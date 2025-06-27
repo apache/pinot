@@ -166,6 +166,19 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     );
   }
 
+  @Test
+  public void testStartTimeEqualsEndTimeQuery() {
+    String query = String.format(
+      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        + " | max{%s} | transformNull{0} | keepLastValue{}",
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    JsonNode result = getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_START_TIME_SEC, getHeaders());
+    assertEquals(result.get("status").asText(), "success");
+    JsonNode series = result.get("data").get("result");
+    assertEquals(series.size(), 0);
+  }
+
   protected Map<String, String> getHeaders() {
     return Collections.emptyMap();
   }

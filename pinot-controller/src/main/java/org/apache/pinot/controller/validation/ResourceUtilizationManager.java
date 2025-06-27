@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.validation;
 
+import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.slf4j.Logger;
@@ -28,15 +29,16 @@ public class ResourceUtilizationManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUtilizationManager.class);
 
   private final boolean _isResourceUtilizationCheckEnabled;
-  private final DiskUtilizationChecker _diskUtilizationChecker;
+  private final List<UtilizationChecker> _utilizationCheckers;
 
-  public ResourceUtilizationManager(ControllerConf controllerConf, DiskUtilizationChecker diskUtilizationChecker) {
+  public ResourceUtilizationManager(ControllerConf controllerConf, List<UtilizationChecker> utilizationCheckers) {
     _isResourceUtilizationCheckEnabled = controllerConf.isResourceUtilizationCheckEnabled();
-    LOGGER.info("Resource utilization check is: {}", _isResourceUtilizationCheckEnabled ? "enabled" : "disabled");
-    _diskUtilizationChecker = diskUtilizationChecker;
+    LOGGER.info("Resource utilization check is: {}, with {} resource utilization checkers",
+        _isResourceUtilizationCheckEnabled ? "enabled" : "disabled", utilizationCheckers.size());
+    _utilizationCheckers = utilizationCheckers;
   }
 
-  public boolean isResourceUtilizationWithinLimits(String tableNameWithType) {
+  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, UtilizationChecker.CheckPurpose purpose) {
     if (!_isResourceUtilizationCheckEnabled) {
       return true;
     }
@@ -44,6 +46,16 @@ public class ResourceUtilizationManager {
       throw new IllegalArgumentException("Table name found to be null or empty while checking resource utilization.");
     }
     LOGGER.info("Checking resource utilization for table: {}", tableNameWithType);
-    return _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableNameWithType);
+    boolean overallIsResourceUtilizationWithinLimits = true;
+    for (UtilizationChecker utilizationChecker : _utilizationCheckers) {
+      boolean isResourceUtilizationWithinLimits =
+          utilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType, purpose);
+      LOGGER.info("For utilization checker: {}, isResourceUtilizationWithinLimits: {}, purpose: {}",
+          utilizationChecker.getName(), isResourceUtilizationWithinLimits, purpose);
+      if (!isResourceUtilizationWithinLimits) {
+        overallIsResourceUtilizationWithinLimits = false;
+      }
+    }
+    return overallIsResourceUtilizationWithinLimits;
   }
 }

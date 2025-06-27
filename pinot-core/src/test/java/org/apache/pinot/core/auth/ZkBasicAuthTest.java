@@ -18,8 +18,11 @@
  */
 package org.apache.pinot.core.auth;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
 import org.testng.Assert;
@@ -28,41 +31,46 @@ import org.testng.annotations.Test;
 
 public class ZkBasicAuthTest {
 
-    @Test
-    public void testBasicAuthPrincipal() {
-        Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
-          ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
-            Collections.emptySet(), ImmutableSet.of("READ")).hasTable("myTable"));
-        Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
-          ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable", "myTable1"),
-            Collections.emptySet(), ImmutableSet.of("Read")).hasTable("myTable1"));
-        Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
-          ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
-            Collections.emptySet(), ImmutableSet.of("read")).hasTable("myTable1"));
-        Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
-          ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable", "myTable1"),
-            Collections.emptySet(), ImmutableSet.of("read")).hasTable("myTable2"));
-        Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
-            ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable", "myTable1"),
-            ImmutableSet.of("myTable3"), ImmutableSet.of("Read")).hasTable("myTable3"));
-        Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
-            ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable", "myTable1"),
-            ImmutableSet.of("myTable"), ImmutableSet.of("read")).hasTable("myTable1"));
-        Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
-            ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), Collections.emptySet(),
-            ImmutableSet.of("myTable"), ImmutableSet.of("read")).hasTable("myTable"));
+  @Test
+  public void testBasicAuthPrincipal() {
+    Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
+        Collections.emptySet(), ImmutableSet.of("READ")).hasTable("myTable"));
+    Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable", "myTable1"),
+        Collections.emptySet(), ImmutableSet.of("Read")).hasTable("myTable1"));
+    Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
+        Collections.emptySet(), ImmutableSet.of("read")).hasTable("myTable1"));
+    Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable", "myTable1"),
+        Collections.emptySet(), ImmutableSet.of("read")).hasTable("myTable2"));
+    Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable", "myTable1"),
+        ImmutableSet.of("myTable3"), ImmutableSet.of("Read")).hasTable("myTable3"));
+    Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable", "myTable1"),
+        ImmutableSet.of("myTable"), ImmutableSet.of("read")).hasTable("myTable1"));
+    Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), Collections.emptySet(),
+        ImmutableSet.of("myTable"), ImmutableSet.of("read")).hasTable("myTable"));
 
-        Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
-          ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
-            Collections.emptySet(), ImmutableSet.of("READ")).hasPermission("read"));
-        Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
-          ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
-            Collections.emptySet(), ImmutableSet.of("Read")).hasPermission("READ"));
-        Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
-          ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
-            Collections.emptySet(), ImmutableSet.of("read")).hasPermission("Read"));
-        Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
-          ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
-            Collections.emptySet(), ImmutableSet.of("read")).hasPermission("write"));
-    }
+    Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
+        Collections.emptySet(), ImmutableSet.of("READ")).hasPermission("read"));
+    Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
+        Collections.emptySet(), ImmutableSet.of("Read")).hasPermission("READ"));
+    Assert.assertTrue(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
+        Collections.emptySet(), ImmutableSet.of("read")).hasPermission("Read"));
+    Assert.assertFalse(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
+        Collections.emptySet(), ImmutableSet.of("read")).hasPermission("write"));
+
+    Assert.assertEquals(new ZkBasicAuthPrincipal("name", "token", "password",
+        ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
+        Collections.emptySet(), ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100"))).getRLSFilters(
+        "myTable").get(), ImmutableList.of("cityID > 100"));
+  }
 }

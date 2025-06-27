@@ -36,7 +36,7 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 /**
  * Filter operator for supporting the execution of text search
- * queries: WHERE TEXT_MATCH(column_name, query_string....)
+ * queries: WHERE TEXT_MATCH(column_name, query_string, options_string)
  */
 public class TextMatchFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_TEXT_INDEX";
@@ -64,9 +64,10 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     if (_textIndexReader.isMultiColumn()) {
       return new BitmapDocIdSet(
-          ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue()), _numDocs);
+          ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
+              _predicate.getOptions()), _numDocs);
     } else {
-      return new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue()), _numDocs);
+      return new BitmapDocIdSet(_textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions()), _numDocs);
     }
   }
 
@@ -78,9 +79,10 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   @Override
   public int getNumMatchingDocs() {
     if (_textIndexReader.isMultiColumn()) {
-      return ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue()).getCardinality();
+      return ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
+          _predicate.getOptions()).getCardinality();
     } else {
-      return _textIndexReader.getDocIds(_predicate.getValue()).getCardinality();
+      return _textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions()).getCardinality();
     }
   }
 
@@ -92,8 +94,9 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   @Override
   public BitmapCollection getBitmaps() {
     ImmutableRoaringBitmap bitmap = _textIndexReader.isMultiColumn()
-        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue())
-        : _textIndexReader.getDocIds(_predicate.getValue());
+        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate.getValue(),
+        _predicate.getOptions()) : _textIndexReader.getDocIds(_predicate.getValue(), _predicate.getOptions());
+
     record(bitmap);
     return new BitmapCollection(_numDocs, false, bitmap);
   }

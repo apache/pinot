@@ -185,7 +185,8 @@ public class TraitAssignment {
                 windowGroupCollation, null /* offset */, null /* fetch */, sort, _planIdGenerator.get(),
                 null /* pinot data distribution */, false /* leaf stage */);
           } else {
-            input = input.copy(input.getTraitSet().plus(RelDistributions.SINGLETON), input.getInputs());
+            input = input.copy(input.getTraitSet().plus(RelDistributions.SINGLETON).plus(windowGroupCollation),
+                input.getInputs());
           }
         } else {
           RelTraitSet newTraitSet = input.getTraitSet().plus(RelDistributions.SINGLETON)

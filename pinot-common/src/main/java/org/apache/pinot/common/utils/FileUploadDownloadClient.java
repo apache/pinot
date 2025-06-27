@@ -729,6 +729,29 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   /**
+   * Upload segment with segment file using default settings. Include table name and type as a request parameters.
+   *
+   * @param uri URI
+   * @param segmentName Segment name
+   * @param segmentFile Segment file
+   * @param headers Optional http headers
+   * @param tableName Table name with or without type suffix
+   * @param tableType Table type
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse uploadSegment(URI uri, String segmentName, File segmentFile, List<Header> headers,
+    String tableName, TableType tableType)
+    throws IOException, HttpErrorStatusException {
+    // Add table name and type request parameters
+    NameValuePair tableNameValuePair = new BasicNameValuePair(QueryParameters.TABLE_NAME, tableName);
+    NameValuePair tableTypeValuePair = new BasicNameValuePair(QueryParameters.TABLE_TYPE, tableType.name());
+    List<NameValuePair> parameters = Arrays.asList(tableNameValuePair, tableTypeValuePair);
+    return uploadSegment(uri, segmentName, segmentFile, headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
+  }
+
+  /**
    * Upload segment with segment file using  table name, type, enableParallelPushProtection and allowRefresh as
    * request parameters.
    *

@@ -85,8 +85,8 @@ public class LiteModeSortInsertRule extends PRelOptRule {
       PhysicalAggregate aggregate = (PhysicalAggregate) call._currentNode;
       Preconditions.checkState(aggregate.getLimit() <= DEFAULT_SERVER_STAGE_LIMIT,
           "Group trim limit={} exceeds server stage limit={}", aggregate.getLimit(), DEFAULT_SERVER_STAGE_LIMIT);
-      // TODO(mse-physical): This resets the limit to server stage limit. Should we stick with group-trim limit?
-      return aggregate.withLimit(DEFAULT_SERVER_STAGE_LIMIT);
+      int limit = aggregate.getLimit() > 0 ? aggregate.getLimit() : DEFAULT_SERVER_STAGE_LIMIT;
+      return aggregate.withLimit(limit);
     }
     PRelNode input = call._currentNode;
     return new PhysicalSort(input.unwrap().getCluster(), RelTraitSet.createEmpty(), List.of(),

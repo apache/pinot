@@ -225,6 +225,10 @@ public class ControllerRequestURLBuilder {
         + "&minAvailableReplicas=" + minAvailableReplicas;
   }
 
+  public String forTableConsumingSegmentsInfo(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "consumingSegmentsInfo");
+  }
+
   public String forTableForceCommit(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "forceCommit");
   }

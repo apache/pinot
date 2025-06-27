@@ -20,6 +20,7 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.collect.BiMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -45,18 +46,18 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
 
   private final PoolingHttpClientConnectionManager _connectionManager;
   private final ControllerMetrics _controllerMetrics;
-  private final DiskUtilizationChecker _diskUtilizationChecker;
+  private final List<UtilizationChecker> _utilizationCheckers;
   private final Executor _executor;
   private final PinotHelixResourceManager _helixResourceManager;
 
   public ResourceUtilizationChecker(ControllerConf config, PoolingHttpClientConnectionManager connectionManager,
-      ControllerMetrics controllerMetrics, DiskUtilizationChecker diskUtilizationChecker, Executor executor,
+      ControllerMetrics controllerMetrics, List<UtilizationChecker> utilizationCheckers, Executor executor,
       PinotHelixResourceManager pinotHelixResourceManager) {
     super(TASK_NAME, config.getResourceUtilizationCheckerFrequency(),
         config.getResourceUtilizationCheckerInitialDelay());
     _connectionManager = connectionManager;
     _controllerMetrics = controllerMetrics;
-    _diskUtilizationChecker = diskUtilizationChecker;
+    _utilizationCheckers = utilizationCheckers;
     _executor = executor;
     _helixResourceManager = pinotHelixResourceManager;
   }
@@ -77,7 +78,10 @@ public class ResourceUtilizationChecker extends BasePeriodicTask {
       BiMap<String, String> endpointsToInstances = instanceAdminEndpoints.inverse();
       CompletionServiceHelper completionServiceHelper =
           new CompletionServiceHelper(_executor, _connectionManager, endpointsToInstances);
-      _diskUtilizationChecker.computeDiskUtilization(endpointsToInstances, completionServiceHelper);
+      for (UtilizationChecker utilizationChecker : _utilizationCheckers) {
+        LOGGER.debug("Computing resource utilization for checker: {}", utilizationChecker.getName());
+        utilizationChecker.computeResourceUtilization(endpointsToInstances, completionServiceHelper);
+      }
     } catch (Exception e) {
       LOGGER.error("Caught exception while running task: {}", _taskName, e);
       _controllerMetrics.addMeteredTableValue(_taskName, ControllerMeter.CONTROLLER_PERIODIC_TASK_ERROR, 1L);

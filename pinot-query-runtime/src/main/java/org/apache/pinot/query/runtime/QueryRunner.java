@@ -86,6 +86,7 @@ import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOver
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.apache.pinot.spi.utils.CommonConstants.Query.Request.MetadataKeys;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerRequestMetadataKeys;
 import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerResponseMetadataKeys;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
@@ -142,86 +143,84 @@ public class QueryRunner {
    * Initializes the query executor.
    * <p>Should be called only once and before calling any other method.
    */
-  public void init(PinotConfiguration config, InstanceDataManager instanceDataManager, @Nullable TlsConfig tlsConfig,
-      BooleanSupplier sendStats) {
-    String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+  public void init(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
+      @Nullable TlsConfig tlsConfig, BooleanSupplier sendStats) {
+    String hostname = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE)) {
       hostname = hostname.substring(CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH);
     }
-    int port = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+    int port = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
 
     // TODO: Consider using separate config for intermediate stage and leaf stage
-    String numGroupsLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
+    String numGroupsLimitStr = serverConf.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT);
     _numGroupsLimit = numGroupsLimitStr != null ? Integer.parseInt(numGroupsLimitStr) : null;
 
-    String numGroupsWarnLimitStr = config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT);
+    String numGroupsWarnLimitStr = serverConf.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT);
     _numGroupsWarningLimit = numGroupsWarnLimitStr != null ? Integer.parseInt(numGroupsWarnLimitStr) : null;
 
-    String mseMinGroupTrimSizeStr = config.getProperty(Server.CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE);
+    String mseMinGroupTrimSizeStr = serverConf.getProperty(Server.CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE);
     _mseMinGroupTrimSize = mseMinGroupTrimSizeStr != null ? Integer.parseInt(mseMinGroupTrimSizeStr) : null;
 
     String maxInitialGroupHolderCapacity =
-        config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+        serverConf.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _maxInitialResultHolderCapacity =
         maxInitialGroupHolderCapacity != null ? Integer.parseInt(maxInitialGroupHolderCapacity) : null;
 
     String minInitialIndexedTableCapacityStr =
-        config.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
+        serverConf.getProperty(Server.CONFIG_OF_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY);
     _minInitialIndexedTableCapacity =
         minInitialIndexedTableCapacityStr != null ? Integer.parseInt(minInitialIndexedTableCapacityStr) : null;
 
     String mseMaxInitialGroupHolderCapacity =
-        config.getProperty(Server.CONFIG_OF_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
+        serverConf.getProperty(Server.CONFIG_OF_MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY);
     _mseMaxInitialResultHolderCapacity =
         mseMaxInitialGroupHolderCapacity != null ? Integer.parseInt(mseMaxInitialGroupHolderCapacity) : null;
 
-    String maxRowsInJoinStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
+    String maxRowsInJoinStr = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_JOIN);
     _maxRowsInJoin = maxRowsInJoinStr != null ? Integer.parseInt(maxRowsInJoinStr) : null;
 
-    String joinOverflowModeStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
+    String joinOverflowModeStr =
+        serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_JOIN_OVERFLOW_MODE);
     _joinOverflowMode = joinOverflowModeStr != null ? JoinOverFlowMode.valueOf(joinOverflowModeStr) : null;
 
-    String maxRowsInWindowStr = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_WINDOW);
+    String maxRowsInWindowStr = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_ROWS_IN_WINDOW);
     _maxRowsInWindow = maxRowsInWindowStr != null ? Integer.parseInt(maxRowsInWindowStr) : null;
 
     String windowOverflowModeStr =
-        config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
+        serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_WINDOW_OVERFLOW_MODE);
     _windowOverflowMode = windowOverflowModeStr != null ? WindowOverFlowMode.valueOf(windowOverflowModeStr) : null;
 
-    ExecutorService baseExecutorService = ExecutorServiceUtils.create(
-        config,
-        Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX,
-        "query-runner-on-" + port,
-        Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE
-    );
+    ExecutorService baseExecutorService =
+        ExecutorServiceUtils.create(serverConf, Server.MULTISTAGE_EXECUTOR_CONFIG_PREFIX, "query-runner-on-" + port,
+            Server.DEFAULT_MULTISTAGE_EXECUTOR_TYPE);
 
     ServerMetrics serverMetrics = ServerMetrics.get();
-    MetricsExecutor metricsExecutor = new MetricsExecutor(
-        baseExecutorService,
+    MetricsExecutor metricsExecutor = new MetricsExecutor(baseExecutorService,
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_STARTED_TASKS),
         serverMetrics.getMeteredValue(ServerMeter.MULTI_STAGE_RUNNER_COMPLETED_TASKS));
     _executorService = MseWorkerThreadContext.contextAwareExecutorService(
-        QueryThreadContext.contextAwareExecutorService(metricsExecutor)
-    );
+        QueryThreadContext.contextAwareExecutorService(metricsExecutor));
 
-    int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(config);
+    int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(serverConf);
     if (hardLimit > 0) {
+      LOGGER.info("Setting multi-stage executor hardLimit: {}", hardLimit);
       _executorService = new HardLimitExecutor(hardLimit, _executorService);
     }
 
-    _opChainScheduler = new OpChainSchedulerService(_executorService, config);
-    _mailboxService = new MailboxService(hostname, port, config, tlsConfig);
+    _opChainScheduler = new OpChainSchedulerService(_executorService, serverConf);
+    _mailboxService = new MailboxService(hostname, port, serverConf, tlsConfig);
     try {
       _leafQueryExecutor = new ServerQueryExecutorV1Impl();
-      _leafQueryExecutor.init(config.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager, serverMetrics);
+      _leafQueryExecutor.init(serverConf.subset(Server.QUERY_EXECUTOR_CONFIG_PREFIX), instanceDataManager,
+          serverMetrics);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-    if (StringUtils.isNotBlank(config.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
-      _timeSeriesPhysicalPlanVisitor = new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService,
-          serverMetrics);
-      TimeSeriesBuilderFactoryProvider.init(config);
+    if (StringUtils.isNotBlank(serverConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
+      _timeSeriesPhysicalPlanVisitor =
+          new PhysicalTimeSeriesServerPlanVisitor(_leafQueryExecutor, _executorService, serverMetrics);
+      TimeSeriesBuilderFactoryProvider.init(serverConf);
     }
 
     _sendStats = sendStats;
@@ -282,8 +281,10 @@ public class QueryRunner {
         _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
-      opChain = ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan,
-          _leafQueryExecutor, _executorService);
+      Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
+      opChain =
+          ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
+              rlsFilters);
     } else {
       opChain = PlanNodeToOpChain.convert(stagePlan.getRootNode(), executionContext);
     }
@@ -315,8 +316,9 @@ public class QueryRunner {
     for (RoutingInfo routingInfo : routingInfos) {
       try {
         StatMap<MailboxSendOperator.StatKey> statMap = new StatMap<>(MailboxSendOperator.StatKey.class);
-        SendingMailbox sendingMailbox = _mailboxService.getSendingMailbox(routingInfo.getHostname(),
-            routingInfo.getPort(), routingInfo.getMailboxId(), deadlineMs, statMap);
+        SendingMailbox sendingMailbox =
+            _mailboxService.getSendingMailbox(routingInfo.getHostname(), routingInfo.getPort(),
+                routingInfo.getMailboxId(), deadlineMs, statMap);
         // TODO: Here we are breaking the stats invariants, sending errors without including the stats of the
         //  current stage. We will need to fix this in future, but for now, we are sending the error block without
         //  the stats.
@@ -346,8 +348,8 @@ public class QueryRunner {
         String planId = pair.getRight();
         Map<String, String> errorMetadata = new HashMap<>();
         errorMetadata.put(WorkerResponseMetadataKeys.ERROR_TYPE, t.getClass().getSimpleName());
-        errorMetadata.put(WorkerResponseMetadataKeys.ERROR_MESSAGE, t.getMessage() == null
-            ? "Unknown error: no message" : t.getMessage());
+        errorMetadata.put(WorkerResponseMetadataKeys.ERROR_MESSAGE,
+            t.getMessage() == null ? "Unknown error: no message" : t.getMessage());
         errorMetadata.put(WorkerResponseMetadataKeys.PLAN_ID, planId);
         // TODO(timeseries): remove logging for failed queries.
         LOGGER.warn("time-series query failed:", t);
@@ -366,11 +368,11 @@ public class QueryRunner {
       Preconditions.checkState(System.currentTimeMillis() < deadlineMs,
           "Query timed out before getting processed in server. Exceeded time by (ms): %s",
           System.currentTimeMillis() - deadlineMs);
-      List<BaseTimeSeriesPlanNode> fragmentRoots = serializedPlanFragments.stream()
-          .map(TimeSeriesPlanSerde::deserialize).collect(Collectors.toList());
-      TimeSeriesExecutionContext context = new TimeSeriesExecutionContext(
-          metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata), deadlineMs, metadata,
-          extractPlanToSegmentMap(metadata), Collections.emptyMap());
+      List<BaseTimeSeriesPlanNode> fragmentRoots =
+          serializedPlanFragments.stream().map(TimeSeriesPlanSerde::deserialize).collect(Collectors.toList());
+      TimeSeriesExecutionContext context =
+          new TimeSeriesExecutionContext(metadata.get(WorkerRequestMetadataKeys.LANGUAGE), extractTimeBuckets(metadata),
+              deadlineMs, metadata, extractPlanToSegmentMap(metadata), Collections.emptyMap());
       final List<BaseTimeSeriesOperator> fragmentOpChains = fragmentRoots.stream().map(x -> {
         return _timeSeriesPhysicalPlanVisitor.compile(x, context);
       }).collect(Collectors.toList());
@@ -493,9 +495,8 @@ public class QueryRunner {
     return _opChainScheduler.cancel(requestId);
   }
 
-  public StagePlan explainQuery(
-      WorkerMetadata workerMetadata, StagePlan stagePlan, Map<String, String> requestMetadata) {
-
+  public StagePlan explainQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> requestMetadata) {
     if (!workerMetadata.isLeafStageWorker()) {
       LOGGER.debug("Explain query on intermediate stages is a NOOP");
       return stagePlan;
@@ -525,7 +526,7 @@ public class QueryRunner {
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,
-            leafNodesConsumer, true);
+            leafNodesConsumer, true, Map.of());
     opChain.close(); // probably unnecessary, but formally needed
 
     PlanNode rootNode = substituteNode(stagePlan.getRootNode(), leafNodes);

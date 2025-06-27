@@ -8,7 +8,6 @@
     "retentionTimeValue": "5",
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "schemaName",
     "replication": "3",
     "replicasPerPartition": "1"
   },

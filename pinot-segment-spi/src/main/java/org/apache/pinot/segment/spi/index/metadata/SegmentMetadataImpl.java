@@ -50,7 +50,6 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.MetadataKeys.Segment;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.IndexService;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextIndexConstants;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants;
@@ -75,7 +74,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentMetadataImpl.class);
 
   private final File _indexDir;
-  private final TreeMap<String, ColumnMetadata> _columnMetadataMap;
+  private final TreeMap<String, ColumnMetadataImpl> _columnMetadataMap;
   private String _segmentName;
   private final Schema _schema;
   private long _crc = Long.MIN_VALUE;
@@ -237,8 +236,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     // Build column metadata map and schema.
     for (String column : physicalColumns) {
-      ColumnMetadata columnMetadata =
-          ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadata);
+      ColumnMetadataImpl columnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration(column, segmentMetadata);
       _columnMetadataMap.put(column, columnMetadata);
       _schema.addField(columnMetadata.getFieldSpec());
     }
@@ -248,13 +246,15 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     if (_segmentVersion == SegmentVersion.v3) {
       File indexMapFile = new File(_indexDir, "v3" + File.separator + V1Constants.INDEX_MAP_FILE_NAME);
       if (indexMapFile.exists()) {
+        IndexService indexService = IndexService.getInstance();
+
         PropertiesConfiguration mapConfig = CommonsConfigurationUtils.fromFile(indexMapFile);
         for (String key : CommonsConfigurationUtils.getKeys(mapConfig)) {
           try {
             String[] parsedKeys = ColumnIndexUtils.parseIndexMapKeys(key, _indexDir.getPath());
             if (parsedKeys[2].equals(ColumnIndexUtils.MAP_KEY_NAME_SIZE)) {
-              IndexType<?, ?, ?> indexType = IndexService.getInstance().get(parsedKeys[1]);
-              _columnMetadataMap.get(parsedKeys[0]).getIndexSizeMap().put(indexType, mapConfig.getLong(key));
+              short indexType = indexService.getNumericId(parsedKeys[1]);
+              _columnMetadataMap.get(parsedKeys[0]).addIndexSize(indexType, mapConfig.getLong(key));
             }
           } catch (Exception e) {
             LOGGER.debug("Unable to load index metadata in {} for {}!", indexMapFile, key, e);
@@ -451,7 +451,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
   @Override
   public TreeMap<String, ColumnMetadata> getColumnMetadataMap() {
-    return _columnMetadataMap;
+    return (TreeMap<String, ColumnMetadata>) (TreeMap<String, ?>) _columnMetadataMap;
   }
 
   @Override
@@ -503,7 +503,7 @@ public class SegmentMetadataImpl implements SegmentMetadata {
 
     if (_columnMetadataMap != null) {
       ArrayNode columnsMetadata = JsonUtils.newArrayNode();
-      for (Map.Entry<String, ColumnMetadata> entry : _columnMetadataMap.entrySet()) {
+      for (Map.Entry<String, ColumnMetadataImpl> entry : _columnMetadataMap.entrySet()) {
         if (columnFilter == null || columnFilter.contains(entry.getKey())) {
           columnsMetadata.add(JsonUtils.objectToJsonNode(entry.getValue()));
         }

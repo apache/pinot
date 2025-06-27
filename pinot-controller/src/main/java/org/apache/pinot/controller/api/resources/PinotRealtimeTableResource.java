@@ -72,15 +72,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
 
-@Api(tags = Constants.TABLE_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TABLE_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotRealtimeTableResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotRealtimeTableResource.class);
@@ -147,7 +150,7 @@ public class PinotRealtimeTableResource {
     if (consumeFrom != null && !consumeFrom.equalsIgnoreCase("smallest") && !consumeFrom.equalsIgnoreCase("largest")) {
       throw new ControllerApplicationException(LOGGER,
           String.format("consumeFrom param '%s' is not valid. Valid values are 'lastConsumed', 'smallest' and "
-                  + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
+              + "'largest'.", consumeFrom), Response.Status.BAD_REQUEST);
     }
     try {
       return Response.ok(_pinotLLCRealtimeSegmentManager.resumeConsumption(tableNameWithType, consumeFrom,
@@ -174,14 +177,16 @@ public class PinotRealtimeTableResource {
       String partitionGroupIds,
       @ApiParam(value = "Comma separated list of consuming segments to be committed") @QueryParam("segments")
       String consumingSegments,
-      @ApiParam(value = "Max number of consuming segments to commit at once (default = Integer.MAX_VALUE)")
-      @QueryParam("batchSize") @DefaultValue(Integer.MAX_VALUE + "") int batchSize,
+      @ApiParam(value = "Max number of consuming segments to commit at once")
+      @QueryParam("batchSize") @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "") int batchSize,
       @ApiParam(value = "How often to check whether the current batch of segments have been successfully committed or"
-          + " not (default = 5)")
-      @QueryParam("batchStatusCheckIntervalSec") @DefaultValue("5") int batchStatusCheckIntervalSec,
+          + " not")
+      @QueryParam("batchStatusCheckIntervalSec")
+      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC + "") int batchStatusCheckIntervalSec,
       @ApiParam(value = "Timeout based on which the controller will stop checking the forceCommit status of the batch"
-          + " of segments and throw an exception. (default = 180)")
-      @QueryParam("batchStatusCheckTimeoutSec") @DefaultValue("180") int batchStatusCheckTimeoutSec,
+          + " of segments and throw an exception")
+      @QueryParam("batchStatusCheckTimeoutSec")
+      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC + "") int batchStatusCheckTimeoutSec,
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     if (partitionGroupIds != null && consumingSegments != null) {
@@ -206,7 +211,7 @@ public class PinotRealtimeTableResource {
       try {
         String jobId = UUID.randomUUID().toString();
         if (!_pinotHelixResourceManager.addNewForceCommitJob(tableNameWithType, jobId, startTimeMs,
-                consumingSegmentsForceCommitted)) {
+            consumingSegmentsForceCommitted)) {
           throw new IllegalStateException("Failed to update table jobs ZK metadata");
         }
         response.put("jobMetaZKWriteStatus", "SUCCESS");

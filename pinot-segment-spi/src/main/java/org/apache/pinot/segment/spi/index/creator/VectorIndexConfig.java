@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.spi.index.creator;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -65,6 +67,21 @@ public class VectorIndexConfig extends IndexConfig {
     _vectorDistanceFunction = properties.containsKey(VECTOR_DISTANCE_FUNCTION) ? VectorDistanceFunction.valueOf(
         properties.get(VECTOR_DISTANCE_FUNCTION)) : DEFAULT_VECTOR_DISTANCE_FUNCTION;
     _version = Integer.parseInt(properties.getOrDefault(VERSION, DEFAULT_VERSION));
+    _properties = properties;
+  }
+
+  @JsonCreator
+  public VectorIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
+      @JsonProperty("vectorIndexType") @Nullable String vectorIndexType,
+      @JsonProperty("vectorDimension") int vectorDimension,
+      @JsonProperty("version") int version,
+      @JsonProperty("vectorDistanceFunction") @Nullable VectorDistanceFunction vectorDistanceFunction,
+      @JsonProperty("properties") @Nullable Map<String, String> properties) {
+    super(disabled);
+    _vectorIndexType = vectorIndexType;
+    _vectorDimension = vectorDimension;
+    _version = version;
+    _vectorDistanceFunction = vectorDistanceFunction;
     _properties = properties;
   }
 

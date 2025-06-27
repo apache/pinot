@@ -684,9 +684,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
             _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
 
             int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
-            realtimeBytesIngestedMeter =
-                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
-                    recordSerializedValueLength, realtimeBytesIngestedMeter);
+            if (recordSerializedValueLength > 0) {
+              realtimeBytesIngestedMeter =
+                  _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
+                      recordSerializedValueLength, realtimeBytesIngestedMeter);
+              _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
+            }
           } catch (Exception e) {
             _numRowsErrored++;
             _numBytesDropped += rowSizeInBytes;

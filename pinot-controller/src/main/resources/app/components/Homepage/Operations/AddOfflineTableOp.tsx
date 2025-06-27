@@ -65,7 +65,6 @@ const defaultTableObj = {
     "server": "DefaultTenant"
   },
   "segmentsConfig": {
-    "schemaName": "",
     "timeColumnName": null,
     "replication": "1",
     "replicasPerPartition": "1",

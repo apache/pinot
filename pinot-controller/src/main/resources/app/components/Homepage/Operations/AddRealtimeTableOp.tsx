@@ -68,7 +68,6 @@ const defaultTableObj = {
     "tagOverrideConfig": {}
   },
   "segmentsConfig": {
-    "schemaName": "",
     "timeColumnName": null,
     "replication": "1",
     "replicasPerPartition": "1",
@@ -102,7 +101,7 @@ const defaultTableObj = {
       "stream.kafka.broker.list": "",
       "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
       "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
+      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
       "realtime.segment.flush.threshold.rows": "0",
       "realtime.segment.flush.threshold.segment.rows": "0",
       "realtime.segment.flush.threshold.time": "24h",

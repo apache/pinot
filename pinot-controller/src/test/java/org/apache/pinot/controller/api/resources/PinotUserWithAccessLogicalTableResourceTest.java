@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.controller.helix.ControllerRequestClient;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.testng.annotations.AfterMethod;
@@ -58,12 +57,8 @@ public class PinotUserWithAccessLogicalTableResourceTest extends ControllerTest 
   }
 
   @Override
-  public ControllerRequestClient getControllerRequestClient() {
-    if (_controllerRequestClient == null) {
-      _controllerRequestClient =
-          new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(), AUTH_HEADER);
-    }
-    return _controllerRequestClient;
+  protected Map<String, String> getControllerRequestClientHeaders() {
+    return AUTH_HEADER;
   }
 
   private void setup(Map<String, Object> properties)

@@ -974,9 +974,11 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       FieldConfig fieldConfig = _tableConfig.getFieldConfigList().stream()
           .filter(fc -> fc.getName().equals("dimStr"))
           .collect(Collectors.toList()).get(0);
-      assertNotNull(fieldConfig.getIndexes().get(JsonIndexType.INDEX_DISPLAY_NAME));
       assertNull(_tableConfig.getIndexingConfig().getJsonIndexColumns());
       assertNull(_tableConfig.getIndexingConfig().getJsonIndexConfigs());
+      assertNotNull(fieldConfig.getIndexes().get(JsonIndexType.INDEX_DISPLAY_NAME));
+      assertTrue(fieldConfig.getIndexTypes().isEmpty());
+      assertNull(fieldConfig.getProperties());
     }
   }
 }
