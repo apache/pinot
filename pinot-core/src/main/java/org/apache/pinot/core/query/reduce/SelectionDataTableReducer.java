@@ -67,7 +67,7 @@ public class SelectionDataTableReducer implements DataTableReducer {
       // Selection order-by
       SelectionOperatorService selectionService =
           new SelectionOperatorService(_queryContext, pair.getLeft(), pair.getRight());
-      brokerResponseNative.setResultTable(selectionService.reduceWithOrderingAndRender(dataTableMap.values()));
+      brokerResponseNative.setResultTable(selectionService.reduceWithOrdering(dataTableMap.values()));
     }
   }
 }
