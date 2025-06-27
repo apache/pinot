@@ -18,15 +18,11 @@
  */
 package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
@@ -62,13 +58,11 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
 
   @Override
   public PRelNode execute(PRelNode currentNode) {
-    Set<String> workerSet = new HashSet<>();
     List<String> workers;
     if (_runInBroker) {
       workers = List.of(String.format("0@%s", _context.getInstanceId()));
     } else {
-      accumulateWorkers(currentNode, workerSet);
-      workers = List.of(sampleWorker(new ArrayList<>(workerSet)));
+      workers = List.of(String.format("0@%s", _context.getRandomInstanceId()));
     }
     return addExchangeAndWorkers(currentNode, null, workers);
   }
@@ -97,36 +91,6 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
           null, null, currentNode, nodeId(), sortedPDD, false);
     }
     return currentNode;
-  }
-
-  /**
-   * Stores workers assigned to the leaf stage nodes into the provided Set. Note that each worker has an integer prefix
-   * which denotes the "workerId". We remove that prefix before storing them in the set.
-   */
-  @VisibleForTesting
-  static void accumulateWorkers(PRelNode currentNode, Set<String> workerSink) {
-    if (currentNode.isLeafStage()) {
-      workerSink.addAll(currentNode.getPinotDataDistributionOrThrow().getWorkers().stream()
-          .map(LiteModeWorkerAssignmentRule::stripIdPrefixFromWorker).collect(Collectors.toList()));
-      return;
-    }
-    for (PRelNode input : currentNode.getPRelInputs()) {
-      accumulateWorkers(input, workerSink);
-    }
-  }
-
-  /**
-   * Samples a worker from the given list.
-   */
-  @VisibleForTesting
-  static String sampleWorker(List<String> instanceIds) {
-    Preconditions.checkState(!instanceIds.isEmpty(), "No workers in leaf stage");
-    return String.format("0@%s", instanceIds.get(RANDOM.nextInt(instanceIds.size())));
-  }
-
-  @VisibleForTesting
-  static String stripIdPrefixFromWorker(String worker) {
-    return worker.split("@")[1];
   }
 
   /**
