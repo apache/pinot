@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.MessageBatch;
@@ -41,6 +42,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.stream.UnsupportedOffsetCatchUpCheckException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
@@ -285,6 +287,21 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         .stream()
         .map(streamName -> new KinesisTopicMetadata().setName(streamName))
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public boolean isOffsetCaughtUp(@Nullable StreamPartitionMsgOffset currentOffset,
+      @Nullable StreamPartitionMsgOffset latestOffset)
+      throws UnsupportedOffsetCatchUpCheckException {
+    if (currentOffset != null && latestOffset != null) {
+      KinesisPartitionGroupOffset latestPartitionGroupOffset = ((KinesisPartitionGroupOffset) latestOffset);
+      if (latestPartitionGroupOffset.getSequenceNumber() == null) {
+        // Cannot conclude if offset has caught up or not. Throw custom exception so that caller can handle accordingly.
+        throw new UnsupportedOffsetCatchUpCheckException("Sequence number in latestPartitionGroupOffset is null.");
+      }
+      return currentOffset.compareTo(latestOffset) >= 0;
+    }
+    return false;
   }
 
   public static class KinesisTopicMetadata implements TopicMetadata {

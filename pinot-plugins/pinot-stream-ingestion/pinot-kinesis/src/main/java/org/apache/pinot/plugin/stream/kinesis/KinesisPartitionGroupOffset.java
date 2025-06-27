@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.JsonUtils;
 
@@ -39,9 +40,10 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
   private final String _shardId;
+  @Nullable
   private final String _sequenceNumber;
 
-  public KinesisPartitionGroupOffset(String shardId, String sequenceNumber) {
+  public KinesisPartitionGroupOffset(String shardId, @Nullable String sequenceNumber) {
     _shardId = shardId;
     _sequenceNumber = sequenceNumber;
   }
@@ -62,6 +64,7 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
     return _shardId;
   }
 
+  @Nullable
   public String getSequenceNumber() {
     return _sequenceNumber;
   }
@@ -73,6 +76,9 @@ public class KinesisPartitionGroupOffset implements StreamPartitionMsgOffset {
 
   @Override
   public int compareTo(StreamPartitionMsgOffset other) {
-    return _sequenceNumber.compareTo(((KinesisPartitionGroupOffset) other)._sequenceNumber);
+    KinesisPartitionGroupOffset otherKinesisPartitionGroupOffset = ((KinesisPartitionGroupOffset) other);
+    assert otherKinesisPartitionGroupOffset.getSequenceNumber() != null;
+    assert _sequenceNumber != null;
+    return _sequenceNumber.compareTo(otherKinesisPartitionGroupOffset.getSequenceNumber());
   }
 }

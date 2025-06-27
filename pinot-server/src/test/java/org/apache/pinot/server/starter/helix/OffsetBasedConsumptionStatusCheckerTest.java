@@ -26,8 +26,10 @@ import java.util.Set;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
+import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMetadataProvider;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -64,6 +66,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
+    when(segMngrA0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrA1.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrB0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     when(segMngrA0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(15));
     when(segMngrA1.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(150));
     when(segMngrB0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(1500));
@@ -114,6 +119,8 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     // setup some SegmentDataManagers
     RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
+    when(segMngrA0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrA1.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
 
@@ -139,6 +146,7 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(200));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(1000));
     when(segMngrB0.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(1500));
+    when(segMngrB0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
 
     //           latest ingested offset     latest stream offset
@@ -175,6 +183,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
+    when(segMngrA0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrA1.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrB0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -230,6 +241,9 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     RealtimeSegmentDataManager segMngrA0 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrA1 = mock(RealtimeSegmentDataManager.class);
     RealtimeSegmentDataManager segMngrB0 = mock(RealtimeSegmentDataManager.class);
+    when(segMngrA0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrA1.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    when(segMngrB0.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
     when(tableDataManagerA.acquireSegment(segA0)).thenReturn(segMngrA0);
     when(tableDataManagerA.acquireSegment(segA1)).thenReturn(segMngrA1);
     when(tableDataManagerB.acquireSegment(segB0)).thenReturn(segMngrB0);
@@ -263,5 +277,28 @@ public class OffsetBasedConsumptionStatusCheckerTest {
     when(segMngrA1.getCurrentOffset()).thenReturn(new LongMsgOffset(300));
     when(segMngrB0.getCurrentOffset()).thenReturn(new LongMsgOffset(3000));
     assertEquals(statusChecker.getNumConsumingSegmentsNotReachedIngestionCriteria(), 1);
+  }
+
+  @Test
+  public void testIsSegmentCaughtUp() {
+    String segA0 = "tableA__0__0__123Z";
+    String segA1 = "tableA__1__0__123Z";
+    String segB0 = "tableB__0__0__123Z";
+    Map<String, Set<String>> consumingSegments = new HashMap<>();
+    consumingSegments.put("tableA_REALTIME", ImmutableSet.of(segA0, segA1));
+    consumingSegments.put("tableB_REALTIME", ImmutableSet.of(segB0));
+    InstanceDataManager instanceDataManager = mock(InstanceDataManager.class);
+    OffsetBasedConsumptionStatusChecker statusChecker =
+        new OffsetBasedConsumptionStatusChecker(instanceDataManager, consumingSegments,
+            ConsumptionStatusCheckerTestUtils.getConsumingSegments(consumingSegments));
+    RealtimeSegmentDataManager mockRealtimeSegmentDataManager = mock(RealtimeSegmentDataManager.class);
+    when(mockRealtimeSegmentDataManager.getCurrentOffset()).thenReturn(new LongMsgOffset(400));
+    when(mockRealtimeSegmentDataManager.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(500));
+    when(mockRealtimeSegmentDataManager.getPartitionMetadataProvider()).thenReturn(new FakeStreamMetadataProvider());
+    Assert.assertFalse(statusChecker.isSegmentCaughtUp(segA0, mockRealtimeSegmentDataManager));
+
+    when(mockRealtimeSegmentDataManager.getCurrentOffset()).thenReturn(new LongMsgOffset(500));
+    when(mockRealtimeSegmentDataManager.getLatestStreamOffsetAtStartupTime()).thenReturn(new LongMsgOffset(500));
+    Assert.assertTrue(statusChecker.isSegmentCaughtUp(segA0, mockRealtimeSegmentDataManager));
   }
 }
