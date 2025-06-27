@@ -73,10 +73,10 @@ public class SelectionOperatorService {
 
   /** Util class used for n-way merge */
   private static class MergeItem {
-    protected final Object[] _row;
-    protected final int _dataTableId;
+   final Object[] _row;
+   final int _dataTableId;
 
-    public MergeItem(Object[] row, int dataTableId) {
+   MergeItem(Object[] row, int dataTableId) {
       _row = row;
       _dataTableId = dataTableId;
     }
