@@ -270,6 +270,13 @@ public abstract class IndexedTable extends BaseTable {
     return _numResizes;
   }
 
+  public boolean isTrimmed() {
+    // single resize occurs on finish() if there's orderBy
+    // all other re-sizes are triggered by trim size and threshold
+    int min = _topRecords != null && _hasOrderBy ? 1 : 0;
+    return _numResizes > min;
+  }
+
   public long getResizeTimeMs() {
     return TimeUnit.NANOSECONDS.toMillis(_resizeTimeNs);
   }

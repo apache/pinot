@@ -127,6 +127,11 @@ public interface BrokerResponse {
   }
 
   /**
+   * Returns whether groups were trimmed (reduced in size after sorting).
+   */
+  boolean isGroupsTrimmed();
+
+  /**
    * Returns whether the number of groups limit has been reached.
    */
   boolean isNumGroupsLimitReached();

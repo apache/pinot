@@ -70,6 +70,7 @@ public class ExecutionStatsAggregator {
   private long _numSegmentsPrunedByValue = 0L;
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
+  private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
 
@@ -228,6 +229,7 @@ public class ExecutionStatsAggregator {
       _numTotalDocs += Long.parseLong(numTotalDocsString);
     }
 
+    _groupsTrimmed |= Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.GROUPS_TRIMMED.getName()));
     _numGroupsLimitReached |=
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
     _numGroupsWarningLimitReached |=
@@ -252,6 +254,7 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setNumSegmentsProcessed(_numSegmentsProcessed);
     brokerResponseNative.setNumSegmentsMatched(_numSegmentsMatched);
     brokerResponseNative.setTotalDocs(_numTotalDocs);
+    brokerResponseNative.setGroupsTrimmed(_groupsTrimmed);
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
     brokerResponseNative.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
     brokerResponseNative.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);

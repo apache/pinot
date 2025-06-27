@@ -56,7 +56,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools"
+    "pools", "groupsTrimmed"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -72,6 +72,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private ResultTable _resultTable;
   private int _numRowsResultSet = 0;
   private List<QueryProcessingException> _exceptions = new ArrayList<>();
+  private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
   private long _timeUsedMs = 0L;
@@ -202,6 +203,15 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void addException(QueryProcessingException exception) {
     _exceptions.add(exception);
+  }
+
+  @Override
+  public boolean isGroupsTrimmed() {
+    return _groupsTrimmed;
+  }
+
+  public void setGroupsTrimmed(boolean groupsTrimmed) {
+    _groupsTrimmed = groupsTrimmed;
   }
 
   @Override

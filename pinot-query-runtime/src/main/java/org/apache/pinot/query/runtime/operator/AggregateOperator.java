@@ -229,6 +229,10 @@ public class AggregateOperator extends MultiStageOperator {
         return _eosBlock;
       } else {
         MseBlock dataBlock = new RowHeapDataBlock(rows, _resultSchema, _aggFunctions);
+        if (_groupByExecutor.getRowsProcessed() > _groupTrimSize) {
+          _statMap.merge(StatKey.GROUPS_TRIMMED, true);
+        }
+
         if (_groupByExecutor.isNumGroupsLimitReached()) {
           if (_errorOnNumGroupsLimit) {
             _input.earlyTerminate();
@@ -461,6 +465,7 @@ public class AggregateOperator extends MultiStageOperator {
         return true;
       }
     },
+    GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN);
     //@formatter:on

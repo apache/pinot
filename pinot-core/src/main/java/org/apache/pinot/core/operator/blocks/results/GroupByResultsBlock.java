@@ -61,6 +61,7 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   private final Table _table;
   private final QueryContext _queryContext;
 
+  private boolean _groupsTrimmed;
   private boolean _numGroupsLimitReached;
   private boolean _numGroupsWarningLimitReached;
   private int _numResizes;
@@ -140,6 +141,14 @@ public class GroupByResultsBlock extends BaseResultsBlock {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  public boolean isGroupsTrimmed() {
+    return _groupsTrimmed;
+  }
+
+  public void setGroupsTrimmed(boolean groupsTrimmed) {
+    _groupsTrimmed = groupsTrimmed;
   }
 
   public boolean isNumGroupsWarningLimitReached() {
@@ -336,6 +345,9 @@ public class GroupByResultsBlock extends BaseResultsBlock {
   @Override
   public Map<String, String> getResultsMetadata() {
     Map<String, String> metadata = super.getResultsMetadata();
+    if (_groupsTrimmed) {
+      metadata.put(MetadataKey.GROUPS_TRIMMED.getName(), "true");
+    }
     if (_numGroupsLimitReached) {
       metadata.put(MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName(), "true");
     }

@@ -34,6 +34,7 @@ import org.apache.pinot.common.response.CursorResponse;
     "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tableQueries",
+    "groupsTrimmed",
     // Fields specific to CursorResponse
     "offset", "numRows", "cursorResultWriteTimeMs", "cursorFetchTimeMs", "submissionTimeMs", "expirationTimeMs",
     "brokerHost", "brokerPort", "bytesWritten"
@@ -57,6 +58,7 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
     setResultTable(response.getResultTable());
     setNumRowsResultSet(response.getNumRowsResultSet());
     setExceptions(response.getExceptions());
+    setGroupsTrimmed(response.isGroupsTrimmed());
     setNumGroupsLimitReached(response.isNumGroupsLimitReached());
     setNumGroupsWarningLimitReached(response.isNumGroupsWarningLimitReached());
     setTimeUsedMs(response.getTimeUsedMs());
