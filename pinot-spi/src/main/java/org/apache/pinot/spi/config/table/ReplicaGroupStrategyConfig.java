@@ -27,9 +27,7 @@ import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /**
  * Class representing configurations related to segment assignment strategy.
- *  @deprecated Use {@link org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig} instead.
  */
-@Deprecated
 public class ReplicaGroupStrategyConfig extends BaseJsonConfig {
   private final String _partitionColumn;
   private final int _numInstancesPerPartition;
