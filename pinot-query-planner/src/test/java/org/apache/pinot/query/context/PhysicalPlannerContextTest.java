@@ -26,22 +26,12 @@ import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
 
-
 public class PhysicalPlannerContextTest {
 
   @Test
   public void testGetRandomInstanceIdWithNoInstances() {
     // Test case: No instances present in context (should throw IllegalStateException)
-    RoutingManager mockRoutingManager = mock(RoutingManager.class);
-
-    PhysicalPlannerContext context = new PhysicalPlannerContext(
-        mockRoutingManager,
-        "localhost",
-        8080,
-        12345L,
-        "broker_instance_1",
-        Map.of()
-    );
+    PhysicalPlannerContext context = createPhysicalPlannerContext();
 
     // Clear the instances map to simulate no instances
     context.getInstanceIdToQueryServerInstance().clear();
@@ -57,16 +47,7 @@ public class PhysicalPlannerContextTest {
   @Test
   public void testGetRandomInstanceIdWithSingleInstance() {
     // Test case: Only one instance present (should return that instance)
-    RoutingManager mockRoutingManager = mock(RoutingManager.class);
-
-    PhysicalPlannerContext context = new PhysicalPlannerContext(
-        mockRoutingManager,
-        "localhost",
-        8080,
-        12345L,
-        "broker_instance_1",
-        Map.of()
-    );
+    PhysicalPlannerContext context = createPhysicalPlannerContext();
 
     // The constructor automatically adds the broker instance, so we should have exactly one
     String randomInstanceId = context.getRandomInstanceId();
@@ -76,16 +57,7 @@ public class PhysicalPlannerContextTest {
   @Test
   public void testGetRandomInstanceIdWithMultipleInstances() {
     // Test case: Multiple instances present (should return one that's not the current instance)
-    RoutingManager mockRoutingManager = mock(RoutingManager.class);
-
-    PhysicalPlannerContext context = new PhysicalPlannerContext(
-        mockRoutingManager,
-        "localhost",
-        8080,
-        12345L,
-        "broker_instance_1",
-        Map.of()
-    );
+    PhysicalPlannerContext context = createPhysicalPlannerContext();
 
     // Add additional server instances
     QueryServerInstance serverInstance2 = new QueryServerInstance("server_instance_2", "host2", 8081, 8081);
@@ -108,16 +80,7 @@ public class PhysicalPlannerContextTest {
   @Test
   public void testGetRandomInstanceIdWithTwoInstances() {
     // Test case: Two instances (broker + one server) - should return the server
-    RoutingManager mockRoutingManager = mock(RoutingManager.class);
-
-    PhysicalPlannerContext context = new PhysicalPlannerContext(
-        mockRoutingManager,
-        "localhost",
-        8080,
-        12345L,
-        "broker_instance_1",
-        Map.of()
-    );
+    PhysicalPlannerContext context = createPhysicalPlannerContext();
 
     // Add one server instance
     QueryServerInstance serverInstance = new QueryServerInstance("server_instance_1", "host1", 8081, 8081);
@@ -126,5 +89,10 @@ public class PhysicalPlannerContextTest {
     String randomInstanceId = context.getRandomInstanceId();
     Assert.assertEquals(randomInstanceId, "server_instance_1",
         "With two instances, should return the non-broker instance");
+  }
+
+  private PhysicalPlannerContext createPhysicalPlannerContext() {
+    RoutingManager mockRoutingManager = mock(RoutingManager.class);
+    return new PhysicalPlannerContext(mockRoutingManager, "localhost", 8080, 12345L, "broker_instance_1", Map.of());
   }
 }
