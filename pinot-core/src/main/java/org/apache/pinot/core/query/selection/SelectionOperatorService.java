@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.selection;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -63,12 +62,25 @@ public class SelectionOperatorService {
   private final QueryContext _queryContext;
   private final DataSchema _dataSchema;
   private final int[] _columnIndices;
-  private final int _offset;
+  private int _offset;
+  private final int _limit;
   private final int _numRowsToKeep;
   // NOTE: this pq is only useful for server version < 1.3.0
-  private final PriorityQueue<Object[]> _rows;
+  private final PriorityQueue<Object[]> _heapSortRows;
+  private final PriorityQueue<MergeItem> _mergeSortRows;
   private final Comparator<Object[]> _comparator;
-  private List<Object[]> _sortedRows;
+  private final Comparator<MergeItem> _mergeComparator;
+
+  /** Util class used for n-way merge */
+  private static class MergeItem {
+    protected final Object[] _row;
+    protected final int _dataTableId;
+
+    public MergeItem(Object[] row, int dataTableId) {
+      _row = row;
+      _dataTableId = dataTableId;
+    }
+  }
 
   public SelectionOperatorService(QueryContext queryContext, DataSchema dataSchema, int[] columnIndices) {
     _queryContext = queryContext;
@@ -76,31 +88,51 @@ public class SelectionOperatorService {
     _columnIndices = columnIndices;
     // Select rows from offset to offset + limit.
     _offset = queryContext.getOffset();
-    _numRowsToKeep = _offset + queryContext.getLimit();
+    _limit = queryContext.getLimit();
+    _numRowsToKeep = _offset + _limit;
     assert queryContext.getOrderByExpressions() != null;
     _comparator = OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
         _queryContext.isNullHandlingEnabled());
-    _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        _comparator.reversed());
-
-    _sortedRows = new ArrayList<>();
+    _heapSortRows =
+        new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+            _comparator.reversed());
+    _mergeComparator = (MergeItem o1, MergeItem o2) -> _comparator.compare(o1._row, o2._row);
+    _mergeSortRows =
+        new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
+            _mergeComparator);
   }
 
   /**
-   * Reduces a collection of {@link DataTable}s to selection rows for selection queries with <code>ORDER BY</code>.
-   * Do merge sort when server side results are sorted
+   * Reduce multiple sorted (and unsorted) dataTables into a single resultTable, ordered, limited, and offset
+   * @param dataTables dataTables to be reduced
+   * @return resultTable
    */
-  public void reduceWithOrdering(Collection<DataTable> dataTables) {
+  public ResultTable reduceWithOrderingAndRender(Collection<DataTable> dataTables) {
+    boolean allSorted = true;
     for (DataTable dataTable : dataTables) {
-      // tables will always be sorted for server version >= 1.3.0
       String sorted = dataTable.getMetadata().get(DataTable.MetadataKey.SORTED.getName());
-      if (Boolean.parseBoolean(sorted)) {
-        _sortedRows = mergeSortedDataTable(_sortedRows, dataTable);
-        continue;
+      if (!Boolean.parseBoolean(sorted)) {
+        allSorted = false;
+        break;
       }
-      // TODO: the following block is only for backward compatibility with server version older than
-      //    1.3.0. From 1.3.0 on, all servers produce sorted dataTable
-      // else add it to priority queue for sorting
+    }
+
+    // TODO: backward compatible, to be removed after 1.2.0 no longer supported
+    if (!allSorted) {
+      List<Object[]> heapSortedRows = heapSortDataTable(dataTables);
+      return new ResultTable(_dataSchema, heapSortedRows);
+    } // end todo
+
+    // n-way merge sorted dataTable
+    List<Object[]> mergedRows = nWayMergeDataTables(dataTables);
+    return new ResultTable(_dataSchema, mergedRows);
+  }
+
+  // process dataTable rows, perform null-handling
+  private List<List<Object[]>> processDataTableRows(Collection<DataTable> dataTables) {
+    List<List<Object[]>> dataTablesRowList = new ArrayList<>();
+    for (DataTable dataTable : dataTables) {
+      List<Object[]> rightRows = new ArrayList<>();
       int numRows = dataTable.getNumberOfRows();
       if (_queryContext.isNullHandlingEnabled()) {
         RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
@@ -114,33 +146,114 @@ public class SelectionOperatorService {
               row[colId] = null;
             }
           }
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+          rightRows.add(row);
           Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       } else {
         for (int rowId = 0; rowId < numRows; rowId++) {
           Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-          SelectionOperatorUtils.addToPriorityQueue(row, _rows, _numRowsToKeep);
+          rightRows.add(row);
           Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
         }
       }
-      // end todo
+      dataTablesRowList.add(rightRows);
     }
+    return dataTablesRowList;
   }
 
   /**
-   * Renders the selection rows to a {@link ResultTable} object for selection queries with <code>ORDER BY</code>.
+   * Merge sorted dataTables using N-way merge
+   * @param dataTables sorted dataTables
+   * @return sorted rows
    */
-  public ResultTable renderResultTableWithOrdering() {
+  private List<Object[]> nWayMergeDataTables(Collection<DataTable> dataTables) {
+    List<List<Object[]>> dataTablesRowList = processDataTableRows(dataTables);
+    // populate pq
+    List<Object[]> resultRows = new ArrayList<>();
+    int[] nextRowIds = new int[dataTablesRowList.size()];
+    int[] numRows = new int[dataTablesRowList.size()];
+    for (int i = 0; i < dataTablesRowList.size(); i++) {
+      List<Object[]> rowList = dataTablesRowList.get(i);
+      numRows[i] = rowList.size();
+      if (!rowList.isEmpty()) {
+        Object[] row = rowList.get(0);
+        MergeItem mergeItem = new MergeItem(row, i);
+        _mergeSortRows.add(mergeItem);
+        nextRowIds[i] = 1;
+      }
+    }
+
+    // merge
     DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     int numColumns = columnDataTypes.length;
-    // merge _sortedRow and _rows into single result, both are ordered
-    List<Object[]> rows = mergeResult(_sortedRows, _rows);
-    if (rows.size() < _offset) {
-      return new ResultTable(_dataSchema, Collections.emptyList());
+    while (resultRows.size() < _limit && !_mergeSortRows.isEmpty()) {
+      MergeItem item = _mergeSortRows.poll();
+      if (_offset > 0) {
+        _offset--;
+      } else {
+        Object[] row = item._row;
+        Object[] resultRow = new Object[numColumns];
+        for (int i = 0; i < numColumns; i++) {
+          Object value = row[_columnIndices[i]];
+          if (value != null) {
+            resultRow[i] = columnDataTypes[i].convertAndFormat(value);
+          }
+        }
+        resultRows.add(resultRow);
+      }
+      int dataTableId = item._dataTableId;
+      int nextRowId = nextRowIds[dataTableId]++;
+      if (nextRowId >= numRows[dataTableId]) {
+        continue;
+      }
+      List<Object[]> rowList = dataTablesRowList.get(dataTableId);
+      Object[] row = rowList.get(nextRowId);
+      MergeItem mergeItem = new MergeItem(row, dataTableId);
+      _mergeSortRows.add(mergeItem);
     }
-    List<Object[]> resultRows = new ArrayList<>();
-    for (Object[] row : rows.subList(_offset, rows.size())) {
+    return resultRows;
+  }
+
+  /**
+   * Heapsort unsorted dataTables, this code is unreachable for
+   * server version >= 1.3.0 as server always performs sorting
+   * TODO: remove after 1.2.0 no longer supported
+   * @param dataTables unsorted dataTables
+   * @return sorted rows
+   */
+  private List<Object[]> heapSortDataTable(Collection<DataTable> dataTables) {
+    // reduce
+    for (DataTable dataTable : dataTables) {
+      int numRows = dataTable.getNumberOfRows();
+      if (_queryContext.isNullHandlingEnabled()) {
+        RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
+        for (int colId = 0; colId < nullBitmaps.length; colId++) {
+          nullBitmaps[colId] = dataTable.getNullRowIds(colId);
+        }
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          for (int colId = 0; colId < nullBitmaps.length; colId++) {
+            if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
+              row[colId] = null;
+            }
+          }
+          SelectionOperatorUtils.addToPriorityQueue(row, _heapSortRows, _numRowsToKeep);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+        }
+      } else {
+        for (int rowId = 0; rowId < numRows; rowId++) {
+          Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
+          SelectionOperatorUtils.addToPriorityQueue(row, _heapSortRows, _numRowsToKeep);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+        }
+      }
+    }
+    // render
+    LinkedList<Object[]> resultRows = new LinkedList<>();
+    DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+    int numColumns = columnDataTypes.length;
+    while (_heapSortRows.size() > _offset) {
+      Object[] row = _heapSortRows.poll();
       assert row != null;
       Object[] resultRow = new Object[numColumns];
       for (int i = 0; i < numColumns; i++) {
@@ -149,47 +262,8 @@ public class SelectionOperatorService {
           resultRow[i] = columnDataTypes[i].convertAndFormat(value);
         }
       }
-      resultRows.add(resultRow);
+      resultRows.addFirst(resultRow);
     }
-    return new ResultTable(_dataSchema, resultRows);
-  }
-
-  /** merge sorted dataTable with sorted sortedRows list, keeping at most _numRowsToKeep elements*/
-  private List<Object[]> mergeSortedDataTable(List<Object[]> sortedRows, DataTable dataTable) {
-
-    List<Object[]> rightRows = new ArrayList<>();
-    int numRows = dataTable.getNumberOfRows();
-    if (_queryContext.isNullHandlingEnabled()) {
-      RoaringBitmap[] nullBitmaps = new RoaringBitmap[dataTable.getDataSchema().size()];
-      for (int colId = 0; colId < nullBitmaps.length; colId++) {
-        nullBitmaps[colId] = dataTable.getNullRowIds(colId);
-      }
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        for (int colId = 0; colId < nullBitmaps.length; colId++) {
-          if (nullBitmaps[colId] != null && nullBitmaps[colId].contains(rowId)) {
-            row[colId] = null;
-          }
-        }
-        rightRows.add(row);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
-      }
-    } else {
-      for (int rowId = 0; rowId < numRows; rowId++) {
-        Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        rightRows.add(row);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
-      }
-    }
-    return SelectionOperatorUtils.mergeWithOrderingList(sortedRows, rightRows, _comparator, _numRowsToKeep);
-  }
-
-  /** merge sortedRows list and rows priority queue, keeping at most _numRowsToKeep elements */
-  private List<Object[]> mergeResult(List<Object[]> sortedRows1, PriorityQueue<Object[]> pq) {
-    LinkedList<Object[]> sortedRow2 = new LinkedList<>();
-    while (!pq.isEmpty()) {
-      sortedRow2.addFirst(pq.poll());
-    }
-    return SelectionOperatorUtils.mergeWithOrderingList(sortedRows1, sortedRow2, _comparator, _numRowsToKeep);
+    return resultRows;
   }
 }
