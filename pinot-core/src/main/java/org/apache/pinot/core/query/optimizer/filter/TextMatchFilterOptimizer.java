@@ -209,10 +209,6 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
   }
 
   private boolean hasTextMatchOptions(List<Expression> operands) {
-    if (operands.size() > 2) {
-      Expression optionsExpr = operands.get(2);
-      return optionsExpr.getLiteral() != null;
-    }
-    return false;
+    return operands.size() > 2;
   }
 }
