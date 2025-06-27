@@ -19,6 +19,7 @@
 
 package org.apache.pinot.core.query.selection;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -39,7 +40,7 @@ import org.testng.annotations.Test;
 
 
 /** query-based tests for selection-orderby */
-public class SelectionOrderByTest extends AbstractSelectionOrderByTest {
+public class SelectionOrderByTest {
 
   @Test
   public void list() {
@@ -427,6 +428,8 @@ public class SelectionOrderByTest extends AbstractSelectionOrderByTest {
   protected static final TableConfig TWO_FIELDS_TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
       .setTableName("testTable")
       .build();
+
+  protected File _baseDir;
 
   @BeforeClass
   void createBaseDir() {

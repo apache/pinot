@@ -81,8 +81,7 @@ public class SelectionOperatorService {
     _comparator = OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
         _queryContext.isNullHandlingEnabled());
     _rows = new PriorityQueue<>(Math.min(_numRowsToKeep, SelectionOperatorUtils.MAX_ROW_HOLDER_INITIAL_CAPACITY),
-        OrderByComparatorFactory.getComparator(queryContext.getOrderByExpressions(),
-            _queryContext.isNullHandlingEnabled()).reversed());
+        _comparator.reversed());
 
     _sortedRows = new ArrayList<>();
   }
@@ -93,9 +92,9 @@ public class SelectionOperatorService {
    */
   public void reduceWithOrdering(Collection<DataTable> dataTables) {
     for (DataTable dataTable : dataTables) {
-      // dataTable is always sorted for server version >= 1.3.0
-      String sortedOnServer = dataTable.getMetadata().get(DataTable.MetadataKey.SORTED.getName());
-      if (sortedOnServer != null && Integer.parseInt(sortedOnServer) == 1) {
+      // tables will always be sorted for server version >= 1.3.0
+      String sorted = dataTable.getMetadata().get(DataTable.MetadataKey.SORTED.getName());
+      if (Boolean.parseBoolean(sorted)) {
         _sortedRows = mergeSortedDataTable(_sortedRows, dataTable);
         continue;
       }

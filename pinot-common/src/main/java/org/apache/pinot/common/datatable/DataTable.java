@@ -146,7 +146,7 @@ public interface DataTable {
     THREAD_MEM_ALLOCATED_BYTES(36, "threadMemAllocatedBytes", MetadataValueType.LONG),
     RESPONSE_SER_MEM_ALLOCATED_BYTES(37, "responseSerMemAllocatedBytes", MetadataValueType.LONG),
     // NOTE: for server after release 1.3.0 this flag is always set to true since servers now perform sorting
-    SORTED(38, "sortedOnServer", MetadataValueType.BOOLEAN);
+    SORTED(38, "sorted", MetadataValueType.BOOLEAN);
 
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!

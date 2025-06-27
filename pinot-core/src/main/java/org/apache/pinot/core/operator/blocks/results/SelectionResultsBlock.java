@@ -89,7 +89,11 @@ public class SelectionResultsBlock extends BaseResultsBlock {
   @Override
   public Map<String, String> getResultsMetadata() {
     Map<String, String> metadata = super.getResultsMetadata();
-    metadata.put(DataTable.MetadataKey.SORTED.getName(), "true");
+    // All selection result blocks created by operators with orderBy
+    // come with non-null comparator
+    if (_comparator != null) {
+      metadata.put(DataTable.MetadataKey.SORTED.getName(), "true");
+    }
     return metadata;
   }
 }
