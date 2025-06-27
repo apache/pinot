@@ -65,6 +65,32 @@ public class HardLimitExecutorTest {
   }
 
   @Test
+  public void testHardLimitLogOnlyEnabled()
+      throws Exception {
+    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), true);
+    CyclicBarrier barrier = new CyclicBarrier(2);
+
+    try {
+      ex.execute(() -> {
+        try {
+          barrier.await();
+          Thread.sleep(Long.MAX_VALUE);
+        } catch (InterruptedException | BrokenBarrierException e) {
+          // do nothing
+        }
+      });
+
+      barrier.await();
+
+      ex.execute(() -> {
+        // do nothing, we just don't want it to throw an exception
+      });
+    } finally {
+      ex.shutdownNow();
+    }
+  }
+
+  @Test
   public void testGetMultiStageExecutorHardLimit() {
     // Only cluster config is set
     Map<String, Object> configMap1 = new HashMap<>();

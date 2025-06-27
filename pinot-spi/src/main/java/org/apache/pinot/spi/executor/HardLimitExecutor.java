@@ -36,11 +36,17 @@ public class HardLimitExecutor extends DecoratorExecutorService {
 
   private final AtomicInteger _running;
   private final int _max;
+  private final boolean _logOnlyMode;
 
-  public HardLimitExecutor(int max, ExecutorService executorService) {
+  public HardLimitExecutor(int max, ExecutorService executorService, boolean logOnlyMode) {
     super(executorService);
     _running = new AtomicInteger(0);
     _max = max;
+    _logOnlyMode = logOnlyMode;
+  }
+
+  public HardLimitExecutor(int max, ExecutorService executorService) {
+    this(max, executorService, false);
   }
 
   /**
@@ -73,7 +79,12 @@ public class HardLimitExecutor extends DecoratorExecutorService {
 
   protected void checkTaskAllowed() {
     if (_running.get() >= _max) {
-      throw new IllegalStateException("Tasks limit exceeded.");
+      if (_logOnlyMode) {
+        LOGGER.warn("Log-only mode bypassing limit: Tasks limit max: {} exceeded with running: {} tasks.",
+            _max, _running.get());
+      } else {
+        throw new IllegalStateException("Tasks limit exceeded.");
+      }
     }
   }
 
