@@ -81,8 +81,9 @@ public abstract class MultiStageOperator
   /// Normally, callers should call [#sampleAndCheckInterruption(long deadlineMs)] passing the correct deadline, but
   /// given most operators use either the active or the passive deadline, this method is provided as a convenience
   /// method. By default, it uses the active deadline, which is the one that should be used for most operators, but
-  /// if the operator is not actively waiting for data, it could override this method to use the passive deadline
-  /// (see for example [MailboxSendOperator][org.apache.pinot.query.runtime.operator.MailboxSendOperator]).
+  /// if the operator does not actively process data (ie both mailbox operators), it should override this method to
+  /// use the passive deadline instead.
+  /// See for example [MailboxSendOperator][org.apache.pinot.query.runtime.operator.MailboxSendOperator]).
   protected void sampleAndCheckInterruption() {
     sampleAndCheckInterruption(_context.getActiveDeadlineMs());
   }
