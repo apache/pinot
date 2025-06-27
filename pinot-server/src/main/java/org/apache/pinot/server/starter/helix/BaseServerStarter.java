@@ -675,6 +675,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     Tracing.ThreadAccountantOps.initializeThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    if (Tracing.getThreadAccountant().getClusterConfigChangeListener() != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          Tracing.getThreadAccountant().getClusterConfigChangeListener());
+    }
+
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
