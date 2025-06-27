@@ -141,7 +141,7 @@ public class SchemaTest {
     Assert.assertEquals(dimensionFieldSpec.getName(), "svDimensionWithMaxLength");
     Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.STRING);
     Assert.assertTrue(dimensionFieldSpec.isSingleValueField());
-    Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
+    Assert.assertEquals(dimensionFieldSpec.getEffectiveMaxLength(), 20000);
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
 
     dimensionFieldSpec = schema.getDimensionSpec("mvDimension");
@@ -166,7 +166,7 @@ public class SchemaTest {
     Assert.assertEquals(dimensionFieldSpec.getName(), "mvDimensionWithMaxLength");
     Assert.assertEquals(dimensionFieldSpec.getDataType(), FieldSpec.DataType.STRING);
     Assert.assertFalse(dimensionFieldSpec.isSingleValueField());
-    Assert.assertEquals(dimensionFieldSpec.getMaxLength(), 20000);
+    Assert.assertEquals(dimensionFieldSpec.getEffectiveMaxLength(), 20000);
     Assert.assertEquals(dimensionFieldSpec.getDefaultNullValue(), "null");
 
     metricFieldSpec = schema.getMetricSpec("metric");

@@ -25,6 +25,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.services.ServiceRole;
@@ -75,6 +76,7 @@ public class ServiceStartableUtils {
         LOGGER.warn("Failed to find cluster config for cluster: {}, skipping applying cluster config", clusterName);
         setTimezone(instanceConfig);
         initForwardIndexConfig(instanceConfig);
+        initFieldSpecConfig(instanceConfig);
         return;
       }
 
@@ -100,6 +102,7 @@ public class ServiceStartableUtils {
     }
     setTimezone(instanceConfig);
     initForwardIndexConfig(instanceConfig);
+    initFieldSpecConfig(instanceConfig);
   }
 
   private static void addConfigIfNotExists(PinotConfiguration instanceConfig, String key, String value) {
@@ -133,6 +136,35 @@ public class ServiceStartableUtils {
     if (defaultTargetDocsPerChunk != null) {
       LOGGER.info("Setting forward index default target docs per chunk to: {}", defaultTargetDocsPerChunk);
       ForwardIndexConfig.setDefaultTargetDocsPerChunk(Integer.parseInt(defaultTargetDocsPerChunk));
+    }
+  }
+
+  public static void initFieldSpecConfig(PinotConfiguration instanceConfig) {
+    String defaultJsonSanitizationStrategy =
+        instanceConfig.getProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH_EXCEED_STRATEGY);
+    if (defaultJsonSanitizationStrategy != null) {
+      try {
+        FieldSpec.MaxLengthExceedStrategy strategy =
+            FieldSpec.MaxLengthExceedStrategy.valueOf(defaultJsonSanitizationStrategy);
+        LOGGER.info("Setting default JSON sanitization strategy to: {}", defaultJsonSanitizationStrategy);
+        FieldSpec.setDefaultJsonMaxLengthExceedStrategy(strategy);
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("Invalid default JSON sanitization strategy: {}, using default: {}",
+            defaultJsonSanitizationStrategy, FieldSpec.getDefaultJsonMaxLengthExceedStrategy());
+      }
+    }
+
+    String defaultJsonMaxLength =
+        instanceConfig.getProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH);
+    if (defaultJsonMaxLength != null) {
+      try {
+        int maxLength = Integer.parseInt(defaultJsonMaxLength);
+        LOGGER.info("Setting default JSON max length to: {}", defaultJsonMaxLength);
+        FieldSpec.setDefaultJsonMaxLength(maxLength);
+      } catch (NumberFormatException e) {
+        LOGGER.warn("Invalid default JSON max length: {}, using default: {}",
+            defaultJsonMaxLength, FieldSpec.getDefaultJsonMaxLength());
+      }
     }
   }
 }
