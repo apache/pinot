@@ -18,18 +18,52 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.collect.ImmutableList;
+import java.util.Collections;
+import java.util.List;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.plan.hep.HepPlanner;
+import org.apache.calcite.plan.hep.HepProgramBuilder;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.logical.LogicalFilter;
+import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.ObjectSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
+import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.type.TypeFactory;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.when;
 
 
 public class RelToPlanNodeConverterTest {
+
+  private AutoCloseable _mocks;
+  @Mock
+  private PinotLogicalTableScan _input;
 
   @Test
   public void testConvertToColumnDataTypeForObjectTypes() {
@@ -129,5 +163,70 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.BYTES_ARRAY);
+  }
+
+  @BeforeMethod
+  public void setUp() {
+    _mocks = MockitoAnnotations.openMocks(this);
+  }
+
+  @Test
+  public void testConvertEnrichedJoinNodeTest() {
+    final TypeFactory typeFactory = TypeFactory.INSTANCE;
+    final RexBuilder rexBuilder = RexBuilder.DEFAULT;
+    RelTraitSet traits = RelTraitSet.createEmpty();
+    Mockito.when(_input.getTraitSet()).thenReturn(traits);
+
+    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+    hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
+    RelOptCluster cluster = RelOptCluster.create(planner, rexBuilder);
+    cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
+
+    RelDataType intType = typeFactory.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .add("col2", SqlTypeName.INTEGER)
+        .add("col3", SqlTypeName.INTEGER)
+        .build();
+
+    when(_input.getCluster()).thenReturn(cluster);
+    when(_input.getRowType()).thenReturn(intType);
+    RelOptTable mockTable = Mockito.mock(RelOptTable.class);
+    when(mockTable.getQualifiedName()).thenReturn(List.of("table1"));
+    when(_input.getTable()).thenReturn(mockTable);
+    when(_input.getHints()).thenReturn(ImmutableList.of());
+    // join condition col0 = col1
+    RexNode joinCondition = rexBuilder.makeCall(SqlStdOperatorTable.EQUALS,
+        rexBuilder.makeInputRef(intType, 0), rexBuilder.makeInputRef(intType, 3));
+    LogicalJoin originalJoin = LogicalJoin.create(_input, _input, Collections.emptyList(),
+        joinCondition, Collections.emptySet(), JoinRelType.INNER);
+
+    // filter condition col2 = 1
+    RexNode filterCondition = rexBuilder.makeCall(
+        SqlStdOperatorTable.EQUALS, rexBuilder.makeInputRef(intType, 2),
+        rexBuilder.makeLiteral(1, typeFactory.createSqlType(SqlTypeName.INTEGER)));
+    LogicalFilter originalFilter = LogicalFilter.create(originalJoin, filterCondition);
+
+    // project above filter
+    List<RexNode> projects = List.of(rexBuilder.makeInputRef(intType, 1));
+    LogicalProject project = LogicalProject.create(
+        originalFilter, Collections.emptyList(), projects, List.of("projectCol1"));
+
+    planner.setRoot(project);
+    PinotLogicalEnrichedJoin enrichedJoin = (PinotLogicalEnrichedJoin) planner.findBestExp();
+
+    RelToPlanNodeConverter relToPlanNodeConverter = new RelToPlanNodeConverter(null);
+
+    PlanNode node = relToPlanNodeConverter.toPlanNode(enrichedJoin);
+    assert (node instanceof EnrichedJoinNode);
+
+    EnrichedJoinNode enrichedJoinNode = (EnrichedJoinNode) node;
+    Assert.assertEquals(enrichedJoinNode.getFilterProjectRexes().size(), 2);
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    _mocks.close();
   }
 }

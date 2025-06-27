@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.validation;
 import java.util.List;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -62,6 +63,12 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
           "Function 'ArrayToMv' is not supported in JOIN Intermediate Stage");
     }
     node.getInputs().forEach(e -> e.visit(this, isIntermediateStage));
+    return null;
+  }
+
+  @Override
+  public Void visitEnrichedJoin(EnrichedJoinNode node, Boolean isIntermediateStage) {
+    visitJoin(node, isIntermediateStage);
     return null;
   }
 
