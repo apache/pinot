@@ -671,6 +671,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
+
     // initialize the thread accountant for query killing
     Tracing.ThreadAccountantOps.initializeThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
