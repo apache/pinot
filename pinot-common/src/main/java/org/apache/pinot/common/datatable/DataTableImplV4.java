@@ -549,6 +549,8 @@ public class DataTableImplV4 implements DataTable {
         dataOutputStream.write(Ints.toByteArray(Integer.parseInt(value)));
       } else if (key.getValueType() == MetadataValueType.LONG) {
         dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
+      } else if (key.getValueType() == MetadataValueType.BOOLEAN) {
+        dataOutputStream.write(DataTableUtils.encodeBoolean(Boolean.parseBoolean(value)));
       } else {
         byte[] valueBytes = value.getBytes(UTF_8);
         dataOutputStream.writeInt(valueBytes.length);
@@ -585,6 +587,9 @@ public class DataTableImplV4 implements DataTable {
         metadata.put(key.getName(), value);
       } else if (key.getValueType() == MetadataValueType.LONG) {
         String value = "" + buffer.getLong();
+        metadata.put(key.getName(), value);
+      } else if (key.getValueType() == MetadataValueType.BOOLEAN) {
+        String value = "" + DataTableUtils.decodeBoolean(buffer);
         metadata.put(key.getName(), value);
       } else {
         String value = DataTableUtils.decodeString(buffer);
