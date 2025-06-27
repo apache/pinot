@@ -18,18 +18,83 @@
  */
 package org.apache.pinot.query.planner.logical;
 
+import com.google.common.collect.ImmutableList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.calcite.plan.Convention;
+import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollations;
+import org.apache.calcite.rel.RelFieldCollation;
+import org.apache.calcite.rel.core.JoinRelType;
+import org.apache.calcite.rel.hint.HintStrategyTable;
+import org.apache.calcite.rel.hint.RelHint;
+import org.apache.calcite.rel.logical.LogicalJoin;
+import org.apache.calcite.rel.logical.LogicalValues;
+import org.apache.calcite.rel.metadata.RelMetadataQuery;
+import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
+import org.apache.calcite.rex.RexBuilder;
+import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.sql.SqlIdentifier;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.type.ArraySqlType;
 import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.ObjectSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
+import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.planner.plannode.PlanNode;
+import org.apache.pinot.query.type.TypeFactory;
+import org.mockito.Mock;
+import org.mockito.Mockito;
+import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.when;
 
 
 public class RelToPlanNodeConverterTest {
+  private static final TypeFactory TYPE_FACTORY = TypeFactory.INSTANCE;
+  private static final RexBuilder REX_BUILDER = RexBuilder.DEFAULT;
+
+  private AutoCloseable _mocks;
+
+  @Mock
+  private RelOptRuleCall _call;
+  @Mock
+  private RelOptCluster _cluster;
+  @Mock
+  private RelMetadataQuery _query;
+  private RelTraitSet _traits;
+
+  @BeforeMethod
+  public void setUp() {
+    _mocks = MockitoAnnotations.openMocks(this);
+    RelTraitSet traits = RelTraitSet.createEmpty();
+    when(_cluster.traitSetOf(Convention.NONE)).thenReturn(traits);
+    when(_cluster.getHintStrategies()).thenReturn(HintStrategyTable.EMPTY);
+    when(_cluster.getMetadataQuery()).thenReturn(RelMetadataQuery.instance());
+    when(_cluster.traitSet()).thenReturn(traits);
+    when(_cluster.getTypeFactory()).thenReturn(TYPE_FACTORY);
+    when(_cluster.getRexBuilder()).thenReturn(REX_BUILDER);
+
+    when(_call.getMetadataQuery()).thenReturn(_query);
+    when(_query.getMaxRowCount(Mockito.any())).thenReturn(null);
+  }
+
+  @AfterMethod
+  public void tearDown()
+      throws Exception {
+    _mocks.close();
+  }
 
   @Test
   public void testConvertToColumnDataTypeForObjectTypes() {
@@ -129,5 +194,312 @@ public class RelToPlanNodeConverterTest {
     Assert.assertEquals(RelToPlanNodeConverter.convertToColumnDataType(
             new ArraySqlType(new ObjectSqlType(SqlTypeName.VARBINARY, SqlIdentifier.STAR, true, null, null), true)),
         DataSchema.ColumnDataType.BYTES_ARRAY);
+  }
+
+  @Test
+  public void testGetMergeJoinCollations() {
+    RelTraitSet traitSet = RelTraitSet.createEmpty();
+    traitSet = traitSet.plus(RelCollations.of(new RelFieldCollation(0)));
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .build();
+
+    LogicalValues input = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)))));
+
+    LogicalValues input2 = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)))));
+
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+        REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 1));
+
+    Map<String, String> strategyHint = new HashMap<>();
+    strategyHint.put(PinotHintOptions.JoinHintOptions.JOIN_STRATEGY,
+        PinotHintOptions.JoinHintOptions.MERGE_JOIN_STRATEGY);
+    RelHint hint = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS).hintOptions(strategyHint).build();
+
+    LogicalJoin join =
+        new LogicalJoin(_cluster, RelTraitSet.createEmpty(), List.of(hint), input, input2, joinCondition, Set.of(),
+            JoinRelType.INNER, false, ImmutableList.of());
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null);
+    PlanNode node = converter.toPlanNode(join);
+    assert (node instanceof JoinNode);
+    JoinNode joinNode = (JoinNode) node;
+    Assert.assertEquals(joinNode.getCollations(), List.of(new RelFieldCollation(0)));
+  }
+
+  @Test
+  public void testRejectMergeJoinCollationsEmptyCollations() {
+    RelTraitSet traitSet = RelTraitSet.createEmpty();
+    traitSet = traitSet.plus(RelCollations.of(new RelFieldCollation(0)));
+
+    RelTraitSet traitSet2 = RelTraitSet.createEmpty();
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .build();
+
+    LogicalValues input = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)))));
+
+    LogicalValues input2 = new LogicalValues(_cluster, traitSet2, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)))));
+
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+        REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 1));
+
+    Map<String, String> strategyHint = new HashMap<>();
+    strategyHint.put(PinotHintOptions.JoinHintOptions.JOIN_STRATEGY,
+        PinotHintOptions.JoinHintOptions.MERGE_JOIN_STRATEGY);
+    RelHint hint = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS).hintOptions(strategyHint).build();
+
+    LogicalJoin join =
+        new LogicalJoin(_cluster, RelTraitSet.createEmpty(), List.of(hint), input, input2, joinCondition, Set.of(),
+            JoinRelType.INNER, false, ImmutableList.of());
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null);
+    PlanNode node = converter.toPlanNode(join);
+    assert (node instanceof JoinNode);
+    JoinNode joinNode = (JoinNode) node;
+    Assert.assertNull(joinNode.getCollations());
+  }
+
+  @Test
+  public void testRejectMergeJoinCollationsWrongDirection() {
+    RelTraitSet traitSet = RelTraitSet.createEmpty();
+    traitSet = traitSet.plus(RelCollations.of(new RelFieldCollation(0)));
+
+    RelTraitSet traitSet2 = RelTraitSet.createEmpty();
+    traitSet2 = traitSet2.plus(RelCollations.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING)));
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .build();
+
+    LogicalValues input = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)))));
+
+    LogicalValues input2 = new LogicalValues(_cluster, traitSet2, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)))));
+
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+        REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 1));
+
+    Map<String, String> strategyHint = new HashMap<>();
+    strategyHint.put(PinotHintOptions.JoinHintOptions.JOIN_STRATEGY,
+        PinotHintOptions.JoinHintOptions.MERGE_JOIN_STRATEGY);
+    RelHint hint = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS).hintOptions(strategyHint).build();
+
+    LogicalJoin join =
+        new LogicalJoin(_cluster, RelTraitSet.createEmpty(), List.of(hint), input, input2, joinCondition, Set.of(),
+            JoinRelType.INNER, false, ImmutableList.of());
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null);
+    PlanNode node = converter.toPlanNode(join);
+    assert (node instanceof JoinNode);
+    JoinNode joinNode = (JoinNode) node;
+    Assert.assertNull(joinNode.getCollations());
+  }
+
+  @Test
+  public void testRejectMergeJoinCollationsWrongColumn() {
+    RelTraitSet traitSet = RelTraitSet.createEmpty();
+    traitSet = traitSet.plus(RelCollations.of(new RelFieldCollation(0)));
+
+    RelTraitSet traitSet2 = RelTraitSet.createEmpty();
+    traitSet2 = traitSet2.plus(RelCollations.of(new RelFieldCollation(1)));
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .add("col2", SqlTypeName.INTEGER)
+        .build();
+
+    RelDataType intColType = TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER);
+
+    LogicalValues input = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, intColType),
+            REX_BUILDER.makeLiteral(2, intColType)
+        )));
+
+    LogicalValues input2 = new LogicalValues(_cluster, traitSet2, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, intColType),
+            REX_BUILDER.makeLiteral(2, intColType)
+        )));
+
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+        REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 2));
+
+    Map<String, String> strategyHint = new HashMap<>();
+    strategyHint.put(PinotHintOptions.JoinHintOptions.JOIN_STRATEGY,
+        PinotHintOptions.JoinHintOptions.MERGE_JOIN_STRATEGY);
+    RelHint hint = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS).hintOptions(strategyHint).build();
+
+    LogicalJoin join =
+        new LogicalJoin(_cluster, RelTraitSet.createEmpty(), List.of(hint), input, input2, joinCondition, Set.of(),
+            JoinRelType.INNER, false, ImmutableList.of());
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null);
+    PlanNode node = converter.toPlanNode(join);
+    assert (node instanceof JoinNode);
+    JoinNode joinNode = (JoinNode) node;
+    Assert.assertNull(joinNode.getCollations());
+  }
+
+  @Test
+  public void testGetMergeJoinCollationsCompositeJoinKey() {
+    RelTraitSet traitSet = RelTraitSet.createEmpty();
+    traitSet = traitSet.plus(
+        RelCollations.of(new RelFieldCollation(0), new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING)));
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .add("col2", SqlTypeName.INTEGER)
+        .build();
+
+    RelDataType intColType = TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER);
+
+    LogicalValues input = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, intColType),
+            REX_BUILDER.makeLiteral(2, intColType)
+        )));
+
+    LogicalValues input2 = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, intColType),
+            REX_BUILDER.makeLiteral(2, intColType)
+        )));
+
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.AND,
+        REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+            REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 2)),
+        REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+            REX_BUILDER.makeInputRef(intType, 1), REX_BUILDER.makeInputRef(intType, 3)));
+
+    Map<String, String> strategyHint = new HashMap<>();
+    strategyHint.put(PinotHintOptions.JoinHintOptions.JOIN_STRATEGY,
+        PinotHintOptions.JoinHintOptions.MERGE_JOIN_STRATEGY);
+    RelHint hint = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS).hintOptions(strategyHint).build();
+
+    LogicalJoin join =
+        new LogicalJoin(_cluster, RelTraitSet.createEmpty(), List.of(hint), input, input2, joinCondition, Set.of(),
+            JoinRelType.INNER, false, ImmutableList.of());
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null);
+    PlanNode node = converter.toPlanNode(join);
+    assert (node instanceof JoinNode);
+    JoinNode joinNode = (JoinNode) node;
+    Assert.assertEquals(joinNode.getCollations(),
+        List.of(new RelFieldCollation(0), new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING)));
+  }
+
+  @Test
+  public void testGetMergeJoinCollationsShiftFieldIdx() {
+    // a.co12 = b.col2 AND a.col3 = b.col1
+    RelTraitSet traitSet = RelTraitSet.createEmpty();
+    traitSet = traitSet.plus(
+        RelCollations.of(new RelFieldCollation(1), new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING)));
+
+    RelTraitSet traitSet2 = RelTraitSet.createEmpty();
+    traitSet2 = traitSet2.plus(
+        RelCollations.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(1)));
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .add("col2", SqlTypeName.INTEGER)
+        .add("col3", SqlTypeName.INTEGER)
+        .build();
+
+    RelDataType intColType = TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER);
+
+    LogicalValues input = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, intColType),
+            REX_BUILDER.makeLiteral(2, intColType),
+            REX_BUILDER.makeLiteral(3, intColType)
+        )));
+
+    LogicalValues input2 = new LogicalValues(_cluster, traitSet2, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, intColType),
+            REX_BUILDER.makeLiteral(2, intColType),
+            REX_BUILDER.makeLiteral(3, intColType)
+        )));
+
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.AND,
+        REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+            REX_BUILDER.makeInputRef(intType, 1), REX_BUILDER.makeInputRef(intType, 4)),
+        REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+            REX_BUILDER.makeInputRef(intType, 2), REX_BUILDER.makeInputRef(intType, 3)));
+
+    Map<String, String> strategyHint = new HashMap<>();
+    strategyHint.put(PinotHintOptions.JoinHintOptions.JOIN_STRATEGY,
+        PinotHintOptions.JoinHintOptions.MERGE_JOIN_STRATEGY);
+    RelHint hint = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS).hintOptions(strategyHint).build();
+
+    LogicalJoin join =
+        new LogicalJoin(_cluster, RelTraitSet.createEmpty(), List.of(hint), input, input2, joinCondition, Set.of(),
+            JoinRelType.INNER, false, ImmutableList.of());
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null);
+    PlanNode node = converter.toPlanNode(join);
+    assert (node instanceof JoinNode);
+    JoinNode joinNode = (JoinNode) node;
+    Assert.assertEquals(joinNode.getCollations(),
+        List.of(new RelFieldCollation(0), new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING)));
+  }
+
+  @Test
+  public void testGetMergeJoinCollationsRedundantCollation() {
+    // a.co12 = b.col2 AND a.col3 = b.col1
+    RelTraitSet traitSet = RelTraitSet.createEmpty();
+    traitSet = traitSet.plus(
+        RelCollations.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(1),
+            new RelFieldCollation(2, RelFieldCollation.Direction.DESCENDING)));
+
+    RelTraitSet traitSet2 = RelTraitSet.createEmpty();
+    traitSet2 = traitSet2.plus(
+        RelCollations.of(new RelFieldCollation(0, RelFieldCollation.Direction.DESCENDING), new RelFieldCollation(1),
+            new RelFieldCollation(2)));
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .add("col2", SqlTypeName.INTEGER)
+        .add("col3", SqlTypeName.INTEGER)
+        .build();
+
+    RelDataType intColType = TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER);
+
+    LogicalValues input = new LogicalValues(_cluster, traitSet, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, intColType),
+            REX_BUILDER.makeLiteral(2, intColType),
+            REX_BUILDER.makeLiteral(3, intColType)
+        )));
+
+    LogicalValues input2 = new LogicalValues(_cluster, traitSet2, intType, ImmutableList.of(
+        ImmutableList.of(REX_BUILDER.makeLiteral(1, intColType),
+            REX_BUILDER.makeLiteral(2, intColType),
+            REX_BUILDER.makeLiteral(3, intColType)
+        )));
+
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.AND,
+        REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+            REX_BUILDER.makeInputRef(intType, 1), REX_BUILDER.makeInputRef(intType, 4)),
+        REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+            REX_BUILDER.makeInputRef(intType, 2), REX_BUILDER.makeInputRef(intType, 3)));
+
+    Map<String, String> strategyHint = new HashMap<>();
+    strategyHint.put(PinotHintOptions.JoinHintOptions.JOIN_STRATEGY,
+        PinotHintOptions.JoinHintOptions.MERGE_JOIN_STRATEGY);
+    RelHint hint = RelHint.builder(PinotHintOptions.JOIN_HINT_OPTIONS).hintOptions(strategyHint).build();
+
+    LogicalJoin join =
+        new LogicalJoin(_cluster, RelTraitSet.createEmpty(), List.of(hint), input, input2, joinCondition, Set.of(),
+            JoinRelType.INNER, false, ImmutableList.of());
+
+    RelToPlanNodeConverter converter = new RelToPlanNodeConverter(null);
+    PlanNode node = converter.toPlanNode(join);
+    assert (node instanceof JoinNode);
+    JoinNode joinNode = (JoinNode) node;
+    Assert.assertEquals(joinNode.getCollations(),
+        List.of(new RelFieldCollation(0), new RelFieldCollation(1, RelFieldCollation.Direction.DESCENDING)));
   }
 }

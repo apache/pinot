@@ -359,11 +359,14 @@ public final class RelToPlanNodeConverter {
           projectInput.getClass().getSimpleName());
     } else if (PinotHintOptions.JoinHintOptions.useMergeJoin(join)) {
       joinStrategy = JoinNode.JoinStrategy.MERGE;
-      // TODO: need to pass collation on join key, check what are the RelFieldCollation on join key columns
       List<RelFieldCollation> joinKeyCollations = getJoinKeyCollations(join, joinInfo);
-      return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
-          joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
-          joinStrategy, null, joinKeyCollations);
+      if (joinKeyCollations != null) {
+        return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
+            joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
+            joinStrategy, null, joinKeyCollations);
+      }
+      // if input does not meet condition, fall back to HASH
+      joinStrategy = JoinNode.JoinStrategy.HASH;
     } else {
       // TODO: Consider adding DYNAMIC_BROADCAST as a separate join strategy
       joinStrategy = JoinNode.JoinStrategy.HASH;
@@ -375,19 +378,47 @@ public final class RelToPlanNodeConverter {
   }
 
   // get and shift collation for use on merge join's join key
+  // return null if we cannot perform MergeJoin
+  @Nullable
   private List<RelFieldCollation> getJoinKeyCollations(Join join, JoinInfo joinInfo) {
+    if (!joinInfo.isEqui()) {
+      return null;
+    }
+    if (join.getLeft().getTraitSet().getCollation() == null || join.getRight().getTraitSet().getCollation() == null) {
+      return null;
+    }
+    Preconditions.checkState(!joinInfo.leftKeys.isEmpty() && !joinInfo.rightKeys.isEmpty());
     List<RelFieldCollation> joinKeyCollations = new ArrayList<>();
     List<RelFieldCollation> leftCollation = join.getLeft().getTraitSet().getCollation().getFieldCollations();
     int idx = 0;
-    for (int fieldIdx : joinInfo.leftKeys) {
+    for (int joinKeyFieldIdx : joinInfo.leftKeys) {
       for (RelFieldCollation collation : leftCollation) {
-        if (collation.getFieldIndex() == fieldIdx) {
-          collation.withFieldIndex(idx++);
-          joinKeyCollations.add(collation);
+        if (collation.getFieldIndex() == joinKeyFieldIdx) {
+          RelFieldCollation newCollation = collation.withFieldIndex(idx++);
+          joinKeyCollations.add(newCollation);
           break;
         }
       }
     }
+    // verify right key has same collation on join key
+    idx = 0;
+    List<RelFieldCollation> rightCollation = join.getRight().getTraitSet().getCollation().getFieldCollations();
+    for (int joinKeyFieldIdx : joinInfo.rightKeys) {
+      boolean hasCollation = false;
+      for (RelFieldCollation collation : rightCollation) {
+        if (collation.getFieldIndex() == joinKeyFieldIdx) {
+          RelFieldCollation leftKeyCollation = joinKeyCollations.get(idx++);
+          if (leftKeyCollation.getDirection() != collation.getDirection()) {
+            return null;
+          }
+          hasCollation = true;
+        }
+      }
+      if (!hasCollation) {
+        return null;
+      }
+    }
+
     return joinKeyCollations;
   }
 
