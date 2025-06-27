@@ -127,7 +127,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final boolean _explainAskingServerDefault;
   private final MultiStageQueryThrottler _queryThrottler;
   private final ExecutorService _queryCompileExecutor;
-  protected final long _brokerPassiveTimeoutMs;
+  protected final long _extraPassiveTimeoutMs;
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
@@ -141,9 +141,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
 
-    _brokerPassiveTimeoutMs = config.getProperty(
-        CommonConstants.Broker.CONFIG_OF_BROKER_PASSIVE_TIMEOUT_MS,
-        CommonConstants.Broker.DEFAULT_BROKER_PASSIVE_TIMEOUT_MS);
+    _extraPassiveTimeoutMs = config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_EXTRA_PASSIVE_TIMEOUT_MS,
+        CommonConstants.Broker.DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS);
 
     failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
     long cancelMillis = config.getProperty(
@@ -408,7 +408,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private long getPassiveTimeout(Map<String, String> queryOptions) {
     Long passiveTimeoutMsFromQueryOption = QueryOptionsUtils.getPassiveTimeoutMs(queryOptions);
-    return passiveTimeoutMsFromQueryOption != null ? passiveTimeoutMsFromQueryOption : _brokerPassiveTimeoutMs;
+    return passiveTimeoutMsFromQueryOption != null ? passiveTimeoutMsFromQueryOption : _extraPassiveTimeoutMs;
   }
 
 

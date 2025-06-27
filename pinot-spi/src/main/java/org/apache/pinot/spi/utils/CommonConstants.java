@@ -344,8 +344,8 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH =
         "pinot.broker.enable.row.column.level.auth";
     public static final boolean DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH = false;
-    public static final String CONFIG_OF_BROKER_PASSIVE_TIMEOUT_MS = "pinot.broker.passiveTimeoutMs";
-    public static final long DEFAULT_BROKER_PASSIVE_TIMEOUT_MS = 100L;
+    public static final String CONFIG_OF_EXTRA_PASSIVE_TIMEOUT_MS = "pinot.broker.extraPassiveTimeoutMs";
+    public static final long DEFAULT_EXTRA_PASSIVE_TIMEOUT_MS = 100L;
     public static final String CONFIG_OF_BROKER_ID = "pinot.broker.instance.id";
     public static final String CONFIG_OF_BROKER_INSTANCE_TAGS = "pinot.broker.instance.tags";
     public static final String CONFIG_OF_BROKER_HOSTNAME = "pinot.broker.hostname";
