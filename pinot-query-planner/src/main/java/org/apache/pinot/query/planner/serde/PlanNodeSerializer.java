@@ -126,6 +126,9 @@ public class PlanNodeSerializer {
       if (node.getMatchCondition() != null) {
         joinNode.setMatchCondition(RexExpressionToProtoExpression.convertExpression(node.getMatchCondition()));
       }
+      if (node.getCollations() != null) {
+        joinNode.addAllCollations(convertCollations(node.getCollations()));
+      }
       builder.setJoinNode(joinNode.build());
       return null;
     }
@@ -309,6 +312,8 @@ public class PlanNodeSerializer {
           return Plan.JoinStrategy.LOOKUP;
         case ASOF:
           return Plan.JoinStrategy.AS_OF;
+        case MERGE:
+          return Plan.JoinStrategy.MERGE;
         default:
           throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
       }

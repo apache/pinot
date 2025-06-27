@@ -1,13 +1,29 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -20,8 +36,6 @@ import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 
 
-// TODO: implement
-// TODO: whether to sort in this operator? or require input to be sorted?
 public class MergeJoinOperator extends BaseJoinOperator {
   private static final String EXPLAIN_NAME = "MERGE_JOIN";
 
@@ -37,7 +51,7 @@ public class MergeJoinOperator extends BaseJoinOperator {
   private final KeySelector<?> _leftKeySelector;
   private final KeySelector<?> _rightKeySelector;
 
-  private final Comparator<Object[]> _comparator;
+  private final SortUtils.MergeJoinComparator _comparator;
 
   private MseBlock.Eos _leftEos;
   private MseBlock.Eos _rightEos;
@@ -56,7 +70,13 @@ public class MergeJoinOperator extends BaseJoinOperator {
     Preconditions.checkState(!rightKeys.isEmpty(), "Merge join operator requires join keys");
     _rightKeySelector = KeySelectorFactory.getKeySelector(rightKeys);
 
-    _comparator = SortUtils.SortComparator(node.getCollations(), false);
+    _leftTable = new LinkedList<>();
+    _leftLookahead = new LinkedList<>();
+    _rightTable = new LinkedList<>();
+    _rightLookahead = new LinkedList<>();
+
+    Preconditions.checkState(node.getCollations() != null);
+    _comparator = new SortUtils.MergeJoinComparator(node.getCollations());
 
     _numRowsJoined = 0;
   }
@@ -146,9 +166,10 @@ public class MergeJoinOperator extends BaseJoinOperator {
     Object[] rightFirstRow = _rightTable.getFirst();
     Object leftKey = _leftKeySelector.getKey(leftFirstRow);
     Object rightKey = _rightKeySelector.getKey(rightFirstRow);
-    if (!Objects.equals(leftKey, rightKey)) {
-      // advance the smaller or equal group (collation is subset of join key)
-      if (_comparator.compare(leftFirstRow, rightFirstRow) <= 0) {
+    int compareResult = _comparator.compare(leftKey, rightKey);
+    if (compareResult != 0) {
+      // advance the smaller or equal group (collation is superset of join key)
+      if (compareResult < 0) {
         _leftTable.clear();
       } else {
         _rightTable.clear();

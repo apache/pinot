@@ -83,4 +83,78 @@ public class SortUtils {
       return 0;
     }
   }
+
+  public static class MergeJoinComparator {
+    private final int _numFields;
+    private final int[] _valueIndices;
+    private final int[] _multipliers;
+    private final int[] _nullsMultipliers;
+
+    /**
+     * MergeJoin comparator for use for comparing join keys.
+     *
+     * @param collations collations to sort on
+     */
+    public MergeJoinComparator(List<RelFieldCollation> collations) {
+      _numFields = collations.size();
+      _valueIndices = new int[_numFields];
+      _multipliers = new int[_numFields];
+      _nullsMultipliers = new int[_numFields];
+      for (int i = 0; i < _numFields; i++) {
+        RelFieldCollation collation = collations.get(i);
+        _valueIndices[i] = collation.getFieldIndex();
+        _multipliers[i] = collation.direction == Direction.ASCENDING ? 1 : -1;
+        boolean nullsLast =
+            collation.nullDirection == NullDirection.LAST || (collation.nullDirection == NullDirection.UNSPECIFIED
+                && collation.direction == Direction.ASCENDING);
+        _nullsMultipliers[i] = nullsLast ? 1 : -1;
+      }
+    }
+
+    public int compare(Object o1, Object o2) {
+      if (o1 instanceof Object[]) {
+        return compareMultipleColumn((Object[]) o1, (Object[]) o2);
+      }
+      return compareSingleColumn(o1, o2);
+    }
+
+    public int compareSingleColumn(Object o1, Object o2) {
+      int index = _valueIndices[0];
+      if (o1 == null) {
+        // null != null here
+        return _nullsMultipliers[0];
+      }
+      if (o2 == null) {
+        return -_nullsMultipliers[0];
+      }
+      //noinspection rawtypes,unchecked
+      int result = ((Comparable) o1).compareTo(o2);
+      if (result != 0) {
+        return result * _multipliers[0];
+      }
+      return 0;
+    }
+
+    // same as SortComparator.compare except it doesn't match null with null
+    public int compareMultipleColumn(Object[] o1, Object[] o2) {
+      for (int i = 0; i < _numFields; i++) {
+        int index = _valueIndices[i];
+        Object v1 = o1[index];
+        Object v2 = o2[index];
+        if (v1 == null) {
+          // null != null here
+          return _nullsMultipliers[i];
+        }
+        if (v2 == null) {
+          return -_nullsMultipliers[i];
+        }
+        //noinspection rawtypes,unchecked
+        int result = ((Comparable) v1).compareTo(v2);
+        if (result != 0) {
+          return result * _multipliers[i];
+        }
+      }
+      return 0;
+    }
+  }
 }

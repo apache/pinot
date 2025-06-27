@@ -255,6 +255,7 @@ public class EquivalentStagesFinder {
             && Objects.equals(node1.getLeftKeys(), that.getLeftKeys())
             && Objects.equals(node1.getRightKeys(), that.getRightKeys())
             && Objects.equals(node1.getNonEquiConditions(), that.getNonEquiConditions())
+            && Objects.equals(node1.getCollations(), that.getCollations())
             && node1.getJoinStrategy() == that.getJoinStrategy();
       }
 

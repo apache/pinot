@@ -272,7 +272,7 @@ public class PRelToPlanNodeConverter {
         "ASOF_JOIN only supports match conditions with a comparison between two columns of the same type");
     return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
-        JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()));
+        JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()), null);
   }
 
   public static DataSchema toDataSchema(RelDataType rowType) {
