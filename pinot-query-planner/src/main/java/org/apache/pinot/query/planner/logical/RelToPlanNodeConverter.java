@@ -31,6 +31,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.AggregateCall;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
@@ -356,6 +357,16 @@ public final class RelToPlanNodeConverter {
       Preconditions.checkState(projectInput instanceof TableScan,
           "Right input for lookup join must be a Project over TableScan, got Project over: %s",
           projectInput.getClass().getSimpleName());
+    } else if (PinotHintOptions.JoinHintOptions.useMergeJoin(join)) {
+      joinStrategy = JoinNode.JoinStrategy.MERGE;
+      List<RelFieldCollation> joinKeyCollations = getJoinKeyCollations(join, joinInfo);
+      if (joinKeyCollations != null) {
+        return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
+            joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
+            joinStrategy, null, joinKeyCollations);
+      }
+      // if input does not meet condition, fall back to HASH
+      joinStrategy = JoinNode.JoinStrategy.HASH;
     } else {
       // TODO: Consider adding DYNAMIC_BROADCAST as a separate join strategy
       joinStrategy = JoinNode.JoinStrategy.HASH;
@@ -364,6 +375,51 @@ public final class RelToPlanNodeConverter {
     return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
         joinStrategy);
+  }
+
+  // get and shift collation for use on merge join's join key
+  // return null if we cannot perform MergeJoin
+  @Nullable
+  private List<RelFieldCollation> getJoinKeyCollations(Join join, JoinInfo joinInfo) {
+    if (!joinInfo.isEqui()) {
+      return null;
+    }
+    if (join.getLeft().getTraitSet().getCollation() == null || join.getRight().getTraitSet().getCollation() == null) {
+      return null;
+    }
+    Preconditions.checkState(!joinInfo.leftKeys.isEmpty() && !joinInfo.rightKeys.isEmpty());
+    List<RelFieldCollation> joinKeyCollations = new ArrayList<>();
+    List<RelFieldCollation> leftCollation = join.getLeft().getTraitSet().getCollation().getFieldCollations();
+    int idx = 0;
+    for (int joinKeyFieldIdx : joinInfo.leftKeys) {
+      for (RelFieldCollation collation : leftCollation) {
+        if (collation.getFieldIndex() == joinKeyFieldIdx) {
+          RelFieldCollation newCollation = collation.withFieldIndex(idx++);
+          joinKeyCollations.add(newCollation);
+          break;
+        }
+      }
+    }
+    // verify right key has same collation on join key
+    idx = 0;
+    List<RelFieldCollation> rightCollation = join.getRight().getTraitSet().getCollation().getFieldCollations();
+    for (int joinKeyFieldIdx : joinInfo.rightKeys) {
+      boolean hasCollation = false;
+      for (RelFieldCollation collation : rightCollation) {
+        if (collation.getFieldIndex() == joinKeyFieldIdx) {
+          RelFieldCollation leftKeyCollation = joinKeyCollations.get(idx++);
+          if (leftKeyCollation.getDirection() != collation.getDirection()) {
+            return null;
+          }
+          hasCollation = true;
+        }
+      }
+      if (!hasCollation) {
+        return null;
+      }
+    }
+
+    return joinKeyCollations;
   }
 
   private JoinNode convertLogicalAsofJoin(LogicalAsofJoin join) {
@@ -402,9 +458,10 @@ public final class RelToPlanNodeConverter {
             && matchKeys.get(1) instanceof RexExpression.InputRef,
         "ASOF_JOIN only supports match conditions with a comparison between two columns of the same type");
 
+    // sort-merge ASOF join not yet supported
     return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
-        JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()));
+        JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()), null);
   }
 
   private List<PlanNode> convertInputs(List<RelNode> inputs) {
