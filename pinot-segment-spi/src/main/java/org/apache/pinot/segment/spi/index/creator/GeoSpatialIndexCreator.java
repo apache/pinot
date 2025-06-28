@@ -35,7 +35,14 @@ public interface GeoSpatialIndexCreator extends IndexCreator {
   @Override
   default void add(@Nonnull Object value, int dictId)
       throws IOException {
-    add(deserialize((byte[]) value));
+    Geometry geometry;
+    try {
+      geometry = deserialize((byte[]) value);
+    } catch (Exception e) {
+      // Swallow the exception and treat the geometry as null
+      geometry = null;
+    }
+    add(geometry);
   }
 
   @Override
@@ -46,7 +53,7 @@ public interface GeoSpatialIndexCreator extends IndexCreator {
   /**
    * Adds the next geospatial value.
    */
-  void add(Geometry geometry)
+  void add(@Nullable Geometry geometry)
       throws IOException;
 
   /**

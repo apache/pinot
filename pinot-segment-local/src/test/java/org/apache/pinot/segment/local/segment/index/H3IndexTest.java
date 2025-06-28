@@ -91,9 +91,9 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
 
     try (MutableH3Index mutableH3Index = new MutableH3Index(h3IndexResolution)) {
       try (GeoSpatialIndexCreator onHeapCreator = new OnHeapH3IndexCreator(TEMP_DIR, onHeapColumnName,
-          h3IndexResolution);
+          h3IndexResolution, "myTable_OFFLINE");
           GeoSpatialIndexCreator offHeapCreator = new OffHeapH3IndexCreator(TEMP_DIR, offHeapColumnName,
-              h3IndexResolution)) {
+              h3IndexResolution, "myTable_OFFLINE")) {
         int docId = 0;
         while (expectedCardinalities.size() < numUniqueH3Ids) {
           double longitude = RANDOM.nextDouble() * 360 - 180;
@@ -123,6 +123,35 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
           }
         }
       }
+    }
+  }
+
+  @Test
+  public void testSkipNullOrInvalidGeometry()
+      throws Exception {
+    String columnName = "skipInvalid";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, resolution,
+        "myTable_OFFLINE")) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
+      creator.add(point);
+
+      // Invalid serialized bytes should be skipped without throwing exception
+      creator.add(new byte[]{1, 2, 3}, -1);
+
+      // Explicit null geometry should also be skipped
+      creator.add(null);
+
+      creator.seal();
+    }
+
+    File indexFile = new File(TEMP_DIR, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        H3IndexReader reader = new ImmutableH3IndexReader(buffer)) {
+      long h3Id = H3Utils.H3_CORE.latLngToCell(20, 10, res);
+      Assert.assertEquals(reader.getDocIds(h3Id).getCardinality(), 1);
     }
   }
 
