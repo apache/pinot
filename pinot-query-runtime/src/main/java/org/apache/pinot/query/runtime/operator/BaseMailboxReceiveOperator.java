@@ -132,6 +132,15 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
+  protected void sampleAndCheckInterruption() {
+    // mailbox receive operator uses passive deadline instead of the active one because it is not an active operator
+    // as it just waits for data from the mailbox.
+    // This way if timeout is reached, it will be less probable to hit the timeout here, on the stage waiting for data,
+    // than in the operator that is actively processing the data, which will produce a more meaningful error message.
+    sampleAndCheckInterruption(_context.getPassiveDeadlineMs());
+  }
+
+  @Override
   public void registerExecution(long time, int numRows) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
