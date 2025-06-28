@@ -44,9 +44,8 @@ public class PinotLogicalEnrichedJoin extends Join {
   private final RelDataType _joinRowType;
   private final RelDataType _outputRowType;
   private final List<FilterProjectRexNode> _filterProjectRexNodes;
-  // currently variableSet of Project Rel is ignored since this EnrichedJoinRel
-  //   is created at the end of logical transformations.
-  //   We don't support nested expressions in execution
+  /// currently variableSet of Project Rel is ignored since
+  /// We don't support nested expressions in execution
   private final Set<CorrelationId> _projectVariableSet;
   @Nullable
   private final List<RexNode> _squashedProjects;
