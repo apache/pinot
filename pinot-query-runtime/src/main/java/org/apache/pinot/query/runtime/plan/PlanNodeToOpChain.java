@@ -182,8 +182,6 @@ public class PlanNodeToOpChain {
       MultiStageOperator rightOperator = visit(right, context);
       JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
       switch (joinStrategy) {
-        case MERGE:
-          // TODO: create MergeJoin operator
         case HASH:
           if (node.getLeftKeys().isEmpty()) {
             // TODO: Consider adding non-equi as a separate join strategy.
