@@ -96,7 +96,6 @@ public class PinotEnrichedJoinRuleTest {
     _mocks.close();
   }
 
-  // TODO: test
   @Test
   public void testOnMatchFilterJoinCase() {
     // Create a RelOptRuleCall for a filter above join

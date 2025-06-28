@@ -171,7 +171,7 @@ public class PinotEnrichedJoinRule extends RelRule<RelRule.Config> {
     @Nullable
     PinotLogicalEnrichedJoin enrichedJoin;
 
-    final LogicalJoin join;
+    LogicalJoin join;
 
     PinotLogicalEnrichedJoin newEnrichedJoin;
 

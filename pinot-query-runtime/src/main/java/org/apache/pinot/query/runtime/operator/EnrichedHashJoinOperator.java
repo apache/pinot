@@ -39,8 +39,8 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
   private final int _projectResultSize;
   private final List<FilterProjectOperand> _filterProjectOperands;
   private final DataSchema _joinResultSchema;
-  // _projectResultSchema is currently not used because sort operation
-  //    does not care about input schema
+  /// _projectResultSchema is currently not used because sort operation
+  ///    does not care about input schema
   private final DataSchema _projectResultSchema;
   private final int _resultColumnSize;
   private final int _offset;
@@ -84,10 +84,65 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return EXPLAIN_NAME;
   }
 
-  // TODO: support filter above project predicate
-  // TODO: check null in advance and do code specialization
+  /// filter, project on a joined row view
+  private void filterProjectLimit(List<Object> rowView, List<Object[]> rows) {
+    Object[] row = null;
 
-  /** limit on a row, return false if the limit reached before adding this row */
+    for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
+      if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
+        // use rowView before reaching a project
+        if (row == null
+            ? filterDiscardRow(rowView, filterProjectOperand.getFilter())
+            : filterDiscardRow(row, filterProjectOperand.getFilter())
+        ) {
+          return;
+        }
+      } else {
+        row = row == null
+            ? projectRow(rowView, filterProjectOperand.getProject())
+            : projectRow(row, filterProjectOperand.getProject());
+      }
+    }
+
+    if (!limitRow()) {
+      return;
+    }
+
+    // if filter only, materialize rowView at the end
+    rows.add(row == null ? rowView.toArray() : row);
+  }
+
+  /// filter, project, limit on the left and right row by creating a view
+  private void filterProjectLimit(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
+      int resultColumnSize, int leftColumnSize) {
+    List<Object> rowView = JoinedRowView.of(leftRow, rightRow, resultColumnSize, leftColumnSize);
+    Object[] row = null;
+
+    for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
+      if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
+        // use rowView before reaching a project
+        if (row == null
+            ? filterDiscardRow(rowView, filterProjectOperand.getFilter())
+            : filterDiscardRow(row, filterProjectOperand.getFilter())
+        ) {
+          return;
+        }
+      } else {
+        row = row == null
+            ? projectRow(rowView, filterProjectOperand.getProject())
+            : projectRow(row, filterProjectOperand.getProject());
+      }
+    }
+
+    if (!limitRow()) {
+      return;
+    }
+
+    // if filter only, materialize rowView at the end
+    rows.add(row == null ? rowView.toArray() : row);
+  }
+
+  /// limit on a row, return false if the limit reached before adding this row
   private boolean limitRow() {
     // limit only, terminate if enough rows
     if (_rowsSeen++ == _numRowsToKeep) {
@@ -98,18 +153,18 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return true;
   }
 
-  /** filter a row by left and right child, return whether the row is filtered out */
-  private boolean filterOutRow(List<Object> rowView, TransformOperand filter) {
+  /// filter a row by left and right child, return whether the row is discarded
+  private boolean filterDiscardRow(List<Object> rowView, TransformOperand filter) {
     Object filterResult = filter.apply(rowView);
     return !BooleanUtils.isTrueInternalValue(filterResult);
   }
 
-  private boolean filterOutRow(Object[] row, TransformOperand filter) {
+  private boolean filterDiscardRow(Object[] row, TransformOperand filter) {
     Object filterResult = filter.apply(row);
     return !BooleanUtils.isTrueInternalValue(filterResult);
   }
 
-  /** return the projected row */
+  /// return the projected row
   private Object[] projectRow(List<Object> rowView, List<TransformOperand> project) {
     Object[] resultRow = new Object[project.size()];
     for (int i = 0; i < project.size(); i++) {
@@ -118,7 +173,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return resultRow;
   }
 
-  /** return the projected row from input row */
+  /// return the projected row from input row
   private Object[] projectRow(Object[] row, List<TransformOperand> project) {
     Object[] resultRow = new Object[project.size()];
     for (int i = 0; i < project.size(); i++) {
@@ -127,7 +182,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return resultRow;
   }
 
-  /** read result from _priorityQueue if sort needed, else return rows */
+  /// read result from _priorityQueue if sort needed, else return rows
   private List<Object[]> getOutputRows(List<Object[]> rows) {
     if (_numRowsToOffset <= 0) {
       return rows;
@@ -140,65 +195,6 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     }
     _numRowsToOffset -= rows.size();
     return Collections.emptyList();
-  }
-
-  /** filter, project, limit on the left and right row by creating a view */
-  private void filterProjectLimit(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
-      int resultColumnSize, int leftColumnSize) {
-    // TODO: this should handle different orders of filter, project
-    List<Object> rowView = JoinedRowView.of(leftRow, rightRow, resultColumnSize, leftColumnSize);
-    Object[] row = null;
-
-    for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
-      if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
-        // use rowView before reaching a project
-        if (row == null
-            ? filterOutRow(rowView, filterProjectOperand.getFilter())
-            : filterOutRow(row, filterProjectOperand.getFilter())
-        ) {
-          return;
-        }
-      } else {
-        row = row == null
-            ? projectRow(rowView, filterProjectOperand.getProject())
-            : projectRow(row, filterProjectOperand.getProject());
-      }
-    }
-
-    if (!limitRow()) {
-      return;
-    }
-
-    // if filter only, materialize rowView at the end
-    rows.add(row == null ? rowView.toArray() : row);
-  }
-
-  /** filter, project on a joined row view */
-  private void filterProjectLimit(List<Object> rowView, List<Object[]> rows) {
-    Object[] row = null;
-
-    for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
-      if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
-        // use rowView before reaching a project
-        if (row == null
-            ? !filterOutRow(rowView, filterProjectOperand.getFilter())
-            : !filterOutRow(row, filterProjectOperand.getFilter())
-        ) {
-          return;
-        }
-      } else {
-        row = row == null
-            ? projectRow(rowView, filterProjectOperand.getProject())
-            : projectRow(row, filterProjectOperand.getProject());
-      }
-    }
-
-    if (!limitRow()) {
-      return;
-    }
-
-    // if filter only, materialize rowView at the end
-    rows.add(row == null ? rowView.toArray() : row);
   }
 
   /**
@@ -267,7 +263,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     }
   }
 
-  /** matchNonEquiConditions that takes the row view */
+  /// matchNonEquiConditions that takes the row view
   protected final boolean matchNonEquiConditions(List<Object> rowView) {
     if (_nonEquiEvaluators.isEmpty()) {
       return true;
