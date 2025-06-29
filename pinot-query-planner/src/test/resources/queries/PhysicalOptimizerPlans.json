@@ -1,4 +1,61 @@
 {
+  "physical_opt_constant_queries": {
+    "queries": [
+      {
+        "description": "Select 1",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT 1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalValues(tuples=[[{ 1 }]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Constant only join query",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR WITH tmp1(id, name) AS (VALUES(1, 'foo')), tmp2(user_id, nm2) AS (VALUES(1, 'bar')) SELECT * FROM tmp1 JOIN tmp2 ON 1=1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalJoin(condition=[true], joinType=[inner])",
+          "\n  PhysicalValues(tuples=[[{ 1, _UTF-8'foo' }]])",
+          "\n  PhysicalValues(tuples=[[{ 1, _UTF-8'bar' }]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Query that gets optimized to a Values node",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a WHERE col1 IS NULL LIMIT 1",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalSort(fetch=[1])",
+          "\n  PhysicalValues(tuples=[[]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Constant only join query",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT COUNT(*) FROM a WHERE col1 IN (WITH tmp1(id, name) AS (VALUES(1, 'foo')), tmp2(user_id, nm) AS (VALUES(2, 'bar')) SELECT A.name FROM tmp1 AS A JOIN tmp2 AS B ON A.id = B.user_id)",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n  PhysicalAggregate(group=[{}], agg#0=[COUNT($0)], aggType=[FINAL])",
+          "\n    PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE])",
+          "\n      PhysicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
+          "\n        PhysicalJoin(condition=[=($0, $1)], joinType=[semi])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n            PhysicalProject(col1=[$0])",
+          "\n              PhysicalFilter(condition=[=($0, _UTF-8'foo')])",
+          "\n                PhysicalTableScan(table=[[default, a]])",
+          "\n          PhysicalExchange(exchangeStrategy=[PARTITIONING_EXCHANGE], distKeys=[[0]])",
+          "\n            PhysicalProject(name=[$1])",
+          "\n              PhysicalJoin(condition=[=($0, $2)], joinType=[inner])",
+          "\n                PhysicalValues(tuples=[[]])",
+          "\n                PhysicalProject(EXPR$0=[$0])",
+          "\n                  PhysicalValues(tuples=[[]])",
+          "\n"
+        ]
+      }
+    ]
+  },
   "physical_opt_chained_subqueries": {
     "queries": [
       {

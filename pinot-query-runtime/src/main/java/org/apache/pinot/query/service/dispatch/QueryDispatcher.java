@@ -320,7 +320,7 @@ public class QueryDispatcher {
         serializePlanFragments(stagePlans, serverInstancesOut, deadline);
 
     if (serverInstancesOut.isEmpty()) {
-      throw new RuntimeException("No server instances to dispatch query to");
+      return;
     }
 
     Map<String, String> requestMetadata =

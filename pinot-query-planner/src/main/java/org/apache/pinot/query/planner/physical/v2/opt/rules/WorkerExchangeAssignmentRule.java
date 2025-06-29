@@ -38,6 +38,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Sort;
+import org.apache.calcite.rel.core.Values;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
@@ -394,11 +395,17 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
    * Computes the PinotDataDistribution of the given node from the input node. This assumes that all traits of the
    * input node are already satisfied.
    */
-  private static PinotDataDistribution computeCurrentNodeDistribution(PRelNode currentNode, @Nullable PRelNode parent) {
+  private PinotDataDistribution computeCurrentNodeDistribution(PRelNode currentNode, @Nullable PRelNode parent) {
     if (currentNode.getPinotDataDistribution() != null) {
       Preconditions.checkState(isLeafStageBoundary(currentNode, parent),
           "current node should not have assigned data distribution unless it's a boundary");
       return currentNode.getPinotDataDistributionOrThrow();
+    }
+    if (currentNode.getPRelInputs().isEmpty()) {
+      Preconditions.checkState(currentNode.unwrap() instanceof Values, "Expected Values node. Found: %s",
+          currentNode.unwrap());
+      List<String> workers = List.of(String.format("0@%s", _physicalPlannerContext.getRandomInstanceId()));
+      return new PinotDataDistribution(RelDistribution.Type.SINGLETON, workers, workers.hashCode(), null, null);
     }
     PinotDataDistribution inputDistribution = currentNode.getPRelInput(0).getPinotDataDistributionOrThrow();
     PinotDataDistribution newDistribution = inputDistribution.apply(DistMappingGenerator.compute(
