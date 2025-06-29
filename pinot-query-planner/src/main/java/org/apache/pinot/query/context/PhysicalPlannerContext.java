@@ -140,7 +140,7 @@ public class PhysicalPlannerContext {
     }
     int numCandidates = _instanceIdToQueryServerInstance.size() - 1;
     return _instanceIdToQueryServerInstance.keySet().stream().filter(instanceId -> !_instanceId.equals(instanceId))
-        .collect(Collectors.toList()).get(RANDOM.nextInt(numCandidates - 1));
+        .collect(Collectors.toList()).get(numCandidates == 1 ? 0 : RANDOM.nextInt(numCandidates - 1));
   }
 
   private QueryServerInstance getBrokerQueryServerInstance() {
