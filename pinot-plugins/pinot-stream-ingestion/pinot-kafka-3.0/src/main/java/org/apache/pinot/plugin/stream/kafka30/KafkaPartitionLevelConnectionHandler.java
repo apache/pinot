@@ -117,6 +117,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   public void close()
       throws IOException {
     _consumer.close();
+    _adminClient.close();
   }
 
   @VisibleForTesting
