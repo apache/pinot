@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.Convention;
 import org.apache.calcite.plan.RelOptCluster;
+import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.plan.RelOptRuleCall;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepMatchOrder;
@@ -121,7 +122,7 @@ public class PinotEnrichedJoinRuleTest {
     LogicalFilter originalFilter = LogicalFilter.create(originalJoin, filterCondition);
     Mockito.when(_call.rel(0)).thenReturn(originalFilter);
     Mockito.when(_call.rel(1)).thenReturn(originalJoin);
-    PinotEnrichedJoinRule rule = PinotEnrichedJoinRule.Config.FILTER_JOIN.toRule();
+    RelOptRule rule = PinotEnrichedJoinRule.FILTER_JOIN;
     Mockito.when(_call.getRule()).thenReturn(rule);
     rule.onMatch(_call);
 
@@ -153,7 +154,7 @@ public class PinotEnrichedJoinRuleTest {
         LogicalProject.create(originalJoin, Collections.emptyList(), projects, List.of("projectCol1"));
     Mockito.when(_call.rel(0)).thenReturn(project);
     Mockito.when(_call.rel(1)).thenReturn(originalJoin);
-    PinotEnrichedJoinRule rule = PinotEnrichedJoinRule.Config.PROJECT_JOIN.toRule();
+    RelOptRule rule = PinotEnrichedJoinRule.PROJECT_JOIN;
     Mockito.when(_call.getRule()).thenReturn(rule);
     rule.onMatch(_call);
 
