@@ -492,6 +492,41 @@ public class CommonConstants {
         "pinot.broker.enable.dynamic.filtering.semijoin";
     public static final boolean DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN = true;
 
+    /**
+     * Whether to use physical optimizer by default.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_PHYSICAL_OPTIMIZER} query option
+     */
+    public static final String CONFIG_OF_USE_PHYSICAL_OPTIMIZER = "pinot.broker.use.physical.optimizer";
+    public static final boolean DEFAULT_USE_PHYSICAL_OPTIMIZER = true;
+
+    /**
+     * Whether to use lite mode by default.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_LITE_MODE} query option
+     */
+    public static final String CONFIG_OF_USE_LITE_MODE = "pinot.broker.use.lite.mode";
+    public static final boolean DEFAULT_USE_LITE_MODE = false;
+
+    /**
+     * Whether to run in broker by default.
+     * This value can always be overridden by {@link Request.QueryOptionKey#RUN_IN_BROKER} query option
+     */
+    public static final String CONFIG_OF_RUN_IN_BROKER = "pinot.broker.run.in.broker";
+    public static final boolean DEFAULT_RUN_IN_BROKER = true;
+
+    /**
+     * Whether to use broker pruning by default.
+     * This value can always be overridden by {@link Request.QueryOptionKey#USE_BROKER_PRUNING} query option
+     */
+    public static final String CONFIG_OF_USE_BROKER_PRUNING = "pinot.broker.use.broker.pruning";
+    public static final boolean DEFAULT_USE_BROKER_PRUNING = true;
+
+    /**
+     * Default server stage limit for lite mode queries.
+     * This value can always be overridden by {@link Request.QueryOptionKey#LITE_MODE_SERVER_STAGE_LIMIT} query option
+     */
+    public static final String CONFIG_OF_LITE_MODE_SERVER_STAGE_LIMIT = "pinot.broker.lite.mode.server.stage.limit";
+    public static final int DEFAULT_LITE_MODE_SERVER_STAGE_LIMIT = 100_000;
+
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
     // would set the pool to -1 in the routing table for that server.
     public static final int FALLBACK_POOL_ID = -1;
@@ -682,6 +717,8 @@ public class CommonConstants {
         // that was supposed to be in partition-1.
         public static final String INFER_REALTIME_SEGMENT_PARTITION = "inferRealtimeSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
+        // Server stage limit for lite mode queries.
+        public static final String LITE_MODE_SERVER_STAGE_LIMIT = "liteModeServerStageLimit";
         // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
         // new MSE query optimizer.
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already

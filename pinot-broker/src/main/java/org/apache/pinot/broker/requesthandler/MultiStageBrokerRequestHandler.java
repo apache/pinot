@@ -374,6 +374,21 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     boolean defaultEnableDynamicFilteringSemiJoin = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN,
         CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN);
+    boolean defaultUsePhysicalOptimizer = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_USE_PHYSICAL_OPTIMIZER,
+        CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER);
+    boolean defaultUseLiteMode = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_USE_LITE_MODE,
+        CommonConstants.Broker.DEFAULT_USE_LITE_MODE);
+    boolean defaultRunInBroker = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_RUN_IN_BROKER,
+        CommonConstants.Broker.DEFAULT_RUN_IN_BROKER);
+    boolean defaultUseBrokerPruning = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_USE_BROKER_PRUNING,
+        CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING);
+    int defaultLiteModeServerStageLimit = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_LITE_MODE_SERVER_STAGE_LIMIT,
+        CommonConstants.Broker.DEFAULT_LITE_MODE_SERVER_STAGE_LIMIT);
     boolean caseSensitive = !_config.getProperty(
         CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
         CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
@@ -389,6 +404,11 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)
         .defaultEnableGroupTrim(defaultEnableGroupTrim)
         .defaultEnableDynamicFilteringSemiJoin(defaultEnableDynamicFilteringSemiJoin)
+        .defaultUsePhysicalOptimizer(defaultUsePhysicalOptimizer)
+        .defaultUseLiteMode(defaultUseLiteMode)
+        .defaultRunInBroker(defaultRunInBroker)
+        .defaultUseBrokerPruning(defaultUseBrokerPruning)
+        .defaultLiteModeServerStageLimit(defaultLiteModeServerStageLimit)
         .build();
   }
 

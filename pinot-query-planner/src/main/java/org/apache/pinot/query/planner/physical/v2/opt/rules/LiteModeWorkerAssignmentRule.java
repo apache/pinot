@@ -33,7 +33,6 @@ import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
@@ -57,7 +56,7 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
 
   public LiteModeWorkerAssignmentRule(PhysicalPlannerContext context) {
     _context = context;
-    _runInBroker = QueryOptionsUtils.isRunInBroker(context.getQueryOptions());
+    _runInBroker = context.isRunInBroker();
   }
 
   @Override
