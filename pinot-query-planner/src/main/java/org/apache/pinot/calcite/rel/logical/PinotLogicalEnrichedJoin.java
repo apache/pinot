@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.logical;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -84,7 +85,7 @@ public class PinotLogicalEnrichedJoin extends Join {
 
   public PinotLogicalEnrichedJoin withNewProject(FilterProjectRexNode project, RelDataType outputRowType,
       Set<CorrelationId> projectVariableSet) {
-    List<FilterProjectRexNode> filterProjectRexNodes = _filterProjectRexNodes;
+    List<FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>(_filterProjectRexNodes);
     filterProjectRexNodes.add(project);
     return new PinotLogicalEnrichedJoin(getCluster(), getTraitSet(), getHints(), left, right,
         getCondition(), getVariablesSet(), getJoinType(),
@@ -93,7 +94,7 @@ public class PinotLogicalEnrichedJoin extends Join {
   }
 
   public PinotLogicalEnrichedJoin withNewFilter(FilterProjectRexNode filter) {
-    List<FilterProjectRexNode> filterProjectRexNodes = _filterProjectRexNodes;
+    List<FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>(_filterProjectRexNodes);
     filterProjectRexNodes.add(filter);
     return new PinotLogicalEnrichedJoin(getCluster(), getTraitSet(), getHints(), left, right,
         getCondition(), getVariablesSet(), getJoinType(),

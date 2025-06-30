@@ -22,7 +22,6 @@ import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.plan.RelOptCluster;
-import org.apache.calcite.plan.RelOptTable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgramBuilder;
@@ -30,6 +29,7 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rel.logical.LogicalJoin;
 import org.apache.calcite.rel.logical.LogicalProject;
+import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeSystem;
@@ -42,28 +42,17 @@ import org.apache.calcite.sql.type.BasicSqlType;
 import org.apache.calcite.sql.type.ObjectSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
-import org.apache.pinot.calcite.rel.logical.PinotLogicalTableScan;
 import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.type.TypeFactory;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-
-import static org.mockito.Mockito.when;
 
 
 public class RelToPlanNodeConverterTest {
-
-  private AutoCloseable _mocks;
-  @Mock
-  private PinotLogicalTableScan _input;
 
   @Test
   public void testConvertToColumnDataTypeForObjectTypes() {
@@ -165,17 +154,11 @@ public class RelToPlanNodeConverterTest {
         DataSchema.ColumnDataType.BYTES_ARRAY);
   }
 
-  @BeforeMethod
-  public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
-  }
-
   @Test
   public void testConvertEnrichedJoinNodeTest() {
     final TypeFactory typeFactory = TypeFactory.INSTANCE;
     final RexBuilder rexBuilder = RexBuilder.DEFAULT;
     RelTraitSet traits = RelTraitSet.createEmpty();
-    Mockito.when(_input.getTraitSet()).thenReturn(traits);
 
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
@@ -189,16 +172,12 @@ public class RelToPlanNodeConverterTest {
         .add("col3", SqlTypeName.INTEGER)
         .build();
 
-    when(_input.getCluster()).thenReturn(cluster);
-    when(_input.getRowType()).thenReturn(intType);
-    RelOptTable mockTable = Mockito.mock(RelOptTable.class);
-    when(mockTable.getQualifiedName()).thenReturn(List.of("table1"));
-    when(_input.getTable()).thenReturn(mockTable);
-    when(_input.getHints()).thenReturn(ImmutableList.of());
+    LogicalValues input = new LogicalValues(cluster, traits, intType, ImmutableList.of());
+
     // join condition col0 = col1
     RexNode joinCondition = rexBuilder.makeCall(SqlStdOperatorTable.EQUALS,
         rexBuilder.makeInputRef(intType, 0), rexBuilder.makeInputRef(intType, 3));
-    LogicalJoin originalJoin = LogicalJoin.create(_input, _input, Collections.emptyList(),
+    LogicalJoin originalJoin = LogicalJoin.create(input, input, Collections.emptyList(),
         joinCondition, Collections.emptySet(), JoinRelType.INNER);
 
     // filter condition col2 = 1
@@ -215,18 +194,13 @@ public class RelToPlanNodeConverterTest {
     planner.setRoot(project);
     PinotLogicalEnrichedJoin enrichedJoin = (PinotLogicalEnrichedJoin) planner.findBestExp();
 
-    RelToPlanNodeConverter relToPlanNodeConverter = new RelToPlanNodeConverter(null);
+    RelToPlanNodeConverter relToPlanNodeConverter = new RelToPlanNodeConverter(null,
+        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
 
     PlanNode node = relToPlanNodeConverter.toPlanNode(enrichedJoin);
     assert (node instanceof EnrichedJoinNode);
 
     EnrichedJoinNode enrichedJoinNode = (EnrichedJoinNode) node;
     Assert.assertEquals(enrichedJoinNode.getFilterProjectRexes().size(), 2);
-  }
-
-  @AfterMethod
-  public void tearDown()
-      throws Exception {
-    _mocks.close();
   }
 }
