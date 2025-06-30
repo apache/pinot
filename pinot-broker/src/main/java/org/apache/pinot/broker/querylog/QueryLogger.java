@@ -338,9 +338,7 @@ public class QueryLogger {
     RLS_FILTERS_APPLIED("rlsFiltersApplied") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
-        if (params._response.getRLSFiltersApplied()) {
-          builder.append(params._response.getRLSFiltersApplied());
-        }
+        builder.append(params._response.getRLSFiltersApplied());
       }
     };
 

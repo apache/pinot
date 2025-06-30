@@ -356,6 +356,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
                     rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
                 String key = RlsUtils.buildRlsFilterKey(tableName);
                 compiledQuery.getOptions().put(key, combinedFilters);
+                _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
               });
         }
       }

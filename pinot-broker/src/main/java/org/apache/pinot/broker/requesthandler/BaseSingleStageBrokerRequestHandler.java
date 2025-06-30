@@ -456,6 +456,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           try {
             CalciteSqlParser.queryRewrite(pinotQuery, RlsFiltersRewriter.class);
             rlsFiltersApplied.set(true);
+            _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RLS_FILTERS_APPLIED, 1);
           } catch (Exception e) {
             LOGGER.error(
                 "Unable to apply RLS filter: {}. Row-level security filtering will be disabled for this query.",
