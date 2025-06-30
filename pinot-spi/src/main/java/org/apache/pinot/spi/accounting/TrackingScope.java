@@ -19,34 +19,9 @@
 package org.apache.pinot.spi.accounting;
 
 /**
- * The context for task execution information of a thread
+ * Scope for tracking resources in ThreadResourceUsageAccountant.
  */
-public interface ThreadExecutionContext {
-
-   /**
-    * SSE: Single Stage Engine
-    * MSE: Multi Stage Engine
-    * UNKNOWN: Default
-    */
-   enum TaskType {
-      SSE,
-      MSE,
-      UNKNOWN
-   }
-
-   /**
-    * get query id of the execution context
-    * @return query id in string
-    */
-   String getQueryId();
-
-   /**
-    *
-    * @return get the anchor thread of execution context
-    */
-   Thread getAnchorThread();
-
-   TaskType getTaskType();
-
-   String getWorkloadName();
+public enum TrackingScope {
+  QUERY,
+  WORKLOAD
 }
