@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 public enum DisasterRecoveryMode {
+  NONE,
   BEST_EFFORT
   // TODO: Add support for strict recovery mode.
 }

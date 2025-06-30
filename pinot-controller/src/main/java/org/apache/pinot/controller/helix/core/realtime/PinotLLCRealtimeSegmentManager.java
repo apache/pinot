@@ -113,6 +113,8 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -2572,6 +2574,15 @@ public class PinotLLCRealtimeSegmentManager {
       return true;
     }
 
+    if ((tableConfig.getIngestionConfig() != null) && (tableConfig.getIngestionConfig().getStreamIngestionConfig()
+        != null)) {
+      DisasterRecoveryMode disasterRecoveryMode =
+          tableConfig.getIngestionConfig().getStreamIngestionConfig().getDisasterRecoveryMode();
+      if (disasterRecoveryMode == DisasterRecoveryMode.BEST_EFFORT) {
+        return true;
+      }
+    }
+
     boolean isPartialUpsertEnabled = (tableConfig.getUpsertConfig() != null) && (tableConfig.getUpsertConfig().getMode()
         == UpsertConfig.Mode.PARTIAL);
     if (isPartialUpsertEnabled) {
@@ -2582,14 +2593,8 @@ public class PinotLLCRealtimeSegmentManager {
     DedupConfig dedupConfig = tableConfig.getDedupConfig();
     boolean isDedupEnabled = (dedupConfig != null) && (dedupConfig.isDedupEnabled());
     if (isDedupEnabled) {
-      DisasterRecoveryMode disasterRecoveryMode = dedupConfig.getDisasterRecoveryMode();
-      if (disasterRecoveryMode == null) {
-        // If dedup is enabled and disaster recovery mode is null, do not allow repair of error segment.
-        return false;
-      } else if (disasterRecoveryMode == DisasterRecoveryMode.BEST_EFFORT) {
-        // If dedup is enabled and disaster recovery mode is BEST_EFFORT, allow repair of error segment.
-        return true;
-      }
+      // If dedup is enabled, do not allow repair of error segment.
+      return false;
     }
 
     return true;
