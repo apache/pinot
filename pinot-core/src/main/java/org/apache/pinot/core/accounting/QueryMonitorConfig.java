@@ -76,7 +76,6 @@ public class QueryMonitorConfig {
   // CPU time based killing threshold
   private final long _cpuTimeBasedKillingThresholdNS;
 
-  //
   private final boolean _isQueryKilledMetricEnabled;
 
   public QueryMonitorConfig(PinotConfiguration config, long maxHeapSize) {
@@ -344,10 +343,6 @@ public class QueryMonitorConfig {
     return _gcWaitTime;
   }
 
-  public int getAlarmingSleepTimeDenominator() {
-    return _alarmingSleepTimeDenominator;
-  }
-
   public int getAlarmingSleepTime() {
     return _alarmingSleepTime;
   }
@@ -360,7 +355,7 @@ public class QueryMonitorConfig {
     return _publishHeapUsageMetric;
   }
 
-  public boolean isCPUTimeBasedKillingEnabled() {
+  public boolean isCpuTimeBasedKillingEnabled() {
     return _isCPUTimeBasedKillingEnabled;
   }
 

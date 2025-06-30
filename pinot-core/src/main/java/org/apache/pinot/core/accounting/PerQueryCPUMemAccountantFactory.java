@@ -349,6 +349,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       threadEntry.setToIdle();
     }
 
+    public WatcherTask getWatcherTask() {
+      return _watcherTask;
+    }
+
     @Override
     public void startWatcherTask() {
       EXECUTOR_SERVICE.submit(_watcherTask);
@@ -624,6 +628,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
       }
 
+      public QueryMonitorConfig getQueryMonitorConfig() {
+        return _queryMonitorConfig.get();
+      }
+
       @Override
       public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
         // Filter configs that have CommonConstants.PREFIX_SCHEDULER_PREFIX
@@ -667,7 +675,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.info("_oomKillQueryEnabled: {}", queryMonitorConfig.isOomKillQueryEnabled());
         LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
         LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}",
-            queryMonitorConfig.isCPUTimeBasedKillingEnabled(), queryMonitorConfig.getCpuTimeBasedKillingThresholdNS());
+            queryMonitorConfig.isCpuTimeBasedKillingEnabled(), queryMonitorConfig.getCpuTimeBasedKillingThresholdNS());
       }
 
       @Override
@@ -746,7 +754,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       private void evalTriggers() {
         QueryMonitorConfig config = _queryMonitorConfig.get();
 
-        if (config.isCPUTimeBasedKillingEnabled()) {
+        if (config.isCpuTimeBasedKillingEnabled()) {
           _triggeringLevel = TriggeringLevel.CPUTimeBasedKilling;
         }
 
