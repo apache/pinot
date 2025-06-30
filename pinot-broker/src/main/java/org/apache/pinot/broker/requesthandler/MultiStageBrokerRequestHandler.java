@@ -306,10 +306,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (sqlNodeAndOptions.getSqlNode().getKind() == SqlKind.EXPLAIN) {
         return explain(compiledQuery, requestId, requestContext, queryTimer);
       } else {
-        BrokerResponse response =
-            query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer);
-        response.setRLSFiltersApplied(rlsFiltersApplied.get());
-        return response;
+        return query(compiledQuery, requestId, requesterIdentity, requestContext, httpHeaders, queryTimer,
+            rlsFiltersApplied.get());
       }
     }
   }
@@ -429,7 +427,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   private BrokerResponse query(QueryEnvironment.CompiledQuery query, long requestId,
-      RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer)
+      RequesterIdentity requesterIdentity, RequestContext requestContext, HttpHeaders httpHeaders, Timer timer,
+      boolean rlsFiltersApplied)
       throws QueryException, WebApplicationException {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.planQuery(requestId), timer);
@@ -569,6 +568,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (QueryOptionsUtils.shouldDropResults(query.getOptions())) {
         brokerResponse.setResultTable(null);
       }
+
+      // set if rls (row level security) filters have been applied on the query
+      brokerResponse.setRLSFiltersApplied(rlsFiltersApplied);
 
       // Log query and stats
       _queryLogger.log(

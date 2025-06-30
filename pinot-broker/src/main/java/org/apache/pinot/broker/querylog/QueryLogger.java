@@ -334,6 +334,14 @@ public class QueryLogger {
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
           builder.append(params._response.getPools());
       }
+    },
+    RLS_FILTERS_APPLIED("rlsFiltersApplied") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        if (params._response.getRLSFiltersApplied()) {
+          builder.append(params._response.getRLSFiltersApplied());
+        }
+      }
     };
 
     public final String _entryName;
