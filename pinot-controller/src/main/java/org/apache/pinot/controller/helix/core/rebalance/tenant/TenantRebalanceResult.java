@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -32,6 +33,8 @@ import java.util.Set;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -40,6 +43,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceSummaryResult;
     "aggregatedRebalanceSummary", "rebalanceTableResults"
 })
 public class TenantRebalanceResult {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TenantRebalanceResult.class);
   private String _jobId;
   private Map<String, RebalanceResult> _rebalanceTableResults;
 
@@ -131,6 +135,8 @@ public class TenantRebalanceResult {
               erroredTablesByCheck.get(checkName).put(tableName, message);
               break;
             default:
+              LOGGER.warn("Unknown pre-check status '{}' for table '{}', check '{}'. Ignoring.",
+                  checkResult.getPreCheckStatus(), tableName, checkName);
               break; // Ignore unknown statuses
           }
         }
@@ -300,7 +306,7 @@ public class TenantRebalanceResult {
   private static class AggregatedServerSegmentChangeInfo extends RebalanceSummaryResult.ServerSegmentChangeInfo {
 
     AggregatedServerSegmentChangeInfo() {
-      super(RebalanceSummaryResult.ServerStatus.UNCHANGED, 0, 0, 0, 0, 0, null);
+      super(RebalanceSummaryResult.ServerStatus.UNCHANGED, 0, 0, 0, 0, 0, new ArrayList<>());
     }
 
     void merge(RebalanceSummaryResult.ServerSegmentChangeInfo changeInfo) {
@@ -311,8 +317,8 @@ public class TenantRebalanceResult {
       _segmentsUnchanged += changeInfo.getSegmentsUnchanged();
 
       // Use tag list from any of the change infos (should be consistent)
-      if (_tagList == null && changeInfo.getTagList() != null) {
-        _tagList = changeInfo.getTagList();
+      if (changeInfo.getTagList() != null) {
+        _tagList = new ArrayList<>(Sets.union(new HashSet<>(_tagList), new HashSet<>(changeInfo.getTagList())));
       }
       if (_totalSegmentsAfterRebalance == 0) {
         _serverStatus = RebalanceSummaryResult.ServerStatus.REMOVED;
@@ -541,13 +547,12 @@ public class TenantRebalanceResult {
       }
     }
 
-    // Keep only top k segments with the highest offsets
+    // Sort consuming segments (top one from each table) by offsets and age
     Map<String, Integer> sortedConsumingSegmentsWithMostOffsetsPerTable = new LinkedHashMap<>();
     consumingSegmentsWithMostOffsetsPerTable.entrySet().stream()
         .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
         .forEach(entry -> sortedConsumingSegmentsWithMostOffsetsPerTable.put(entry.getKey(), entry.getValue()));
 
-    // Keep only top k segments with the oldest ages
     Map<String, Integer> sortedConsumingSegmentsWithOldestAgePerTable = new LinkedHashMap<>();
     consumingSegmentsWithOldestAgePerTable.entrySet().stream()
         .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
