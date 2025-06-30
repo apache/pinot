@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.List;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
@@ -129,6 +130,7 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
         .get(0)
         .put(StreamConfigProperties.PAUSELESS_SEGMENT_DOWNLOAD_TIMEOUT_SECONDS, "10");
     streamIngestionConfig.setPauselessConsumptionEnabled(true);
+    streamIngestionConfig.setDisasterRecoveryMode(DisasterRecoveryMode.ALWAYS);
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
 
     addTableConfig(tableConfig);

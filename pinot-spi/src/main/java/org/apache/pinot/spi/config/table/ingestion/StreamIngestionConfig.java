@@ -57,7 +57,7 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   @JsonPropertyDescription("Recovery mode which is used to decide how to recover a segment online in IS but having no"
       + " completed (immutable) replica on any server in pause-less ingestion")
-  private DisasterRecoveryMode _disasterRecoveryMode = DisasterRecoveryMode.ALWAYS;
+  private DisasterRecoveryMode _disasterRecoveryMode = DisasterRecoveryMode.DEFAULT;
 
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
