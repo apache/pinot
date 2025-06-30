@@ -184,7 +184,6 @@ public class SelectionOperatorService {
 
   private List<Object[]> processSingleDataTable(DataTable dataTable) {
     List<Object[]> resultRows = new ArrayList<>();
-    int offsetCounter = _offset;
     DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
     int numColumns = _dataSchema.size();
     int numRows = dataTable.getNumberOfRows();
@@ -201,30 +200,16 @@ public class SelectionOperatorService {
       for (int rowId = start; rowId < end; rowId++) {
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
         setNullsForRow(nullBitmaps, rowId, row);
-        if (offsetCounter > 0) {
-          offsetCounter--;
-        } else {
-          Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
-          resultRows.add(resultRow);
-        }
+        Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
+        resultRows.add(resultRow);
         Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
-        if (resultRows.size() == _limit) {
-          break;
-        }
       }
     } else {
       for (int rowId = start; rowId < end; rowId++) {
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
-        if (offsetCounter > 0) {
-          offsetCounter--;
-        } else {
-          Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
-          resultRows.add(resultRow);
-        }
+        Object[] resultRow = formatRow(numColumns, row, columnDataTypes);
+        resultRows.add(resultRow);
         Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
-        if (resultRows.size() == _limit) {
-          break;
-        }
       }
     }
     return resultRows;

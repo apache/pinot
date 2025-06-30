@@ -106,6 +106,132 @@ public class SelectionOrderByTest {
   }
 
   @Test
+  public void testSingleTableLimitOffsetSmallerThanResultSize()
+      throws IOException {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(
+            new PinotConfiguration(Map.of(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT col1 FROM testTable ORDER BY col1 LIMIT 1 OFFSET 1");
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    // sorted block
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 1);
+    dataTableBuilder.finishRow();
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 2);
+    dataTableBuilder.finishRow();
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 3);
+    dataTableBuilder.finishRow();
+
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(DataTable.MetadataKey.SORTED.getName(), "true");
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    int numSortedInstances = 1;
+    for (int i = 0; i < numSortedInstances; i++) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i, TableType.OFFLINE);
+      dataTableMap.put(instance, dataTable);
+    }
+    long reduceTimeoutMs = 100000;
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap, reduceTimeoutMs,
+            mock(BrokerMetrics.class));
+    brokerReduceService.shutDown();
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 1);
+    assertEquals(rows.get(0), new Object[]{2});
+  }
+
+  @Test
+  public void testSingleTableLimitOffsetLargerThanResultSize()
+      throws IOException {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(
+            new PinotConfiguration(Map.of(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT col1 FROM testTable ORDER BY col1 LIMIT 3 OFFSET 1");
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    // sorted block
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 1);
+    dataTableBuilder.finishRow();
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 2);
+    dataTableBuilder.finishRow();
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 3);
+    dataTableBuilder.finishRow();
+
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(DataTable.MetadataKey.SORTED.getName(), "true");
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    int numSortedInstances = 1;
+    for (int i = 0; i < numSortedInstances; i++) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i, TableType.OFFLINE);
+      dataTableMap.put(instance, dataTable);
+    }
+    long reduceTimeoutMs = 100000;
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap, reduceTimeoutMs,
+            mock(BrokerMetrics.class));
+    brokerReduceService.shutDown();
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 2);
+    assertEquals(rows.get(0), new Object[]{2});
+    assertEquals(rows.get(1), new Object[]{3});
+  }
+
+  @Test
+  public void testSingleTableOffsetLargerThanResultSize()
+      throws IOException {
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(
+            new PinotConfiguration(Map.of(CommonConstants.Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+    BrokerRequest brokerRequest =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT col1 FROM testTable ORDER BY col1 LIMIT 1 OFFSET 4");
+    DataSchema dataSchema =
+        new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(dataSchema);
+    // sorted block
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 1);
+    dataTableBuilder.finishRow();
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 2);
+    dataTableBuilder.finishRow();
+    dataTableBuilder.startRow();
+    dataTableBuilder.setColumn(0, 3);
+    dataTableBuilder.finishRow();
+
+    DataTable dataTable = dataTableBuilder.build();
+    dataTable.getMetadata().put(DataTable.MetadataKey.SORTED.getName(), "true");
+    Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
+    int numSortedInstances = 1;
+    for (int i = 0; i < numSortedInstances; i++) {
+      ServerRoutingInstance instance = new ServerRoutingInstance("localhost", i, TableType.OFFLINE);
+      dataTableMap.put(instance, dataTable);
+    }
+    long reduceTimeoutMs = 100000;
+    BrokerResponseNative brokerResponse =
+        brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap, reduceTimeoutMs,
+            mock(BrokerMetrics.class));
+    brokerReduceService.shutDown();
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+    List<Object[]> rows = resultTable.getRows();
+    assertEquals(rows.size(), 0);
+  }
+
+  @Test
   public void testSingleTableWithNull()
       throws IOException {
     BrokerReduceService brokerReduceService =
