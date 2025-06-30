@@ -28,40 +28,19 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.mockito.Mock;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.Mockito.when;
-import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertTrue;
 
 
 public class EnrichedHashJoinOperatorTest {
   private AutoCloseable _mocks;
   private MultiStageOperator _leftInput;
   private MultiStageOperator _rightInput;
-  @Mock
-  private VirtualServerAddress _serverAddress;
-
   private static final DataSchema DEFAULT_CHILD_SCHEMA = new DataSchema(new String[]{"int_col", "string_col"},
       new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING});
-
-  @BeforeMethod
-  public void setUp() {
-    _mocks = openMocks(this);
-    when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
-  }
-
-  @AfterMethod
-  public void tearDown()
-      throws Exception {
-    _mocks.close();
-  }
 
   @Test
   public void shouldHandleBasicInnerJoin() {
@@ -601,7 +580,6 @@ public class EnrichedHashJoinOperatorTest {
     assertEquals(resultRows.get(0)[1], "BB");
     assertEquals(resultRows.get(1), new Object[]{null, null, 4, "Bd"});
   }
-
 
   // utils ----
   private EnrichedHashJoinOperator getOperator(DataSchema leftSchema, DataSchema resultSchema, JoinRelType joinType,
