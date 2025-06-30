@@ -313,21 +313,16 @@ public class SelectionOperatorUtils {
     List<Object[]> sortedRows1 = mergedBlock.getRows();
     List<Object[]> sortedRows2 = blockToMerge.getRows();
     Comparator<? super Object[]> comparator = mergedBlock.getComparator();
-    List<Object[]> mergedRows = mergeWithOrderingList(sortedRows1, sortedRows2, comparator, maxNumRows);
-    mergedBlock.setRows(mergedRows);
-  }
-
-  public static List<Object[]> mergeWithOrderingList(List<Object[]> sortedRows1, List<Object[]> sortedRows2,
-      Comparator<? super Object[]> comparator, int maxNumRows) {
     assert comparator != null;
     int numSortedRows1 = sortedRows1.size();
     int numSortedRows2 = sortedRows2.size();
     if (numSortedRows1 == 0) {
-      return sortedRows2;
+      mergedBlock.setRows(sortedRows2);
+      return;
     }
     if (numSortedRows2 == 0 || (numSortedRows1 == maxNumRows
         && comparator.compare(sortedRows1.get(numSortedRows1 - 1), sortedRows2.get(0)) <= 0)) {
-      return sortedRows1;
+      return;
     }
     int numRowsToMerge = Math.min(numSortedRows1 + numSortedRows2, maxNumRows);
     List<Object[]> mergedRows = new ArrayList<>(numRowsToMerge);
@@ -355,7 +350,7 @@ public class SelectionOperatorUtils {
         mergedRows.addAll(sortedRows2.subList(i2, i2 + numRowsToMerge - numMergedRows));
       }
     }
-    return mergedRows;
+    mergedBlock.setRows(mergedRows);
   }
 
   /**
