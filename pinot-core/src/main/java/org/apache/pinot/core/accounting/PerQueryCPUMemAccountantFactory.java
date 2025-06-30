@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -353,6 +354,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       EXECUTOR_SERVICE.submit(_watcherTask);
     }
 
+    @Override
+    public PinotClusterConfigChangeListener getClusterConfigChangeListener() {
+      return _watcherTask;
+    }
+
     /**
      * remove in active queries from _finishedTaskStatAggregator
      */
@@ -573,7 +579,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     public class WatcherTask implements Runnable, PinotClusterConfigChangeListener {
 
-      protected AtomicReference<QueryMonitorConfig> _queryMonitorConfig;
+      protected AtomicReference<QueryMonitorConfig> _queryMonitorConfig = new AtomicReference<>();
 
       protected long _usedBytes;
       protected int _sleepTime;
@@ -620,7 +626,25 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       @Override
       public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-        _queryMonitorConfig.set(new QueryMonitorConfig(_queryMonitorConfig.get(), changedConfigs, clusterConfigs));
+        // Filter configs that have CommonConstants.PREFIX_SCHEDULER_PREFIX
+        Set<String> filteredChangedConfigs = changedConfigs.stream().filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
+            .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
+            .collect(Collectors.toSet());
+
+        if (filteredChangedConfigs.isEmpty()) {
+          LOGGER.debug("No relevant configs changed, skipping update for QueryMonitorConfig.");
+          return;
+        }
+
+        Map<String, String> filteredClusterConfigs = clusterConfigs.entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
+            .collect(Collectors.toMap(
+                entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
+                Map.Entry::getValue));
+
+        QueryMonitorConfig oldConfig = _queryMonitorConfig.get();
+        QueryMonitorConfig newConfig = new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+        _queryMonitorConfig.set(newConfig);
         logQueryMonitorConfig();
       }
 
