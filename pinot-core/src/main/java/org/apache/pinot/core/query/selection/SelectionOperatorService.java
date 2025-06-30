@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.selection;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
@@ -188,9 +189,16 @@ public class SelectionOperatorService {
     int numColumns = _dataSchema.size();
     int numRows = dataTable.getNumberOfRows();
 
+    if (numRows <= _offset) {
+      return Collections.emptyList();
+    }
+
+    int start = _offset;
+    int end = Math.min(numRows, _offset + _limit);
+
     if (_queryContext.isNullHandlingEnabled()) {
       RoaringBitmap[] nullBitmaps = getNullBitmap(dataTable);
-      for (int rowId = 0; rowId < numRows; rowId++) {
+      for (int rowId = start; rowId < end; rowId++) {
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
         setNullsForRow(nullBitmaps, rowId, row);
         if (offsetCounter > 0) {
@@ -205,7 +213,7 @@ public class SelectionOperatorService {
         }
       }
     } else {
-      for (int rowId = 0; rowId < numRows; rowId++) {
+      for (int rowId = start; rowId < end; rowId++) {
         Object[] row = SelectionOperatorUtils.extractRowFromDataTable(dataTable, rowId);
         if (offsetCounter > 0) {
           offsetCounter--;

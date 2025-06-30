@@ -506,6 +506,25 @@ public class SelectionOrderByTest {
   }
 
   @Test
+  public void listOffsetLimitSmallerThanResultSize() {
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(SINGLE_FIELD_NULLABLE_DIMENSION_SCHEMAS.get(FieldSpec.DataType.INT), SINGLE_FIELD_TABLE_CONFIG)
+        .onFirstInstance(
+            new Object[]{1},
+            new Object[]{3}
+        )
+        .andOnSecondInstance(
+            new Object[]{2}
+        )
+        .whenQuery("select myField from testTable order by myField offset 1 limit 3")
+        .thenResultIs("INTEGER",
+            "2",
+            "3"
+        );
+  }
+
+  @Test
   public void listOffsetLargerThanResult() {
     FluentQueryTest.withBaseDir(_baseDir)
         .withNullHandling(false)
