@@ -2,20 +2,26 @@
   "tableName": "testTable",
   "segmentsConfig": {
     "replication": "1",
-    "schemaName": "testTable",
     "timeColumnName": "time"
   },
   "fieldConfigList": [
     {
-      "encodingType": "DICTIONARY",
-      "indexType": "RANGE",
-      "name": "hits"
+      "encodingType": "RAW",
+      "indexType": "TEXT",
+      "name": "event_text",
+      "properties": {
+        "deriveNumDocsPerChunkForRawIndex": "true",
+        "rawIndexWriterVersion": "3"
+      }
     }
   ],
   "tableIndexConfig": {
     "invertedIndexColumns": [],
-    "rangeIndexColumns": [
-      "hits"
+    "jsonIndexColumns": [
+      "event_text",
+      "group_text",
+      "member_text",
+      "venue_text"
     ],
     "loadMode": "HEAP"
   },

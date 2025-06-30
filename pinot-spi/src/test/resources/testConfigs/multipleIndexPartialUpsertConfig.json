@@ -1,8 +1,7 @@
 {
-  "tableName": "testTable",
+  "tableName": "testTableUpsert",
   "segmentsConfig": {
     "replication": "1",
-    "schemaName": "testTable",
     "timeColumnName": "time"
   },
   "fieldConfigList": [
@@ -28,6 +27,14 @@
     "broker": "DefaultTenant",
     "server": "DefaultTenant"
   },
-  "tableType": "OFFLINE",
+  "tableType": "REALTIME",
+  "upsertConfig": {
+    "mode": "PARTIAL",
+    "comparisonColumn": "_comparison_column",
+    "partialUpsertStrategies": {},
+    "defaultPartialUpsertStrategy": "OVERWRITE",
+    "hashFunction": "MURMUR3",
+    "enableSnapshot": false
+  },
   "metadata": {}
 }

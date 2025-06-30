@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.segment.index.creator;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -248,18 +247,12 @@ public class SegmentGenerationWithTimeColumnTest implements PinotBuffersAfterMet
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      HashMap<String, Object> map = new HashMap<>();
-
+      GenericRow row = new GenericRow();
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        Object value;
-
-        value = getRandomValueForColumn(fieldSpec, isSimpleDate, isInvalidDate, timeZoneSuffix);
-        map.put(fieldSpec.getName(), value);
+        row.putValue(fieldSpec.getName(),
+            getRandomValueForColumn(fieldSpec, isSimpleDate, isInvalidDate, timeZoneSuffix));
       }
-
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      rows.add(row);
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

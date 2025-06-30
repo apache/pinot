@@ -19,6 +19,7 @@
 package org.apache.pinot.perf;
 
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -65,24 +66,24 @@ public class BenchmarkThreadResourceUsageProvider {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchThreadMXBeanThreadCPUTime(MyState myState, Blackhole bh) {
-    bh.consume(myState._threadResourceUsageProvider.getThreadTimeNs());
+    bh.consume(myState._threadResourceSnapshot.getCpuTimeNs());
   }
 
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MILLISECONDS)
   public void benchThreadMXBeanMem(MyState myState, Blackhole bh) {
-    bh.consume(myState._threadResourceUsageProvider.getThreadAllocatedBytes());
+    bh.consume(myState._threadResourceSnapshot.getAllocatedBytes());
   }
 
   @State(Scope.Benchmark)
   public static class MyState {
-    ThreadResourceUsageProvider _threadResourceUsageProvider;
+    ThreadResourceSnapshot _threadResourceSnapshot;
     long[] _allocation;
 
     @Setup(Level.Iteration)
     public void doSetup() {
-      _threadResourceUsageProvider = new ThreadResourceUsageProvider();
+      _threadResourceSnapshot = new ThreadResourceSnapshot();
     }
 
     @Setup(Level.Invocation)

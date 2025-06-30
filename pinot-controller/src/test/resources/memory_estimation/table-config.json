@@ -9,7 +9,6 @@
     "replication": "3",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "5",
-    "schemaName": "testTable",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "segmentPushFrequency": "daily",
     "segmentPushType": "APPEND",

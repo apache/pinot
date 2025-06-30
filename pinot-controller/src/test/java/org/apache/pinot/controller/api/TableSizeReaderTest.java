@@ -41,7 +41,7 @@ import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.MetricValueUtils;
 import org.apache.pinot.common.restlet.resources.SegmentSizeInfo;
 import org.apache.pinot.common.restlet.resources.TableSizeInfo;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
@@ -98,10 +98,10 @@ public class TableSizeReaderTest {
         .thenAnswer((Answer) invocationOnMock -> {
           String path = (String) invocationOnMock.getArguments()[0];
           if (path.contains("realtime_REALTIME")) {
-            return TableConfigUtils.toZNRecord(tableConfig);
+            return TableConfigSerDeUtils.toZNRecord(tableConfig);
           }
           if (path.contains("offline_OFFLINE")) {
-            return TableConfigUtils.toZNRecord(tableConfig);
+            return TableConfigSerDeUtils.toZNRecord(tableConfig);
           }
           return null;
         });

@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.miscellaneous.PerFieldAnalyzerWrapper;
 import org.apache.lucene.document.Document;
@@ -350,7 +351,34 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
   }
 
   @Override
-  public MutableRoaringBitmap getDocIds(String column, String searchQuery) {
+  public MutableRoaringBitmap getDocIds(String column, String searchQuery, @Nullable String optionsString) {
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      if (!options.getOptions().isEmpty()) {
+        return getDocIdsWithOptions(column, searchQuery, options);
+      }
+    }
+    return getDocIdsWithoutOptions(column, searchQuery);
+  }
+
+  // TODO: Consider creating a base class (e.g., BaseLuceneTextIndexReader) to avoid code duplication
+  // for getDocIdsWithOptions method across LuceneTextIndexReader, MultiColumnLuceneTextIndexReader,
+  // RealtimeLuceneTextIndex, and MultiColumnRealtimeLuceneTextIndex
+  private MutableRoaringBitmap getDocIdsWithOptions(String column, String actualQuery,
+      LuceneTextIndexUtils.LuceneTextIndexOptions options) {
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
+    try {
+      Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, column, _analyzer);
+      _indexSearcher.search(query, docIDCollector);
+      return docIds;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed while searching the text index for column " + column
+          + " with search query: " + actualQuery, e);
+    }
+  }
+
+  private MutableRoaringBitmap getDocIdsWithoutOptions(String column, String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {

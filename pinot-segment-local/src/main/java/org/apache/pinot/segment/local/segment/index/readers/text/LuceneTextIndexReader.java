@@ -159,8 +159,24 @@ public class LuceneTextIndexReader implements TextIndexReader {
     throw new UnsupportedOperationException("");
   }
 
+  @Deprecated
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
+    return getDocIds(searchQuery, null);
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      if (!options.getOptions().isEmpty()) {
+        return getDocIdsWithOptions(searchQuery, options);
+      }
+    }
+    return getDocIdsWithoutOptions(searchQuery);
+  }
+
+  private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
     MutableRoaringBitmap docIds = new MutableRoaringBitmap();
     Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
     try {
@@ -168,11 +184,10 @@ public class LuceneTextIndexReader implements TextIndexReader {
       QueryParserBase parser = _queryParserClassConstructor.newInstance(_column, _analyzer);
       // Phrase search with prefix/suffix matching may have leading *. E.g., `*pache pinot` which can be stripped by
       // the query parser. To support the feature, we need to explicitly set the config to be true.
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser")
-              && _enablePrefixSuffixMatchingInPhraseQueries) {
+      if (_enablePrefixSuffixMatchingInPhraseQueries) {
         parser.setAllowLeadingWildcard(true);
       }
-      if (_queryParserClass.equals("org.apache.lucene.queryparser.classic.QueryParser") && _useANDForMultiTermQueries) {
+      if (_useANDForMultiTermQueries) {
         parser.setDefaultOperator(QueryParser.Operator.AND);
       }
       Query query = parser.parse(searchQuery);
@@ -188,6 +203,24 @@ public class LuceneTextIndexReader implements TextIndexReader {
       throw new RuntimeException(msg, e);
     }
   }
+
+  // TODO: Consider creating a base class (e.g., BaseLuceneTextIndexReader) to avoid code duplication
+  // for getDocIdsWithOptions method across LuceneTextIndexReader, MultiColumnLuceneTextIndexReader,
+  // RealtimeLuceneTextIndex, and MultiColumnRealtimeLuceneTextIndex
+  private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery,
+      LuceneTextIndexUtils.LuceneTextIndexOptions options) {
+    MutableRoaringBitmap docIds = new MutableRoaringBitmap();
+    Collector docIDCollector = new LuceneDocIdCollector(docIds, _docIdTranslator);
+    try {
+      Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
+      _indexSearcher.search(query, docIDCollector);
+      return docIds;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Failed while searching the text index for column " + _column + " with search query: " + actualQuery, e);
+    }
+  }
+
   /**
    * When we destroy the loaded ImmutableSegment, all the indexes
    * (for each column) are destroyed and as part of that

@@ -55,10 +55,8 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.ClusterMessagingService;
-import org.apache.helix.Criteria;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
-import org.apache.helix.InstanceType;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
@@ -99,6 +97,7 @@ import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpd
 import org.apache.pinot.controller.helix.core.realtime.segment.FlushThresholdUpdater;
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
+import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.core.data.manager.realtime.SegmentCompletionUtils;
 import org.apache.pinot.core.util.PeerServerSegmentFinder;
@@ -804,9 +803,16 @@ public class PinotLLCRealtimeSegmentManager {
         newConsumingSegmentName = newLLCSegment.getSegmentName();
         LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
             Status.IN_PROGRESS);
+      } else {
+        LOGGER.info(
+            "Skipping creation of new segment metadata after segment: {} during commit. Reason: Partition ID: {} not "
+                + "found in upstream metadata.",
+            committingSegmentName, committingSegmentPartitionGroupId);
       }
     } else {
-      LOGGER.info("Skipped creation of new segment metadata as the table: {} is paused", realtimeTableName);
+      LOGGER.info(
+          "Skipping creation of new segment metadata after segment: {} during commit. Reason: table: {} is paused.",
+          committingSegmentName, realtimeTableName);
     }
     return newConsumingSegmentName;
   }
@@ -1412,16 +1418,10 @@ public class PinotLLCRealtimeSegmentManager {
         newConsumingSegment, newInstances, realtimeTableName, instancesNoLongerServe);
 
     ClusterMessagingService messagingService = _helixManager.getMessagingService();
+    IngestionMetricsRemoveMessage message = new IngestionMetricsRemoveMessage();
     List<String> instancesSent = new ArrayList<>(instancesNoLongerServe.size());
     for (String instance : instancesNoLongerServe) {
-      Criteria recipientCriteria = new Criteria();
-      recipientCriteria.setInstanceName(instance);
-      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      recipientCriteria.setResource(realtimeTableName);
-      recipientCriteria.setPartition(committedSegment);
-      recipientCriteria.setSessionSpecific(true);
-      IngestionMetricsRemoveMessage message = new IngestionMetricsRemoveMessage();
-      if (messagingService.send(recipientCriteria, message, null, -1) > 0) {
+      if (MessagingServiceUtils.send(messagingService, message, realtimeTableName, committedSegment, instance) > 0) {
         instancesSent.add(instance);
       } else {
         LOGGER.warn("Failed to send ingestion metrics remove message for table: {} segment: {} to instance: {}",
@@ -2176,7 +2176,7 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       for (Set<String> segmentBatchToCommit : segmentBatchList) {
         if (prevBatch != null) {
-          waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch, forceCommitBatchConfig);
+          waitUntilSegmentsForceCommitted(tableNameWithType, prevBatch, forceCommitBatchConfig);
         }
         sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
         prevBatch = segmentBatchToCommit;
@@ -2187,7 +2187,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
+  public void waitUntilSegmentsForceCommitted(String tableNameWithType, Set<String> segmentsToWait,
       ForceCommitBatchConfig forceCommitBatchConfig)
       throws InterruptedException {
     int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
@@ -2200,17 +2200,17 @@ public class PinotLLCRealtimeSegmentManager {
     Set<?>[] segmentsYetToBeCommitted = new Set[1];
     try {
       retryPolicy.attempt(() -> {
-        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
+        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentsToWait);
         return segmentsYetToBeCommitted[0].isEmpty();
       });
     } catch (AttemptFailureException e) {
       String errorMsg = String.format(
           "Exception occurred while waiting for the forceCommit of segments: %s, attempt count: %d, "
-              + "segmentsYetToBeCommitted: %s", segmentBatchToCommit, e.getAttempts(), segmentsYetToBeCommitted[0]);
+              + "segmentsYetToBeCommitted: %s", segmentsToWait, e.getAttempts(), segmentsYetToBeCommitted[0]);
       throw new RuntimeException(errorMsg, e);
     }
 
-    LOGGER.info("segmentBatch: {} successfully force committed", segmentBatchToCommit);
+    LOGGER.info("segments: {} successfully force committed", segmentsToWait);
   }
 
   @VisibleForTesting
@@ -2360,20 +2360,14 @@ public class PinotLLCRealtimeSegmentManager {
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
     if (!consumingSegments.isEmpty()) {
-      Criteria recipientCriteria = new Criteria();
-      recipientCriteria.setInstanceName("%");
-      recipientCriteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
-      recipientCriteria.setResource(tableNameWithType);
-      recipientCriteria.setSessionSpecific(true);
+      LOGGER.info("Sending force commit messages for segments: {} of table: {}", consumingSegments, tableNameWithType);
+      ClusterMessagingService messagingService = _helixManager.getMessagingService();
       ForceCommitMessage message = new ForceCommitMessage(tableNameWithType, consumingSegments);
-      int numMessagesSent = _helixManager.getMessagingService().send(recipientCriteria, message, null, -1);
+      int numMessagesSent = MessagingServiceUtils.send(messagingService, message, tableNameWithType);
       if (numMessagesSent > 0) {
-        LOGGER.info("Sent {} force commit messages for table: {} segments: {}", numMessagesSent, tableNameWithType,
-            consumingSegments);
+        LOGGER.info("Sent {} force commit messages for table: {}", numMessagesSent, tableNameWithType);
       } else {
-        throw new RuntimeException(
-            String.format("No force commit message was sent for table: %s segments: %s", tableNameWithType,
-                consumingSegments));
+        throw new IllegalStateException("No force commit message sent for table: " + tableNameWithType);
       }
     }
   }

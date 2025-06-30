@@ -19,12 +19,14 @@
 package org.apache.pinot.broker.requesthandler;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -68,7 +70,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testBasicAcquireRelease()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
@@ -83,7 +85,7 @@ public class MultiStageQueryThrottlerTest {
     when(_helixAdmin.getConfig(any(),
         eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "2"));
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     Assert.assertTrue(_multiStageQueryThrottler.tryAcquire(1, 100, TimeUnit.MILLISECONDS));
@@ -99,7 +101,7 @@ public class MultiStageQueryThrottlerTest {
     when(_helixAdmin.getConfig(any(),
         eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "-1"));
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     // If maxConcurrentQueries is <= 0, the throttling mechanism should be "disabled" and any attempt to acquire should
@@ -112,7 +114,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testIncreaseNumBrokers()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     for (int i = 0; i < 2; i++) {
@@ -140,7 +142,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testDecreaseNumBrokers()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     for (int i = 0; i < 2; i++) {
@@ -162,7 +164,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testIncreaseNumServers()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     for (int i = 0; i < 2; i++) {
@@ -185,7 +187,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testDecreaseNumServers()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     for (int i = 0; i < 2; i++) {
@@ -212,7 +214,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testIncreaseMaxServerQueryThreads()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     for (int i = 0; i < 2; i++) {
@@ -233,7 +235,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testDecreaseMaxServerQueryThreads()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     for (int i = 0; i < 2; i++) {
@@ -260,7 +262,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testEnabledToDisabledTransitionDisallowed()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
@@ -286,7 +288,7 @@ public class MultiStageQueryThrottlerTest {
     when(_helixAdmin.getConfig(any(),
         eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
     ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "-1"));
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     // If maxServerQueryThreads is <= 0, the throttling mechanism should be "disabled" and any attempt to acquire should
@@ -308,8 +310,74 @@ public class MultiStageQueryThrottlerTest {
   }
 
   @Test
+  public void testCalculateMaxServerQueryThreads() {
+    // Neither config is set, both use defaults
+    when(_helixAdmin.getConfig(any(),
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of());
+
+    PinotConfiguration emptyConfig = new PinotConfiguration(); // No MSE_MAX_SERVER_QUERY_THREADS set
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(emptyConfig);
+    _multiStageQueryThrottler.init(_helixManager);
+
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), -1);
+
+    // Only cluster config is set
+    when(_helixAdmin.getConfig(any(),
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "10"));
+
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(emptyConfig);
+    _multiStageQueryThrottler.init(_helixManager);
+
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), 10);
+
+    // Only broker config is set
+    when(_helixAdmin.getConfig(any(),
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "-1"));
+
+    Map<String, Object> brokerConfigMap = new HashMap<>();
+    brokerConfigMap.put(CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS, "20");
+    PinotConfiguration brokerConfig = new PinotConfiguration(brokerConfigMap);
+
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig);
+    _multiStageQueryThrottler.init(_helixManager);
+
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), 20);
+
+    // Both configs are set. Cluster config is lower. Broker config prioritized.
+    when(_helixAdmin.getConfig(any(),
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "15"));
+
+    Map<String, Object> brokerConfigMap2 = new HashMap<>();
+    brokerConfigMap2.put(CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS, "25");
+    PinotConfiguration brokerConfig2 = new PinotConfiguration(brokerConfigMap2);
+
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig2);
+    _multiStageQueryThrottler.init(_helixManager);
+
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), 25);
+
+    // Both configs are set. Broker config is lower. Broker config prioritized.
+    when(_helixAdmin.getConfig(any(),
+        eq(Collections.singletonList(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS)))
+    ).thenReturn(Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "30"));
+
+    Map<String, Object> brokerConfigMap3 = new HashMap<>();
+    brokerConfigMap3.put(CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS, "5");
+    PinotConfiguration brokerConfig3 = new PinotConfiguration(brokerConfigMap3);
+
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(brokerConfig3);
+    _multiStageQueryThrottler.init(_helixManager);
+
+    Assert.assertEquals(_multiStageQueryThrottler.calculateMaxServerQueryThreads(), 5);
+  }
+
+  @Test
   public void testLowMaxServerQueryThreads() {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);
@@ -321,7 +389,7 @@ public class MultiStageQueryThrottlerTest {
   @Test
   public void testAcquireReleaseWithDifferentQuerySizes()
       throws Exception {
-    _multiStageQueryThrottler = new MultiStageQueryThrottler();
+    _multiStageQueryThrottler = new MultiStageQueryThrottler(new PinotConfiguration());
     _multiStageQueryThrottler.init(_helixManager);
 
     Assert.assertEquals(_multiStageQueryThrottler.availablePermits(), 4);

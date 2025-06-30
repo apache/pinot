@@ -29,8 +29,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.minion.MinionContext;
@@ -191,26 +191,26 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     @SuppressWarnings("unchecked")
     ZkHelixPropertyStore<ZNRecord> helixPropertyStore = Mockito.mock(ZkHelixPropertyStore.class);
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfig));
     Mockito
         .when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_PARTITIONING, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfigWithPartitioning));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigWithPartitioning));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_WITH_SORTED_COL, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfigWithSortedCol));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigWithSortedCol));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_EPOCH_HOURS, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfigEpochHours));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigEpochHours));
     Mockito.when(helixPropertyStore.get("/CONFIGS/TABLE/" + TABLE_NAME_SDF, null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfigSDF));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfigSDF));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTable", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(schema));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableWithPartitioning", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(schema));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableWithSortedCol", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schema));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(schema));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableEpochHours", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schemaEpochHours));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(schemaEpochHours));
     Mockito.when(helixPropertyStore.get("/SCHEMAS/testTableSDF", null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(schemaSDF));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(schemaSDF));
     minionContext.setHelixPropertyStore(helixPropertyStore);
   }
 

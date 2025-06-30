@@ -35,6 +35,8 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.MinionMeter;
+import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
@@ -113,6 +115,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   private long _totalIndexTimeNs = 0;
   private long _totalStatsCollectorTimeNs = 0;
   private boolean _continueOnError;
+  private int _incompleteRowsFound = 0;
+  private int _skippedRowsFound = 0;
+  private int _sanitizedRowsFound = 0;
 
   @Override
   public void init(SegmentGeneratorConfig config)
@@ -236,7 +241,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
-    int incompleteRowsFound = 0;
+    _incompleteRowsFound = 0;
+    _skippedRowsFound = 0;
+    _sanitizedRowsFound = 0;
     try {
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
@@ -271,7 +278,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           if (!_continueOnError) {
             throw new RuntimeException("Error occurred while reading row during indexing", e);
           } else {
-            incompleteRowsFound++;
+            _incompleteRowsFound++;
             LOGGER.debug("Error occurred while reading row during indexing", e);
             continue;
           }
@@ -281,7 +288,9 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           _indexCreator.indexRow(row);
         }
         _totalIndexTimeNs += (System.nanoTime() - recordReadStopTimeNs);
-        incompleteRowsFound += reusedResult.getIncompleteRowCount();
+        _incompleteRowsFound += reusedResult.getIncompleteRowCount();
+        _skippedRowsFound += reusedResult.getSkippedRowCount();
+        _sanitizedRowsFound += reusedResult.getSanitizedRowCount();
       }
     } catch (Exception e) {
       _indexCreator.close();
@@ -290,9 +299,27 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _recordReader.close();
     }
 
-    if (incompleteRowsFound > 0) {
+    if (_incompleteRowsFound > 0) {
       LOGGER.warn("Incomplete data found for {} records. This can be due to error during reader or transformations",
-          incompleteRowsFound);
+          _incompleteRowsFound);
+    }
+    if (_skippedRowsFound > 0) {
+      LOGGER.info("Skipped {} records during transformation", _skippedRowsFound);
+    }
+    if (_sanitizedRowsFound > 0) {
+      LOGGER.info("Sanitized {} records during transformation", _sanitizedRowsFound);
+    }
+
+    MinionMetrics metrics = MinionMetrics.get();
+    String tableNameWithType = _config.getTableConfig().getTableName();
+    if (_incompleteRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
+    }
+    if (_skippedRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.DROPPED_RECORD_COUNT, _skippedRowsFound);
+    }
+    if (_sanitizedRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
     }
 
     LOGGER.info("Finished records indexing in IndexCreator!");
@@ -615,5 +642,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public SegmentPreIndexStatsContainer getSegmentStats() {
     return _segmentStats;
+  }
+
+  public int getIncompleteRowsFound() {
+    return _incompleteRowsFound;
+  }
+
+  public int getSkippedRowsFound() {
+    return _skippedRowsFound;
+  }
+
+  public int getSanitizedRowsFound() {
+    return _sanitizedRowsFound;
   }
 }

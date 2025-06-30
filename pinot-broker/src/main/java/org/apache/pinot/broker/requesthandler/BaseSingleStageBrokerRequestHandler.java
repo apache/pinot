@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,7 @@ import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -122,6 +124,8 @@ import org.apache.pinot.sql.FilterKind;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.sql.parsers.rewriter.RlsFiltersRewriter;
+import org.apache.pinot.sql.parsers.rewriter.RlsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -432,6 +436,29 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
+      }
+
+      if (_enableRowColumnLevelAuth) {
+        TableRowColAccessResult rlsFilters = accessControl.getRowColFilters(requesterIdentity, tableName);
+
+        //rewrite query
+        Map<String, String> queryOptions =
+            pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
+
+        rlsFilters.getRLSFilters().ifPresent(rowFilters -> {
+          String combinedFilters =
+              rowFilters.stream().map(filter -> "( " + filter + " )").collect(Collectors.joining(" AND "));
+          String rowFiltersKey = RlsUtils.buildRlsFilterKey(rawTableName);
+          queryOptions.put(rowFiltersKey, combinedFilters);
+          pinotQuery.setQueryOptions(queryOptions);
+          try {
+            CalciteSqlParser.queryRewrite(pinotQuery, RlsFiltersRewriter.class);
+          } catch (Exception e) {
+            LOGGER.error(
+                "Unable to apply RLS filter: {}. Row-level security filtering will be disabled for this query.",
+                RlsFiltersRewriter.class.getName(), e);
+          }
+        });
       }
 
       // Validate QPS quota

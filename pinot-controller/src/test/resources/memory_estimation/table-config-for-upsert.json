@@ -13,7 +13,6 @@
     "replication": "3",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "5",
-    "schemaName": "restletTable_UPSERT",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "segmentPushFrequency": "daily",
     "segmentPushType": "APPEND",

@@ -4,7 +4,6 @@
   "segmentsConfig": {
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "fineFoodReviews",
     "replication": "1"
   },
   "tenants": {
