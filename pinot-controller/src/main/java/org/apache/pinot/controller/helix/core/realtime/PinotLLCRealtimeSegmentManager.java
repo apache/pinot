@@ -2578,7 +2578,7 @@ public class PinotLLCRealtimeSegmentManager {
         == UpsertConfig.Mode.PARTIAL);
     if (isPartialUpsertEnabled) {
       // If isPartialUpsert is enabled, do not allow repair.
-      LOGGER.error("Skipping repair for errored segments in table: {} because partialUpsert is enabled",
+      LOGGER.warn("Skipping repair for errored segments in table: {} because partialUpsert is enabled",
           tableConfig.getTableName());
       return false;
     }
@@ -2587,7 +2587,7 @@ public class PinotLLCRealtimeSegmentManager {
     boolean isDedupEnabled = (dedupConfig != null) && (dedupConfig.isDedupEnabled());
     if (isDedupEnabled) {
       // If dedup is enabled, do not allow repair of error segment.
-      LOGGER.error("Skipping repair for errored segments in table: {} because dedup is enabled",
+      LOGGER.warn("Skipping repair for errored segments in table: {} because dedup is enabled",
           tableConfig.getTableName());
       return false;
     }
