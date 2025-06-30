@@ -181,17 +181,28 @@ public class QueryOptionsUtils {
     return skipIndexes;
   }
 
-  @Nullable
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
-    // Example config:  skipPlannerRules='FilterIntoJoinRule,FilterAggregateTransposeRule'
+    // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
     String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
     if (skipIndexesStr == null) {
-      return null;
+      return Collections.emptySet();
     }
 
     String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
 
     return new HashSet<>(List.of(skippedRules));
+  }
+
+  public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
+    // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
+    String usedIndexesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
+    if (usedIndexesStr == null) {
+      return Collections.emptySet();
+    }
+
+    String[] usedRules = StringUtils.split(usedIndexesStr, ',');
+
+    return new HashSet<>(List.of(usedRules));
   }
 
   @Nullable
@@ -345,6 +356,7 @@ public class QueryOptionsUtils {
     String numGroupsWarningLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT);
     return checkedParseIntPositive(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, numGroupsWarningLimit);
   }
+
   @Nullable
   public static Integer getMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
     String maxInitialResultHolderCapacity = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);

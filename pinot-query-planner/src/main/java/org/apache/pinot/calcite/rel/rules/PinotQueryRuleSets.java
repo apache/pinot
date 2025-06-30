@@ -39,6 +39,8 @@ import org.apache.calcite.rel.rules.ProjectToWindowRule;
 import org.apache.calcite.rel.rules.ProjectWindowTransposeRule;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
 import org.apache.calcite.rel.rules.SemiJoinRule;
+import org.apache.calcite.rel.rules.SortJoinCopyRule;
+import org.apache.calcite.rel.rules.SortJoinTransposeRule;
 import org.apache.calcite.rel.rules.SortRemoveRule;
 import org.apache.calcite.rel.rules.UnionToDistinctRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotFilterIntoJoinRule;
@@ -48,6 +50,8 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 
 /**
  * Default rule sets for Pinot query
+ * Defaultly disabled rules are defined in
+ * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES}
  */
 public class PinotQueryRuleSets {
   private PinotQueryRuleSets() {
@@ -98,7 +102,12 @@ public class PinotQueryRuleSets {
           .instanceWithDescription(PlannerRuleNames.EVALUATE_LITERAL_FILTER),
 
       // sort join rules
-      // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
+      // push sort through join for left/right outer join only, disabled by default
+      SortJoinTransposeRule.Config.DEFAULT
+              .withDescription(PlannerRuleNames.SORT_JOIN_TRANSPOSE).toRule(),
+      // copy sort below join without offset and limit, disabled by default
+      SortJoinCopyRule.Config.DEFAULT
+          .withDescription(PlannerRuleNames.SORT_JOIN_COPY).toRule(),
 
       // join rules
       JoinPushExpressionsRule.Config.DEFAULT
@@ -125,6 +134,9 @@ public class PinotQueryRuleSets {
       // push aggregate through join
       AggregateJoinTransposeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE).toRule(),
+      // push aggregate functions through join, disabled by default
+      AggregateJoinTransposeRule.Config.EXTENDED
+          .withDescription(PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED).toRule(),
       // aggregate union rule
       AggregateUnionAggregateRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.AGGREGATE_UNION_AGGREGATE).toRule(),

@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.Closeable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +55,6 @@ import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
 import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
-import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
@@ -152,7 +152,7 @@ public class QueryEnvironment {
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     // default optProgram with no skip rule options
-    _optProgram = getOptProgram(null);
+    _optProgram = getOptProgram(Collections.emptySet(), Collections.emptySet());
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
@@ -173,9 +173,10 @@ public class QueryEnvironment {
     HepProgram optProgram = _optProgram;
     if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
-      if (CollectionUtils.isNotEmpty(skipRuleSet)) {
+      Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
+      if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
-        optProgram = getOptProgram(skipRuleSet);
+        optProgram = getOptProgram(skipRuleSet, useRuleSet);
       }
     }
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
@@ -493,7 +494,7 @@ public class QueryEnvironment {
    * @param skipRuleSet parsed skipped rule name set from query options
    * @return HepProgram that performs logical transformations
    */
-  private static HepProgram getOptProgram(@Nullable Set<String> skipRuleSet) {
+  private static HepProgram getOptProgram(Set<String> skipRuleSet, Set<String> useRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
     // Set the match order as DEPTH_FIRST. The default is arbitrary which works the same as DEPTH_FIRST, but it's
     // best to be explicit.
@@ -502,27 +503,17 @@ public class QueryEnvironment {
     // ----
     // Rules are disabled if its corresponding value is set to false in ruleFlags
     // construct filtered BASIC_RULES, FILTER_PUSHDOWN_RULES, PROJECT_PUSHDOWN_RULES, PRUNE_RULES
-    List<RelOptRule> basicRules;
-    List<RelOptRule> filterPushdownRules;
-    List<RelOptRule> projectPushdownRules;
-    List<RelOptRule> pruneRules;
-    if (skipRuleSet == null) {
-      basicRules = PinotQueryRuleSets.BASIC_RULES;
-      filterPushdownRules = PinotQueryRuleSets.FILTER_PUSHDOWN_RULES;
-      projectPushdownRules = PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES;
-      pruneRules = PinotQueryRuleSets.PRUNE_RULES;
-    } else {
-      basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet);
-      filterPushdownRules = filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet);
-      projectPushdownRules = filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet);
-      pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet);
-    }
-
+    List<RelOptRule> basicRules = filterRuleList(PinotQueryRuleSets.BASIC_RULES, skipRuleSet, useRuleSet);
+    List<RelOptRule> filterPushdownRules =
+        filterRuleList(PinotQueryRuleSets.FILTER_PUSHDOWN_RULES, skipRuleSet, useRuleSet);
+    List<RelOptRule> projectPushdownRules =
+        filterRuleList(PinotQueryRuleSets.PROJECT_PUSHDOWN_RULES, skipRuleSet, useRuleSet);
+    List<RelOptRule> pruneRules = filterRuleList(PinotQueryRuleSets.PRUNE_RULES, skipRuleSet, useRuleSet);
 
     // Run the Calcite CORE rules using 1 HepInstruction per rule. We use 1 HepInstruction per rule for simplicity:
     // the rules used here can rest assured that they are the only ones evaluated in a dedicated graph-traversal.
     for (RelOptRule relOptRule : basicRules) {
-        hepProgramBuilder.addRuleInstance(relOptRule);
+      hepProgramBuilder.addRuleInstance(relOptRule);
     }
 
     // ----
@@ -542,11 +533,6 @@ public class QueryEnvironment {
     return hepProgramBuilder.build();
   }
 
-  // util func to check no rules are skipped
-  private static boolean noRulesSkipped(Set<String> set) {
-    return set.isEmpty();
-  }
-
   /**
    * Filter static RuleSet according to query options
    * The filtering is done via checking query option with
@@ -556,11 +542,12 @@ public class QueryEnvironment {
    * @param skipRuleSet skip rule set from options
    * @return filtered list of rules
    */
-  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Set<String> skipRuleSet) {
+  private static List<RelOptRule> filterRuleList(List<RelOptRule> rules, Set<String> skipRuleSet,
+      Set<String> useRuleSet) {
     List<RelOptRule> filteredRules = new ArrayList<>();
     for (RelOptRule relOptRule : rules) {
       String ruleName = relOptRule.toString();
-      if (isRuleSkipped(ruleName, skipRuleSet)) {
+      if (isRuleSkipped(ruleName, skipRuleSet, useRuleSet)) {
         continue;
       }
       filteredRules.add(relOptRule);
@@ -569,14 +556,21 @@ public class QueryEnvironment {
   }
 
   /**
-   * Whether a rule is skipped, rules not skipped by default
+   * Returns whether a rule is skipped.
+   * A rule is disabled if it is in both skipRuleSet and useRuleSet
+   *
    * @param ruleName description of the rule
    * @param skipRuleSet query skipSet
    * @return false if corresponding key is not in skipMap or the value is "false", else true
    */
-  private static boolean isRuleSkipped(String ruleName, Set<String> skipRuleSet) {
-    // can put rule-specific default behavior here
-    return skipRuleSet.contains(ruleName);
+  private static boolean isRuleSkipped(String ruleName, Set<String> skipRuleSet, Set<String> useRuleSet) {
+    if (skipRuleSet.contains(ruleName)) {
+      return true;
+    }
+    if (CommonConstants.Broker.DEFAULT_DISABLED_RULES.contains(ruleName)) {
+      return !useRuleSet.contains(ruleName);
+    }
+    return false;
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
@@ -682,7 +676,6 @@ public class QueryEnvironment {
     default boolean defaultUseLeafServerForIntermediateStage() {
       return CommonConstants.Broker.DEFAULT_USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE;
     }
-
 
     @Value.Default
     default boolean defaultEnableGroupTrim() {
