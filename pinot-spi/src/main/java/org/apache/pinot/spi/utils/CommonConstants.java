@@ -759,13 +759,11 @@ public class CommonConstants {
      * If a rule is enabled and disabled at the same time,
      * it will be disabled
      */
-    public static class DefaultDisabledRules {
-      public static Set<String> DEFAULT_DISABLED_RULES = Set.of(
-          PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
-          PlannerRuleNames.SORT_JOIN_TRANSPOSE,
-          PlannerRuleNames.SORT_JOIN_COPY
-      );
-    }
+    public static Set<String> DEFAULT_DISABLED_RULES = Set.of(
+        PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
+        PlannerRuleNames.SORT_JOIN_TRANSPOSE,
+        PlannerRuleNames.SORT_JOIN_COPY
+    );
 
     public static class FailureDetector {
       public enum Type {

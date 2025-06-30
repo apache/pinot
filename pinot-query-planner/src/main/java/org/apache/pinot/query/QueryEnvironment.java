@@ -567,7 +567,7 @@ public class QueryEnvironment {
     if (skipRuleSet.contains(ruleName)) {
       return true;
     }
-    if (CommonConstants.Broker.DefaultDisabledRules.DEFAULT_DISABLED_RULES.contains(ruleName)) {
+    if (CommonConstants.Broker.DEFAULT_DISABLED_RULES.contains(ruleName)) {
       return !useRuleSet.contains(ruleName);
     }
     return false;

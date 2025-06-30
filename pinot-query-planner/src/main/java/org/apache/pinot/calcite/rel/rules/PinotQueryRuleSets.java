@@ -51,7 +51,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.PlannerRuleNames;
 /**
  * Default rule sets for Pinot query
  * Defaultly disabled rules are defined in
- * {@link org.apache.pinot.spi.utils.CommonConstants.Broker.DefaultDisabledRules#DEFAULT_DISABLED_RULES}
+ * {@link org.apache.pinot.spi.utils.CommonConstants.Broker#DEFAULT_DISABLED_RULES}
  */
 public class PinotQueryRuleSets {
   private PinotQueryRuleSets() {
