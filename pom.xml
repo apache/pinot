@@ -150,7 +150,7 @@
     <jersey.version>2.47</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.25.2</swagger-ui.version>
+    <swagger-ui.version>5.25.3</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.2</jsonsmart.version>
@@ -159,14 +159,14 @@
     <immutables.version>2.10.1</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.22.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.23.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.33</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
     <zstd-jni.version>1.5.7-3</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
-    <libthrift.verion>0.18.1</libthrift.verion>
+    <libthrift.verion>0.22.0</libthrift.verion>
     <log4j.version>2.25.0</log4j.version>
     <slf4j.version>2.0.17</slf4j.version>
     <netty.version>4.1.119.Final</netty.version>
@@ -177,7 +177,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.70</aws.sdk.version>
+    <aws.sdk.version>2.31.72</aws.sdk.version>
     <azure.sdk.version>1.2.35</azure.sdk.version>
     <azure.msal4j.version>1.21.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -295,7 +295,7 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea46</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea47</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.10</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>

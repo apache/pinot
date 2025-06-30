@@ -31,12 +31,15 @@ import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelDistribution;
+import org.apache.calcite.rel.core.Sort;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
+import org.apache.pinot.query.planner.physical.v2.mapping.DistMappingGenerator;
+import org.apache.pinot.query.planner.physical.v2.mapping.PinotDistMapping;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
@@ -67,31 +70,29 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
       accumulateWorkers(currentNode, workerSet);
       workers = List.of(sampleWorker(new ArrayList<>(workerSet)));
     }
-    PinotDataDistribution pdd = new PinotDataDistribution(RelDistribution.Type.SINGLETON, workers, workers.hashCode(),
-        null, null);
-    return addExchangeAndWorkers(currentNode, null, pdd);
+    return addExchangeAndWorkers(currentNode, null, workers);
   }
 
-  public PRelNode addExchangeAndWorkers(PRelNode currentNode, @Nullable PRelNode parent, PinotDataDistribution pdd) {
+  public PRelNode addExchangeAndWorkers(PRelNode currentNode, @Nullable PRelNode parent, List<String> liteModeWorkers) {
     if (currentNode.isLeafStage()) {
       if (parent == null) {
+        // This is because the Root Exchange is added by the RootExchangeInsertRule.
         return currentNode;
       }
-      return new PhysicalExchange(nodeId(), currentNode, pdd, Collections.emptyList(),
-          ExchangeStrategy.SINGLETON_EXCHANGE, currentNode.unwrap().getTraitSet().getCollation(),
-          PinotExecStrategyTrait.getDefaultExecStrategy());
+      return computeLeafExchange(currentNode, liteModeWorkers);
     }
     List<PRelNode> newInputs = new ArrayList<>();
     for (PRelNode input : currentNode.getPRelInputs()) {
-      newInputs.add(addExchangeAndWorkers(input, currentNode, pdd));
+      newInputs.add(addExchangeAndWorkers(input, currentNode, liteModeWorkers));
     }
-    currentNode = currentNode.with(newInputs, pdd);
+    PinotDataDistribution currentNodePDD = inferPDD(currentNode, newInputs, liteModeWorkers);
+    currentNode = currentNode.with(newInputs, currentNodePDD);
     if (!currentNode.areTraitsSatisfied()) {
       RelCollation collation = currentNode.unwrap().getTraitSet().getCollation();
       Preconditions.checkState(collation != null && !collation.getFieldCollations().isEmpty(),
           "Expected non-null collation since traits are not satisfied");
       PinotDataDistribution sortedPDD = new PinotDataDistribution(
-          RelDistribution.Type.SINGLETON, pdd.getWorkers(), pdd.getWorkerHash(), null, collation);
+          RelDistribution.Type.SINGLETON, liteModeWorkers, liteModeWorkers.hashCode(), null, collation);
       return new PhysicalSort(currentNode.unwrap().getCluster(), RelTraitSet.createEmpty(), List.of(), collation,
           null, null, currentNode, nodeId(), sortedPDD, false);
     }
@@ -126,6 +127,46 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   @VisibleForTesting
   static String stripIdPrefixFromWorker(String worker) {
     return worker.split("@")[1];
+  }
+
+  /**
+   * Infers Exchange to be added on top of the leaf stage.
+   */
+  private PhysicalExchange computeLeafExchange(PRelNode leafStageRoot, List<String> liteModeWorkers) {
+    RelCollation collation = leafStageRoot.unwrap().getTraitSet().getCollation();
+    PinotDataDistribution pdd;
+    if (collation != null) {
+      // If the leaf stage root has a collation trait, then we will use a sorted receive in the exchange, so we can
+      // add the collation to the PDD.
+      pdd = new PinotDataDistribution(
+          RelDistribution.Type.SINGLETON, liteModeWorkers, liteModeWorkers.hashCode(), null, collation);
+    } else {
+      pdd = new PinotDataDistribution(
+          RelDistribution.Type.SINGLETON, liteModeWorkers, liteModeWorkers.hashCode(), null, null);
+    }
+    return new PhysicalExchange(nodeId(), leafStageRoot, pdd, Collections.emptyList(),
+        ExchangeStrategy.SINGLETON_EXCHANGE, collation, PinotExecStrategyTrait.getDefaultExecStrategy());
+  }
+
+  /**
+   * Infers distribution for the current node based on its inputs and node-type. Can also add collation to the PDD
+   * automatically (e.g. if the current node is a Sort or the input is sorted and this node does not drop collation).
+   */
+  private static PinotDataDistribution inferPDD(PRelNode currentNode, List<PRelNode> newInputs,
+      List<String> liteModeWorkers) {
+    if (currentNode instanceof Sort) {
+      Sort sort = (Sort) currentNode.unwrap();
+      return new PinotDataDistribution(RelDistribution.Type.SINGLETON, liteModeWorkers,
+          liteModeWorkers.hashCode(), null, sort.getCollation());
+    }
+    if (newInputs.isEmpty()) {
+      // Can happen for Values node.
+      return new PinotDataDistribution(RelDistribution.Type.SINGLETON, liteModeWorkers,
+          liteModeWorkers.hashCode(), null, null);
+    }
+    return newInputs.get(0).getPinotDataDistributionOrThrow().apply(
+        DistMappingGenerator.compute(newInputs.get(0).unwrap(), currentNode.unwrap(), null),
+        PinotDistMapping.doesDropCollation(currentNode.unwrap()) /* dropCollation */);
   }
 
   private int nodeId() {

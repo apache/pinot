@@ -48,6 +48,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -75,10 +77,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -2248,5 +2247,45 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + ", 'C++', 'parser=COMPLEX') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryDifferentParsers, expectedDifferentColumnsAnd.size(), false,
         expectedDifferentColumnsAnd);
+  }
+
+  @Test
+  public void testTextFilterOptimizerWithWildcardsSameOptions()
+      throws Exception {
+    // Test that optimizer works when all TEXT_MATCH expressions have the same options with wildcards
+    String query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*Python*', 'parser=CLASSIC,allowLeadingWildcard=true') LIMIT 50000";
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, getTableConfig(), SCHEMA);
+    assertTrue(brokerResponse.getNumDocsScanned() > 0, "Query should scan some documents");
+  }
+
+  @Test
+  public void testTextFilterOptimizerWithWildcardsDifferentOptions()
+      throws Exception {
+    // This should pass: trailing wildcard is allowed by default
+    String queryTrailing =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Python*', 'parser=STANDARD') LIMIT 50000";
+    BrokerResponseNative responseTrailing = getBrokerResponseForOptimizedQuery(queryTrailing, getTableConfig(), SCHEMA);
+    assertTrue(responseTrailing.getNumDocsScanned() > 0, "Trailing wildcard should scan some documents");
+
+    // This should fail: leading wildcard is NOT allowed with parser=STANDARD
+    // The optimizer should NOT merge these expressions because they have options
+    String queryLeading =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*Python*', 'parser=STANDARD') LIMIT 50000";
+
+    BrokerResponseNative responseLeading = getBrokerResponseForOptimizedQuery(queryLeading, getTableConfig(), SCHEMA);
+    List<QueryProcessingException> exceptions = responseLeading.getExceptions();
+    assertFalse(exceptions.isEmpty(), "Expected error for leading wildcard with parser=STANDARD");
+    String errorMsg = exceptions.toString();
+    assertTrue(errorMsg.contains("Leading wildcard is not allowed") || errorMsg.contains(
+            "Failed while searching the text index"),
+        "Expected error related to leading wildcard or text search failure, got: " + errorMsg);
   }
 }
