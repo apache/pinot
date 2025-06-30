@@ -102,6 +102,7 @@ import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -129,7 +130,6 @@ public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
   private static final String PEER_SEGMENT_DOWNLOAD_DIR = "peerSegmentDownloadDir";
   private static final String SEGMENT_UPLOAD_DIR = "segmentUploadDir";
-  private static final int DEFAULT_MAX_LENGTH = 512;
 
   @Inject
   private ServerInstance _serverInstance;
@@ -270,7 +270,7 @@ public class TablesResource {
               }
             } else {
               // For type of STRUCT, MAP, LIST, set the columnLength as DEFAULT_MAX_LENGTH (512).
-              columnLength = DEFAULT_MAX_LENGTH;
+              columnLength = FieldSpec.DEFAULT_MAX_LENGTH;
             }
             int columnCardinality = columnMetadata.getCardinality();
             columnLengthMap.merge(column, (double) columnLength, Double::sum);

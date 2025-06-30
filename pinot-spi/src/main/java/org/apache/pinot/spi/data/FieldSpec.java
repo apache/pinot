@@ -92,7 +92,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_MAP = Map.of();
   public static final List DEFAULT_COMPLEX_NULL_VALUE_OF_LIST = List.of();
-  private static final int DEFAULT_MAX_LENGTH = 512;
+  public static final int DEFAULT_MAX_LENGTH = 512;
 
   private static MaxLengthExceedStrategy _defaultJsonMaxLengthExceedStrategy = MaxLengthExceedStrategy.NO_ACTION;
   private static int _defaultJsonMaxLength = DEFAULT_MAX_LENGTH;
@@ -279,7 +279,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setMaxLength(Integer maxLength) {
+  public void setMaxLength(@Nullable Integer maxLength) {
     _maxLength = maxLength;
   }
 

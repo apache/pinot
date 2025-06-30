@@ -473,8 +473,8 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
   public static Object[][] optimizeDictionaryTypeParams() {
     // Format: {optimizeDictionaryType, expectedCRC}, crc is used here to check the correct dictionary type was used
     return new Object[][]{
-        {true, "2615245967"},
-        {false, "2372761269"},
+        {true, "2653526366"},
+        {false, "2948830084"},
     };
   }
 

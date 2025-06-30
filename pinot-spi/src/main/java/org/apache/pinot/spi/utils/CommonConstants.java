@@ -1807,9 +1807,9 @@ public class CommonConstants {
 
   public static class FieldSpecConfigs {
     public static final String CONFIG_OF_DEFAULT_JSON_MAX_LENGTH_EXCEED_STRATEGY =
-        "pinot.fieldspec.default.json.sanitization.strategy";
+        "pinot.field.spec.default.json.max.length.exceed.strategy";
     public static final String CONFIG_OF_DEFAULT_JSON_MAX_LENGTH =
-        "pinot.fieldspec.default.json.max.length";
+        "pinot.field.spec.default.json.max.length";
   }
 
   /**
