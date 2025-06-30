@@ -25,8 +25,8 @@ package org.apache.pinot.spi.config.table;
 public enum DisasterRecoveryMode {
   // ALWAYS means Pinot will always run the Disaster Recovery Job
   ALWAYS,
-  // DEFAULT means Pinot will skip the Disaster Recovery Job for tables like dedup/upsert where consistency
-  // of data is higher in priority than availability. Features like Dedup/Partial Upsert requires ingestion to only
+  // DEFAULT means Pinot will skip the Disaster Recovery Job for tables like Dedup/Partial-Upsert where consistency
+  // of data is higher in priority than availability. Features like Dedup/Partial-Upsert requires ingestion to only
   // happen in strict order (i.e. a segment ingested in past cannot be re-ingested if server has consumed the
   // following segments to it). So in case of above Disaster scenario, there's only a fix requiring bulk delete of
   // segments.
