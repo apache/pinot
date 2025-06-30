@@ -113,8 +113,6 @@ import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -2523,7 +2521,6 @@ public class PinotLLCRealtimeSegmentManager {
       // lead to data inconsistencies
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
-      LOGGER.error("Skipping repair for errored segments in table: {}.", realtimeTableName);
       return;
     } else {
       LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
@@ -2587,6 +2584,8 @@ public class PinotLLCRealtimeSegmentManager {
         == UpsertConfig.Mode.PARTIAL);
     if (isPartialUpsertEnabled) {
       // If isPartialUpsert is enabled, do not allow repair.
+      LOGGER.error("Skipping repair for errored segments in table: {} because partialUpsert is enabled",
+          tableConfig.getTableName());
       return false;
     }
 
@@ -2594,6 +2593,8 @@ public class PinotLLCRealtimeSegmentManager {
     boolean isDedupEnabled = (dedupConfig != null) && (dedupConfig.isDedupEnabled());
     if (isDedupEnabled) {
       // If dedup is enabled, do not allow repair of error segment.
+      LOGGER.error("Skipping repair for errored segments in table: {} because dedup is enabled",
+          tableConfig.getTableName());
       return false;
     }
 
