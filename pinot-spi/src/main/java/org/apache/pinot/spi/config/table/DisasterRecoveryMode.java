@@ -19,8 +19,8 @@
 package org.apache.pinot.spi.config.table;
 
 /**
- Recovery mode which is used to decide how to recover a segment online in IS but having no completed (immutable)
- replica on any server in pause-less ingestion
+ * Recovery mode which is used to decide how to recover a segment online in IS but having no completed (immutable)
+ * replica on any server in pause-less ingestion
  */
 public enum DisasterRecoveryMode {
   // ALWAYS means Pinot will always run the Disaster Recovery Job
