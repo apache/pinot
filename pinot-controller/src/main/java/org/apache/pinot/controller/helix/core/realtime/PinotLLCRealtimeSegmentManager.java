@@ -2575,7 +2575,7 @@ public class PinotLLCRealtimeSegmentManager {
         != null)) {
       DisasterRecoveryMode disasterRecoveryMode =
           tableConfig.getIngestionConfig().getStreamIngestionConfig().getDisasterRecoveryMode();
-      if (disasterRecoveryMode == DisasterRecoveryMode.BEST_EFFORT) {
+      if (disasterRecoveryMode == DisasterRecoveryMode.ALWAYS) {
         return true;
       }
     }

@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests;
 import java.io.File;
 import java.util.List;
 import org.apache.pinot.common.utils.PauselessConsumptionUtils;
-import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy;
@@ -141,7 +140,6 @@ public class PauselessDedupRealtimeIngestionSegmentCommitFailureTest
   protected TableConfig createDedupTableConfig(File sampleAvroFile) {
     TableConfig tableConfig = super.createDedupTableConfig(sampleAvroFile, getPartitionColumn(), NUM_PARTITIONS);
     assertNotNull(tableConfig.getDedupConfig());
-    tableConfig.getDedupConfig().setDisasterRecoveryMode(DisasterRecoveryMode.BEST_EFFORT);
     if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
       tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(CommonConstants.HTTP_PROTOCOL);
     }

@@ -18,8 +18,14 @@
  */
 package org.apache.pinot.spi.config.table;
 
+/**
+ Recovery mode which is used to decide how to recover a segment online in IS but having no completed (immutable)
+ replica on any server in pause-less ingestion
+ */
 public enum DisasterRecoveryMode {
-  NONE,
-  BEST_EFFORT
-  // TODO: Add support for strict recovery mode.
+  // ALWAYS means Pinot will always run the Disaster Recovery Job
+  ALWAYS,
+  // CONSISTENCY_FIRST means Pinot will skip the Disaster Recovery Job for tables like dedup/upsert where consistency
+  // of data is higher in priority than availability.
+  CONSISTENCY_FIRST
 }
