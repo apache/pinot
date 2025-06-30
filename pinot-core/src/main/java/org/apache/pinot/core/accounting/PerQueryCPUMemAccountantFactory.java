@@ -625,11 +625,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
 
       @Override
-      public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+      public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
         // Filter configs that have CommonConstants.PREFIX_SCHEDULER_PREFIX
-        Set<String> filteredChangedConfigs = changedConfigs.stream().filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
-            .collect(Collectors.toSet());
+        Set<String> filteredChangedConfigs =
+            changedConfigs.stream().filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
+                .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
+                .collect(Collectors.toSet());
 
         if (filteredChangedConfigs.isEmpty()) {
           LOGGER.debug("No relevant configs changed, skipping update for QueryMonitorConfig.");
@@ -637,13 +638,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
 
         Map<String, String> filteredClusterConfigs = clusterConfigs.entrySet().stream()
-            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
-            .collect(Collectors.toMap(
-                entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
-                Map.Entry::getValue));
+            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX)).collect(
+                Collectors.toMap(
+                    entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
+                    Map.Entry::getValue));
 
         QueryMonitorConfig oldConfig = _queryMonitorConfig.get();
-        QueryMonitorConfig newConfig = new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+        QueryMonitorConfig newConfig =
+            new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
         _queryMonitorConfig.set(newConfig);
         logQueryMonitorConfig();
       }
@@ -665,8 +667,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.info("_oomKillQueryEnabled: {}", queryMonitorConfig.isOomKillQueryEnabled());
         LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
         LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}",
-            queryMonitorConfig.isCPUTimeBasedKillingEnabled(),
-            queryMonitorConfig.getCpuTimeBasedKillingThresholdNS());
+            queryMonitorConfig.isCPUTimeBasedKillingEnabled(), queryMonitorConfig.getCpuTimeBasedKillingThresholdNS());
       }
 
       @Override
