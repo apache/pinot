@@ -73,8 +73,8 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
         CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS,
         CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS);
     _logOnlyMode = brokerConf.getProperty(
-        CommonConstants.Helix.CONFIG_OF_QUERY_THROTTLING_LOG_ONLY_ENABLED,
-        CommonConstants.Helix.DEFAULT_QUERY_THROTTLING_LOG_ONLY_ENABLED);
+        CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED,
+        CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED);
   }
 
   @Override
@@ -121,7 +121,7 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
       return true;
     }
 
-    if (numQueryThreads > _semaphore.getTotalPermits()) {
+    if (numQueryThreads > _semaphore.getTotalPermits() && !_logOnlyMode) {
       throw new RuntimeException(
           String.format("Can't dispatch query because the estimated number of server threads for this query is too "
               + "large for the configured value of '%s' or '%s'. estimatedThreads=%d configuredLimit=%d",

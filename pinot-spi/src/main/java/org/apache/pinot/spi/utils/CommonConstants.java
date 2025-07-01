@@ -257,9 +257,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR =
         "pinot.beta.multistage.engine.max.server.query.threads.hardlimit.factor";
     public static final String DEFAULT_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_HARDLIMIT_FACTOR = "4";
-    public static final String CONFIG_OF_QUERY_THROTTLING_LOG_ONLY_ENABLED =
-        "pinot.multistage.query.throttling.log.only.enabled";
-    public static final boolean DEFAULT_QUERY_THROTTLING_LOG_ONLY_ENABLED = false;
+    public static final String CONFIG_OF_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED =
+        "pinot.multistage.thread.limiting.log.only.enabled";
+    public static final boolean DEFAULT_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED = false;
 
     // Preprocess throttle configs
     public static final String CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM =

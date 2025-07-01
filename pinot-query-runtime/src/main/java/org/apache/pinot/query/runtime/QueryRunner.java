@@ -205,8 +205,8 @@ public class QueryRunner {
     int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(serverConf);
     if (hardLimit > 0) {
       boolean logOnlyMode = serverConf.getProperty(
-          CommonConstants.Helix.CONFIG_OF_QUERY_THROTTLING_LOG_ONLY_ENABLED,
-          CommonConstants.Helix.DEFAULT_QUERY_THROTTLING_LOG_ONLY_ENABLED);
+          CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED,
+          CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED);
       LOGGER.info("Setting multi-stage executor hardLimit: {} logOnlyMode: {}", hardLimit, logOnlyMode);
       _executorService = new HardLimitExecutor(hardLimit, _executorService, logOnlyMode);
     }
