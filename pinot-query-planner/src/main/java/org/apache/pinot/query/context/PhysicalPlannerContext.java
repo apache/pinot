@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -35,7 +36,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * Per-query unique context dedicated for the physical planner.
  */
 public class PhysicalPlannerContext {
-  private static final Random RANDOM = new Random();
   private final Supplier<Integer> _nodeIdGenerator = new Supplier<>() {
     private int _id = 0;
 
@@ -170,8 +170,9 @@ public class PhysicalPlannerContext {
       return _instanceIdToQueryServerInstance.keySet().iterator().next();
     }
     int numCandidates = _instanceIdToQueryServerInstance.size() - 1;
+    Random random = ThreadLocalRandom.current();
     return _instanceIdToQueryServerInstance.keySet().stream().filter(instanceId -> !_instanceId.equals(instanceId))
-        .collect(Collectors.toList()).get(numCandidates == 1 ? 0 : RANDOM.nextInt(numCandidates - 1));
+        .collect(Collectors.toList()).get(numCandidates == 1 ? 0 : random.nextInt(numCandidates - 1));
   }
 
   private QueryServerInstance getBrokerQueryServerInstance() {

@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Random;
 import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
@@ -46,7 +45,6 @@ import org.apache.pinot.query.planner.physical.v2.opt.PRelNodeTransformer;
  * plan nodes.
  */
 public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
-  private static final Random RANDOM = new Random();
   private final PhysicalPlannerContext _context;
   private final boolean _runInBroker;
 
@@ -59,9 +57,9 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
   public PRelNode execute(PRelNode currentNode) {
     List<String> workers;
     if (_runInBroker) {
-      workers = List.of(String.format("0@%s", _context.getInstanceId()));
+      workers = List.of("0@" + _context.getInstanceId());
     } else {
-      workers = List.of(String.format("0@%s", _context.getRandomInstanceId()));
+      workers = List.of("0@" + _context.getRandomInstanceId());
     }
     return addExchangeAndWorkers(currentNode, null, workers);
   }
