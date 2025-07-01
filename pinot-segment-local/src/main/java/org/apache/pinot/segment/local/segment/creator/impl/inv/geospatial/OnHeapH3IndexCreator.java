@@ -34,9 +34,9 @@ import org.roaringbitmap.RoaringBitmapWriter;
  */
 public class OnHeapH3IndexCreator extends BaseH3IndexCreator {
 
-  public OnHeapH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution, String tableNameWithType)
+  public OnHeapH3IndexCreator(File indexDir, String columnName, String tableNameWithType, H3IndexResolution resolution)
       throws IOException {
-    super(indexDir, columnName, resolution, tableNameWithType);
+    super(indexDir, columnName, tableNameWithType, resolution);
   }
 
   @Override

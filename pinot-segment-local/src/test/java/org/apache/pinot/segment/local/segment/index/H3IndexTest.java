@@ -91,9 +91,9 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
 
     try (MutableH3Index mutableH3Index = new MutableH3Index(h3IndexResolution)) {
       try (GeoSpatialIndexCreator onHeapCreator = new OnHeapH3IndexCreator(TEMP_DIR, onHeapColumnName,
-          h3IndexResolution, "myTable_OFFLINE");
+          "myTable_OFFLINE", h3IndexResolution);
           GeoSpatialIndexCreator offHeapCreator = new OffHeapH3IndexCreator(TEMP_DIR, offHeapColumnName,
-              h3IndexResolution, "myTable_OFFLINE")) {
+              "myTable_OFFLINE", h3IndexResolution)) {
         int docId = 0;
         while (expectedCardinalities.size() < numUniqueH3Ids) {
           double longitude = RANDOM.nextDouble() * 360 - 180;
@@ -133,8 +133,8 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
     int res = 5;
     H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
 
-    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, resolution,
-        "myTable_OFFLINE")) {
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE",
+        resolution)) {
       Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
       creator.add(point);
 
