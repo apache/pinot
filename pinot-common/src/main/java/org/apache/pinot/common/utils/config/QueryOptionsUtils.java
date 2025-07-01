@@ -185,7 +185,7 @@ public class QueryOptionsUtils {
     // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
     String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
     if (skipIndexesStr == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
 
     String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
@@ -197,7 +197,7 @@ public class QueryOptionsUtils {
     // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
     String usedIndexesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
     if (usedIndexesStr == null) {
-      return Collections.emptySet();
+      return Set.of();
     }
 
     String[] usedRules = StringUtils.split(usedIndexesStr, ',');
