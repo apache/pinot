@@ -116,6 +116,7 @@ public class QueryLoggerTest {
         + "offlineMemAllocatedBytes(total/thread/resSer):0/0/0,"
         + "realtimeMemAllocatedBytes(total/thread/resSer):0/0/0,"
         + "pools=[],"
+        + "rlsFiltersApplied=true,"
         + "query=SELECT * FROM foo");
     //@formatter:on
   }
@@ -278,6 +279,7 @@ public class QueryLoggerTest {
     response.setRealtimeSystemActivitiesCpuTimeNs(18);
     response.setRealtimeResponseSerializationCpuTimeNs(19);
     response.setBrokerReduceTimeMs(20);
+    response.setRLSFiltersApplied(true);
 
     RequesterIdentity identity = new RequesterIdentity() {
       @Override
