@@ -40,7 +40,6 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
@@ -77,9 +76,9 @@ public abstract class MultiStageOperator
   // assuming the block holds 10000 rows or more.
   protected void sampleAndCheckInterruption() {
     Tracing.ThreadAccountantOps.sampleMSE();
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
+    if (Thread.interrupted()) {
       earlyTerminate();
-      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "
+      throw QueryErrorCode.QUERY_CANCELLATION.asException("Operator Interrupted: "
           + getExplainName());
     }
   }
@@ -91,8 +90,9 @@ public abstract class MultiStageOperator
    */
   @Override
   public MseBlock nextBlock() {
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException("Interrupted while processing next block");
+    if (Thread.interrupted()) {
+      throw QueryErrorCode.QUERY_CANCELLATION.asException("Operator Interrupted: "
+          + getExplainName());
     }
     if (logger().isDebugEnabled()) {
       logger().debug("Operator {}: Reading next block", _operatorId);

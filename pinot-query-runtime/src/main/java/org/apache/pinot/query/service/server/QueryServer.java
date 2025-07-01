@@ -51,7 +51,6 @@ import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.MetricsExecutor;
@@ -287,13 +286,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
       Map<String, String> reqMetadata) {
     String requestIdStr = Long.toString(QueryThreadContext.getRequestId());
 
-    //TODO: Verify if this matches with what OOM protection expects. This method will not block for the query to
-    // finish, so it may be breaking some of the OOM protection assumptions.
-    Tracing.ThreadAccountantOps.setupRunner(requestIdStr, ThreadExecutionContext.TaskType.MSE);
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-
     try {
-      return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata, parentContext);
+      return _queryRunner.processQuery(workerMetadata, stagePlan, reqMetadata);
     } finally {
       Tracing.ThreadAccountantOps.clear();
     }

@@ -74,7 +74,6 @@ import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
 import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesServerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.HardLimitExecutor;
@@ -244,8 +243,8 @@ public class QueryRunner {
   /// This method will not block the current thread but use [#_executorService] instead.
   /// If any error happened during the asynchronous execution, an error block will be sent to all receiver mailboxes.
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
-    Runnable runnable = () -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata, parentContext);
+      Map<String, String> requestMetadata) {
+    Runnable runnable = () -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata);
     return CompletableFuture.runAsync(runnable, _executorService);
   }
 
@@ -256,7 +255,7 @@ public class QueryRunner {
   ///
   /// If the pipeline breaker success, the rest of the stage is asynchronously executed on the [#_opChainScheduler].
   private void processQueryBlocking(WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
+      Map<String, String> requestMetadata) {
     MseWorkerThreadContext.setStageId(stagePlan.getStageMetadata().getStageId());
     MseWorkerThreadContext.setWorkerId(workerMetadata.getWorkerId());
 
@@ -270,7 +269,7 @@ public class QueryRunner {
     // run pre-stage execution for all pipeline breakers
     PipelineBreakerResult pipelineBreakerResult =
         PipelineBreakerExecutor.executePipelineBreakers(_opChainScheduler, _mailboxService, workerMetadata, stagePlan,
-            opChainMetadata, requestId, deadlineMs, parentContext, _sendStats.getAsBoolean());
+            opChainMetadata, requestId, deadlineMs, _sendStats.getAsBoolean());
 
     // Send error block to all the receivers if pipeline breaker fails
     if (pipelineBreakerResult != null && pipelineBreakerResult.getErrorBlock() != null) {
@@ -283,7 +282,7 @@ public class QueryRunner {
     // run OpChain
     OpChainExecutionContext executionContext =
         new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
-            workerMetadata, pipelineBreakerResult, parentContext, _sendStats.getAsBoolean());
+            workerMetadata, pipelineBreakerResult, _sendStats.getAsBoolean());
     OpChain opChain;
     if (workerMetadata.isLeafStageWorker()) {
       Map<String, String> rlsFilters = RlsUtils.extractRlsFilters(requestMetadata);
@@ -527,7 +526,7 @@ public class QueryRunner {
     // compile OpChain
     OpChainExecutionContext executionContext =
         new OpChainExecutionContext(_mailboxService, requestId, deadlineMs, opChainMetadata, stageMetadata,
-            workerMetadata, null, null, false);
+            workerMetadata, null, false);
 
     OpChain opChain =
         ServerPlanRequestUtils.compileLeafStage(executionContext, stagePlan, _leafQueryExecutor, _executorService,

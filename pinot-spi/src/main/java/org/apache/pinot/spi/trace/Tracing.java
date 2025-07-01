@@ -276,6 +276,10 @@ public class Tracing {
       setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadExecutionContext);
     }
 
+    public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType) {
+      setupWorker(taskId, taskType, null);
+    }
+
     /**
      * Setup metadata of query worker threads.
      * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.

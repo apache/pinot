@@ -528,7 +528,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       ThreadExecutionContext.TaskType _taskType;
 
       public AggregatedStats(long cpuNS, long allocatedBytes, Thread anchorThread, boolean isAnchorThread,
-          AtomicReference<Exception> exceptionAtomicReference, String queryId, ThreadExecutionContext.TaskType taskType) {
+          AtomicReference<Exception> exceptionAtomicReference, String queryId,
+          ThreadExecutionContext.TaskType taskType) {
         _cpuNS = cpuNS;
         _allocatedBytes = allocatedBytes;
         _anchorThread = anchorThread;

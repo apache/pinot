@@ -88,12 +88,10 @@ import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesBrokerPlanVis
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.tsdb.planner.TimeSeriesExchangeNode;
 import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerRequestMetadataKeys;
@@ -595,10 +593,9 @@ public class QueryDispatcher {
         "Expecting single worker for reduce stage, got: %s", workerMetadata.size());
 
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext executionContext =
         new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadata.get(0), null, parentContext, true);
+            workerMetadata.get(0), null, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
     DataSchema sourceSchema = rootNode.getDataSchema();

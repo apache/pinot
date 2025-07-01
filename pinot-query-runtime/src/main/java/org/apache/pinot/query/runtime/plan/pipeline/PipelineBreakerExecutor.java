@@ -37,7 +37,6 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +68,7 @@ public class PipelineBreakerExecutor {
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> opChainMetadata, long requestId, long deadlineMs,
-      @Nullable ThreadExecutionContext parentContext, boolean sendStats) {
+      boolean sendStats) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
     if (!pipelineBreakerContext.getPipelineBreakerMap().isEmpty()) {
@@ -79,7 +78,7 @@ public class PipelineBreakerExecutor {
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
             new OpChainExecutionContext(mailboxService, requestId, deadlineMs, opChainMetadata,
-                stagePlan.getStageMetadata(), workerMetadata, null, parentContext, sendStats);
+                stagePlan.getStageMetadata(), workerMetadata, null, sendStats);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
         LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
