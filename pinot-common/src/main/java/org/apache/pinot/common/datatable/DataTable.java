@@ -93,7 +93,7 @@ public interface DataTable {
   DataTable toDataOnlyDataTable();
 
   enum MetadataValueType {
-    INT, LONG, STRING
+    INT, LONG, STRING, BOOLEAN
   }
 
   /* The MetadataKey is used since V3, where we present metadata as Map<MetadataKey, String>
@@ -145,6 +145,8 @@ public interface DataTable {
     NUM_GROUPS_WARNING_LIMIT_REACHED(35, "numGroupsWarningLimitReached", MetadataValueType.STRING),
     THREAD_MEM_ALLOCATED_BYTES(36, "threadMemAllocatedBytes", MetadataValueType.LONG),
     RESPONSE_SER_MEM_ALLOCATED_BYTES(37, "responseSerMemAllocatedBytes", MetadataValueType.LONG),
+    // NOTE: for server after release 1.3.0 this flag is always set to true since servers now perform sorting
+    SORTED(38, "sorted", MetadataValueType.BOOLEAN),
     GROUPS_TRIMMED(38, "groupsTrimmed", MetadataValueType.STRING);
 
     // We keep this constant to track the max id added so far for backward compatibility.

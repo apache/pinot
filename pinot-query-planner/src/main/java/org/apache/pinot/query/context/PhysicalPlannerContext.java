@@ -25,6 +25,7 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.query.routing.QueryServerInstance;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -58,6 +59,9 @@ public class PhysicalPlannerContext {
   private final String _instanceId;
   private final Map<String, String> _queryOptions;
   private final boolean _useLiteMode;
+  private final boolean _runInBroker;
+  private final boolean _useBrokerPruning;
+  private final int _liteModeServerStageLimit;
 
   /**
    * Used by controller when it needs to extract table names from the query.
@@ -70,18 +74,26 @@ public class PhysicalPlannerContext {
     _requestId = 0;
     _instanceId = "";
     _queryOptions = Map.of();
-    _useLiteMode = false;
+    _useLiteMode = CommonConstants.Broker.DEFAULT_USE_LITE_MODE;
+    _runInBroker = CommonConstants.Broker.DEFAULT_RUN_IN_BROKER;
+    _useBrokerPruning = CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING;
+    _liteModeServerStageLimit = CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
-      String instanceId, Map<String, String> queryOptions) {
+      String instanceId, Map<String, String> queryOptions, boolean defaultUseLiteMode, boolean defaultRunInBroker,
+      boolean defaultUseBrokerPruning, int defaultLiteModeServerStageLimit) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
     _requestId = requestId;
     _instanceId = instanceId;
     _queryOptions = queryOptions == null ? Map.of() : queryOptions;
-    _useLiteMode = QueryOptionsUtils.isUseLiteMode(_queryOptions);
+    _useLiteMode = QueryOptionsUtils.isUseLiteMode(_queryOptions, defaultUseLiteMode);
+    _runInBroker = QueryOptionsUtils.isRunInBroker(_queryOptions, defaultRunInBroker);
+    _useBrokerPruning = QueryOptionsUtils.isUseBrokerPruning(_queryOptions, defaultUseBrokerPruning);
+    _liteModeServerStageLimit = QueryOptionsUtils.getLiteModeServerStageLimit(_queryOptions,
+        defaultLiteModeServerStageLimit);
     _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
   }
 
@@ -120,6 +132,18 @@ public class PhysicalPlannerContext {
 
   public boolean isUseLiteMode() {
     return _useLiteMode;
+  }
+
+  public boolean isRunInBroker() {
+    return _runInBroker;
+  }
+
+  public boolean isUseBrokerPruning() {
+    return _useBrokerPruning;
+  }
+
+  public int getLiteModeServerStageLimit() {
+    return _liteModeServerStageLimit;
   }
 
   private QueryServerInstance getBrokerQueryServerInstance() {
