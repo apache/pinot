@@ -872,14 +872,14 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Taking snapshot for {} segments", numTrackedSegments);
     long startTimeMs = System.currentTimeMillis();
 
-    int numImmutableSegmentsForValidDocs = 0;
+    int numImmutableSegments = 0;
     int numConsumingSegments = 0;
-    int numUnchangedSegmentsForValidDocIds = 0;
+    int numUnchangedSegments = 0;
     // The segments without validDocIds snapshots should take their snapshots at last. So that when there is failure
     // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
     // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
-    Set<ImmutableSegmentImpl> segmentsWithoutValidDocsSnapshot = new HashSet<>();
+    Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     TableDataManager tableDataManager = _context.getTableDataManager();
     Preconditions.checkNotNull(tableDataManager, "Taking snapshot requires tableDataManager");
     boolean isSegmentSkipped = false;
@@ -890,7 +890,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       if (!_updatedSegmentsSinceLastValidDocIdsSnapshot.contains(segment)) {
         // if no updates since last snapshot then skip
-        numUnchangedSegmentsForValidDocIds++;
+        numUnchangedSegments++;
         continue;
       }
       // Try to acquire the segmentLock when taking snapshot for the segment because the segment directory can be
@@ -915,9 +915,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       try {
         ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
         if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
-          segmentsWithoutValidDocsSnapshot.add(immutableSegment);
+          segmentsWithoutSnapshot.add(immutableSegment);
           continue;
         }
+        immutableSegment.persistValidDocIdsSnapshot();
+        _updatedSegmentsSinceLastValidDocIdsSnapshot.remove(segment);
+        numImmutableSegments++;
+        numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
       } catch (Exception e) {
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
         isSegmentSkipped = true;
@@ -929,23 +933,22 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     // add new snapshot files on disk. This ensures all the validDocIds snapshots kept on disk are still disjoint
     // with each other, although some of them may have become stale, i.e. tracking more valid docs than expected.
     if (!isSegmentSkipped) {
-      for (ImmutableSegmentImpl segment : segmentsWithoutValidDocsSnapshot) {
+      for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
         String segmentName = segment.getSegmentName();
         Lock segmentLock = tableDataManager.getSegmentLock(segmentName);
         boolean locked = segmentLock.tryLock();
         if (!locked) {
-          _logger.warn("Could not get segmentLock to take validDocIds snapshot for segment: {} w/o snapshot, skipping",
+          _logger.warn("Could not get segmentLock to take snapshot for segment: {} w/o snapshot, skipping",
               segmentName);
           continue;
         }
         try {
           segment.persistValidDocIdsSnapshot();
           _updatedSegmentsSinceLastValidDocIdsSnapshot.remove(segment);
-          numImmutableSegmentsForValidDocs++;
+          numImmutableSegments++;
           numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
         } catch (Exception e) {
-          _logger.warn("Caught exception while taking snapshot for segment: {} w/o validDocIds snapshot, skipping",
-              segmentName, e);
+          _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
         } finally {
           segmentLock.unlock();
         }
@@ -959,20 +962,19 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
-        ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegmentsForValidDocs);
+        ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
-    int numMissedSegments = numTrackedSegments - numImmutableSegmentsForValidDocs - numConsumingSegments
-        - numUnchangedSegmentsForValidDocIds;
+    int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments - numUnchangedSegments;
     if (numMissedSegments > 0) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
           ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
-      _logger.warn("Missed taking validDocIds snapshot for {} immutable segments", numMissedSegments);
+      _logger.warn("Missed taking snapshot for {} immutable segments", numMissedSegments);
     }
     _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
-            + "{} are consuming segments) in {} ms", numImmutableSegmentsForValidDocs, numPrimaryKeysInSnapshot,
-        numTrackedSegments, numConsumingSegments, System.currentTimeMillis() - startTimeMs);
-    return numMissedSegments == 0;
+            + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
+        numConsumingSegments, System.currentTimeMillis() - startTimeMs);
+    return _updatedSegmentsSinceLastValidDocIdsSnapshot.isEmpty();
   }
 
   protected File getWatermarkFile() {
