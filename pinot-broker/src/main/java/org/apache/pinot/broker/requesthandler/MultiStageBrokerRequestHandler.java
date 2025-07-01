@@ -402,6 +402,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int defaultLiteModeServerStageLimit = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT,
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
+    String defaultHashFunction = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION,
+        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
     boolean caseSensitive = !_config.getProperty(
         CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
         CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
@@ -422,6 +425,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)
         .defaultLiteModeServerStageLimit(defaultLiteModeServerStageLimit)
+        .defaultHashFunction(defaultHashFunction)
         .build();
   }
 

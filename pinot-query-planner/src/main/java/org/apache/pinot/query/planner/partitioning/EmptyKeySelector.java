@@ -22,10 +22,24 @@ import javax.annotation.Nullable;
 
 
 public class EmptyKeySelector implements KeySelector<Integer> {
+  private final String _hashFunction;
+
   private EmptyKeySelector() {
+    this(KeySelector.DEFAULT_HASH_ALGORITHM);
+  }
+
+  private EmptyKeySelector(String hashFunction) {
+    _hashFunction = hashFunction;
   }
 
   public static final EmptyKeySelector INSTANCE = new EmptyKeySelector();
+
+  public static EmptyKeySelector getInstance(String hashFunction) {
+    if (KeySelector.DEFAULT_HASH_ALGORITHM.equals(hashFunction)) {
+      return INSTANCE;
+    }
+    return new EmptyKeySelector(hashFunction);
+  }
 
   @Nullable
   @Override
@@ -36,5 +50,10 @@ public class EmptyKeySelector implements KeySelector<Integer> {
   @Override
   public int computeHash(Object[] input) {
     return 0;
+  }
+
+  @Override
+  public String hashAlgorithm() {
+    return _hashFunction;
   }
 }
