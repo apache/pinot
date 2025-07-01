@@ -23,9 +23,15 @@ import org.apache.pinot.core.data.table.Key;
 
 public class MultiColumnKeySelector implements KeySelector<Key> {
   private final int[] _keyIds;
+  private final String _hashFunction;
 
   public MultiColumnKeySelector(int[] keyIds) {
+    this(keyIds, KeySelector.DEFAULT_HASH_ALGORITHM);
+  }
+
+  public MultiColumnKeySelector(int[] keyIds, String hashFunction) {
     _keyIds = keyIds;
+    _hashFunction = hashFunction;
   }
 
   @Override
@@ -60,11 +66,16 @@ public class MultiColumnKeySelector implements KeySelector<Key> {
     for (int keyId : _keyIds) {
       Object value = input[keyId];
       if (value != null) {
-        hashCode += value.hashCode();
+        hashCode += HashFunctionSelector.computeHash(value, _hashFunction);
       }
     }
 
     // return a positive number because this is used directly to modulo-index
     return hashCode & Integer.MAX_VALUE;
+  }
+
+  @Override
+  public String hashAlgorithm() {
+    return _hashFunction;
   }
 }
