@@ -156,10 +156,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       return false; // if table is paused by admin, then skip subsequent checks
     }
     // Perform resource utilization checks.
-    boolean isResourceUtilizationWithinLimits =
+    UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
         _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
             UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    if (!isResourceUtilizationWithinLimits) {
+    if (isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.FALSE)) {
       LOGGER.warn("Resource utilization limit exceeded for table: {}", tableNameWithType);
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
           1L);
@@ -170,14 +170,22 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
             PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization limit exceeded.");
       }
       return false; // if resource utilization check failed, then skip subsequent checks
+    } else if (isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.TRUE) && isTablePaused
+        && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
       // within limits and table previously paused by resource utilization --> unpause
-    } else if (isTablePaused && pauseStatus.getReasonCode()
-        .equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+      LOGGER.info("Resource utilization limit is back within limits for table: {}", tableNameWithType);
       // unset the pause state and allow consuming segment recreation.
       _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
           PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization within limits");
       pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
       isTablePaused = pauseStatus.getPauseFlag();
+    } else if (isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.STALE) && isTablePaused
+        && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+      // The table was previously paused due to exceeding resource utilization, but the current status cannot be
+      // determined. To be safe, leave it as paused and once the status is available take the correct action
+      LOGGER.warn("Resource utilization limit could not be determined for for table: {}, and it is paused, leave it as "
+              + "paused", tableNameWithType);
+      return false;
     }
     _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
         0L);

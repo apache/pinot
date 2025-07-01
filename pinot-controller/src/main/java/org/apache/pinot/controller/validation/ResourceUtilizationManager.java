@@ -38,22 +38,38 @@ public class ResourceUtilizationManager {
     _utilizationCheckers = utilizationCheckers;
   }
 
-  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, UtilizationChecker.CheckPurpose purpose) {
+  /**
+   * Returns the status of the resource utilization check across all UtilizationCheckers
+   * @param tableNameWithType table name with type
+   * @param purpose the purpose of the utilization check
+   * @return CheckResult, FALSE if even one resource utilization checker has returned FALSE, STALE if the result cannot
+   *         be determined for even one UtilizationChecker and all the others are also STALE or TRUE, and TRUE if
+   *         resource utilization is within limits for all UtilizationCheckers
+   */
+  public UtilizationChecker.CheckResult isResourceUtilizationWithinLimits(String tableNameWithType,
+      UtilizationChecker.CheckPurpose purpose) {
     if (!_isResourceUtilizationCheckEnabled) {
-      return true;
+      return UtilizationChecker.CheckResult.TRUE;
     }
     if (StringUtils.isEmpty(tableNameWithType)) {
       throw new IllegalArgumentException("Table name found to be null or empty while checking resource utilization.");
     }
     LOGGER.info("Checking resource utilization for table: {}", tableNameWithType);
-    boolean overallIsResourceUtilizationWithinLimits = true;
+    UtilizationChecker.CheckResult overallIsResourceUtilizationWithinLimits = UtilizationChecker.CheckResult.TRUE;
     for (UtilizationChecker utilizationChecker : _utilizationCheckers) {
-      boolean isResourceUtilizationWithinLimits =
+      UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
           utilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType, purpose);
       LOGGER.info("For utilization checker: {}, isResourceUtilizationWithinLimits: {}, purpose: {}",
           utilizationChecker.getName(), isResourceUtilizationWithinLimits, purpose);
-      if (!isResourceUtilizationWithinLimits) {
-        overallIsResourceUtilizationWithinLimits = false;
+      if (isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.FALSE)) {
+        // If any UtilizationChecker returns FALSE, we should mark the overall as FALSE. FALSE should always have
+        // priority over other results
+        overallIsResourceUtilizationWithinLimits = UtilizationChecker.CheckResult.FALSE;
+      } else if (overallIsResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.TRUE)
+          && isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.STALE)) {
+        // If we haven't already updated the overall to a value other than TRUE, and we get a STALE result,
+        // update the overall to STALE. Should not update to STALE if we have set the overall to FALSE.
+        overallIsResourceUtilizationWithinLimits = UtilizationChecker.CheckResult.STALE;
       }
     }
     return overallIsResourceUtilizationWithinLimits;
