@@ -72,6 +72,6 @@ public final class DimensionFieldSpec extends FieldSpec {
   public String toString() {
     return "< field type: DIMENSION, field name: " + _name + ", data type: " + _dataType + ", is single-value field: "
         + _singleValueField + ", default null value: " + _defaultNullValue + ", max length: " + _maxLength
-        + ", max length exceed strategy: " + _maxLengthExceedStrategy +  " >";
+        + ", max length exceed strategy: " + _maxLengthExceedStrategy + " >";
   }
 }
