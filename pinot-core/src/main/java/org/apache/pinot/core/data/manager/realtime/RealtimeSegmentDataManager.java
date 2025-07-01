@@ -1306,7 +1306,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentBuildDescriptor descriptor;
     try {
       descriptor = buildSegmentInternal(false);
-    } catch (SegmentBuildFailureException e) {
+    } catch (Exception e) {
       return false;
     }
     if (descriptor == null) {
@@ -1475,9 +1475,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               } else if (_currentOffset.compareTo(endOffset) == 0) {
                 _segmentLogger
                     .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
-                boolean replaced = buildSegmentAndReplace();
-                if (!replaced) {
-                  throw new RuntimeException("Failed to build the segment: " + _segmentNameStr);
+                if (!buildSegmentAndReplace()) {
+                  _segmentLogger.warn("Failed to build the segment: {} and replace. Downloading to replace",
+                      _segmentNameStr);
+                  downloadSegmentAndReplace(segmentZKMetadata);
                 }
               } else {
                 boolean success = false;
@@ -1495,9 +1496,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
                 if (success) {
                   _segmentLogger.info("Caught up to offset {}", _currentOffset);
-                  boolean replaced = buildSegmentAndReplace();
-                  if (!replaced) {
-                    throw new RuntimeException("Failed to build the segment: " + _segmentNameStr);
+                  if (!buildSegmentAndReplace()) {
+                    _segmentLogger.warn("Failed to build the segment: {} after catchup. Downloading to replace",
+                        _segmentNameStr);
+                    downloadSegmentAndReplace(segmentZKMetadata);
                   }
                 } else {
                   _segmentLogger

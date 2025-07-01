@@ -178,7 +178,8 @@ public class QueryEnvironment {
         optProgram = getOptProgram(skipRuleSet);
       }
     }
-    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions());
+    boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions(),
+        _envConfig.defaultUsePhysicalOptimizer());
     HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
@@ -192,7 +193,9 @@ public class QueryEnvironment {
       workerManager = _envConfig.getWorkerManager();
       physicalPlannerContext = new PhysicalPlannerContext(workerManager.getRoutingManager(),
           workerManager.getHostName(), workerManager.getPort(), _envConfig.getRequestId(),
-          workerManager.getInstanceId(), sqlNodeAndOptions.getOptions());
+          workerManager.getInstanceId(), sqlNodeAndOptions.getOptions(),
+          _envConfig.defaultUseLiteMode(), _envConfig.defaultRunInBroker(), _envConfig.defaultUseBrokerPruning(),
+          _envConfig.defaultLiteModeServerStageLimit());
     }
     return new PlannerContext(_config, _catalogReader, _typeFactory, optProgram, traitProgram,
         sqlNodeAndOptions.getOptions(), _envConfig, format, physicalPlannerContext);
@@ -692,6 +695,66 @@ public class QueryEnvironment {
     @Value.Default
     default boolean defaultEnableDynamicFilteringSemiJoin() {
       return CommonConstants.Broker.DEFAULT_ENABLE_DYNAMIC_FILTERING_SEMI_JOIN;
+    }
+
+    /**
+     * Whether to use physical optimizer by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_PHYSICAL_OPTIMIZER}.
+     */
+    @Value.Default
+    default boolean defaultUsePhysicalOptimizer() {
+      return CommonConstants.Broker.DEFAULT_USE_PHYSICAL_OPTIMIZER;
+    }
+
+    /**
+     * Whether to use lite mode by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_LITE_MODE}.
+     */
+    @Value.Default
+    default boolean defaultUseLiteMode() {
+      return CommonConstants.Broker.DEFAULT_USE_LITE_MODE;
+    }
+
+    /**
+     * Whether to run in broker by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#RUN_IN_BROKER}.
+     */
+    @Value.Default
+    default boolean defaultRunInBroker() {
+      return CommonConstants.Broker.DEFAULT_RUN_IN_BROKER;
+    }
+
+    /**
+     * Whether to use broker pruning by default.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_BROKER_PRUNING}.
+     */
+    @Value.Default
+    default boolean defaultUseBrokerPruning() {
+      return CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING;
+    }
+
+    /**
+     * Default server stage limit for lite mode queries.
+     *
+     * This is treated as the default value for the broker and it is expected to be obtained from a Pinot configuration.
+     * This default value can be always overridden at query level by the query option
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#LITE_MODE_SERVER_STAGE_LIMIT}.
+     */
+    @Value.Default
+    default int defaultLiteModeServerStageLimit() {
+      return CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
     }
 
     /**

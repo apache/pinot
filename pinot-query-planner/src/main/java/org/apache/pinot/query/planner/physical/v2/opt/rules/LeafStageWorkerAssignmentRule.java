@@ -119,7 +119,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       leafStageRoot = leafStageRoot == null ? call._currentNode : leafStageRoot;
       String tableName = getActualTableName((TableScan) call._currentNode.unwrap());
       PinotQuery pinotQuery = LeafStageToPinotQuery.createPinotQueryForRouting(tableName, leafStageRoot.unwrap(),
-          !QueryOptionsUtils.isUseBrokerPruning(_physicalPlannerContext.getQueryOptions()));
+          !_physicalPlannerContext.isUseBrokerPruning());
       return assignTableScan((PhysicalTableScan) call._currentNode, _physicalPlannerContext.getRequestId(),
           pinotQuery);
     }
