@@ -77,7 +77,7 @@ public class PhysicalPlannerContext {
     _useLiteMode = CommonConstants.Broker.DEFAULT_USE_LITE_MODE;
     _runInBroker = CommonConstants.Broker.DEFAULT_RUN_IN_BROKER;
     _useBrokerPruning = CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING;
-    _liteModeServerStageLimit = CommonConstants.Broker.DEFAULT_LITE_MODE_SERVER_STAGE_LIMIT;
+    _liteModeServerStageLimit = CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,

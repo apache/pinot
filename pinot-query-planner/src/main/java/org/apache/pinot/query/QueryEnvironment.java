@@ -754,7 +754,7 @@ public class QueryEnvironment {
      */
     @Value.Default
     default int defaultLiteModeServerStageLimit() {
-      return CommonConstants.Broker.DEFAULT_LITE_MODE_SERVER_STAGE_LIMIT;
+      return CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
     }
 
     /**
