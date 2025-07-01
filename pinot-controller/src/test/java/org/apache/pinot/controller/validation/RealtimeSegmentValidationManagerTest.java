@@ -86,12 +86,12 @@ public class RealtimeSegmentValidationManagerTest {
             true},
 
         // Resource utilization is STALE but was previously paused due to resource utilization, should return false
-        {true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.UNDETERMINED, false,
-            false},
+        {true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.UNDETERMINED,
+            false, false},
 
         // Resource utilization is STALE but was not previously paused due to resource utilization, should return true
-        {false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.UNDETERMINED, false,
-            true},
+        {false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.UNDETERMINED,
+            false, true},
 
         // Resource utilization is within limits but was previously paused due to storage quota exceeded,
         // should return false
