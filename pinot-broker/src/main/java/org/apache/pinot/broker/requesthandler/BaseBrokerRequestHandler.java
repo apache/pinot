@@ -85,6 +85,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final Set<String> _trackedHeaders;
   protected final BrokerRequestIdGenerator _requestIdGenerator;
   protected final long _brokerTimeoutMs;
+  protected final boolean _enableRowColumnLevelAuth;
   protected final QueryLogger _queryLogger;
   @Nullable
   protected final String _enableNullHandling;
@@ -110,6 +111,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
     _requestIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
+    _enableRowColumnLevelAuth = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
+        Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
     _queryLogger = new QueryLogger(config);
     _enableNullHandling = config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING);
 

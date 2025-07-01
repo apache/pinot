@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.list;
+package org.apache.pinot.common.collections;
 
 import java.util.Collection;
 import java.util.Iterator;

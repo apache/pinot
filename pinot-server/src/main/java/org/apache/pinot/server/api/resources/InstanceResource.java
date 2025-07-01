@@ -40,13 +40,16 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
+import org.apache.pinot.common.restlet.resources.PrimaryKeyCountInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
 
@@ -125,5 +128,24 @@ public class InstanceResource {
     }
     DiskUsageInfo diskUsageInfo = DiskUtilization.computeDiskUsage(_instanceId, pathStr);
     return ResourceUtils.convertToJsonString(diskUsageInfo);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/primaryKeyCount")
+  @ApiOperation(value = "Show number of primary keys", notes = "Total number of upsert / dedup primary keys")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getPrimaryKeyCountInfo(@Context HttpHeaders headers)
+      throws WebApplicationException {
+    // Use InstanceDataManager to fetch details about the number of primary keys across all upsert / dedup tables
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    PrimaryKeyCountInfo primaryKeyCountInfo =
+        PrimaryKeyCount.computeNumberOfPrimaryKeys(_instanceId, instanceDataManager);
+    return ResourceUtils.convertToJsonString(primaryKeyCountInfo);
   }
 }

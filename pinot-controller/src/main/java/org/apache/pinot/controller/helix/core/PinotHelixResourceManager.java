@@ -131,7 +131,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -2043,7 +2042,7 @@ public class PinotHelixResourceManager {
       LOGGER.info("Assigning {} instances to table: {}", instancePartitionsTypesToAssign, tableNameWithType);
       for (InstancePartitionsType instancePartitionsType : instancePartitionsTypesToAssign) {
         boolean hasPreConfiguredInstancePartitions =
-            TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
+            InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType);
         boolean isPreConfigurationBasedAssignment =
             InstanceAssignmentConfigUtils.isMirrorServerSetAssignment(tableConfig, instancePartitionsType);
         InstancePartitions instancePartitions;
@@ -3229,6 +3228,44 @@ public class PinotHelixResourceManager {
         }
         if (!instanceStateEntry.getValue().equals(SegmentStateModel.OFFLINE)) {
           serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
+        }
+      }
+    }
+    return serverToSegmentsMap;
+  }
+
+  /**
+   * Get the servers to segments map for which servers are ONLINE in external view for those segments in IDEAL STATE
+   */
+  public Map<String, List<String>> getServerToOnlineSegmentsMapFromEV(String tableNameWithType,
+      boolean includeReplacedSegments) {
+    Map<String, List<String>> serverToSegmentsMap = new TreeMap<>();
+    IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    ExternalView externalView = _helixAdmin.getResourceExternalView(_helixClusterName, tableNameWithType);
+    if (idealState == null) {
+      throw new IllegalStateException("Ideal State does not exist for table: " + tableNameWithType);
+    }
+    if (externalView == null) {
+      throw new IllegalStateException("External View state does not exist for table: " + tableNameWithType);
+    }
+
+    Map<String, Map<String, String>> idealStateMap = idealState.getRecord().getMapFields();
+    Set<String> segments = idealStateMap.keySet();
+    if (!includeReplacedSegments) {
+      SegmentLineage segmentLineage =
+          SegmentLineageAccessHelper.getSegmentLineage(getPropertyStore(), tableNameWithType);
+      SegmentLineageUtils.filterSegmentsBasedOnLineageInPlace(segments, segmentLineage);
+    }
+
+    for (Map.Entry<String, Map<String, String>> entry : idealStateMap.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> externalViewStateMap = externalView.getStateMap(segmentName);
+      if (externalViewStateMap != null) {
+        for (Map.Entry<String, String> instanceStateEntry : externalViewStateMap.entrySet()) {
+          String server = instanceStateEntry.getKey();
+          if (instanceStateEntry.getValue().equals(SegmentStateModel.ONLINE)) {
+            serverToSegmentsMap.computeIfAbsent(server, key -> new ArrayList<>()).add(segmentName);
+          }
         }
       }
     }

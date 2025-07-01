@@ -64,14 +64,15 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
-public class TableConfigSerDeTest {
+public class TableConfigSerDeUtilsTest {
   private static final double NO_DICTIONARY_THRESHOLD_RATIO = 0.72;
 
   @Test
   public void testSerDe()
       throws IOException {
     TableConfigBuilder tableConfigBuilder = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
-        .setNoDictionarySizeRatioThreshold(NO_DICTIONARY_THRESHOLD_RATIO).setOptimizeDictionaryForMetrics(true);
+        .setNoDictionarySizeRatioThreshold(NO_DICTIONARY_THRESHOLD_RATIO)
+        .setOptimizeDictionaryForMetrics(true);
     {
       // Default table config
       TableConfig tableConfig = tableConfigBuilder.build();
@@ -83,7 +84,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkDefaultTableConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkDefaultTableConfig(tableConfigToCompare);
 
@@ -107,7 +108,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkQuotaConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkQuotaConfig(tableConfigToCompare);
     }
@@ -123,7 +124,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkTenantConfigWithoutTagOverride(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkTenantConfigWithoutTagOverride(tableConfigToCompare);
 
@@ -138,7 +139,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkTenantConfigWithTagOverride(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkTenantConfigWithTagOverride(tableConfigToCompare);
     }
@@ -146,7 +147,8 @@ public class TableConfigSerDeTest {
       // With SegmentAssignmentStrategyConfig
       ReplicaGroupStrategyConfig replicaGroupStrategyConfig = new ReplicaGroupStrategyConfig("memberId", 5);
       TableConfig tableConfig = tableConfigBuilder.setSegmentAssignmentStrategy("ReplicaGroupSegmentAssignmentStrategy")
-          .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig).build();
+          .setReplicaGroupStrategyConfig(replicaGroupStrategyConfig)
+          .build();
 
       checkSegmentAssignmentStrategyConfig(tableConfig);
 
@@ -155,7 +157,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkSegmentAssignmentStrategyConfig(tableConfigToCompare);
     }
@@ -171,7 +173,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkCompletionConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkCompletionConfig(tableConfigToCompare);
     }
@@ -188,7 +190,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkRoutingConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkRoutingConfig(tableConfigToCompare);
     }
@@ -205,7 +207,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkQueryConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkQueryConfig(tableConfigToCompare);
     }
@@ -225,7 +227,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkInstanceAssignmentConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkInstanceAssignmentConfig(tableConfigToCompare);
     }
@@ -248,7 +250,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkFieldConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkFieldConfig(tableConfigToCompare);
     }
@@ -258,7 +260,8 @@ public class TableConfigSerDeTest {
 
       // Serialize then de-serialize
       checkTableConfigWithUpsertConfig(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkTableConfigWithUpsertConfig(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+      checkTableConfigWithUpsertConfig(
+          TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig)));
     }
     {
       // with dedup config - without metadata ttl and metadata time column
@@ -269,7 +272,7 @@ public class TableConfigSerDeTest {
       checkTableConfigWithDedupConfigWithoutTTL(
           JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
       checkTableConfigWithDedupConfigWithoutTTL(
-          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+          TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig)));
     }
     {
       // with dedup config - with metadata ttl and metadata time column
@@ -280,7 +283,8 @@ public class TableConfigSerDeTest {
       TableConfig tableConfig = tableConfigBuilder.setDedupConfig(dedupConfig).build();
       // Serialize then de-serialize
       checkTableConfigWithDedupConfigWithTTL(JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
-      checkTableConfigWithDedupConfigWithTTL(TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+      checkTableConfigWithDedupConfigWithTTL(
+          TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig)));
     }
     {
       // with SegmentsValidationAndRetentionConfig
@@ -288,7 +292,7 @@ public class TableConfigSerDeTest {
       checkSegmentsValidationAndRetentionConfig(
           JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class));
       checkSegmentsValidationAndRetentionConfig(
-          TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig)));
+          TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig)));
     }
     {
       // With ingestion config
@@ -317,7 +321,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkIngestionConfig(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkIngestionConfig(tableConfigToCompare);
     }
@@ -339,7 +343,7 @@ public class TableConfigSerDeTest {
       assertEquals(tableConfigToCompare, tableConfig);
       checkTierConfigList(tableConfigToCompare);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       checkTierConfigList(tableConfigToCompare);
     }
@@ -359,7 +363,7 @@ public class TableConfigSerDeTest {
       assertEquals(tunerConfigToCompare.getName(), name);
       assertEquals(tunerConfigToCompare.getTunerProperties(), props);
 
-      tableConfigToCompare = TableConfigUtils.fromZNRecord(TableConfigUtils.toZNRecord(tableConfig));
+      tableConfigToCompare = TableConfigSerDeUtils.fromZNRecord(TableConfigSerDeUtils.toZNRecord(tableConfig));
       assertEquals(tableConfigToCompare, tableConfig);
       tunerConfigToCompare = tableConfigToCompare.getTunerConfigsList().get(0);
       assertEquals(tunerConfigToCompare.getName(), name);

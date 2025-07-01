@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.core.auth;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.spi.config.user.ComponentType;
 import org.apache.pinot.spi.config.user.RoleType;
@@ -32,7 +34,13 @@ public class ZkBasicAuthPrincipal extends BasicAuthPrincipal {
 
     public ZkBasicAuthPrincipal(String name, String token, String password, String component, String role,
         Set<String> tables, Set<String> excludeTables, Set<String> permissions) {
-        super(name, token, tables, excludeTables, permissions);
+     this(name, token, password, component, role, tables, excludeTables, permissions, null);
+    }
+
+    public ZkBasicAuthPrincipal(String name, String token, String password, String component, String role,
+        Set<String> tables, Set<String> excludeTables, Set<String> permissions,
+        Map<String, List<String>> tableRLSFilters) {
+        super(name, token, tables, excludeTables, permissions, tableRLSFilters);
         _component = component;
         _role = role;
         _password = password;

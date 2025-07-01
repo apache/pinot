@@ -182,6 +182,19 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
+    // Example config:  skipPlannerRules='FilterIntoJoinRule,FilterAggregateTransposeRule'
+    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
+    if (skipIndexesStr == null) {
+      return null;
+    }
+
+    String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
+
+    return new HashSet<>(List.of(skippedRules));
+  }
+
+  @Nullable
   public static Boolean isUseFixedReplica(Map<String, String> queryOptions) {
     String useFixedReplica = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA);
     return useFixedReplica != null ? Boolean.parseBoolean(useFixedReplica) : null;
@@ -418,20 +431,29 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, "false"));
+  public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_PHYSICAL_OPTIMIZER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isUseLiteMode(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_LITE_MODE, "false"));
+  public static boolean isUseLiteMode(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_LITE_MODE);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isUseBrokerPruning(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_BROKER_PRUNING, "false"));
+  public static boolean isUseBrokerPruning(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_BROKER_PRUNING);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isRunInBroker(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.RUN_IN_BROKER, "false"));
+  public static boolean isRunInBroker(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.RUN_IN_BROKER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static int getLiteModeServerStageLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT, option) : defaultValue;
   }
 
   @Nullable

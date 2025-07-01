@@ -2,14 +2,13 @@
   "tableName": "testTable",
   "segmentsConfig": {
     "replication": "1",
-    "schemaName": "testTable",
     "timeColumnName": "time"
   },
   "fieldConfigList": [
     {
       "encodingType": "RAW",
-      "indexType": "TEXT",
-      "name": "event_text",
+      "indexType": "JSON",
+      "name": "event_json",
       "properties": {
         "deriveNumDocsPerChunkForRawIndex": "true",
         "rawIndexWriterVersion": "3"
@@ -19,10 +18,10 @@
   "tableIndexConfig": {
     "invertedIndexColumns": [],
     "jsonIndexColumns": [
-      "event_text",
-      "group_text",
-      "member_text",
-      "venue_text"
+      "event_json",
+      "group_json",
+      "member_json",
+      "venue_json"
     ],
     "loadMode": "HEAP"
   },

@@ -3504,10 +3504,10 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\n"
         + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
-        + "Rule: AggregateProjectMergeRule -> Time:*\n"
-        + "Rule: Project -> Time:*\n"
-        + "Rule: AggregateRemoveRule -> Time:*\n"
-        + "Rule: SortRemoveRule -> Time:*\n");
+        + "Rule: SortRemove -> Time:*\n"
+        + "Rule: AggregateProjectMerge -> Time:*\n"
+        + "Rule: EvaluateProjectLiteral -> Time:*\n"
+        + "Rule: AggregateRemove -> Time:*\n");
 
     // In the query below, FlightNum column has an inverted index and there is no data satisfying the predicate
     // "FlightNum < 0". Hence, all segments are pruned out before query execution on the server side.
@@ -3531,12 +3531,11 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
             + "  LogicalFilter\\(condition=\\[<\\(.*, 0\\)]\\)\n"
             + "    PinotLogicalTableScan\\(table=\\[\\[default, mytable]]\\)\n"
     ).matcher(response2Json.get("rows").get(0).get(1).asText()).find());
-    assertEquals(response2Json.get("rows").get(0).get(2).asText(),
-        "Rule Execution Times\n"
-            + "Rule: Project -> Time: *\n"
-            + "Rule: FilterProjectTransposeRule -> Time: *\n"
-            + "Rule: Filter -> Time: *\n"
-            + "Rule: ProjectFilterTransposeRule -> Time: *\n");
+    assertEquals(response2Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
+            + "Rule: ProjectFilterTranspose -> Time: *\n"
+            + "Rule: EvaluateProjectLiteral -> Time: *\n"
+            + "Rule: FilterProjectTranspose -> Time: *\n"
+            + "Rule: EvaluateFilterLiteral -> Time: *\n");
   }
 
   /** Test to make sure we are properly handling string comparisons in predicates. */

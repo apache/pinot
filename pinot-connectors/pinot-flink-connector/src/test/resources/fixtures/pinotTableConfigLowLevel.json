@@ -7,7 +7,6 @@
     "segmentPushFrequency" : null,
     "segmentPushType" : "APPEND",
     "replication" : "2",
-    "schemaName" : "demand",
     "timeColumnName" : "timestamp",
     "segmentAssignmentStrategy" : "BalanceNumSegmentAssignmentStrategy",
     "replicaGroupStrategyConfig" : null,

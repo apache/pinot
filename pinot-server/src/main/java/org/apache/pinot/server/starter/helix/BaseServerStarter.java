@@ -675,6 +675,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     Tracing.ThreadAccountantOps.initializeThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    if (Tracing.getThreadAccountant().getClusterConfigChangeListener() != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          Tracing.getThreadAccountant().getClusterConfigChangeListener());
+    }
+
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
@@ -747,6 +752,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       long endTimeMs =
           startTimeMs + _serverConf.getProperty(Server.CONFIG_OF_STARTUP_TIMEOUT_MS, Server.DEFAULT_STARTUP_TIMEOUT_MS);
       try {
+        serverMetrics.setValueOfGlobalGauge(ServerGauge.STARTUP_STATUS_CHECK_IN_PROGRESS, 1);
         startupServiceStatusCheck(endTimeMs);
       } catch (Exception e) {
         LOGGER.error("Caught exception while checking service status. Stopping server.", e);
@@ -754,6 +760,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _adminApiApplication.stop();
         _helixManager.disconnect();
         throw e;
+      } finally {
+        serverMetrics.setValueOfGlobalGauge(ServerGauge.STARTUP_STATUS_CHECK_IN_PROGRESS, 0);
       }
     }
 

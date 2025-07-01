@@ -168,18 +168,14 @@ public class DefaultAggregationExecutorTest {
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Map<String, Object> map = new HashMap<>();
-
+      GenericRow row = new GenericRow();
       for (int j = 0; j < _columns.length; j++) {
         String metricName = _columns[j];
         double value = _random.nextDouble() * MAX_VALUE;
         _inputData[j][i] = value;
-        map.put(metricName, value);
+        row.putValue(metricName, value);
       }
-
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      rows.add(row);
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

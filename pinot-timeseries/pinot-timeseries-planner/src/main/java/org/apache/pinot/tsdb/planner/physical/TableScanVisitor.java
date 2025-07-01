@@ -61,6 +61,7 @@ public class TableScanVisitor {
     if (planNode instanceof LeafTimeSeriesPlanNode) {
       LeafTimeSeriesPlanNode sfpNode = (LeafTimeSeriesPlanNode) planNode;
       Expression filterExpression = CalciteSqlParser.compileToExpression(sfpNode.getEffectiveFilter(timeBuckets));
+      context.addTableName(sfpNode.getTableName());
       RoutingTable routingTable = _routingManager.getRoutingTable(
           compileBrokerRequest(sfpNode.getTableName(), filterExpression),
           context._requestId);
@@ -129,6 +130,7 @@ public class TableScanVisitor {
   public static class Context {
     private final Map<ServerInstance, Map<String, List<String>>> _leafIdToSegmentsByServer = new HashMap<>();
     private final Long _requestId;
+    private final List<String> _tableNames = new ArrayList<>();
 
     public Context(Long requestId) {
       _requestId = requestId;
@@ -149,6 +151,14 @@ public class TableScanVisitor {
 
     Map<ServerInstance, Map<String, List<String>>> getLeafIdToSegmentsByServer() {
       return _leafIdToSegmentsByServer;
+    }
+
+    public List<String> getTableNames() {
+      return _tableNames;
+    }
+
+    public void addTableName(String tableName) {
+      _tableNames.add(tableName);
     }
   }
 

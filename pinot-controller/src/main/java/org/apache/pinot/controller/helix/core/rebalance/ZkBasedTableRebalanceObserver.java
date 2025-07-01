@@ -151,6 +151,22 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
           updatedStatsInZk = true;
         }
         break;
+      case FORCE_COMMIT_START_TRIGGER:
+        _tableRebalanceProgressStats.getRebalanceProgressStatsOverall()._isForceCommittingConsumingSegments = true;
+        _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep()._isForceCommittingConsumingSegments = true;
+        trackStatsInZk();
+        updatedStatsInZk = true;
+        break;
+      case FORCE_COMMIT_END_TRIGGER:
+        _tableRebalanceProgressStats.getRebalanceProgressStatsOverall()._isForceCommittingConsumingSegments = false;
+        _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep()._isForceCommittingConsumingSegments = false;
+        _tableRebalanceProgressStats.getRebalanceProgressStatsOverall()._totalSegmentsForceCommitted +=
+            rebalanceContext.getNumSegmentsForceCommitted();
+        _tableRebalanceProgressStats.getRebalanceProgressStatsCurrentStep()._totalSegmentsForceCommitted =
+            rebalanceContext.getNumSegmentsForceCommitted();
+        trackStatsInZk();
+        updatedStatsInZk = true;
+        break;
       default:
         throw new IllegalArgumentException("Unimplemented trigger: " + trigger);
     }
@@ -527,6 +543,7 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
     switch (trigger) {
       case START_TRIGGER:
       case NEXT_ASSIGNMENT_CALCULATION_TRIGGER:
+        existingProgressStats = rebalanceProgressStats.getRebalanceProgressStatsCurrentStep();
         // These are initialization steps for global / step progress stats
         progressStats._totalSegmentsToBeAdded = totalSegmentsToBeAdded;
         progressStats._totalSegmentsToBeDeleted = totalSegmentsToBeDeleted;
@@ -536,6 +553,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         progressStats._totalCarryOverSegmentsToBeDeleted = 0;
         progressStats._totalRemainingSegmentsToConverge = segmentsUnchangedYetNotConverged;
         progressStats._totalUniqueNewUntrackedSegmentsDuringRebalance = totalNewSegmentsNotMonitored;
+        progressStats._isForceCommittingConsumingSegments = false;
+        progressStats._totalSegmentsForceCommitted = existingProgressStats._totalSegmentsForceCommitted;
         progressStats._percentageRemainingSegmentsToBeAdded = totalSegmentsToBeAdded == 0 ? 0.0 : 100.0;
         progressStats._percentageRemainingSegmentsToBeDeleted = totalSegmentsToBeDeleted == 0 ? 0.0 : 100.0;
         progressStats._estimatedTimeToCompleteAddsInSeconds = totalSegmentsToBeAdded == 0 ? 0.0 : -1.0;
@@ -562,6 +581,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         // (the segmentsToMonitor is passed in as null), copy over the existing stats
         progressStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
             existingProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance;
+        progressStats._isForceCommittingConsumingSegments = false;
+        progressStats._totalSegmentsForceCommitted = existingProgressStats._totalSegmentsForceCommitted;
         progressStats._percentageRemainingSegmentsToBeAdded = TableRebalanceProgressStats.calculatePercentageChange(
             progressStats._totalSegmentsToBeAdded, totalSegmentsToBeAdded);
         progressStats._percentageRemainingSegmentsToBeDeleted = TableRebalanceProgressStats.calculatePercentageChange(
@@ -615,6 +636,8 @@ public class ZkBasedTableRebalanceObserver implements TableRebalanceObserver {
         progressStats._totalRemainingSegmentsToConverge = segmentsUnchangedYetNotConverged;
         progressStats._totalUniqueNewUntrackedSegmentsDuringRebalance =
             existingProgressStats._totalUniqueNewUntrackedSegmentsDuringRebalance + totalNewSegmentsNotMonitored;
+        progressStats._isForceCommittingConsumingSegments = false;
+        progressStats._totalSegmentsForceCommitted = existingProgressStats._totalSegmentsForceCommitted;
         // This percentage can be > 100% for EV-IS convergence since there could be some segments carried over from the
         // last step to this one that are yet to converge. This can especially occur if bestEfforts=true
         progressStats._percentageRemainingSegmentsToBeAdded = TableRebalanceProgressStats.calculatePercentageChange(
