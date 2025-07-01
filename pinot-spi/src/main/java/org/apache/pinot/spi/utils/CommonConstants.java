@@ -1421,7 +1421,7 @@ public class CommonConstants {
     public static final int DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS = 30_000;
 
     public static final String CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.panic.heap.usage.ratio";
-    public static final float DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
+    public static final float DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO = 0.99f;
 
     public static final String CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO = "accounting.oom.critical.heap.usage.ratio";
     public static final float DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO = 0.96f;

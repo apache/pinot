@@ -87,7 +87,7 @@ public class QueryMonitorConfig {
 
     _panicLevel =
         (long) (maxHeapSize * config.getProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
+            CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
 
     // kill the most expensive query if heap usage exceeds this
     _criticalLevel =
@@ -153,7 +153,7 @@ public class QueryMonitorConfig {
     if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
           CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)) {
-        _panicLevel = (long) (_maxHeapSize * CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO);
+        _panicLevel = (long) (_maxHeapSize * CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO);
       } else {
         _panicLevel = (long) (_maxHeapSize * Double.parseDouble(
             clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)));

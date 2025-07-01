@@ -28,6 +28,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -96,6 +97,7 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertFalse(accountant.getWatcherTask().getQueryMonitorConfig().isOomKillQueryEnabled());
     accountant.getWatcherTask().onChange(
         Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY)),
         CLUSTER_CONFIGS);
@@ -108,6 +110,7 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertFalse(accountant.getWatcherTask().getQueryMonitorConfig().isPublishHeapUsageMetric());
     accountant.getWatcherTask()
         .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE)),
             CLUSTER_CONFIGS);
@@ -120,6 +123,7 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertFalse(accountant.getWatcherTask().getQueryMonitorConfig().isCpuTimeBasedKillingEnabled());
     accountant.getWatcherTask().onChange(
         Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED)),
         CLUSTER_CONFIGS);
@@ -132,6 +136,8 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getCpuTimeBasedKillingThresholdNS(),
+        CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS * 1000_000L);
     accountant.getWatcherTask().onChange(
         Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS)),
         CLUSTER_CONFIGS);
@@ -145,6 +151,9 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getPanicLevel(),
+        CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO * accountant.getWatcherTask()
+            .getQueryMonitorConfig().getMaxHeapSize());
     accountant.getWatcherTask().onChange(
         Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)),
         CLUSTER_CONFIGS);
@@ -158,6 +167,9 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getCriticalLevel(),
+        CommonConstants.Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO * accountant.getWatcherTask()
+            .getQueryMonitorConfig().getMaxHeapSize());
     accountant.getWatcherTask().onChange(
         Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO)),
         CLUSTER_CONFIGS);
@@ -171,6 +183,10 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getCriticalLevelAfterGC(),
+        accountant.getWatcherTask().getQueryMonitorConfig().getCriticalLevel()
+            - CommonConstants.Accounting.DEFAULT_CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC
+            * accountant.getWatcherTask().getQueryMonitorConfig().getMaxHeapSize());
     accountant.getWatcherTask().onChange(Set.of(getFullyQualifiedConfigName(
         CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC)), CLUSTER_CONFIGS);
     assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getCriticalLevelAfterGC(),
@@ -184,6 +200,9 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getAlarmingLevel(),
+        CommonConstants.Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO * accountant.getWatcherTask()
+            .getQueryMonitorConfig().getMaxHeapSize());
     accountant.getWatcherTask().onChange(
         Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO)),
         CLUSTER_CONFIGS);
@@ -197,6 +216,8 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getNormalSleepTime(),
+        CommonConstants.Accounting.DEFAULT_SLEEP_TIME_MS);
     accountant.getWatcherTask()
         .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS)),
             CLUSTER_CONFIGS);
@@ -209,6 +230,9 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getAlarmingSleepTime(),
+        accountant.getWatcherTask().getQueryMonitorConfig().getNormalSleepTime()
+            / CommonConstants.Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR);
     accountant.getWatcherTask()
         .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR)),
             CLUSTER_CONFIGS);
@@ -223,6 +247,9 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getMinMemoryFootprintForKill(),
+        (long) (CommonConstants.Accounting.DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO * accountant.getWatcherTask()
+            .getQueryMonitorConfig().getMaxHeapSize()));
     accountant.getWatcherTask().onChange(
         Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO)),
         CLUSTER_CONFIGS);
@@ -237,6 +264,8 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getGcBackoffCount(),
+        CommonConstants.Accounting.DEFAULT_GC_BACKOFF_COUNT);
     accountant.getWatcherTask()
         .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_GC_BACKOFF_COUNT)),
             CLUSTER_CONFIGS);
@@ -249,6 +278,8 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getGcWaitTime(),
+        CommonConstants.Accounting.DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS);
     accountant.getWatcherTask()
         .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_GC_WAIT_TIME_MS)),
             CLUSTER_CONFIGS);
@@ -261,6 +292,7 @@ public class PerQueryCPUMemAccountantFactoryTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
+    assertFalse(accountant.getWatcherTask().getQueryMonitorConfig().isQueryKilledMetricEnabled());
     accountant.getWatcherTask()
         .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED)),
             CLUSTER_CONFIGS);
