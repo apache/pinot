@@ -24,7 +24,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -1423,20 +1422,14 @@ public final class TableConfigUtils {
   }
 
   public static void checkForDuplicates(List<String> columns) {
-    Object2LongOpenHashMap<String> map = new Object2LongOpenHashMap<>(columns.size());
-    map.defaultReturnValue(0);
+    Set<String> seen = new HashSet<>(columns.size());
+    Set<String> duplicates = new HashSet<>(columns.size());
 
-    for (String column : columns) {
-      map.put(column, map.getLong(column) + 1);
-    }
-
-    List<String> duplicates = new ArrayList<>();
-
-    map.forEach((k, v) -> {
-      if (v > 1) {
-        duplicates.add(k);
+    for (String item : columns) {
+      if (!seen.add(item)) {
+        duplicates.add(item);
       }
-    });
+    }
 
     if (!duplicates.isEmpty()) {
       throw new IllegalStateException(
