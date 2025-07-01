@@ -107,7 +107,7 @@ public interface PartitionUpsertMetadataManager extends Closeable {
    * Takes snapshot for all the tracked immutable segments when snapshot is enabled. This method should be invoked
    * before a new consuming segment starts consuming.
    */
-  void takeSnapshot();
+  boolean takeSnapshot();
 
   /**
    * Remove the expired primary keys from the metadata when TTL is enabled.
