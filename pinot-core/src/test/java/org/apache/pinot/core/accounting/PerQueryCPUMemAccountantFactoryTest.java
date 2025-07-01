@@ -152,7 +152,7 @@ public class PerQueryCPUMemAccountantFactoryTest {
             InstanceType.SERVER);
 
     assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getPanicLevel(),
-        CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO * accountant.getWatcherTask()
+        CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO * accountant.getWatcherTask()
             .getQueryMonitorConfig().getMaxHeapSize());
     accountant.getWatcherTask().onChange(
         Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO)),
