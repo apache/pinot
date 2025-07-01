@@ -63,13 +63,15 @@ public abstract class BlockExchange {
    * mailbox index that receives the stats should be tuned.
    * @param statsIndexChooser a function to choose the mailbox index to send stats to.
    */
-  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
-      List<Integer> keys, BlockSplitter splitter, Function<List<SendingMailbox>, Integer> statsIndexChooser) {
+  public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes,
+      RelDistribution.Type distributionType, List<Integer> keys, BlockSplitter splitter,
+      Function<List<SendingMailbox>, Integer> statsIndexChooser, String hashFunction) {
     switch (distributionType) {
       case SINGLETON:
         return new SingletonExchange(sendingMailboxes, splitter, statsIndexChooser);
       case HASH_DISTRIBUTED:
-        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys), splitter, statsIndexChooser);
+        return new HashExchange(sendingMailboxes, KeySelectorFactory.getKeySelector(keys, hashFunction), splitter,
+            statsIndexChooser);
       case RANDOM_DISTRIBUTED:
         return new RandomExchange(sendingMailboxes, splitter, statsIndexChooser);
       case BROADCAST_DISTRIBUTED:
@@ -83,8 +85,8 @@ public abstract class BlockExchange {
   }
 
   public static BlockExchange getExchange(List<SendingMailbox> sendingMailboxes, RelDistribution.Type distributionType,
-      List<Integer> keys, BlockSplitter splitter) {
-    return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER);
+      List<Integer> keys, BlockSplitter splitter, String hashFunction) {
+    return getExchange(sendingMailboxes, distributionType, keys, splitter, RANDOM_INDEX_CHOOSER, hashFunction);
   }
 
   protected BlockExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
