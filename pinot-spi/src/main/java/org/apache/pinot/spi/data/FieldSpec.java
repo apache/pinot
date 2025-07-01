@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -69,6 +70,7 @@ import org.apache.pinot.spi.utils.TimestampUtils;
     @JsonSubTypes.Type(value = DateTimeFieldSpec.class, name = "DATE_TIME"),
     @JsonSubTypes.Type(value = ComplexFieldSpec.class, name = "COMPLEX")
 })
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
