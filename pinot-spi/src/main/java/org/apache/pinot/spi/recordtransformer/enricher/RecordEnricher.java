@@ -22,10 +22,9 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 
 
-/**
- * Record enricher is a special {@link RecordTransformer} which is applied before other transformers to enrich the
- * columns. If a column with the same name as the input column already exists in the record, it will be overwritten.
- */
+/// Record enricher is a special [RecordTransformer] which is applied before other transformers to enrich the columns.
+/// If a column with the same name as the input column already exists in the record, it will be overwritten.
+/// TODO: Clean up this interface as it is the same as [RecordTransformer].
 public interface RecordEnricher extends RecordTransformer {
 
   /**
@@ -34,8 +33,7 @@ public interface RecordEnricher extends RecordTransformer {
   void enrich(GenericRow record);
 
   @Override
-  default GenericRow transform(GenericRow record) {
+  default void transform(GenericRow record) {
     enrich(record);
-    return record;
   }
 }

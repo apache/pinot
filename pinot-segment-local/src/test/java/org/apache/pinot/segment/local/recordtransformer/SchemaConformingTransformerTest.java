@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -45,15 +44,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.fail;
+import static org.testng.Assert.*;
 
 
 public class SchemaConformingTransformerTest {
@@ -103,20 +97,6 @@ public class SchemaConformingTransformerTest {
     ServerMetrics.register(mock(ServerMetrics.class));
   }
 
-  private static final SchemaConformingTransformer _RECORD_TRANSFORMER =
-      new SchemaConformingTransformer(createDefaultBasicTableConfig(), createDefaultSchema());
-
-  private static TableConfig createDefaultBasicTableConfig() {
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    SchemaConformingTransformerConfig schemaConformingTransformerConfig =
-        new SchemaConformingTransformerConfig(true, INDEXABLE_EXTRAS_FIELD_NAME, true, UNINDEXABLE_EXTRAS_FIELD_NAME,
-            UNINDEXABLE_FIELD_SUFFIX, null, null, null, null, null, null, false, null, null, null, null, null, null,
-            null, null, null, null, null);
-    ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
-        .build();
-  }
-
   private static TableConfig createDefaultTableConfig(String indexableExtrasField, String unindexableExtrasField,
       String unindexableFieldSuffix, Set<String> fieldPathsToDrop, Set<String> fieldPathsToPreserve,
       Set<String> fieldPathsToPreserveWithIndex, Map<String, String> columnNameToJsonKeyPathMap,
@@ -134,10 +114,6 @@ public class SchemaConformingTransformerTest {
     ingestionConfig.setSchemaConformingTransformerConfig(schemaConformingTransformerConfig);
     return new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setIngestionConfig(ingestionConfig)
         .build();
-  }
-
-  private static Schema createDefaultSchema() {
-    return createDefaultSchemaBuilder().addSingleValueDimension("intField", DataType.INT).build();
   }
 
   private static Schema.SchemaBuilder createDefaultSchemaBuilder() {
@@ -952,8 +928,8 @@ public class SchemaConformingTransformerTest {
       ((List<Object>) expectedMergedTextIndexValue).sort(null);
     }
 
-    Assert.assertNotNull(outputRecord);
-    Assert.assertEquals(outputRecord.getFieldToValueMap(), expectedOutputRecordMap);
+    assertNotNull(outputRecord);
+    assertEquals(outputRecord.getFieldToValueMap(), expectedOutputRecordMap);
   }
 
   /**
@@ -962,26 +938,23 @@ public class SchemaConformingTransformerTest {
    */
   private GenericRow transformRow(TableConfig tableConfig, Schema schema, String inputRecordJSONString) {
     Map<String, Object> inputRecordMap = jsonStringToMap(inputRecordJSONString);
-    GenericRow inputRecord = createRowFromMap(inputRecordMap);
-    SchemaConformingTransformer schemaConformingTransformer =
-        new SchemaConformingTransformer(tableConfig, schema);
-    return schemaConformingTransformer.transform(inputRecord);
+    GenericRow record = createRowFromMap(inputRecordMap);
+    SchemaConformingTransformer transformer = SchemaConformingTransformer.create(tableConfig, schema);
+    assertNotNull(transformer);
+    return transformer.transform(List.of(record)).get(0);
   }
 
   /**
    * @return A map representing the given JSON string
    */
-  @Nonnull
   private Map<String, Object> jsonStringToMap(String jsonString) {
     try {
       TypeReference<Map<String, Object>> typeRef = new TypeReference<>() {
       };
       return OBJECT_MAPPER.readValue(jsonString, typeRef);
     } catch (IOException e) {
-      fail(e.getMessage());
+      throw new RuntimeException(e);
     }
-    // Should never reach here
-    return null;
   }
 
   /**

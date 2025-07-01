@@ -257,16 +257,16 @@ public class ExpressionTransformerTest {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testDerivedFunctions")
         .setIngestionConfig(ingestionConfig).build();
     ExpressionTransformer expressionTransformer = new ExpressionTransformer(tableConfig, schema);
-    GenericRow genericRow = new GenericRow();
-    genericRow.putValue("x", 100);
-    genericRow.putValue("e", 200);
-    GenericRow transform = expressionTransformer.transform(genericRow);
-    Assert.assertEquals(transform.getValue("a"), 130.0);
-    Assert.assertEquals(transform.getValue("b"), 120.0);
-    Assert.assertEquals(transform.getValue("c"), 240.0);
-    Assert.assertEquals(transform.getValue("d"), 110.0);
-    Assert.assertEquals(transform.getValue("e"), 200);
-    Assert.assertEquals(transform.getValue("f"), 210.0);
+    GenericRow record = new GenericRow();
+    record.putValue("x", 100);
+    record.putValue("e", 200);
+    expressionTransformer.transform(record);
+    Assert.assertEquals(record.getValue("a"), 130.0);
+    Assert.assertEquals(record.getValue("b"), 120.0);
+    Assert.assertEquals(record.getValue("c"), 240.0);
+    Assert.assertEquals(record.getValue("d"), 110.0);
+    Assert.assertEquals(record.getValue("e"), 200);
+    Assert.assertEquals(record.getValue("f"), 210.0);
   }
 
   /** Check if there is more than one transform function definition for the same column. */

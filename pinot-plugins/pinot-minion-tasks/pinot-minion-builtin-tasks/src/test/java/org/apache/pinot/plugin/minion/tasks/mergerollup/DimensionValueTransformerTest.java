@@ -90,7 +90,7 @@ public class DimensionValueTransformerTest {
 
     GenericRow record = getRecord();
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      record = transformer.transform(record);
+      transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svInt"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
       assertEquals(record.getValue("svLong"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);
@@ -110,7 +110,7 @@ public class DimensionValueTransformerTest {
     // Test empty record
     record = new GenericRow();
     for (int i = 0; i < NUM_ROUNDS; i++) {
-      record = transformer.transform(record);
+      transformer.transform(record);
       assertNotNull(record);
       assertEquals(record.getValue("svInt"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_INT);
       assertEquals(record.getValue("svLong"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_LONG);

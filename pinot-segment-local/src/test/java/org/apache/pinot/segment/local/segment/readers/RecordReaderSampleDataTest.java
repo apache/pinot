@@ -23,7 +23,7 @@ import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -42,18 +42,14 @@ import static org.testng.Assert.assertTrue;
 
 
 public class RecordReaderSampleDataTest {
-  private static final File AVRO_SAMPLE_DATA_FILE = new File(Preconditions
-      .checkNotNull(RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_sample_data.avro"))
-      .getFile());
-  private static final File CSV_SAMPLE_DATA_FILE = new File(Preconditions
-      .checkNotNull(RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_sample_data.csv"))
-      .getFile());
-  private static final File JSON_SAMPLE_DATA_FILE = new File(Preconditions
-      .checkNotNull(RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_sample_data.json"))
-      .getFile());
-  private static final File JSON_EMPTY_DATA_FILE = new File(Preconditions
-      .checkNotNull(RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_empty_data.json"))
-      .getFile());
+  private static final File AVRO_SAMPLE_DATA_FILE = new File(Preconditions.checkNotNull(
+      RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_sample_data.avro")).getFile());
+  private static final File CSV_SAMPLE_DATA_FILE = new File(Preconditions.checkNotNull(
+      RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_sample_data.csv")).getFile());
+  private static final File JSON_SAMPLE_DATA_FILE = new File(Preconditions.checkNotNull(
+      RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_sample_data.json")).getFile());
+  private static final File JSON_EMPTY_DATA_FILE = new File(Preconditions.checkNotNull(
+      RecordReaderSampleDataTest.class.getClassLoader().getResource("data/test_empty_data.json")).getFile());
   private static final Schema SCHEMA =
       new Schema.SchemaBuilder().addSingleValueDimension("column1", FieldSpec.DataType.LONG)
           .addSingleValueDimension("column2", FieldSpec.DataType.INT)
@@ -61,29 +57,30 @@ public class RecordReaderSampleDataTest {
           .addSingleValueDimension("column7", FieldSpec.DataType.STRING)
           .addSingleValueDimension("unknown_dimension", FieldSpec.DataType.STRING)
           .addMetric("met_impressionCount", FieldSpec.DataType.LONG)
-          .addMetric("unknown_metric", FieldSpec.DataType.DOUBLE).build();
+          .addMetric("unknown_metric", FieldSpec.DataType.DOUBLE)
+          .build();
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
   @Test
   public void testRecordReaders()
       throws Exception {
-    CompositeTransformer defaultTransformer = CompositeTransformer.getDefaultTransformer(TABLE_CONFIG, SCHEMA);
-    try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null);
-        RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null);
-        RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, SCHEMA.getColumnNames(), null)) {
+    TransformPipeline transformPipeline = new TransformPipeline(TABLE_CONFIG, SCHEMA);
+    try (RecordReader avroRecordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE,
+        SCHEMA.getColumnNames(), null);
+        RecordReader csvRecordReader = RecordReaderFactory.getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE,
+            SCHEMA.getColumnNames(), null);
+        RecordReader jsonRecordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE,
+            SCHEMA.getColumnNames(), null)) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
         assertTrue(jsonRecordReader.hasNext());
         numRecords++;
 
-        GenericRow avroRecord = defaultTransformer.transform(avroRecordReader.next());
-        GenericRow csvRecord = defaultTransformer.transform(csvRecordReader.next());
-        GenericRow jsonRecord = defaultTransformer.transform(jsonRecordReader.next());
+        GenericRow avroRecord = transformPipeline.processRow(avroRecordReader.next()).getTransformedRows().get(0);
+        GenericRow csvRecord = transformPipeline.processRow(csvRecordReader.next()).getTransformedRows().get(0);
+        GenericRow jsonRecord = transformPipeline.processRow(jsonRecordReader.next()).getTransformedRows().get(0);
         checkEqualCSV(avroRecord, csvRecord);
         checkEqual(avroRecord, jsonRecord);
 
@@ -114,8 +111,8 @@ public class RecordReaderSampleDataTest {
   @Test
   public void testRecordReaderEmptyFile()
       throws Exception {
-    try (RecordReader jsonRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.JSON, JSON_EMPTY_DATA_FILE, SCHEMA.getColumnNames(), null)) {
+    try (RecordReader jsonRecordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, JSON_EMPTY_DATA_FILE,
+        SCHEMA.getColumnNames(), null)) {
       Assert.assertFalse(jsonRecordReader.hasNext());
     }
   }
@@ -129,12 +126,12 @@ public class RecordReaderSampleDataTest {
   public void testRecordExtractorAbsentFields()
       throws Exception {
     HashSet<String> sourceFields = Sets.newHashSet("incoming", "time_day", "outgoing", "column2");
-    try (RecordReader avroRecordReader = RecordReaderFactory
-        .getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE, sourceFields, null);
-        RecordReader csvRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE, sourceFields, null);
-        RecordReader jsonRecordReader = RecordReaderFactory
-            .getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE, sourceFields, null)) {
+    try (RecordReader avroRecordReader = RecordReaderFactory.getRecordReader(FileFormat.AVRO, AVRO_SAMPLE_DATA_FILE,
+        sourceFields, null);
+        RecordReader csvRecordReader = RecordReaderFactory.getRecordReader(FileFormat.CSV, CSV_SAMPLE_DATA_FILE,
+            sourceFields, null);
+        RecordReader jsonRecordReader = RecordReaderFactory.getRecordReader(FileFormat.JSON, JSON_SAMPLE_DATA_FILE,
+            sourceFields, null)) {
       int numRecords = 0;
       while (avroRecordReader.hasNext()) {
         assertTrue(csvRecordReader.hasNext());
@@ -149,7 +146,7 @@ public class RecordReaderSampleDataTest {
 
         // Check the values from the first record
         if (numRecords == 1) {
-          assertEquals(Long.valueOf(avroRecord.getValue("time_day").toString()), new Long(1072889503L));
+          assertEquals(Long.parseLong(avroRecord.getValue("time_day").toString()), 1072889503L);
           assertEquals(avroRecord.getValue("column2"), 231355578);
           assertNull(avroRecord.getValue("incoming"));
           assertNull(avroRecord.getValue("outgoing"));
