@@ -85,8 +85,15 @@ public class PhysicalPlannerContext {
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
+      String instanceId, Map<String, String> queryOptions) {
+    this(routingManager, hostName, port, requestId, instanceId, queryOptions,
+        CommonConstants.Broker.DEFAULT_USE_LITE_MODE, CommonConstants.Broker.DEFAULT_RUN_IN_BROKER,
+        CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING, CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
+  }
+
+  public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
       String instanceId, Map<String, String> queryOptions, boolean defaultUseLiteMode, boolean defaultRunInBroker,
-      boolean defaultUseBrokerPruning, int defaultLiteModeServerStageLimit) {
+      boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
@@ -97,7 +104,7 @@ public class PhysicalPlannerContext {
     _runInBroker = QueryOptionsUtils.isRunInBroker(_queryOptions, defaultRunInBroker);
     _useBrokerPruning = QueryOptionsUtils.isUseBrokerPruning(_queryOptions, defaultUseBrokerPruning);
     _liteModeServerStageLimit = QueryOptionsUtils.getLiteModeServerStageLimit(_queryOptions,
-        defaultLiteModeServerStageLimit);
+        defaultLiteModeLeafStageLimit);
     _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
   }
 
