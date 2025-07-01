@@ -260,6 +260,8 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter GRPC_TRANSPORT_TERMINATED = create(
       "GRPC_TRANSPORT_TERMINATED", "grpcTransport", true);
 
+  public static final BrokerMeter RLS_FILTERS_APPLIED = create("RLS_FILTERS_APPLIED", "queries", false);
+
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 
   // Iterate through all query error codes from QueryErrorCode.getAllValues() and create a metric for each

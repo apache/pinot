@@ -51,7 +51,7 @@ import org.apache.pinot.common.response.ProcessingException;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "groupsTrimmed"
+    "pools", "rlsFiltersApplied", "groupsTrimmed"
 })
 public class BrokerResponseNativeV2 implements BrokerResponse {
   private final StatMap<StatKey> _brokerStats = new StatMap<>(StatKey.class);
@@ -83,6 +83,7 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   private Set<String> _tablesQueried = Set.of();
 
   private Set<Integer> _pools = Set.of();
+  private boolean _rlsFiltersApplied = false;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   @Nullable
@@ -412,6 +413,16 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   @NotNull
   public Set<Integer> getPools() {
     return _pools;
+  }
+
+  @Override
+  public void setRLSFiltersApplied(boolean rlsFiltersApplied) {
+    _rlsFiltersApplied = rlsFiltersApplied;
+  }
+
+  @Override
+  public boolean getRLSFiltersApplied() {
+    return _rlsFiltersApplied;
   }
 
   public void addBrokerStats(StatMap<StatKey> brokerStats) {
