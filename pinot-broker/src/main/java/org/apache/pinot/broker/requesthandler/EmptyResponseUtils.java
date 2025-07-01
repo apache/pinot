@@ -139,8 +139,8 @@ public class EmptyResponseUtils {
     if (useMSE) {
       QueryEnvironment queryEnvironment = new QueryEnvironment(database, tableCache, null);
       RelRoot root;
-      try (QueryEnvironment.CompiledQuery compiledQuery = queryEnvironment.compile(query)) {
-        root = compiledQuery.getRelRoot();
+      try (QueryEnvironment.MseQuery compiledQuery = queryEnvironment.createQuery(query)) {
+        root = compiledQuery.getOptimizedRelRoot();
       } catch (Exception ignored) {
         root = null;
       }
