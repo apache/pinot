@@ -74,34 +74,34 @@ public class RealtimeSegmentValidationManagerTest {
   public Object[][] testCases() {
     return new Object[][]{
         // Table is paused due to admin intervention, should return false
-        {true, PauseState.ReasonCode.ADMINISTRATIVE, UtilizationChecker.CheckResult.TRUE, false, false},
+        {true, PauseState.ReasonCode.ADMINISTRATIVE, UtilizationChecker.CheckResult.PASS, false, false},
 
         // Resource utilization exceeded and pause state is updated, should return false
-        {false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.FALSE, false,
+        {false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.FAIL, false,
             false},
 
         // Resource utilization is within limits but was previously paused due to resource utilization,
         // should return true
-        {true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.TRUE, false,
+        {true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.PASS, false,
             true},
 
         // Resource utilization is STALE but was previously paused due to resource utilization, should return false
-        {true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.STALE, false,
+        {true, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.UNDETERMINED, false,
             false},
 
         // Resource utilization is STALE but was not previously paused due to resource utilization, should return true
-        {false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.STALE, false,
+        {false, PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, UtilizationChecker.CheckResult.UNDETERMINED, false,
             true},
 
         // Resource utilization is within limits but was previously paused due to storage quota exceeded,
         // should return false
-        {true, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.TRUE, true, false},
+        {true, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.PASS, true, false},
 
         // Storage quota exceeded, should return false
-        {false, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.TRUE, true, false},
+        {false, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.PASS, true, false},
 
         // Storage quota within limits but was previously paused due to storage quota exceeded, should return true
-        {true, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.TRUE, false, true}};
+        {true, PauseState.ReasonCode.STORAGE_QUOTA_EXCEEDED, UtilizationChecker.CheckResult.PASS, false, true}};
   }
 
   @Test(dataProvider = "testCases")

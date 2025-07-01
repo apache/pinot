@@ -71,7 +71,7 @@ public class DiskUtilizationChecker implements UtilizationChecker {
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       LOGGER.warn("Table config for table: {} is null", tableNameWithType);
-      return CheckResult.TRUE; // table does not exist
+      return CheckResult.PASS; // table does not exist
     }
     List<String> instances;
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
@@ -103,7 +103,7 @@ public class DiskUtilizationChecker implements UtilizationChecker {
         LOGGER.warn("Disk utilization for server: {} is above threshold: {}%. UsedBytes: {}, TotalBytes: {}",
             instance, diskUsageInfo.getUsedSpaceBytes() * 100 / diskUsageInfo.getTotalSpaceBytes(), diskUsageInfo
                 .getUsedSpaceBytes(), diskUsageInfo.getTotalSpaceBytes());
-        return CheckResult.FALSE;
+        return CheckResult.FAIL;
       }
     }
     // If results for all servers is null or stale, return the status as STALE to indicate that the status cannot be
@@ -112,7 +112,7 @@ public class DiskUtilizationChecker implements UtilizationChecker {
     //       STALE, and these are the ones that may have a resource utilization breach, but we return TRUE here.
     //       Eventually when the status is updated, the correct value will be returned and the correct action can be
     //       taken based on that. Temporarily the action taken may be the wrong one.
-    return numInstancesWithStaleOrNullResults == instances.size() ? CheckResult.STALE : CheckResult.TRUE;
+    return numInstancesWithStaleOrNullResults == instances.size() ? CheckResult.UNDETERMINED : CheckResult.PASS;
   }
 
   /**

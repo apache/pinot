@@ -35,7 +35,7 @@ public interface UtilizationChecker {
    * Returns whether the resource's utilization is within limits
    * @param tableNameWithType table name with type
    * @param purpose purpose of this check
-   * @return CheckResult, STALE if result cannot be determined, TRUE if within limits, FALSE if not within limits
+   * @return CheckResult, UNDETERMINED if result cannot be determined, PASS if within limits, FAIL if not within limits
    */
   CheckResult isResourceUtilizationWithinLimits(String tableNameWithType, CheckPurpose purpose);
 
@@ -58,9 +58,9 @@ public interface UtilizationChecker {
   }
 
   enum CheckResult {
-    // STALE if the result cannot be determined due to not having sufficient information
-    // TRUE if the resource's utilization is within limits
-    // FALSE if the resource's utilization is not within limits
-    STALE, TRUE, FALSE
+    // PASS if the resource's utilization is within limits
+    // FAIL if the resource's utilization is not within limits
+    // UNDETERMINED if the result cannot be determined due to not having sufficient information
+    PASS, FAIL, UNDETERMINED
   }
 }

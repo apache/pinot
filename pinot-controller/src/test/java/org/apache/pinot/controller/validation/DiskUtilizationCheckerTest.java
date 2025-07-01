@@ -82,11 +82,11 @@ public class DiskUtilizationCheckerTest {
 
     UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.TRUE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
 
     result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.TASK_GENERATION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.TRUE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
   }
 
   @Test
@@ -96,11 +96,11 @@ public class DiskUtilizationCheckerTest {
 
     UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.TRUE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
 
     result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.TASK_GENERATION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.TRUE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
   }
 
   @Test
@@ -124,11 +124,11 @@ public class DiskUtilizationCheckerTest {
 
     UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.STALE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.UNDETERMINED);
 
     result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.TASK_GENERATION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.STALE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.UNDETERMINED);
   }
 
   @Test
@@ -154,11 +154,11 @@ public class DiskUtilizationCheckerTest {
 
     UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.TRUE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
 
     result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.TASK_GENERATION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.TRUE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
   }
 
   @Test
@@ -184,11 +184,11 @@ public class DiskUtilizationCheckerTest {
 
     UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.FALSE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.FAIL);
 
     result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
         UtilizationChecker.CheckPurpose.TASK_GENERATION);
-    Assert.assertEquals(result, UtilizationChecker.CheckResult.FALSE);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.FAIL);
   }
 
   @Test
