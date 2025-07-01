@@ -30,6 +30,7 @@ import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.Connection;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -40,6 +41,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.toExplainStr;
+import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.toResultStr;
 import static org.testng.AssertJUnit.assertEquals;
 import static org.testng.AssertJUnit.assertFalse;
 import static org.testng.AssertJUnit.assertTrue;
@@ -48,6 +51,8 @@ import static org.testng.AssertJUnit.assertTrue;
 // Tests that 'groupsTrimmed' flag is set when results trimming occurs at:
 // SSQE - segment, inter-segment/server and broker levels
 // MSQE - segment, inter-segment and intermediate levels
+// Note: MSQE doesn't push collations depending on group by result into aggregation nodes
+// so e.g. ORDER BY i*j doesn't trigger trimming even when hints are set
 public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSet {
 
   static final int FILES_NO = 4;
@@ -128,161 +133,645 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     return files;
   }
 
+  // MSQE - multi stage query engine
   @Test
-  public void testMSQEGroupsTrimmedAtSegmentLevel()
+  public void testMSQEOrderByOnDependingOnAggregateResultIsNotPushedDown()
       throws Exception {
     setUseMultiStageQueryEngine(true);
 
     Connection conn = getPinotConnection();
-    assertFalse(conn.execute("SELECT COUNT(*) FROM mytable GROUP BY i ORDER BY i")
-        .getBrokerResponse()
-        .getExecutionStats()
-        .isGroupsTrimmed());
+    assertTrimFlagNotSet(conn.execute("SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY i*j DESC LIMIT 5"));
 
     String options = "SET minSegmentGroupTrimSize=5; ";
-    String query = "SELECT /*+ aggOptions(is_enable_group_trim='true') */ COUNT(*) "
-        + "FROM mytable "
-        + "GROUP BY i "
-        + "ORDER BY i "
-        + "LIMIT 10 ";
+    String query = "SELECT /*+ aggOptions(is_enable_group_trim='true') */ i, j, COUNT(*) "
+        + "FROM mytable GROUP BY i, j ORDER BY i*j DESC LIMIT 5 ";
 
-    assertTrue(conn.execute(options + query).getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    ResultSetGroup result = conn.execute(options + query);
+    assertTrimFlagNotSet(result);
 
     assertEquals("Execution Plan\n"
-            + "LogicalSort(sort0=[$1], dir0=[ASC], offset=[0], fetch=[10])\n"
-            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], "
+            + "LogicalSort(sort0=[$3], dir0=[DESC], offset=[0], fetch=[5])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[3 DESC]], isSortOnSender=[false], "
             + "isSortOnReceiver=[true])\n"
-            + "    LogicalSort(sort0=[$1], dir0=[ASC], fetch=[10])\n"
-            + "      LogicalProject(EXPR$0=[$1], i=[$0])\n"
-            + "        PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL], collations=[[0]], "
-            + "limit=[10])\n"
-            + "          PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "    LogicalSort(sort0=[$3], dir0=[DESC], fetch=[5])\n" // <-- actual sort & limit
+            + "      LogicalProject(i=[$0], j=[$1], EXPR$2=[$2], EXPR$3=[*($0, $1)])\n"
+            // <-- order by value is computed here, so trimming in upstream stages is not possible
+            + "        PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL])\n"
+            + "          PinotLogicalExchange(distribution=[hash[0, 1]])\n"
             + "            LeafStageCombineOperator(table=[mytable])\n"
             + "              StreamingInstanceResponse\n"
             + "                CombineGroupBy\n"
-            + "                  GroupBy(groupKeys=[[i]], aggregations=[[count(*)]])\n" //<-- trimming happens here
-            + "                    Project(columns=[[i]])\n"
+            + "                  GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
+            + "                    Project(columns=[[i, j]])\n"
             + "                      DocIdSet(maxDocs=[40000])\n"
             + "                        FilterMatchEntireSegment(numDocs=[4000])\n",
-        GroupByOptionsIntegrationTest.toExplainStr(postQuery(options
-            + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query)));
+        toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
   }
 
   @Test
-  public void testMSQEGroupsTrimmedAtInterSegmentLevel()
+  public void testMSQEGroupsTrimmedAtSegmentLevelWithOrderByOnSomeGroupByKeysIsNotSafe()
       throws Exception {
     setUseMultiStageQueryEngine(true);
 
     Connection conn = getPinotConnection();
-    assertFalse(conn.execute("SELECT COUNT(*) FROM mytable GROUP BY i ORDER BY i")
-        .getBrokerResponse()
-        .getExecutionStats()
-        .isGroupsTrimmed());
+    assertTrimFlagNotSet(conn.execute("SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY j DESC LIMIT 5"));
 
-    String options = "SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 100; ";
-    String query = "SELECT /*+ aggOptions(is_enable_group_trim='true') */ COUNT(*) "
-        + "FROM mytable "
-        + "GROUP BY i "
-        + "ORDER BY i "
-        + "LIMIT 10 ";
-    assertTrue(conn.execute(options + query).getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    String options = "SET minSegmentGroupTrimSize=5; ";
+    String query = "SELECT /*+ aggOptions(is_enable_group_trim='true') */ i, j, COUNT(*) "
+        + "FROM mytable GROUP BY i, j ORDER BY j DESC LIMIT 5 ";
+
+    ResultSetGroup result = conn.execute(options + query);
+    assertTrimFlagSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+        + "99,\t999,\t4\n"
+        + "98,\t998,\t4\n"
+        + "97,\t997,\t4\n"
+        + "96,\t996,\t4\n"
+        + "95,\t995,\t4", toResultStr(result));
 
     assertEquals("Execution Plan\n"
-            + "LogicalSort(sort0=[$1], dir0=[ASC], offset=[0], fetch=[10])\n"
-            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], "
+            + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
             + "isSortOnReceiver=[true])\n"
-            + "    LogicalSort(sort0=[$1], dir0=[ASC], fetch=[10])\n"
-            + "      LogicalProject(EXPR$0=[$1], i=[$0])\n"
-            + "        PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL], collations=[[0]], "
-            + "limit=[10])\n"
-            + "          PinotLogicalExchange(distribution=[hash[0]])\n"
-            + "            LeafStageCombineOperator(table=[mytable])\n"
-            + "              StreamingInstanceResponse\n"
-            + "                CombineGroupBy\n" // <-- trimming happens here
-            + "                  GroupBy(groupKeys=[[i]], aggregations=[[count(*)]])\n"
-            + "                    Project(columns=[[i]])\n"
-            + "                      DocIdSet(maxDocs=[40000])\n"
-            + "                        FilterMatchEntireSegment(numDocs=[4000])\n",
-        GroupByOptionsIntegrationTest.toExplainStr(postQuery(options
-            + "SET explainAskingServers=true; EXPLAIN PLAN FOR " + query)));
+            + "    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[5])\n"
+            + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[1 DESC]],"
+            + " limit=[5])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
+            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "            StreamingInstanceResponse\n"
+            + "              CombineGroupBy\n"
+            + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n" // <-- trimming happens here
+            + "                  Project(columns=[[i, j]])\n"
+            + "                    DocIdSet(maxDocs=[40000])\n"
+            + "                      FilterMatchEntireSegment(numDocs=[4000])\n",
+        toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
   }
 
   @Test
-  public void testMSQEGroupsTrimmedAtIntermediateLevel()
+  public void testMSQEGroupsTrimmedAtSegmentLevelWithOrderByOnAggregateIsNotSafe()
       throws Exception {
     setUseMultiStageQueryEngine(true);
 
     Connection conn = getPinotConnection();
-    assertFalse(conn.execute("SELECT COUNT(*) FROM mytable GROUP BY i ORDER BY i")
-        .getBrokerResponse()
-        .getExecutionStats()
-        .isGroupsTrimmed());
+    assertTrimFlagNotSet(
+        conn.execute("SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY COUNT(*) DESC LIMIT 5"));
+
+    String options = "SET minSegmentGroupTrimSize=5; ";
+    String query = "SELECT /*+ aggOptions(is_enable_group_trim='true') */ i, j, COUNT(*) "
+        + "FROM mytable GROUP BY i, j ORDER BY count(*) DESC LIMIT 5 ";
+
+    ResultSetGroup result = conn.execute(options + query);
+    assertTrimFlagSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+        + "77,\t377,\t4\n"
+        + "66,\t566,\t4\n"
+        + "39,\t339,\t4\n"
+        + "96,\t396,\t4\n"
+        + "25,\t25,\t4", toResultStr(result));
+
+    assertEquals("Execution Plan\n"
+            + "LogicalSort(sort0=[$2], dir0=[DESC], offset=[0], fetch=[5])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[2 DESC]], isSortOnSender=[false], "
+            + "isSortOnReceiver=[true])\n"
+            + "    LogicalSort(sort0=[$2], dir0=[DESC], fetch=[5])\n"
+            + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[2 DESC]],"
+            + " limit=[5])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
+            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "            StreamingInstanceResponse\n"
+            + "              CombineGroupBy\n"
+            + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n" //<-- trimming happens here
+            + "                  Project(columns=[[i, j]])\n"
+            + "                    DocIdSet(maxDocs=[40000])\n"
+            + "                      FilterMatchEntireSegment(numDocs=[4000])\n",
+        toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
+  }
+
+  @Test
+  public void testMSQEGroupsTrimmedAtInterSegmentLevelWithOrderByOnSomeGroupByKeysIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute("SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY j DESC LIMIT 5"));
+
+    String options = "SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 100; ";
+    String query = "SELECT /*+ aggOptions(is_enable_group_trim='true') */ i, j, COUNT(*) "
+        + "FROM mytable "
+        + "GROUP BY i, j "
+        + "ORDER BY j DESC "
+        + "LIMIT 5 ";
+    ResultSetGroup result = conn.execute(options + query);
+    assertTrimFlagSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+        + "99,\t999,\t4\n"
+        + "98,\t998,\t4\n"
+        + "97,\t997,\t4\n"
+        + "96,\t996,\t4\n"
+        + "95,\t995,\t4", toResultStr(result));
+
+    assertEquals("Execution Plan\n"
+            + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
+            + "isSortOnReceiver=[true])\n"
+            + "    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[5])\n"
+            + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[1 DESC]],"
+            + " limit=[5])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n"
+            + "          LeafStageCombineOperator(table=[mytable])\n"
+            + "            StreamingInstanceResponse\n"
+            + "              CombineGroupBy\n" // <-- trimming happens here
+            + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
+            + "                  Project(columns=[[i, j]])\n"
+            + "                    DocIdSet(maxDocs=[40000])\n"
+            + "                      FilterMatchEntireSegment(numDocs=[4000])\n",
+        toExplainStr(postQuery(options + "SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
+  }
+
+  @Test
+  public void testMSQEGroupsTrimmedAtIntermediateLevelWithOrderByOnSomeGroupByKeysIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute("SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY j DESC LIMIT 5"));
 
     // This case is tricky because intermediate results are hash-split among servers so one gets 50 rows on average.
     // That's the reason both limit and trim size needs to be so small.
-    String query = "SELECT /*+ aggOptions(is_enable_group_trim='true',mse_min_group_trim_size='5') */ COUNT(*) "
+    String query = "SELECT /*+ aggOptions(is_enable_group_trim='true',mse_min_group_trim_size='5') */ i, j, COUNT(*) "
         + "FROM mytable "
-        + "GROUP BY i "
-        + "ORDER BY i "
+        + "GROUP BY i, j "
+        + "ORDER BY j DESC "
         + "LIMIT 5 ";
-    assertTrue(conn.execute(query).getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    ResultSetGroup result = conn.execute(query);
+    assertTrimFlagSet(result);
 
-    assertEquals("Execution Plan\n"
-            + "LogicalSort(sort0=[$1], dir0=[ASC], offset=[0], fetch=[5])\n"
-            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1]], isSortOnSender=[false], "
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+        + "99,\t999,\t4\n"
+        + "98,\t998,\t4\n"
+        + "97,\t997,\t4\n"
+        + "96,\t996,\t4\n"
+        + "95,\t995,\t4", toResultStr(result));
+
+    assertEquals(
+        "Execution Plan\n"
+            + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
+            + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
             + "isSortOnReceiver=[true])\n"
-            + "    LogicalSort(sort0=[$1], dir0=[ASC], fetch=[5])\n"
-            + "      LogicalProject(EXPR$0=[$1], i=[$0])\n"
-            + "        PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL], collations=[[0]], "
-            + "limit=[5])\n" // receives 50-row-big blocks, trimming kicks in only if limit is lower
-            + "          PinotLogicalExchange(distribution=[hash[0]])\n" // splits blocks via hash distribution
-            + "            LeafStageCombineOperator(table=[mytable])\n" // no trimming happens 'below'
-            + "              StreamingInstanceResponse\n"
-            + "                CombineGroupBy\n"
-            + "                  GroupBy(groupKeys=[[i]], aggregations=[[count(*)]])\n"
-            + "                    Project(columns=[[i]])\n"
-            + "                      DocIdSet(maxDocs=[40000])\n"
-            + "                        FilterMatchEntireSegment(numDocs=[4000])\n",
-        GroupByOptionsIntegrationTest.toExplainStr(postQuery(" set explainAskingServers=true; EXPLAIN PLAN FOR "
-            + query)));
+            + "    LogicalSort(sort0=[$1], dir0=[DESC], fetch=[5])\n"
+            + "      PinotLogicalAggregate(group=[{0, 1}], agg#0=[COUNT($2)], aggType=[FINAL], collations=[[1 DESC]],"
+            + " limit=[5])\n" // receives 50-row-big blocks, trimming kicks in only if limit is lower
+            + "        PinotLogicalExchange(distribution=[hash[0, 1]])\n" // splits blocks via hash distribution
+            + "          LeafStageCombineOperator(table=[mytable])\n" // no trimming happens 'below'
+            + "            StreamingInstanceResponse\n"
+            + "              CombineGroupBy\n"
+            + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
+            + "                  Project(columns=[[i, j]])\n"
+            + "                    DocIdSet(maxDocs=[40000])\n"
+            + "                      FilterMatchEntireSegment(numDocs=[4000])\n",
+        toExplainStr(postQuery(" set explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
+  }
+
+  // SSQE segment level
+  @Test
+  public void testSSQEFilteredGroupsTrimmedAtSegmentLevelWithOrderGroupByKeysDerivedFunctionIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT i, j, SUM(i) FILTER (WHERE i > 0) FROM mytable GROUP BY i, j ORDER BY i + j DESC LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
+
+    ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
+    assertTrimFlagSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"sum(i) FILTER(WHERE i > '0')\"[\"DOUBLE\"]\n"
+        + "99,\t999,\t396.0\n"
+        + "98,\t998,\t392.0\n"
+        + "97,\t997,\t388.0\n"
+        + "96,\t996,\t384.0\n"
+        + "95,\t995,\t380.0", toResultStr(result));
+
+    assertEquals(
+        "BROKER_REDUCE(sort:[plus(i,j) DESC],limit:5,postAggregations:filter(sum(i),greater_than(i,'0'))),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY_FILTERED(groupKeys:i, j, aggregations:sum(i)),\t3,\t2\n" // <-- trimming happens here
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_FULL_SCAN(operator:RANGE,predicate:i > '0'),\t6,\t5\n"
+            + "PROJECT(i, j),\t7,\t3\n"
+            + "DOC_ID_SET,\t8,\t7\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t9,\t8\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
   }
 
   @Test
-  public void testSSQEGroupsTrimmedAtSegmentLevel() {
+  public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderGroupByKeysDerivedFunctionIsNotSafe()
+      throws Exception {
     setUseMultiStageQueryEngine(false);
-    String query = "SELECT COUNT(*) FROM mytable GROUP BY i ORDER BY i";
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY i + j DESC LIMIT 5";
 
     Connection conn = getPinotConnection();
-    assertFalse(conn.execute(query).getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    assertTrimFlagNotSet(conn.execute(query));
 
-    assertTrue(conn.execute("SET minSegmentGroupTrimSize=5; " + query)
-        .getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
+    assertTrimFlagSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+        + "99,\t999,\t4\n"
+        + "98,\t998,\t4\n"
+        + "97,\t997,\t4\n"
+        + "96,\t996,\t4\n"
+        + "95,\t995,\t4", toResultStr(result));
+
+    assertEquals("BROKER_REDUCE(sort:[plus(i,j) DESC],limit:5),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n" //<-- trimming happens here
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
   }
 
   @Test
-  public void testSSQEGroupsTrimmedAtServerLevel() {
+  public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderBySomeGroupByKeysIsNotSafe()
+      throws Exception {
     setUseMultiStageQueryEngine(false);
-    String query = "SELECT COUNT(*) FROM mytable GROUP BY i ORDER BY i";
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY j DESC LIMIT 5";
 
     Connection conn = getPinotConnection();
-    assertFalse(conn.execute(query).getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    assertTrimFlagNotSet(conn.execute(query));
+
+    ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
+    assertTrimFlagSet(result);
+
+    // With test data set result is stable, but in general, trimming data ordered by subset of
+    // group by keys can produce incomplete group aggregates due to lack of stability.
+    // That is because, for a given value of j, sorting treats all values of i the same,
+    // and segment data is usually unordered.
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+        + "99,\t999,\t4\n"
+        + "98,\t998,\t4\n"
+        + "97,\t997,\t4\n"
+        + "96,\t996,\t4\n"
+        + "95,\t995,\t4", toResultStr(result));
+
+    assertEquals(
+        "BROKER_REDUCE(sort:[j DESC],limit:5),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n" // <- trimming happens here
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  @Test
+  public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderByAllGroupByKeysAndHavingIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+
+    // trimming is safe on rows ordered by all group by keys (regardless of key order, direction or duplications)
+    // but not when HAVING clause is present
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j HAVING i > 50  ORDER BY i ASC, j ASC";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
+
+    ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
+    assertTrimFlagSet(result);
+
+    // Result is unexpectedly empty  because segment-level trim keeps first 50 records ordered by i ASC, j ASC
+    // that are later filtered out at broker stage.
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]", toResultStr(result));
+
+    assertEquals("BROKER_REDUCE(havingFilter:i > '50',sort:[i ASC, j ASC],limit:10),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n" // <- trimming happens here
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  @Test
+  public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderByAllGroupByKeysIsSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+
+    // trimming is safe on rows ordered by all group by keys (regardless of key order, direction or duplications)
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY j ASC, i DESC, j ASC LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
+
+    ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
+    assertTrimFlagNotSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+        + "0,\t0,\t4\n"
+        + "1,\t1,\t4\n"
+        + "2,\t2,\t4\n"
+        + "3,\t3,\t4\n"
+        + "4,\t4,\t4", toResultStr(result));
+
+    assertEquals(
+        "BROKER_REDUCE(sort:[j ASC, i DESC],limit:5),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  @Test
+  public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderByAggregateIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+
+    // trimming is safe on rows ordered by all group by keys (regardless of key order or direction)
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY count(*)*j ASC LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
+
+    ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
+    assertTrimFlagSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+        + "0,\t0,\t4\n"
+        + "1,\t1,\t4\n"
+        + "2,\t2,\t4\n"
+        + "3,\t3,\t4\n"
+        + "4,\t4,\t4", toResultStr(result));
+
+    assertEquals("BROKER_REDUCE(sort:[times(count(*),j) ASC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  // SSQE inter-segment level
+
+  @Test
+  public void testSSQEGroupsTrimmedAtInterSegmentLevelWithOrderByOnSomeGroupByKeysIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY i DESC  LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
 
     // on server level, trimming occurs only when threshold is reached
-    assertTrue(conn.execute("SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 100; " + query)
-        .getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    ResultSetGroup result = conn.execute("SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
+    assertTrimFlagSet(result);
+    // result's order is not stable due to concurrent operations on indexed table
+
+    assertEquals("BROKER_REDUCE(sort:[i DESC],limit:5),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n" // <-- trimming happens here
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
   }
 
   @Test
-  public void testSSQEGroupsTrimmedAtBrokerLevel() {
+  public void testSSQEGroupsTrimmedAtInterSegmentLevelWithOrderByOnAllGroupByKeysIsSafe()
+      throws Exception {
+    // for SSQE server level == inter-segment level
     setUseMultiStageQueryEngine(false);
-    String query = "SELECT COUNT(*) FROM mytable GROUP BY i ORDER BY i";
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY i, j  LIMIT 5";
 
     Connection conn = getPinotConnection();
-    assertFalse(conn.execute(query).getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    assertTrimFlagNotSet(conn.execute(query));
+
+    // on server level, trimming occurs only when threshold is reached
+    ResultSetGroup result = conn.execute("SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 100; " + query);
+    assertTrimFlagNotSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+        + "0,\t0,\t4\n"
+        + "0,\t100,\t4\n"
+        + "0,\t200,\t4\n"
+        + "0,\t300,\t4\n"
+        + "0,\t400,\t4", toResultStr(result));
+
+    assertEquals(
+        "BROKER_REDUCE(sort:[i ASC, j ASC],limit:5),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n" //<-- trimming happens here
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  @Test
+  public void testSSQEGroupsTrimmedAtInterSegmentLevelWithOrderByOnAggregateIsNotSafe()
+      throws Exception {
+    // for SSQE server level == inter-segment level
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY count(*)*j DESC LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
+
+    // on server level, trimming occurs only when threshold is reached
+    ResultSetGroup result = conn.execute("SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 100; " + query);
+    assertTrimFlagSet(result);
+
+    // Result, though unstable due to concurrent operations on IndexedTable, is similar to the following
+    // (which is not correct):
+    //i[INT],j[LONG],count(*)[LONG]
+    //98,\t998,\t4
+    //94,\t994,\t4
+    //90,\t990,\t4
+    //86,\t986,\t4
+    //79,\t979,\t4
+
+    assertEquals("BROKER_REDUCE(sort:[times(count(*),j) DESC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n" //<-- trimming happens here
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  @Test
+  public void testSSQEGroupsTrimmedAtInterSegmentLevelWithOrderByOnAllGroupByKeysAndHavingIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j HAVING i > 50  ORDER BY i ASC, j ASC LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
+
+    // on server level, trimming occurs only when threshold is reached
+    ResultSetGroup result = conn.execute("SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
+    assertTrimFlagSet(result);
+
+    // Result is unexpectedly empty  because inter-segment-level trim keeps first 25 records ordered by i ASC, j ASC
+    // that are later filtered out at broker stage.
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]", toResultStr(result));
+
+    assertEquals("BROKER_REDUCE(havingFilter:i > '50',sort:[i ASC, j ASC],limit:5),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n" //<-- trimming happens here
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  // SSQE broker level
+
+  @Test
+  public void testSSQEGroupsTrimmedAtBrokerLevelOrderedByAllGroupByKeysIsSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY i, j LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
 
     // on broker level, trimming occurs only when threshold is reached
-    assertTrue(conn.execute("SET minBrokerGroupTrimSize = 5; SET groupTrimThreshold = 100; " + query)
-        .getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+    ResultSetGroup result = conn.execute("SET minBrokerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
+    assertTrimFlagNotSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+        + "0,\t0,\t4\n"
+        + "0,\t100,\t4\n"
+        + "0,\t200,\t4\n"
+        + "0,\t300,\t4\n"
+        + "0,\t400,\t4", toResultStr(result));
+
+    assertEquals("BROKER_REDUCE(sort:[i ASC, j ASC],limit:5),\t1,\t0\n" //<-- trimming happens here
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  @Test
+  public void testSSQEGroupsTrimmedAtBrokerLevelOrderedBySomeGroupByKeysIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY j DESC LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    ResultSetGroup result1 = conn.execute(query);
+    assertTrimFlagNotSet(result1);
+
+    // on broker level, trimming occurs only when threshold is reached
+    ResultSetGroup result = conn.execute("SET minBrokerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
+    assertTrimFlagSet(result);
+
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+        + "99,\t999,\t4\n"
+        + "98,\t998,\t4\n"
+        + "97,\t997,\t4\n"
+        + "96,\t996,\t4\n"
+        + "95,\t995,\t4", toResultStr(result));
+
+    assertEquals("BROKER_REDUCE(sort:[j DESC],limit:5),\t1,\t0\n" //<-- trimming happens here
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  @Test
+  public void testSSQEGroupsTrimmedAtBrokerLevelOrderedByAllGroupByKeysAndHavingIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j HAVING i > 50  ORDER BY i ASC, j ASC LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    ResultSetGroup result1 = conn.execute(query);
+    assertTrimFlagNotSet(result1);
+
+    // on broker level, trimming occurs only when threshold is reached
+    ResultSetGroup result = conn.execute("SET minBrokerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
+    assertTrimFlagSet(result);
+
+    // Result is unexpectedly empty  because segment-level trim keeps first 50 records ordered by i ASC, j ASC
+    // that are later filtered out at broker stage.
+    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]", toResultStr(result));
+
+    assertEquals(
+        "BROKER_REDUCE(havingFilter:i > '50',sort:[i ASC, j ASC],limit:5),\t1,\t0\n" //<-- trimming happens here
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  @Test
+  public void testSSQEGroupsTrimmedAtBrokerLevelOrderedByAllGroupByAggregateIsNotSafe()
+      throws Exception {
+    setUseMultiStageQueryEngine(false);
+    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY count(*)*j DESC LIMIT 5";
+
+    Connection conn = getPinotConnection();
+    assertTrimFlagNotSet(conn.execute(query));
+
+    // on broker level, trimming occurs only when threshold is reached
+    ResultSetGroup result = conn.execute("SET minBrokerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
+    assertTrimFlagSet(result);
+
+    // result is similar to the following, but unstable:
+    //i[INT],j[LONG],count(*)[LONG]
+    //99,999,4
+    //98,998,4
+    //97,997,4
+    //96,996,4
+    //82,982,4
+
+    assertEquals("BROKER_REDUCE(sort:[times(count(*),j) DESC],limit:5," //<-- trimming happens here
+            + "postAggregations:times(count(*),j)),\t1,\t0\n"
+            + "COMBINE_GROUP_BY,\t2,\t1\n"
+            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
+            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
+            + "PROJECT(i, j),\t4,\t3\n"
+            + "DOC_ID_SET,\t5,\t4\n"
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
+        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+  }
+
+  private static void assertTrimFlagNotSet(ResultSetGroup result) {
+    assertFalse(result.getBrokerResponse().getExecutionStats().isGroupsTrimmed());
+  }
+
+  private static void assertTrimFlagSet(ResultSetGroup result) {
+    assertTrue(result.getBrokerResponse().getExecutionStats().isGroupsTrimmed());
   }
 
   @AfterClass

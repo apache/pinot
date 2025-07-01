@@ -226,7 +226,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return new ExceptionResultsBlock(errMsg);
     }
 
-    _groupsTrimmed |= _indexedTable.isTrimmed();
+    if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
+      _groupsTrimmed = true;
+    }
 
     IndexedTable indexedTable = _indexedTable;
     if (_queryContext.isServerReturnFinalResult()) {

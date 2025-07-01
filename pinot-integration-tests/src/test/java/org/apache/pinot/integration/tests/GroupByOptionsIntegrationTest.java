@@ -32,6 +32,7 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -550,6 +551,17 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
         getExtraQueryProperties());
   }
 
+  public static @NotNull String toResultStr(ResultSetGroup resultSet) {
+    if (resultSet == null) {
+      return "null";
+    }
+    JsonNode node = resultSet.getBrokerResponse().getResultTable();
+    if (node == null) {
+      return toErrorString(resultSet.getBrokerResponse().getExceptions());
+    }
+    return toString(node);
+  }
+
   public static @NotNull String toResultStr(JsonNode mainNode) {
     if (mainNode == null) {
       return "null";
@@ -561,7 +573,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toString(node);
   }
 
-  static @NotNull String toExplainStr(JsonNode mainNode) {
+  static @NotNull String toExplainStr(JsonNode mainNode, boolean isMSQE) {
     if (mainNode == null) {
       return "null";
     }
@@ -569,7 +581,11 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     if (node == null) {
       return toErrorString(mainNode.get("exceptions"));
     }
-    return toExplainString(node);
+    return toExplainString(node, isMSQE);
+  }
+
+  static @NotNull String toExplainStr(JsonNode mainNode) {
+    return toExplainStr(mainNode, false);
   }
 
   public static String toErrorString(JsonNode node) {
@@ -613,8 +629,21 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return buf.toString();
   }
 
-  public static String toExplainString(JsonNode node) {
-    return node.get("rows").get(0).get(1).textValue();
+  private static String toExplainString(JsonNode node, boolean isMSQE) {
+    if (isMSQE) {
+      return node.get("rows").get(0).get(1).textValue();
+    } else {
+      StringBuilder result = new StringBuilder();
+      JsonNode rows = node.get("rows");
+      for (int i = 0, n = rows.size(); i < n; i++) {
+        JsonNode row = rows.get(i);
+        result.append(row.get(0).textValue())
+            .append(",\t").append(row.get(1).intValue())
+            .append(",\t").append(row.get(2).intValue())
+            .append('\n');
+      }
+      return result.toString();
+    }
   }
 
   @AfterClass

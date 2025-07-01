@@ -197,9 +197,9 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
 
         ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
-
+        boolean unsafeTrim = _queryContext.isUnsafeTrim(); // set trim flag only if it's not safe
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
-        resultsBlock.setGroupsTrimmed(true);
+        resultsBlock.setGroupsTrimmed(unsafeTrim);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
