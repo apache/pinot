@@ -150,7 +150,7 @@ public class QueryEnvironment {
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
-    // default optProgram with no skip rule options
+    // default optProgram with no skip rule options and no use rule options
     _optProgram = getOptProgram(Set.of(), Set.of());
   }
 
