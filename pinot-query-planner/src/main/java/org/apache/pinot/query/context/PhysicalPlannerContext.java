@@ -137,7 +137,7 @@ public class PhysicalPlannerContext {
   public boolean isUseLiteMode() {
     return _useLiteMode;
   }
-  
+
   public boolean isRunInBroker() {
     return _runInBroker;
   }
