@@ -90,7 +90,6 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
     _indexTypeMap = IndexTypeMap.get(indexTypes, readers);
   }
 
-  @SuppressWarnings("unchecked")
   @Nullable
   @Override
   public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
@@ -102,6 +101,18 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
       throws IOException {
     // TODO (index-spi): Verify that readers can be closed in any order
     _indexTypeMap.close();
+
+    // This reader is closed on segment destroy()
+    _multiColTextReader = null;
+  }
+
+  public MultiColumnLuceneTextIndexReader getMultiColumnTextIndex() {
+    return _multiColTextReader;
+  }
+
+  public void setMultiColumnTextIndex(
+      MultiColumnLuceneTextIndexReader multiColTextReader) {
+    _multiColTextReader = multiColTextReader;
   }
 
   static class IndexTypeMap implements Closeable {
@@ -168,16 +179,5 @@ public final class PhysicalColumnIndexContainer implements ColumnIndexContainer 
         }
       }
     }
-    // This reader is closed on segment destroy()
-    _multiColTextReader = null;
-  }
-
-  public MultiColumnLuceneTextIndexReader getMultiColumnTextIndex() {
-    return _multiColTextReader;
-  }
-
-  public void setMultiColumnTextIndex(
-      MultiColumnLuceneTextIndexReader multiColTextReader) {
-    _multiColTextReader = multiColTextReader;
   }
 }
