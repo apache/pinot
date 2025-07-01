@@ -67,7 +67,7 @@ import org.slf4j.LoggerFactory;
  * While this is an index creator, it consumes values for multiple columns in a single call,
  * which doesn't fit IndexCreator.
  */
-public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends AbstractTextIndexCreator*/ {
+public class MultiColumnLuceneTextIndexCreator implements Closeable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiColumnLuceneTextIndexCreator.class);
   public static final String LUCENE_INDEX_DOC_ID_COLUMN_NAME = "DocID";
 
@@ -395,7 +395,7 @@ public class MultiColumnLuceneTextIndexCreator implements Closeable /*extends Ab
     }
   }
 
-  //@Override
+  @Override
   public void close()
       throws IOException {
     if (_reuseMutableIndex) {
