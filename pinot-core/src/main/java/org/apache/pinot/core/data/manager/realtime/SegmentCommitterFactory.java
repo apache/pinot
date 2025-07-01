@@ -64,7 +64,7 @@ public class SegmentCommitterFactory {
     }
 
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-    String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
+    String segmentStoreUri = "file:/Users/stardeepthi/Documents/data/rocksDB/quickstart";
 
     SegmentUploader segmentUploader;
     if (uploadToFs || peerSegmentDownloadScheme != null) {
