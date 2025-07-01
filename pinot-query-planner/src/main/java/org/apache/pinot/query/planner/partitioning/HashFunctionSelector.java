@@ -45,7 +45,7 @@ public class HashFunctionSelector {
 
     switch (hashFunction.toLowerCase()) {
       case "abshashcode":
-        return Math.abs(value.hashCode());
+        return value.hashCode() & Integer.MAX_VALUE;
       case "murmur2":
         return computeMurmur2Hash(value);
       case "murmur3":
