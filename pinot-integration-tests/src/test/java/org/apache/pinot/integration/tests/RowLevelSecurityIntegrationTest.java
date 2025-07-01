@@ -301,9 +301,14 @@ public class RowLevelSecurityIntegrationTest extends BaseClusterIntegrationTest 
     return response;
   }
 
-  private boolean compareRows(JsonNode expectedResponse, JsonNode response) {
-    JsonNode responseRow = response.get("resultTable").get("rows").get(0);
-    JsonNode expectedRow = expectedResponse.get("resultTable").get("rows").get(0);
+  private boolean compareRows(JsonNode adminQueryResponse, JsonNode userQueryResponse) {
+    // No filters should get applied for admin response
+    Assert.assertFalse(adminQueryResponse.get("rlsFiltersApplied").asBoolean());
+    // Filters are always applied in case of users
+    Assert.assertTrue(userQueryResponse.get("rlsFiltersApplied").asBoolean());
+
+    JsonNode responseRow = userQueryResponse.get("resultTable").get("rows").get(0);
+    JsonNode expectedRow = adminQueryResponse.get("resultTable").get("rows").get(0);
 
     // Compare each column
     for (int i = 0; i < responseRow.size(); i++) {
