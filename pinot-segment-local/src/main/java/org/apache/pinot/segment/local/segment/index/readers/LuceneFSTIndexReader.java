@@ -20,11 +20,14 @@ package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.fst.ByteSequenceOutputs;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.OffHeapFSTStore;
+import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
 import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
+import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -49,12 +52,25 @@ public class LuceneFSTIndexReader implements TextIndexReader {
   public LuceneFSTIndexReader(PinotDataBuffer pinotDataBuffer)
       throws IOException {
     _dataBuffer = pinotDataBuffer;
-    _dataBufferIndexInput = new PinotBufferIndexInput(_dataBuffer, 0L, _dataBuffer.size());
 
-    FST.FSTMetadata<?> metadata = FST.readMetadata(_dataBufferIndexInput, ByteSequenceOutputs.getSingleton());
-    OffHeapFSTStore fstStore =
-        new OffHeapFSTStore(_dataBufferIndexInput, _dataBufferIndexInput.getFilePointer(), metadata);
-    _readFST = FST.fromFSTReader(metadata, fstStore);
+    // Check if this is a case-insensitive FST by looking for magic header
+    int magicHeader = _dataBuffer.getInt(0);
+    if (FSTHeader.isCaseInsensitiveMagic(magicHeader)) {
+      // Case-insensitive FST: skip magic header and read as BytesRef
+      PinotDataBuffer fstBuffer = _dataBuffer.view(4, _dataBuffer.size(), java.nio.ByteOrder.BIG_ENDIAN);
+      _dataBufferIndexInput = new PinotBufferIndexInput(fstBuffer, 0L, fstBuffer.size());
+      FST.FSTMetadata<BytesRef> metadata = FST.readMetadata(_dataBufferIndexInput, ByteSequenceOutputs.getSingleton());
+      OffHeapFSTStore fstStore =
+          new OffHeapFSTStore(_dataBufferIndexInput, _dataBufferIndexInput.getFilePointer(), metadata);
+      _readFST = FST.fromFSTReader(metadata, fstStore);
+    } else {
+      // Case-sensitive FST: read directly as Long (backward compatibility)
+      _dataBufferIndexInput = new PinotBufferIndexInput(_dataBuffer, 0L, _dataBuffer.size());
+      FST.FSTMetadata<Long> metadata = FST.readMetadata(_dataBufferIndexInput, PositiveIntOutputs.getSingleton());
+      OffHeapFSTStore fstStore =
+          new OffHeapFSTStore(_dataBufferIndexInput, _dataBufferIndexInput.getFilePointer(), metadata);
+      _readFST = FST.fromFSTReader(metadata, fstStore);
+    }
   }
 
   @Override

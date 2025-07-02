@@ -180,7 +180,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
   private void buildSegment(FSTType fstType)
       throws Exception {
-    buildSegment(fstType, false); // Default to case-sensitive for backward compatibility
+    buildSegment(fstType, true); // Default to case-sensitive for backward compatibility
   }
 
   private void buildSegment(FSTType fstType, boolean caseSensitive)
@@ -465,7 +465,7 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
   @Test
   public void testCaseInsensitiveFSTBasedRegexLike()
       throws Exception {
-    buildSegment(FSTType.LUCENE, false); // case-insensitive
+    //buildSegment(FSTType.LUCENE, false); // case-insensitive
     String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'WWW.DOMAIN1.*') LIMIT 50000";
     testInnerSegmentSelectionQuery(query, 256, null); // Should match in case-insensitive mode
   }

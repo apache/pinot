@@ -27,6 +27,7 @@ import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
 import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
+import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
@@ -48,6 +49,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   private final String _tableNameWithType;
   private final boolean _continueOnError;
   private final FSTBuilder _fstBuilder;
+  private final boolean _caseSensitive;
   Integer _dictId;
 
   /**
@@ -66,18 +68,20 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
       String[] sortedEntries, Boolean caseSensitive)
       throws IOException {
-    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder(caseSensitive));
+    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder(caseSensitive),
+        caseSensitive);
   }
 
   @VisibleForTesting
   public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
-      String[] sortedEntries, FSTBuilder fstBuilder)
+      String[] sortedEntries, FSTBuilder fstBuilder, Boolean caseSensitive)
       throws IOException {
     _columnName = columnName;
     _tableNameWithType = tableNameWithType;
     _continueOnError = continueOnError;
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
 
+    _caseSensitive = caseSensitive;
     _fstBuilder = fstBuilder;
     _dictId = 0;
     if (sortedEntries != null) {
@@ -102,7 +106,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       throws IOException {
     this(context.getIndexDir(), context.getFieldSpec().getName(), context.getTableNameWithType(),
         context.isContinueOnError(), (String[]) context.getSortedUniqueElementsArray(),
-        new FSTBuilder(fstIndexConfig.isCaseSensitive()));
+        new FSTBuilder(fstIndexConfig.isCaseSensitive()), fstIndexConfig.isCaseSensitive());
   }
 
   // Expects dictionary entries in sorted order.
@@ -137,6 +141,12 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
       FST<?> fst = _fstBuilder.done();
+
+      // Write magic header for case-insensitive FSTs
+      if (!_caseSensitive) {
+        FSTHeader.writeCaseInsensitiveMagic(fileOutputStream);
+      }
+
       OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
       fst.save(d, d);
     } finally {
