@@ -29,6 +29,7 @@ import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,12 +60,13 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    * @param tableNameWithType table name with type
    * @param continueOnError if true, don't throw exception on add() failures
    * @param sortedEntries Sorted entries of the unique values of the column.
+   * @param caseSensitive FST index caseSensitive configuration
    * @throws IOException
    */
   public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
-      String[] sortedEntries)
+      String[] sortedEntries, Boolean caseSensitive)
       throws IOException {
-    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder());
+    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder(caseSensitive));
   }
 
   @VisibleForTesting
@@ -96,10 +98,11 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
     }
   }
 
-  public LuceneFSTIndexCreator(IndexCreationContext context)
+  public LuceneFSTIndexCreator(IndexCreationContext context, FstIndexConfig fstIndexConfig)
       throws IOException {
     this(context.getIndexDir(), context.getFieldSpec().getName(), context.getTableNameWithType(),
-        context.isContinueOnError(), (String[]) context.getSortedUniqueElementsArray());
+        context.isContinueOnError(), (String[]) context.getSortedUniqueElementsArray(),
+        new FSTBuilder(fstIndexConfig.isCaseSensitive()));
   }
 
   // Expects dictionary entries in sorted order.
