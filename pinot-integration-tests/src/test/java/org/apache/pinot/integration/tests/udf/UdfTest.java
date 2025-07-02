@@ -150,7 +150,7 @@ public class UdfTest {
     // Check if the snapshot directory is empty
     File[] files = getSnapshotFiles(snapshotDir);
     if (files.length == 0) {
-      return ;
+      return;
     }
     Set<String> udfNames = _framework.getUdfs().stream()
         .map(Udf::getMainFunctionName)
