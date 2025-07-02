@@ -136,7 +136,7 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     LOGGER.info("Creating new inverted index for segment: {}, column: {}", segmentName, columnName);
     int numDocs = columnMetadata.getTotalDocs();
 
-    IndexCreationContext context = IndexCreationContext.builder()
+    IndexCreationContext.Common context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig)
