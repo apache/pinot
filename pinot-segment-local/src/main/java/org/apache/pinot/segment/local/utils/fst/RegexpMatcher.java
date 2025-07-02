@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.IntsRefBuilder;
 import org.apache.lucene.util.automaton.Automaton;
 import org.apache.lucene.util.automaton.CharacterRunAutomaton;
@@ -29,29 +30,40 @@ import org.apache.lucene.util.automaton.RegExp;
 import org.apache.lucene.util.automaton.Transition;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.Util;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * RegexpMatcher is a helper to retrieve matching values for a given regexp query.
  * Regexp query is converted into an automaton and we run the matching algorithm on FST.
+ * Supports both FST<Long> (case-sensitive) and FST<BytesRef> (case-insensitive) types.
  *
  * Two main functions of this class are
  *   regexMatchOnFST() Function runs matching on FST (See function comments for more details)
  *   match(input) Function builds the automaton and matches given input.
  */
 public class RegexpMatcher {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RegexpMatcher.class);
 
   private final String _regexQuery;
-  private final FST<Long> _fst;
+  private final FST<?> _fst;
   private final Automaton _automaton;
+  private final boolean _isBytesRefFST;
 
-  public RegexpMatcher(String regexQuery, FST<Long> fst) {
-    _regexQuery = regexQuery;
+  public RegexpMatcher(String regexQuery, FST<?> fst) {
     _fst = fst;
+    _isBytesRefFST = (fst != null && fst.outputs.getNoOutput() instanceof BytesRef);
+    // For case-insensitive FSTs, convert regex to lowercase since we only store lowercase keys
+    if (_isBytesRefFST) {
+      _regexQuery = regexQuery.toLowerCase();
+    } else {
+      _regexQuery = regexQuery;
+    }
     _automaton = (new RegExp(_regexQuery)).toAutomaton();
   }
 
-  public static List<Long> regexMatch(String regexQuery, FST<Long> fst)
+  public static List<Long> regexMatch(String regexQuery, FST<?> fst)
       throws IOException {
     RegexpMatcher matcher = new RegexpMatcher(regexQuery, fst);
     return matcher.regexMatchOnFST();
@@ -65,7 +77,7 @@ public class RegexpMatcher {
 
   /**
    * This function runs matching on automaton built from regexQuery and the FST.
-   * FST stores key (string) to a value (Long). Both are state machines and state transition is based on
+   * FST stores key (string) to a value (Long or BytesRef). Both are state machines and state transition is based on
    * a input character.
    *
    * This algorithm starts with Queue containing (Automaton Start Node, FST Start Node).
@@ -81,17 +93,28 @@ public class RegexpMatcher {
    */
   public List<Long> regexMatchOnFST()
       throws IOException {
+    if (_isBytesRefFST) {
+      return regexMatchOnBytesRefFST();
+    } else {
+      return regexMatchOnLongFST();
+    }
+  }
+
+  private List<Long> regexMatchOnLongFST()
+      throws IOException {
     final List<Path<Long>> queue = new ArrayList<>();
     final List<Path<Long>> endNodes = new ArrayList<>();
     if (_automaton.getNumStates() == 0) {
       return Collections.emptyList();
     }
 
+    FST<Long> longFST = (FST<Long>) _fst;
     // Automaton start state and FST start node is added to the queue.
-    queue.add(new Path<>(0, _fst.getFirstArc(new FST.Arc<Long>()), _fst.outputs.getNoOutput(), new IntsRefBuilder()));
+    queue.add(
+        new Path<>(0, longFST.getFirstArc(new FST.Arc<Long>()), longFST.outputs.getNoOutput(), new IntsRefBuilder()));
 
     final FST.Arc<Long> scratchArc = new FST.Arc<>();
-    final FST.BytesReader fstReader = _fst.getBytesReader();
+    final FST.BytesReader fstReader = longFST.getBytesReader();
 
     Transition t = new Transition();
     while (!queue.isEmpty()) {
@@ -113,23 +136,23 @@ public class RegexpMatcher {
         final int min = t.min;
         final int max = t.max;
         if (min == max) {
-          final FST.Arc<Long> nextArc = _fst.findTargetArc(t.min, path._fstNode, scratchArc, fstReader);
+          final FST.Arc<Long> nextArc = longFST.findTargetArc(t.min, path._fstNode, scratchArc, fstReader);
           if (nextArc != null) {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(t.min);
             queue.add(new Path<Long>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
-                _fst.outputs.add(path._output, nextArc.output()), newInput));
+                longFST.outputs.add(path._output, nextArc.output()), newInput));
           }
         } else {
-          FST.Arc<Long> nextArc = Util.readCeilArc(min, _fst, path._fstNode, scratchArc, fstReader);
+          FST.Arc<Long> nextArc = Util.readCeilArc(min, longFST, path._fstNode, scratchArc, fstReader);
           while (nextArc != null && nextArc.label() <= max) {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(nextArc.label());
             queue.add(new Path<>(t.dest, new FST.Arc<Long>().copyFrom(nextArc),
-                _fst.outputs.add(path._output, nextArc.output()), newInput));
-            nextArc = nextArc.isLast() ? null : _fst.readNextRealArc(nextArc, fstReader);
+                longFST.outputs.add(path._output, nextArc.output()), newInput));
+            nextArc = nextArc.isLast() ? null : longFST.readNextRealArc(nextArc, fstReader);
           }
         }
       }
@@ -139,6 +162,87 @@ public class RegexpMatcher {
     ArrayList<Long> matchedIds = new ArrayList<>();
     for (Path<Long> path : endNodes) {
       matchedIds.add(path._output);
+    }
+    return matchedIds;
+  }
+
+  private List<Long> regexMatchOnBytesRefFST()
+      throws IOException {
+    final List<Path<BytesRef>> queue = new ArrayList<>();
+    final List<Path<BytesRef>> endNodes = new ArrayList<>();
+    if (_automaton.getNumStates() == 0) {
+      return Collections.emptyList();
+    }
+
+    FST<BytesRef> bytesRefFST = (FST<BytesRef>) _fst;
+    // Automaton start state and FST start node is added to the queue.
+    queue.add(new Path<>(0, bytesRefFST.getFirstArc(new FST.Arc<BytesRef>()), bytesRefFST.outputs.getNoOutput(),
+        new IntsRefBuilder()));
+
+    final FST.Arc<BytesRef> scratchArc = new FST.Arc<>();
+    final FST.BytesReader fstReader = bytesRefFST.getBytesReader();
+
+    Transition t = new Transition();
+    while (!queue.isEmpty()) {
+      final Path<BytesRef> path = queue.remove(queue.size() - 1);
+
+      // If automaton is in accept state and the fstNode is final (i.e. end node) then add the entry to endNodes which
+      // contains the result set.
+      if (_automaton.isAccept(path._state)) {
+        if (path._fstNode.isFinal()) {
+          // For final nodes, we need to combine the accumulated output with the final output
+          BytesRef finalOutput = path._fstNode.nextFinalOutput();
+          BytesRef completeOutput;
+          if (finalOutput != null && finalOutput.length > 0) {
+            // Combine accumulated output with final output
+            completeOutput = bytesRefFST.outputs.add(path._output, finalOutput);
+          } else {
+            // Use the accumulated output if no final output
+            completeOutput = path._output;
+          }
+          // Create a new path with the complete output
+          endNodes.add(new Path<>(path._state, path._fstNode, completeOutput, path._input));
+        }
+      }
+
+      // Gather next set of transitions on automaton and find target nodes in FST.
+      IntsRefBuilder currentInput = path._input;
+      int count = _automaton.initTransition(path._state, t);
+      for (int i = 0; i < count; i++) {
+        _automaton.getNextTransition(t);
+        final int min = t.min;
+        final int max = t.max;
+        if (min == max) {
+          final FST.Arc<BytesRef> nextArc = bytesRefFST.findTargetArc(t.min, path._fstNode, scratchArc, fstReader);
+          if (nextArc != null) {
+            final IntsRefBuilder newInput = new IntsRefBuilder();
+            newInput.copyInts(currentInput.get());
+            newInput.append(t.min);
+            queue.add(new Path<BytesRef>(t.dest, new FST.Arc<BytesRef>().copyFrom(nextArc),
+                bytesRefFST.outputs.add(path._output, nextArc.output()), newInput));
+          }
+        } else {
+          FST.Arc<BytesRef> nextArc = Util.readCeilArc(min, bytesRefFST, path._fstNode, scratchArc, fstReader);
+          while (nextArc != null && nextArc.label() <= max) {
+            final IntsRefBuilder newInput = new IntsRefBuilder();
+            newInput.copyInts(currentInput.get());
+            newInput.append(nextArc.label());
+            queue.add(new Path<>(t.dest, new FST.Arc<BytesRef>().copyFrom(nextArc),
+                bytesRefFST.outputs.add(path._output, nextArc.output()), newInput));
+            nextArc = nextArc.isLast() ? null : bytesRefFST.readNextRealArc(nextArc, fstReader);
+          }
+        }
+      }
+    }
+
+    // From the result set of matched entries gather the values stored and return.
+    ArrayList<Long> matchedIds = new ArrayList<>();
+    for (Path<BytesRef> path : endNodes) {
+      // Deserialize BytesRef to List<Integer> and convert to List<Long>
+      List<Integer> intValues = FSTBuilder.deserializeBytesRefToIntegerList(path._output);
+      for (Integer value : intValues) {
+        matchedIds.add(value.longValue());
+      }
     }
     return matchedIds;
   }

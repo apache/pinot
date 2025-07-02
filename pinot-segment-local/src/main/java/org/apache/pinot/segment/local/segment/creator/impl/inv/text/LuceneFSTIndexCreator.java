@@ -133,7 +133,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
     FileOutputStream fileOutputStream = null;
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
-      FST<Long> fst = _fstBuilder.done();
+      FST<?> fst = _fstBuilder.done();
       OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
       fst.save(d, d);
     } finally {
