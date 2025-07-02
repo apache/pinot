@@ -776,7 +776,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testGroupsTrimmedAtSegmentLevel() {
-    String query = "SELECT COUNT(*) FROM testTable GROUP BY column1 ORDER BY column1";
+    String query = "SELECT COUNT(*) FROM testTable GROUP BY column1, column3 ORDER BY column1";
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertFalse(brokerResponse.isGroupsTrimmed());
@@ -790,7 +790,7 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
 
   @Test
   public void testGroupsTrimmedAtServerLevel() {
-    String query = "SELECT COUNT(*) FROM testTable GROUP BY column1 ORDER BY column1";
+    String query = "SELECT COUNT(*) FROM testTable GROUP BY column1, column3 ORDER BY column1";
 
     BrokerResponseNative brokerResponse = getBrokerResponse(query);
     assertFalse(brokerResponse.isGroupsTrimmed());
