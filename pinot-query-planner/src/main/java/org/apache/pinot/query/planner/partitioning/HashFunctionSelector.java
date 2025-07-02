@@ -92,15 +92,15 @@ public class HashFunctionSelector {
   }
 
   private static int murmur2(Object value) {
-    return MurmurHashFunctions.murmurHash2(toBytes(value));
+    return MurmurHashFunctions.murmurHash2(toBytes(value)) & Integer.MAX_VALUE;
   }
 
   private static int murmur3(Object value) {
-    return MurmurHashFunctions.murmurHash3X64Bit32(toBytes(value), 0);
+    return MurmurHashFunctions.murmurHash3X64Bit32(toBytes(value), 0) & Integer.MAX_VALUE;
   }
 
   private static int cityHash(Object value) {
-    return (int) CityHashFunctions.cityHash64(toBytes(value));
+    return (int) (CityHashFunctions.cityHash64(toBytes(value)) & Integer.MAX_VALUE);
   }
 
   private static int multiHash(Object[] values, java.util.function.ToIntFunction<Object> hashFunction) {
