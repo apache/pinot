@@ -61,12 +61,12 @@ public class ResourceUtilizationManager {
           utilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType, purpose);
       LOGGER.info("For utilization checker: {}, isResourceUtilizationWithinLimits: {}, purpose: {}",
           utilizationChecker.getName(), isResourceUtilizationWithinLimits, purpose);
-      if (isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.FAIL)) {
+      if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
         // If any UtilizationChecker returns FAIL, we should mark the overall as FAIL. FAIL should always have
         // priority over other results
         overallIsResourceUtilizationWithinLimits = UtilizationChecker.CheckResult.FAIL;
-      } else if (overallIsResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.PASS)
-          && isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.UNDETERMINED)) {
+      } else if ((overallIsResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.PASS)
+          && (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED)) {
         // If we haven't already updated the overall to a value other than PASS, and we get an UNDETERMINED result,
         // update the overall to UNDETERMINED. Should not update to UNDETERMINED if we have set the overall to FAIL
         overallIsResourceUtilizationWithinLimits = UtilizationChecker.CheckResult.UNDETERMINED;

@@ -159,7 +159,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
         _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
             UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    if (isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.FAIL)) {
+    if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
       LOGGER.warn("Resource utilization limit exceeded for table: {}", tableNameWithType);
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
           1L);
@@ -170,7 +170,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
             PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization limit exceeded.");
       }
       return false; // if resource utilization check failed, then skip subsequent checks
-    } else if (isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.PASS) && isTablePaused
+    } else if ((isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.PASS) && isTablePaused
         && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
       // within limits and table previously paused by resource utilization --> unpause
       LOGGER.info("Resource utilization limit is back within limits for table: {}", tableNameWithType);
@@ -179,7 +179,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
           PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization within limits");
       pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
       isTablePaused = pauseStatus.getPauseFlag();
-    } else if (isResourceUtilizationWithinLimits.equals(UtilizationChecker.CheckResult.UNDETERMINED) && isTablePaused
+    } else if ((isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) && isTablePaused
         && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
       // The table was previously paused due to exceeding resource utilization, but the current status cannot be
       // determined. To be safe, leave it as paused and once the status is available take the correct action

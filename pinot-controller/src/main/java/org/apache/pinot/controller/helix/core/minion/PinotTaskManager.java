@@ -224,7 +224,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       LOGGER.info("Trying to create tasks of type: {}, table: {}", taskType, tableNameWithType);
       try {
         if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
-            UtilizationChecker.CheckPurpose.TASK_GENERATION).equals(UtilizationChecker.CheckResult.FAIL)) {
+            UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
           LOGGER.warn("Resource utilization is above threshold, skipping task creation for table: {}", tableName);
           _controllerMetrics.setOrUpdateTableGauge(tableName, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, 1L);
           continue;
@@ -724,7 +724,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       String tableName = tableConfig.getTableName();
       try {
         if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName,
-            UtilizationChecker.CheckPurpose.TASK_GENERATION).equals(UtilizationChecker.CheckResult.FAIL)) {
+            UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
           String message = String.format("Skipping tasks generation as resource utilization is not within limits for "
               + "table: %s. Disk utilization for one or more servers hosting this table has exceeded the threshold. "
               + "Tasks won't be generated until the issue is mitigated.", tableName);
