@@ -947,9 +947,7 @@ public class TableRebalancer {
     uniqueConsumingSegments.forEach(segment -> consumingSegmentZKMetadata.put(segment,
         ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segment)));
     Map<String, Integer> consumingSegmentsOffsetsToCatchUp =
-        getConsumingSegmentsOffsetsToCatchUp(tableConfig, consumingSegmentZKM
-
-            etadata, tableRebalanceLogger);
+        getConsumingSegmentsOffsetsToCatchUp(tableConfig, consumingSegmentZKMetadata, tableRebalanceLogger);
     Map<String, Integer> consumingSegmentsAge =
         getConsumingSegmentsAge(consumingSegmentZKMetadata, tableRebalanceLogger);
 
