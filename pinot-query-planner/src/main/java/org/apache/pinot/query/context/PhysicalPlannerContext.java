@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.query.context;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
@@ -81,8 +85,15 @@ public class PhysicalPlannerContext {
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
+      String instanceId, Map<String, String> queryOptions) {
+    this(routingManager, hostName, port, requestId, instanceId, queryOptions,
+        CommonConstants.Broker.DEFAULT_USE_LITE_MODE, CommonConstants.Broker.DEFAULT_RUN_IN_BROKER,
+        CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING, CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
+  }
+
+  public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
       String instanceId, Map<String, String> queryOptions, boolean defaultUseLiteMode, boolean defaultRunInBroker,
-      boolean defaultUseBrokerPruning, int defaultLiteModeServerStageLimit) {
+      boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
@@ -93,7 +104,7 @@ public class PhysicalPlannerContext {
     _runInBroker = QueryOptionsUtils.isRunInBroker(_queryOptions, defaultRunInBroker);
     _useBrokerPruning = QueryOptionsUtils.isUseBrokerPruning(_queryOptions, defaultUseBrokerPruning);
     _liteModeServerStageLimit = QueryOptionsUtils.getLiteModeServerStageLimit(_queryOptions,
-        defaultLiteModeServerStageLimit);
+        defaultLiteModeLeafStageLimit);
     _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
   }
 
@@ -144,6 +155,24 @@ public class PhysicalPlannerContext {
 
   public int getLiteModeServerStageLimit() {
     return _liteModeServerStageLimit;
+  }
+
+  /**
+   * Gets a random instance id from the registered instances in the context.
+   * <p>
+   *   <b>Important:</b> This method will always return a server instanceId, unless no server has yet been registered
+   *   with the context, which could happen for queries which don't consist of any table-scans.
+   * </p>
+   */
+  public String getRandomInstanceId() {
+    Preconditions.checkState(!_instanceIdToQueryServerInstance.isEmpty(), "No instances present in context");
+    if (_instanceIdToQueryServerInstance.size() == 1) {
+      return _instanceIdToQueryServerInstance.keySet().iterator().next();
+    }
+    int numCandidates = _instanceIdToQueryServerInstance.size() - 1;
+    Random random = ThreadLocalRandom.current();
+    return _instanceIdToQueryServerInstance.keySet().stream().filter(instanceId -> !_instanceId.equals(instanceId))
+        .collect(Collectors.toList()).get(numCandidates == 1 ? 0 : random.nextInt(numCandidates - 1));
   }
 
   private QueryServerInstance getBrokerQueryServerInstance() {

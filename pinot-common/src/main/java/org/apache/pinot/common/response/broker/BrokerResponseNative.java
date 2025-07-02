@@ -591,11 +591,13 @@ public class BrokerResponseNative implements BrokerResponse {
     return _pools;
   }
 
+  @JsonProperty("rlsFiltersApplied")
   @Override
   public void setRLSFiltersApplied(boolean rlsFiltersApplied) {
     _rlsFiltersApplied = rlsFiltersApplied;
   }
 
+  @JsonProperty("rlsFiltersApplied")
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;
