@@ -595,6 +595,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         }
       }
 
+      if (brokerResponse.isGroupsTrimmed()) {
+        for (String table : tableNames) {
+          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
+        }
+      }
+
       // Set total query processing time
       // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
       long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();

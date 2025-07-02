@@ -240,6 +240,9 @@ public class LeafOperator extends MultiStageOperator {
           case TOTAL_DOCS:
             _statMap.merge(StatKey.TOTAL_DOCS, Long.parseLong(entry.getValue()));
             break;
+          case GROUPS_TRIMMED:
+            _statMap.merge(StatKey.GROUPS_TRIMMED, Boolean.parseBoolean(entry.getValue()));
+            break;
           case NUM_GROUPS_LIMIT_REACHED:
             _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
             break;
@@ -654,6 +657,7 @@ public class LeafOperator extends MultiStageOperator {
     NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
+    GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),
