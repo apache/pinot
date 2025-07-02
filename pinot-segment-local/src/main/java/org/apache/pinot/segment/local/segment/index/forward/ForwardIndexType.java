@@ -229,8 +229,8 @@ public class ForwardIndexType extends AbstractIndexType<ForwardIndexConfig, Forw
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new ForwardIndexHandler(segmentDirectory, configsByCol, schema, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new ForwardIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
   @Override
