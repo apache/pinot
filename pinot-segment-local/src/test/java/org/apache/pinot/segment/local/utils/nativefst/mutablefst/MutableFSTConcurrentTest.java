@@ -31,8 +31,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils.regexQueryNrHitsForRealTimeFST;
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class MutableFSTConcurrentTest {
@@ -91,13 +91,12 @@ public class MutableFSTConcurrentTest {
     countDownLatch.await();
 
     assertEquals(_resultSet.size(), words.size());
-
-    assertTrue("ab not found in result set", _resultSet.contains("ab"));
-    assertTrue("abba not found in result set", _resultSet.contains("abba"));
-    assertTrue("aba not found in result set", _resultSet.contains("aba"));
-    assertTrue("bab not found in result set", _resultSet.contains("bab"));
-    assertTrue("cdd not found in result set", _resultSet.contains("cdd"));
-    assertTrue("efg not found in result set", _resultSet.contains("efg"));
+    assertTrue(_resultSet.contains("ab"), "ab not found in result set");
+    assertTrue(_resultSet.contains("abba"), "abba not found in result set");
+    assertTrue(_resultSet.contains("aba"), "aba not found in result set");
+    assertTrue(_resultSet.contains("bab"), "bab not found in result set");
+    assertTrue(_resultSet.contains("cdd"), "cdd not found in result set");
+    assertTrue(_resultSet.contains("efg"), "efg not found in result set");
   }
 
   @Test
@@ -139,9 +138,8 @@ public class MutableFSTConcurrentTest {
     countDownLatch.await();
 
     assertEquals(_resultSet.size(), words.size());
-
-    assertTrue("abacxcvbnmlkjjhgfsaqwertyuioopzxcvbnmllkjshfgsfawieeiuefgeurfeoafa not found in result set",
-        _resultSet.contains("abacxcvbnmlkjjhgfsaqwertyuioopzxcvbnmllkjshfgsfawieeiuefgeurfeoafa"));
+    assertTrue(_resultSet.contains("abacxcvbnmlkjjhgfsaqwertyuioopzxcvbnmllkjshfgsfawieeiuefgeurfeoafa"),
+        "abacxcvbnmlkjjhgfsaqwertyuioopzxcvbnmllkjshfgsfawieeiuefgeurfeoafa not found in result set");
 
     _resultSet.clear();
   }

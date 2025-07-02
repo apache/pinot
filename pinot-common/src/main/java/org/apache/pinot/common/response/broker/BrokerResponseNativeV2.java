@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.ProcessingException;
@@ -405,12 +404,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public void setPools(@NotNull Set<Integer> pools) {
+  public void setPools(Set<Integer> pools) {
     _pools = pools;
   }
 
   @Override
-  @NotNull
   public Set<Integer> getPools() {
     return _pools;
   }
@@ -470,12 +468,11 @@ public class BrokerResponseNativeV2 implements BrokerResponse {
   }
 
   @Override
-  public void setTablesQueried(@NotNull Set<String> tablesQueried) {
+  public void setTablesQueried(Set<String> tablesQueried) {
     _tablesQueried = tablesQueried;
   }
 
   @Override
-  @NotNull
   public Set<String> getTablesQueried() {
     return _tablesQueried;
   }

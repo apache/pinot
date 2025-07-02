@@ -38,9 +38,9 @@ import static org.apache.pinot.server.predownload.PredownloadTestUtil.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertFalse;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class PredownloadTableInfoTest {
@@ -62,7 +62,7 @@ public class PredownloadTableInfoTest {
 
   @Test
   public void testGetter() {
-    assertEquals(_tableConfig, _predownloadTableInfo.getTableConfig());
+    assertEquals(_predownloadTableInfo.getTableConfig(), _tableConfig);
   }
 
   @Test
