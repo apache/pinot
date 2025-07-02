@@ -48,15 +48,27 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Map of <prefix, replacement> so matching fields are renamed to start with the replacement")
   private final Map<String, String> _prefixesToRename;
 
+  @JsonPropertyDescription("Skip original fields in unnest")
+  private boolean _skipOriginalFieldInUnnest;
+
   @JsonCreator
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
       @JsonProperty("delimiter") @Nullable String delimiter,
       @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson,
-      @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename) {
+      @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename,
+      @JsonProperty("skipOriginalFieldInUnnest") boolean skipOriginalFieldInUnnest) {
     _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
+    _skipOriginalFieldInUnnest = skipOriginalFieldInUnnest;
+  }
+
+  public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
+      @JsonProperty("delimiter") @Nullable String delimiter,
+      @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson,
+      @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename) {
+    this(fieldsToUnnest, delimiter, collectionNotUnnestedToJson, prefixesToRename, false);
   }
 
   @Nullable
@@ -77,5 +89,13 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @Nullable
   public Map<String, String> getPrefixesToRename() {
     return _prefixesToRename;
+  }
+
+  public void setSkipOriginalFieldInUnnest(boolean skipOriginalFieldInUnnest) {
+    _skipOriginalFieldInUnnest = skipOriginalFieldInUnnest;
+  }
+
+  public boolean isSkipOriginalFieldInUnnest() {
+    return _skipOriginalFieldInUnnest;
   }
 }
