@@ -257,13 +257,11 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private CombinedInvertedIndexCreator newRangeIndexCreator(ColumnMetadata columnMetadata)
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
-    IndexCreationContext.Builder builder = IndexCreationContext.builder()
+    IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata);
-    if (_tableConfig != null) {
-      builder.withTableNameWithType(_tableConfig.getTableName());
-    }
-    IndexCreationContext context = builder.build();
+        .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig)
+        .build();
     RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
         .getConfig(StandardIndexes.range());
     return StandardIndexes.range().createIndexCreator(context, config);

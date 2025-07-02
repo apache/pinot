@@ -114,13 +114,11 @@ public class BloomFilterHandler extends BaseIndexHandler {
   private void createAndSealBloomFilterForDictionaryColumn(File indexDir, ColumnMetadata columnMetadata,
       BloomFilterConfig bloomFilterConfig, SegmentDirectory.Writer segmentWriter)
       throws Exception {
-    IndexCreationContext.Builder builder = IndexCreationContext.builder()
+    IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata);
-    if (_tableConfig != null) {
-      builder.withTableNameWithType(_tableConfig.getTableName());
-    }
-    IndexCreationContext context = builder.build();
+        .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig)
+        .build();
     try (BloomFilterCreator bloomFilterCreator =
         StandardIndexes.bloomFilter().createIndexCreator(context, bloomFilterConfig);
         Dictionary dictionary = getDictionaryReader(columnMetadata, segmentWriter)) {
@@ -136,13 +134,11 @@ public class BloomFilterHandler extends BaseIndexHandler {
       BloomFilterConfig bloomFilterConfig, SegmentDirectory.Writer segmentWriter)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    IndexCreationContext.Builder builder = IndexCreationContext.builder()
+    IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata);
-    if (_tableConfig != null) {
-      builder.withTableNameWithType(_tableConfig.getTableName());
-    }
-    IndexCreationContext context = builder.build();
+        .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig)
+        .build();
     try (BloomFilterCreator bloomFilterCreator = StandardIndexes.bloomFilter()
         .createIndexCreator(context, bloomFilterConfig);
         ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);

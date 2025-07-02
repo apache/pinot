@@ -170,14 +170,12 @@ public class TextIndexHandler extends BaseIndexHandler {
     // further need to move around the lucene index directory since it is created with correct directory structure
     // based on segmentVersion.
 
-    IndexCreationContext.Builder builder = IndexCreationContext.builder()
+    IndexCreationContext context = IndexCreationContext.builder()
         .withColumnMetadata(columnMetadata)
         .withIndexDir(segmentDirectory)
-        .withTextCommitOnClose(true);
-    if (_tableConfig != null) {
-      builder.withTableNameWithType(_tableConfig.getTableName());
-    }
-    IndexCreationContext context = builder.build();
+        .withTextCommitOnClose(true)
+        .withTableNameWithType(_tableConfig)
+        .build();
     TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
 
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);

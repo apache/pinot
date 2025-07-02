@@ -136,13 +136,11 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     LOGGER.info("Creating new inverted index for segment: {}, column: {}", segmentName, columnName);
     int numDocs = columnMetadata.getTotalDocs();
 
-    IndexCreationContext.Builder builder = IndexCreationContext.builder()
+    IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata);
-    if (_tableConfig != null) {
-      builder.withTableNameWithType(_tableConfig.getTableName());
-    }
-    IndexCreationContext.Common context = builder.build();
+        .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig)
+        .build();
 
     try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()
         .createIndexCreator(context, IndexConfig.ENABLED)) {

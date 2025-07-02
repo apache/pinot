@@ -270,10 +270,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withColumnMetadata(_columnMetadata)
           .withForwardIndexDisabled(false)
           .withDictionary(_dictionaryEnabled)
-          .withLengthOfLongestEntry(lengthOfLongestEntry);
-      if (_tableNameWithType != null) {
-        builder.withTableNameWithType(_tableNameWithType);
-      }
+          .withLengthOfLongestEntry(lengthOfLongestEntry)
+          .withTableNameWithType(_tableNameWithType);
       IndexCreationContext context = builder.build();
 
       // note: this method closes buffers and removes files
@@ -359,10 +357,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withTotalNumberOfEntries(_nextValueId)
           .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
           .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
-          .withLengthOfLongestEntry(lengthOfLongestEntry);
-      if (_tableNameWithType != null) {
-        builder.withTableNameWithType(_tableNameWithType);
-      }
+          .withLengthOfLongestEntry(lengthOfLongestEntry)
+          .withTableNameWithType(_tableNameWithType);
       IndexCreationContext context = builder.build();
 
       writeToForwardIndex(dictionary, context);

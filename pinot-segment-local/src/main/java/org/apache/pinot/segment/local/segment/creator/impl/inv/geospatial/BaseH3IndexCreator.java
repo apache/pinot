@@ -88,7 +88,8 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
 
   int _nextDocId;
 
-  BaseH3IndexCreator(File indexDir, String columnName, String tableNameWithType, H3IndexResolution resolution)
+  BaseH3IndexCreator(File indexDir, String columnName, @Nullable String tableNameWithType,
+      H3IndexResolution resolution)
       throws IOException {
     _tableNameWithType = tableNameWithType;
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);

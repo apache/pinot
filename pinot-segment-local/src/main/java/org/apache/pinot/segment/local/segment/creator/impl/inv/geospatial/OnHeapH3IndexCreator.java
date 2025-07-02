@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
@@ -34,7 +35,8 @@ import org.roaringbitmap.RoaringBitmapWriter;
  */
 public class OnHeapH3IndexCreator extends BaseH3IndexCreator {
 
-  public OnHeapH3IndexCreator(File indexDir, String columnName, String tableNameWithType, H3IndexResolution resolution)
+  public OnHeapH3IndexCreator(File indexDir, String columnName, @Nullable String tableNameWithType,
+      H3IndexResolution resolution)
       throws IOException {
     super(indexDir, columnName, tableNameWithType, resolution);
   }

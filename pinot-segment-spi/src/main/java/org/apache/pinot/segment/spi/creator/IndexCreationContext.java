@@ -25,6 +25,7 @@ import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
@@ -270,8 +271,13 @@ public interface IndexCreationContext {
       return this;
     }
 
-    public Builder withTableNameWithType(String tableNameWithType) {
+    public Builder withTableNameWithType(@Nullable String tableNameWithType) {
       _tableNameWithType = tableNameWithType;
+      return this;
+    }
+
+    public Builder withTableNameWithType(@Nullable TableConfig tableConfig) {
+      _tableNameWithType = tableConfig != null ? tableConfig.getTableName() : null;
       return this;
     }
 

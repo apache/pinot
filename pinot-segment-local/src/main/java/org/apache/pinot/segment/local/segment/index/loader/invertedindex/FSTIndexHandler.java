@@ -169,13 +169,11 @@ public class FSTIndexHandler extends BaseIndexHandler {
     LOGGER.info("Creating new FST index for column: {} in segment: {}, cardinality: {}", columnName, segmentName,
         columnMetadata.getCardinality());
 
-    IndexCreationContext.Builder builder = IndexCreationContext.builder()
+    IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata);
-    if (_tableConfig != null) {
-      builder.withTableNameWithType(_tableConfig.getTableName());
-    }
-    IndexCreationContext context = builder.build();
+        .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig)
+        .build();
     FstIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.fst());
 
     try (FSTIndexCreator fstIndexCreator = StandardIndexes.fst().createIndexCreator(context, config);

@@ -159,13 +159,11 @@ public class H3IndexHandler extends BaseIndexHandler {
 
     FieldIndexConfigs colIndexConf = _fieldIndexConfigs.get(columnName);
 
-    IndexCreationContext.Builder builder = IndexCreationContext.builder()
+    IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata);
-    if (_tableConfig != null) {
-      builder.withTableNameWithType(_tableConfig.getTableName());
-    }
-    IndexCreationContext context = builder.build();
+        .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig)
+        .build();
     H3IndexConfig config = colIndexConf.getConfig(StandardIndexes.h3());
 
     try (ForwardIndexReader forwardIndexReader = StandardIndexes.forward().getReaderFactory()
@@ -187,13 +185,11 @@ public class H3IndexHandler extends BaseIndexHandler {
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     String columnName = columnMetadata.getColumnName();
-    IndexCreationContext.Builder builder = IndexCreationContext.builder()
+    IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
-        .withColumnMetadata(columnMetadata);
-    if (_tableConfig != null) {
-      builder.withTableNameWithType(_tableConfig.getTableName());
-    }
-    IndexCreationContext context = builder.build();
+        .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig)
+        .build();
     H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3());
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
