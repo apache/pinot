@@ -43,9 +43,9 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.toExplainStr;
 import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.toResultStr;
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertFalse;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 // Tests that 'groupsTrimmed' flag is set when results trimming occurs at:
@@ -149,7 +149,8 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute(options + query);
     assertTrimFlagNotSet(result);
 
-    assertEquals("Execution Plan\n"
+    assertEquals(toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
+        "Execution Plan\n"
             + "LogicalSort(sort0=[$3], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[3 DESC]], isSortOnSender=[false], "
             + "isSortOnReceiver=[true])\n"
@@ -164,8 +165,7 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
             + "                  GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
             + "                    Project(columns=[[i, j]])\n"
             + "                      DocIdSet(maxDocs=[40000])\n"
-            + "                        FilterMatchEntireSegment(numDocs=[4000])\n",
-        toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
+            + "                        FilterMatchEntireSegment(numDocs=[4000])\n");
   }
 
   @Test
@@ -183,14 +183,16 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute(options + query);
     assertTrimFlagSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
-        + "99,\t999,\t4\n"
-        + "98,\t998,\t4\n"
-        + "97,\t997,\t4\n"
-        + "96,\t996,\t4\n"
-        + "95,\t995,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+            + "99,\t999,\t4\n"
+            + "98,\t998,\t4\n"
+            + "97,\t997,\t4\n"
+            + "96,\t996,\t4\n"
+            + "95,\t995,\t4");
 
-    assertEquals("Execution Plan\n"
+    assertEquals(toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
+        "Execution Plan\n"
             + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
             + "isSortOnReceiver=[true])\n"
@@ -204,8 +206,7 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n" // <-- trimming happens here
             + "                  Project(columns=[[i, j]])\n"
             + "                    DocIdSet(maxDocs=[40000])\n"
-            + "                      FilterMatchEntireSegment(numDocs=[4000])\n",
-        toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
+            + "                      FilterMatchEntireSegment(numDocs=[4000])\n");
   }
 
   @Test
@@ -224,14 +225,16 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute(options + query);
     assertTrimFlagSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
-        + "77,\t377,\t4\n"
-        + "66,\t566,\t4\n"
-        + "39,\t339,\t4\n"
-        + "96,\t396,\t4\n"
-        + "25,\t25,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+            + "77,\t377,\t4\n"
+            + "66,\t566,\t4\n"
+            + "39,\t339,\t4\n"
+            + "96,\t396,\t4\n"
+            + "25,\t25,\t4");
 
-    assertEquals("Execution Plan\n"
+    assertEquals(toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
+        "Execution Plan\n"
             + "LogicalSort(sort0=[$2], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[2 DESC]], isSortOnSender=[false], "
             + "isSortOnReceiver=[true])\n"
@@ -245,8 +248,7 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n" //<-- trimming happens here
             + "                  Project(columns=[[i, j]])\n"
             + "                    DocIdSet(maxDocs=[40000])\n"
-            + "                      FilterMatchEntireSegment(numDocs=[4000])\n",
-        toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
+            + "                      FilterMatchEntireSegment(numDocs=[4000])\n");
   }
 
   @Test
@@ -266,14 +268,16 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute(options + query);
     assertTrimFlagSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
-        + "99,\t999,\t4\n"
-        + "98,\t998,\t4\n"
-        + "97,\t997,\t4\n"
-        + "96,\t996,\t4\n"
-        + "95,\t995,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+            + "99,\t999,\t4\n"
+            + "98,\t998,\t4\n"
+            + "97,\t997,\t4\n"
+            + "96,\t996,\t4\n"
+            + "95,\t995,\t4");
 
-    assertEquals("Execution Plan\n"
+    assertEquals(toExplainStr(postQuery(options + "SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
+        "Execution Plan\n"
             + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
             + "isSortOnReceiver=[true])\n"
@@ -287,8 +291,7 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
             + "                  Project(columns=[[i, j]])\n"
             + "                    DocIdSet(maxDocs=[40000])\n"
-            + "                      FilterMatchEntireSegment(numDocs=[4000])\n",
-        toExplainStr(postQuery(options + "SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
+            + "                      FilterMatchEntireSegment(numDocs=[4000])\n");
   }
 
   @Test
@@ -309,14 +312,15 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute(query);
     assertTrimFlagSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
-        + "99,\t999,\t4\n"
-        + "98,\t998,\t4\n"
-        + "97,\t997,\t4\n"
-        + "96,\t996,\t4\n"
-        + "95,\t995,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+            + "99,\t999,\t4\n"
+            + "98,\t998,\t4\n"
+            + "97,\t997,\t4\n"
+            + "96,\t996,\t4\n"
+            + "95,\t995,\t4");
 
-    assertEquals(
+    assertEquals(toExplainStr(postQuery(" set explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
         "Execution Plan\n"
             + "LogicalSort(sort0=[$1], dir0=[DESC], offset=[0], fetch=[5])\n"
             + "  PinotLogicalSortExchange(distribution=[hash], collation=[[1 DESC]], isSortOnSender=[false], "
@@ -331,8 +335,7 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
             + "                GroupBy(groupKeys=[[i, j]], aggregations=[[count(*)]])\n"
             + "                  Project(columns=[[i, j]])\n"
             + "                    DocIdSet(maxDocs=[40000])\n"
-            + "                      FilterMatchEntireSegment(numDocs=[4000])\n",
-        toExplainStr(postQuery(" set explainAskingServers=true; EXPLAIN PLAN FOR " + query), true));
+            + "                      FilterMatchEntireSegment(numDocs=[4000])\n");
   }
 
   // SSQE segment level
@@ -348,14 +351,15 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
     assertTrimFlagSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"sum(i) FILTER(WHERE i > '0')\"[\"DOUBLE\"]\n"
-        + "99,\t999,\t396.0\n"
-        + "98,\t998,\t392.0\n"
-        + "97,\t997,\t388.0\n"
-        + "96,\t996,\t384.0\n"
-        + "95,\t995,\t380.0", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"sum(i) FILTER(WHERE i > '0')\"[\"DOUBLE\"]\n"
+            + "99,\t999,\t396.0\n"
+            + "98,\t998,\t392.0\n"
+            + "97,\t997,\t388.0\n"
+            + "96,\t996,\t384.0\n"
+            + "95,\t995,\t380.0");
 
-    assertEquals(
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
         "BROKER_REDUCE(sort:[plus(i,j) DESC],limit:5,postAggregations:filter(sum(i),greater_than(i,'0'))),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
@@ -365,8 +369,7 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
             + "FILTER_FULL_SCAN(operator:RANGE,predicate:i > '0'),\t6,\t5\n"
             + "PROJECT(i, j),\t7,\t3\n"
             + "DOC_ID_SET,\t8,\t7\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t9,\t8\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t9,\t8\n");
   }
 
   @Test
@@ -381,21 +384,22 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
     assertTrimFlagSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
-        + "99,\t999,\t4\n"
-        + "98,\t998,\t4\n"
-        + "97,\t997,\t4\n"
-        + "96,\t996,\t4\n"
-        + "95,\t995,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+            + "99,\t999,\t4\n"
+            + "98,\t998,\t4\n"
+            + "97,\t997,\t4\n"
+            + "96,\t996,\t4\n"
+            + "95,\t995,\t4");
 
-    assertEquals("BROKER_REDUCE(sort:[plus(i,j) DESC],limit:5),\t1,\t0\n"
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(sort:[plus(i,j) DESC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n" //<-- trimming happens here
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -414,22 +418,22 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     // group by keys can produce incomplete group aggregates due to lack of stability.
     // That is because, for a given value of j, sorting treats all values of i the same,
     // and segment data is usually unordered.
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
-        + "99,\t999,\t4\n"
-        + "98,\t998,\t4\n"
-        + "97,\t997,\t4\n"
-        + "96,\t996,\t4\n"
-        + "95,\t995,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+            + "99,\t999,\t4\n"
+            + "98,\t998,\t4\n"
+            + "97,\t997,\t4\n"
+            + "96,\t996,\t4\n"
+            + "95,\t995,\t4");
 
-    assertEquals(
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
         "BROKER_REDUCE(sort:[j DESC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n" // <- trimming happens here
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -449,16 +453,16 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Result is unexpectedly empty  because segment-level trim keeps first 50 records ordered by i ASC, j ASC
     // that are later filtered out at broker stage.
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]", toResultStr(result));
+    assertEquals(toResultStr(result), "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]");
 
-    assertEquals("BROKER_REDUCE(havingFilter:i > '50',sort:[i ASC, j ASC],limit:10),\t1,\t0\n"
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(havingFilter:i > '50',sort:[i ASC, j ASC],limit:10),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n" // <- trimming happens here
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -475,22 +479,22 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
     assertTrimFlagNotSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
-        + "0,\t0,\t4\n"
-        + "1,\t1,\t4\n"
-        + "2,\t2,\t4\n"
-        + "3,\t3,\t4\n"
-        + "4,\t4,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+            + "0,\t0,\t4\n"
+            + "1,\t1,\t4\n"
+            + "2,\t2,\t4\n"
+            + "3,\t3,\t4\n"
+            + "4,\t4,\t4");
 
-    assertEquals(
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
         "BROKER_REDUCE(sort:[j ASC, i DESC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -507,21 +511,22 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
     assertTrimFlagSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
-        + "0,\t0,\t4\n"
-        + "1,\t1,\t4\n"
-        + "2,\t2,\t4\n"
-        + "3,\t3,\t4\n"
-        + "4,\t4,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+            + "0,\t0,\t4\n"
+            + "1,\t1,\t4\n"
+            + "2,\t2,\t4\n"
+            + "3,\t3,\t4\n"
+            + "4,\t4,\t4");
 
-    assertEquals("BROKER_REDUCE(sort:[times(count(*),j) ASC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(sort:[times(count(*),j) ASC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   // SSQE inter-segment level
@@ -540,14 +545,14 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     assertTrimFlagSet(result);
     // result's order is not stable due to concurrent operations on indexed table
 
-    assertEquals("BROKER_REDUCE(sort:[i DESC],limit:5),\t1,\t0\n"
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(sort:[i DESC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n" // <-- trimming happens here
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -564,22 +569,22 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute("SET minServerGroupTrimSize = 5; SET groupTrimThreshold = 100; " + query);
     assertTrimFlagNotSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
-        + "0,\t0,\t4\n"
-        + "0,\t100,\t4\n"
-        + "0,\t200,\t4\n"
-        + "0,\t300,\t4\n"
-        + "0,\t400,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+            + "0,\t0,\t4\n"
+            + "0,\t100,\t4\n"
+            + "0,\t200,\t4\n"
+            + "0,\t300,\t4\n"
+            + "0,\t400,\t4");
 
-    assertEquals(
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
         "BROKER_REDUCE(sort:[i ASC, j ASC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n" //<-- trimming happens here
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -605,14 +610,14 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     //86,\t986,\t4
     //79,\t979,\t4
 
-    assertEquals("BROKER_REDUCE(sort:[times(count(*),j) DESC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(sort:[times(count(*),j) DESC],limit:5,postAggregations:times(count(*),j)),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n" //<-- trimming happens here
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -630,16 +635,16 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Result is unexpectedly empty  because inter-segment-level trim keeps first 25 records ordered by i ASC, j ASC
     // that are later filtered out at broker stage.
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]", toResultStr(result));
+    assertEquals(toResultStr(result), "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]");
 
-    assertEquals("BROKER_REDUCE(havingFilter:i > '50',sort:[i ASC, j ASC],limit:5),\t1,\t0\n"
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(havingFilter:i > '50',sort:[i ASC, j ASC],limit:5),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n" //<-- trimming happens here
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   // SSQE broker level
@@ -657,21 +662,22 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute("SET minBrokerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
     assertTrimFlagNotSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
-        + "0,\t0,\t4\n"
-        + "0,\t100,\t4\n"
-        + "0,\t200,\t4\n"
-        + "0,\t300,\t4\n"
-        + "0,\t400,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+            + "0,\t0,\t4\n"
+            + "0,\t100,\t4\n"
+            + "0,\t200,\t4\n"
+            + "0,\t300,\t4\n"
+            + "0,\t400,\t4");
 
-    assertEquals("BROKER_REDUCE(sort:[i ASC, j ASC],limit:5),\t1,\t0\n" //<-- trimming happens here
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(sort:[i ASC, j ASC],limit:5),\t1,\t0\n" //<-- trimming happens here
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -688,21 +694,22 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute("SET minBrokerGroupTrimSize = 5; SET groupTrimThreshold = 50; " + query);
     assertTrimFlagSet(result);
 
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
-        + "99,\t999,\t4\n"
-        + "98,\t998,\t4\n"
-        + "97,\t997,\t4\n"
-        + "96,\t996,\t4\n"
-        + "95,\t995,\t4", toResultStr(result));
+    assertEquals(toResultStr(result),
+        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
+            + "99,\t999,\t4\n"
+            + "98,\t998,\t4\n"
+            + "97,\t997,\t4\n"
+            + "96,\t996,\t4\n"
+            + "95,\t995,\t4");
 
-    assertEquals("BROKER_REDUCE(sort:[j DESC],limit:5),\t1,\t0\n" //<-- trimming happens here
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(sort:[j DESC],limit:5),\t1,\t0\n" //<-- trimming happens here
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -721,17 +728,16 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
 
     // Result is unexpectedly empty  because segment-level trim keeps first 50 records ordered by i ASC, j ASC
     // that are later filtered out at broker stage.
-    assertEquals("\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]", toResultStr(result));
+    assertEquals(toResultStr(result), "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]");
 
-    assertEquals(
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
         "BROKER_REDUCE(havingFilter:i > '50',sort:[i ASC, j ASC],limit:5),\t1,\t0\n" //<-- trimming happens here
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   @Test
@@ -755,15 +761,15 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     //96,996,4
     //82,982,4
 
-    assertEquals("BROKER_REDUCE(sort:[times(count(*),j) DESC],limit:5," //<-- trimming happens here
+    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
+        "BROKER_REDUCE(sort:[times(count(*),j) DESC],limit:5," //<-- trimming happens here
             + "postAggregations:times(count(*),j)),\t1,\t0\n"
             + "COMBINE_GROUP_BY,\t2,\t1\n"
             + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
             + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
             + "PROJECT(i, j),\t4,\t3\n"
             + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n",
-        toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false));
+            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
 
   private static void assertTrimFlagNotSet(ResultSetGroup result) {

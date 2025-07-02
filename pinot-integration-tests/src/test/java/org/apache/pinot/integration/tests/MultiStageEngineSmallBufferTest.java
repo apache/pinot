@@ -39,8 +39,8 @@ import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT;
 import static org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class MultiStageEngineSmallBufferTest extends BaseClusterIntegrationTestSet {
@@ -172,9 +172,9 @@ public class MultiStageEngineSmallBufferTest extends BaseClusterIntegrationTestS
       startLatch.countDown();
       doneLatch.await();
 
-      assertEquals(numClients, results.size());
+      assertEquals(results.size(), numClients);
       for (String result : results) {
-        assertEquals(expected, result);
+        assertEquals(result, expected);
       }
     }
 }

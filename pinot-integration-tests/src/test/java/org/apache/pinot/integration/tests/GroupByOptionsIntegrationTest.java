@@ -39,7 +39,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -551,7 +550,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
         getExtraQueryProperties());
   }
 
-  public static @NotNull String toResultStr(ResultSetGroup resultSet) {
+  public static String toResultStr(ResultSetGroup resultSet) {
     if (resultSet == null) {
       return "null";
     }
@@ -562,7 +561,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toString(node);
   }
 
-  public static @NotNull String toResultStr(JsonNode mainNode) {
+  public static String toResultStr(JsonNode mainNode) {
     if (mainNode == null) {
       return "null";
     }
@@ -573,7 +572,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toString(node);
   }
 
-  static @NotNull String toExplainStr(JsonNode mainNode, boolean isMSQE) {
+  static String toExplainStr(JsonNode mainNode, boolean isMSQE) {
     if (mainNode == null) {
       return "null";
     }
@@ -584,7 +583,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     return toExplainString(node, isMSQE);
   }
 
-  static @NotNull String toExplainStr(JsonNode mainNode) {
+  static String toExplainStr(JsonNode mainNode) {
     return toExplainStr(mainNode, false);
   }
 
