@@ -1207,13 +1207,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
 
-    // trigger pauseless table rebalance warning
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(
-        Collections.singletonList(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
-    streamIngestionConfig.setPauselessConsumptionEnabled(true);
-    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
-    newTableConfig.setIngestionConfig(ingestionConfig);
+    // trigger peer-download enabled table rebalance warning
+    newTableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
     rebalanceConfig.setDowntime(true);
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
@@ -1221,19 +1216,19 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Replication of the table is 1, which is not recommended for pauseless tables as it may cause data loss "
-            + "during rebalance");
+        "Replication of the table is 1, which is not recommended for peer-download enabled tables as it may "
+            + "cause data loss during rebalance");
 
     newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(3).build();
-    newTableConfig.setIngestionConfig(ingestionConfig);
+    newTableConfig.getValidationConfig().setPeerSegmentDownloadScheme("https");
 
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Number of replicas (3) is greater than 1, downtime is not recommended.\nDowntime or minAvailableReplicas=0 "
-            + "for pauseless tables may cause data loss during rebalance");
+        "Number of replicas (3) is greater than 1, downtime is not recommended.\nDowntime or minAvailableReplicas<=0 "
+            + "for peer-download enabled tables may cause data loss during rebalance");
 
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setMinAvailableReplicas(-3);
@@ -1242,7 +1237,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
+        "Downtime or minAvailableReplicas<=0 for peer-download enabled tables may cause data loss during rebalance");
 
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setMinAvailableReplicas(0);
@@ -1251,7 +1246,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
+        "Downtime or minAvailableReplicas<=0 for peer-download enabled tables may cause data loss during rebalance");
 
     // test pass
     rebalanceConfig.setMinAvailableReplicas(1);
