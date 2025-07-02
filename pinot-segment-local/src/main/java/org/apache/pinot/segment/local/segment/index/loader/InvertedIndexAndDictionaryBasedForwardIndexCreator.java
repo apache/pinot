@@ -265,14 +265,14 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         }
       }
 
-      IndexCreationContext.Builder builder = IndexCreationContext.builder()
+      IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(_segmentMetadata.getIndexDir())
           .withColumnMetadata(_columnMetadata)
           .withForwardIndexDisabled(false)
           .withDictionary(_dictionaryEnabled)
           .withLengthOfLongestEntry(lengthOfLongestEntry)
-          .withTableNameWithType(_tableNameWithType);
-      IndexCreationContext context = builder.build();
+          .withTableNameWithType(_tableNameWithType)
+          .build();
 
       // note: this method closes buffers and removes files
       writeToForwardIndex(dictionary, context);
@@ -349,7 +349,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
         });
       }
 
-      IndexCreationContext.Builder builder = IndexCreationContext.builder()
+      IndexCreationContext context = IndexCreationContext.builder()
           .withIndexDir(_segmentMetadata.getIndexDir())
           .withColumnMetadata(_columnMetadata)
           .withForwardIndexDisabled(false)
@@ -358,8 +358,8 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
           .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
           .withLengthOfLongestEntry(lengthOfLongestEntry)
-          .withTableNameWithType(_tableNameWithType);
-      IndexCreationContext context = builder.build();
+          .withTableNameWithType(_tableNameWithType)
+          .build();
 
       writeToForwardIndex(dictionary, context);
 
