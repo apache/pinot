@@ -474,7 +474,7 @@ public class GroupByOptionsIntegrationTest extends BaseClusterIntegrationTestSet
     JsonNode plan = postV2Query(option + " set explainAskingServers=true; explain plan for " + query);
 
     Assert.assertEquals(toResultStr(result), expectedResult);
-    Assert.assertEquals(toExplainStr(plan), expectedPlan);
+    Assert.assertEquals(toExplainStr(plan, true), expectedPlan);
   }
 
   @Test
