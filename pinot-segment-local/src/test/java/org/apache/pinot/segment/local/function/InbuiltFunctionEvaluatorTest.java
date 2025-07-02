@@ -25,6 +25,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class InbuiltFunctionEvaluatorTest {
@@ -37,6 +38,67 @@ public class InbuiltFunctionEvaluatorTest {
     checkBooleanLiteralExpression("False", 0);
     checkBooleanLiteralExpression("1", 1);
     checkBooleanLiteralExpression("0", 0);
+  }
+
+  @Test
+  public void testOrWithNulls() {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator("or(null, false, true)");
+    Object output = evaluator.evaluate(new GenericRow());
+    assertEquals(output, true);
+
+    evaluator = new InbuiltFunctionEvaluator("or(null, false, null)");
+    output = evaluator.evaluate(new GenericRow());
+    assertNull(output);
+
+    evaluator = new InbuiltFunctionEvaluator("or(null, null, null)");
+    output = evaluator.evaluate(new Object[]{});
+    assertNull(output);
+
+    evaluator = new InbuiltFunctionEvaluator("or(null, true, null)");
+    output = evaluator.evaluate(new Object[]{});
+    assertEquals(output, true);
+
+    evaluator = new InbuiltFunctionEvaluator("or(true, false)");
+    output = evaluator.evaluate(new GenericRow());
+    assertEquals(output, true);
+  }
+
+  @Test
+  public void testAndWithNulls() {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator("and(null, false, true)");
+    Object output = evaluator.evaluate(new GenericRow());
+    assertEquals(output, false);
+
+    evaluator = new InbuiltFunctionEvaluator("and(null, false, null)");
+    output = evaluator.evaluate(new GenericRow());
+    assertEquals(output, false);
+
+    evaluator = new InbuiltFunctionEvaluator("and(null, null, null)");
+    output = evaluator.evaluate(new Object[]{});
+    assertNull(output);
+
+    evaluator = new InbuiltFunctionEvaluator("and(null, true, null)");
+    output = evaluator.evaluate(new Object[]{});
+    assertNull(output);
+
+    evaluator = new InbuiltFunctionEvaluator("and(true, false)");
+    output = evaluator.evaluate(new GenericRow());
+    assertEquals(output, false);
+  }
+
+  @Test
+  public void testNotWithNulls() {
+    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator("not(null)");
+    Object output = evaluator.evaluate(new GenericRow());
+    assertNull(output);
+
+    evaluator = new InbuiltFunctionEvaluator("not(false)");
+    output = evaluator.evaluate(new Object[]{});
+    assertEquals(output, true);
+
+    evaluator = new InbuiltFunctionEvaluator("not(true)");
+    output = evaluator.evaluate(new GenericRow());
+    assertEquals(output, false);
   }
 
   private void checkBooleanLiteralExpression(String expression, int value) {
