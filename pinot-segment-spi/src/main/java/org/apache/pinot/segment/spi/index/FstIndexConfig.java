@@ -28,23 +28,31 @@ import org.apache.pinot.spi.config.table.IndexConfig;
 
 
 public class FstIndexConfig extends IndexConfig {
-  public static final FstIndexConfig DISABLED = new FstIndexConfig(true, null);
+  public static final FstIndexConfig DISABLED = new FstIndexConfig(true, null, true);
   private final FSTType _fstType;
+  private final boolean _caseSensitive;
 
   public FstIndexConfig(@JsonProperty("type") @Nullable FSTType fstType) {
-    this(false, fstType);
+    this(false, fstType, true);
   }
 
   @JsonCreator
   public FstIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
-      @JsonProperty("type") @Nullable FSTType fstType) {
+      @JsonProperty("type") @Nullable FSTType fstType,
+      @JsonProperty("caseSensitive") @Nullable Boolean caseSensitive) {
     super(disabled);
     _fstType = fstType;
+    _caseSensitive = caseSensitive != null ? caseSensitive : true;
   }
 
   @JsonProperty("type")
   public FSTType getFstType() {
     return _fstType;
+  }
+
+  @JsonProperty("caseSensitive")
+  public boolean isCaseSensitive() {
+    return _caseSensitive;
   }
 
   @Override
@@ -56,16 +64,16 @@ public class FstIndexConfig extends IndexConfig {
       return false;
     }
     FstIndexConfig that = (FstIndexConfig) o;
-    return _fstType == that._fstType;
+    return _fstType == that._fstType && _caseSensitive == that._caseSensitive;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_fstType);
+    return Objects.hash(_fstType, _caseSensitive);
   }
 
   @Override
   public String toString() {
-    return "FstIndexConfig{\"fstType\":" + _fstType + '}';
+    return "FstIndexConfig{\"fstType\":" + _fstType + ",\"caseSensitive\":" + _caseSensitive + '}';
   }
 }

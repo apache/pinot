@@ -26,6 +26,7 @@ import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,13 +52,14 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    * @param indexDir  Index directory
    * @param columnName Column name for which index is being created
    * @param sortedEntries Sorted entries of the unique values of the column.
+   * @param caseSensitive FST index caseSensitive configuration
    * @throws IOException
    */
-  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
+  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries, Boolean caseSensitive)
       throws IOException {
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
 
-    _fstBuilder = new FSTBuilder();
+    _fstBuilder = new FSTBuilder(caseSensitive);
     _dictId = 0;
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
@@ -66,9 +68,10 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
     }
   }
 
-  public LuceneFSTIndexCreator(IndexCreationContext context)
+  public LuceneFSTIndexCreator(IndexCreationContext context, FstIndexConfig fstIndexConfig)
       throws IOException {
-    this(context.getIndexDir(), context.getFieldSpec().getName(), (String[]) context.getSortedUniqueElementsArray());
+    this(context.getIndexDir(), context.getFieldSpec().getName(), (String[]) context.getSortedUniqueElementsArray(),
+        fstIndexConfig.isCaseSensitive());
   }
 
   // Expects dictionary entries in sorted order.

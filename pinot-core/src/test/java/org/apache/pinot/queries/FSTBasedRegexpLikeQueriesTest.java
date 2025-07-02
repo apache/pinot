@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.queries;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,7 +48,6 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.EncodingType;
-import org.apache.pinot.spi.config.table.FieldConfig.IndexType;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -80,9 +81,26 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(URL_COL, FieldSpec.DataType.STRING)
       .addSingleValueDimension(NO_INDEX_STRING_COL_NAME, FieldSpec.DataType.STRING)
       .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
-  private static final List<FieldConfig> FIELD_CONFIGS =
-      List.of(new FieldConfig(DOMAIN_NAMES_COL, EncodingType.DICTIONARY, List.of(IndexType.FST), null, null),
-          new FieldConfig(URL_COL, EncodingType.DICTIONARY, List.of(IndexType.FST), null, null));
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
+  private static List<FieldConfig> getFieldConfigs(boolean caseSensitive) {
+    try {
+      // Create FST index configuration JSON
+      ObjectNode fstIndexConfig = OBJECT_MAPPER.createObjectNode();
+      fstIndexConfig.put("type", "LUCENE");
+      fstIndexConfig.put("caseSensitive", caseSensitive);
+
+      ObjectNode indexes = OBJECT_MAPPER.createObjectNode();
+      indexes.set("fst", fstIndexConfig);
+
+      // Create FieldConfig with the FST index configuration
+      return List.of(
+          new FieldConfig(DOMAIN_NAMES_COL, EncodingType.DICTIONARY, null, null, null, null, indexes, null, null),
+          new FieldConfig(URL_COL, EncodingType.DICTIONARY, null, null, null, null, indexes, null, null));
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to create field configs", e);
+    }
+  }
 
   private TableConfig _tableConfig;
   private IndexSegment _indexSegment;
@@ -162,9 +180,14 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
   private void buildSegment(FSTType fstType)
       throws Exception {
+    buildSegment(fstType, false); // Default to case-sensitive for backward compatibility
+  }
+
+  private void buildSegment(FSTType fstType, boolean caseSensitive)
+      throws Exception {
     List<GenericRow> rows = createTestData();
-    _tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setFieldConfigList(FIELD_CONFIGS).build();
+    _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setFieldConfigList(getFieldConfigs(caseSensitive)).build();
     _tableConfig.getIndexingConfig().setFSTIndexType(fstType);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
@@ -437,5 +460,13 @@ public class FSTBasedRegexpLikeQueriesTest extends BaseQueriesTest {
 
     query = "SELECT count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'www.domain1.*')";
     testInterSegmentsCountQuery(query, 1024);
+  }
+
+  @Test
+  public void testCaseInsensitiveFSTBasedRegexLike()
+      throws Exception {
+    buildSegment(FSTType.LUCENE, false); // case-insensitive
+    String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'WWW.DOMAIN1.*') LIMIT 50000";
+    testInnerSegmentSelectionQuery(query, 256, null); // Should match in case-insensitive mode
   }
 }
