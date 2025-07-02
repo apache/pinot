@@ -92,6 +92,28 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       }
     } else if (filterKind.isRange() || filterKind == FilterKind.EQUALS) {
       Expression expression = operands.get(0);
+      if (expression.getType() == ExpressionType.LITERAL) {
+        switch (filterKind) {
+          case GREATER_THAN:
+            filterFunction.setOperator(FilterKind.LESS_THAN.name());
+            break;
+          case GREATER_THAN_OR_EQUAL:
+            filterFunction.setOperator(FilterKind.LESS_THAN_OR_EQUAL.name());
+            break;
+          case LESS_THAN:
+            filterFunction.setOperator(FilterKind.GREATER_THAN.name());
+            break;
+          case LESS_THAN_OR_EQUAL:
+            filterFunction.setOperator(FilterKind.GREATER_THAN_OR_EQUAL.name());
+            break;
+          default:
+            break;
+        }
+        filterKind = FilterKind.valueOf(filterFunction.getOperator());
+        operands.set(0, operands.get(1));
+        operands.set(1, expression);
+        expression = operands.get(0);
+      }
       if (expression.getType() == ExpressionType.FUNCTION) {
         Function expressionFunction = expression.getFunctionCall();
         String functionName = StringUtils.remove(expressionFunction.getOperator(), '_');

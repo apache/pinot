@@ -50,10 +50,13 @@ public class TimePredicateFilterOptimizerTest {
 
     // Other input format
     testTimeConvert("timeConvert(col, 'MINUTES', 'SECONDS') > 1620830760", new Range(27013846L, false, null, false));
+    testTimeConvertReverse("1620830760 < timeConvert(col, 'MINUTES', 'SECONDS')", new Range(27013846L, false, null, false));
     testTimeConvert("timeConvert(col, 'HOURS', 'MINUTES') < 27015286", new Range(null, false, 450254L, true));
+    testTimeConvertReverse("27015286 > timeConvert(col, 'HOURS', 'MINUTES')", new Range(null, false, 450254L, true));
     testTimeConvert("timeConvert(col, 'DAYS', 'HOURS') BETWEEN 450230 AND 450254",
         new Range(18759L, false, 18760L, true));
     testTimeConvert("timeConvert(col, 'SECONDS', 'DAYS') = 18759", new Range(1620777600L, true, 1620864000L, false));
+    testTimeConvertReverse("18759 = timeConvert(col, 'SECONDS', 'DAYS')", new Range(1620777600L, true, 1620864000L, false));
 
     // Invalid time
     testInvalidFilterOptimizer("timeConvert(col, 'MINUTES', 'SECONDS') > 1620830760.5");
@@ -161,11 +164,16 @@ public class TimePredicateFilterOptimizerTest {
   @Test
   public void testDateTruncOptimizer() {
     testDateTrunc("datetrunc('DAY', col) = 1620777600000", new Range("1620777600000", true, "1620863999999", true));
+    testDateTruncReverse("1620777600000 = datetrunc('DAY', col)", new Range("1620777600000", true, "1620863999999", true));
     testDateTrunc("dateTrunc('DAY', col) = 1620777600001", new Range(Long.MAX_VALUE, true, Long.MIN_VALUE, true));
+    testDateTruncReverse("1620777600001 = dateTrunc('DAY', col)", new Range(Long.MAX_VALUE, true, Long.MIN_VALUE, true));
 
     testDateTrunc("datetrunc('DAY', col) < 1620777600000", new Range(Long.MIN_VALUE, true, "1620777600000", false));
+    testDateTruncReverse("1620777600000 > datetrunc('DAY', col)", new Range(Long.MIN_VALUE, true, "1620777600000", false));
     testDateTrunc("DATETRUNC('DAY', col) < 1620777600010", new Range(Long.MIN_VALUE, true, "1620863999999", true));
+    testDateTruncReverse("1620777600010 > DATETRUNC('DAY', col)", new Range(Long.MIN_VALUE, true, "1620863999999", true));
     testDateTrunc("DATE_TRUNC('DAY', col) < 1620863999999", new Range(Long.MIN_VALUE, true, "1620863999999", true));
+    testDateTruncReverse("1620863999999 > DATE_TRUNC('DAY', col)", new Range(Long.MIN_VALUE, true, "1620863999999", true));
 
     testDateTrunc("datetrunc('DAY', col) <= 1620777600000", new Range(Long.MIN_VALUE, true, "1620863999999", true));
     testDateTrunc("datetrunc('DAY', col) <= 1620777600010", new Range(Long.MIN_VALUE, true, "1620863999999", true));
@@ -202,12 +210,11 @@ public class TimePredicateFilterOptimizerTest {
     testDateTrunc("datetrunc('DAY', col, 'DAYS', 'UTC', 'DAYS') BETWEEN 453630 AND 453632",
         new Range("453630", true, "453632", true));
 
-    // TODO: Currently time filter optimizers do not support 'literal = func()' syntax
-    testInvalidFilterOptimizer("453630 = datetrunc('DAY', col)");
+
   }
 
   /**
-   * Helper method to test optimizing DATE_TRUNC on the given filter.
+   * Helper method to test optimizing DATE_TRUNC on the given filter with the form func(x) = literal
    */
   private void testDateTrunc(String filterString, Range expectedRange) {
     Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);
@@ -219,6 +226,24 @@ public class TimePredicateFilterOptimizerTest {
     assertEquals(operands.size(), 2);
     assertEquals(operands.get(0),
         originalExpression.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(1));
+    String rangeString = operands.get(1).getLiteral().getStringValue();
+    assertEquals(rangeString, expectedRange.getRangeString());
+  }
+
+  /**
+   * Helper method to test optimizing DATE_TRUNC on the given filter with the form literal = func(x)
+   */
+  private void testDateTruncReverse(String filterString, Range expectedRange) {
+    Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);
+    Expression optimizedFilterExpression =
+        TimePredicateFilterOptimizer.optimize(CalciteSqlParser.compileToExpression(filterString));
+    Function function = optimizedFilterExpression.getFunctionCall();
+    assertEquals(function.getOperator(), FilterKind.RANGE.name());
+    List<Expression> operands = function.getOperands();
+    System.out.println(operands);
+    assertEquals(operands.size(), 2);
+    assertEquals(operands.get(0),
+        originalExpression.getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(1));
     String rangeString = operands.get(1).getLiteral().getStringValue();
     assertEquals(rangeString, expectedRange.getRangeString());
   }
@@ -245,7 +270,7 @@ public class TimePredicateFilterOptimizerTest {
   }
 
   /**
-   * Helper method to test optimizing TIME_CONVERT/DATE_TIME_CONVERT on the given filter.
+   * Helper method to test optimizing TIME_CONVERT/DATE_TIME_CONVERT on the given filter with the form func(x) = literal
    */
   private void testTimeConvert(String filterString, Range expectedRange) {
     Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);
@@ -257,6 +282,24 @@ public class TimePredicateFilterOptimizerTest {
     assertEquals(operands.size(), 2);
     assertEquals(operands.get(0),
         originalExpression.getFunctionCall().getOperands().get(0).getFunctionCall().getOperands().get(0));
+    String rangeString = operands.get(1).getLiteral().getStringValue();
+    assertEquals(rangeString, expectedRange.getRangeString());
+  }
+
+  /**
+   * Helper method to test optimizing TIME_CONVERT/DATE_TIME_CONVERT on the given filter with the form literal = func(x)
+   */
+  private void testTimeConvertReverse(String filterString, Range expectedRange) {
+    Expression originalExpression = CalciteSqlParser.compileToExpression(filterString);
+    Expression optimizedFilterExpression =
+        TimePredicateFilterOptimizer.optimize(CalciteSqlParser.compileToExpression(filterString));
+    Function function = optimizedFilterExpression.getFunctionCall();
+    assertEquals(function.getOperator(), FilterKind.RANGE.name());
+    List<Expression> operands = function.getOperands();
+    System.out.println(operands);
+    assertEquals(operands.size(), 2);
+    assertEquals(operands.get(0),
+        originalExpression.getFunctionCall().getOperands().get(1).getFunctionCall().getOperands().get(0));
     String rangeString = operands.get(1).getLiteral().getStringValue();
     assertEquals(rangeString, expectedRange.getRangeString());
   }
