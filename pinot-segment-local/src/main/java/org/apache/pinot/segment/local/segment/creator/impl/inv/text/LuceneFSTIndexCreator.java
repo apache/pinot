@@ -24,6 +24,7 @@ import java.io.IOException;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
+import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.FstIndexConfig;
@@ -42,6 +43,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexCreator.class);
   private final File _fstIndexFile;
   private final FSTBuilder _fstBuilder;
+  private final boolean _caseSensitive;
   Integer _dictId;
 
   /**
@@ -59,6 +61,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       throws IOException {
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
 
+    _caseSensitive = caseSensitive;
     _fstBuilder = new FSTBuilder(caseSensitive);
     _dictId = 0;
     if (sortedEntries != null) {
@@ -98,6 +101,12 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
       FST<?> fst = _fstBuilder.done();
+
+      // Write magic header for case-insensitive FSTs
+      if (!_caseSensitive) {
+        FSTHeader.writeCaseInsensitiveMagic(fileOutputStream);
+      }
+
       OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
       fst.save(d, d);
     } finally {
