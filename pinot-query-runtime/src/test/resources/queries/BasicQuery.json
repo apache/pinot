@@ -20,6 +20,10 @@
       {
         "description": "basic test with literal",
         "sql": "SELECT 1 AS int, CAST(2 AS DOUBLE) AS double"
+      },
+      {
+        "description": "select 1 but alias to a reserved column name",
+        "sql": "SELECT 1 as \"timestamp\""
       }
     ]
   },
