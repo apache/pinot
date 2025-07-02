@@ -62,16 +62,16 @@ public class MultiColumnKeySelector implements KeySelector<Key> {
     // also see: https://github.com/apache/pinot/issues/9998
     //
     // TODO: consider better hashing algorithms than hashCode sum, such as XOR'ing
-    int hashCode = 0;
+    Object[] values = new Object[_keyIds.length];
+    int index = 0;
     for (int keyId : _keyIds) {
       Object value = input[keyId];
-      if (value != null) {
-        hashCode += HashFunctionSelector.computeHash(value, _hashFunction);
-      }
+      values[index] = value;
+      ++index;
     }
 
     // return a positive number because this is used directly to modulo-index
-    return hashCode & Integer.MAX_VALUE;
+    return HashFunctionSelector.computeMultiHash(values, _hashFunction);
   }
 
   @Override
