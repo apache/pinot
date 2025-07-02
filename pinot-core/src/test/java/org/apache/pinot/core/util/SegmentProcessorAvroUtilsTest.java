@@ -127,7 +127,7 @@ public class SegmentProcessorAvroUtilsTest {
   @Test(dataProvider = "getTypeConversion")
   public void convertNonNullableSchema(
       FieldSpec.DataType dataType,
-      org.apache.avro.Schema.Type exepctedType
+      org.apache.avro.Schema.Type expectedType
   ) {
     Schema.SchemaBuilder pinotSchemaBuilder = new Schema.SchemaBuilder();
     pinotSchemaBuilder.setSchemaName("testSchema");
@@ -143,7 +143,7 @@ public class SegmentProcessorAvroUtilsTest {
     assertEquals(avroField.schema().getProp("logicalType"), expectedLogicalType,
         "Unexpected logical type");
     assertFalse(avroField.schema().isNullable(), "Field should not be nullable");
-    assertEquals(avroField.schema().getType(), exepctedType, "Unexpected physical type");
+    assertEquals(avroField.schema().getType(), expectedType, "Unexpected physical type");
   }
 
   @Test(dataProvider = "getTypeConversion")
