@@ -62,12 +62,10 @@ import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.StringUtil;
@@ -172,15 +170,13 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : dispatchableStagePlan.getServerInstanceToWorkerIdMap()
         .entrySet()) {
       QueryServerEnclosure serverEnclosure = _servers.get(entry.getKey());
-      Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
-      ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       List<WorkerMetadata> workerMetadataList =
           entry.getValue().stream().map(stageWorkerMetadataList::get).collect(Collectors.toList());
       StageMetadata stageMetadata =
           new StageMetadata(stageId, workerMetadataList, dispatchableStagePlan.getCustomProperties());
       StagePlan stagePlan = new StagePlan(dispatchableStagePlan.getPlanFragment().getFragmentRoot(), stageMetadata);
       for (WorkerMetadata workerMetadata : workerMetadataList) {
-        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap, parentContext));
+        submissionStubs.add(serverEnclosure.processQuery(workerMetadata, stagePlan, requestMetadataMap));
       }
     }
     return submissionStubs;

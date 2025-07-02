@@ -84,7 +84,7 @@ public class OpChainSchedulerService {
         // TODO: Change the code so we ownership is expressed in the code in a better way
         try (OpChain closeMe = operatorChain) {
           Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
-              ThreadExecutionContext.TaskType.MSE, operatorChain.getParentContext());
+              ThreadExecutionContext.TaskType.MSE);
           LOGGER.trace("({}): Executing", operatorChain);
           MseBlock result = operatorChain.getRoot().nextBlock();
           while (result.isData()) {
