@@ -623,7 +623,28 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertNotNull(rebalanceResult.getInstanceAssignment());
       assertNotNull(rebalanceResult.getSegmentAssignment());
 
-      // Rebalance with downtime should succeed
+      // Enable peer-download for the table and validate that rebalance with downtime results in FAILURE
+      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
+      rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setDowntime(true);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
+      assertEquals(rebalanceResult.getDescription(), "Peer-download enabled tables cannot undergo downtime rebalance "
+          + "due to the potential for data loss, if RF=1 use minAvailableReplicas=0 instead");
+
+      // Enable peer-download for the table and validate that rebalance with downtime results in FAILURE
+      String existingReplication = tableConfig.getValidationConfig().getReplication();
+      tableConfig.getValidationConfig().setReplication("3");
+      rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setMinAvailableReplicas(0);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
+      assertEquals(rebalanceResult.getDescription(), "Peer-download enabled tables with RF>1 cannot set "
+          + "minAvailableReplicas=0 for rebalance due to the potential for data loss");
+
+      // Rebalance with downtime should succeed after disabling the peer-download
+      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(null);
+      tableConfig.getValidationConfig().setReplication(existingReplication);
       rebalanceConfig = new RebalanceConfig();
       rebalanceConfig.setDowntime(true);
       rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);

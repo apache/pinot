@@ -43,6 +43,7 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
@@ -387,6 +388,16 @@ public class TableRebalancer {
           tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
     }
 
+    if (downtime && !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())) {
+      // Don't allow downtime rebalance if peer-download is enabled as it can result in data loss. If RF=1, set
+      // minAvailableReplicas=0 instead
+      String errorMsg = "Peer-download enabled tables cannot undergo downtime rebalance due to the potential for "
+          + "data loss, if RF=1 use minAvailableReplicas=0 instead";
+      tableRebalanceLogger.error(errorMsg);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+          tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+    }
+
     if (downtime) {
       tableRebalanceLogger.info("Rebalancing with downtime");
       if (forceCommit) {
@@ -487,6 +498,19 @@ public class TableRebalancer {
               + "resetting minAvailableReplicas to {}", minAvailableReplicas, numCurrentAssignmentReplicas,
           numCurrentAssignmentReplicas);
       minAvailableReplicas = numCurrentAssignmentReplicas;
+    }
+
+    // Don't allow rebalance if peer-download is enabled where numReplicas > 1 but minAvailableReplicas = 0 (which is
+    // similar to downtime rebalance where we can drop to 0 replicas during rebalance)
+    if (numReplicas > 1 && minAvailableReplicas == 0
+        && !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())) {
+      // Don't allow minAvailableReplicas=0 rebalance if peer-download is enabled and numReplicas > 1, as it can result
+      // in data loss. If RF=1, it is okay to set minAvailableReplicas=0 instead as this scenario is handled
+      String errorMsg = "Peer-download enabled tables with RF>1 cannot set minAvailableReplicas=0 for rebalance due to "
+          + "the potential for data loss";
+      tableRebalanceLogger.error(errorMsg);
+      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+          tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
     }
 
     tableRebalanceLogger.info("Rebalancing with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, "
