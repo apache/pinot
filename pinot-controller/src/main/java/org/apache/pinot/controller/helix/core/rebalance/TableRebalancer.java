@@ -943,13 +943,15 @@ public class TableRebalancer {
         newServersToConsumingSegmentMap.values().stream().reduce(0, (a, b) -> a + b.size(), Integer::sum);
     Set<String> uniqueConsumingSegments =
         newServersToConsumingSegmentMap.values().stream().flatMap(Set::stream).collect(Collectors.toSet());
-    Map<String, SegmentZKMetadata> consumingSegmentZKmetadata = new HashMap<>();
-    uniqueConsumingSegments.forEach(segment -> consumingSegmentZKmetadata.put(segment,
+    Map<String, SegmentZKMetadata> consumingSegmentZKMetadata = new HashMap<>();
+    uniqueConsumingSegments.forEach(segment -> consumingSegmentZKMetadata.put(segment,
         ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segment)));
     Map<String, Integer> consumingSegmentsOffsetsToCatchUp =
-        getConsumingSegmentsOffsetsToCatchUp(tableConfig, consumingSegmentZKmetadata, tableRebalanceLogger);
+        getConsumingSegmentsOffsetsToCatchUp(tableConfig, consumingSegmentZKM
+
+            etadata, tableRebalanceLogger);
     Map<String, Integer> consumingSegmentsAge =
-        getConsumingSegmentsAge(consumingSegmentZKmetadata, tableRebalanceLogger);
+        getConsumingSegmentsAge(consumingSegmentZKMetadata, tableRebalanceLogger);
 
     Map<String, Integer> consumingSegmentsOffsetsToCatchUpTopN;
     Map<String, RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer>
