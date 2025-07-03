@@ -43,8 +43,8 @@ public class HashFunctionSelectorTest {
   @Test
   public void testMurmur2() {
     String value = "test";
-    int hash1 = HashFunctionSelector.computeHash(value, "murmur2");
-    int hash2 = HashFunctionSelector.computeHash(value, "murmur2");
+    int hash1 = HashFunctionSelector.computeHash(value, "murmur");
+    int hash2 = HashFunctionSelector.computeHash(value, "murmur");
 
     // Same input should produce same hash
     Assert.assertEquals(hash1, hash2);
@@ -90,7 +90,7 @@ public class HashFunctionSelectorTest {
 
     // Should be different from other hash functions
     int absHash = HashFunctionSelector.computeHash(value, "abshashcode");
-    int murmur2Hash = HashFunctionSelector.computeHash(value, "murmur2");
+    int murmur2Hash = HashFunctionSelector.computeHash(value, "murmur");
     int murmur3Hash = HashFunctionSelector.computeHash(value, "murmur3");
     Assert.assertNotEquals(hash1, absHash);
     Assert.assertNotEquals(hash1, murmur2Hash);
@@ -101,7 +101,7 @@ public class HashFunctionSelectorTest {
   public void testNullValue() {
     // Null values should return 0 for all hash functions
     Assert.assertEquals(HashFunctionSelector.computeHash(null, "abshashcode"), 0);
-    Assert.assertEquals(HashFunctionSelector.computeHash(null, "murmur2"), 0);
+    Assert.assertEquals(HashFunctionSelector.computeHash(null, "murmur"), 0);
     Assert.assertEquals(HashFunctionSelector.computeHash(null, "murmur3"), 0);
     Assert.assertEquals(HashFunctionSelector.computeHash(null, "cityhash"), 0);
   }
@@ -118,8 +118,8 @@ public class HashFunctionSelectorTest {
   @Test
   public void testCaseInsensitive() {
     String value = "test";
-    int hash1 = HashFunctionSelector.computeHash(value, "MURMUR2");
-    int hash2 = HashFunctionSelector.computeHash(value, "murmur2");
+    int hash1 = HashFunctionSelector.computeHash(value, "MURMUR");
+    int hash2 = HashFunctionSelector.computeHash(value, "murmur");
     Assert.assertEquals(hash1, hash2);
   }
 }

@@ -29,7 +29,7 @@ public class KeySelectorHashFunctionTest {
 
   @Test
   public void testSingleColumnKeySelectorWithCustomHashFunction() {
-    SingleColumnKeySelector selector = new SingleColumnKeySelector(0, "murmur2");
+    SingleColumnKeySelector selector = new SingleColumnKeySelector(0, "murmur");
 
     Object[] row = {"test"};
     int hash = selector.computeHash(row);
@@ -38,7 +38,7 @@ public class KeySelectorHashFunctionTest {
     Assert.assertTrue(hash >= 0);
 
     // Should use the specified hash function
-    Assert.assertEquals(selector.hashAlgorithm(), "murmur2");
+    Assert.assertEquals(selector.hashAlgorithm(), "murmur");
 
     // Same input should produce same hash
     int hash2 = selector.computeHash(row);
@@ -80,8 +80,8 @@ public class KeySelectorHashFunctionTest {
   @Test
   public void testKeySelectorFactoryWithCustomHashFunction() {
     // Test single column
-    KeySelector<?> singleSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0), "murmur2");
-    Assert.assertEquals(singleSelector.hashAlgorithm(), "murmur2");
+    KeySelector<?> singleSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0), "murmur");
+    Assert.assertEquals(singleSelector.hashAlgorithm(), "murmur");
 
     // Test multi column
     KeySelector<?> multiSelector = KeySelectorFactory.getKeySelector(java.util.List.of(0, 1), "murmur3");
@@ -112,7 +112,7 @@ public class KeySelectorHashFunctionTest {
     Object[] row = {"test"};
 
     SingleColumnKeySelector absSelector = new SingleColumnKeySelector(0, "abshashcode");
-    SingleColumnKeySelector murmur2Selector = new SingleColumnKeySelector(0, "murmur2");
+    SingleColumnKeySelector murmur2Selector = new SingleColumnKeySelector(0, "murmur");
     SingleColumnKeySelector murmur3Selector = new SingleColumnKeySelector(0, "murmur3");
     SingleColumnKeySelector citySelector = new SingleColumnKeySelector(0, "cityhash");
 
