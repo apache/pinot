@@ -1100,9 +1100,9 @@ public class CommonConstants {
     public static final String DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = DEFAULT_MULTISTAGE_EXECUTOR_TYPE;
 
     // Enable SSE & MSE task throttling on critical heap usage.
-    public static final String CONFIG_OF_ENABLE_MSE_THROTTLING_ON_CRITICAL_HEAP_USAGE =
+    public static final String CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_CRITICAL_HEAP_USAGE =
         QUERY_EXECUTOR_CONFIG_PREFIX + ".enableThrottlingOnCriticalHeapUsage";
-    public static final boolean DEFAULT_ENABLE_MSE_THROTTLING_ON_CRITICAL_HEAP_USAGE = false;
+    public static final boolean DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_CRITICAL_HEAP_USAGE = false;
 
     /**
      * The ExecutorServiceProvider to be used for timeseries threads.

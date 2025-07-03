@@ -89,8 +89,8 @@ public abstract class ResourceManager {
         CommonConstants.ExecutorService.PINOT_QUERY_RUNNER_NAME_FORMAT);
 
     ExecutorService runnerService = Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory);
-    if (config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_MSE_THROTTLING_ON_CRITICAL_HEAP_USAGE,
-        CommonConstants.Server.DEFAULT_ENABLE_MSE_THROTTLING_ON_CRITICAL_HEAP_USAGE)) {
+    if (config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_CRITICAL_HEAP_USAGE,
+        CommonConstants.Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_CRITICAL_HEAP_USAGE)) {
       runnerService = new ThrottleOnCriticalHeapUsageExecutor(runnerService, resourceUsageAccountant);
     }
     _queryRunners = MoreExecutors.listeningDecorator(runnerService);
@@ -99,8 +99,8 @@ public abstract class ResourceManager {
     ThreadFactory queryWorkersFactory = new TracedThreadFactory(Thread.NORM_PRIORITY, false,
         CommonConstants.ExecutorService.PINOT_QUERY_WORKER_NAME_FORMAT);
     ExecutorService workerService = Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory);
-    if (config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_MSE_THROTTLING_ON_CRITICAL_HEAP_USAGE,
-        CommonConstants.Server.DEFAULT_ENABLE_MSE_THROTTLING_ON_CRITICAL_HEAP_USAGE)) {
+    if (config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_CRITICAL_HEAP_USAGE,
+        CommonConstants.Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_CRITICAL_HEAP_USAGE)) {
       workerService = new ThrottleOnCriticalHeapUsageExecutor(workerService, resourceUsageAccountant);
     }
     _queryWorkers = MoreExecutors.listeningDecorator(workerService);
