@@ -18,9 +18,14 @@
  */
 package org.apache.pinot.core.query.utils;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
+import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
@@ -56,6 +61,107 @@ public class OrderByComparatorFactory {
   public static Comparator<Object[]> getComparator(List<OrderByExpressionContext> orderByExpressions,
       boolean nullHandlingEnabled) {
     return getComparator(orderByExpressions, nullHandlingEnabled, 0, orderByExpressions.size());
+  }
+
+  /**
+   * get orderBy expressions on the groupBy keys when orderBy keys match groupBy keys
+   */
+  public static Comparator<Key> getGroupKeyComparator(List<OrderByExpressionContext> orderByExpressions,
+      List<ExpressionContext> groupByExpressions,
+      boolean nullHandlingEnabled) {
+    List<OrderByExpressionWithIndex> groupKeyOrderByExpressions =
+        getGroupKeyOrderByExpressionFromRowOrderByExpressions(orderByExpressions, groupByExpressions);
+    Comparator<Object[]> valueComparator = getComparatorWithIndex(groupKeyOrderByExpressions, nullHandlingEnabled);
+    return (k1, k2) -> valueComparator.compare(k1.getValues(), k2.getValues());
+  }
+
+  private static Map<String, Integer> getGroupByExpressionIndexMap(List<ExpressionContext> groupByExpressions) {
+    Map<String, Integer> groupByExpressionIndexMap = new HashMap<>();
+    int numGroupByExpressions = groupByExpressions.size();
+    for (int i = 0; i < numGroupByExpressions; i++) {
+      groupByExpressionIndexMap.put(groupByExpressions.get(i).getIdentifier(), i);
+    }
+    return groupByExpressionIndexMap;
+  }
+
+  public static class OrderByExpressionWithIndex {
+    OrderByExpressionContext _orderByExpressionContext;
+    Integer _index;
+
+    OrderByExpressionWithIndex(OrderByExpressionContext orderByExpressionContext, Integer index) {
+      _orderByExpressionContext = orderByExpressionContext;
+      _index = index;
+    }
+  }
+
+  /**
+   * add an index for each orderby expression with respect to its position in the group keys
+   */
+  public static List<OrderByExpressionWithIndex> getGroupKeyOrderByExpressionFromRowOrderByExpressions(
+      List<OrderByExpressionContext> rowOrderByExpressions, List<ExpressionContext> groupByExpressions) {
+    Map<String, Integer> groupByExpressionIndexMap = getGroupByExpressionIndexMap(groupByExpressions);
+    List<OrderByExpressionWithIndex> result = new ArrayList<>();
+    // get index wrt group key for each order by expression
+    rowOrderByExpressions.forEach(expr ->
+        result.add(
+            new OrderByExpressionWithIndex(expr, groupByExpressionIndexMap.get(expr.getExpression().getIdentifier()))));
+    return result;
+  }
+
+  /**
+   * get comparator that applies list of orderByExpressions that each has a column index
+   *
+   * @param orderByExpressions
+   * @param nullHandlingEnabled
+   * @return
+   */
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  public static Comparator<Object[]> getComparatorWithIndex(List<OrderByExpressionWithIndex> orderByExpressions,
+      boolean nullHandlingEnabled) {
+    int expressionSize = orderByExpressions.size();
+
+    // Use multiplier -1 or 1 to control ascending/descending order
+    int[] multipliers = new int[expressionSize];
+    // Use nulls multiplier -1 or 1 to control nulls last/first order
+    int[] nullsMultipliers = new int[expressionSize];
+    for (int i = 0; i < expressionSize; i++) {
+      multipliers[i] = orderByExpressions.get(i)._orderByExpressionContext.isAsc() ? 1 : -1;
+      nullsMultipliers[i] = orderByExpressions.get(i)._orderByExpressionContext.isNullsLast() ? 1 : -1;
+    }
+    if (nullHandlingEnabled) {
+      return (Object[] o1, Object[] o2) -> {
+        for (int i = 0; i < expressionSize; i++) {
+          OrderByExpressionWithIndex expr = orderByExpressions.get(i);
+          Comparable v1 = (Comparable) o1[expr._index];
+          Comparable v2 = (Comparable) o2[expr._index];
+          if (v1 == null && v2 == null) {
+            continue;
+          } else if (v1 == null) {
+            return nullsMultipliers[i];
+          } else if (v2 == null) {
+            return -nullsMultipliers[i];
+          }
+          int result = v1.compareTo(v2);
+          if (result != 0) {
+            return result * multipliers[i];
+          }
+        }
+        return 0;
+      };
+    } else {
+      return (Object[] o1, Object[] o2) -> {
+        for (int i = 0; i < expressionSize; i++) {
+          OrderByExpressionWithIndex expr = orderByExpressions.get(i);
+          Comparable v1 = (Comparable) o1[expr._index];
+          Comparable v2 = (Comparable) o2[expr._index];
+          int result = v1.compareTo(v2);
+          if (result != 0) {
+            return result * multipliers[i];
+          }
+        }
+        return 0;
+      };
+    }
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
