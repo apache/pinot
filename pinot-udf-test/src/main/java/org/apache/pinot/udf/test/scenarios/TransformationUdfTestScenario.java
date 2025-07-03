@@ -23,8 +23,8 @@ import java.util.Map;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
-import org.apache.pinot.udf.test.UdfTestCluster;
 import org.apache.pinot.udf.test.UdfExampleResult;
+import org.apache.pinot.udf.test.UdfTestCluster;
 import org.apache.pinot.udf.test.UdfTestScenario;
 
 
