@@ -88,6 +88,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
@@ -735,6 +736,8 @@ public final class TableConfigUtils {
     // specifically for upsert
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     if (upsertConfig != null) {
+      // Currently, only one tier is allowed for upsert table, as the committed segments can't be moved to other tiers.
+      Preconditions.checkState(tableConfig.getTierConfigsList() == null, "The upsert table cannot have multi-tiers");
       // no startree index
       Preconditions.checkState(CollectionUtils.isEmpty(tableConfig.getIndexingConfig().getStarTreeIndexConfigs())
               && !tableConfig.getIndexingConfig().isEnableDefaultStarTree(),
@@ -876,6 +879,40 @@ public final class TableConfigUtils {
       Preconditions.checkState(timeColumnDataType.isNumeric(),
           "MetadataTTL must have time column: %s in numeric type, found: %s", timeColumn, timeColumnDataType);
     }
+    if (tableConfig.getTierConfigsList() != null) {
+      validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+    }
+  }
+
+  @VisibleForTesting
+  static void validateTTLAndTierConfigsForDedupTable(TableConfig tableConfig, Schema schema) {
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    // Tiers are required to use segmentAge selector, and the min of them should be >= TTL, so that only segments
+    // out of TTL are moved to other tiers. Also, TTL must be defined on timeColumn to compare with segmentAges.
+    String timeColumn = tableConfig.getValidationConfig().getTimeColumnName();
+    String dedupTimeColumn = dedupConfig.getDedupTimeColumn();
+    if (dedupTimeColumn != null && !dedupTimeColumn.isEmpty()) {
+      Preconditions.checkState(timeColumn.equalsIgnoreCase(dedupTimeColumn),
+          "DedupTimeColumn: %s is different from table's timeColumn: %s", dedupTimeColumn, timeColumn);
+    }
+    long minSegmentAgeInMs = Long.MAX_VALUE;
+    for (TierConfig tierConfig : tableConfig.getTierConfigsList()) {
+      String tierName = tierConfig.getName();
+      String segmentSelectorType = tierConfig.getSegmentSelectorType();
+      Preconditions.checkState(segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE),
+          "Time based segment selector is required but tier: %s uses selector: %s", tierName, segmentSelectorType);
+      String segmentAge = tierConfig.getSegmentAge();
+      minSegmentAgeInMs = Math.min(minSegmentAgeInMs, TimeUtils.convertPeriodToMillis(segmentAge));
+    }
+    // Convert TTL value to millisecond based on timeColumn fieldSpec in order to compare with segment ages.
+    DateTimeFieldSpec dateTimeSpec = schema.getSpecForTimeColumn(timeColumn);
+    long ttl = (long) dedupConfig.getMetadataTTL();
+    long ttlInMs = dateTimeSpec.getFormatSpec().fromFormatToMillis(ttl);
+    LOGGER.debug(
+        "Converting MetadataTTL: {} to {}ms with DateTimeFieldSpec: {} and to compare with minSegmentAge: {}ms", ttl,
+        ttlInMs, dateTimeSpec, minSegmentAgeInMs);
+    Preconditions.checkState(ttlInMs < minSegmentAgeInMs,
+        "MetadataTTL: %s(ms) must be smaller than the minimum segmentAge: %s(ms)", ttlInMs, minSegmentAgeInMs);
   }
 
   /**
@@ -1052,8 +1089,8 @@ public final class TableConfigUtils {
       Preconditions.checkState(tierNames.add(tierName), "Tier name: %s already exists in tier configs", tierName);
 
       String segmentSelectorType = tierConfig.getSegmentSelectorType();
-      String segmentAge = tierConfig.getSegmentAge();
       if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
+        String segmentAge = tierConfig.getSegmentAge();
         Preconditions.checkState(segmentAge != null,
             "Must provide 'segmentAge' for segmentSelectorType: %s in tier: %s", segmentSelectorType, tierName);
         Preconditions.checkState(TimeUtils.isPeriodValid(segmentAge),
@@ -1512,8 +1549,8 @@ public final class TableConfigUtils {
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
-            .withIndexTypes(null).withProperties(null).build());
+        cleanFieldConfigList.add(
+            new FieldConfig.Builder(fieldConfig).withIndexTypes(null).withProperties(null).build());
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }
@@ -1705,8 +1742,7 @@ public final class TableConfigUtils {
     Set<String> relevantTags = new HashSet<>();
     String serverTenantName = tableConfig.getTenantConfig().getServer();
     if (serverTenantName != null) {
-      String serverTenantTag =
-          TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
+      String serverTenantTag = TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
       relevantTags.add(serverTenantTag);
     }
     TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();

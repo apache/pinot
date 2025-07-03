@@ -1794,6 +1794,90 @@ public class TableConfigUtilsTest {
   }
 
   @Test
+  public void testValidateTierConfigsForDedupTable() {
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    // Validate that table's timeColumn must be used as dedupTimeColumn.
+    DedupConfig dedupConfig = new DedupConfig();
+    dedupConfig.setDedupTimeColumn("foo");
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .build();
+    try {
+      TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "DedupTimeColumn: foo is different from table's timeColumn: timeColumn");
+    }
+    // Validate that time based segment selector must be used by tiers.
+    dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(100);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .setTierConfigList(Lists.newArrayList(new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, "", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null)))
+        .build();
+    try {
+      TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "Time based segment selector is required but tier: tier1 uses selector: fixed");
+    }
+    // Validate that TTL must be smaller than min of segment ages of all segment selectors.
+    // Changing timeColumn time units to make sure TTL is converted to millisecond properly.
+    dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(100);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "50s", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "100s", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null)))
+        .build();
+    // Got TTL=100ms vs. minAge=50s, testing with timeColumn of ms/epoch
+    TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+    // Got TTL=100s vs. minAge=50s, testing with timeColumn of sec/epoch
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.LONG, "1:SECONDS:EPOCH", "1:SECONDS")
+        .build();
+    try {
+      TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "MetadataTTL: 100000(ms) must be smaller than the minimum segmentAge: 50000(ms)");
+    }
+    // Got TTL=50000ms vs. minAge=50000ms, testing with timeColumn of timestamp type
+    dedupConfig = new DedupConfig();
+    dedupConfig.setMetadataTTL(50000);
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setDedupConfig(dedupConfig)
+        .setTierConfigList(Lists.newArrayList(
+            new TierConfig("tier1", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "50s", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE.toLowerCase(), "tier1_tag_OFFLINE", null, null),
+            new TierConfig("tier2", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "100s", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE, "tier2_tag_OFFLINE", null, null)))
+        .build();
+    schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addDateTime(TIME_COLUMN, FieldSpec.DataType.TIMESTAMP, "1:MILLISECONDS:EPOCH", "1:MILLISECONDS")
+        .build();
+    try {
+      TableConfigUtils.validateTTLAndTierConfigsForDedupTable(tableConfig, schema);
+      fail();
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "MetadataTTL: 50000(ms) must be smaller than the minimum segmentAge: 50000(ms)");
+    }
+  }
+
+  @Test
   public void testValidateDedupConfig() {
     Schema schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
