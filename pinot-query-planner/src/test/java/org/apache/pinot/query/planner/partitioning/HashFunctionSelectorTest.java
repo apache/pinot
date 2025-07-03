@@ -77,10 +77,10 @@ public class HashFunctionSelectorTest {
   }
 
   @Test
-  public void testCityHash() {
+  public void testHashCode() {
     String value = "test";
-    int hash1 = HashFunctionSelector.computeHash(value, "cityhash");
-    int hash2 = HashFunctionSelector.computeHash(value, "cityhash");
+    int hash1 = HashFunctionSelector.computeHash(value, "hashcode");
+    int hash2 = HashFunctionSelector.computeHash(value, "hashcode");
 
     // Same input should produce same hash
     Assert.assertEquals(hash1, hash2);
@@ -88,11 +88,11 @@ public class HashFunctionSelectorTest {
     // Should be positive
     Assert.assertTrue(hash1 >= 0);
 
-    // Should be different from other hash functions
+    // Should be different from murmur and murmur3 but same as absHashCode
     int absHash = HashFunctionSelector.computeHash(value, "abshashcode");
     int murmur2Hash = HashFunctionSelector.computeHash(value, "murmur");
     int murmur3Hash = HashFunctionSelector.computeHash(value, "murmur3");
-    Assert.assertNotEquals(hash1, absHash);
+    Assert.assertEquals(hash1, absHash);
     Assert.assertNotEquals(hash1, murmur2Hash);
     Assert.assertNotEquals(hash1, murmur3Hash);
   }

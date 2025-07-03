@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.partitioning;
 
 import java.nio.charset.StandardCharsets;
-import org.apache.pinot.spi.utils.hash.CityHashFunctions;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
@@ -30,7 +29,7 @@ import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 public class HashFunctionSelector {
   public static final String MURMUR2 = "murmur";
   public static final String MURMUR3 = "murmur3";
-  public static final String CITY_HASH = "cityhash";
+  public static final String HASH_CODE = "hashcode";
 
   private HashFunctionSelector() {
   }
@@ -49,7 +48,8 @@ public class HashFunctionSelector {
     switch (hashFunction.toLowerCase()) {
       case MURMUR2: return murmur2(value);
       case MURMUR3: return murmur3(value);
-      case CITY_HASH: return cityHash(value);
+      // hashCode and absHashCode are treated the same for single hash.
+      case HASH_CODE:
       // Default hash is absHashCode.
       default: return absHashCode(value);
     }
@@ -71,8 +71,9 @@ public class HashFunctionSelector {
     switch (hashFunction.toLowerCase()) {
       case MURMUR2: return multiHash(values, keyIds, HashFunctionSelector::murmur2);
       case MURMUR3: return multiHash(values, keyIds, HashFunctionSelector::murmur3);
-      case CITY_HASH: return multiHash(values, keyIds, HashFunctionSelector::cityHash);
-      // We should hashCode instead of absHashCode for multi hash to maintain consistency with legacy behavior.
+      // hashCode and absHashCode are treated the same for multi hash.
+      case HASH_CODE:
+        // We should hashCode instead of absHashCode for multi hash to maintain consistency with legacy behavior.
       default: return multiHash(values, keyIds, HashFunctionSelector::hashCode);
     }
   }
@@ -91,10 +92,6 @@ public class HashFunctionSelector {
 
   private static int murmur3(Object value) {
     return MurmurHashFunctions.murmurHash3X64Bit32(toBytes(value), 0) & Integer.MAX_VALUE;
-  }
-
-  private static int cityHash(Object value) {
-    return (int) (CityHashFunctions.cityHash64(toBytes(value)) & Integer.MAX_VALUE);
   }
 
   private static int multiHash(Object[] values, int[] keyIds, java.util.function.ToIntFunction<Object> hashFunction) {
