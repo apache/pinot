@@ -1099,6 +1099,11 @@ public class CommonConstants {
     @Deprecated
     public static final String DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = DEFAULT_MULTISTAGE_EXECUTOR_TYPE;
 
+    // Enable MSE throttling on critical heap usage.
+    public static final String CONFIG_OF_ENABLE_MSE_THROTTLING_ON_CRITICAL_HEAP_USAGE =
+        MSE_CONFIG_PREFIX + ".enableThrottlingOnCriticalHeapUsage";
+    public static final boolean DEFAULT_ENABLE_MSE_THROTTLING_ON_CRITICAL_HEAP_USAGE = false;
+
     /**
      * The ExecutorServiceProvider to be used for timeseries threads.
      *

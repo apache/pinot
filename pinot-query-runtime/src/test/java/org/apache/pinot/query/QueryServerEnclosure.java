@@ -30,6 +30,7 @@ import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -61,7 +62,8 @@ public class QueryServerEnclosure {
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true);
+    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true,
+        new Tracing.DefaultThreadResourceUsageAccountant());
   }
 
   public int getPort() {
