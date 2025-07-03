@@ -28,7 +28,6 @@ public class MinionConstants {
   private MinionConstants() {
   }
 
-
   public static final String TASK_TIME_SUFFIX = ".time";
 
   public static final String TABLE_NAME_KEY = "tableName";
