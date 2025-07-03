@@ -36,6 +36,14 @@ public class FstIndexConfig extends IndexConfig {
     this(false, fstType, true);
   }
 
+  /**
+   * @deprecated Use {@link #FstIndexConfig(Boolean, FSTType, Boolean)} instead
+   */
+  @Deprecated
+  public FstIndexConfig(@Nullable Boolean disabled, @Nullable FSTType fstType) {
+    this(disabled, fstType, true);
+  }
+
   @JsonCreator
   public FstIndexConfig(@JsonProperty("disabled") @Nullable Boolean disabled,
       @JsonProperty("type") @Nullable FSTType fstType,
