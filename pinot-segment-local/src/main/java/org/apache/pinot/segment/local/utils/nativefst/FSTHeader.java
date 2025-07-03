@@ -32,7 +32,6 @@ public final class FSTHeader {
    * FST magic (4 bytes).
    */
   public static final int FST_MAGIC = ('\\' << 24) | ('f' << 16) | ('s' << 8) | 'a';
-  
   /**
    * Case-insensitive FST magic (4 bytes) - "FSTI".
    */
@@ -82,10 +81,9 @@ public final class FSTHeader {
     os.write(FST_MAGIC);
     os.write(version);
   }
-  
+
   /**
    * Writes case-insensitive FST magic bytes (without version).
-   *
    * @param os The stream to write to.
    * @throws IOException Rethrown if writing fails.
    */
@@ -96,10 +94,8 @@ public final class FSTHeader {
     os.write(CASE_INSENSITIVE_FST_MAGIC >> 8);
     os.write(CASE_INSENSITIVE_FST_MAGIC);
   }
-  
   /**
    * Checks if the given magic header matches case-insensitive FST magic.
-   *
    * @param magicHeader The magic header to check.
    * @return true if it matches case-insensitive FST magic.
    */
