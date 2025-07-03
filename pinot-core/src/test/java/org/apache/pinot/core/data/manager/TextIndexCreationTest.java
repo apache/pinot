@@ -100,7 +100,7 @@ public class TextIndexCreationTest {
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     ImmutableSegment segment = null;
     try {
-      segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, null);
+      segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
     } finally {
       if (segment != null) {
         segment.destroy();

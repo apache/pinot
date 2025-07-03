@@ -452,22 +452,23 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       PinotConfiguration segmentDirectoryConfigs =
           new PinotConfiguration(Map.of(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap));
 
+      TableConfig tableConfig = _config.getTableConfig();
+      Schema schema = _config.getSchema();
       SegmentDirectoryLoaderContext segmentLoaderContext =
           new SegmentDirectoryLoaderContext.Builder()
-              .setTableConfig(_config.getTableConfig())
-              .setSchema(_config.getSchema())
+              .setTableConfig(tableConfig)
+              .setSchema(schema)
               .setSegmentName(_segmentName)
               .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
               .build();
 
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig, schema);
+
       try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
           .load(segmentOutputDir.toURI(), segmentLoaderContext);
           SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter()) {
-        MultiColumnTextIndexHandler handler =
-            new MultiColumnTextIndexHandler(segmentDirectory,
-                _config.getIndexConfigsByColName(),
-                _config.getMultiColumnTextIndexConfig(),
-                _config.getTableConfig());
+        MultiColumnTextIndexHandler handler = new MultiColumnTextIndexHandler(segmentDirectory, indexLoadingConfig,
+            _config.getMultiColumnTextIndexConfig());
         handler.updateIndices(segmentWriter);
         handler.postUpdateIndicesCleanup(segmentWriter);
       }
@@ -480,30 +481,31 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
         .filter(indexType -> indexType.getIndexBuildLifecycle() == IndexType.BuildLifecycle.POST_SEGMENT_CREATION)
         .collect(Collectors.toSet());
 
-    if (postSegCreationIndexes.size() > 0) {
+    if (!postSegCreationIndexes.isEmpty()) {
       // Build other indexes
       Map<String, Object> props = new HashMap<>();
       props.put(IndexLoadingConfig.READ_MODE_KEY, ReadMode.mmap);
       PinotConfiguration segmentDirectoryConfigs = new PinotConfiguration(props);
 
+      TableConfig tableConfig = _config.getTableConfig();
+      Schema schema = _config.getSchema();
       SegmentDirectoryLoaderContext segmentLoaderContext =
           new SegmentDirectoryLoaderContext.Builder()
-              .setTableConfig(_config.getTableConfig())
-              .setSchema(_config.getSchema())
+              .setTableConfig(tableConfig)
+              .setSchema(schema)
               .setSegmentName(_segmentName)
               .setSegmentDirectoryConfigs(segmentDirectoryConfigs)
               .build();
 
-      IndexLoadingConfig indexLoadingConfig =
-          new IndexLoadingConfig(null, _config.getTableConfig(), _config.getSchema());
+      IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(null, tableConfig, schema);
 
       try (SegmentDirectory segmentDirectory = SegmentDirectoryLoaderRegistry.getDefaultSegmentDirectoryLoader()
           .load(indexDir.toURI(), segmentLoaderContext);
           SegmentDirectory.Writer segmentWriter = segmentDirectory.createWriter()) {
         for (IndexType indexType : postSegCreationIndexes) {
           IndexHandler handler =
-              indexType.createIndexHandler(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(),
-                  _config.getSchema(), _config.getTableConfig());
+              indexType.createIndexHandler(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(), schema,
+                  tableConfig);
           handler.updateIndices(segmentWriter);
         }
       }
