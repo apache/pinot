@@ -260,7 +260,7 @@ public class RangeIndexHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
-        .withTableNameWithType(_tableConfig)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
         .getConfig(StandardIndexes.range());

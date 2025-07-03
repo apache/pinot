@@ -174,7 +174,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .withIndexDir(segmentDirectory)
         .withTextCommitOnClose(true)
-        .withTableNameWithType(_tableConfig)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
 

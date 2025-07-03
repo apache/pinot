@@ -139,7 +139,7 @@ public class InvertedIndexHandler extends BaseIndexHandler {
     IndexCreationContext.Common context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
-        .withTableNameWithType(_tableConfig)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
 
     try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()

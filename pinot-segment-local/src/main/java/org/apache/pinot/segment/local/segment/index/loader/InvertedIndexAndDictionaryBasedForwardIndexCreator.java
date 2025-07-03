@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.inverted.InvertedIndexType;
@@ -116,7 +115,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
   public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
       boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
-      boolean isTemporaryForwardIndex, @Nullable String tableNameWithType)
+      boolean isTemporaryForwardIndex, String tableNameWithType)
       throws IOException {
     _columnName = columnName;
     _segmentDirectory = segmentDirectory;

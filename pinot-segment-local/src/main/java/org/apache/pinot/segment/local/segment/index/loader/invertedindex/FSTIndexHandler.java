@@ -172,7 +172,7 @@ public class FSTIndexHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
-        .withTableNameWithType(_tableConfig)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     FstIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.fst());
 

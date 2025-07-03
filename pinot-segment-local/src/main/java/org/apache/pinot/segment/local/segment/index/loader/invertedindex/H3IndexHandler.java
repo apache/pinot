@@ -162,7 +162,7 @@ public class H3IndexHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
-        .withTableNameWithType(_tableConfig)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     H3IndexConfig config = colIndexConf.getConfig(StandardIndexes.h3());
 
@@ -188,7 +188,7 @@ public class H3IndexHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
-        .withTableNameWithType(_tableConfig)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     H3IndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.h3());
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);

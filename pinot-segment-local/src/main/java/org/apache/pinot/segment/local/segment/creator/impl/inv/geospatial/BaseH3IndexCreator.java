@@ -88,8 +88,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
 
   int _nextDocId;
 
-  BaseH3IndexCreator(File indexDir, String columnName, @Nullable String tableNameWithType,
-      H3IndexResolution resolution)
+  BaseH3IndexCreator(File indexDir, String columnName, String tableNameWithType, H3IndexResolution resolution)
       throws IOException {
     _tableNameWithType = tableNameWithType;
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
@@ -118,13 +117,9 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   public void add(@Nullable Geometry geometry)
       throws IOException {
     if (geometry == null || !(geometry instanceof Point)) {
-      if (_tableNameWithType != null) {
-        String metricKeyName =
-            _tableNameWithType + "-" + H3IndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
-      } else {
-        ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
-      }
+      String metricKeyName =
+          _tableNameWithType + "-" + H3IndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+      ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
       _nextDocId++;
       return;
     }

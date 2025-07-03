@@ -463,7 +463,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     try (ForwardIndexReader<?> reader = ForwardIndexType.read(segmentWriter, columnMetadata)) {
       IndexCreationContext.Builder builder =
           IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
-              .withTableNameWithType(_tableConfig);
+              .withTableNameWithType(_tableConfig.getTableName());
       // Set entry length info for raw index creators. No need to set this when changing dictionary id compression type.
       if (!reader.isDictionaryEncoded() && !columnMetadata.getDataType().getStoredType().isFixedWidth()) {
         int lengthOfLongestEntry = reader.getLengthOfLongestEntry();
@@ -889,7 +889,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
     try (ForwardIndexReader<?> reader = ForwardIndexType.read(segmentWriter, existingColMetadata)) {
       IndexCreationContext.Builder builder =
           IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(existingColMetadata)
-              .withTableNameWithType(_tableConfig);
+              .withTableNameWithType(_tableConfig.getTableName());
       // existingColMetadata has dictEnable=false. Overwrite the value.
       builder.withDictionary(true);
       IndexCreationContext context = builder.build();
@@ -964,7 +964,7 @@ public class ForwardIndexHandler extends BaseIndexHandler {
       Dictionary dictionary = DictionaryIndexType.read(segmentWriter, columnMetadata);
       IndexCreationContext.Builder builder =
           IndexCreationContext.builder().withIndexDir(indexDir).withColumnMetadata(columnMetadata)
-              .withTableNameWithType(_tableConfig);
+              .withTableNameWithType(_tableConfig.getTableName());
       builder.withDictionary(false);
       if (!columnMetadata.getDataType().getStoredType().isFixedWidth()) {
         if (columnMetadata.isSingleValue()) {
