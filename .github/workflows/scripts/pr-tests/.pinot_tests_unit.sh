@@ -30,10 +30,10 @@ netstat -i
 #     due to the -am flag (include dependency modules)
 if [ "$RUN_TEST_SET" == "1" ]; then
   mvn test -T 16 \
-      -am \
       -pl 'pinot-spi' \
       -pl 'pinot-segment-spi' \
       -pl 'pinot-common' \
+      -pl 'pinot-segment-local' \
       -pl 'pinot-core' \
       -pl 'pinot-query-planner' \
       -pl 'pinot-query-runtime' \
@@ -41,12 +41,11 @@ if [ "$RUN_TEST_SET" == "1" ]; then
 
 fi
 if [ "$RUN_TEST_SET" == "2" ]; then
-  # These tests, if run multi-threaded, causes Develocity errors in CI
   mvn test \
-    -am \
     -pl '!pinot-spi' \
     -pl '!pinot-segment-spi' \
     -pl '!pinot-common' \
+    -pl '!pinot-segment-local' \
     -pl '!pinot-core' \
     -pl '!pinot-query-planner' \
     -pl '!pinot-query-runtime' \
