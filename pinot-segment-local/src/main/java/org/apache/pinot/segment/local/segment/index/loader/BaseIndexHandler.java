@@ -115,7 +115,7 @@ public abstract class BaseIndexHandler implements IndexHandler {
 
     InvertedIndexAndDictionaryBasedForwardIndexCreator creator =
         new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,
-            forwardIndexConfig, segmentWriter, isTemporaryForwardIndex);
+            forwardIndexConfig, segmentWriter, isTemporaryForwardIndex, _tableConfig.getTableName());
     creator.regenerateForwardIndex();
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, StandardIndexes.forward())) {

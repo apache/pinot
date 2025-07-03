@@ -160,6 +160,7 @@ public class JsonIndexHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
@@ -182,6 +183,7 @@ public class JsonIndexHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);

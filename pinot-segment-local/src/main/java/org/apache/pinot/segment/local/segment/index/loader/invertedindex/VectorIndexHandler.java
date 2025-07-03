@@ -167,6 +167,7 @@ public class VectorIndexHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(segmentDirectory)
         .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     VectorIndexConfig config = colIndexConf.getConfig(StandardIndexes.vector());
 
@@ -200,6 +201,7 @@ public class VectorIndexHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(segmentDirectory)
         .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
