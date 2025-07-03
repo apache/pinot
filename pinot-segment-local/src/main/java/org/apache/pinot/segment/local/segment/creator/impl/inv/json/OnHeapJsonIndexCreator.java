@@ -39,9 +39,10 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  */
 public class OnHeapJsonIndexCreator extends BaseJsonIndexCreator {
 
-  public OnHeapJsonIndexCreator(File indexDir, String columnName, JsonIndexConfig jsonIndexConfig)
+  public OnHeapJsonIndexCreator(File indexDir, String columnName, String tableNameWithType,
+      JsonIndexConfig jsonIndexConfig)
       throws IOException {
-    super(indexDir, columnName, jsonIndexConfig);
+    super(indexDir, columnName, tableNameWithType, jsonIndexConfig);
   }
 
   @Override

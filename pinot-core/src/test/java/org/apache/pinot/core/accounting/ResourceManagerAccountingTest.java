@@ -520,7 +520,8 @@ public class ResourceManagerAccountingTest {
     File indexDir = new File(FileUtils.getTempDirectory(), "testJsonIndexExtractMapOOM");
     FileUtils.forceMkdir(indexDir);
     String colName = "col";
-    try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(indexDir, colName, new JsonIndexConfig());
+    try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(indexDir, colName, "myTable_OFFLINE",
+        new JsonIndexConfig());
         MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig(), "table__0__1", "col")) {
       // build json indexes
       for (int i = 0; i < 1000000; i++) {

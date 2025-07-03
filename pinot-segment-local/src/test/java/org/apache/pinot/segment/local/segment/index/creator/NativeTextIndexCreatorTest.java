@@ -59,7 +59,7 @@ public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckR
     uniqueValues[2] = "still";
     uniqueValues[3] = "zoobar";
 
-    try (NativeTextIndexCreator creator = new NativeTextIndexCreator("testFSTColumn", INDEX_DIR)) {
+    try (NativeTextIndexCreator creator = new NativeTextIndexCreator("testFSTColumn", "myTable_OFFLINE", INDEX_DIR)) {
       for (int i = 0; i < 4; i++) {
         creator.add(uniqueValues[i]);
       }
@@ -103,7 +103,8 @@ public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckR
     uniqueValues[2] = "hello-world";
     uniqueValues[3] = "hello-world123";
 
-    try (NativeTextIndexCreator creator = spy(new NativeTextIndexCreator("testFSTColumn", INDEX_DIR))) {
+    try (NativeTextIndexCreator creator = spy(new NativeTextIndexCreator("testFSTColumn", "myTable_OFFLINE",
+        INDEX_DIR))) {
       // Add a couple of words so they show up in the index
       for (int i = 0; i < 2; i++) {
         creator.add(uniqueValues[i]);

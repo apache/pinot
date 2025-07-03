@@ -62,7 +62,8 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     uniqueValues[1] = "hello-world123";
     uniqueValues[2] = "still";
 
-    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", uniqueValues);
+    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE",
+        uniqueValues);
     creator.seal();
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer pinotDataBuffer =
@@ -94,8 +95,8 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     FSTBuilder fstBuilder = Mockito.spy(new FSTBuilder());
     // For the word "still" throw an exception so it is not indexed
     doThrow(IOException.class).when(fstBuilder).addEntry(eq("still"), anyInt());
-    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", uniqueValues,
-        fstBuilder);
+    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE",
+        uniqueValues, fstBuilder);
     creator.seal();
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer pinotDataBuffer =

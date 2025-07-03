@@ -22,10 +22,12 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Locale;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -43,6 +45,7 @@ import org.slf4j.LoggerFactory;
 public class LuceneFSTIndexCreator implements FSTIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexCreator.class);
   private final File _fstIndexFile;
+  private final String _tableNameWithType;
   private final FSTBuilder _fstBuilder;
   Integer _dictId;
 
@@ -53,17 +56,20 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    *
    * @param indexDir  Index directory
    * @param columnName Column name for which index is being created
+   * @param tableNameWithType table name with type
    * @param sortedEntries Sorted entries of the unique values of the column.
    * @throws IOException
    */
-  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
+  public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, String[] sortedEntries)
       throws IOException {
-    this(indexDir, columnName, sortedEntries, new FSTBuilder());
+    this(indexDir, columnName, tableNameWithType, sortedEntries, new FSTBuilder());
   }
 
   @VisibleForTesting
-  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries, FSTBuilder fstBuilder)
+  public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, String[] sortedEntries,
+      FSTBuilder fstBuilder)
       throws IOException {
+    _tableNameWithType = tableNameWithType;
     _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = fstBuilder;
@@ -74,11 +80,9 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
           _fstBuilder.addEntry(sortedEntries[_dictId], _dictId);
         } catch (IOException ex) {
           // Caught exception while trying to add, update metric and skip the document
-          ServerMetrics serverMetrics = ServerMetrics.get();
-          // TODO: Get the tableNameWithType and IndexType for the metric name
-          if (serverMetrics != null) {
-            ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
-          }
+          String metricKeyName =
+              _tableNameWithType + "-" + FstIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+          ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
         }
       }
     }
@@ -86,7 +90,8 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
 
   public LuceneFSTIndexCreator(IndexCreationContext context)
       throws IOException {
-    this(context.getIndexDir(), context.getFieldSpec().getName(), (String[]) context.getSortedUniqueElementsArray());
+    this(context.getIndexDir(), context.getFieldSpec().getName(), context.getTableNameWithType(),
+        (String[]) context.getSortedUniqueElementsArray());
   }
 
   // Expects dictionary entries in sorted order.
@@ -96,11 +101,9 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       _fstBuilder.addEntry(document, _dictId);
     } catch (IOException ex) {
       // Caught exception while trying to add, update metric and skip the document
-      ServerMetrics serverMetrics = ServerMetrics.get();
-      // TODO: Get the tableNameWithType and IndexType for the metric name
-      if (serverMetrics != null) {
-        ServerMetrics.get().addMeteredGlobalValue(ServerMeter.INDEXING_FAILURES, 1);
-      }
+      String metricKeyName =
+          _tableNameWithType + "-" + FstIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+      ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
     }
     _dictId++;
   }
