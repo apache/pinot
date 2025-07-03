@@ -28,6 +28,7 @@ public class MinionConstants {
   private MinionConstants() {
   }
 
+
   public static final String TASK_TIME_SUFFIX = ".time";
 
   public static final String TABLE_NAME_KEY = "tableName";
@@ -71,6 +72,12 @@ public class MinionConstants {
    * Job configs
    */
   public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
+
+  /**
+   * Segment download thread pool size.
+   */
+  public static final String SEGMENT_DOWNLOAD_THREAD_POOL_SIZE = "segmentDownloadThreadPoolSize";
+  public static final int DEFAULT_SEGMENT_DOWNLOAD_THREAD_POOL_SIZE = 1;
 
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
