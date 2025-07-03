@@ -196,6 +196,9 @@ class PlanNodeMerger {
       if (!node.getNonEquiConditions().equals(otherNode.getNonEquiConditions())) {
         return null;
       }
+      if (!Objects.equals(node.getCollations(), otherNode.getCollations())) {
+        return null;
+      }
       List<PlanNode> children = mergeChildren(node, context);
       if (children == null) {
         return null;

@@ -104,7 +104,8 @@ public class PlanNodeDeserializer {
         protoJoinNode.getRightKeysList(), convertExpressions(protoJoinNode.getNonEquiConditionsList()),
         convertJoinStrategy(protoJoinNode.getJoinStrategy()),
         protoJoinNode.hasMatchCondition() ? ProtoExpressionToRexExpression.convertExpression(
-            protoJoinNode.getMatchCondition()) : null);
+            protoJoinNode.getMatchCondition()) : null,
+        protoJoinNode.getCollationsList().isEmpty() ? null : convertCollations(protoJoinNode.getCollationsList()));
   }
 
   private static MailboxReceiveNode deserializeMailboxReceiveNode(Plan.PlanNode protoNode) {
