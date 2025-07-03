@@ -85,7 +85,6 @@ public final class FSTHeader {
 
   /**
    * Writes case-insensitive FST magic bytes (without version).
-   *
    * @param os The stream to write to.
    * @throws IOException Rethrown if writing fails.
    */
@@ -99,7 +98,6 @@ public final class FSTHeader {
 
   /**
    * Checks if the given magic header matches case-insensitive FST magic.
-   *
    * @param magicHeader The magic header to check.
    * @return true if it matches case-insensitive FST magic.
    */
