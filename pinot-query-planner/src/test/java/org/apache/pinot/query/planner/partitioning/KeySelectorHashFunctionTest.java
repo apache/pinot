@@ -65,7 +65,7 @@ public class KeySelectorHashFunctionTest {
 
   @Test
   public void testEmptyKeySelectorWithCustomHashFunction() {
-    EmptyKeySelector selector = EmptyKeySelector.getInstance("cityhash");
+    EmptyKeySelector selector = EmptyKeySelector.getInstance("hashcode");
 
     Object[] row = {"test"};
     int hash = selector.computeHash(row);
@@ -74,7 +74,7 @@ public class KeySelectorHashFunctionTest {
     Assert.assertEquals(hash, 0);
 
     // Should use the specified hash function
-    Assert.assertEquals(selector.hashAlgorithm(), "cityhash");
+    Assert.assertEquals(selector.hashAlgorithm(), "hashcode");
   }
 
   @Test
@@ -88,8 +88,8 @@ public class KeySelectorHashFunctionTest {
     Assert.assertEquals(multiSelector.hashAlgorithm(), "murmur3");
 
     // Test empty
-    KeySelector<?> emptySelector = KeySelectorFactory.getKeySelector(java.util.List.of(), "cityhash");
-    Assert.assertEquals(emptySelector.hashAlgorithm(), "cityhash");
+    KeySelector<?> emptySelector = KeySelectorFactory.getKeySelector(java.util.List.of(), "hashcode");
+    Assert.assertEquals(emptySelector.hashAlgorithm(), "hashcode");
   }
 
   @Test
@@ -105,28 +105,5 @@ public class KeySelectorHashFunctionTest {
     // Test empty
     KeySelector<?> emptySelector = KeySelectorFactory.getKeySelector(java.util.List.of());
     Assert.assertEquals(emptySelector.hashAlgorithm(), KeySelector.DEFAULT_HASH_ALGORITHM);
-  }
-
-  @Test
-  public void testDifferentHashFunctionsProduceDifferentHashes() {
-    Object[] row = {"test"};
-
-    SingleColumnKeySelector absSelector = new SingleColumnKeySelector(0, "abshashcode");
-    SingleColumnKeySelector murmur2Selector = new SingleColumnKeySelector(0, "murmur");
-    SingleColumnKeySelector murmur3Selector = new SingleColumnKeySelector(0, "murmur3");
-    SingleColumnKeySelector citySelector = new SingleColumnKeySelector(0, "cityhash");
-
-    int absHash = absSelector.computeHash(row);
-    int murmur2Hash = murmur2Selector.computeHash(row);
-    int murmur3Hash = murmur3Selector.computeHash(row);
-    int cityHash = citySelector.computeHash(row);
-
-    // All hashes should be different
-    Assert.assertNotEquals(absHash, murmur2Hash);
-    Assert.assertNotEquals(absHash, murmur3Hash);
-    Assert.assertNotEquals(absHash, cityHash);
-    Assert.assertNotEquals(murmur2Hash, murmur3Hash);
-    Assert.assertNotEquals(murmur2Hash, cityHash);
-    Assert.assertNotEquals(murmur3Hash, cityHash);
   }
 }

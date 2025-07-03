@@ -134,7 +134,7 @@ public class PlanNodeDeserializer {
         receiverIds, convertExchangeType(protoMailboxSendNode.getExchangeType()),
         convertDistributionType(protoMailboxSendNode.getDistributionType()), protoMailboxSendNode.getKeysList(),
         protoMailboxSendNode.getPrePartitioned(), convertCollations(protoMailboxSendNode.getCollationsList()),
-        protoMailboxSendNode.getSort());
+        protoMailboxSendNode.getSort(), protoMailboxSendNode.getHashFunction());
   }
 
   private static ProjectNode deserializeProjectNode(Plan.PlanNode protoNode) {
