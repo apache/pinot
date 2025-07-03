@@ -28,6 +28,7 @@ netstat -i
 # Unit Tests
 #   - TEST_SET#1 runs install and test together so the module list must ensure no additional modules were tested
 #     due to the -am flag (include dependency modules)
+#   - tests for pinot-plugins should not be ran multi-threaded
 if [ "$RUN_TEST_SET" == "1" ]; then
   mvn test \
       -pl 'pinot-spi' \
