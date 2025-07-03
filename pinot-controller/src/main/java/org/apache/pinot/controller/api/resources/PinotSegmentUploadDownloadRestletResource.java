@@ -31,6 +31,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -423,6 +424,11 @@ public class PinotSegmentUploadDownloadRestletResource {
       return new SuccessResponse("Successfully uploaded segment: " + segmentName + " of table: " + tableNameWithType);
     } catch (WebApplicationException e) {
       throw e;
+    } catch (FileNotFoundException e) {
+      _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
+      throw new ControllerApplicationException(LOGGER, "Exception while uploading segment: " + e.getMessage(),
+          Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
@@ -755,6 +761,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiResponse(code = 200, message = "Successfully uploaded segment"),
       @ApiResponse(code = 400, message = "Bad Request"),
       @ApiResponse(code = 403, message = "Segment validation fails"),
+      @ApiResponse(code = 404, message = "Segment location not found"),
       @ApiResponse(code = 409, message = "Segment already exists or another parallel push in progress"),
       @ApiResponse(code = 410, message = "Segment to refresh does not exist"),
       @ApiResponse(code = 412, message = "CRC check fails"),

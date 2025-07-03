@@ -19,15 +19,18 @@
 package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.exception.FileNotFoundWrapperException;
 import org.apache.pinot.common.utils.RoundRobinURIProvider;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.retry.RetriableOperationException;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,16 +74,27 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
   @Override
   public void fetchSegmentToLocal(URI uri, File dest)
       throws Exception {
-    RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
-      try {
-        fetchSegmentToLocalWithoutRetry(uri, dest);
-        _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
-        return true;
-      } catch (Exception e) {
-        _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
-        return false;
+    try {
+      RetryPolicies.exponentialBackoffRetryPolicy(_retryCount, _retryWaitMs, _retryDelayScaleFactor).attempt(() -> {
+        try {
+          fetchSegmentToLocalWithoutRetry(uri, dest);
+          _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
+          return true;
+        } catch (FileNotFoundException e) {
+          _logger.error("Could not fetch segment from URI location: {} to: {}", uri, dest, e);
+          throw new FileNotFoundWrapperException(e);
+        } catch (Exception e) {
+          _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
+          return false;
+        }
+      });
+    } catch (RetriableOperationException e) {
+      if (e.getCause() instanceof FileNotFoundWrapperException) {
+        FileNotFoundWrapperException fnfe = (FileNotFoundWrapperException) e.getCause();
+        throw fnfe.getCause(); // rethrow the original FileNotFoundException
       }
-    });
+      throw e;
+    }
   }
 
   @Override
