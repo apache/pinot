@@ -1,3 +1,4 @@
+#!/bin/bash -x
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -16,27 +17,11 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-ARG PINOT_BUILD_IMAGE_TAG=11-amazoncorretto
-ARG PINOT_RUNTIME_IMAGE_TAG=${PINOT_BUILD_IMAGE_TAG}
-FROM --platform=linux/amd64 pinot-build:${PINOT_BUILD_IMAGE_TAG} AS pinot_build_dist
-FROM apachepinot/pinot-base-runtime:${PINOT_RUNTIME_IMAGE_TAG}
-LABEL MAINTAINER=dev@pinot.apache.org
 
-ENV PINOT_HOME=/opt/pinot
-ENV JAVA_OPTS="-Xms4G -Xmx4G -Dpinot.admin.system.exit=false"
+set -e
 
-VOLUME ["${PINOT_HOME}/configs", "${PINOT_HOME}/data"]
+docker manifest create apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG} \
+    --amend apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-amd64 \
+    --amend apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}-arm64
 
-COPY --from=pinot_build_dist ${PINOT_HOME} ${PINOT_HOME}
-COPY bin ${PINOT_HOME}/bin
-COPY etc ${PINOT_HOME}/etc
-COPY examples ${PINOT_HOME}/examples
-
-# expose ports for controller/broker/server/admin
-EXPOSE 9000 8099 8098 8097 8096
-
-WORKDIR ${PINOT_HOME}
-
-ENTRYPOINT ["./bin/pinot-admin.sh"]
-
-CMD ["-help"]
+docker manifest push apachepinot/pinot-base-${BASE_IMAGE_TYPE}:${TAG}

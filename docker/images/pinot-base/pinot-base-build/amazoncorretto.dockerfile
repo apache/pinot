@@ -30,10 +30,21 @@ ARG version=11.0.18.10-1
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
+# Print platform info for debugging
+RUN echo "Building for platform: $(uname -m)" && \
+    echo "Architecture: $(dpkg --print-architecture)" && \
+    cat /etc/os-release
+
+# Install basic dependencies first
 RUN set -eux \
   && apt-get update \
   && apt-get install -y --no-install-recommends \
-  curl ca-certificates gnupg software-properties-common fontconfig java-common vim wget git automake bison flex g++ libboost-all-dev libevent-dev libssl-dev libtool make pkg-config\
+  curl ca-certificates gnupg software-properties-common fontconfig java-common \
+  vim wget git && \
+  rm -rf /var/lib/apt/lists/*
+
+# Install Amazon Corretto
+RUN set -eux \
   && curl -fL https://apt.corretto.aws/corretto.key | apt-key add - \
   && add-apt-repository 'deb https://apt.corretto.aws stable main' \
   && mkdir -p /usr/share/man/man1 || true \
@@ -41,24 +52,42 @@ RUN set -eux \
   && apt-get install -y java-11-amazon-corretto-jdk=1:$version \
   && rm -rf /var/lib/apt/lists/*
 
+# Install build dependencies separately
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+    automake bison flex g++ libtool make pkg-config && \
+  rm -rf /var/lib/apt/lists/*
+
+# Install boost and other libraries separately (can be problematic on ARM64)
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+    libboost-all-dev libevent-dev libssl-dev && \
+  rm -rf /var/lib/apt/lists/*
+
 ENV LANG C.UTF-8
 ENV JAVA_HOME=/usr/lib/jvm/java-11-amazon-corretto
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
-  && wget https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz -P /tmp \
+  && echo "Downloading Maven for $(uname -m) architecture..." \
+  && wget https://dlcdn.apache.org/maven/maven-3/3.9.10/binaries/apache-maven-3.9.10-bin.tar.gz -P /tmp \
   && tar -xzf /tmp/apache-maven-*.tar.gz -C /usr/share/maven --strip-components=1 \
   && rm -f /tmp/apache-maven-*.tar.gz \
-  && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn
-ENV MAVEN_HOME /usr/share/maven
-ENV MAVEN_CONFIG /opt/.m2
+  && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn \
+  && mvn --version
+ENV MAVEN_HOME=/usr/share/maven
+ENV MAVEN_CONFIG=/opt/.m2
 
-# install thrift
-RUN  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
+# install thrift with better error handling
+RUN echo "Building Thrift for $(uname -m) architecture..." && \
+  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
   tar xfz /tmp/thrift-0.12.0.tar.gz --directory /tmp && \
-  base_dir=`pwd` && \
   cd /tmp/thrift-0.12.0 && \
+  echo "Configuring Thrift..." && \
   ./configure --with-cpp=no --with-c_glib=no --with-java=yes --with-python=no --with-ruby=no --with-erlang=no --with-go=no --with-nodejs=no --with-php=no && \
-  make install
+  echo "Building Thrift..." && \
+  make -j$(nproc) install && \
+  echo "Thrift installation completed" && \
+  rm -rf /tmp/thrift-0.12.0*
 
 CMD ["bash"]

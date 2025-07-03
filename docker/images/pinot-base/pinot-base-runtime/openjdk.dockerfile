@@ -17,7 +17,7 @@
 # under the License.
 #
 ARG JAVA_VERSION=21
-ARG JDK_IMAGE=openjdk
+ARG JDK_IMAGE=mcr.microsoft.com/openjdk/jdk
 
 FROM ${JDK_IMAGE}:${JAVA_VERSION}-jdk-slim
 

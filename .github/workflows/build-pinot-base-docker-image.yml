@@ -16,11 +16,11 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-name: Pinot Base Docker Image Build and Publish
+name: 2. Pinot Base Docker Image Build and Publish
 
 on:
   workflow_dispatch:
-    inputs: { }
+    inputs: {}
 
 jobs:
   build-pinot-build-docker-image:
@@ -28,8 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        baseImageType: [ "build", "runtime" ]
-        openJdkDist: [ "amazoncorretto", "ms-openjdk" ]
+        openJdkDist: ["amazoncorretto", "ms-openjdk"]
+        jdk_version: [11, 17, 21]
+        arch: [amd64, arm64]
+        type: [build, runtime]
     steps:
       - name: Login to DockerHub
         uses: docker/login-action@v3
@@ -41,10 +43,37 @@ jobs:
       - uses: docker/setup-buildx-action@v3
         name: Set up Docker Buildx
       - uses: actions/checkout@v4
-      - name: Build and push the Docker image
+      - name: Build ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}-${{ matrix.arch }} Pinot Base Docker Image
         env:
           OPEN_JDK_DIST: ${{ matrix.openJdkDist }}
-          BASE_IMAGE_TYPE: ${{ matrix.baseImageType }}
-          BUILD_PLATFORM: "linux/amd64,linux/arm64"
-          TAG: "11-${{ matrix.openJdkDist }}"
+          BASE_IMAGE_TYPE: ${{ matrix.type }}
+          BUILD_PLATFORM: "linux/${{ matrix.arch }}"
+          TAG: "${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}"
+          JDK_VERSION: ${{ matrix.jdk_version }}
+          ARCH: ${{ matrix.arch }}
         run: .github/workflows/scripts/docker/.pinot_base_docker_image_build_and_push.sh
+  push-pinot-build-docker-manifest:
+    name: Push Pinot Base Docker Manifest
+    runs-on: ubuntu-latest
+    needs: build-pinot-build-docker-image
+    strategy:
+      matrix:
+        openJdkDist: ["amazoncorretto", "ms-openjdk"]
+        jdk_version: [11, 17, 21]
+        type: [build, runtime]
+    steps:
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/setup-qemu-action@v3
+        name: Set up QEMU
+      - uses: docker/setup-buildx-action@v3
+        name: Set up Docker Buildx
+      - uses: actions/checkout@v4
+      - name: Push ${{ matrix.type }} ${{ matrix.jdk_version }}-${{ matrix.openJdkDist }} Pinot Base Docker manifest
+        env:
+          BASE_IMAGE_TYPE: ${{ matrix.type }}
+          TAG: "${{ matrix.jdk_version }}-${{ matrix.openJdkDist }}"
+        run: .github/workflows/scripts/docker/.pinot_base_docker_manifest_build_and_push.sh

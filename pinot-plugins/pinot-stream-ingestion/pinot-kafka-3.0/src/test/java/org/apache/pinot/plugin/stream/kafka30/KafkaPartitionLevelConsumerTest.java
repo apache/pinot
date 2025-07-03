@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -29,11 +30,15 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -43,7 +48,6 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.pinot.plugin.stream.kafka.KafkaMessageBatch;
 import org.apache.pinot.plugin.stream.kafka.KafkaStreamConfigProperties;
-import org.apache.pinot.plugin.stream.kafka30.utils.MiniKafkaCluster;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.OffsetCriteria;
@@ -57,7 +61,11 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.retry.ExponentialBackoffRetryPolicy;
+import org.testcontainers.DockerClientFactory;
+import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.utility.DockerImageName;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -82,23 +90,52 @@ public class KafkaPartitionLevelConsumerTest {
   private static final int NUM_MSG_PRODUCED_PER_PARTITION = 1000;
   private static final long TIMESTAMP = Instant.now().toEpochMilli();
   private static final Random RANDOM = new Random();
+  private static final String KAFKA_IMAGE = "apache/kafka:3.9.1";
 
-  private MiniKafkaCluster _kafkaCluster;
+  private KafkaContainer _kafkaContainer;
+  private AdminClient _adminClient;
   private String _kafkaBrokerAddress;
 
   @BeforeClass
   public void setUp()
       throws Exception {
-    _kafkaCluster = new MiniKafkaCluster("0");
-    _kafkaCluster.start();
-    _kafkaBrokerAddress = _kafkaCluster.getKafkaServerAddress();
-    _kafkaCluster.createTopic(TEST_TOPIC_1, 1, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_2, 2, 1);
-    _kafkaCluster.createTopic(TEST_TOPIC_3, 1, 1);
+    if (!DockerClientFactory.instance().isDockerAvailable()) {
+      throw new SkipException("Docker is not available for Kafka testcontainers");
+    }
+    _kafkaContainer = new KafkaContainer(DockerImageName.parse(KAFKA_IMAGE));
+    _kafkaContainer.start();
+    _kafkaBrokerAddress = _kafkaContainer.getBootstrapServers();
+    _adminClient = AdminClient.create(adminClientProps());
+    createTopic(TEST_TOPIC_1, 1, 1);
+    createTopic(TEST_TOPIC_2, 2, 1);
+    createTopic(TEST_TOPIC_3, 1, 1);
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
     produceMsgToKafka();
     Thread.sleep(STABILIZE_SLEEP_DELAYS);
-    _kafkaCluster.deleteRecordsBeforeOffset(TEST_TOPIC_3, 0, 200);
+    deleteRecordsBeforeOffset(TEST_TOPIC_3, 0, 200);
+  }
+
+  private Properties adminClientProps() {
+    Properties props = new Properties();
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, _kafkaBrokerAddress);
+    return props;
+  }
+
+  private void createTopic(String topicName, int numPartitions, int replicationFactor)
+      throws ExecutionException, InterruptedException {
+    NewTopic newTopic = new NewTopic(topicName, numPartitions, (short) replicationFactor);
+    _adminClient.createTopics(Collections.singletonList(newTopic)).all().get();
+  }
+
+  private void deleteTopic(String topicName)
+      throws ExecutionException, InterruptedException {
+    _adminClient.deleteTopics(Collections.singletonList(topicName)).all().get();
+  }
+
+  private void deleteRecordsBeforeOffset(String topicName, int partitionId, long offset) {
+    Map<TopicPartition, RecordsToDelete> recordsToDelete = new HashMap<>();
+    recordsToDelete.put(new TopicPartition(topicName, partitionId), RecordsToDelete.beforeOffset(offset));
+    _adminClient.deleteRecords(recordsToDelete);
   }
 
   private void produceMsgToKafka() {
@@ -123,11 +160,18 @@ public class KafkaPartitionLevelConsumerTest {
   public void tearDown()
       throws Exception {
     try {
-      _kafkaCluster.deleteTopic(TEST_TOPIC_1);
-      _kafkaCluster.deleteTopic(TEST_TOPIC_2);
-      _kafkaCluster.deleteTopic(TEST_TOPIC_3);
+      deleteTopic(TEST_TOPIC_1);
+      deleteTopic(TEST_TOPIC_2);
+      deleteTopic(TEST_TOPIC_3);
     } finally {
-      _kafkaCluster.close();
+      if (_adminClient != null) {
+        _adminClient.close();
+        _adminClient = null;
+      }
+      if (_kafkaContainer != null) {
+        _kafkaContainer.stop();
+        _kafkaContainer = null;
+      }
     }
   }
 

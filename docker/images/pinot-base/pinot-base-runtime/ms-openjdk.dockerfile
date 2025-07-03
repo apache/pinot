@@ -44,4 +44,5 @@ RUN case `uname -m` in \
   && curl -L https://github.com/jvm-profiling-tools/async-profiler/releases/download/v2.9/async-profiler-2.9-linux-${arch}.tar.gz | tar -xz --strip-components 1 -C /usr/local/lib/async-profiler \
   && ln -s /usr/local/lib/async-profiler/profiler.sh /usr/local/bin/async-profiler
 
+RUN ls /usr/lib/jvm
 CMD ["bash"]

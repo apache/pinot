@@ -22,27 +22,47 @@ FROM ${JDK_IMAGE}:${JAVA_VERSION}-ubuntu AS pinot_build_env
 
 LABEL MAINTAINER=dev@pinot.apache.org
 
+# Print platform info for debugging
+RUN echo "Building for platform: $(uname -m)" && \
+    echo "Architecture: $(dpkg --print-architecture)" && \
+    cat /etc/os-release
+
 # extra dependency for running launcher
+# Split package installation to better identify issues
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends vim wget curl git automake bison flex g++ libboost-all-dev libevent-dev \
-  libssl-dev libtool make pkg-config && \
+  apt-get install -y --no-install-recommends \
+    vim wget curl git \
+    automake bison flex g++ \
+    libtool make pkg-config && \
+  rm -rf /var/lib/apt/lists/*
+
+# Install boost separately as it can be problematic on ARM64
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+    libboost-all-dev libevent-dev libssl-dev && \
   rm -rf /var/lib/apt/lists/*
 
 # install maven
 RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
-  && wget https://dlcdn.apache.org/maven/maven-3/3.9.9/binaries/apache-maven-3.9.9-bin.tar.gz -P /tmp \
+  && echo "Downloading Maven for $(uname -m) architecture..." \
+  && wget https://dlcdn.apache.org/maven/maven-3/3.9.10/binaries/apache-maven-3.9.10-bin.tar.gz -P /tmp \
   && tar -xzf /tmp/apache-maven-*.tar.gz -C /usr/share/maven --strip-components=1 \
   && rm -f /tmp/apache-maven-*.tar.gz \
-  && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn
-ENV MAVEN_HOME /usr/share/maven
-ENV MAVEN_CONFIG /opt/.m2
+  && ln -s /usr/share/maven/bin/mvn /usr/bin/mvn \
+  && mvn --version
+ENV MAVEN_HOME=/usr/share/maven
+ENV MAVEN_CONFIG=/opt/.m2
 
-# install thrift
-RUN  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
+# install thrift with better error handling
+RUN echo "Building Thrift for $(uname -m) architecture..." && \
+  wget https://archive.apache.org/dist/thrift/0.12.0/thrift-0.12.0.tar.gz -O /tmp/thrift-0.12.0.tar.gz && \
   tar xfz /tmp/thrift-0.12.0.tar.gz --directory /tmp && \
-  base_dir=`pwd` && \
   cd /tmp/thrift-0.12.0 && \
+  echo "Configuring Thrift..." && \
   ./configure --with-cpp=no --with-c_glib=no --with-java=yes --with-python=no --with-ruby=no --with-erlang=no --with-go=no --with-nodejs=no --with-php=no && \
-  make install
+  echo "Building Thrift..." && \
+  make -j$(nproc) install && \
+  echo "Thrift installation completed" && \
+  rm -rf /tmp/thrift-0.12.0*
 
 CMD ["bash"]
