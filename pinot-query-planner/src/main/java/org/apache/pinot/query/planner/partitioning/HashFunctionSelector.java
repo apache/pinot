@@ -28,10 +28,9 @@ import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
  * This class provides consistent hash computation for KeySelector implementations.
  */
 public class HashFunctionSelector {
-  public static final String MURMUR2 = "murmur2";
+  public static final String MURMUR2 = "murmur";
   public static final String MURMUR3 = "murmur3";
   public static final String CITY_HASH = "cityhash";
-  public static final String ABS_HASH_CODE = "absHashCode";
 
   private HashFunctionSelector() {
   }
@@ -39,7 +38,7 @@ public class HashFunctionSelector {
   /**
    * Computes a hash code for a single value using the specified hash function.
    * @param value The value to hash.
-   * @param hashFunction The hash function to use (e.g., "murmur2", "murmur3", "cityhash", "absHashCode").
+   * @param hashFunction The hash function to use (e.g., "murmur", "murmur3", "cityhash", "absHashCode").
    * @return The computed hash code.
    */
   public static int computeHash(Object value, String hashFunction) {
@@ -57,22 +56,24 @@ public class HashFunctionSelector {
   }
 
   /**
-   * Computes a hash code for multiple values using the specified hash function.
+   * Computes a hash code for multiple values based on specified key IDs using the specified hash function.
+   * This is useful for partitioning where only certain keys are relevant.
    * @param values The array of values to hash.
+   * @param keyIds The array of key IDs indicating which values to include in the hash computation.
    * @param hashFunction The hash function to use (e.g., "murmur2", "murmur3", "cityhash", "absHashCode").
    * @return The computed hash code.
    */
-  public static int computeMultiHash(Object[] values, String hashFunction) {
+  public static int computeMultiHash(Object[] values, int[] keyIds, String hashFunction) {
     if (values == null || values.length == 0) {
       return 0;
     }
 
     switch (hashFunction.toLowerCase()) {
-      case MURMUR2: return multiHash(values, HashFunctionSelector::murmur2);
-      case MURMUR3: return multiHash(values, HashFunctionSelector::murmur3);
-      case CITY_HASH: return multiHash(values, HashFunctionSelector::cityHash);
-      // Default hash is absHashCode.
-      default: return multiAbsHashCode(values);
+      case MURMUR2: return multiHash(values, keyIds, HashFunctionSelector::murmur2);
+      case MURMUR3: return multiHash(values, keyIds, HashFunctionSelector::murmur3);
+      case CITY_HASH: return multiHash(values, keyIds, HashFunctionSelector::cityHash);
+      // We should hashCode instead of absHashCode for multi hash to maintain consistency with legacy behavior.
+      default: return multiHash(values, keyIds, HashFunctionSelector::hashCode);
     }
   }
 
@@ -80,15 +81,8 @@ public class HashFunctionSelector {
     return value.hashCode() & Integer.MAX_VALUE;
   }
 
-  // multiAbsHashCode is different from absHashCode due to legacy implementation.
-  private static int multiAbsHashCode(Object[] values) {
-    int hash = 0;
-    for (Object value : values) {
-      if (value != null) {
-        hash += value.hashCode();
-      }
-    }
-    return hash & Integer.MAX_VALUE;
+  private static int hashCode(Object value) {
+    return value.hashCode();
   }
 
   private static int murmur2(Object value) {
@@ -103,11 +97,11 @@ public class HashFunctionSelector {
     return (int) (CityHashFunctions.cityHash64(toBytes(value)) & Integer.MAX_VALUE);
   }
 
-  private static int multiHash(Object[] values, java.util.function.ToIntFunction<Object> hashFunction) {
+  private static int multiHash(Object[] values, int[] keyIds, java.util.function.ToIntFunction<Object> hashFunction) {
     int hash = 0;
-    for (Object value : values) {
-      if (value != null) {
-        hash += hashFunction.applyAsInt(value);
+    for (int keyId : keyIds) {
+      if (keyId < values.length && values[keyId] != null) {
+        hash += hashFunction.applyAsInt(values[keyId]);
       }
     }
     return hash & Integer.MAX_VALUE;
