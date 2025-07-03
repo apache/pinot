@@ -398,8 +398,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records)
       throws IOException {
     try (JsonIndexCreator indexCreator = createOnHeap
-        ? new OnHeapJsonIndexCreator(INDEX_DIR, ON_HEAP_COLUMN_NAME, jsonIndexConfig)
-        : new OffHeapJsonIndexCreator(INDEX_DIR, OFF_HEAP_COLUMN_NAME, jsonIndexConfig)) {
+        ? new OnHeapJsonIndexCreator(INDEX_DIR, ON_HEAP_COLUMN_NAME, "myTable_OFFLINE", jsonIndexConfig)
+        : new OffHeapJsonIndexCreator(INDEX_DIR, OFF_HEAP_COLUMN_NAME, "myTable_OFFLINE", jsonIndexConfig)) {
       for (String record : records) {
         indexCreator.add(record);
       }
@@ -453,7 +453,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     };
 
     String colName = "col";
-    try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, getIndexConfig());
+    try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, "myTable_OFFLINE",
+        getIndexConfig());
         MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col")) {
       for (String record : records) {
         offHeapCreator.add(record);
@@ -522,7 +523,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     // @formatter: on
 
     String colName = "col";
-    try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, getIndexConfig());
+    try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, "myTable_OFFLINE",
+        getIndexConfig());
         MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col")) {
       for (String record : records) {
         offHeapCreator.add(record);
