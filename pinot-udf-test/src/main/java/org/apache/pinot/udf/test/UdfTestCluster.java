@@ -33,7 +33,7 @@ public interface UdfTestCluster extends AutoCloseable {
 
   void start();
 
-  /// Adds a table to the cluster with the given schema and table configuration.o
+  /// Adds a table to the cluster with the given schema and table configuration.
   /// Implementations can assume that the table doesn not exist in the cluster.
   void addTable(Schema schema, TableConfig tableConfig);
 
