@@ -27,6 +27,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.fcfs.BoundedFCFSScheduler;
 import org.apache.pinot.core.query.scheduler.fcfs.FCFSQueryScheduler;
 import org.apache.pinot.core.query.scheduler.tokenbucket.TokenPriorityScheduler;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.slf4j.Logger;
@@ -58,7 +59,8 @@ public class QuerySchedulerFactory {
    * @return returns an instance of query scheduler
    */
   public static QueryScheduler create(PinotConfiguration schedulerConfig, QueryExecutor queryExecutor,
-      ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
+      ServerMetrics serverMetrics, LongAccumulator latestQueryTime,
+      ThreadResourceUsageAccountant resourceUsageAccountant) {
     Preconditions.checkNotNull(schedulerConfig);
     Preconditions.checkNotNull(queryExecutor);
 
@@ -66,16 +68,20 @@ public class QuerySchedulerFactory {
     QueryScheduler scheduler;
     switch (schedulerName.toLowerCase()) {
       case FCFS_ALGORITHM:
-        scheduler = new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        scheduler = new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
+            resourceUsageAccountant);
         break;
       case TOKEN_BUCKET_ALGORITHM:
-        scheduler = TokenPriorityScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        scheduler = TokenPriorityScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
+            resourceUsageAccountant);
         break;
       case BOUNDED_FCFS_ALGORITHM:
-        scheduler = BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        scheduler = BoundedFCFSScheduler.create(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
+            resourceUsageAccountant);
         break;
       case BINARY_WORKLOAD_ALGORITHM:
-        scheduler = new BinaryWorkloadScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+        scheduler = new BinaryWorkloadScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
+            resourceUsageAccountant);
         break;
       default:
         scheduler =
@@ -93,7 +99,8 @@ public class QuerySchedulerFactory {
     // Failure on bad configuration will cause outage vs an inferior algorithm that
     // will provide degraded service
     LOGGER.warn("Scheduler {} not found. Using default FCFS query scheduler", schedulerName);
-    return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+    return new FCFSQueryScheduler(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
+        resourceUsageAccountant);
   }
 
   @Nullable
