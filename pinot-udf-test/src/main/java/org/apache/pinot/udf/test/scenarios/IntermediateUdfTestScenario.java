@@ -89,8 +89,8 @@ public class IntermediateUdfTestScenario extends AbstractUdfTestScenario {
             + "FROM fakeTable \n"
             + "WHERE @signatureCol = '@signature' \n"
             + "  AND @udfCol = '@udfName' \n")
-        .replaceAll("@firstCol", firstCol)
-        .replaceAll("@otherCols", otherCols.toString());
+        .replace("@firstCol", firstCol)
+        .replace("@otherCols", otherCols.toString());
 
     UdfTestCluster.ExecutionContext context = new UdfTestCluster.ExecutionContext(
         isNullHandlingEnabled(),

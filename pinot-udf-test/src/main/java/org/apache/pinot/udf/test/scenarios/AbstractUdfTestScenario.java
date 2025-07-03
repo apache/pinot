@@ -55,17 +55,17 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
       /* language=sql*/ String templateSql) {
     String call = udf.asSqlCall(udf.getMainFunctionName(), PinotFunctionEnvGenerator.getArgsForCall(signature));
     return templateSql
-        .replaceAll("@call", call)
-        .replaceAll("@table", PinotFunctionEnvGenerator.getTableName(udf))
-        .replaceAll("@udfCol", PinotFunctionEnvGenerator.getUdfColumnName())
-        .replaceAll("@udfName", udf.getMainFunctionName())
-        .replaceAll("@testCol", PinotFunctionEnvGenerator.getTestColumnName())
-        .replaceAll("@resultCol", PinotFunctionEnvGenerator.getResultColumnName(signature, nullHandling))
+        .replace("@call", call)
+        .replace("@table", PinotFunctionEnvGenerator.getTableName(udf))
+        .replace("@udfCol", PinotFunctionEnvGenerator.getUdfColumnName())
+        .replace("@udfName", udf.getMainFunctionName())
+        .replace("@testCol", PinotFunctionEnvGenerator.getTestColumnName())
+        .replace("@resultCol", PinotFunctionEnvGenerator.getResultColumnName(signature, nullHandling))
         // Important, we need to replace the @testCol and @result after replacing @test and @resultCol respectively
-        .replaceAll("@test", "test")
-        .replaceAll("@result", "result")
-        .replaceAll("@signatureCol", PinotFunctionEnvGenerator.getSignatureColumnName())
-        .replaceAll("@signature", signature.toString());
+        .replace("@test", "test")
+        .replace("@result", "result")
+        .replace("@signatureCol", PinotFunctionEnvGenerator.getSignatureColumnName())
+        .replace("@signature", signature.toString());
   }
 
   @Override
