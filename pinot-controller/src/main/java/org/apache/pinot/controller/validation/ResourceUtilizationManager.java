@@ -38,22 +38,38 @@ public class ResourceUtilizationManager {
     _utilizationCheckers = utilizationCheckers;
   }
 
-  public boolean isResourceUtilizationWithinLimits(String tableNameWithType, UtilizationChecker.CheckPurpose purpose) {
+  /**
+   * Returns the status of the resource utilization check across all UtilizationCheckers
+   * @param tableNameWithType table name with type
+   * @param purpose the purpose of the utilization check
+   * @return CheckResult, FAIL if even one resource utilization checker has returned FALSE, UNDETERMINED if the result
+   *         cannot be determined for even one UtilizationChecker and all the others are also UNDETERMINED or PASS,
+   *         and PASS if resource utilization is within limits for all UtilizationCheckers
+   */
+  public UtilizationChecker.CheckResult isResourceUtilizationWithinLimits(String tableNameWithType,
+      UtilizationChecker.CheckPurpose purpose) {
     if (!_isResourceUtilizationCheckEnabled) {
-      return true;
+      return UtilizationChecker.CheckResult.PASS;
     }
     if (StringUtils.isEmpty(tableNameWithType)) {
       throw new IllegalArgumentException("Table name found to be null or empty while checking resource utilization.");
     }
     LOGGER.info("Checking resource utilization for table: {}", tableNameWithType);
-    boolean overallIsResourceUtilizationWithinLimits = true;
+    UtilizationChecker.CheckResult overallIsResourceUtilizationWithinLimits = UtilizationChecker.CheckResult.PASS;
     for (UtilizationChecker utilizationChecker : _utilizationCheckers) {
-      boolean isResourceUtilizationWithinLimits =
+      UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
           utilizationChecker.isResourceUtilizationWithinLimits(tableNameWithType, purpose);
       LOGGER.info("For utilization checker: {}, isResourceUtilizationWithinLimits: {}, purpose: {}",
           utilizationChecker.getName(), isResourceUtilizationWithinLimits, purpose);
-      if (!isResourceUtilizationWithinLimits) {
-        overallIsResourceUtilizationWithinLimits = false;
+      if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
+        // If any UtilizationChecker returns FAIL, we should mark the overall as FAIL. FAIL should always have
+        // priority over other results
+        overallIsResourceUtilizationWithinLimits = UtilizationChecker.CheckResult.FAIL;
+      } else if ((overallIsResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.PASS)
+          && (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED)) {
+        // If we haven't already updated the overall to a value other than PASS, and we get an UNDETERMINED result,
+        // update the overall to UNDETERMINED. Should not update to UNDETERMINED if we have set the overall to FAIL
+        overallIsResourceUtilizationWithinLimits = UtilizationChecker.CheckResult.UNDETERMINED;
       }
     }
     return overallIsResourceUtilizationWithinLimits;

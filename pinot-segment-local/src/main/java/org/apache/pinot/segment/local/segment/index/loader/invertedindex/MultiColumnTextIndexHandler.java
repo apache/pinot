@@ -25,15 +25,17 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
-import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
+import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.index.multicolumntext.MultiColumnTextMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
@@ -43,7 +45,6 @@ import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -80,12 +81,9 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
 
   private final MultiColumnTextIndexConfig _textIndexConfig;
 
-  public MultiColumnTextIndexHandler(
-      SegmentDirectory segmentDirectory,
-      Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      MultiColumnTextIndexConfig textIndexConfig,
-      @Nullable TableConfig tableConfig) {
-    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+  public MultiColumnTextIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig,
+      MultiColumnTextIndexConfig textIndexConfig) {
+    super(segmentDirectory, indexLoadingConfig);
     _textIndexConfig = textIndexConfig;
   }
 
@@ -98,6 +96,7 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     boolean needUpdate = shouldModifyMultiColTextIndex(_textIndexConfig, oldConfig);
     if (needUpdate) {
       List<String> newColumns = _textIndexConfig.getColumns();
+      TableConfigUtils.checkForDuplicates(newColumns);
       for (String column : newColumns) {
         ColumnMetadata columnMeta = segmentMetadata.getColumnMetadataFor(column);
         if (columnMeta != null) {
@@ -115,10 +114,16 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     }
   }
 
-  private static void validate(DataType columnMeta, String column) {
+  private void validate(DataType columnMeta, String column) {
     if (columnMeta != DataType.STRING) {
       throw new UnsupportedOperationException(
           "Cannot create TEXT index on column: " + column + " of stored type other than STRING");
+    }
+
+    TextIndexConfig config = _fieldIndexConfigs.get(column).getConfig(StandardIndexes.text());
+    if (config != null && config.isEnabled()) {
+      throw new UnsupportedOperationException(
+          "Cannot create both single and multi-column TEXT index on column: " + column);
     }
   }
 
@@ -152,6 +157,8 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
+
+    TableConfigUtils.checkForDuplicates(_textIndexConfig.getColumns());
 
     BooleanList columnsSV = new BooleanArrayList(_textIndexConfig.getColumns().size());
     for (String column : _textIndexConfig.getColumns()) {

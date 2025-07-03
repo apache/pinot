@@ -23,7 +23,6 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
@@ -44,6 +43,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,8 +55,8 @@ public class H3IndexHandler extends BaseIndexHandler {
   private final Map<String, H3IndexConfig> _h3Configs;
 
   public H3IndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      @Nullable TableConfig tableConfig) {
-    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+      TableConfig tableConfig, Schema schema) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig, schema);
     _h3Configs = FieldIndexConfigsUtil.enableConfigByColumn(StandardIndexes.h3(), _fieldIndexConfigs);
   }
 

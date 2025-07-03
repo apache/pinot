@@ -69,7 +69,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -538,7 +537,7 @@ public class TableIndexingTest {
     }
   }
 
-  private @NotNull StringBuilder generateSummary() {
+  private StringBuilder generateSummary() {
     StringBuilder summary = new StringBuilder();
     summary.append("data_type;cardinality;encoding;index_type;success;error\n");
     for (TestCase test : _allResults) {
@@ -565,7 +564,7 @@ public class TableIndexingTest {
     return summary;
   }
 
-  private @NotNull List<String> readExpectedFromFile()
+  private List<String> readExpectedFromFile()
       throws IOException {
     URL resource = getClass().getClassLoader().getResource("TableIndexingTest.csv");
     File expectedFile = new File(TestUtils.getFileFromResourceUrl(resource));

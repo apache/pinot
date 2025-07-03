@@ -104,6 +104,7 @@ public class QueryLoggerTest {
         + ":5/6/7/8/9/10/21,"
         + "consumingFreshnessTimeMs=11,"
         + "servers=12/13,"
+        + "groupsTrimmed=false,"
         + "groupLimitReached=false,"
         + "groupWarningLimitReached=false,"
         + "brokerReduceTimeMs=20,"

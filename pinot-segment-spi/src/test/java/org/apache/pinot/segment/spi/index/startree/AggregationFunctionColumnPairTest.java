@@ -22,20 +22,22 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair.getStoredType;
-import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 
 public class AggregationFunctionColumnPairTest {
 
   @Test
   public void testResolveToStoredType() {
-    assertEquals(AggregationFunctionColumnPair.fromColumnName("distinctCountThetaSketch__dimX"),
-        AggregationFunctionColumnPair.resolveToStoredType(
-            AggregationFunctionColumnPair.fromColumnName("distinctCountRawThetaSketch__dimX")));
-    assertEquals(AggregationFunctionColumnPair.fromColumnName("count__*"),
-        AggregationFunctionColumnPair.resolveToStoredType(AggregationFunctionColumnPair.fromColumnName("count__*")));
-    assertEquals(AggregationFunctionColumnPair.fromColumnName("sum__dimY"),
-        AggregationFunctionColumnPair.resolveToStoredType(AggregationFunctionColumnPair.fromColumnName("sum__dimY")));
+    assertEquals(AggregationFunctionColumnPair.resolveToStoredType(
+            AggregationFunctionColumnPair.fromColumnName("distinctCountRawThetaSketch__dimX")),
+        AggregationFunctionColumnPair.fromColumnName("distinctCountThetaSketch__dimX"));
+    assertEquals(
+        AggregationFunctionColumnPair.resolveToStoredType(AggregationFunctionColumnPair.fromColumnName("count__*")),
+        AggregationFunctionColumnPair.fromColumnName("count__*"));
+    assertEquals(
+        AggregationFunctionColumnPair.resolveToStoredType(AggregationFunctionColumnPair.fromColumnName("sum__dimY")),
+        AggregationFunctionColumnPair.fromColumnName("sum__dimY"));
   }
 
   @Test

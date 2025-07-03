@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.transformer.timeunit;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import org.joda.time.DurationFieldType;
 import org.joda.time.chrono.ISOChronology;
 
@@ -28,8 +27,8 @@ import org.joda.time.chrono.ISOChronology;
  * Implementation of {@link TimeUnitTransformer} to handle custom time units such as WEEKS, MONTHS, YEARS.
  */
 public class CustomTimeUnitTransformer implements TimeUnitTransformer {
-  private TimeUnit _inputTimeUnit;
-  private CustomTimeUnit _outputTimeUnit;
+  private final TimeUnit _inputTimeUnit;
+  private final CustomTimeUnit _outputTimeUnit;
 
   private enum CustomTimeUnit {
     WEEKS {
@@ -58,13 +57,13 @@ public class CustomTimeUnitTransformer implements TimeUnitTransformer {
     abstract long fromMillis(long millisSinceEpoch);
   }
 
-  public CustomTimeUnitTransformer(@Nonnull TimeUnit inputTimeUnit, @Nonnull String outputTimeUnitName) {
+  public CustomTimeUnitTransformer(TimeUnit inputTimeUnit, String outputTimeUnitName) {
     _inputTimeUnit = inputTimeUnit;
     _outputTimeUnit = CustomTimeUnit.valueOf(outputTimeUnitName);
   }
 
   @Override
-  public void transform(@Nonnull long[] input, @Nonnull long[] output, int length) {
+  public void transform(long[] input, long[] output, int length) {
     for (int i = 0; i < length; i++) {
       output[i] = _outputTimeUnit.fromMillis(_inputTimeUnit.toMillis(input[i]));
     }

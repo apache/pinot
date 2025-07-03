@@ -26,6 +26,7 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.NativeMutableTextIndex;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -39,6 +40,7 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
   private String _predicate;
   private String _options;
   private TextIndexReader _textIndexReader;
+  private String _column;
 
   @Override
   public String getName() {
@@ -60,7 +62,10 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
       throw new IllegalArgumentException("Cannot apply TEXT_MATCH on column: " + columnName + " without text index");
     }
     TextIndexReader indexReader = dataSource.getTextIndex();
-    // TODO: handle multi-column index (if defined)
+    if (indexReader == null) {
+      indexReader = dataSource.getMultiColumnTextIndex();
+      _column = columnName;
+    }
     if (indexReader == null) {
       throw new IllegalArgumentException("Cannot apply TEXT_MATCH on column: " + columnName + " without text index");
     }
@@ -115,7 +120,9 @@ public class TextMatchTransformFunction extends BaseTransformFunction {
     initZeroFillingIntValuesSV(length);
 
     int[] docIds = valueBlock.getDocIds();
-    MutableRoaringBitmap indexDocIds = _textIndexReader.getDocIds(_predicate, _options);
+    MutableRoaringBitmap indexDocIds = _textIndexReader.isMultiColumn()
+        ? ((MultiColumnTextIndexReader) _textIndexReader).getDocIds(_column, _predicate, _options)
+        : _textIndexReader.getDocIds(_predicate, _options);
 
     for (int i = 0; i < length; i++) {
       if (indexDocIds.contains(docIds[i])) {

@@ -46,13 +46,15 @@ public class ResourceUtilizationManagerTest {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(false);
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
-    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
+    UtilizationChecker.CheckResult result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    Assert.assertTrue(result, "Resource utilization should be within limits when the check is disabled");
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS,
+        "Resource utilization should be within limits when the check is disabled");
 
     result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
         UtilizationChecker.CheckPurpose.TASK_GENERATION);
-    Assert.assertTrue(result, "Resource utilization should be within limits when the check is disabled");
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS,
+        "Resource utilization should be within limits when the check is disabled");
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)
@@ -95,35 +97,59 @@ public class ResourceUtilizationManagerTest {
   public void testIsResourceUtilizationWithinLimitsWhenCheckIsEnabled() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
     Mockito.when(_diskUtilizationChecker.isResourceUtilizationWithinLimits(_testTable,
-        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(true);
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(UtilizationChecker.CheckResult.PASS);
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
-    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
+    UtilizationChecker.CheckResult result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    Assert.assertTrue(result, "Resource utilization should be within limits when disk check and primary key count "
-        + "check returns true");
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS,
+        "Resource utilization should be within limits when disk check and primary key count check returns true");
 
     Mockito.when(_diskUtilizationChecker.isResourceUtilizationWithinLimits(_testTable,
-        UtilizationChecker.CheckPurpose.TASK_GENERATION)).thenReturn(true);
+        UtilizationChecker.CheckPurpose.TASK_GENERATION)).thenReturn(UtilizationChecker.CheckResult.PASS);
     result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
         UtilizationChecker.CheckPurpose.TASK_GENERATION);
-    Assert.assertTrue(result, "Resource utilization should be within limits when disk check and primary key count "
-        + "check returns true");
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS,
+        "Resource utilization should be within limits when disk check and primary key count check returns true");
   }
 
   @Test
   public void testIsResourceUtilizationWithinLimitsWhenCheckFails() {
     Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
     Mockito.when(_diskUtilizationChecker.isResourceUtilizationWithinLimits(_testTable,
-        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(false);
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(UtilizationChecker.CheckResult.FAIL);
+    Mockito.when(_diskUtilizationChecker.isResourceUtilizationWithinLimits(_testTable,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION)).thenReturn(UtilizationChecker.CheckResult.FAIL);
     _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
 
-    boolean result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
+    UtilizationChecker.CheckResult result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
         UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
-    Assert.assertFalse(result, "Resource utilization should not be within limits when disk check returns false");
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.FAIL,
+        "Resource utilization should not be within limits when disk check returns false");
 
     result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
         UtilizationChecker.CheckPurpose.TASK_GENERATION);
-    Assert.assertFalse(result, "Resource utilization should not be within limits when disk check returns false");
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.FAIL,
+        "Resource utilization should not be within limits when disk check returns false");
+  }
+
+  @Test
+  public void testIsResourceUtilizationWithinLimitsWhenCheckStale() {
+    Mockito.when(_controllerConf.isResourceUtilizationCheckEnabled()).thenReturn(true);
+    Mockito.when(_diskUtilizationChecker.isResourceUtilizationWithinLimits(_testTable,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION)).thenReturn(UtilizationChecker.CheckResult.UNDETERMINED);
+    Mockito.when(_diskUtilizationChecker.isResourceUtilizationWithinLimits(_testTable,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION)).thenReturn(UtilizationChecker.CheckResult.UNDETERMINED);
+    _resourceUtilizationManager = new ResourceUtilizationManager(_controllerConf, _utilizationCheckers);
+
+    UtilizationChecker.CheckResult result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.UNDETERMINED,
+        "Resource utilization should return STALE when the diskUtilization returns STALE");
+
+    result = _resourceUtilizationManager.isResourceUtilizationWithinLimits(_testTable,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.UNDETERMINED,
+        "Resource utilization should return STALE when the diskUtilization returns STALE");
   }
 }

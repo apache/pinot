@@ -145,6 +145,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
       throws TimeoutException {
     // NOTE: This step will modify the data schema and also return final aggregate results.
     IndexedTable indexedTable = getIndexedTable(dataSchema, dataTables, reducerContext);
+    if (indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
+      brokerResponseNative.setGroupsTrimmed(true);
+    }
+
     if (brokerMetrics != null) {
       brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.NUM_RESIZES, indexedTable.getNumResizes());
       brokerMetrics.addValueToTableGauge(rawTableName, BrokerGauge.RESIZE_TIME_MS, indexedTable.getResizeTimeMs());

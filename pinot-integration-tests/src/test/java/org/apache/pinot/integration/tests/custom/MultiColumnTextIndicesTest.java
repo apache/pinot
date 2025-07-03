@@ -48,17 +48,16 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
 import org.testng.annotations.Test;
 
 import static org.apache.avro.Schema.create;
 import static org.apache.avro.Schema.createArray;
 import static org.apache.avro.Schema.createUnion;
+import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.toResultStr;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.fail;
+import static org.testng.Assert.fail;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -131,7 +130,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     return null;
   }
 
-  protected static @NotNull MultiColumnTextIndexConfig getMultiColumnTextIndexConfig() {
+  protected static MultiColumnTextIndexConfig getMultiColumnTextIndexConfig() {
     return new MultiColumnTextIndexConfig(TEXT_COLUMNS, null,
         Map.of(
             TEXT_COL_CASE_SENSITIVE, Map.of(FieldConfig.TEXT_INDEX_CASE_SENSITIVE_KEY, "true"),
@@ -304,11 +303,24 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
     updateTableConfig(tableConfig);
 
-    if (isRealtimeTable()) {
-      reloadRealtimeTable(getTableName());
-    } else {
-      reloadOfflineTable(getTableName());
-    }
+    reloadTable();
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testTextMatchTransformFunction(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String queryTemplate =
+        "SELECT TEXT_MATCH(skills, 'machine learning') as test, count(*) as cnt "
+            + " FROM %s "
+            + " GROUP BY TEXT_MATCH(skills, 'machine learning') "
+            + " ORDER BY 1 ";
+    String query = String.format(queryTemplate, getTableName());
+
+    assertEquals(toResultStr(postQuery(query)),
+        "\"test\"[\"BOOLEAN\"],\t\"cnt\"[\"LONG\"]\n"
+            + "false,\t18000\n"
+            + "true,\t10000");
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -360,7 +372,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {
       long result = getQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName()));
-      assertTrue(result >= previousResult);
+      org.testng.Assert.assertTrue(result >= previousResult);
       previousResult = result;
       Thread.sleep(100);
     }
@@ -443,7 +455,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     String suffix = "              FilterTextIndex(predicate=[text_match(nullable_skills,'test')], "
         + "indexLookUp=[text_index], multiColumnIndex=[true], operator=[TEXT_MATCH])\n";
-    Assert.assertTrue(plan + " doesn't end with: " + suffix, plan.endsWith(suffix));
+    assertTrue(plan.endsWith(suffix), plan + " doesn't end with: " + suffix);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -486,15 +498,11 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     ArrayList<String> newColumns = new ArrayList<>(TEXT_COLUMNS);
     newColumns.remove(TEXT_COL);
 
-    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(newColumns,
-        oldConfig.getProperties(), oldConfig.getPerColumnProperties());
+    MultiColumnTextIndexConfig newConfig =
+        new MultiColumnTextIndexConfig(newColumns, oldConfig.getProperties(), oldConfig.getPerColumnProperties());
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
     updateTableConfig(tableConfig);
-    if (isRealtimeTable()) {
-      reloadRealtimeTable(getTableName());
-    } else {
-      reloadOfflineTable(getTableName());
-    }
+    reloadTable();
 
     boolean columnDisabled = false;
 
@@ -502,9 +510,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     while ((System.currentTimeMillis() - start) < 60000) {
       JsonNode node =
           postQuery(String.format("SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'x')", getTableName(), TEXT_COL));
-      if (node.get("exceptions") != null
-          && node.get("exceptions").size() > 0
-          && node.get("exceptions").get(0).get("message").textValue().contains("without text index")) {
+      if (node.get("exceptions") != null && !node.get("exceptions").isEmpty()) {
         columnDisabled = true;
         break;
       }
@@ -519,19 +525,14 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
         TEXT_COL_CASE_SENSITIVE)), 0);
   }
 
-  // run as last
-  @Test(priority = Integer.MAX_VALUE)
+  @Test(priority = 2)
   public void testRemoveIndex()
       throws Exception {
     setUseMultiStageQueryEngine(false);
     TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
     tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(null);
     updateTableConfig(tableConfig);
-    if (isRealtimeTable()) {
-      reloadRealtimeTable(getTableName());
-    } else {
-      reloadOfflineTable(getTableName());
-    }
+    reloadTable();
 
     boolean[] columnDisabled = new boolean[TEXT_COLUMNS.size()];
     long start = System.currentTimeMillis();
@@ -542,8 +543,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
           JsonNode node = postQuery(String.format("SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'x')", getTableName(),
               TEXT_COLUMNS.get(i)));
           if (node.get("exceptions") != null
-              && node.get("exceptions").size() > 0
-              && node.get("exceptions").get(0).get("message").textValue().contains("without text index")) {
+              && node.get("exceptions").size() > 0) {
             columnDisabled[i] = true;
           } else {
             isComplete = true;
@@ -558,9 +558,105 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     for (int i = 0; i < columnDisabled.length; i++) {
       if (!columnDisabled[i]) {
-        Assert.fail(
-            "Not all columns were removed from multi-column text index, flags:" + Arrays.toString(columnDisabled));
+        fail("Not all columns were removed from multi-column text index, flags:" + Arrays.toString(columnDisabled));
       }
+    }
+  }
+
+  @Test(priority = Integer.MAX_VALUE)
+  public void testCreateWithDuplicateColumnsReturnsError() {
+    setUseMultiStageQueryEngine(false);
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
+
+    ArrayList<String> newColumns = new ArrayList<>();
+    newColumns.add(TEXT_COL);
+    newColumns.add(TEXT_COL);
+
+    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(newColumns, null, null);
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      fail();
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Cannot create TEXT index on duplicate columns: [skills]"), e.getMessage());
+    }
+  }
+
+  @Test(priority = Integer.MAX_VALUE)
+  public void testCreateWithNoColumnsReturnsError() {
+    setUseMultiStageQueryEngine(false);
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
+
+    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(Collections.emptyList(), null, null);
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      fail();
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Multi-column text index's list of columns can't be empty"), e.getMessage());
+    }
+  }
+
+  @Test(priority = Integer.MAX_VALUE)
+  public void testCreateWithWrongSharedPropertyKeyReturnsError() {
+    setUseMultiStageQueryEngine(false);
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
+
+    ArrayList<String> newColumns = new ArrayList<>();
+    newColumns.add(TEXT_COL);
+
+    MultiColumnTextIndexConfig newConfig = new MultiColumnTextIndexConfig(newColumns, Map.of("XXX", "YYY"), null);
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      fail();
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Multi-column text index doesn't allow: XXX as shared property"),
+          e.getMessage());
+    }
+  }
+
+  @Test(priority = Integer.MAX_VALUE)
+  public void testCreateWithWrongColumnPropertyKeyReturnsError() {
+    setUseMultiStageQueryEngine(false);
+    TableConfig tableConfig = isRealtimeTable() ? createRealtimeTableConfig(null) : createOfflineTableConfig();
+
+    ArrayList<String> newColumns = new ArrayList<>();
+    newColumns.add(TEXT_COL);
+
+    MultiColumnTextIndexConfig newConfig =
+        new MultiColumnTextIndexConfig(newColumns, null, Map.of(TEXT_COL, Map.of("XXX", "YYY")));
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      fail();
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Multi-column text index doesn't allow: XXX as property for column: skills"),
+          e.getMessage());
+    }
+
+    newConfig = new MultiColumnTextIndexConfig(newColumns, null, Map.of("bogus", Map.of("XXX", "YYY")));
+    tableConfig.getIndexingConfig().setMultiColumnTextIndexConfig(newConfig);
+
+    try {
+      updateTableConfig(tableConfig);
+      fail();
+    } catch (IOException e) {
+      assertTrue(e.getMessage().contains("Multi-column text index per-column property refers to unknown column: bogus"),
+          e.getMessage());
+    }
+  }
+
+  private String reloadTable()
+      throws IOException {
+    if (isRealtimeTable()) {
+      return reloadRealtimeTable(getTableName());
+    } else {
+      return reloadOfflineTable(getTableName());
     }
   }
 

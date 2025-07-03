@@ -159,7 +159,9 @@ public class MailboxSendOperator extends MultiStageOperator {
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
     long requestId = context.getRequestId();
-    long deadlineMs = context.getDeadlineMs();
+    // It is important to use passive deadline here, otherwise the GRPC channel could be closed before
+    // the useful error block is sent
+    long deadlineMs = context.getPassiveDeadlineMs();
 
     List<MailboxInfo> mailboxInfos =
         context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
@@ -228,6 +230,12 @@ public class MailboxSendOperator extends MultiStageOperator {
       }
       return errorBlock;
     }
+  }
+
+  @Override
+  protected void sampleAndCheckInterruption() {
+    // mailbox send operator uses passive deadline instead of the active one
+    sampleAndCheckInterruption(_context.getPassiveDeadlineMs());
   }
 
   private void sendEos(MseBlock.Eos eosBlockWithoutStats)
