@@ -210,8 +210,8 @@ public class QueryRunner {
       _executorService = new HardLimitExecutor(hardLimit, _executorService);
     }
 
-    if (serverConf.getProperty(Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_CRITICAL_HEAP_USAGE,
-        Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_CRITICAL_HEAP_USAGE)) {
+    if (serverConf.getProperty(Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE,
+        Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE)) {
       LOGGER.info("Enable OOM Throttling on critical heap usage for multi-stage executor");
       _executorService = new ThrottleOnCriticalHeapUsageExecutor(_executorService, resourceUsageAccountant);
     }
