@@ -23,7 +23,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.List;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManager;
 import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
@@ -39,10 +39,13 @@ import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MutableSegmentImplUpsertTest {
@@ -70,15 +73,17 @@ public class MutableSegmentImplUpsertTest {
 
   private void setup(UpsertConfig upsertConfigWithHash)
       throws Exception {
-    URL schemaResourceUrl = this.getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
-    URL dataResourceUrl = this.getClass().getClassLoader().getResource(DATA_FILE_PATH);
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)
         .setUpsertConfig(upsertConfigWithHash)
         .setNullHandlingEnabled(true)
         .build();
+    URL schemaResourceUrl = getClass().getClassLoader().getResource(SCHEMA_FILE_PATH);
+    assertNotNull(schemaResourceUrl);
     Schema schema = Schema.fromFile(new File(schemaResourceUrl.getFile()));
-    CompositeTransformer recordTransformer = CompositeTransformer.getDefaultTransformer(tableConfig, schema);
+    TransformPipeline transformPipeline = new TransformPipeline(tableConfig, schema);
+    URL dataResourceUrl = getClass().getClassLoader().getResource(DATA_FILE_PATH);
+    assertNotNull(dataResourceUrl);
     File jsonFile = new File(dataResourceUrl.getFile());
     TableUpsertMetadataManager tableUpsertMetadataManager =
         TableUpsertMetadataManagerFactory.create(new PinotConfiguration(), tableConfig, schema,
@@ -93,8 +98,10 @@ public class MutableSegmentImplUpsertTest {
         schema.getColumnNames(), null)) {
       while (recordReader.hasNext()) {
         recordReader.next(reuse);
-        GenericRow transformedRow = recordTransformer.transform(reuse);
-        _mutableSegmentImpl.index(transformedRow, null);
+        TransformPipeline.Result result = transformPipeline.processRow(reuse);
+        for (GenericRow transformedRow : result.getTransformedRows()) {
+          _mutableSegmentImpl.index(transformedRow, null);
+        }
         reuse.clear();
       }
     }
@@ -136,35 +143,35 @@ public class MutableSegmentImplUpsertTest {
       ImmutableRoaringBitmap bitmap = _mutableSegmentImpl.getValidDocIds().getMutableRoaringBitmap();
       if (upsertConfig.getComparisonColumns() == null) {
         // aa
-        Assert.assertFalse(bitmap.contains(0));
-        Assert.assertTrue(bitmap.contains(1));
-        Assert.assertFalse(bitmap.contains(2));
-        Assert.assertFalse(bitmap.contains(3));
+        assertFalse(bitmap.contains(0));
+        assertTrue(bitmap.contains(1));
+        assertFalse(bitmap.contains(2));
+        assertFalse(bitmap.contains(3));
         // bb
-        Assert.assertFalse(bitmap.contains(4));
-        Assert.assertTrue(bitmap.contains(5));
-        Assert.assertFalse(bitmap.contains(6));
+        assertFalse(bitmap.contains(4));
+        assertTrue(bitmap.contains(5));
+        assertFalse(bitmap.contains(6));
       } else {
         // aa
-        Assert.assertFalse(bitmap.contains(0));
-        Assert.assertFalse(bitmap.contains(1));
-        Assert.assertTrue(bitmap.contains(2));
-        Assert.assertFalse(bitmap.contains(3));
+        assertFalse(bitmap.contains(0));
+        assertFalse(bitmap.contains(1));
+        assertTrue(bitmap.contains(2));
+        assertFalse(bitmap.contains(3));
         // Confirm that both comparison column values have made it into the persisted upserted doc
-        Assert.assertEquals(_mutableSegmentImpl.getValue(2, TIME_COLUMN), 1567205397L);
-        Assert.assertEquals(_mutableSegmentImpl.getValue(2, OTHER_COMPARISON_COLUMN), 1567205395L);
-        Assert.assertFalse(_mutableSegmentImpl.getDataSource(TIME_COLUMN).getNullValueVector().isNull(2));
-        Assert.assertFalse(_mutableSegmentImpl.getDataSource(OTHER_COMPARISON_COLUMN).getNullValueVector().isNull(2));
+        assertEquals(_mutableSegmentImpl.getValue(2, TIME_COLUMN), 1567205397L);
+        assertEquals(_mutableSegmentImpl.getValue(2, OTHER_COMPARISON_COLUMN), 1567205395L);
+        assertFalse(_mutableSegmentImpl.getDataSource(TIME_COLUMN).getNullValueVector().isNull(2));
+        assertFalse(_mutableSegmentImpl.getDataSource(OTHER_COMPARISON_COLUMN).getNullValueVector().isNull(2));
 
         // bb
-        Assert.assertFalse(bitmap.contains(4));
-        Assert.assertTrue(bitmap.contains(5));
-        Assert.assertFalse(bitmap.contains(6));
+        assertFalse(bitmap.contains(4));
+        assertTrue(bitmap.contains(5));
+        assertFalse(bitmap.contains(6));
         // Confirm that comparison column values have made it into the persisted upserted doc
-        Assert.assertEquals(_mutableSegmentImpl.getValue(5, TIME_COLUMN), 1567205396L);
-        Assert.assertEquals(_mutableSegmentImpl.getValue(5, OTHER_COMPARISON_COLUMN), Long.MIN_VALUE);
-        Assert.assertFalse(_mutableSegmentImpl.getDataSource(TIME_COLUMN).getNullValueVector().isNull(5));
-        Assert.assertTrue(_mutableSegmentImpl.getDataSource(OTHER_COMPARISON_COLUMN).getNullValueVector().isNull(5));
+        assertEquals(_mutableSegmentImpl.getValue(5, TIME_COLUMN), 1567205396L);
+        assertEquals(_mutableSegmentImpl.getValue(5, OTHER_COMPARISON_COLUMN), Long.MIN_VALUE);
+        assertFalse(_mutableSegmentImpl.getDataSource(TIME_COLUMN).getNullValueVector().isNull(5));
+        assertTrue(_mutableSegmentImpl.getDataSource(OTHER_COMPARISON_COLUMN).getNullValueVector().isNull(5));
       }
     } finally {
       tearDown();

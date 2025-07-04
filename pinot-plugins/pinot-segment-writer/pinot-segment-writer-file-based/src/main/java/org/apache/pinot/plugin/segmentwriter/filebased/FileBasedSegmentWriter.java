@@ -38,7 +38,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
-import org.apache.pinot.segment.local.recordtransformer.CompositeTransformer;
+import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -50,7 +50,6 @@ import org.apache.pinot.spi.ingestion.batch.BatchConfig;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.ingestion.batch.spec.Constants;
 import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
-import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +71,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
   private String _outputDirURI;
   private Schema _schema;
   private Set<String> _fieldsToRead;
-  private RecordTransformer _recordTransformer;
+  private TransformPipeline _transformPipeline;
 
   private File _stagingDir;
   private File _bufferFile;
@@ -114,7 +113,7 @@ public class FileBasedSegmentWriter implements SegmentWriter {
 
     _schema = schema;
     _fieldsToRead = _schema.getColumnNames();
-    _recordTransformer = CompositeTransformer.getDefaultTransformer(_tableConfig, _schema);
+    _transformPipeline = new TransformPipeline(_tableConfig, _schema);
     _avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(_schema);
     _reusableRecord = new GenericData.Record(_avroSchema);
 
@@ -140,11 +139,13 @@ public class FileBasedSegmentWriter implements SegmentWriter {
 
   @Override
   public void collect(GenericRow row)
-      throws IOException {
+      throws Exception {
     // TODO: Revisit whether we should transform the row
-    GenericRow transform = _recordTransformer.transform(row);
-    SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transform, _reusableRecord, _fieldsToRead);
-    _recordWriter.append(_reusableRecord);
+    TransformPipeline.Result result = _transformPipeline.processRow(row);
+    for (GenericRow transformedRow : result.getTransformedRows()) {
+      SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(transformedRow, _reusableRecord, _fieldsToRead);
+      _recordWriter.append(_reusableRecord);
+    }
   }
 
   /**
@@ -231,5 +232,6 @@ public class FileBasedSegmentWriter implements SegmentWriter {
     LOGGER.info("Closing {} for table: {}", FileBasedSegmentWriter.class.getName(), _tableNameWithType);
     _recordWriter.close();
     FileUtils.deleteQuietly(_stagingDir);
+    _transformPipeline.reportStats();
   }
 }

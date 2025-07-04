@@ -107,7 +107,7 @@ public class RealtimeSegmentConverter {
       recordReader.init(_realtimeSegmentImpl, sortedDocIds);
       RealtimeSegmentSegmentCreationDataSource dataSource =
           new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
-      driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline()); // initializes reader
+      driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName)); // initializes reader
 
       if (!_enableColumnMajor) {
         driver.build();

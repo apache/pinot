@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.segment.local.segment.creator;
 
-import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
-import org.testng.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 
 
 public class TransformPipelineTest {
@@ -42,32 +44,22 @@ public class TransformPipelineTest {
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow simpleRow = Fixtures.createSingleRow(9527);
-    TransformPipeline.Result result = new TransformPipeline.Result();
-    pipeline.processRow(simpleRow, result);
-    Assert.assertNotNull(result);
-    Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertEquals(result.getSkippedRowCount(), 0);
-    Assert.assertEquals(result.getTransformedRows().get(0), simpleRow);
+    TransformPipeline.Result result = pipeline.processRow(simpleRow);
+    assertNotNull(result);
+    assertEquals(result.getTransformedRows().size(), 1);
+    assertEquals(result.getSkippedRowCount(), 0);
+    assertEquals(result.getTransformedRows().get(0), simpleRow);
   }
 
-  @Test
+  @Test(expectedExceptions = RuntimeException.class,
+      expectedExceptionsMessageRegExp = "Caught exception while transforming data type.*")
   public void testSingleRowFailure()
       throws Exception {
     TableConfig config = createTestTableConfig();
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow simpleRow = Fixtures.createInvalidSingleRow(9527);
-    boolean exceptionThrown = false;
-    TransformPipeline.Result result = new TransformPipeline.Result();
-    try {
-      pipeline.processRow(simpleRow, result);
-    } catch (Exception ex) {
-      exceptionThrown = true;
-    }
-    Assert.assertTrue(exceptionThrown);
-    Assert.assertNotNull(result);
-    Assert.assertEquals(result.getTransformedRows().size(), 0);
-    Assert.assertEquals(result.getSkippedRowCount(), 0);
+    pipeline.processRow(simpleRow);
   }
 
   @Test
@@ -77,58 +69,24 @@ public class TransformPipelineTest {
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow multipleRow = Fixtures.createMultipleRow(9527);
-    Collection<GenericRow> rows = (Collection<GenericRow>) multipleRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
-    TransformPipeline.Result result = new TransformPipeline.Result();
-    pipeline.processRow(multipleRow, result);
-
-    Assert.assertNotNull(result);
-    Assert.assertEquals(result.getTransformedRows().size(), rows.size());
-    Assert.assertEquals(result.getSkippedRowCount(), 0);
-    Assert.assertEquals(result.getTransformedRows(), rows);
+    //noinspection unchecked
+    List<GenericRow> rows = (List<GenericRow>) multipleRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY);
+    TransformPipeline.Result result = pipeline.processRow(multipleRow);
+    assertNotNull(result);
+    assertEquals(result.getTransformedRows().size(), rows.size());
+    assertEquals(result.getSkippedRowCount(), 0);
+    assertEquals(result.getTransformedRows(), rows);
   }
 
-  @Test
+  @Test(expectedExceptions = RuntimeException.class,
+      expectedExceptionsMessageRegExp = "Caught exception while transforming data type.*")
   public void testMultipleRowPartialFailure()
       throws Exception {
     TableConfig config = createTestTableConfig();
     Schema schema = Fixtures.createSchema();
     TransformPipeline pipeline = new TransformPipeline(config, schema);
     GenericRow multipleRow = Fixtures.createMultipleRowPartialFailure(9527);
-    TransformPipeline.Result result = new TransformPipeline.Result();
-    boolean exceptionThrown = false;
-    try {
-      pipeline.processRow(multipleRow, result);
-    } catch (Exception ex) {
-      exceptionThrown = true;
-    }
-
-    Assert.assertTrue(exceptionThrown);
-    Assert.assertNotNull(result);
-    Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertEquals(result.getSkippedRowCount(), 0);
-  }
-
-  @Test
-  public void testReuseResultSet()
-      throws Exception {
-    TableConfig config = createTestTableConfig();
-    Schema schema = Fixtures.createSchema();
-    TransformPipeline pipeline = new TransformPipeline(config, schema);
-    GenericRow simpleRow = Fixtures.createSingleRow(9527);
-
-    TransformPipeline.Result result = new TransformPipeline.Result();
-    pipeline.processRow(simpleRow, result);
-    Assert.assertNotNull(result);
-    Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertEquals(result.getSkippedRowCount(), 0);
-    Assert.assertEquals(result.getTransformedRows().get(0), simpleRow);
-
-    // same row runs twice, should reset the flag.
-    pipeline.processRow(simpleRow, result);
-    Assert.assertNotNull(result);
-    Assert.assertEquals(result.getTransformedRows().size(), 1);
-    Assert.assertEquals(result.getSkippedRowCount(), 0);
-    Assert.assertEquals(result.getTransformedRows().get(0), simpleRow);
+    pipeline.processRow(multipleRow);
   }
 
   @Test
@@ -282,26 +240,26 @@ public class TransformPipelineTest {
     sampleRow.putValue("public", true);
     sampleRow.putValue("created_at", "2018-01-01T11:00:00Z");
 
-    TransformPipeline.Result result = new TransformPipeline.Result();
-    pipeline.processRow(sampleRow, result);
-    GenericRow transformedRow = result.getTransformedRows().get(0);
-    Assert.assertNull(transformedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
-    Assert.assertEquals(transformedRow.getValue("created_at_timestamp"), 1514804400000L);
-    Assert.assertEquals(transformedRow.getValue("commits.author.email"),
+    TransformPipeline.Result result = pipeline.processRow(sampleRow);
+    List<GenericRow> transformedRows = result.getTransformedRows();
+    assertEquals(transformedRows.size(), 1);
+    GenericRow transformedRow = transformedRows.get(0);
+    assertEquals(transformedRow.getValue("created_at_timestamp"), 1514804400000L);
+    assertEquals(transformedRow.getValue("commits.author.email"),
         "4cc153d999e24274955157fc813e6f92f821525d@outlook.com");
-    Assert.assertEquals(transformedRow.getValue("commits.author.name"), "Lime");
-    Assert.assertEquals(transformedRow.getValue("commits.message"),
+    assertEquals(transformedRow.getValue("commits.author.name"), "Lime");
+    assertEquals(transformedRow.getValue("commits.message"),
         "Merge branch 'master' of https://github.com/LimeVista/Tapes\\n\\n# Conflicts:\\n#\\t.gitignore");
-    Assert.assertEquals(transformedRow.getValue("commits.sha"), "c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
-    Assert.assertEquals(transformedRow.getValue("commits.distinct"), 1);
-    Assert.assertEquals(transformedRow.getValue("commits.url"),
+    assertEquals(transformedRow.getValue("commits.sha"), "c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
+    assertEquals(transformedRow.getValue("commits.distinct"), 1);
+    assertEquals(transformedRow.getValue("commits.url"),
         "https://api.github.com/repos/LimeVista/Tapes/commits/c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
-    Assert.assertEquals(transformedRow.getValue("ref"), "refs/heads/master");
-    Assert.assertEquals(transformedRow.getValue("distinct_size"), 1);
-    Assert.assertEquals(transformedRow.getValue("head"), "c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
-    Assert.assertEquals(transformedRow.getValue("push_id"), 2226018068L);
-    Assert.assertEquals(transformedRow.getValue("size"), 1);
-    Assert.assertEquals(transformedRow.getValue("before"), "892d872c5d3f24cc6837900c9f4618dc2fe92930");
+    assertEquals(transformedRow.getValue("ref"), "refs/heads/master");
+    assertEquals(transformedRow.getValue("distinct_size"), 1);
+    assertEquals(transformedRow.getValue("head"), "c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
+    assertEquals(transformedRow.getValue("push_id"), 2226018068L);
+    assertEquals(transformedRow.getValue("size"), 1);
+    assertEquals(transformedRow.getValue("before"), "892d872c5d3f24cc6837900c9f4618dc2fe92930");
   }
 
   @Test
@@ -455,36 +413,36 @@ public class TransformPipelineTest {
     sampleRow.putValue("public", true);
     sampleRow.putValue("created_at", "2018-01-01T11:00:00Z");
 
-    TransformPipeline.Result result = new TransformPipeline.Result();
-    pipeline.processRow(sampleRow, result);
-    GenericRow transformedRow = result.getTransformedRows().get(0);
-    Assert.assertNull(transformedRow.getValue(GenericRow.MULTIPLE_RECORDS_KEY));
-    Assert.assertEquals(transformedRow.getValue("created_at_timestamp"), 1514804400000L);
-    Assert.assertEquals(transformedRow.getValue("commits.author.email"),
+    TransformPipeline.Result result = pipeline.processRow(sampleRow);
+    List<GenericRow> transformedRows = result.getTransformedRows();
+    assertEquals(transformedRows.size(), 1);
+    GenericRow transformedRow = transformedRows.get(0);
+    assertEquals(transformedRow.getValue("created_at_timestamp"), 1514804400000L);
+    assertEquals(transformedRow.getValue("commits.author.email"),
         "4cc153d999e24274955157fc813e6f92f821525d@outlook.com");
-    Assert.assertEquals(transformedRow.getValue("commits.author.name"), "Lime");
-    Assert.assertEquals(transformedRow.getValue("commits.message"),
+    assertEquals(transformedRow.getValue("commits.author.name"), "Lime");
+    assertEquals(transformedRow.getValue("commits.message"),
         "Merge branch 'master' of https://github.com/LimeVista/Tapes\\n\\n# Conflicts:\\n#\\t.gitignore");
-    Assert.assertEquals(transformedRow.getValue("commits.sha"), "c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
-    Assert.assertEquals(transformedRow.getValue("commits.distinct"), 1);
-    Assert.assertEquals(transformedRow.getValue("commits.url"),
+    assertEquals(transformedRow.getValue("commits.sha"), "c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
+    assertEquals(transformedRow.getValue("commits.distinct"), 1);
+    assertEquals(transformedRow.getValue("commits.url"),
         "https://api.github.com/repos/LimeVista/Tapes/commits/c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
-    Assert.assertEquals(transformedRow.getValue("ref"), "refs/heads/master");
-    Assert.assertEquals(transformedRow.getValue("distinct_size"), 1);
-    Assert.assertEquals(transformedRow.getValue("head"), "c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
-    Assert.assertEquals(transformedRow.getValue("push_id"), 2226018068L);
-    Assert.assertEquals(transformedRow.getValue("size"), 1);
-    Assert.assertEquals(transformedRow.getValue("before"), "892d872c5d3f24cc6837900c9f4618dc2fe92930");
+    assertEquals(transformedRow.getValue("ref"), "refs/heads/master");
+    assertEquals(transformedRow.getValue("distinct_size"), 1);
+    assertEquals(transformedRow.getValue("head"), "c5fc8b32a9ead1eba315d97410cb4ac1e6ca1774");
+    assertEquals(transformedRow.getValue("push_id"), 2226018068L);
+    assertEquals(transformedRow.getValue("size"), 1);
+    assertEquals(transformedRow.getValue("before"), "892d872c5d3f24cc6837900c9f4618dc2fe92930");
 
-    Assert.assertEquals(transformedRow.getValue("a.id"), 18542751);
-    Assert.assertEquals(transformedRow.getValue("a.login"), "LimeVista");
-    Assert.assertEquals(transformedRow.getValue("a.display_login"), "LimeVista");
-    Assert.assertEquals(transformedRow.getValue("a.gravatar_id"), "");
-    Assert.assertEquals(transformedRow.getValue("a.url"), "https://api.github.com/users/LimeVista");
-    Assert.assertEquals(transformedRow.getValue("a.avatar_url"), "https://avatars.githubusercontent.com/u/18542751?");
+    assertEquals(transformedRow.getValue("a.id"), 18542751);
+    assertEquals(transformedRow.getValue("a.login"), "LimeVista");
+    assertEquals(transformedRow.getValue("a.display_login"), "LimeVista");
+    assertEquals(transformedRow.getValue("a.gravatar_id"), "");
+    assertEquals(transformedRow.getValue("a.url"), "https://api.github.com/users/LimeVista");
+    assertEquals(transformedRow.getValue("a.avatar_url"), "https://avatars.githubusercontent.com/u/18542751?");
 
-    Assert.assertEquals(transformedRow.getValue("r.id"), 115911530);
-    Assert.assertEquals(transformedRow.getValue("r.name"), "LimeVista/Tapes");
-    Assert.assertEquals(transformedRow.getValue("r.url"), "https://api.github.com/repos/LimeVista/Tapes");
+    assertEquals(transformedRow.getValue("r.id"), 115911530);
+    assertEquals(transformedRow.getValue("r.name"), "LimeVista/Tapes");
+    assertEquals(transformedRow.getValue("r.url"), "https://api.github.com/repos/LimeVista/Tapes");
   }
 }

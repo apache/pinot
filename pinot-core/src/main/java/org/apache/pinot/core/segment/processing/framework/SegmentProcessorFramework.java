@@ -341,7 +341,7 @@ public class SegmentProcessorFramework {
           GenericRowFileRecordReader recordReaderForRange = recordReader.getRecordReaderForRange(startRowId, endRowId);
           SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
           driver.init(generatorConfig, new RecordReaderSegmentCreationDataSource(recordReaderForRange),
-              TransformPipeline.getPassThroughPipeline());
+              TransformPipeline.getPassThroughPipeline(tableConfig.getTableName()));
           driver.build();
           _incompleteRowsFound += driver.getIncompleteRowsFound();
           _skippedRowsFound += driver.getSkippedRowsFound();
