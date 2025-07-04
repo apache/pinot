@@ -22,24 +22,96 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.testng.Assert;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 public class IngestionDelayTrackerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final int TIMER_THREAD_TICK_INTERVAL_MS = 100;
+  public static final long OFFSET_TRACKING_INTERVAL = 1000L;
 
-  private final ServerMetrics _serverMetrics = mock(ServerMetrics.class);
-  private final RealtimeTableDataManager _realtimeTableDataManager = mock(RealtimeTableDataManager.class);
+  private ServerMetrics _serverMetrics;
+  private RealtimeTableDataManager _realtimeTableDataManager;
+
+  // Mocks for StreamConsumerFactory and StreamMetadataProvider
+  private StreamConsumerFactory _mockStreamConsumerFactory;
+  private StreamMetadataProvider _mockStreamMetadataProvider;
+
+  // MockedStatic for StreamConsumerFactoryProvider
+  private MockedStatic<StreamConsumerFactoryProvider> _mockedFactoryProvider;
+
+  @BeforeMethod
+  public void setUp() throws Exception {
+    _serverMetrics = mock(ServerMetrics.class);
+    _realtimeTableDataManager = mock(RealtimeTableDataManager.class);
+
+    // Initialize mocks for StreamConsumerFactory and StreamMetadataProvider
+    _mockStreamConsumerFactory = mock(StreamConsumerFactory.class);
+    _mockStreamMetadataProvider = mock(StreamMetadataProvider.class);
+
+    // Mock the static method StreamConsumerFactoryProvider.create()
+    _mockedFactoryProvider = Mockito.mockStatic(StreamConsumerFactoryProvider.class);
+    _mockedFactoryProvider.when(() -> StreamConsumerFactoryProvider.create(any()))
+        .thenReturn(_mockStreamConsumerFactory);
+
+    // When createPartitionMetadataProvider is called, return the mock StreamMetadataProvider
+    when(_mockStreamConsumerFactory.createPartitionMetadataProvider(anyString(), anyInt()))
+        .thenReturn(_mockStreamMetadataProvider);
+
+    // Default behavior for fetchStreamPartitionOffset
+    when(_mockStreamMetadataProvider.fetchStreamPartitionOffset(any(), anyLong()))
+        .thenReturn(new LongMsgOffset(100L));
+
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", "kafka");
+    streamConfigMap.put("stream.kafka.topic.name", RAW_TABLE_NAME);
+    streamConfigMap.put("stream.kafka.decoder.class.name",
+        "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(Collections.singletonList(streamConfigMap));
+    when(_realtimeTableDataManager.getStreamIngestionConfig()).thenReturn(streamIngestionConfig);
+
+    PinotConfiguration instanceConfig = new PinotConfiguration();
+    instanceConfig.setProperty(IngestionDelayTracker.OFFSET_LAG_TRACKING_ENABLE_CONFIG_KEY, "true");
+    instanceConfig.setProperty(IngestionDelayTracker.OFFSET_LAG_TRACKING_UPDATE_INTERVAL_CONFIG_KEY,
+        String.valueOf(OFFSET_TRACKING_INTERVAL));
+    InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
+    when(instanceDataManagerConfig.getConfig()).thenReturn(instanceConfig);
+    when(_realtimeTableDataManager.getInstanceDataManagerConfig()).thenReturn(instanceDataManagerConfig);
+  }
+
+  @AfterMethod
+  public void tearDown() {
+    // Close the mocked static after each test
+    _mockedFactoryProvider.close();
+  }
 
   private IngestionDelayTracker createTracker() {
     IngestionDelayTracker ingestionDelayTracker =
@@ -96,7 +168,7 @@ public class IngestionDelayTrackerTest {
     for (long ingestionTimeMs = 0; ingestionTimeMs <= maxTestDelay; ingestionTimeMs++) {
       long firstStreamIngestionTimeMs = ingestionTimeMs + 1;
       ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, ingestionTimeMs, firstStreamIngestionTimeMs,
-          null, null);
+          null);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0),
           clock.millis() - ingestionTimeMs);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0),
@@ -108,7 +180,7 @@ public class IngestionDelayTrackerTest {
     for (long ingestionTimeMs = maxTestDelay; ingestionTimeMs >= 0; ingestionTimeMs--) {
       long firstStreamIngestionTimeMs = ingestionTimeMs + 1;
       ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, ingestionTimeMs, firstStreamIngestionTimeMs,
-          null, null);
+          null);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0),
           clock.millis() - ingestionTimeMs);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0),
@@ -117,13 +189,13 @@ public class IngestionDelayTrackerTest {
     }
 
     // Make the current partition maximum
-    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, maxTestDelay, maxTestDelay, null, null);
+    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, maxTestDelay, maxTestDelay, null);
 
     // Bring up partition1 delay up and verify values
     for (long ingestionTimeMs = 0; ingestionTimeMs <= 2 * maxTestDelay; ingestionTimeMs++) {
       long firstStreamIngestionTimeMs = ingestionTimeMs + 1;
       ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, ingestionTimeMs, firstStreamIngestionTimeMs,
-          null, null);
+          null);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition1),
           clock.millis() - ingestionTimeMs);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition1),
@@ -135,7 +207,7 @@ public class IngestionDelayTrackerTest {
     for (long ingestionTimeMs = 2 * maxTestDelay; ingestionTimeMs >= 0; ingestionTimeMs--) {
       long firstStreamIngestionTimeMs = ingestionTimeMs + 1;
       ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, ingestionTimeMs, firstStreamIngestionTimeMs,
-          null, null);
+          null);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition1),
           clock.millis() - ingestionTimeMs);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition1),
@@ -168,7 +240,7 @@ public class IngestionDelayTrackerTest {
     Clock clock = Clock.fixed(now, zoneId);
     ingestionDelayTracker.setClock(clock);
     long ingestionTimeMs = clock.millis() - partition0Delay0;
-    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, ingestionTimeMs, ingestionTimeMs, null, null);
+    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, ingestionTimeMs, ingestionTimeMs, null);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0), partition0Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0), partition0Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition0), ingestionTimeMs);
@@ -183,7 +255,7 @@ public class IngestionDelayTrackerTest {
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition0), ingestionTimeMs);
 
     ingestionTimeMs = offsetClock.millis() - partition0Delay1;
-    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, ingestionTimeMs, ingestionTimeMs, null, null);
+    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, ingestionTimeMs, ingestionTimeMs, null);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0), partition0Delay1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0), partition0Delay1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition0), ingestionTimeMs);
@@ -195,7 +267,7 @@ public class IngestionDelayTrackerTest {
         (partition0Delay1 + partition0Offset1Ms));
 
     ingestionTimeMs = offsetClock.millis() - partition1Delay0;
-    ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, ingestionTimeMs, ingestionTimeMs, null, null);
+    ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, ingestionTimeMs, ingestionTimeMs, null);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition1), partition1Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition1), partition1Delay0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition1), ingestionTimeMs);
@@ -225,8 +297,7 @@ public class IngestionDelayTrackerTest {
     for (int partitionId = 0; partitionId <= maxTestDelay; partitionId++) {
       String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, 123).getSegmentName();
       long ingestionTimeMs = clock.millis() - partitionId;
-      ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, ingestionTimeMs, null,
-          null);
+      ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, ingestionTimeMs, null);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionId), partitionId);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionId), partitionId);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partitionId), ingestionTimeMs);
@@ -253,7 +324,7 @@ public class IngestionDelayTrackerTest {
 
     String segmentName = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, 123).getSegmentName();
     long ingestionTimeMs = clock.millis() - 10;
-    ingestionDelayTracker.updateIngestionMetrics(segmentName, 0, ingestionTimeMs, ingestionTimeMs, null, null);
+    ingestionDelayTracker.updateIngestionMetrics(segmentName, 0, ingestionTimeMs, ingestionTimeMs, null);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 10);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 10);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), ingestionTimeMs);
@@ -264,7 +335,7 @@ public class IngestionDelayTrackerTest {
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
 
     // Should not update metrics for removed segment
-    ingestionDelayTracker.updateIngestionMetrics(segmentName, 0, ingestionTimeMs, ingestionTimeMs, null, null);
+    ingestionDelayTracker.updateIngestionMetrics(segmentName, 0, ingestionTimeMs, ingestionTimeMs, null);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(0), 0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
@@ -285,8 +356,7 @@ public class IngestionDelayTrackerTest {
     for (int partitionId = 0; partitionId <= maxTestDelay; partitionId++) {
       String segmentName = new LLCSegmentName(RAW_TABLE_NAME, partitionId, 0, 123).getSegmentName();
       long ingestionTimeMs = clock.millis() - partitionId;
-      ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, ingestionTimeMs, null,
-          null);
+      ingestionDelayTracker.updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, ingestionTimeMs, null);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partitionId), partitionId);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partitionId), partitionId);
     }
@@ -309,8 +379,8 @@ public class IngestionDelayTrackerTest {
     // Test tracking offset lag for a single partition
     StreamPartitionMsgOffset msgOffset0 = new LongMsgOffset(50);
     StreamPartitionMsgOffset latestOffset0 = new LongMsgOffset(150);
-    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0,
-        latestOffset0);
+    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0);
+    mockUpdateLatestStreamOffset(latestOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 100);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition0), 150);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition0), 50);
@@ -318,8 +388,8 @@ public class IngestionDelayTrackerTest {
     // Test tracking offset lag for another partition
     StreamPartitionMsgOffset msgOffset1 = new LongMsgOffset(50);
     StreamPartitionMsgOffset latestOffset1 = new LongMsgOffset(150);
-    ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset1,
-        latestOffset1);
+    ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset1);
+    mockUpdateLatestStreamOffset(latestOffset1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition1), 100);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition1), 150);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition1), 50);
@@ -327,12 +397,22 @@ public class IngestionDelayTrackerTest {
     // Update offset lag for partition0
     msgOffset0 = new LongMsgOffset(150);
     latestOffset0 = new LongMsgOffset(200);
-    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0,
-        latestOffset0);
+    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, Long.MIN_VALUE, Long.MIN_VALUE, msgOffset0);
+    mockUpdateLatestStreamOffset(latestOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 50);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition0), 200);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition0), 150);
 
     ingestionDelayTracker.shutdown();
+  }
+
+  private void mockUpdateLatestStreamOffset(StreamPartitionMsgOffset latestOffset0) {
+    try {
+      when(_mockStreamMetadataProvider.fetchStreamPartitionOffset(any(), anyLong())).thenReturn(
+          new LongMsgOffset(latestOffset0));
+      Thread.sleep(2 * OFFSET_TRACKING_INTERVAL);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 }
