@@ -953,10 +953,10 @@ public class ControllerTest {
 
     assert taskIds != null;
     LOGGER.info("Scheduled {} for table {} with id: {}", taskType, tableNameWithType, taskIds);
-    assertEquals(taskIds.size(), 1, String.format("Task %s not scheduled as expected for table %s. Expected 1 task, but got: %s",
+    assertEquals(taskIds.size(), 1,
+        String.format("Task %s not scheduled as expected for table %s. Expected 1 task, but got: %s",
         taskType, tableNameWithType, taskIds.size()));
     return taskIds.get(0);
-
   }
 
   public void pauseTable(String tableName)
