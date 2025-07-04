@@ -405,6 +405,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS = "pinot.broker.mse.max.server.query.threads";
     public static final int DEFAULT_MSE_MAX_SERVER_QUERY_THREADS = -1;
+    public static final String CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY =
+        "pinot.broker.mse.max.server.query.threads.exceed.strategy";
+    public static final String DEFAULT_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY = "WAIT";
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
@@ -1036,6 +1039,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_MAX_EXECUTION_THREADS =
         MSE_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
     public static final int DEFAULT_MSE_MAX_EXECUTION_THREADS = -1;
+    public static final String CONFIG_OF_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY =
+        MSE_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS + ".exceed.strategy";
+    public static final String DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY = "ERROR";
 
     // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
     // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When

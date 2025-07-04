@@ -82,6 +82,7 @@ import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.executor.MetricsExecutor;
 import org.apache.pinot.spi.executor.ThrottleOnCriticalHeapUsageExecutor;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -206,8 +207,21 @@ public class QueryRunner {
 
     int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(serverConf);
     if (hardLimit > 0) {
-      LOGGER.info("Setting multi-stage executor hardLimit: {}", hardLimit);
-      _executorService = new HardLimitExecutor(hardLimit, _executorService);
+      String strategyStr = serverConf.getProperty(
+          CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY,
+          CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+      QueryThreadExceedStrategy exceedStrategy;
+      try {
+        exceedStrategy = QueryThreadExceedStrategy.valueOf(strategyStr.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        LOGGER.error("Invalid exceed strategy: {}, using default: {}", strategyStr,
+            CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+        exceedStrategy = QueryThreadExceedStrategy.valueOf(
+            CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+      }
+
+      LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
+      _executorService = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy);
     }
 
     if (serverConf.getProperty(Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE,

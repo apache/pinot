@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,11 +37,17 @@ public class HardLimitExecutor extends DecoratorExecutorService {
 
   private final AtomicInteger _running;
   private final int _max;
+  private final QueryThreadExceedStrategy _exceedStrategy;
 
-  public HardLimitExecutor(int max, ExecutorService executorService) {
+  public HardLimitExecutor(int max, ExecutorService executorService, QueryThreadExceedStrategy exceedStrategy) {
     super(executorService);
     _running = new AtomicInteger(0);
     _max = max;
+    _exceedStrategy = exceedStrategy;
+  }
+
+  public HardLimitExecutor(int max, ExecutorService executorService) {
+    this(max, executorService, QueryThreadExceedStrategy.ERROR);
   }
 
   /**
@@ -73,7 +80,15 @@ public class HardLimitExecutor extends DecoratorExecutorService {
 
   protected void checkTaskAllowed() {
     if (_running.get() >= _max) {
-      throw new IllegalStateException("Tasks limit exceeded.");
+      if (_exceedStrategy == QueryThreadExceedStrategy.LOG) {
+        LOGGER.warn("Exceed strategy LOG: Tasks limit max: {} exceeded with running: {} tasks.",
+            _max, _running.get());
+      } else if (_exceedStrategy == QueryThreadExceedStrategy.ERROR) {
+        throw new IllegalStateException("Tasks limit exceeded.");
+      } else {
+        throw new IllegalStateException(String.format(
+            "%s is configured to an unsupported strategy.", this.getClass().getName()));
+      }
     }
   }
 
