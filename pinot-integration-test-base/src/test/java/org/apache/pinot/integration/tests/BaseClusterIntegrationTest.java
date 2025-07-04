@@ -37,6 +37,7 @@ import java.util.Properties;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientTransportFactory;
@@ -207,6 +208,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
+  protected RoutingConfig getRoutingConfig() {
+    // Default routing config is handled by broker
+    return null;
+  }
+
+  @Nullable
+  protected UpsertConfig getUpsertConfig() {
+    return null;
+  }
+
+  @Nullable
   protected List<String> getBloomFilterColumns() {
     return new ArrayList<>(DEFAULT_BLOOM_FILTER_COLUMNS);
   }
@@ -261,6 +273,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Nullable
   protected SegmentPartitionConfig getSegmentPartitionConfig() {
+    return null;
+  }
+
+  @Nullable
+  protected ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return null;
   }
 
@@ -384,6 +401,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setInvertedIndexColumns(getInvertedIndexColumns())
         .setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns())
+        .setRoutingConfig(getRoutingConfig())
+        .setUpsertConfig(getUpsertConfig())
         .setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs())
         .setNumReplicas(getNumReplicas())
@@ -395,7 +414,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setIngestionConfig(getIngestionConfig())
         .setQueryConfig(getQueryConfig())
         .setStreamConfigs(getStreamConfigs())
-        .setNullHandlingEnabled(getNullHandlingEnabled());
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setSegmentPartitionConfig(getSegmentPartitionConfig())
+        .setReplicaGroupStrategyConfig(getReplicaGroupStrategyConfig());
   }
 
   /**
@@ -722,6 +743,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       return resultSetGroup.getResultSet(0).getLong(0);
     }
     return 0;
+  }
+
+  protected void waitForTaskCompletion(String taskId) {
+    TestUtils.waitForCondition(aVoid ->
+            _controllerStarter.getHelixTaskResourceManager().getTaskState(taskId) == TaskState.COMPLETED,
+        300_000L, "Failed to complete the task");
   }
 
   /**
