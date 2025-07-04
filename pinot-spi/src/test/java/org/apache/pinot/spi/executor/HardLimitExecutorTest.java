@@ -24,6 +24,7 @@ import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
@@ -65,9 +66,9 @@ public class HardLimitExecutorTest {
   }
 
   @Test
-  public void testHardLimitLogOnlyEnabled()
+  public void testHardLimitLogExceedStrategy()
       throws Exception {
-    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), true);
+    HardLimitExecutor ex = new HardLimitExecutor(1, Executors.newCachedThreadPool(), QueryThreadExceedStrategy.LOG);
     CyclicBarrier barrier = new CyclicBarrier(2);
 
     try {

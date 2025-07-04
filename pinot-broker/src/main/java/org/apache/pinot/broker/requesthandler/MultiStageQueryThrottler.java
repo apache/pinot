@@ -32,6 +32,7 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.pinot.broker.broker.helix.ClusterChangeHandler;
 import org.apache.pinot.common.concurrency.AdjustableSemaphore;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +54,7 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(MultiStageQueryThrottler.class);
 
   private final int _maxServerQueryThreadsFromBrokerConfig;
-  private final boolean _logOnlyMode;
+  private final QueryThreadExceedStrategy _exceedStrategy;
   private final AtomicInteger _currentQueryServerThreads = new AtomicInteger();
   /**
    * If _maxServerQueryThreads is <= 0, it means that the cluster is not configured to limit the number of multi-stage
@@ -72,9 +73,20 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
     _maxServerQueryThreadsFromBrokerConfig = brokerConf.getProperty(
         CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS,
         CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS);
-    _logOnlyMode = brokerConf.getProperty(
-        CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED,
-        CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED);
+
+    String strategyStr = brokerConf.getProperty(
+        CommonConstants.Broker.CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY,
+        CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY);
+    QueryThreadExceedStrategy strategy;
+    try {
+      strategy = QueryThreadExceedStrategy.valueOf(strategyStr.toUpperCase());
+    } catch (IllegalArgumentException e) {
+      LOGGER.error("Invalid exceed strategy: {}, using default: {}", strategyStr,
+          CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY);
+      strategy = QueryThreadExceedStrategy.valueOf(
+          CommonConstants.Broker.DEFAULT_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY);
+    }
+    _exceedStrategy = strategy;
   }
 
   @Override
@@ -121,7 +133,7 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
       return true;
     }
 
-    if (numQueryThreads > _semaphore.getTotalPermits() && !_logOnlyMode) {
+    if (numQueryThreads > _semaphore.getTotalPermits() && _exceedStrategy != QueryThreadExceedStrategy.LOG) {
       throw new RuntimeException(
           String.format("Can't dispatch query because the estimated number of server threads for this query is too "
               + "large for the configured value of '%s' or '%s'. estimatedThreads=%d configuredLimit=%d",
@@ -130,23 +142,24 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
                   numQueryThreads, _semaphore.getTotalPermits()));
     }
 
-    if (_logOnlyMode) {
-      // In log-only mode, check if the current thread count would surpass the configured maximum limit
+    if (_exceedStrategy == QueryThreadExceedStrategy.LOG) {
       boolean wouldThrottle = _currentQueryServerThreads.get() + numQueryThreads > _maxServerQueryThreads;
       if (wouldThrottle) {
         LOGGER.warn(
-            "Log-only mode: Query would have been throttled since it is estimated to use more threads than available. "
-                + "estimatedThreads: {} availableThreads: {}",
+            "Exceed strategy LOG: Query would have been throttled. estimatedThreads: {} availableThreads: {}",
             numQueryThreads, _maxServerQueryThreads - _currentQueryServerThreads.get());
       }
       _currentQueryServerThreads.addAndGet(numQueryThreads);
       return true;
-    } else {
+    } else if (_exceedStrategy == QueryThreadExceedStrategy.WAIT) {
       boolean result = _semaphore.tryAcquire(numQueryThreads, timeout, unit);
       if (result) {
         _currentQueryServerThreads.addAndGet(numQueryThreads);
       }
       return result;
+    } else {
+      throw new IllegalStateException(String.format(
+          "%s is configured to an unsupported strategy.", this.getClass().getName()));
     }
   }
 
@@ -156,7 +169,7 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
    */
   public void release(int numQueryThreads) {
     _currentQueryServerThreads.addAndGet(-1 * numQueryThreads);
-    if (_maxServerQueryThreads > 0 && !_logOnlyMode) {
+    if (_maxServerQueryThreads > 0 && _exceedStrategy == QueryThreadExceedStrategy.WAIT) {
       _semaphore.release(numQueryThreads);
     }
   }
@@ -231,8 +244,8 @@ public class MultiStageQueryThrottler implements ClusterChangeHandler {
   private int calculateSemaphoreLimit() {
     int semaphoreLimit = Math.max(1, _maxServerQueryThreads * _numServers / _numBrokers);
     LOGGER.info("Calculating estimated server query threads limit: {} for maxServerQueryThreads: {}, "
-            + "numBrokers: {}, numServers: {}, logOnlyMode: {}",
-        semaphoreLimit, _maxServerQueryThreads, _numBrokers, _numServers, _logOnlyMode);
+            + "numBrokers: {}, numServers: {}, exceedStrategy: {}",
+        semaphoreLimit, _maxServerQueryThreads, _numBrokers, _numServers, _exceedStrategy);
     return semaphoreLimit;
   }
 }

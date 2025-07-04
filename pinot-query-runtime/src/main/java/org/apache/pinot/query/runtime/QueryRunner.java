@@ -80,6 +80,7 @@ import org.apache.pinot.spi.executor.ExecutorServiceUtils;
 import org.apache.pinot.spi.executor.HardLimitExecutor;
 import org.apache.pinot.spi.executor.MetricsExecutor;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.query.QueryThreadExceedStrategy;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -204,11 +205,21 @@ public class QueryRunner {
 
     int hardLimit = HardLimitExecutor.getMultiStageExecutorHardLimit(serverConf);
     if (hardLimit > 0) {
-      boolean logOnlyMode = serverConf.getProperty(
-          CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED,
-          CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_QUERY_THREAD_LIMITING_LOG_ONLY_ENABLED);
-      LOGGER.info("Setting multi-stage executor hardLimit: {} logOnlyMode: {}", hardLimit, logOnlyMode);
-      _executorService = new HardLimitExecutor(hardLimit, _executorService, logOnlyMode);
+      String strategyStr = serverConf.getProperty(
+          CommonConstants.Server.CONFIG_OF_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY,
+          CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+      QueryThreadExceedStrategy exceedStrategy;
+      try {
+        exceedStrategy = QueryThreadExceedStrategy.valueOf(strategyStr.toUpperCase());
+      } catch (IllegalArgumentException e) {
+        LOGGER.error("Invalid exceed strategy: {}, using default: {}", strategyStr,
+            CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+        exceedStrategy = QueryThreadExceedStrategy.valueOf(
+            CommonConstants.Server.DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY);
+      }
+
+      LOGGER.info("Setting multi-stage executor hardLimit: {} exceedStrategy: {}", hardLimit, exceedStrategy);
+      _executorService = new HardLimitExecutor(hardLimit, _executorService, exceedStrategy);
     }
 
     _opChainScheduler = new OpChainSchedulerService(_executorService, serverConf);
