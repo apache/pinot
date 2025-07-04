@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -42,6 +43,7 @@ import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFacto
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 
 
@@ -98,6 +100,8 @@ public class QueryContext {
   private Set<String> _columns;
 
   // Other properties to be shared across all the segments
+  // Latest table schema at query time
+  private Schema _schema;
   // End time in milliseconds for the query
   private long _endTimeMs;
   // Whether to enable prefetch for the query
@@ -117,6 +121,8 @@ public class QueryContext {
   private int _minInitialIndexedTableCapacity = Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY;
   // Limit of number of groups stored in each segment
   private int _numGroupsLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_LIMIT;
+  // Warning threshold of number of groups stored in each segment
+  private int _numGroupsWarningLimit = Server.DEFAULT_QUERY_EXECUTOR_NUM_GROUPS_WARN_LIMIT;
   // Minimum number of groups to keep per segment when trimming groups for SQL GROUP BY
   private int _minSegmentGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SEGMENT_GROUP_TRIM_SIZE;
   // Minimum number of groups to keep across segments when trimming groups for SQL GROUP BY
@@ -133,6 +139,7 @@ public class QueryContext {
   private boolean _serverReturnFinalResult;
   // Whether server returns the final result with unpartitioned group key
   private boolean _serverReturnFinalResultKeyUnpartitioned;
+  private boolean _accurateGroupByWithoutOrderBy;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -156,6 +163,48 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _expressionOverrideHints = expressionOverrideHints;
     _explain = explain;
+  }
+
+  private boolean isSameOrderAndGroupByColumns(QueryContext context) {
+    List<ExpressionContext> groupByKeys = context.getGroupByExpressions();
+    List<OrderByExpressionContext> orderByKeys = context.getOrderByExpressions();
+
+    if (groupByKeys == null || groupByKeys.isEmpty()) {
+      return orderByKeys == null || orderByKeys.isEmpty();
+    } else if (orderByKeys == null || orderByKeys.isEmpty()) {
+      return false;
+    }
+
+    BitSet orderByKeysMatched = new BitSet(orderByKeys.size());
+
+    OUTER_GROUP:
+    for (ExpressionContext groupExp : groupByKeys) {
+      for (int i = 0; i < orderByKeys.size(); i++) {
+        OrderByExpressionContext orderExp = orderByKeys.get(i);
+        if (groupExp.equals(orderExp.getExpression())) {
+          orderByKeysMatched.set(i);
+          continue OUTER_GROUP;
+        }
+      }
+
+      return false;
+    }
+
+    OUTER_ORDER:
+    for (int i = 0, n = orderByKeys.size(); i < n; i++) {
+      if (orderByKeysMatched.get(i)) {
+        continue;
+      }
+
+      for (ExpressionContext groupExp : groupByKeys) {
+        if (groupExp.equals(orderByKeys.get(i).getExpression())) {
+          continue OUTER_ORDER;
+        }
+      }
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -266,6 +315,15 @@ public class QueryContext {
     return _explain != ExplainMode.NONE;
   }
 
+
+  public boolean isAccurateGroupByWithoutOrderBy() {
+    return _accurateGroupByWithoutOrderBy;
+  }
+
+  public void setAccurateGroupByWithoutOrderBy(boolean enable) {
+    _accurateGroupByWithoutOrderBy = enable;
+  }
+
   /**
    * Returns the explain mode of the query.
    */
@@ -310,6 +368,14 @@ public class QueryContext {
    */
   public Set<String> getColumns() {
     return _columns;
+  }
+
+  public Schema getSchema() {
+    return _schema;
+  }
+
+  public void setSchema(Schema schema) {
+    _schema = schema;
   }
 
   public long getEndTimeMs() {
@@ -382,6 +448,14 @@ public class QueryContext {
 
   public void setNumGroupsLimit(int numGroupsLimit) {
     _numGroupsLimit = numGroupsLimit;
+  }
+
+  public int getNumGroupsWarningLimit() {
+    return _numGroupsWarningLimit;
+  }
+
+  public void setNumGroupsWarningLimit(int numGroupsWarningLimit) {
+    _numGroupsWarningLimit = numGroupsWarningLimit;
   }
 
   public int getMinSegmentGroupTrimSize() {
@@ -487,6 +561,10 @@ public class QueryContext {
 
   public boolean isIndexUseAllowed(DataSource dataSource, FieldConfig.IndexType indexType) {
     return isIndexUseAllowed(dataSource.getColumnName(), indexType);
+  }
+
+  public boolean isUnsafeTrim() {
+    return !isSameOrderAndGroupByColumns(this) || getHavingFilter() != null;
   }
 
   public static class Builder {

@@ -49,7 +49,7 @@ public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM 
       LOGGER.info(
           "Starting to commit changes to ZK and ideal state for the segment:{} during pauseles ingestion as the "
               + "leader has been selected", _segmentName);
-      _segmentManager.commitSegmentStartMetadata(
+      _segmentManager.commitSegmentMetadataToCommitting(
           TableNameBuilder.REALTIME.tableNameWithType(_segmentName.getTableName()), committingSegmentDescriptor);
     } catch (Exception e) {
       // this aims to handle the failures during commitSegmentStartMetadata
@@ -95,7 +95,7 @@ public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM 
   @Override
   protected void commitSegmentMetadata(String realtimeTableName,
       CommittingSegmentDescriptor committingSegmentDescriptor) {
-    _segmentManager.commitSegmentEndMetadata(realtimeTableName, committingSegmentDescriptor);
+    _segmentManager.commitSegmentMetadataToDone(realtimeTableName, committingSegmentDescriptor);
   }
 
   @Override

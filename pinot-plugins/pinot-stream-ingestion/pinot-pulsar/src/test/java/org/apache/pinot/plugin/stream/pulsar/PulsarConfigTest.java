@@ -36,12 +36,10 @@ public class PulsarConfigTest {
   public static final String TABLE_NAME_WITH_TYPE = "tableName_REALTIME";
   public static final String STREAM_TYPE = "pulsar";
   public static final String STREAM_PULSAR_BROKER_LIST = "pulsar://localhost:6650";
-  public static final String STREAM_PULSAR_CONSUMER_TYPE = "simple";
 
   Map<String, String> getCommonStreamConfigMap() {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", STREAM_TYPE);
-    streamConfigMap.put("stream.pulsar.consumer.type", STREAM_PULSAR_CONSUMER_TYPE);
     streamConfigMap.put("stream.pulsar.topic.name", "test-topic");
     streamConfigMap.put("stream.pulsar.bootstrap.servers", STREAM_PULSAR_BROKER_LIST);
     streamConfigMap.put("stream.pulsar.consumer.prop.auto.offset.reset", "smallest");

@@ -41,8 +41,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
@@ -77,6 +79,7 @@ import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
@@ -94,17 +97,15 @@ import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
-import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.server.access.AccessControlFactory;
 import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
-import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -112,19 +113,18 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
-import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-
-@Api(tags = "Table", authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = "Table", authorizations = {
+    @Authorization(value = CommonConstants.SWAGGER_AUTHORIZATION_KEY), @Authorization(value = CommonConstants.DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
-    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY,
-        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
-    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
-        description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key =
+        CommonConstants.SWAGGER_AUTHORIZATION_KEY, description = "The format of the key is  ```\"Basic <token>\" or "
+        + "\"Bearer <token>\"```"), @ApiKeyAuthDefinition(name = CommonConstants.DATABASE, in =
+    ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = CommonConstants.DATABASE, description =
+    "Database context passed through http header. If no context is provided 'default' database "
+        + "context will be considered.")
+}))
 @Path("/")
 public class TablesResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(TablesResource.class);
@@ -279,10 +279,14 @@ public class TablesResource {
               int maxNumMultiValues = columnMetadata.getMaxNumberOfMultiValues();
               maxNumMultiValuesMap.merge(column, (double) maxNumMultiValues, Double::sum);
             }
-            for (Map.Entry<IndexType<?, ?, ?>, Long> entry : columnMetadata.getIndexSizeMap().entrySet()) {
-              String indexName = entry.getKey().getId();
+
+            IndexService indexService = IndexService.getInstance();
+            for (int i = 0, n = columnMetadata.getNumIndexes(); i < n; i++) {
+              String indexName = indexService.get(columnMetadata.getIndexType(i)).getId();
+              long value = columnMetadata.getIndexSize(i);
+
               Map<String, Double> columnIndexSizes = columnIndexSizesMap.getOrDefault(column, new HashMap<>());
-              Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + entry.getValue();
+              Double indexSize = columnIndexSizes.getOrDefault(indexName, 0d) + value;
               columnIndexSizes.put(indexName, indexSize);
               columnIndexSizesMap.put(column, columnIndexSizes);
             }
@@ -499,8 +503,7 @@ public class TablesResource {
   public ValidDocIdsBitmapResponse downloadValidDocIdsBitmap(
       @ApiParam(value = "Name of the table with type REALTIME", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType,
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Name of the segment", required = true) @PathParam("segmentName") @Encoded String segmentName,
       @Context HttpHeaders httpHeaders) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
@@ -525,6 +528,7 @@ public class TablesResource {
             String.format("Table %s segment %s is not a immutable segment", tableNameWithType, segmentName),
             Response.Status.BAD_REQUEST);
       }
+      ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
 
       final Pair<ValidDocIdsType, MutableRoaringBitmap> validDocIdsSnapshotPair =
           getValidDocIds(indexSegment, validDocIdsType);
@@ -534,15 +538,15 @@ public class TablesResource {
       if (validDocIdSnapshot == null) {
         String msg = String.format(
             "Found that validDocIds is missing while fetching validDocIds for table %s segment %s while "
-                + "reading the validDocIds with validDocIdType %s",
-            tableNameWithType, segmentDataManager.getSegmentName(), validDocIdsType);
+                + "reading the validDocIds with validDocIdType %s", tableNameWithType,
+            segmentDataManager.getSegmentName(), validDocIdsType);
         LOGGER.warn(msg);
         throw new WebApplicationException(msg, Response.Status.NOT_FOUND);
       }
-
       byte[] validDocIdsBytes = RoaringBitmapUtils.serialize(validDocIdSnapshot);
       return new ValidDocIdsBitmapResponse(segmentName, indexSegment.getSegmentMetadata().getCrc(),
-          finalValidDocIdsType, validDocIdsBytes);
+          finalValidDocIdsType, validDocIdsBytes, _serverInstance.getInstanceDataManager().getInstanceId(),
+          status);
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
@@ -624,7 +628,8 @@ public class TablesResource {
       @ApiParam(value = "Valid doc ids type")
       @QueryParam("validDocIdsType") String validDocIdsType,
       @ApiParam(value = "Segment name", allowMultiple = true) @QueryParam("segmentNames") List<String> segmentNames,
-      @Context HttpHeaders headers) {
+      @Context HttpHeaders headers)
+      throws Exception {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     return ResourceUtils.convertToJsonString(
         processValidDocIdsMetadata(tableNameWithType, segmentNames, validDocIdsType));
@@ -642,9 +647,8 @@ public class TablesResource {
   public String getValidDocIdsMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_REALTIME")
       @PathParam("tableNameWithType") String tableNameWithType,
-      @ApiParam(value = "Valid doc ids type")
-      @QueryParam("validDocIdsType") String validDocIdsType, TableSegments tableSegments,
-      @Context HttpHeaders headers) {
+      @ApiParam(value = "Valid doc ids type") @QueryParam("validDocIdsType") String validDocIdsType,
+      TableSegments tableSegments, @Context HttpHeaders headers) {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
     List<String> segmentNames = tableSegments.getSegments();
     return ResourceUtils.convertToJsonString(
@@ -657,7 +661,7 @@ public class TablesResource {
         ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
     List<String> missingSegments = new ArrayList<>();
     int nonImmutableSegmentCount = 0;
-    int missingValidDocIdSnapshotSegmentCount = 0;
+    List<String> missingValidDocsSegments = new ArrayList<>();
     List<SegmentDataManager> segmentDataManagers;
     if (segments == null) {
       segmentDataManagers = tableDataManager.acquireAllSegments();
@@ -672,6 +676,8 @@ public class TablesResource {
         // process the remaining available segments.
         LOGGER.warn("Table {} has missing segments {}", tableNameWithType, missingSegments);
       }
+      ServiceStatus.Status status = ServiceStatus.getServiceStatus(_instanceId);
+
       List<Map<String, Object>> allValidDocIdsMetadata = new ArrayList<>(segmentDataManagers.size());
       for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         IndexSegment indexSegment = segmentDataManager.getSegment();
@@ -702,7 +708,7 @@ public class TablesResource {
                 segmentDataManager.getSegmentName(), validDocIdsType);
             LOGGER.debug(msg);
           }
-          missingValidDocIdSnapshotSegmentCount++;
+          missingValidDocsSegments.add(segmentDataManager.getSegmentName());
           continue;
         }
 
@@ -716,20 +722,23 @@ public class TablesResource {
         validDocIdsMetadata.put("totalInvalidDocs", totalInvalidDocs);
         validDocIdsMetadata.put("segmentCrc", indexSegment.getSegmentMetadata().getCrc());
         validDocIdsMetadata.put("validDocIdsType", finalValidDocIdsType);
+        validDocIdsMetadata.put("serverStatus", status);
+        validDocIdsMetadata.put("instanceId", _serverInstance.getInstanceDataManager().getInstanceId());
         if (segmentDataManager instanceof ImmutableSegmentDataManager) {
           validDocIdsMetadata.put("segmentSizeInBytes",
               ((ImmutableSegment) segmentDataManager.getSegment()).getSegmentSizeBytes());
         }
+        validDocIdsMetadata.put("segmentCreationTimeMillis", indexSegment.getSegmentMetadata().getIndexCreationTime());
         allValidDocIdsMetadata.add(validDocIdsMetadata);
       }
       if (nonImmutableSegmentCount > 0) {
         LOGGER.warn("Table {} has {} non-immutable segments found while processing validDocIdsMetadata",
             tableNameWithType, nonImmutableSegmentCount);
       }
-      if (missingValidDocIdSnapshotSegmentCount > 0) {
-        LOGGER.warn("Found that validDocIds is missing for {} segments while processing validDocIdsMetadata "
-                + "for table {} while reading the validDocIds with validDocIdType {}. ",
-            missingValidDocIdSnapshotSegmentCount, tableNameWithType, validDocIdsType);
+      if (!missingValidDocsSegments.isEmpty()) {
+        LOGGER.warn("Found that validDocIds is missing for segments {} while processing validDocIdsMetadata "
+                + "for table {} while reading the validDocIds with validDocIdType {}. ", missingValidDocsSegments,
+            tableNameWithType, validDocIdsType);
       }
       return allValidDocIdsMetadata;
     } finally {
@@ -1188,8 +1197,46 @@ public class TablesResource {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     try {
-      Pair<TableConfig, Schema> tableConfigSchemaPair = tableDataManager.fetchTableConfigAndSchema();
-      return tableDataManager.getStaleSegments(tableConfigSchemaPair.getLeft(), tableConfigSchemaPair.getRight());
+      return tableDataManager.getStaleSegments();
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @DELETE
+  @Path("/tables/{tableName}/ingestionMetrics")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Remove ingestion metrics for partition(s)", notes = "Removes ingestion-related metrics for "
+      + "the given table. If no partitionId is provided, metrics for all partitions hosted by this server will be "
+      + "removed.")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully removed ingestion metrics"),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  public String removeIngestionMetrics(
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @Nullable @ApiParam(value = "List of partition Ids (optional)") @QueryParam("partitionId")
+      Set<Integer> partitionIds,
+      @Context HttpHeaders headers) {
+    try {
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+    } catch (Exception e) {
+      throw new WebApplicationException(e.getMessage(), Response.Status.BAD_REQUEST);
+    }
+    String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+    TableDataManager tableDataManager =
+        ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableNameWithType);
+    try {
+      if (tableDataManager instanceof RealtimeTableDataManager) {
+        RealtimeTableDataManager realtimeTableDataManager = (RealtimeTableDataManager) tableDataManager;
+        Set<Integer> removedPartitionIds = realtimeTableDataManager.stopTrackingPartitionIngestionDelay(partitionIds);
+        return "Successfully removed ingestion metrics for partitions: " + removedPartitionIds + " in table: "
+            + tableNameWithType;
+      } else {
+        throw new WebApplicationException(
+            "TableDataManager is not RealtimeTableDataManager for table: " + tableNameWithType,
+            Response.Status.BAD_REQUEST);
+      }
     } catch (Exception e) {
       throw new WebApplicationException(e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
     }

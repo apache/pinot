@@ -62,7 +62,6 @@ public class Fixtures {
     + "      \"realtime.segment.flush.threshold.time\":\"" + MAX_TIME_FOR_SEGMENT_CLOSE_MS + "\","
     + "      \"stream.fakeStream.broker.list\":\"broker:7777\","
     + "      \"stream.fakeStream.consumer.prop.auto.offset.reset\":\"smallest\","
-    + "      \"stream.fakeStream.consumer.type\":\"simple\","
     + "      \"stream.fakeStream.consumer.factory.class.name\":\"%s\","
     + "      \"stream.fakeStream.decoder.class.name\":\"%s\","
     + "      \"stream.fakeStream.decoder.prop.schema.registry.rest.url\":\"http://1.2.3.4:1766/schemas\","

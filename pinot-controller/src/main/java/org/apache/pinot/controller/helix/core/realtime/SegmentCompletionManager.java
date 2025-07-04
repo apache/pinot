@@ -25,9 +25,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.realtime.segment.CommittingSegmentDescriptor;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -101,8 +103,7 @@ public class SegmentCompletionManager {
   protected StreamPartitionMsgOffsetFactory getStreamPartitionMsgOffsetFactory(LLCSegmentName llcSegmentName) {
     String rawTableName = llcSegmentName.getTableName();
     TableConfig tableConfig = _segmentManager.getTableConfig(TableNameBuilder.REALTIME.tableNameWithType(rawTableName));
-    StreamConfig streamConfig =
-        new StreamConfig(tableConfig.getTableName(), IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0));
+    StreamConfig streamConfig = IngestionConfigUtils.getFirstStreamConfig(tableConfig);
     return StreamConsumerFactoryProvider.create(streamConfig).createStreamMsgOffsetFactory();
   }
 
@@ -131,14 +132,20 @@ public class SegmentCompletionManager {
     TableConfig tableConfig = _segmentManager.getTableConfig(realtimeTableName);
     String factoryName = null;
     try {
-      Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(tableConfig).get(0);
+      Map<String, String> streamConfigMap = IngestionConfigUtils.getFirstStreamConfigMap(tableConfig);
       factoryName = streamConfigMap.get(StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME);
     } catch (Exception e) {
       // If there is an exception, we default to the default factory.
     }
 
     if (factoryName == null) {
-      factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
+      if (PauselessConsumptionUtils.isPauselessEnabled(tableConfig)) {
+        factoryName = _segmentCompletionConfig.getDefaultPauselessFsmScheme();
+        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 1);
+      } else {
+        factoryName = _segmentCompletionConfig.getDefaultFsmScheme();
+        _controllerMetrics.setValueOfTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_CONSUMPTION_ENABLED, 0);
+      }
     }
 
     Preconditions.checkState(SegmentCompletionFSMFactory.isFactoryTypeSupported(factoryName),
@@ -245,6 +252,20 @@ public class SegmentCompletionManager {
       _fsmMap.remove(segmentNameStr);
     }
     return response;
+  }
+
+  public SegmentCompletionProtocol.Response reduceSegmentSizeAndReset(
+      SegmentCompletionProtocol.Request.Params reqParams) {
+    String segmentName = reqParams.getSegmentName();
+    SegmentCompletionFSM fsm = _fsmMap.get(segmentName);
+    if (fsm != null && fsm.isImmutableSegmentCreated()) {
+      // In this case, other replica already starts committing the segment. It is a false alert.
+      LOGGER.warn("Segment {} cannot build is a false alert", segmentName);
+      return SegmentCompletionProtocol.RESP_DISCARD;
+    }
+    _segmentManager.reduceSegmentSizeAndReset(new LLCSegmentName(reqParams.getSegmentName()), reqParams.getNumRows());
+    _fsmMap.remove(segmentName);
+    return SegmentCompletionProtocol.RESP_PROCESSED;
   }
 
   /**

@@ -20,12 +20,12 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
@@ -94,16 +94,13 @@ public class TransformOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock() {
-    TransferableBlock block = _input.nextBlock();
-    if (block.isEndOfStreamBlock()) {
-      if (block.isSuccessfulEndOfStreamBlock()) {
-        return updateEosBlock(block, _statMap);
-      } else {
-        return block;
-      }
+  protected MseBlock getNextBlock() {
+    MseBlock block = _input.nextBlock();
+    if (block.isEos()) {
+      return block;
     }
-    List<Object[]> container = block.getContainer();
+    MseBlock.Data dataBlock = (MseBlock.Data) block;
+    List<Object[]> container = dataBlock.asRowHeap().getRows();
     List<Object[]> resultRows = new ArrayList<>(container.size());
     for (Object[] row : container) {
       Object[] resultRow = new Object[_resultColumnSize];
@@ -112,7 +109,12 @@ public class TransformOperator extends MultiStageOperator {
       }
       resultRows.add(resultRow);
     }
-    return new TransferableBlock(resultRows, _resultSchema, DataBlock.Type.ROW);
+    return new RowHeapDataBlock(resultRows, _resultSchema);
+  }
+
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   public enum StatKey implements StatMap.Key {

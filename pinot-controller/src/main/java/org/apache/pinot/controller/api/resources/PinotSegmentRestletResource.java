@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
@@ -37,6 +38,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,17 +67,18 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.controller.ControllerConf;
@@ -83,6 +87,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
@@ -529,7 +534,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
     Map<String, String> controllerJobZKMetadata =
-        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_SEGMENT);
+        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobTypes.RELOAD_SEGMENT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
           Status.NOT_FOUND);
@@ -555,9 +560,19 @@ public class PinotSegmentRestletResource {
           endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
       if (segmentNames != null) {
-        List<String> targetSegments = serverToSegments.get(server);
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments,
-            SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
+        List<String> segmentsForServer = serverToSegments.get(server);
+        StringBuilder encodedSegmentsBuilder = new StringBuilder();
+        if (!segmentsForServer.isEmpty()) {
+          Iterator<String> segmentIterator = segmentsForServer.iterator();
+          // Append first segment without a leading separator
+          encodedSegmentsBuilder.append(URIUtils.encode(segmentIterator.next()));
+          // Append remaining segments, each prefixed by the separator
+          while (segmentIterator.hasNext()) {
+            encodedSegmentsBuilder.append(SegmentNameUtils.SEGMENT_NAME_SEPARATOR)
+                                  .append(URIUtils.encode(segmentIterator.next()));
+          }
+        }
+        reloadTaskStatusEndpoint += "&segmentName=" + encodedSegmentsBuilder;
       }
       serverUrls.add(reloadTaskStatusEndpoint);
     }
@@ -617,7 +632,7 @@ public class PinotSegmentRestletResource {
       @Nullable String instanceName) {
     if (segmentNames == null) {
       // instanceName can be null or not null, and this method below can handle both cases.
-      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
+      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName, true);
     }
     // Skip servers and segments not involved in the segment reloading job.
     List<String> segmnetNameList = new ArrayList<>();
@@ -891,7 +906,8 @@ public class PinotSegmentRestletResource {
     return new SuccessResponse("Deleted " + numSegments + " segments from table: " + tableName);
   }
 
-  private void deleteSegmentsInternal(String tableNameWithType, List<String> segments, String retentionPeriod) {
+  private void deleteSegmentsInternal(String tableNameWithType, List<String> segments,
+      @Nullable String retentionPeriod) {
     PinotResourceManagerResponse response = _pinotHelixResourceManager.deleteSegments(tableNameWithType, segments,
         retentionPeriod);
     if (!response.isSuccessful()) {
@@ -1173,6 +1189,187 @@ public class PinotSegmentRestletResource {
           Status.BAD_REQUEST);
     }
     return updateZKTimeIntervalInternal(tableNameWithType);
+  }
+
+  @DELETE
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/deleteSegmentsFromSequenceNum/{tableNameWithType}")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableNameWithType", action = Actions.Table.DELETE_SEGMENT)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation(value = "Delete segments from a pauseless enabled table", notes =
+      "Deletes segments from a pauseless-enabled table based on the provided segment names. "
+          + "For each segment provided, it identifies the partition and deletes all segments "
+          + "with sequence numbers >= the provided segment in that partition. "
+          + "When force flag is true, it bypasses checks for pauseless being enabled and table being paused. "
+          + "The retention period controls how long deleted segments are retained before permanent removal. "
+          + "It follows this precedence: input parameter → table config → cluster setting → 7d default. "
+          + "Use 0d or -1d for immediate deletion without retention.")
+  public String deleteSegmentsFromSequenceNum(
+      @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
+      String tableNameWithType,
+      @ApiParam(value = "List of segment names. For each segment, all segments with higher sequence IDs in the same "
+          + "partition will be deleted", required = true, allowMultiple = true)
+      @QueryParam("segments") List<String> segments,
+      @ApiParam(value = "Dry run to list the segment names that will get deleted per partition", defaultValue = "true")
+      @QueryParam("dryRun") boolean dryRun,
+      @ApiParam(value = "Force flag to bypass checks for pauseless being enabled and table being paused",
+          defaultValue = "false") @QueryParam("force") boolean force,
+      @Context HttpHeaders headers
+  )
+      throws JsonProcessingException {
+
+    tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
+
+    Preconditions.checkState(TableNameBuilder.isRealtimeTableResource(tableNameWithType),
+        "Table should be a realtime table.");
+
+    // Validate input segments
+    if (segments == null || segments.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "Segment list must not be empty", Status.BAD_REQUEST);
+    }
+
+    TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+
+    if (!force) {
+      // Check if pauseless is enabled
+      Preconditions.checkState(PauselessConsumptionUtils.isPauselessEnabled(tableConfig),
+          "Pauseless is not enabled for the table " + tableNameWithType);
+      // Check if the ingestion has been paused
+      Preconditions.checkState(_pinotHelixResourceManager.getRealtimeSegmentManager()
+          .getPauseStatusDetails(tableNameWithType)
+          .getPauseFlag(), "Table " + tableNameWithType + " should be paused before deleting segments.");
+    }
+
+    IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Ideal State does not exist for table " + tableNameWithType);
+
+    Set<String> idealStateSegmentsSet = idealState.getRecord().getMapFields().keySet();
+    Map<Integer, LLCSegmentName> partitionToOldestSegment =
+        getPartitionIDToOldestSegment(segments, idealStateSegmentsSet);
+    Map<Integer, LLCSegmentName> partitionIdToLatestSegment = new HashMap<>();
+    Map<Integer, Set<String>> partitionIdToSegmentsToDeleteMap =
+        getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment, idealStateSegmentsSet,
+            partitionIdToLatestSegment);
+
+    Map<String, Object> response = new HashMap<>();
+    Map<Integer, Object> partitionDetails = new HashMap<>();
+
+    for (Integer partitionID : partitionToOldestSegment.keySet()) {
+      Set<String> segmentsToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
+      LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionID);
+      LLCSegmentName latestSegment = partitionIdToLatestSegment.get(partitionID);
+
+      Map<String, Object> partitionInfo = new HashMap<>();
+      partitionInfo.put("segmentsToDelete", new ArrayList<>(segmentsToDeleteForPartition));
+      partitionInfo.put("oldestSegment", oldestSegment.getSegmentName());
+      partitionInfo.put("latestSegment", latestSegment.getSegmentName());
+      partitionInfo.put("segmentCount", segmentsToDeleteForPartition.size());
+
+      partitionDetails.put(partitionID, partitionInfo);
+
+      // Only perform actual deletion if dryRun is false
+      if (!dryRun) {
+        LOGGER.info(
+            "Deleting {} segments from segment: {} to segment: {} for partition: {}. Segments being deleted are: {}",
+            segmentsToDeleteForPartition.size(), oldestSegment, latestSegment, partitionID,
+            segmentsToDeleteForPartition);
+        deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentsToDeleteForPartition), null);
+      }
+    }
+
+    response.put("tableName", tableNameWithType);
+    response.put("dryRun", dryRun);
+    response.put("partitions", partitionDetails);
+
+    if (dryRun) {
+      response.put("message", "Dry run completed. Segments identified for deletion but not actually deleted.");
+    } else {
+      response.put("message", "Successfully deleted segments for table: " + tableNameWithType);
+    }
+    return JsonUtils.objectToString(response);
+  }
+
+  /**
+   * Identifies segments that need to be deleted based on partition and sequence ID information.
+   *
+   * For each partition in the provided partitionToOldestSegment map, this method identifies
+   * all segments with sequence IDs greater than or equal to the oldest segment's sequence ID.
+   * It also tracks the latest segment (highest sequence ID) for each partition, which is useful
+   * for logging purposes.
+   *
+   * @param partitionToOldestSegment Map of partition IDs to their corresponding oldest segment (lowest sequence ID)
+   *                                that serves as the threshold for deletion. All segments with sequence IDs
+   *                                greater than or equal to this will be selected for deletion.
+   * @param idealStateSegmentsSet The segments present in the ideal state for the table
+   * @param partitionIdToLatestSegment A map that will be populated with the latest segment (highest sequence ID)
+   *                                  for each partition. This is passed by reference and modified by this method.
+   *
+   * @return A map from partition IDs to sets of segment names that should be deleted.
+   *         Each set contains all segments with sequence IDs >= the oldest segment's sequence ID
+   *         for that particular partition.
+   */
+  @VisibleForTesting
+  Map<Integer, Set<String>> getPartitionIdToSegmentsToDeleteMap(
+      Map<Integer, LLCSegmentName> partitionToOldestSegment,
+      Set<String> idealStateSegmentsSet, Map<Integer, LLCSegmentName> partitionIdToLatestSegment) {
+
+    // Find segments to delete (those with higher sequence numbers)
+    Map<Integer, Set<String>> partitionToSegmentsToDelete = new HashMap<>();
+
+    for (String segmentName : idealStateSegmentsSet) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName == null) {
+        LOGGER.info("Skip segment: {} not in low-level consumer format", segmentName);
+        continue;
+      }
+      int partitionId = llcSegmentName.getPartitionGroupId();
+
+      LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionId);
+      if (oldestSegment == null) {
+        continue;
+      }
+
+      if (oldestSegment.getSequenceNumber() <= llcSegmentName.getSequenceNumber()) {
+        partitionToSegmentsToDelete
+            .computeIfAbsent(partitionId, k -> new HashSet<>())
+            .add(segmentName);
+      }
+
+      // Track latest segment (segment with highest sequence ID)
+      LLCSegmentName currentLatest = partitionIdToLatestSegment.get(partitionId);
+      if (currentLatest == null || llcSegmentName.getSequenceNumber() > currentLatest.getSequenceNumber()) {
+        partitionIdToLatestSegment.put(partitionId, llcSegmentName);
+      }
+    }
+
+    return partitionToSegmentsToDelete;
+  }
+
+  @VisibleForTesting
+  Map<Integer, LLCSegmentName> getPartitionIDToOldestSegment(List<String> segments, Set<String> idealStateSegmentsSet) {
+    Map<Integer, LLCSegmentName> partitionToOldestSegment = new HashMap<>();
+
+    for (String segment : segments) {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segment);
+      if (llcSegmentName == null) {
+        LOGGER.warn("Skip segment: {} not in low-level consumer format", segment);
+        continue;
+      }
+
+      // ignore segments that are not present in the ideal state
+      if (!idealStateSegmentsSet.contains(segment)) {
+        LOGGER.warn("Segment: {} is not present in the ideal state", segment);
+        continue;
+      }
+      int partitionId = llcSegmentName.getPartitionGroupId();
+
+      LLCSegmentName currentOldest = partitionToOldestSegment.get(partitionId);
+      if (currentOldest == null || llcSegmentName.getSequenceNumber() < currentOldest.getSequenceNumber()) {
+        partitionToOldestSegment.put(partitionId, llcSegmentName);
+      }
+    }
+
+    return partitionToOldestSegment;
   }
 
   /**

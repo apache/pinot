@@ -26,9 +26,11 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -292,6 +294,22 @@ public class PercentileSmartTDigestAggregationFunction extends NullableSingleInp
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(Object o) {
+    if (o instanceof TDigest) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.TDigest.getValue(),
+          ObjectSerDeUtils.TDIGEST_SER_DE.serialize((TDigest) o));
+    } else {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleArrayList.getValue(),
+          ObjectSerDeUtils.DOUBLE_ARRAY_LIST_SER_DE.serialize((DoubleArrayList) o));
+    }
+  }
+
+  @Override
+  public Object deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.deserialize(customObject);
   }
 
   @Override

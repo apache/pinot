@@ -18,12 +18,23 @@
  */
 package org.apache.pinot.controller.helix.core.retention;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.io.FileUtils;
+import org.apache.helix.AccessOption;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.model.IdealState;
+import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -34,20 +45,32 @@ import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
 import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
+import org.apache.pinot.controller.util.BrokerServiceHelper;
+import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
+import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.BatchIngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.data.DateTimeFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import static org.apache.pinot.controller.helix.core.retention.RetentionManager.DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
@@ -57,7 +80,31 @@ public class RetentionManagerTest {
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TEST_TABLE_NAME);
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(TEST_TABLE_NAME);
 
-  private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp) {
+  // Variables for real file test
+  private Path _tempDir;
+  private File _tableDir;
+
+  @BeforeMethod
+  public void setUp() throws Exception {
+    // Setup for real file test
+    _tempDir = Files.createTempDirectory("pinot-retention-test");
+    _tableDir = new File(_tempDir.toFile(), TEST_TABLE_NAME);
+    _tableDir.mkdirs();
+
+    final long pastMillisSinceEpoch = 1343001600000L;
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+  }
+
+  @AfterMethod
+  public void tearDown() throws Exception {
+    // Clean up the temporary directory after each test
+    if (_tempDir != null) {
+      FileUtils.deleteDirectory(_tempDir.toFile());
+    }
+  }
+
+  private void testDifferentTimeUnits(long pastTimeStamp, TimeUnit timeUnit, long dayAfterTomorrowTimeStamp,
+      String untrackedSegmentsDeletionBatchSize, int untrackedSegmentsInDeepstoreSize) {
     List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
     // Create metadata for 10 segments really old, that will be removed by the retention manager.
     final int numOlderSegments = 10;
@@ -73,70 +120,378 @@ public class RetentionManagerTest {
           mockSegmentZKMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
       segmentsZKMetadata.add(segmentZKMetadata);
     }
+
+    // Create actual segment files with specific modification times
+    // 1. A file that should be kept (in ZK metadata)
+    File segment1File = new File(_tableDir, segmentsZKMetadata.get(0).getSegmentName());
+    createFileWithContent(segment1File, "segment1 data");
+    setFileModificationTime(segment1File, timeUnit.toMillis(pastTimeStamp));
+
+    // 2. A file that should be kept (in ZK metadata)
+    File segment2File = new File(_tableDir, segmentsZKMetadata.get(10).getSegmentName());
+    createFileWithContent(segment2File, "segment2 data");
+    setFileModificationTime(segment2File, timeUnit.toMillis(pastTimeStamp));
+
+    // 3. A file that should not be deleted (not in ZK metadata but recent)
+    File segment3File = new File(_tableDir, "segment3.tar.gz");
+    createFileWithContent(segment3File, "segment3 data");
+    setFileModificationTime(segment3File, timeUnit.toMillis(dayAfterTomorrowTimeStamp));
+
+    int deletionBatchSize = untrackedSegmentsDeletionBatchSize == null ? DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE
+        : Integer.parseInt(untrackedSegmentsDeletionBatchSize);
+
+    // Create additional untracked segment files to test batch size limit
+    if (untrackedSegmentsInDeepstoreSize > 0) {
+      // Create more untracked segments
+      for (int i = 0; i < untrackedSegmentsInDeepstoreSize; i++) {
+        String segmentName = "extraSegment" + i;
+        File segmentFile = new File(_tableDir, segmentName);
+        createFileWithContent(segmentFile, "extra segment " + i + " data");
+        setFileModificationTime(segmentFile, timeUnit.toMillis(pastTimeStamp));
+        if (i < deletionBatchSize) {
+          // Add segments to the removed list till we reach untrackedSegmentsDeletionBatchSize
+          removedSegments.add(segmentName);
+        }
+      }
+    }
+
     final TableConfig tableConfig = createOfflineTableConfig();
+    // Set untrackedSegmentsDeletionBatchSize if not null
+    if (untrackedSegmentsDeletionBatchSize != null) {
+      tableConfig.getValidationConfig().setUntrackedSegmentsDeletionBatchSize(untrackedSegmentsDeletionBatchSize);
+    }
+
     LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
     when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
-    setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+
+    // Use appropriate setup based on test case
+    // In case of untrackedSegmentsDeletionBatchSize < untrackedSegmentsInDeepstoreSize, we cannot guarantee which
+    // files/ segments will be picked for deletion as there is not ordering/ sorting done before selecting
+    // untrackedSegmentsDeletionBatchSize out of untrackedSegmentsInDeepstoreSize to delete.
+    // For the case untrackedSegmentsDeletionBatchSize < untrackedSegmentsInDeepstoreSize we just check the size of the
+    // segments that will get deleted.
+    // if the untrackedSegmentsDeletionBatchSize all the segments will be deleted as the batch size by default is 100
+    if (deletionBatchSize >= untrackedSegmentsInDeepstoreSize) {
+      // Use original setup for the case when all the segments will be included
+      setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+    } else {
+      // Use batch size specific setup
+      setupPinotHelixResourceManagerForBatchSize(tableConfig, numOlderSegments,
+          deletionBatchSize, segmentsZKMetadata,
+          pinotHelixResourceManager, leadControllerManager);
+    }
 
     when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
     when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
 
     ControllerConf conf = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
+    conf.setUntrackedSegmentDeletionEnabled(true);
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
     RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics);
+        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+            brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
 
     SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
 
-    // Verify that the removeAgedDeletedSegments() method in deletion manager is actually called.
+    // Verify that the removeAgedDeletedSegments() method in deletion manager is called
     verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
 
-    // Verify that the deleteSegments method is actually called.
-    verify(pinotHelixResourceManager, times(1)).deleteSegments(anyString(), anyList());
+    // Verify deleteSegments is called
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
   }
 
   @Test
-  public void testRetentionWithMinutes() {
+  public void testRetentionWithMinutesNoBatchSizeAndSegmentsInDeepStore() {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
     final long pastMinutesSinceEpoch = 22383360L;
-    testDifferentTimeUnits(pastMinutesSinceEpoch, TimeUnit.MINUTES, minutesSinceEpochTimeStamp);
+    testDifferentTimeUnits(pastMinutesSinceEpoch, TimeUnit.MINUTES, minutesSinceEpochTimeStamp, null, 4);
   }
 
   @Test
-  public void testRetentionWithSeconds() {
+  public void testRetentionWithMinutesNoBatchSizeAndMoreSegmentsInDeepStore() {
+    // For this test the default batch size will get picked
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
+    final long pastMinutesSinceEpoch = 22383360L;
+    testDifferentTimeUnits(pastMinutesSinceEpoch, TimeUnit.MINUTES, minutesSinceEpochTimeStamp, null, 105);
+  }
+
+
+  @Test
+  public void testRetentionWithMinutesWithBatchSizeAndLessSegmentsInDeepStore() {
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
+    final long pastMinutesSinceEpoch = 22383360L;
+    testDifferentTimeUnits(pastMinutesSinceEpoch, TimeUnit.MINUTES, minutesSinceEpochTimeStamp, "5", 3);
+  }
+
+  @Test
+  public void testRetentionWithMinutesWithBatchSizeAndMoreSegmentsInDeepStore() {
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long minutesSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60;
+    final long pastMinutesSinceEpoch = 22383360L;
+    testDifferentTimeUnits(pastMinutesSinceEpoch, TimeUnit.MINUTES, minutesSinceEpochTimeStamp, "5", 10);
+  }
+
+
+  @Test
+  public void testRetentionWithSecondsNoBatchSizeAndSegmentsInDeepStore() {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
     final long pastSecondsSinceEpoch = 1343001600L;
-    testDifferentTimeUnits(pastSecondsSinceEpoch, TimeUnit.SECONDS, secondsSinceEpochTimeStamp);
+    testDifferentTimeUnits(pastSecondsSinceEpoch, TimeUnit.SECONDS, secondsSinceEpochTimeStamp, null, 4);
   }
 
   @Test
-  public void testRetentionWithMillis() {
+  public void testRetentionWithSecondsWithBatchSizeAndLessSegmentsInDeepStore() {
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
+    final long pastSecondsSinceEpoch = 1343001600L;
+    testDifferentTimeUnits(pastSecondsSinceEpoch, TimeUnit.SECONDS, secondsSinceEpochTimeStamp, "5", 3);
+  }
+
+  @Test
+  public void testRetentionWithSecondsWithBatchSizeAndMoreSegmentsInDeepStore() {
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long secondsSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60;
+    final long pastSecondsSinceEpoch = 1343001600L;
+    testDifferentTimeUnits(pastSecondsSinceEpoch, TimeUnit.SECONDS, secondsSinceEpochTimeStamp, "5", 10);
+  }
+
+  @Test
+  public void testRetentionWithMillisNoBatchSizeAndSegmentsInDeepStore() {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long millisSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
     final long pastMillisSinceEpoch = 1343001600000L;
-    testDifferentTimeUnits(pastMillisSinceEpoch, TimeUnit.MILLISECONDS, millisSinceEpochTimeStamp);
+    testDifferentTimeUnits(pastMillisSinceEpoch, TimeUnit.MILLISECONDS, millisSinceEpochTimeStamp, null, 4);
   }
 
   @Test
-  public void testRetentionWithHours() {
+  public void testRetentionWithMillisWithBatchSizeAndLessSegmentsInDeepStore() {
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long millisSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
+    final long pastMillisSinceEpoch = 1343001600000L;
+    testDifferentTimeUnits(pastMillisSinceEpoch, TimeUnit.MILLISECONDS, millisSinceEpochTimeStamp, "5", 3);
+  }
+
+  @Test
+  public void testRetentionWithMillisWithBatchSizeAndMoreSegmentsInDeepStore() {
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long millisSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24 * 60 * 60 * 1000;
+    final long pastMillisSinceEpoch = 1343001600000L;
+    testDifferentTimeUnits(pastMillisSinceEpoch, TimeUnit.MILLISECONDS, millisSinceEpochTimeStamp, "5", 10);
+  }
+
+  @Test
+  public void testRetentionWithHoursNoBatchSizeAndSegmentsInDeepStore() {
     final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
     final long pastHoursSinceEpoch = 373056L;
-    testDifferentTimeUnits(pastHoursSinceEpoch, TimeUnit.HOURS, hoursSinceEpochTimeStamp);
+    testDifferentTimeUnits(pastHoursSinceEpoch, TimeUnit.HOURS, hoursSinceEpochTimeStamp, null, 4);
   }
 
   @Test
-  public void testRetentionWithDays() {
+  public void testRetentionWithHoursWithBatchSizeAndLessSegmentsInDeepStore() {
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
+    final long pastHoursSinceEpoch = 373056L;
+    testDifferentTimeUnits(pastHoursSinceEpoch, TimeUnit.HOURS, hoursSinceEpochTimeStamp, "5", 3);
+  }
+
+  @Test
+  public void testRetentionWithHoursWithBatchSizeAndMoreSegmentsInDeepStore() {
+    final long theDayAfterTomorrowSinceEpoch = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long hoursSinceEpochTimeStamp = theDayAfterTomorrowSinceEpoch * 24;
+    final long pastHoursSinceEpoch = 373056L;
+    testDifferentTimeUnits(pastHoursSinceEpoch, TimeUnit.HOURS, hoursSinceEpochTimeStamp, "5", 10);
+  }
+
+
+  @Test
+  public void testRetentionWithDaysNoBatchSizeAndSegmentsInDeepStore() {
     final long daysSinceEpochTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
     final long pastDaysSinceEpoch = 15544L;
-    testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp);
+    testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp, null, 4);
+  }
+
+  @Test
+  public void testRetentionWithDaysWithBatchSizeAndLessSegmentsInDeepStore() {
+    final long daysSinceEpochTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long pastDaysSinceEpoch = 15544L;
+    testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp, "5", 3);
+  }
+
+  @Test
+  public void testRetentionWithDaysWithBatchSizeAndMoreSegmentsInDeepStore() {
+    final long daysSinceEpochTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+    final long pastDaysSinceEpoch = 15544L;
+    testDifferentTimeUnits(pastDaysSinceEpoch, TimeUnit.DAYS, daysSinceEpochTimeStamp, "5", 10);
+  }
+
+  @Test
+  public void testOffByDefaultForUntrackedSegmentsDeletion() {
+    long pastTimeStamp = 15544L;
+    TimeUnit timeUnit = TimeUnit.DAYS;
+    long dayAfterTomorrowTimeStamp = System.currentTimeMillis() / 1000 / 60 / 60 / 24 + 2;
+
+    List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
+    // Create metadata for 10 segments really old, that will be removed by the retention manager.
+    final int numOlderSegments = 10;
+    List<String> removedSegments = new ArrayList<>();
+    for (int i = 0; i < numOlderSegments; i++) {
+      SegmentZKMetadata segmentZKMetadata = mockSegmentZKMetadata(pastTimeStamp, pastTimeStamp, timeUnit);
+      segmentsZKMetadata.add(segmentZKMetadata);
+      removedSegments.add(segmentZKMetadata.getSegmentName());
+    }
+    // Create metadata for 5 segments that will not be removed.
+    for (int i = 0; i < 5; i++) {
+      SegmentZKMetadata segmentZKMetadata =
+          mockSegmentZKMetadata(dayAfterTomorrowTimeStamp, dayAfterTomorrowTimeStamp, timeUnit);
+      segmentsZKMetadata.add(segmentZKMetadata);
+    }
+
+    // Create actual segment files with specific modification times
+    // 1. A file that should be kept (in ZK metadata)
+    File segment1File = new File(_tableDir, segmentsZKMetadata.get(0).getSegmentName());
+    createFileWithContent(segment1File, "segment1 data");
+    setFileModificationTime(segment1File, timeUnit.toMillis(pastTimeStamp));
+
+    // 2. A file that should be kept (in ZK metadata)
+    File segment2File = new File(_tableDir, segmentsZKMetadata.get(10).getSegmentName());
+    createFileWithContent(segment2File, "segment2 data");
+    setFileModificationTime(segment2File, timeUnit.toMillis(pastTimeStamp));
+
+    // 3. A file that should not be deleted as the deletion of untracked segments is off by default
+    File segment3File = new File(_tableDir, "segment3.tar.gz");
+    createFileWithContent(segment3File, "segment3 data");
+    setFileModificationTime(segment3File, timeUnit.toMillis(pastTimeStamp));
+
+    final TableConfig tableConfig = createOfflineTableConfig();
+
+    LeadControllerManager leadControllerManager = mock(LeadControllerManager.class);
+    when(leadControllerManager.isLeaderForTable(anyString())).thenReturn(true);
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+
+      setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+
+    when(pinotHelixResourceManager.getTableConfig(OFFLINE_TABLE_NAME)).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME)).thenReturn(segmentsZKMetadata);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
+
+    ControllerConf conf = new ControllerConf();
+    ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+    conf.setRetentionControllerFrequencyInSeconds(0);
+    conf.setDeletedSegmentsRetentionInDays(0);
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf,
+        controllerMetrics, brokerServiceHelper);
+    retentionManager.start();
+    retentionManager.run();
+
+    SegmentDeletionManager deletionManager = pinotHelixResourceManager.getSegmentDeletionManager();
+
+    // Verify that the removeAgedDeletedSegments() method in deletion manager is called
+    verify(deletionManager, times(1)).removeAgedDeletedSegments(leadControllerManager);
+
+    // Verify deleteSegments is called
+    verify(pinotHelixResourceManager, times(1)).deleteSegments(eq(OFFLINE_TABLE_NAME), anyList());
+  }
+
+  @Test
+  public void testManageRetentionForHybridTable() {
+    // setup
+    String tableName = "myTable";
+    String realtimeTableName = "myTable_REALTIME";
+    String offlineTableName = "myTable_OFFLINE";
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    ingestionConfig.setBatchIngestionConfig(new BatchIngestionConfig(null, "APPEND", "DAILY", false));
+    TableConfig realtimeTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(realtimeTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("7").setRetentionTimeUnit("DAYS")
+        .setIngestionConfig(ingestionConfig)
+        .build();
+
+    TableConfig offlineTableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(offlineTableName)
+        .setTimeColumnName("ms").setTimeType("MILLISECONDS").setRetentionTimeValue("90").setRetentionTimeUnit("DAYS")
+        .build();
+    SegmentsValidationAndRetentionConfig segmentsValidationAndRetentionConfig =
+        new SegmentsValidationAndRetentionConfig();
+    segmentsValidationAndRetentionConfig.setTimeColumnName("ms");
+    offlineTableConfig.setValidationConfig(segmentsValidationAndRetentionConfig);
+    PinotHelixResourceManager mockPinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+
+    when(mockPinotHelixResourceManager.getOfflineTableConfig(offlineTableName)).thenReturn(offlineTableConfig);
+
+    ZkHelixPropertyStore<ZNRecord> mockPropertyStore = mock(ZkHelixPropertyStore.class);
+    when(mockPinotHelixResourceManager.getPropertyStore()).thenReturn(mockPropertyStore);
+
+    // create realtime table schema
+    Schema schema = new Schema();
+    schema.setSchemaName(tableName);
+    schema.addField(new DateTimeFieldSpec("ms", FieldSpec.DataType.LONG, "EPOCH|MILLISECONDS|1", "MILLISECONDS|1"));
+    String realtimeTableSchemaJson = schema.toSingleLineJsonString();
+    ZNRecord tableZNRecord = new ZNRecord(tableName);
+    tableZNRecord.setSimpleField("schemaJSON", realtimeTableSchemaJson);
+    when(mockPropertyStore.get("/SCHEMAS/" + tableName, null, AccessOption.PERSISTENT)).thenReturn(tableZNRecord);
+
+    InstanceConfig instanceConfig = new InstanceConfig("Broker_localhost_1234");
+    instanceConfig.setHostName("localhost");
+    instanceConfig.setPort("8000");
+
+    ControllerConf controllerConf = new ControllerConf();
+    controllerConf.setControllerBrokerProtocol("http");
+
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    when(mockResourceManager.getBrokerInstancesConfigsFor(offlineTableConfig.getTableName()))
+        .thenReturn(Collections.singletonList(instanceConfig));
+
+    CompletionServiceHelper mockServiceHelper = mock(CompletionServiceHelper.class);
+
+    // Mock responses
+    Map<String, String> responseMap = new HashMap<>();
+    responseMap.put("http://localhost:8000/debug/timeBoundary/" + offlineTableName,
+        "{ \"timeColumn\": \"ts\", \"timeValue\": 7776000000}");
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        new CompletionServiceHelper.CompletionServiceResponse();
+    serviceResponse._httpResponses = responseMap;
+    when(mockServiceHelper.doMultiGetRequest(anyList(), anyString(), anyBoolean(), anyMap(), anyInt(), anyString()))
+        .thenReturn(serviceResponse);
+
+    // create segment ZK metadata for realtime table
+    SegmentZKMetadata realtimeSeg1 = new SegmentZKMetadata("realtime_seg1");
+    realtimeSeg1.setStatus(CommonConstants.Segment.Realtime.Status.IN_PROGRESS);
+
+    SegmentZKMetadata realtimeSeg2 = new SegmentZKMetadata("realtime_seg2");
+    realtimeSeg2.setStatus(CommonConstants.Segment.Realtime.Status.DONE);
+    realtimeSeg2.setTimeUnit(TimeUnit.MILLISECONDS);
+    realtimeSeg2.setEndTime(86_400_000 * 8);
+
+    List<SegmentZKMetadata> realtimeSegments = Arrays.asList(realtimeSeg1, realtimeSeg2);
+    when(mockPinotHelixResourceManager.getSegmentsZKMetadata(realtimeTableName)).thenReturn(realtimeSegments);
+
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, controllerConf, null, null);
+    brokerServiceHelper.setCompletionServiceHelper(mockServiceHelper);
+
+    // test
+    RetentionManager retentionManager =
+        new RetentionManager(mockPinotHelixResourceManager, null, controllerConf, mock(ControllerMetrics.class),
+            brokerServiceHelper);
+    retentionManager.manageRetentionForHybridTable(realtimeTableConfig, offlineTableConfig);
+
+    // verify
+    verify(mockPinotHelixResourceManager, times(1)).deleteSegments(eq(realtimeTableName), anyList());
   }
 
   private TableConfig createOfflineTableConfig() {
@@ -179,6 +534,47 @@ public class RetentionManagerTest {
     }).when(resourceManager).deleteSegments(anyString(), anyList());
   }
 
+  private void setupPinotHelixResourceManagerForBatchSize(TableConfig tableConfig, int numOlderSegments,
+      int untrackedSegmentsDeletionBatchSize, List<SegmentZKMetadata> segmentsZKMetadata,
+      PinotHelixResourceManager resourceManager, LeadControllerManager leadControllerManager) {
+
+    String tableNameWithType = tableConfig.getTableName();
+    when(resourceManager.getAllTables()).thenReturn(List.of(tableNameWithType));
+
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
+    when(resourceManager.getPropertyStore()).thenReturn(propertyStore);
+
+    SegmentDeletionManager deletionManager = mock(SegmentDeletionManager.class);
+    doAnswer(invocationOnMock -> null).when(deletionManager).removeAgedDeletedSegments(leadControllerManager);
+    when(resourceManager.getSegmentDeletionManager()).thenReturn(deletionManager);
+
+    // Set up verification for deleteSegments with focus on the count and segment inclusion rules
+    doAnswer(invocationOnMock -> {
+      Object[] args = invocationOnMock.getArguments();
+      String tableNameArg = (String) args[0];
+      assertEquals(tableNameArg, tableNameWithType);
+      List<String> segmentListArg = (List<String>) args[1];
+
+      // Verify all the old metadata segments are included
+      for (int i = 0; i < numOlderSegments; i++) {
+        assertTrue(segmentListArg.contains(segmentsZKMetadata.get(i).getSegmentName()));
+      }
+
+      // Verify segment3 (recent untracked segment) is NOT included
+      assertFalse(segmentListArg.contains("segment3.tar.gz"));
+
+      // Calculate expected total segments that should be deleted
+      // ZK metadata segments + untracked segments up to the batch size limit
+      int expectedTotalSegments = numOlderSegments + untrackedSegmentsDeletionBatchSize;
+
+      // Verify the total count is as expected
+      assertEquals(expectedTotalSegments, segmentListArg.size());
+
+      return null;
+    }).when(resourceManager).deleteSegments(anyString(), anyList());
+  }
+
+
   // This test makes sure that we clean up the segments marked OFFLINE in realtime for more than 7 days
   @Test
   public void testRealtimeLLCCleanup() {
@@ -194,13 +590,18 @@ public class RetentionManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager =
         setupSegmentMetadata(tableConfig, now, initialNumSegments, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
 
     ControllerConf conf = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
-    RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics);
+
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
+    RetentionManager retentionManager = new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf,
+        controllerMetrics, brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
 
@@ -226,13 +627,18 @@ public class RetentionManagerTest {
     PinotHelixResourceManager pinotHelixResourceManager =
         setupSegmentMetadataForPausedTable(tableConfig, now, removedSegments);
     setupPinotHelixResourceManager(tableConfig, removedSegments, pinotHelixResourceManager, leadControllerManager);
+    when(pinotHelixResourceManager.getDataDir()).thenReturn(_tempDir.toString());
 
     ControllerConf conf = new ControllerConf();
     ControllerMetrics controllerMetrics = new ControllerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
     conf.setRetentionControllerFrequencyInSeconds(0);
     conf.setDeletedSegmentsRetentionInDays(0);
+    PinotHelixResourceManager mockResourceManager = mock(PinotHelixResourceManager.class);
+    BrokerServiceHelper brokerServiceHelper =
+        new BrokerServiceHelper(mockResourceManager, conf, null, null);
     RetentionManager retentionManager =
-        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics);
+        new RetentionManager(pinotHelixResourceManager, leadControllerManager, conf, controllerMetrics,
+            brokerServiceHelper);
     retentionManager.start();
     retentionManager.run();
 
@@ -371,5 +777,28 @@ public class RetentionManagerTest {
     when(segmentZKMetadata.getStartTimeMs()).thenReturn(timeUnit.toMillis(startTime));
     when(segmentZKMetadata.getEndTimeMs()).thenReturn(timeUnit.toMillis(endTime));
     return segmentZKMetadata;
+  }
+
+  /**
+   * Helper method to create a file with content
+   */
+  private void createFileWithContent(File file, String content) {
+    try {
+      Files.write(file.toPath(), content.getBytes());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Helper method to set file modification time
+   */
+  private void setFileModificationTime(File file, long timestamp) {
+    FileTime fileTime = FileTime.fromMillis(timestamp);
+    try {
+      Files.setLastModifiedTime(file.toPath(), fileTime);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

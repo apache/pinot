@@ -24,11 +24,12 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 
 
 /**
@@ -42,10 +43,10 @@ public class InstanceResponseBlock implements Block {
   public InstanceResponseBlock(BaseResultsBlock resultsBlock) {
     _resultsBlock = resultsBlock;
     _exceptions = new HashMap<>();
-    List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
+    List<QueryErrorMessage> processingExceptions = resultsBlock.getErrorMessages();
     if (processingExceptions != null) {
-      for (ProcessingException processingException : processingExceptions) {
-        _exceptions.put(processingException.getErrorCode(), processingException.getMessage());
+      for (QueryErrorMessage errMsg : processingExceptions) {
+        _exceptions.put(errMsg.getErrCode().getId(), errMsg.getUsrMsg());
       }
     }
     _metadata = resultsBlock.getResultsMetadata();
@@ -70,12 +71,8 @@ public class InstanceResponseBlock implements Block {
     return new InstanceResponseBlock(_exceptions, _metadata);
   }
 
-  public void addException(ProcessingException processingException) {
-    _exceptions.put(processingException.getErrorCode(), processingException.getMessage());
-  }
-
-  public void addException(int errorCode, String exceptionMessage) {
-    _exceptions.put(errorCode, exceptionMessage);
+  public void addException(QueryErrorCode errorCode, String message) {
+    _exceptions.put(errorCode.getId(), message);
   }
 
   public void addMetadata(String key, String value) {

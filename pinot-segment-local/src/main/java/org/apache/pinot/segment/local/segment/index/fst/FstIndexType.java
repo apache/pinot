@@ -79,20 +79,31 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   }
 
   @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    FstIndexConfig fstIndexConfig = indexConfigs.getConfig(StandardIndexes.fst());
+    if (fstIndexConfig.isEnabled()) {
+      String column = fieldSpec.getName();
+      Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create FST index on column: %s without dictionary", column);
+      Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot create FST index on multi-value column: %s",
+          column);
+      Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
+          "Cannot create FST index on column: %s of stored type other than STRING", column);
+    }
+  }
+
+  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
 
   @Override
-  public ColumnConfigDeserializer<FstIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass())
-        .withExclusiveAlternative(IndexConfigDeserializer.fromIndexTypes(
-            FieldConfig.IndexType.FST,
-            (tableConfig, fieldConfig) -> {
-              IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
-              FSTType fstIndexType = indexingConfig != null ? indexingConfig.getFSTIndexType() : null;
-              return new FstIndexConfig(fstIndexType);
-            }));
+  protected ColumnConfigDeserializer<FstIndexConfig> createDeserializerForLegacyConfigs() {
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.FST, (tableConfig, fieldConfig) -> {
+      IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+      FSTType fstIndexType = indexingConfig != null ? indexingConfig.getFSTIndexType() : null;
+      return new FstIndexConfig(fstIndexType);
+    });
   }
 
   @Override
@@ -123,8 +134,8 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new FSTIndexHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new FSTIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
   @Override
@@ -134,6 +145,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   private static class ReaderFactory extends IndexReaderFactory.Default<FstIndexConfig, TextIndexReader> {
     public static final ReaderFactory INSTANCE = new ReaderFactory();
+
     @Override
     protected IndexType<FstIndexConfig, TextIndexReader, ?> getIndexType() {
       return StandardIndexes.fst();

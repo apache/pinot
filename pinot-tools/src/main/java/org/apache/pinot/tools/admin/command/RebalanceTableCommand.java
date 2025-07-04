@@ -20,6 +20,7 @@ package org.apache.pinot.tools.admin.command;
 
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.PinotTableRebalancer;
@@ -52,12 +53,16 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   private boolean _dryRun = false;
 
   @CommandLine.Option(names = {"-reassignInstances"},
-      description = "Whether to reassign instances before reassigning segments (false by default)")
-  private boolean _reassignInstances = false;
+      description = "Whether to reassign instances before reassigning segments (true by default)")
+  private boolean _reassignInstances = true;
 
   @CommandLine.Option(names = {"-includeConsuming"},
-      description = "Whether to reassign CONSUMING segments for real-time table (false by default)")
-  private boolean _includeConsuming = false;
+      description = "Whether to reassign CONSUMING segments for real-time table (true by default)")
+  private boolean _includeConsuming = true;
+
+  @CommandLine.Option(names = {"-minimizeDataMovement"}, description = "Whether to enable, disable minimize data "
+      + "movement algorithm, or use table's default config")
+  private Enablement _minimizeDataMovement = Enablement.ENABLE;
 
   @CommandLine.Option(names = {"-bootstrap"},
       description = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, reassign"
@@ -70,8 +75,13 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
 
   @CommandLine.Option(names = {"-minAvailableReplicas"},
       description = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum "
-          + "number of replicas allowed to be unavailable if value is negative (1 by default)")
-  private int _minAvailableReplicas = 1;
+          + "number of replicas allowed to be unavailable if value is negative (-1 by default)")
+  private int _minAvailableReplicas = -1;
+
+  @CommandLine.Option(names = {"-batchSizePerServer"},
+      description = "Batch size per server to use to batch segments updated in IdealState per rebalance step. "
+          + "If set to -1, disables batching (-1 by default)")
+  private int _batchSizePerServer = -1;
 
   @CommandLine.Option(names = {"-lowDiskMode"}, description =
       "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
@@ -103,10 +113,12 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
   @Override
   public boolean execute()
       throws Exception {
+    // TODO: Add pre-checks option to this command. This needs the PinotHelixResourceManager to be wired in to use
+    //       the default pre-checker
     PinotTableRebalancer tableRebalancer =
-        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming, _bootstrap,
-            _downtime, _minAvailableReplicas, _lowDiskMode, _bestEfforts, _externalViewCheckIntervalInMs,
-            _externalViewStabilizationTimeoutInMs);
+        new PinotTableRebalancer(_zkAddress, _clusterName, _dryRun, _reassignInstances, _includeConsuming,
+            _minimizeDataMovement, _bootstrap, _downtime, _minAvailableReplicas, _batchSizePerServer, _lowDiskMode,
+            _bestEfforts, _externalViewCheckIntervalInMs, _externalViewStabilizationTimeoutInMs);
     RebalanceResult rebalanceResult = tableRebalancer.rebalance(_tableNameWithType);
     LOGGER
         .info("Got rebalance result: {} for table: {}", JsonUtils.objectToString(rebalanceResult), _tableNameWithType);
@@ -181,6 +193,13 @@ public class RebalanceTableCommand extends AbstractBaseAdminCommand implements C
     System.out.println(
         "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
             + "myTable_OFFLINE -minAvailableReplicas -1");
+    System.out.println();
+
+    System.out.println(
+        "Rebalance table with batch size per server specified to enable batching.");
+    System.out.println(
+        "sh pinot-admin.sh RebalanceTable -zkAddress localhost:2191 -clusterName PinotCluster -tableName "
+            + "myTable_OFFLINE -batchSizePerServer 10");
     System.out.println();
 
     System.out.println(

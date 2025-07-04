@@ -34,6 +34,7 @@ import org.apache.pinot.controller.cursors.ResponseStoreCleaner;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
@@ -59,7 +60,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
       "SELECT ArrDelay, CarrierDelay, (ArrDelay - CarrierDelay) AS diff FROM mytable WHERE ArrDelay > CarrierDelay "
           + "ORDER BY diff, ArrDelay, CarrierDelay LIMIT 100000";
   private static final String EMPTY_RESULT_QUERY =
-      "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
+      "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND 1 != 1";
 
   private static int _resultSize;
 
@@ -358,8 +359,7 @@ public class CursorIntegrationTest extends BaseClusterIntegrationTestSet {
             + getCursorQueryProperties(_resultSize), getHeaders(), getExtraQueryProperties());
     Assert.assertFalse(pinotResponse.get("exceptions").isEmpty());
     JsonNode exception = pinotResponse.get("exceptions").get(0);
-    Assert.assertTrue(exception.get("message").asText().startsWith("QueryValidationError:"));
-    Assert.assertEquals(exception.get("errorCode").asInt(), 700);
+    Assert.assertEquals(exception.get("errorCode").asInt(), QueryErrorCode.QUERY_VALIDATION.getId());
     Assert.assertTrue(pinotResponse.get("brokerId").asText().startsWith("Broker_"));
     // There should be no resultTable.
     Assert.assertNull(pinotResponse.get("resultTable"));

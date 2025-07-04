@@ -26,9 +26,9 @@ import org.apache.pinot.client.utils.DriverUtils;
 
 
 public class PinotResultMetadata extends AbstractBaseResultSetMetadata {
-  private int _totalColumns;
-  private Map<Integer, String> _columns = new HashMap<>();
-  private Map<Integer, String> _columnDataTypes = new HashMap<>();
+  private final int _totalColumns;
+  private final Map<Integer, String> _columns = new HashMap<>();
+  private final Map<Integer, String> _columnDataTypes;
 
   public PinotResultMetadata(int totalColumns, Map<String, Integer> columnsNameToIndex,
       Map<Integer, String> columnDataTypes) {

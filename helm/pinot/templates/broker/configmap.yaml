@@ -24,7 +24,9 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
 data:
   pinot-broker.conf: |-
+{{- if .Values.broker.configureBrokerPort }}
     pinot.broker.client.queryPort={{ .Values.broker.service.port }}
+{{- end }}
     pinot.broker.routing.table.builder.class={{ .Values.broker.routingTable.builderClass }}
 {{ .Values.broker.extra.configs | indent 4 }}
 {{- if .Values.pinotAuth.enabled}}

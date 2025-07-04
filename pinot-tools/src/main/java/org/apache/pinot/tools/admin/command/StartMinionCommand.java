@@ -49,9 +49,9 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
   private String _zkAddress = DEFAULT_ZK_ADDRESS;
   @CommandLine.Option(names = {"-clusterName"}, required = false, description = "Pinot cluster name.")
   private String _clusterName = "PinotCluster";
-  @CommandLine.Option(names = {"-configFileName"}, required = false,
-      description = "Minion Starter Config file.")
-      // TODO: support forbids = {"-minionHost", "-minionPort"}
+  @CommandLine.Option(names = {"-configFileName", "-config", "-configFile", "-minionConfig", "-minionConf"},
+      required = false, description = "Minion Starter Config file.")
+  // TODO: support forbids = {"-minionHost", "-minionPort"}
   private String _configFileName;
 
   private Map<String, Object> _configOverrides = new HashMap<>();

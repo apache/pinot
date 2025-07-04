@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -115,6 +116,16 @@ public class PercentileRawEstAggregationFunction
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return _percentileEstAggregationFunction.getIntermediateResultColumnType();
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(QuantileDigest quantileDigest) {
+    return _percentileEstAggregationFunction.serializeIntermediateResult(quantileDigest);
+  }
+
+  @Override
+  public QuantileDigest deserializeIntermediateResult(CustomObject customObject) {
+    return _percentileEstAggregationFunction.deserializeIntermediateResult(customObject);
   }
 
   @Override

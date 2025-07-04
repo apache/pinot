@@ -63,6 +63,12 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   SECONDARY_Q_WAIT_TIME_MS("milliseconds", false,
       "Time spent waiting in the secondary queue when BinaryWorkloadScheduler is used."),
 
+  PREV_SEGMENT_FETCH_IDEAL_STATE_TIME_MS("milliseconds", false,
+      "Time spent while fetching previous segment from ideal state for any segment."),
+
+  PREV_SEGMENT_WAIT_TIME_MS("milliseconds", false,
+      "Time spent while waiting on previous segment to be registered."),
+
   // Multi-stage
   /**
    * Time spent building the hash table for the join.
@@ -93,7 +99,9 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   RECEIVE_UPSTREAM_WAIT_CPU_TIME_MS("millis", true),
   // How long it took the server to start.
   STARTUP_SUCCESS_DURATION_MS("millis", true),
-  STARTUP_FAILURE_DURATION_MS("millis", true);
+  STARTUP_FAILURE_DURATION_MS("millis", true),
+
+  PREDOWNLOAD_TIME("millis", true);
 
   private final String _timerName;
   private final boolean _global;

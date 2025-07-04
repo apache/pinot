@@ -38,6 +38,9 @@ import software.amazon.awssdk.services.kinesis.model.SequenceNumberRange;
 import software.amazon.awssdk.services.kinesis.model.Shard;
 import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 
+import static org.apache.pinot.plugin.stream.kinesis.KinesisStreamMetadataProvider.SHARD_ID_PREFIX;
+import static org.apache.pinot.spi.stream.OffsetCriteria.LARGEST_OFFSET_CRITERIA;
+import static org.apache.pinot.spi.stream.OffsetCriteria.SMALLEST_OFFSET_CRITERIA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -61,7 +64,6 @@ public class KinesisStreamMetadataProviderTest {
     props.put(KinesisConfig.MAX_RECORDS_TO_FETCH, "10");
     props.put(KinesisConfig.SHARD_ITERATOR_TYPE, ShardIteratorType.AT_SEQUENCE_NUMBER.toString());
     props.put(StreamConfigProperties.STREAM_TYPE, "kinesis");
-    props.put("stream.kinesis.consumer.type", "lowLevel");
     props.put("stream.kinesis.topic.name", STREAM_NAME);
     props.put("stream.kinesis.decoder.class.name", "ABCD");
     props.put("stream.kinesis.consumer.factory.class.name",
@@ -99,6 +101,51 @@ public class KinesisStreamMetadataProviderTest {
   }
 
   @Test
+  public void fetchStreamPartitionOffsetTest() {
+    Shard shard0 = Shard.builder().shardId(SHARD_ID_PREFIX + SHARD_ID_0)
+        .sequenceNumberRange(
+            SequenceNumberRange.builder().startingSequenceNumber("1").endingSequenceNumber("100").build()).build();
+    Shard shard1 = Shard.builder().shardId(SHARD_ID_PREFIX + SHARD_ID_1)
+        .sequenceNumberRange(
+            SequenceNumberRange.builder().startingSequenceNumber("2").endingSequenceNumber("200").build()).build();
+    when(_kinesisConnectionHandler.getShards()).thenReturn(ImmutableList.of(shard0, shard1));
+
+    KinesisStreamMetadataProvider kinesisStreamMetadataProviderShard0 =
+        new KinesisStreamMetadataProvider(CLIENT_ID, getStreamConfig(), SHARD_ID_0, _kinesisConnectionHandler,
+            _streamConsumerFactory);
+    Assert.assertEquals(kinesisStreamMetadataProviderShard0.fetchPartitionCount(TIMEOUT), 2);
+
+    KinesisPartitionGroupOffset kinesisPartitionGroupOffset =
+        (KinesisPartitionGroupOffset) kinesisStreamMetadataProviderShard0.fetchStreamPartitionOffset(
+            SMALLEST_OFFSET_CRITERIA, TIMEOUT);
+    Assert.assertEquals(kinesisPartitionGroupOffset.getShardId(), SHARD_ID_PREFIX + SHARD_ID_0);
+    Assert.assertEquals(kinesisPartitionGroupOffset.getSequenceNumber(), "1");
+
+    kinesisPartitionGroupOffset =
+        (KinesisPartitionGroupOffset) kinesisStreamMetadataProviderShard0.fetchStreamPartitionOffset(
+            LARGEST_OFFSET_CRITERIA, TIMEOUT);
+    Assert.assertEquals(kinesisPartitionGroupOffset.getShardId(), SHARD_ID_PREFIX + SHARD_ID_0);
+    Assert.assertEquals(kinesisPartitionGroupOffset.getSequenceNumber(), "100");
+
+    KinesisStreamMetadataProvider kinesisStreamMetadataProviderShard1 =
+        new KinesisStreamMetadataProvider(CLIENT_ID, getStreamConfig(), SHARD_ID_1, _kinesisConnectionHandler,
+            _streamConsumerFactory);
+    Assert.assertEquals(kinesisStreamMetadataProviderShard1.fetchPartitionCount(TIMEOUT), 2);
+
+    kinesisPartitionGroupOffset =
+        (KinesisPartitionGroupOffset) kinesisStreamMetadataProviderShard1.fetchStreamPartitionOffset(
+            SMALLEST_OFFSET_CRITERIA, TIMEOUT);
+    Assert.assertEquals(kinesisPartitionGroupOffset.getShardId(), SHARD_ID_PREFIX + SHARD_ID_1);
+    Assert.assertEquals(kinesisPartitionGroupOffset.getSequenceNumber(), "2");
+
+    kinesisPartitionGroupOffset =
+        (KinesisPartitionGroupOffset) kinesisStreamMetadataProviderShard1.fetchStreamPartitionOffset(
+            LARGEST_OFFSET_CRITERIA, TIMEOUT);
+    Assert.assertEquals(kinesisPartitionGroupOffset.getShardId(), SHARD_ID_PREFIX + SHARD_ID_1);
+    Assert.assertEquals(kinesisPartitionGroupOffset.getSequenceNumber(), "200");
+  }
+
+  @Test
   public void getPartitionsGroupInfoEndOfShardTest()
       throws Exception {
     List<PartitionGroupConsumptionStatus> currentPartitionGroupMeta = new ArrayList<>();
@@ -131,6 +178,38 @@ public class KinesisStreamMetadataProviderTest {
 
     Assert.assertEquals(result.size(), 1);
     Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
+    Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
+
+    // Simulate the case where initial calls to fetchMessages returns empty messages but non-null next shard iterator
+    when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture()))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true));
+    result =
+        _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
+            currentPartitionGroupMeta, TIMEOUT);
+    Assert.assertEquals(result.size(), 1);
+    Assert.assertEquals(result.get(0).getPartitionGroupId(), 1);
+    Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
+
+    // Simulate the case where all calls to fetchMessages returns empty messages and non-null next shard iterator
+    when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture()))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false));
+
+    result =
+        _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
+            currentPartitionGroupMeta, TIMEOUT);
+
+    Assert.assertEquals(result.size(), 2);
+    Assert.assertEquals(result.get(0).getPartitionGroupId(), 0);
+    Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
+    Assert.assertEquals(result.get(1).getPartitionGroupId(), 1);
     Assert.assertEquals(partitionGroupMetadataCapture.getValue().getSequenceNumber(), 1);
   }
 

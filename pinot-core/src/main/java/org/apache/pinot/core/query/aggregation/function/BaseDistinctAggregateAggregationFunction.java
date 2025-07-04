@@ -19,15 +19,21 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
+import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
+import it.unimi.dsi.fastutil.floats.FloatSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -48,6 +54,11 @@ import org.roaringbitmap.RoaringBitmap;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class BaseDistinctAggregateAggregationFunction<T extends Comparable>
     extends NullableSingleInputAggregationFunction<Set, T> {
+  // Use empty IntOpenHashSet as a placeholder for empty result
+  private static final IntSet EMPTY_PLACEHOLDER = new IntOpenHashSet();
+  private static final byte[] SERIALIZED_EMPTY_PLACEHOLDER =
+      ObjectSerDeUtils.INT_SET_SER_DE.serialize(EMPTY_PLACEHOLDER);
+
   private final AggregationFunctionType _functionType;
 
   protected BaseDistinctAggregateAggregationFunction(ExpressionContext expression,
@@ -75,8 +86,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   public Set extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     Object result = aggregationResultHolder.getResult();
     if (result == null) {
-      // Use empty IntOpenHashSet as a placeholder for empty result
-      return new IntOpenHashSet();
+      return EMPTY_PLACEHOLDER;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -92,8 +102,7 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   public Set extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     Object result = groupByResultHolder.getResult(groupKey);
     if (result == null) {
-      // NOTE: Return an empty IntOpenHashSet for empty result.
-      return new IntOpenHashSet();
+      return EMPTY_PLACEHOLDER;
     }
 
     if (result instanceof DictIdsWrapper) {
@@ -123,6 +132,49 @@ public abstract class BaseDistinctAggregateAggregationFunction<T extends Compara
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(Set set) {
+    return serializeSet(set);
+  }
+
+  static SerializedIntermediateResult serializeSet(Set set) {
+    if (set.isEmpty()) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntSet.getValue(),
+          SERIALIZED_EMPTY_PLACEHOLDER);
+    }
+    if (set instanceof IntSet) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntSet.getValue(),
+          ObjectSerDeUtils.INT_SET_SER_DE.serialize((IntSet) set));
+    }
+    if (set instanceof LongSet) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.LongSet.getValue(),
+          ObjectSerDeUtils.LONG_SET_SER_DE.serialize((LongSet) set));
+    }
+    if (set instanceof FloatSet) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatSet.getValue(),
+          ObjectSerDeUtils.FLOAT_SET_SER_DE.serialize((FloatSet) set));
+    }
+    if (set instanceof DoubleSet) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.DoubleSet.getValue(),
+          ObjectSerDeUtils.DOUBLE_SET_SER_DE.serialize((DoubleSet) set));
+    }
+    Object sampleValue = set.iterator().next();
+    if (sampleValue instanceof String) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringSet.getValue(),
+          ObjectSerDeUtils.STRING_SET_SER_DE.serialize((Set<String>) set));
+    }
+    if (sampleValue instanceof ByteArray) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.BytesSet.getValue(),
+          ObjectSerDeUtils.BYTES_SET_SER_DE.serialize((Set<ByteArray>) set));
+    }
+    throw new IllegalStateException("Illegal data type distinct aggregation function: " + sampleValue.getClass());
+  }
+
+  @Override
+  public Set deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.deserialize(customObject);
   }
 
   /**

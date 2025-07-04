@@ -20,8 +20,10 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.google.common.collect.ImmutableMap;
+import it.unimi.dsi.fastutil.objects.Object2ShortOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -30,6 +32,8 @@ import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
 import javax.annotation.concurrent.ThreadSafe;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -53,18 +57,44 @@ import javax.annotation.concurrent.ThreadSafe;
  */
 @ThreadSafe
 public class IndexService {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IndexService.class);
 
+  public static final short UNKNOWN_INDEX = (short) -1;
   private static volatile IndexService _instance = fromServiceLoader();
 
   private final List<IndexType<?, ?, ?>> _allIndexes;
   private final Map<String, IndexType<?, ?, ?>> _allIndexesById;
+  private final Object2ShortOpenHashMap<String> _allIndexPosById;
 
-  private IndexService(Set<IndexPlugin<?>> allPlugins) {
-    ImmutableMap.Builder<String, IndexType<?, ?, ?>> builder = ImmutableMap.builder();
+  public IndexService(Set<IndexPlugin<?>> allPlugins) {
+    HashMap<String, IndexPlugin<?>> pluginsById = new HashMap<>();
 
     for (IndexPlugin<?> plugin : allPlugins) {
       IndexType<?, ?, ?> indexType = plugin.getIndexType();
-      builder.put(indexType.getId().toLowerCase(Locale.US), indexType);
+      pluginsById.merge(indexType.getId().toLowerCase(Locale.US), plugin, (older, newer) -> {
+        if (older == newer) {
+          return older;
+        }
+        IndexPlugin<?> winner;
+        IndexPlugin<?> loser;
+        if (older.getPriority() >= newer.getPriority()) {
+          winner = older;
+          loser = newer;
+        } else {
+          winner = newer;
+          loser = older;
+        }
+        LOGGER.info("Two index plugins found for index type {}. "
+                + "Using {} with priority {} instead of {} with priority {}",
+            indexType.getId(), winner.getClass().getCanonicalName(), winner.getPriority(),
+            loser.getClass().getCanonicalName(), loser.getPriority());
+        return winner;
+      });
+    }
+
+    ImmutableMap.Builder<String, IndexType<?, ?, ?>> builder = ImmutableMap.builder();
+    for (Map.Entry<String, IndexPlugin<?>> entry : pluginsById.entrySet()) {
+      builder.put(entry.getKey(), entry.getValue().getIndexType());
     }
     _allIndexesById = builder.build();
     // Sort index types so that servers can loop over and process them in a more deterministic order.
@@ -72,6 +102,12 @@ public class IndexService {
     Collections.sort(allIndexIds);
     _allIndexes = new ArrayList<>();
     allIndexIds.forEach(id -> _allIndexes.add(_allIndexesById.get(id)));
+
+    _allIndexPosById = new Object2ShortOpenHashMap(allIndexIds.size());
+    _allIndexPosById.defaultReturnValue(UNKNOWN_INDEX);
+    for (short i = 0; i < _allIndexes.size(); i++) {
+      _allIndexPosById.put(_allIndexes.get(i).getId(), i);
+    }
   }
 
   /**
@@ -150,5 +186,33 @@ public class IndexService {
       throw new IllegalArgumentException("Unknown index id: " + indexId);
     }
     return indexType;
+  }
+
+  public short getNumericId(String indexId) {
+    short id = _allIndexPosById.getShort(indexId.toLowerCase(Locale.US));
+    if (id == UNKNOWN_INDEX) {
+      throw new IllegalArgumentException("Unknown index id: " + indexId);
+    }
+    return id;
+  }
+
+  public short getNumericId(IndexType indexType) {
+    short id = _allIndexPosById.getShort(indexType.getId());
+    if (id == UNKNOWN_INDEX) {
+      throw new IllegalArgumentException("Unknown index type: " + indexType);
+    }
+    return id;
+  }
+
+  public IndexType<?, ?, ?> get(long indexId) {
+    return get((int) indexId);
+  }
+
+  public IndexType<?, ?, ?> get(int indexId) {
+    if (indexId < 0 || indexId >= _allIndexes.size()) {
+      throw new IllegalArgumentException("Unknown index id: " + indexId);
+    }
+
+    return _allIndexes.get(indexId);
   }
 }

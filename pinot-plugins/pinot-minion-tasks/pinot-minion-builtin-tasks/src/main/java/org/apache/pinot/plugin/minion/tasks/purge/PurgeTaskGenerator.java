@@ -36,7 +36,6 @@ import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,18 +87,10 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       } else {
         tableMaxNumTasks = Integer.MAX_VALUE;
       }
-      List<SegmentZKMetadata> segmentsZKMetadata = new ArrayList<>();
-      if (tableConfig.getTableType() == TableType.REALTIME) {
-        List<SegmentZKMetadata> segmentsZKMetadataAll = getSegmentsZKMetadataForTable(tableName);
-        for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadataAll) {
-          CommonConstants.Segment.Realtime.Status status = segmentZKMetadata.getStatus();
-          if (status.isCompleted()) {
-            segmentsZKMetadata.add(segmentZKMetadata);
-          }
-        }
-      } else {
-        segmentsZKMetadata = getSegmentsZKMetadataForTable(tableName);
-      }
+      List<SegmentZKMetadata> segmentsZKMetadata =
+          tableConfig.getTableType() == TableType.OFFLINE
+              ? getSegmentsZKMetadataForTable(tableName)
+              : getNonConsumingSegmentsZKMetadataForRealtimeTable(tableName);
 
       List<SegmentZKMetadata> purgedSegmentsZKMetadata = new ArrayList<>();
       List<SegmentZKMetadata> notpurgedSegmentsZKMetadata = new ArrayList<>();

@@ -23,6 +23,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.Duration;
@@ -38,6 +39,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
+import org.apache.pinot.client.PinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -47,7 +49,6 @@ import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
-import org.apache.pinot.spi.config.table.HashFunction;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.RoutingConfig;
@@ -58,8 +59,10 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.stream.StreamDataServerStartable;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -189,6 +192,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return new ArrayList<>(DEFAULT_INVERTED_INDEX_COLUMNS);
   }
 
+  protected boolean isCreateInvertedIndexDuringSegmentGeneration() {
+    return false;
+  }
+
   @Nullable
   protected List<String> getNoDictionaryColumns() {
     return new ArrayList<>(DEFAULT_NO_DICTIONARY_COLUMNS);
@@ -279,6 +286,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return Schema.fromInputStream(new FileInputStream(schemaFile));
   }
 
+  protected TableConfig createTableConfig(String tableConfigFileName)
+      throws IOException {
+    URL configPathUrl = getClass().getClassLoader().getResource(tableConfigFileName);
+    Assert.assertNotNull(configPathUrl);
+    return createTableConfig(new File(configPathUrl.getFile()));
+  }
+
   protected TableConfig createTableConfig(File tableConfigFile)
       throws IOException {
     InputStream inputStream = new FileInputStream(tableConfigFile);
@@ -296,6 +310,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setTimeColumnName(getTimeColumnName())
         .setSortedColumn(getSortedColumn())
         .setInvertedIndexColumns(getInvertedIndexColumns())
+        .setCreateInvertedIndexDuringSegmentGeneration(isCreateInvertedIndexDuringSegmentGeneration())
         .setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns())
         .setBloomFilterColumns(getBloomFilterColumns())
@@ -357,7 +372,12 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
-    return new TableConfigBuilder(TableType.REALTIME)
+    return getTableConfigBuilder(TableType.REALTIME).build();
+  }
+
+  // TODO - Use this method to create table config for all table types to avoid redundant code
+  protected TableConfigBuilder getTableConfigBuilder(TableType tableType) {
+    return new TableConfigBuilder(tableType)
         .setTableName(getTableName())
         .setTimeColumnName(getTimeColumnName())
         .setSortedColumn(getSortedColumn())
@@ -375,8 +395,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setIngestionConfig(getIngestionConfig())
         .setQueryConfig(getQueryConfig())
         .setStreamConfigs(getStreamConfigs())
-        .setNullHandlingEnabled(getNullHandlingEnabled())
-        .build();
+        .setNullHandlingEnabled(getNullHandlingEnabled());
   }
 
   /**
@@ -430,7 +449,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
     if (upsertConfig == null) {
       upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
-      upsertConfig.setEnableSnapshot(true);
+      upsertConfig.setSnapshot(Enablement.ENABLE);
     }
     if (kafkaTopicName == null) {
       kafkaTopicName = getKafkaTopic();
@@ -463,14 +482,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
     return new TableConfigBuilder(TableType.REALTIME).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
-        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
-        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setStreamConfigs(getStreamConfigs()).setNullHandlingEnabled(getNullHandlingEnabled()).setRoutingConfig(
+        .setTimeColumnName(getTimeColumnName())
+        .setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas())
+        .setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig())
+        .setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig())
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setRoutingConfig(
             new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
         .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(primaryKeyColumn, 1))
-        .setDedupConfig(new DedupConfig(true, HashFunction.NONE)).build();
+        .setDedupConfig(new DedupConfig())
+        .build();
   }
 
   /**
@@ -478,6 +505,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    */
   protected TableConfig getRealtimeTableConfig() {
     return getRealtimeTableConfig(getTableName());
+  }
+
+  /**
+   * Returns the headers to be used for the connection to Pinot cluster.
+   * {@link PinotClientTransportFactory}
+   */
+  protected Map<String, String> getPinotClientTransportHeaders() {
+    return Map.of();
   }
 
   /**
@@ -497,9 +532,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       return _pinotConnectionV2;
     }
     if (_pinotConnection == null) {
+      JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory()
+        .withConnectionProperties(getPinotConnectionProperties());
+      factory.setHeaders(getPinotClientTransportHeaders());
       _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
-          new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(getPinotConnectionProperties())
-              .buildTransport());
+          factory.buildTransport());
     }
     return _pinotConnection;
   }
@@ -598,6 +635,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   protected boolean injectTombstones() {
     return false;
+  }
+
+  protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+    URL dataPathUrl = getClass().getClassLoader().getResource(dataFilePath);
+    assert dataPathUrl != null;
+    File file = new File(dataPathUrl.getFile());
+
+    TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
+    ClusterIntegrationTestUtils.buildSegmentFromFile(file, tableConfig, schema, "%", _segmentDir, _tarDir, fileFormat);
+    uploadSegments(tableConfig.getTableName(), _tarDir);
+
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableConfig.getTableName()) == expectedNoOfDocs, 100L,
+        timeoutMs, "Failed to load " + expectedNoOfDocs + " documents in table " + tableConfig.getTableName(),
+        true, Duration.ofMillis(timeoutMs / 10));
   }
 
   protected List<File> getAllAvroFiles()

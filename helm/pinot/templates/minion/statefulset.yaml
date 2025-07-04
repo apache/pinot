@@ -60,6 +60,8 @@ spec:
 {{ toYaml .Values.minion.affinity | indent 8 }}
       tolerations:
 {{ toYaml .Values.minion.tolerations | indent 8 }}
+      initContainers:
+{{ toYaml .Values.minion.initContainers | indent 8 }}
       containers:
       - name: minion
         securityContext:

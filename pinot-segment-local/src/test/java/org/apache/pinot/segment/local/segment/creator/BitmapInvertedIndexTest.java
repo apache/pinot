@@ -39,6 +39,8 @@ import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.Pairs;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
@@ -93,8 +95,14 @@ public class BitmapInvertedIndexTest implements PinotBuffersAfterClassCheckRule 
   private void testBitmapInvertedIndex(ReadMode readMode)
       throws Exception {
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
-        .setInvertedIndexColumns(INVERTED_INDEX_COLUMNS).build();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, null);
+        .setInvertedIndexColumns(INVERTED_INDEX_COLUMNS)
+        .build();
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addDateTime("time_day", DataType.INT, "EPOCH|DAYS", "1:DAYS")
+        .addSingleValueDimension("column10", DataType.STRING)
+        .addMetric("met_impressionCount", DataType.LONG)
+        .build();
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     indexLoadingConfig.setReadMode(readMode);
     IndexSegment indexSegment = ImmutableSegmentLoader.load(_segmentDirectory, indexLoadingConfig);
 

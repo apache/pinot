@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -25,21 +26,19 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions.JoinHintOptions;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datatable.StatMap;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperand;
 import org.apache.pinot.query.runtime.operator.operands.TransformOperandFactory;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
@@ -86,12 +85,8 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   protected final JoinOverFlowMode _joinOverflowMode;
 
   protected boolean _isRightTableBuilt;
-  protected TransferableBlock _upstreamErrorBlock;
-  protected MultiStageQueryStats _leftSideStats;
-  protected MultiStageQueryStats _rightSideStats;
-  // Used by non-inner join.
-  // Needed to indicate we have finished processing all results after returning last block.
-  protected boolean _isTerminated;
+  @Nullable
+  protected MseBlock.Eos _eos;
 
   public BaseJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node) {
@@ -165,66 +160,103 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  protected TransferableBlock getNextBlock()
-      throws ProcessingException {
+  protected MseBlock getNextBlock() {
     if (!_isRightTableBuilt) {
       buildRightTable();
     }
-    if (_upstreamErrorBlock != null) {
-      LOGGER.trace("Returning upstream error block for join operator");
-      return _upstreamErrorBlock;
+    if (_eos != null) {
+      LOGGER.trace("Returning eos");
+      return _eos;
     }
-    TransferableBlock transferableBlock = buildJoinedDataBlock();
-    LOGGER.trace("Returning {} for join operator", transferableBlock);
-    return transferableBlock;
+    MseBlock mseBlock = buildJoinedDataBlock();
+    LOGGER.trace("Returning {} for join operator", mseBlock);
+    if (mseBlock.isEos()) {
+      _eos = (MseBlock.Eos) mseBlock;
+      onEosProduced();
+    }
+    return mseBlock;
   }
 
-  protected abstract void buildRightTable()
-      throws ProcessingException;
+  protected abstract void onEosProduced();
 
-  protected TransferableBlock buildJoinedDataBlock()
-      throws ProcessingException {
+  protected void buildRightTable() {
+    LOGGER.trace("Building right table for join operator");
+    long startTime = System.currentTimeMillis();
+    int numRows = 0;
+    MseBlock rightBlock = _rightInput.nextBlock();
+    while (rightBlock.isData()) {
+      List<Object[]> rows = ((MseBlock.Data) rightBlock).asRowHeap().getRows();
+      // Row based overflow check.
+      if (rows.size() + numRows > _maxRowsInJoin) {
+        if (_joinOverflowMode == JoinOverFlowMode.THROW) {
+          throwForJoinRowLimitExceeded(
+              "Cannot build in memory hash table for join operator, reached number of rows limit: " + _maxRowsInJoin);
+        } else {
+          // Just fill up the buffer.
+          int remainingRows = _maxRowsInJoin - numRows;
+          rows = rows.subList(0, remainingRows);
+          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
+          // setting only the rightTableOperator to be early terminated and awaits EOS block next.
+          _rightInput.earlyTerminate();
+        }
+      }
+
+      addRowsToRightTable(rows);
+      numRows += rows.size();
+      sampleAndCheckInterruption();
+      rightBlock = _rightInput.nextBlock();
+    }
+
+    MseBlock.Eos eosBlock = (MseBlock.Eos) rightBlock;
+    if (eosBlock.isError()) {
+      _eos = eosBlock;
+    } else {
+      _isRightTableBuilt = true;
+      finishBuildingRightTable();
+    }
+
+    _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
+    LOGGER.trace("Finished building right table for join operator");
+  }
+
+  protected abstract void addRowsToRightTable(List<Object[]> rows);
+
+  protected abstract void finishBuildingRightTable();
+
+  protected MseBlock buildJoinedDataBlock() {
     LOGGER.trace("Building joined data block for join operator");
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
-      if (_upstreamErrorBlock != null) {
-        return _upstreamErrorBlock;
-      }
-      if (_isTerminated) {
-        assert _leftSideStats != null;
-        return TransferableBlockUtils.getEndOfStreamTransferableBlock(_leftSideStats);
+      if (_eos != null) {
+        return _eos;
       }
       LOGGER.trace("Processing next block on left input");
-      TransferableBlock leftBlock = _leftInput.nextBlock();
-      if (leftBlock.isErrorBlock()) {
-        return leftBlock;
-      }
-      if (leftBlock.isSuccessfulEndOfStreamBlock()) {
-        assert _rightSideStats != null;
-        _leftSideStats = leftBlock.getQueryStats();
-        assert _leftSideStats != null;
-        _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
-        if (needUnmatchedRightRows()) {
-          List<Object[]> rows = buildNonMatchRightRows();
-          if (!rows.isEmpty()) {
-            _isTerminated = true;
-            return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+      MseBlock leftBlock = _leftInput.nextBlock();
+      if (leftBlock.isEos()) {
+        MseBlock.Eos eosBlock = (MseBlock.Eos) leftBlock;
+        if (eosBlock.isError()) {
+          return eosBlock;
+        } else {
+          if (needUnmatchedRightRows()) {
+            List<Object[]> rows = buildNonMatchRightRows();
+            if (!rows.isEmpty()) {
+              _eos = SuccessMseBlock.INSTANCE;
+              return new RowHeapDataBlock(rows, _resultSchema);
+            }
           }
+          return leftBlock;
         }
-        return leftBlock;
       }
-      assert leftBlock.isDataBlock();
-      List<Object[]> rows = buildJoinedRows(leftBlock);
+      List<Object[]> rows = buildJoinedRows((MseBlock.Data) leftBlock);
       sampleAndCheckInterruption();
       if (!rows.isEmpty()) {
-        return new TransferableBlock(rows, _resultSchema, DataBlock.Type.ROW);
+        return new RowHeapDataBlock(rows, _resultSchema);
       }
     }
   }
 
-  protected abstract List<Object[]> buildJoinedRows(TransferableBlock leftBlock)
-      throws ProcessingException;
+  protected abstract List<Object[]> buildJoinedRows(MseBlock.Data leftBlock);
 
   protected abstract List<Object[]> buildNonMatchRightRows();
 
@@ -240,7 +272,11 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     return resultRow;
   }
 
-  protected boolean matchNonEquiConditions(Object[] row) {
+  protected List<Object> joinRowView(@Nullable Object[] leftRow, @Nullable Object[] rightRow) {
+    return JoinedRowView.of(leftRow, rightRow, _resultColumnSize, _leftColumnSize);
+  }
+
+  protected boolean matchNonEquiConditions(List<Object> row) {
     if (_nonEquiEvaluators.isEmpty()) {
       return true;
     }
@@ -257,27 +293,22 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   protected boolean needUnmatchedLeftRows() {
-    return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL;
+    return _joinType == JoinRelType.LEFT || _joinType == JoinRelType.FULL || _joinType == JoinRelType.LEFT_ASOF;
   }
 
   protected void earlyTerminateLeftInput() {
     _leftInput.earlyTerminate();
-    TransferableBlock leftBlock = _leftInput.nextBlock();
+    MseBlock leftBlock = _leftInput.nextBlock();
 
-    while (!leftBlock.isSuccessfulEndOfStreamBlock()) {
-      if (leftBlock.isErrorBlock()) {
-        _upstreamErrorBlock = leftBlock;
-        return;
-      }
+    while (leftBlock.isData()) {
       leftBlock = _leftInput.nextBlock();
     }
+    _eos = (MseBlock.Eos) leftBlock;
+  }
 
-    assert leftBlock.isSuccessfulEndOfStreamBlock();
-    assert _rightSideStats != null;
-    _leftSideStats = leftBlock.getQueryStats();
-    assert _leftSideStats != null;
-    _leftSideStats.mergeInOrder(_rightSideStats, getOperatorType(), _statMap);
-    _isTerminated = true;
+  @Override
+  protected StatMap<?> copyStatMaps() {
+    return new StatMap<>(_statMap);
   }
 
   /**
@@ -286,11 +317,10 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
    *
    * @return {@code true} if the limit has been reached, {@code false} otherwise.
    */
-  protected boolean isMaxRowsLimitReached(int numJoinedRows)
-      throws ProcessingException {
+  protected boolean isMaxRowsLimitReached(int numJoinedRows) {
     if (numJoinedRows == _maxRowsInJoin) {
       if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-        throwProcessingExceptionForJoinRowLimitExceeded(
+        throwForJoinRowLimitExceeded(
             "Cannot process join, reached number of rows limit: " + _maxRowsInJoin);
       } else {
         // Skip over remaining blocks until we reach the end of stream since we already breached the rows limit.
@@ -305,19 +335,18 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     return false;
   }
 
-  protected static void throwProcessingExceptionForJoinRowLimitExceeded(String reason)
-      throws ProcessingException {
-    ProcessingException resourceLimitExceededException =
-        new ProcessingException(QueryException.SERVER_RESOURCE_LIMIT_EXCEEDED_ERROR_CODE);
-    resourceLimitExceededException.setMessage(reason
-        + ". Consider increasing the limit for the maximum number of rows in a join either via the query option '"
-        + QueryOptionKey.MAX_ROWS_IN_JOIN + "' or the '" + JoinHintOptions.MAX_ROWS_IN_JOIN + "' hint in the '"
-        + PinotHintOptions.JOIN_HINT_OPTIONS
-        + "'. Alternatively, if partial results are acceptable, the join overflow mode can be set to '"
-        + JoinOverFlowMode.BREAK.name() + "' either via the query option '" + QueryOptionKey.JOIN_OVERFLOW_MODE
-        + "' or the '" + JoinHintOptions.JOIN_OVERFLOW_MODE + "' hint in the '" + PinotHintOptions.JOIN_HINT_OPTIONS
-        + "'.");
-    throw resourceLimitExceededException;
+  protected static void throwForJoinRowLimitExceeded(String reason) {
+    throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+        reason
+            + ".\nConsider increasing the limit for the maximum number of rows in a join either via:\n"
+            + "  - The query option '" + QueryOptionKey.MAX_ROWS_IN_JOIN + "'\n"
+            + "  - The hint '" + JoinHintOptions.MAX_ROWS_IN_JOIN + "' in the '" + PinotHintOptions.JOIN_HINT_OPTIONS
+            + "\n"
+            + "'Alternatively, if partial results are acceptable, the join overflow mode can be set to '"
+            + JoinOverFlowMode.BREAK.name() + "' either via:\n"
+            + "  - The query option '" + QueryOptionKey.JOIN_OVERFLOW_MODE + "'\n"
+            + "  - The hint '" + JoinHintOptions.JOIN_OVERFLOW_MODE + "' in the '"
+            + PinotHintOptions.JOIN_HINT_OPTIONS + "'\n");
   }
 
   public enum StatKey implements StatMap.Key {
@@ -350,6 +379,108 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     @Override
     public StatMap.Type getType() {
       return _type;
+    }
+  }
+
+  /**
+   * This util class is a view over the left and right row joined together
+   * currently this is used for filtering and input of projection. So if the joined
+   * tuple doesn't pass the predicate, the join result is not materialized into Object[].
+   *
+   * It is debatable whether we always want to use this instead of copying the tuple
+   */
+  private abstract static class JoinedRowView extends AbstractList<Object> implements List<Object> {
+    protected final int _leftSize;
+    protected final int _size;
+
+    protected JoinedRowView(int resultColumnSize, int leftSize) {
+      _leftSize = leftSize;
+      _size = resultColumnSize;
+    }
+
+    private static final class BothNotNullView extends JoinedRowView {
+      private final Object[] _leftRow;
+      private final Object[] _rightRow;
+
+      private BothNotNullView(Object[] leftRow, Object[] rightRow, int resultColumnSize, int leftSize) {
+        super(resultColumnSize, leftSize);
+        _leftRow = leftRow;
+        _rightRow = rightRow;
+      }
+
+      @Override
+      public Object get(int i) {
+        return i < _leftSize ? _leftRow[i] : _rightRow[i - _leftSize];
+      }
+
+      @Override
+      public Object[] toArray() {
+        Object[] resultRow = new Object[_size];
+        System.arraycopy(_leftRow, 0, resultRow, 0, _leftSize);
+        System.arraycopy(_rightRow, 0, resultRow, _leftSize, _rightRow.length);
+        return resultRow;
+      }
+    }
+
+    private static final class RightNotNullView extends JoinedRowView {
+      private final Object[] _rightRow;
+
+      public RightNotNullView(Object[] rightRow, int resultColumnSize, int leftSize) {
+        super(resultColumnSize, leftSize);
+        _rightRow = rightRow;
+      }
+
+      @Override
+      public Object get(int i) {
+        return i < _leftSize ? null : _rightRow[i - _leftSize];
+      }
+
+      @Override
+      public Object[] toArray() {
+        Object[] resultRow = new Object[_size];
+        System.arraycopy(_rightRow, 0, resultRow, _leftSize, _rightRow.length);
+        return resultRow;
+      }
+    }
+
+    private static final class LeftNotNullView extends JoinedRowView {
+      private final Object[] _leftRow;
+
+      public LeftNotNullView(Object[] leftRow, int resultColumnSize, int leftSize) {
+        super(resultColumnSize, leftSize);
+        _leftRow = leftRow;
+      }
+
+      @Override
+      public Object get(int i) {
+        return i < _leftSize ? _leftRow[i] : null;
+      }
+
+      @Override
+      public Object[] toArray() {
+        Object[] resultRow = new Object[_size];
+        System.arraycopy(_leftRow, 0, resultRow, 0, _leftSize);
+        return resultRow;
+      }
+    }
+
+    public static JoinedRowView of(@Nullable Object[] leftRow, @Nullable Object[] rightRow, int resultColumnSize,
+        int leftSize) {
+      if (leftRow == null && rightRow == null) {
+        throw new IllegalStateException("both left and right side of join are null");
+      }
+      if (leftRow == null) {
+        return new RightNotNullView(rightRow, resultColumnSize, leftSize);
+      }
+      if (rightRow == null) {
+        return new LeftNotNullView(leftRow, resultColumnSize, leftSize);
+      }
+      return new BothNotNullView(leftRow, rightRow, resultColumnSize, leftSize);
+    }
+
+    @Override
+    public int size() {
+      return _size;
     }
   }
 }

@@ -29,9 +29,9 @@ import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.tier.Tier;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -106,7 +106,8 @@ public abstract class BaseSegmentAssignment implements SegmentAssignment {
 
     // Get tier to segment assignment map i.e. current assignments split by tiers they are eligible for
     SegmentAssignmentUtils.TierSegmentAssignment tierSegmentAssignment =
-        new SegmentAssignmentUtils.TierSegmentAssignment(_tableNameWithType, sortedTiers, currentAssignment);
+        new SegmentAssignmentUtils.TierSegmentAssignment(_helixManager, _tableNameWithType, sortedTiers,
+            currentAssignment);
     Map<String, Map<String, Map<String, String>>> tierNameToSegmentAssignmentMap =
         tierSegmentAssignment.getTierNameToSegmentAssignmentMap();
 

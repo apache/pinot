@@ -19,14 +19,15 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 
 
 /**
  * The <code>TableRebalanceObserver</code> interface provides callbacks to take actions
- * during critical triggers. The 3 main triggers during a rebalance operation are show below.
+ * during critical triggers. The 4 main triggers during a rebalance operation are shown below.
  * For example, we can track stats + status of rebalance during these triggers.
  */
-
 public interface TableRebalanceObserver {
   enum Trigger {
     // Start of rebalance Trigger
@@ -35,10 +36,16 @@ public interface TableRebalanceObserver {
     EXTERNAL_VIEW_TO_IDEAL_STATE_CONVERGENCE_TRIGGER,
     // Ideal state changes due to external events and new target for rebalance is computed
     IDEAL_STATE_CHANGE_TRIGGER,
+    // Next assignment calculation change trigger which calculates next assignment to act on
+    NEXT_ASSIGNMENT_CALCULATION_TRIGGER,
+    // When forceCommit is set to true, this trigger is called when the commit starts
+    FORCE_COMMIT_START_TRIGGER,
+    // When forceCommit is set to true, this trigger is called when the commit ends
+    FORCE_COMMIT_END_TRIGGER,
   }
 
   void onTrigger(Trigger trigger, Map<String, Map<String, String>> currentState,
-      Map<String, Map<String, String>> targetState);
+      Map<String, Map<String, String>> targetState, RebalanceContext rebalanceContext);
 
   void onNoop(String msg);
 
@@ -46,7 +53,52 @@ public interface TableRebalanceObserver {
 
   void onError(String errorMsg);
 
+  void onRollback();
+
   boolean isStopped();
 
   RebalanceResult.Status getStopStatus();
+
+  class RebalanceContext {
+    private final long _estimatedAverageSegmentSizeInBytes;
+    private final Set<String> _uniqueSegments;
+    private final Set<String> _segmentsToMonitor;
+    private final int _numSegmentsForceCommitted;
+
+    public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegments,
+        @Nullable Set<String> segmentsToMonitor) {
+      _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
+      _uniqueSegments = uniqueSegments;
+      _segmentsToMonitor = segmentsToMonitor;
+      _numSegmentsForceCommitted = 0;
+    }
+
+    public RebalanceContext(long estimatedAverageSegmentSizeInBytes, Set<String> uniqueSegments,
+        @Nullable Set<String> segmentsToMonitor, int numSegmentsForceCommitted) {
+      _estimatedAverageSegmentSizeInBytes = estimatedAverageSegmentSizeInBytes;
+      _uniqueSegments = uniqueSegments;
+      _segmentsToMonitor = segmentsToMonitor;
+      _numSegmentsForceCommitted = numSegmentsForceCommitted;
+    }
+
+    public RebalanceContext(int numSegmentsForceCommitted) {
+      this(0L, Set.of(), null, numSegmentsForceCommitted);
+    }
+
+    public long getEstimatedAverageSegmentSizeInBytes() {
+      return _estimatedAverageSegmentSizeInBytes;
+    }
+
+    public Set<String> getUniqueSegments() {
+      return _uniqueSegments;
+    }
+
+    public Set<String> getSegmentsToMonitor() {
+      return _segmentsToMonitor;
+    }
+
+    public int getNumSegmentsForceCommitted() {
+      return _numSegmentsForceCommitted;
+    }
+  }
 }

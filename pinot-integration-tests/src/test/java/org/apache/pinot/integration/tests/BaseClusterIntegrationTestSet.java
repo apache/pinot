@@ -23,6 +23,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URL;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -32,12 +33,23 @@ import org.apache.helix.PropertyKey;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
+import org.apache.http.HttpStatus;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
-import org.apache.pinot.common.exception.QueryException;
+import org.apache.pinot.common.exception.HttpErrorStatusException;
+import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
+import org.apache.pinot.controller.api.resources.TableViews;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
+import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.query.utils.idset.IdSet;
 import org.apache.pinot.core.query.utils.idset.IdSets;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.MetricFieldSpec;
@@ -45,10 +57,12 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.StringUtil;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 
 import static org.testng.Assert.assertEquals;
@@ -282,6 +296,28 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     query = "SELECT CASE WHEN Sum(ArrDelay) < 0 THEN 0 WHEN SUM(ArrDelay) > 0 THEN SUM(ArrDelay) END AS SumArrDelay "
         + "FROM mytable";
     testQuery(query);
+
+    // Test CAST
+    query =
+        "SELECT SUM(CAST(CAST(ArrTime AS VARCHAR) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
+            + "'DL'";
+    testQuery(query);
+    query =
+        "SELECT CAST(CAST(ArrTime AS STRING) AS BIGINT) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
+            + "ORDER BY ArrTime DESC";
+    h2Query =
+        "SELECT CAST(CAST(ArrTime AS VARCHAR) AS BIGINT) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
+            + "'DL' ORDER BY ArrTime DESC";
+    testQuery(query, h2Query);
+
+    // Test orderedPreferredPools option which will fallbacks to non preferred Pools
+    // when non of preferred Pools is available
+    query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_' option(orderedPreferredPools=0|1)";
+    h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testQuery(query, h2Query);
+    query = "SET orderedPreferredPools='0 | 1'; SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    h2Query = "SELECT count(*) FROM mytable WHERE OriginState LIKE 'A_'";
+    testQuery(query, h2Query);
   }
 
   private void testHardcodedQueriesV2()
@@ -309,18 +345,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
 
   private void testHardCodedQueriesV1()
       throws Exception {
-    String query;
-    String h2Query;
-    // TODO: move to common when multistage support CAST AS 'LONG', for now it must use: CAST AS BIGINT
-    query =
-        "SELECT SUM(CAST(CAST(ArrTime AS varchar) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "
-            + "'DL'";
-    testQuery(query);
-    query =
-        "SELECT CAST(CAST(ArrTime AS varchar) AS LONG) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = 'DL' "
-            + "ORDER BY ArrTime DESC";
-    testQuery(query);
-
     // Non-Standard SQL syntax:
     // IN_ID_SET
     {
@@ -497,39 +521,6 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
         testQuery(query.generatePinotQuery(), query.generateH2Query());
       }
     }
-  }
-
-  /**
-   * Test invalid queries which should cause query exceptions.
-   *
-   * @throws Exception
-   */
-  public void testQueryExceptions()
-      throws Exception {
-    testQueryException("POTATO", QueryException.SQL_PARSING_ERROR_CODE);
-
-    // Ideally, we should attempt to unify the error codes returned by the two query engines if possible
-    testQueryException("SELECT COUNT(*) FROM potato",
-        useMultiStageQueryEngine()
-            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.TABLE_DOES_NOT_EXIST_ERROR_CODE);
-
-    testQueryException("SELECT POTATO(ArrTime) FROM mytable",
-        useMultiStageQueryEngine()
-            ? QueryException.QUERY_PLANNING_ERROR_CODE : QueryException.QUERY_VALIDATION_ERROR_CODE);
-
-    // ArrTime expects a numeric type
-    testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        QueryException.QUERY_VALIDATION_ERROR_CODE);
-
-    // Cannot use numeric aggregate function for string column
-    testQueryException("SELECT MAX(OriginState) FROM mytable where ArrTime > 5",
-        QueryException.QUERY_VALIDATION_ERROR_CODE);
-  }
-
-  private void testQueryException(String query, int errorCode)
-      throws Exception {
-    JsonNode jsonObject = postQuery(query);
-    assertEquals(jsonObject.get("exceptions").get(0).get("errorCode").asInt(), errorCode);
   }
 
   /**
@@ -822,5 +813,138 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
   private MetricFieldSpec constructNewMetric(FieldSpec.DataType dataType) {
     String column = "New" + StringUtils.capitalize(dataType.toString().toLowerCase()) + "Metric";
     return new MetricFieldSpec(column, dataType);
+  }
+
+  protected String getTableRebalanceUrl(RebalanceConfig rebalanceConfig, TableType tableType) {
+    return StringUtil.join("/", getControllerRequestURLBuilder().getBaseUrl(), "tables", getTableName(), "rebalance")
+        + "?type=" + tableType.toString() + "&" + rebalanceConfig.toQueryString();
+  }
+
+  protected void waitForRebalanceToComplete(String rebalanceJobId, long timeoutMs) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String requestUrl = getControllerRequestURLBuilder().forTableRebalanceStatus(rebalanceJobId);
+        SimpleHttpResponse httpResponse =
+            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
+        ServerRebalanceJobStatusResponse rebalanceStatus =
+            JsonUtils.stringToObject(httpResponse.getResponse(), ServerRebalanceJobStatusResponse.class);
+        return rebalanceStatus.getTableRebalanceProgressStats().getStatus() == RebalanceResult.Status.DONE;
+      } catch (HttpErrorStatusException e) {
+        if (e.getStatusCode() != HttpStatus.SC_NOT_FOUND) {
+          Assert.fail("Caught unexpected HTTP error while waiting for rebalance to complete: " + e.getMessage(), e);
+        }
+        return null;
+      } catch (Exception e) {
+        Assert.fail("Caught exception while waiting for rebalance to complete", e);
+        return null;
+      }
+    }, 1000L, timeoutMs, "Failed to complete rebalance");
+  }
+
+  protected void waitForTableEVISConverge(String tableName, long timeoutMs) {
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        String requestUrl = getControllerRequestURLBuilder().forIdealState(tableName);
+        SimpleHttpResponse httpResponse =
+            HttpClient.wrapAndThrowHttpException(getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null));
+        TableViews.TableView idealState =
+            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
+
+        requestUrl = getControllerRequestURLBuilder().forExternalView(tableName);
+        httpResponse = getHttpClient().sendGetRequest(new URL(requestUrl).toURI(), null);
+        TableViews.TableView externalView =
+            JsonUtils.stringToObject(httpResponse.getResponse(), TableViews.TableView.class);
+        return idealState._realtime.equals(externalView._realtime) && idealState._offline.equals(externalView._offline);
+      } catch (Exception e) {
+        Assert.fail("Caught exception while waiting for table EV and IS to converge", e);
+        return null;
+      }
+    }, 1000L, timeoutMs, "Failed to converge EV and IS for table: " + tableName);
+  }
+
+  /**
+   * Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
+   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
+   */
+  protected void performForceCommitSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
+      String newTenant,
+      boolean shouldCommit, long timeoutMs)
+      throws Exception {
+    performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, false);
+  }
+
+  /**
+   * Helper method to perform segment moving test regarding forceCommit in rebalance with EVIS convergence wait.
+   * Similar to performSegmentMovingTest but waits for external view/ideal state convergence instead of rebalance
+   * completion.
+   */
+  protected void performForceCommitSegmentMovingTestWithEVISConverge(RebalanceConfig rebalanceConfig,
+      TableConfig tableConfig,
+      String newTenant, boolean shouldCommit, long timeoutMs)
+      throws Exception {
+    performForceCommitSegmentMovingTest(rebalanceConfig, tableConfig, newTenant, shouldCommit, timeoutMs, true);
+  }
+
+  /**
+   * Helper method to perform segment moving test regarding forceCommit in rebalance with specified configuration.
+   * Changes the table tenant, executes rebalance with force commit, and verifies if segments were committed.
+   *
+   * @param rebalanceConfig the rebalance configuration
+   * @param tableConfig the table configuration
+   * @param newTenant the new tenant to move segments to
+   * @param shouldCommit whether segments should be committed (affects verification)
+   * @param timeoutMs timeout in milliseconds
+   * @param waitForEVISConverge if true, waits for external view/ideal state convergence; if false, waits for
+   *                            rebalance completion
+   */
+  private void performForceCommitSegmentMovingTest(RebalanceConfig rebalanceConfig, TableConfig tableConfig,
+      String newTenant,
+      boolean shouldCommit, long timeoutMs, boolean waitForEVISConverge)
+      throws Exception {
+    // Change tenant
+    tableConfig.setTenantConfig(new TenantConfig(getBrokerTenant(), newTenant, null));
+    updateTableConfig(tableConfig);
+
+    // Set force commit
+    rebalanceConfig.setForceCommit(true);
+
+    // Execute rebalance
+    String response = sendPostRequest(getTableRebalanceUrl(rebalanceConfig, TableType.REALTIME));
+    RebalanceResult rebalanceResult = JsonUtils.stringToObject(response, RebalanceResult.class);
+
+    // Get original consuming segments (if present)
+    Set<String> originalConsumingSegmentsToMove = null;
+    if (rebalanceResult.getRebalanceSummaryResult() != null
+        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo() != null
+        && rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getConsumingSegmentToBeMovedSummary() != null) {
+      originalConsumingSegmentsToMove = rebalanceResult.getRebalanceSummaryResult().getSegmentInfo()
+          .getConsumingSegmentToBeMovedSummary()
+          .getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp()
+          .keySet();
+    }
+
+    // Wait for completion based on the flag
+    if (waitForEVISConverge) {
+      waitForTableEVISConverge(getTableName(), timeoutMs);
+    } else {
+      waitForRebalanceToComplete(rebalanceResult.getJobId(), timeoutMs);
+    }
+
+    // Check if segments were committed (only if there were consuming segments to move)
+    if (originalConsumingSegmentsToMove != null && !originalConsumingSegmentsToMove.isEmpty()) {
+      response = sendGetRequest(getControllerRequestURLBuilder().forTableConsumingSegmentsInfo(getTableName()));
+      ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap consumingSegmentInfoResponse =
+          JsonUtils.stringToObject(response, ConsumingSegmentInfoReader.ConsumingSegmentsInfoMap.class);
+      LLCSegmentName consumingSegmentNow = new LLCSegmentName(
+          consumingSegmentInfoResponse._segmentToConsumingInfoMap.keySet().stream().sorted().iterator().next());
+      LLCSegmentName consumingSegmentOriginal =
+          new LLCSegmentName(originalConsumingSegmentsToMove.stream().sorted().iterator().next());
+
+      if (shouldCommit) {
+        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber() + 1);
+      } else {
+        assertEquals(consumingSegmentNow.getSequenceNumber(), consumingSegmentOriginal.getSequenceNumber());
+      }
+    }
   }
 }

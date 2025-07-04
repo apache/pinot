@@ -20,6 +20,8 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
@@ -29,9 +31,15 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
+import java.net.URI;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -42,8 +50,13 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.api.access.AccessType;
+import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
@@ -185,5 +198,63 @@ public class PinotTableInstances {
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
     }
+  }
+
+  @DELETE
+  @Path("/tables/{tableName}/{instanceId}/ingestionMetrics")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.DELETE_INGESTION_METRICS)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation(value = "Remove realtime ingestion metrics emitted per partitionId from serverInstance", notes =
+      "Removes ingestion-related metrics from serverInstance for partition(s) under the specified table")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Successfully removed ingestion metrics."),
+      @ApiResponse(code = 500, message = "Internal Server Error")
+  })
+  public SuccessResponse removeIngestionMetrics(
+      @ApiParam(value = "Table name", required = true) @PathParam("tableName") String tableName,
+      @ApiParam(value = "Instance id of the server", required = true) @PathParam("instanceId") String instanceId,
+      @ApiParam(value = "List of Partition Ids (optional)") @QueryParam("partitionId") @Nullable
+      Set<Integer> partitionIds,
+      @Context HttpHeaders headers) {
+    try {
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.BAD_REQUEST);
+    }
+    String tableNameWithType =
+        ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, TableType.REALTIME, LOGGER)
+            .get(0);
+    String serverEndpoint;
+    try {
+      BiMap<String, String> dataInstanceAdminEndpoints =
+          _pinotHelixResourceManager.getDataInstanceAdminEndpoints(Collections.singleton(instanceId));
+      serverEndpoint = dataInstanceAdminEndpoints.get(instanceId);
+      Preconditions.checkNotNull(serverEndpoint, "Server endpoint not found for instance: " + instanceId);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, "Failed to get server endpoint for instance: " + instanceId,
+          Response.Status.BAD_REQUEST);
+    }
+    StringBuilder uriBuilder = new StringBuilder(serverEndpoint)
+        .append("/tables/")
+        .append(tableNameWithType)
+        .append("/ingestionMetrics");
+
+    if (CollectionUtils.isNotEmpty(partitionIds)) {
+      String query = partitionIds.stream()
+          .map(id -> "partitionId=" + id)
+          .collect(Collectors.joining("&"));
+      uriBuilder.append("?").append(query);
+    }
+
+    String fullUrl = uriBuilder.toString();
+    SimpleHttpResponse simpleHttpResponse;
+    try {
+      simpleHttpResponse =
+          HttpClient.wrapAndThrowHttpException(HttpClient.getInstance().sendDeleteRequest(URI.create(fullUrl)));
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return new SuccessResponse(simpleHttpResponse.getResponse());
   }
 }

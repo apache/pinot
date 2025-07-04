@@ -51,6 +51,12 @@ public class NoClosePinotFS implements PinotFS {
   }
 
   @Override
+  public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+      throws IOException {
+    return _delegate.deleteBatch(segmentUris, forceDelete);
+  }
+
+  @Override
   public boolean move(URI srcUri, URI dstUri, boolean overwrite)
       throws IOException {
     return _delegate.move(srcUri, dstUri, overwrite);

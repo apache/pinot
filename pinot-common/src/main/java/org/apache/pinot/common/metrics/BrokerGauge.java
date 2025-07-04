@@ -67,7 +67,37 @@ public enum BrokerGauge implements AbstractMetrics.Gauge {
   /**
    * The queue size of ServerRoutingStatsManager main executor service.
    */
-  ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true);
+  ROUTING_STATS_MANAGER_QUEUE_SIZE("routingStatsManagerQueueSize", true),
+
+  /**
+   * The ZooKeeper jute.maxbuffer size in bytes.
+   */
+  ZK_JUTE_MAX_BUFFER("zkJuteMaxBuffer", true),
+
+  /**
+   * The estimated number of query server threads for all currently running multi-stage queries.
+   */
+  ESTIMATED_MSE_SERVER_THREADS("number", true),
+
+  // gRPC Netty buffer metrics
+  GRPC_NETTY_POOLED_USED_DIRECT_MEMORY("bytes", true),
+  GRPC_NETTY_POOLED_USED_HEAP_MEMORY("bytes", true),
+  GRPC_NETTY_POOLED_ARENAS_DIRECT("arenas", true),
+  GRPC_NETTY_POOLED_ARENAS_HEAP("arenas", true),
+  GRPC_NETTY_POOLED_CACHE_SIZE_SMALL("bytes", true),
+  GRPC_NETTY_POOLED_CACHE_SIZE_NORMAL("bytes", true),
+  GRPC_NETTY_POOLED_THREADLOCALCACHE("bytes", true),
+  GRPC_NETTY_POOLED_CHUNK_SIZE("bytes", true),
+
+  // GrpcMailboxServer memory metrics
+  MAILBOX_SERVER_USED_DIRECT_MEMORY("bytes", true),
+  MAILBOX_SERVER_USED_HEAP_MEMORY("bytes", true),
+  MAILBOX_SERVER_ARENAS_DIRECT("arenas", true),
+  MAILBOX_SERVER_ARENAS_HEAP("arenas", true),
+  MAILBOX_SERVER_CACHE_SIZE_SMALL("bytes", true),
+  MAILBOX_SERVER_CACHE_SIZE_NORMAL("bytes", true),
+  MAILBOX_SERVER_THREADLOCALCACHE("bytes", true),
+  MAILBOX_SERVER_CHUNK_SIZE("bytes", true);
 
   private final String _brokerGaugeName;
   private final String _unit;

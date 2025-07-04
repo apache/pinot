@@ -324,13 +324,17 @@ public class SegmentDeletionManagerTest {
     PinotFS pinotFS = PinotFSFactory.create("fake");
 
     URI tableUri1 = new URI("fake://bucket/sc/managed/pinot/Deleted_Segments/table_1/");
-    URI segment1ForTable1 = new URI(tableUri1.getPath() + "segment1" + RETENTION_UNTIL_SEPARATOR + "201901010000");
-    URI segment2ForTable1 = new URI(tableUri1.getPath() + "segment2" + RETENTION_UNTIL_SEPARATOR + "210001010000");
     pinotFS.mkdir(tableUri1);
-    pinotFS.mkdir(segment1ForTable1);
-    pinotFS.mkdir(segment2ForTable1);
-    // Create dummy files
+    for (int i = 0; i < 101; i++) {
+      URI segmentURIForTable =
+          new URI(tableUri1.getPath() + "segment" + i + RETENTION_UNTIL_SEPARATOR + "201901010000");
+      pinotFS.mkdir(segmentURIForTable);
+    }
+    // Add a segment that will not be deleted as it won't meet the retention age criteria.
+    URI segmentURIForTable = new URI(tableUri1.getPath() + "segment2" + RETENTION_UNTIL_SEPARATOR + "210001010000");
+    pinotFS.mkdir(segmentURIForTable);
 
+    // Create dummy files
     URI tableUri2 = new URI("fake://bucket/sc/managed/pinot/Deleted_Segments/table_2/");
     URI segment1ForTable2 = new URI(tableUri2.getPath() + "segment1" + RETENTION_UNTIL_SEPARATOR + "201901010000");
     URI segment2ForTable2 = new URI(tableUri2.getPath() + "segment1" + RETENTION_UNTIL_SEPARATOR + "201801010000");
@@ -341,8 +345,9 @@ public class SegmentDeletionManagerTest {
     deletionManager1.removeAgedDeletedSegments(leadControllerManager);
     // all files should get deleted
     Assert.assertFalse(pinotFS.exists(tableUri2));
-    // only one file that is beyond retention should exist
-    Assert.assertEquals(pinotFS.listFiles(tableUri1, false).length, 1);
+
+    // One file that doesn't meet retention criteria, and another file due to the per attempt batch limit remains.
+    Assert.assertEquals(pinotFS.listFiles(tableUri1, false).length, 2);
   }
 
   @Test
@@ -469,6 +474,40 @@ public class SegmentDeletionManagerTest {
     }, 2000L, 10_000L, "Unable to verify table deletion with retention");
   }
 
+  @Test
+  public void testRemoveSegmentsFromStoreInBatch()
+      throws Exception {
+    Map<String, Object> properties = new HashMap<>();
+    properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
+        LocalPinotFS.class.getName());
+    PinotFSFactory.init(new PinotConfiguration(properties));
+
+    HelixAdmin helixAdmin = makeHelixAdmin();
+    ZkHelixPropertyStore<ZNRecord> propertyStore = makePropertyStore();
+    File tempDir = Files.createTempDir();
+    tempDir.deleteOnExit();
+    SegmentDeletionManager deletionManager = new SegmentDeletionManager(
+        tempDir.getAbsolutePath(), helixAdmin, CLUSTER_NAME, propertyStore, 7);
+
+    // create table segment files.
+    List<String> segmentsThatShouldBeDeleted = segmentsThatShouldBeDeleted();
+    createTableAndSegmentFiles(tempDir, segmentsThatShouldBeDeleted);
+    final File tableDir = new File(tempDir.getAbsolutePath() + File.separator + TABLE_NAME);
+    final File deletedTableDir = new File(tempDir.getAbsolutePath() + File.separator + "Deleted_Segments"
+        + File.separator + TABLE_NAME);
+
+    deletionManager.removeSegmentsFromStoreInBatch(TABLE_NAME, segmentsThatShouldBeDeleted, 0L);
+
+    TestUtils.waitForCondition(aVoid -> {
+      try {
+        Assert.assertEquals(tableDir.listFiles().length, 0);
+        Assert.assertTrue(!deletedTableDir.exists() || deletedTableDir.listFiles().length == 0);
+        return true;
+      } catch (Throwable t) {
+        return false;
+      }
+    }, 2000L, 10_000L, "Unable to verify table deletion with retention");
+  }
 
   public void createTableAndSegmentFiles(File tempDir, List<String> segmentIds)
       throws Exception {

@@ -142,7 +142,6 @@ public class ForwardIndexTypeTest {
           new ForwardIndexConfig.Builder()
               .withCompressionType(ChunkCompressionType.SNAPPY)
               .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(2)
               .build()
       );
     }
@@ -163,7 +162,6 @@ public class ForwardIndexTypeTest {
           new ForwardIndexConfig.Builder()
               .withCompressionType(ChunkCompressionType.SNAPPY)
               .withDeriveNumDocsPerChunk(false)
-              .withRawIndexWriterVersion(2)
               .build()
       );
     }

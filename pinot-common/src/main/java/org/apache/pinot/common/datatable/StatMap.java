@@ -61,6 +61,13 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
     _map = Collections.synchronizedMap(new EnumMap<>(keyClass));
   }
 
+  /// A copy constructor for the class.
+  /// @param other The object to copy, which will be deep copied.
+  public StatMap(StatMap<K> other) {
+    this(other._keyClass);
+    _map.putAll(other._map);
+  }
+
   public int getInt(K key) {
     Preconditions.checkArgument(key.getType() == Type.INT, "Key %s is of type %s, not INT", key, key.getType());
     Object o = _map.get(key);

@@ -75,6 +75,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -294,7 +295,8 @@ public class ClusterIntegrationTestUtils {
     if (numAvroFiles == 1) {
       buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
     } else {
-      ExecutorService executorService = Executors.newFixedThreadPool(numAvroFiles);
+      ExecutorService executorService =
+          Executors.newFixedThreadPool(Math.min(numAvroFiles, Runtime.getRuntime().availableProcessors()));
       List<Future<Void>> futures = new ArrayList<>(numAvroFiles);
       for (int i = 0; i < numAvroFiles; i++) {
         File avroFile = avroFiles.get(i);
@@ -341,8 +343,15 @@ public class ClusterIntegrationTestUtils {
   public static void buildSegmentFromAvro(File avroFile, TableConfig tableConfig,
       org.apache.pinot.spi.data.Schema schema, String segmentNamePostfix, File segmentDir, File tarDir)
       throws Exception {
+    buildSegmentFromFile(avroFile, tableConfig, schema, segmentNamePostfix, segmentDir, tarDir, FileFormat.AVRO);
+  }
+
+  public static void buildSegmentFromFile(File file, TableConfig tableConfig, org.apache.pinot.spi.data.Schema schema,
+      String segmentNamePostfix, File segmentDir, File tarDir, FileFormat fileFormat)
+      throws Exception {
     SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
-    segmentGeneratorConfig.setInputFilePath(avroFile.getPath());
+    segmentGeneratorConfig.setFormat(fileFormat);
+    segmentGeneratorConfig.setInputFilePath(file.getPath());
     segmentGeneratorConfig.setOutDir(segmentDir.getPath());
     segmentGeneratorConfig.setTableName(tableConfig.getTableName());
     segmentGeneratorConfig.setSegmentNamePostfix(segmentNamePostfix);
@@ -870,6 +879,10 @@ public class ClusterIntegrationTestUtils {
 
   public static String getBrokerQueryApiUrl(String brokerBaseApiUrl, boolean useMultiStageQueryEngine) {
     return useMultiStageQueryEngine ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
+  }
+
+  public static String getTimeSeriesQueryApiUrl(String timeSeriesBaseApiUrl) {
+    return timeSeriesBaseApiUrl + "/timeseries/api/v1/query_range";
   }
 
   public static String getBrokerQueryCancelUrl(String brokerBaseApiUrl, String brokerId, String clientQueryId) {

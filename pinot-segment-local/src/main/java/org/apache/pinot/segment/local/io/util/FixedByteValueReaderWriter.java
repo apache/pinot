@@ -53,10 +53,8 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     return _dataBuffer.getDouble((long) index * Double.BYTES);
   }
 
-  /**
-   * Reads the unpadded bytes into the given buffer and returns the length.
-   */
-  private int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
+  @Override
+  public int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
     // Based on the ZeroInWord algorithm: http://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord
     assert buffer.length >= numBytesPerValue;
     long startOffset = (long) index * numBytesPerValue;
@@ -83,20 +81,6 @@ public final class FixedByteValueReaderWriter implements ValueReader {
       buffer[i] = b;
     }
     return i;
-  }
-
-  @Override
-  public byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
-    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
-    byte[] bytes = new byte[length];
-    System.arraycopy(buffer, 0, bytes, 0, length);
-    return bytes;
-  }
-
-  @Override
-  public String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
-    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
-    return new String(buffer, 0, length, UTF_8);
   }
 
   @Override

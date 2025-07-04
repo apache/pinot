@@ -39,6 +39,8 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.ColumnIndexCreationInfo;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.ColumnMetadataImpl;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.BoundedColumnValuePartitionFunction;
@@ -46,6 +48,7 @@ import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.data.ComplexFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.util.TestUtils;
@@ -108,7 +111,8 @@ public class ColumnMetadataTest {
 
     // Single-value string dimension column.
     ColumnMetadata col3Meta = segmentMetadata.getColumnMetadataFor("column3");
-    Assert.assertEquals(col3Meta.getFieldSpec(), new DimensionFieldSpec("column3", DataType.STRING, true));
+    Assert.assertEquals(col3Meta.getFieldSpec(),
+        new DimensionFieldSpec("column3", DataType.STRING, true, FieldSpec.DEFAULT_MAX_LENGTH, null));
     Assert.assertEquals(col3Meta.getCardinality(), 5);
     Assert.assertEquals(col3Meta.getTotalDocs(), 100000);
     Assert.assertEquals(col3Meta.getBitsPerElement(), 3);
@@ -243,5 +247,27 @@ public class ColumnMetadataTest {
         false, -1);
     ColumnMetadataImpl intMapColumnMetadata = ColumnMetadataImpl.fromPropertiesConfiguration("intMap", config);
     Assert.assertEquals(intMapColumnMetadata.getFieldSpec(), intMapFieldSpec);
+  }
+
+  @Test
+  public void testSetAndCheckIndexSizes() {
+    ColumnMetadataImpl meta = new ColumnMetadataImpl.Builder().build();
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.json()), 12345L);
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.h3()), 0xffffffffffffL);
+    meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.vector()), 0);
+
+    Assert.assertEquals(meta.getNumIndexes(), 3);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.json()), 12345L);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.h3()), 0xffffffffffffL);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.vector()), 0);
+    Assert.assertEquals(meta.getIndexSizeFor(StandardIndexes.inverted()), ColumnMetadata.INDEX_NOT_FOUND);
+
+    try {
+      meta.addIndexSize(IndexService.getInstance().getNumericId(StandardIndexes.fst()), -1);
+      Assert.fail();
+    } catch (IllegalArgumentException e) {
+      Assert.assertEquals(e.getMessage(),
+          "Index size should be a non-negative integer value between 0 and 281474976710655");
+    }
   }
 }

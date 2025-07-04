@@ -32,11 +32,6 @@ public class ControllerBasedBrokerSelector implements BrokerSelector {
   private final UpdatableBrokerCache _brokerCache;
   private final Properties _properties;
 
-  public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort)
-      throws Exception {
-    this(scheme, controllerHost, controllerPort, new Properties());
-  }
-
   public ControllerBasedBrokerSelector(String scheme, String controllerHost, int controllerPort, Properties properties)
       throws Exception {
     _properties = properties;
@@ -52,7 +47,6 @@ public class ControllerBasedBrokerSelector implements BrokerSelector {
     _brokerCache = new BrokerCacheUpdaterPeriodic(properties, controllerUrl);
     _brokerCache.init();
   }
-
 
   @Override
   public String selectBroker(String... tableNames) {

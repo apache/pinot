@@ -45,6 +45,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.minion.event.MinionEventObserver;
 import org.apache.pinot.minion.event.MinionEventObservers;
 import org.apache.pinot.minion.event.MinionTaskState;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
@@ -140,6 +141,44 @@ public class PinotTaskProgressResource {
                   StringUtils.isEmpty(subtaskNames) ? "NOT_SPECIFIED" : subtaskNames,
                   StringUtils.isEmpty(subTaskState) ? "NOT_SPECIFIED" : subTaskState,
                   e.getMessage()))
+          .build());
+    }
+  }
+
+  @GET
+  @Path("/tasks/subtask/progressStats")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation("Get task progress stats tracked for the given subtasks")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getSubtaskProgressStats(
+      @ApiParam(value = "Sub task name") @QueryParam("subtaskName") String subtaskName) {
+    try {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Getting progress stats for subtask: {}", subtaskName);
+      }
+      Map<String, MinionTaskBaseObserverStats> progressStatsMap = new HashMap<>();
+      MinionEventObserver observer = MinionEventObservers.getInstance().getMinionEventObserver(subtaskName);
+      if (observer == null) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("MinionEventObserver does not exist for subtask: {}", subtaskName);
+        }
+        return JsonUtils.objectToString(progressStatsMap);
+      }
+      MinionTaskBaseObserverStats progressStats = observer.getProgressStats();
+      if (progressStats != null) {
+        progressStats.setProgressLogs(null);
+        progressStatsMap.put(subtaskName, progressStats);
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Got subtasks progress stats: {}", progressStats);
+        }
+      }
+      return JsonUtils.objectToString(progressStatsMap);
+    } catch (Exception e) {
+      throw new WebApplicationException(Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(
+          String.format("Failed to get task progress stats for subtask: %s due to error: %s",
+              subtaskName, e.getMessage()))
           .build());
     }
   }

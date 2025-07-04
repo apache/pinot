@@ -30,6 +30,7 @@ import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.rel.logical.LogicalIntersect;
@@ -42,6 +43,7 @@ import org.apache.calcite.rex.RexLiteral;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexWindowBound;
 import org.apache.calcite.rex.RexWindowBounds;
+import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
@@ -153,7 +155,12 @@ public final class PlanNodeToRelConverter {
           conditions.add(RexExpressionUtils.toRexNode(_builder, nonEquiCondition));
         }
 
-        _builder.join(node.getJoinType(), conditions);
+        if (node.getJoinType() == JoinRelType.ASOF || node.getJoinType() == JoinRelType.LEFT_ASOF) {
+          RexNode matchCondition = RexExpressionUtils.toRexNode(_builder, node.getMatchCondition());
+          _builder.asofJoin(node.getJoinType(), _builder.and(conditions), matchCondition);
+        } else {
+          _builder.join(node.getJoinType(), conditions);
+        }
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert join node: {}", node, e);
         _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Collections.emptyMap(),
@@ -330,7 +337,7 @@ public final class PlanNodeToRelConverter {
 
         Window.Group group =
             new Window.Group(keys, isRow, getWindowBound(node.getLowerBound()), getWindowBound(node.getUpperBound()),
-                orderKeys, aggCalls);
+                RexWindowExclusion.EXCLUDE_NO_OTHER, orderKeys, aggCalls);
 
         List<RexLiteral> constants =
             node.getConstants().stream().map(constant -> RexExpressionUtils.toRexLiteral(_builder, constant))

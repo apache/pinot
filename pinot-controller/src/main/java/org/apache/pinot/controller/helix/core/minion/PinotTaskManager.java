@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
@@ -56,6 +57,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerato
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
+import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -110,6 +112,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private final Map<String, Map<String, String>> _tableTaskTypeToCronExpressionMap = new ConcurrentHashMap<>();
   private final Map<String, TableTaskSchedulerUpdater> _tableTaskSchedulerUpdaterMap = new ConcurrentHashMap<>();
 
+  private final boolean _isPinotTaskManagerSchedulerEnabled;
+
   // For metrics
   private final Map<String, TaskTypeMetricsUpdater> _taskTypeMetricsUpdaterMap = new ConcurrentHashMap<>();
   private final Map<TaskState, Integer> _taskStateToCountMap = new ConcurrentHashMap<>();
@@ -135,9 +139,21 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     _taskGeneratorRegistry = new TaskGeneratorRegistry(_clusterInfoAccessor);
     _skipLateCronSchedule = controllerConf.isSkipLateCronSchedule();
     _maxCronScheduleDelayInSeconds = controllerConf.getMaxCronScheduleDelayInSeconds();
-    if (controllerConf.isPinotTaskManagerSchedulerEnabled()) {
+    _isPinotTaskManagerSchedulerEnabled = controllerConf.isPinotTaskManagerSchedulerEnabled();
+    if (_isPinotTaskManagerSchedulerEnabled) {
       try {
         _scheduler = new StdSchedulerFactory().getScheduler();
+      } catch (SchedulerException e) {
+        throw new RuntimeException("Caught exception while setting up the scheduler", e);
+      }
+    } else {
+      _scheduler = null;
+    }
+  }
+
+  public void init() {
+    if (_isPinotTaskManagerSchedulerEnabled) {
+      try {
         _scheduler.start();
         synchronized (_zkTableConfigChangeListener) {
           // Subscribe child changes before reading the data to avoid missing changes
@@ -153,8 +169,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       } catch (SchedulerException e) {
         throw new RuntimeException("Caught exception while setting up the scheduler", e);
       }
-    } else {
-      _scheduler = null;
     }
   }
 
@@ -209,7 +223,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       LOGGER.info("Trying to create tasks of type: {}, table: {}", taskType, tableNameWithType);
       try {
-        if (!_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType)) {
+        if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+            UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
           LOGGER.warn("Resource utilization is above threshold, skipping task creation for table: {}", tableName);
           _controllerMetrics.setOrUpdateTableGauge(tableName, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, 1L);
           continue;
@@ -708,7 +723,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     for (TableConfig tableConfig : enabledTableConfigs) {
       String tableName = tableConfig.getTableName();
       try {
-        if (!_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName)) {
+        if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName,
+            UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
           String message = String.format("Skipping tasks generation as resource utilization is not within limits for "
               + "table: %s. Disk utilization for one or more servers hosting this table has exceeded the threshold. "
               + "Tasks won't be generated until the issue is mitigated.", tableName);
@@ -799,7 +815,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   protected void processTables(List<String> tableNamesWithType, Properties taskProperties) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setLeader(true)
-        .setTriggeredBy(CommonConstants.TaskTriggers.CRON_TRIGGER.name());
+        .setTriggeredBy(CommonConstants.TaskTriggers.CRON_TRIGGER.name())
+        .setTablesToSchedule(ImmutableSet.copyOf(tableNamesWithType));
     // cron schedule
     scheduleTasks(context);
   }

@@ -20,7 +20,6 @@ package org.apache.pinot.common.assignment;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -55,7 +54,7 @@ public class InstanceAssignmentConfigUtils {
    */
   public static boolean allowInstanceAssignment(TableConfig tableConfig,
       InstancePartitionsType instancePartitionsType) {
-    if (TableConfigUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
+    if (InstancePartitionsUtils.hasPreConfiguredInstancePartitions(tableConfig, instancePartitionsType)) {
       return true;
     }
     TableType tableType = tableConfig.getTableType();

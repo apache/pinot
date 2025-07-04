@@ -21,8 +21,11 @@ package org.apache.pinot.query.planner.explain;
 import java.util.List;
 import java.util.Map;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.externalize.RelJson;
 import org.apache.calcite.rel.externalize.RelJsonWriter;
+import org.apache.calcite.util.JsonBuilder;
 import org.apache.calcite.util.Pair;
+import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 
@@ -30,6 +33,11 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * Extends {@link RelJsonWriter} to add the type of the relational algebra node.
  */
 public class PinotRelJsonWriter extends RelJsonWriter {
+
+  public PinotRelJsonWriter() {
+    super(new JsonBuilder(), relJson -> new PinotRelJson(relJson));
+  }
+
   @Override
   protected void explain_(RelNode rel, List<Pair<String, @Nullable Object>> values) {
     super.explain_(rel, values);
@@ -39,6 +47,26 @@ public class PinotRelJsonWriter extends RelJsonWriter {
       @SuppressWarnings("unchecked")
       Map<String, Object> map = (Map<String, Object>) last;
       map.put("type", rel.getRelTypeName());
+    }
+  }
+
+  static class PinotRelJson extends RelJson {
+    private final RelJson _relJson;
+
+    /**
+     * Creates a PinotRelJson.
+     */
+    public PinotRelJson(RelJson relJson) {
+      super(null);
+      _relJson = relJson;
+    }
+
+    @Override
+    public @Nullable Object toJson(@Nullable Object value) {
+      if (value instanceof AggregateNode.AggType) {
+        return ((AggregateNode.AggType) value).name();
+      }
+      return _relJson.toJson(value);
     }
   }
 }

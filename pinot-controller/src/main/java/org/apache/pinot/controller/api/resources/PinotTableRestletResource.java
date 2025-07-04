@@ -39,14 +39,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -73,16 +74,17 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.exception.RebalanceInProgressException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.response.server.TableIndexMetadataResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.DatabaseUtils;
+import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
@@ -93,13 +95,12 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
-import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
+import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalancer;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
@@ -112,13 +113,15 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableStatsHumanReadable;
 import org.apache.pinot.spi.config.table.TableStatus;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.controller.ControllerJobType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -170,6 +173,9 @@ public class PinotTableRestletResource {
   PinotHelixResourceManager _pinotHelixResourceManager;
 
   @Inject
+  TableRebalanceManager _tableRebalanceManager;
+
+  @Inject
   PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @Inject
@@ -182,9 +188,6 @@ public class PinotTableRestletResource {
   ControllerMetrics _controllerMetrics;
 
   @Inject
-  ExecutorService _executorService;
-
-  @Inject
   AccessControlFactory _accessControlFactory;
 
   @Inject
@@ -194,9 +197,8 @@ public class PinotTableRestletResource {
   HttpClientConnectionManager _connectionManager;
 
   /**
-   * API to create a table. Before adding, validations will be done (min number of replicas,
-   * checking offline and realtime table configs match, checking for tenants existing)
-   * @param tableConfigStr
+   * API to create a table. Before adding, validations will be done (min number of replicas, checking offline and
+   * realtime table configs match, checking for tenants existing).
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
@@ -218,14 +220,13 @@ public class PinotTableRestletResource {
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
       tableConfig.setTableName(tableNameWithType);
-      // Handle legacy config
-      handleLegacySchemaConfig(tableConfig, httpHeaders);
 
       // validate permission
       ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
           AccessType.CREATE, Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
-      schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
 
       TableConfigTunerUtils.applyTunerConfigs(_pinotHelixResourceManager, tableConfig, schema, Collections.emptyMap());
 
@@ -389,18 +390,25 @@ public class PinotTableRestletResource {
 
       if ((tableTypeStr == null || TableType.OFFLINE.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasOfflineTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false);
+        TableConfig tableConfig = _pinotHelixResourceManager.getOfflineTableConfig(tableName, false, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.OFFLINE.name(), tableConfig.toJsonNode());
       }
 
       if ((tableTypeStr == null || TableType.REALTIME.name().equalsIgnoreCase(tableTypeStr))
           && _pinotHelixResourceManager.hasRealtimeTable(tableName)) {
-        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false);
+        TableConfig tableConfig = _pinotHelixResourceManager.getRealtimeTableConfig(tableName, false, false);
         Preconditions.checkNotNull(tableConfig);
         ret.set(TableType.REALTIME.name(), tableConfig.toJsonNode());
       }
+
+      if (ret.isEmpty()) {
+        String tableNameWithType = tableTypeStr != null ? tableName + "_" + tableTypeStr.toUpperCase() : tableName;
+        throw new TableNotFoundException("Table " + tableNameWithType + " does not exist");
+      }
       return ret.toString();
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
     }
@@ -424,6 +432,7 @@ public class PinotTableRestletResource {
     List<String> tablesDeleted = new LinkedList<>();
     try {
       tableName = DatabaseUtils.translateTableName(tableName, headers);
+      validateLogicalTableReference(tableName, tableType);
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
@@ -468,6 +477,20 @@ public class PinotTableRestletResource {
     return typeFromTableName == null || typeFromTableName == expectedType;
   }
 
+  private void validateLogicalTableReference(String tableName, TableType tableType) {
+    String tableNameWithType =
+        tableType == null ? tableName : TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    List<LogicalTableConfig> allLogicalTableConfigs =
+        ZKMetadataProvider.getAllLogicalTableConfigs(_pinotHelixResourceManager.getPropertyStore());
+    for (LogicalTableConfig logicalTableConfig : allLogicalTableConfigs) {
+      if (LogicalTableConfigUtils.checkPhysicalTableRefExists(logicalTableConfig, tableNameWithType)) {
+        throw new ControllerApplicationException(LOGGER,
+            String.format("Cannot delete table config: %s because it is referenced in logical table: %s",
+                tableName, logicalTableConfig.getTableName()), Response.Status.CONFLICT);
+      }
+    }
+  }
+
   @PUT
   @Path("/tables/{tableName}")
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.UPDATE_TABLE_CONFIG)
@@ -490,8 +513,6 @@ public class PinotTableRestletResource {
       tableConfig = tableConfigAndUnrecognizedProperties.getLeft();
       tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), headers);
       tableConfig.setTableName(tableNameWithType);
-      // Handle legacy config
-      handleLegacySchemaConfig(tableConfig, headers);
       String tableNameFromPath = DatabaseUtils.translateTableName(
           TableNameBuilder.forType(tableConfig.getTableType()).tableNameWithType(tableName), headers);
       if (!tableNameFromPath.equals(tableNameWithType)) {
@@ -500,7 +521,8 @@ public class PinotTableRestletResource {
             Response.Status.BAD_REQUEST);
       }
 
-      schema = _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig);
+      schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
+      Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
     } catch (Exception e) {
       String msg = String.format("Invalid table config: %s with error: %s", tableName, e.getMessage());
@@ -559,24 +581,22 @@ public class PinotTableRestletResource {
     String tableNameWithType = DatabaseUtils.translateTableName(tableConfig.getTableName(), httpHeaders);
     tableConfig.setTableName(tableNameWithType);
 
-    // Handle legacy config
-    handleLegacySchemaConfig(tableConfig, httpHeaders);
-
     // validate permission
     ResourceUtils.checkPermissionAndAccess(tableNameWithType, request, httpHeaders,
         AccessType.READ, Actions.Table.VALIDATE_TABLE_CONFIGS, _accessControlFactory, LOGGER);
 
-    ObjectNode validationResponse =
-        validateConfig(tableConfig, _pinotHelixResourceManager.getSchemaForTableConfig(tableConfig), typesToSkip);
+    ObjectNode validationResponse = validateConfig(tableConfig, typesToSkip);
     validationResponse.set("unrecognizedProperties",
         JsonUtils.objectToJsonNode(tableConfigAndUnrecognizedProperties.getRight()));
     return validationResponse;
   }
 
-  private ObjectNode validateConfig(TableConfig tableConfig, Schema schema, @Nullable String typesToSkip) {
+  private ObjectNode validateConfig(TableConfig tableConfig, @Nullable String typesToSkip) {
+    String tableNameWithType = tableConfig.getTableName();
     try {
+      Schema schema = _pinotHelixResourceManager.getTableSchema(tableNameWithType);
       if (schema == null) {
-        throw new SchemaNotFoundException("Got empty schema");
+        throw new SchemaNotFoundException("Failed to find schema for table: " + tableNameWithType);
       }
       TableConfigUtils.validate(tableConfig, schema, typesToSkip);
       TaskConfigUtils.validateTaskConfigs(tableConfig, schema, _pinotTaskManager, typesToSkip);
@@ -588,7 +608,7 @@ public class PinotTableRestletResource {
       }
       return tableConfigValidateStr;
     } catch (Exception e) {
-      String msg = String.format("Invalid table config: %s. %s", tableConfig.getTableName(), e.getMessage());
+      String msg = String.format("Invalid table config: %s. %s", tableNameWithType, e.getMessage());
       throw new ControllerApplicationException(LOGGER, msg, Response.Status.BAD_REQUEST, e);
     }
   }
@@ -606,22 +626,22 @@ public class PinotTableRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Whether to rebalance table in dry-run mode") @DefaultValue("false") @QueryParam("dryRun")
       boolean dryRun,
-      @ApiParam(value = "Whether to return dry-run summary instead of full, dry-run must be enabled to use this")
-      @DefaultValue("false") @QueryParam("summary")
-      boolean summary,
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
-      @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("false")
+      @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("true")
       @QueryParam("reassignInstances") boolean reassignInstances,
-      @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("false")
+      @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("true")
       @QueryParam("includeConsuming") boolean includeConsuming,
+      @ApiParam(value = "Whether to enable minimize data movement on rebalance, DEFAULT will use "
+          + "the minimizeDataMovement in table config") @DefaultValue("ENABLE")
+      @QueryParam("minimizeDataMovement") Enablement minimizeDataMovement,
       @ApiParam(value = "Whether to rebalance table in bootstrap mode (regardless of minimum segment movement, "
           + "reassign all segments in a round-robin fashion as if adding new segments to an empty table)")
       @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
       boolean downtime,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
-          + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("1")
+          + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("-1")
       @QueryParam("minAvailableReplicas") int minAvailableReplicas,
       @ApiParam(value = "For no-downtime rebalance, whether to enable low disk mode during rebalance. When enabled, "
           + "segments will first be offloaded from servers, then added to servers after offload is done while "
@@ -630,9 +650,18 @@ public class PinotTableRestletResource {
           + "more servers.") @DefaultValue("false") @QueryParam("lowDiskMode") boolean lowDiskMode,
       @ApiParam(value = "Whether to use best-efforts to rebalance (not fail the rebalance when the no-downtime "
           + "contract cannot be achieved)") @DefaultValue("false") @QueryParam("bestEfforts") boolean bestEfforts,
+      @ApiParam(value = "How many maximum segment adds per server to update in the IdealState in each step. For "
+          + "non-strict replica group based assignment, this number will be capped at the batchSizePerServer value "
+          + "per rebalance step (some servers may get fewer segments). For strict replica group based assignment, "
+          + "this is a per-server best effort value since each partition of a replica group must be moved as a whole "
+          + "and at least one partition in a replica group should be moved. A value of -1 is used to disable batching "
+          + "(select as many segments as possible per incremental step in rebalance such that minAvailableReplicas is "
+          + "honored).")
+      @DefaultValue("-1") @QueryParam("batchSizePerServer") int batchSizePerServer,
       @ApiParam(value = "How often to check if external view converges with ideal states") @DefaultValue("1000")
       @QueryParam("externalViewCheckIntervalInMs") long externalViewCheckIntervalInMs,
-      @ApiParam(value = "How long to wait till external view converges with ideal states") @DefaultValue("3600000")
+      @ApiParam(value = "Maximum time (in milliseconds) to wait for external view to converge with ideal states. "
+          + "Extends if progress has been made during the wait, otherwise times out") @DefaultValue("3600000")
       @QueryParam("externalViewStabilizationTimeoutInMs") long externalViewStabilizationTimeoutInMs,
       @ApiParam(value = "How often to make a status update (i.e. heartbeat)") @DefaultValue("300000")
       @QueryParam("heartbeatIntervalInMs") long heartbeatIntervalInMs,
@@ -644,6 +673,23 @@ public class PinotTableRestletResource {
       @QueryParam("retryInitialDelayInMs") long retryInitialDelayInMs,
       @ApiParam(value = "Whether to update segment target tier as part of the rebalance") @DefaultValue("false")
       @QueryParam("updateTargetTier") boolean updateTargetTier,
+      @ApiParam(value = "Disk utilization threshold override used in pre-check (0.0 to 1.0, e.g., 0.85 for 85%). "
+          + "If not provided, uses " + ControllerConf.REBALANCE_DISK_UTILIZATION_THRESHOLD
+          + " in the controller config")
+      @DefaultValue("-1.0")
+      @QueryParam("diskUtilizationThreshold") double diskUtilizationThreshold,
+      @ApiParam(value = "Whether to force commit consuming segments for a REALTIME table before they are rebalanced.")
+      @DefaultValue("false")
+      @QueryParam("forceCommit") boolean forceCommit,
+      @ApiParam(value = "Batch size for force commit operations")
+      @DefaultValue(ForceCommitBatchConfig.DEFAULT_BATCH_SIZE + "")
+      @QueryParam("forceCommitBatchSize") int forceCommitBatchSize,
+      @ApiParam(value = "Interval in milliseconds for checking force commit batch status")
+      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_INTERVAL_SEC * 1000 + "")
+      @QueryParam("forceCommitBatchStatusCheckIntervalMs") int forceCommitBatchStatusCheckIntervalMs,
+      @ApiParam(value = "Timeout in milliseconds for force commit batch status check")
+      @DefaultValue(ForceCommitBatchConfig.DEFAULT_STATUS_CHECK_TIMEOUT_SEC * 1000 + "")
+      @QueryParam("forceCommitBatchStatusCheckTimeoutMs") int forceCommitBatchStatusCheckTimeoutMs,
       @Context HttpHeaders headers
       //@formatter:on
   ) {
@@ -651,15 +697,20 @@ public class PinotTableRestletResource {
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
-    rebalanceConfig.setSummary(summary);
     rebalanceConfig.setPreChecks(preChecks);
     rebalanceConfig.setReassignInstances(reassignInstances);
     rebalanceConfig.setIncludeConsuming(includeConsuming);
+    rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);
     rebalanceConfig.setBootstrap(bootstrap);
     rebalanceConfig.setDowntime(downtime);
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
+    rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
+    rebalanceConfig.setForceCommit(forceCommit);
+    rebalanceConfig.setForceCommitBatchSize(forceCommitBatchSize);
+    rebalanceConfig.setForceCommitBatchStatusCheckIntervalMs(forceCommitBatchStatusCheckIntervalMs);
+    rebalanceConfig.setForceCommitBatchStatusCheckTimeoutMs(forceCommitBatchStatusCheckTimeoutMs);
     rebalanceConfig.setExternalViewCheckIntervalInMs(externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(externalViewStabilizationTimeoutInMs);
     heartbeatIntervalInMs = Math.max(externalViewCheckIntervalInMs, heartbeatIntervalInMs);
@@ -669,35 +720,35 @@ public class PinotTableRestletResource {
     rebalanceConfig.setMaxAttempts(maxAttempts);
     rebalanceConfig.setRetryInitialDelayInMs(retryInitialDelayInMs);
     rebalanceConfig.setUpdateTargetTier(updateTargetTier);
+    rebalanceConfig.setDiskUtilizationThreshold(diskUtilizationThreshold);
     String rebalanceJobId = TableRebalancer.createUniqueRebalanceJobIdentifier();
 
     try {
-      if (dryRun || summary || preChecks || downtime) {
-        // For dry-run, preChecks or rebalance with downtime, directly return the rebalance result as it should return
-        // immediately
-        return _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
+      if (dryRun || preChecks) {
+        return _tableRebalanceManager.rebalanceTableDryRun(tableNameWithType, rebalanceConfig, rebalanceJobId);
+      } else if (downtime) {
+        // For rebalance with downtime, it's fine to run the rebalance synchronously since it should be a really
+        // short operation.
+        return _tableRebalanceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
       } else {
         // Make a dry-run first to get the target assignment
         rebalanceConfig.setDryRun(true);
         RebalanceResult dryRunResult =
-            _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig, rebalanceJobId, false);
+            _tableRebalanceManager.rebalanceTableDryRun(tableNameWithType, rebalanceConfig, rebalanceJobId);
 
         if (dryRunResult.getStatus() == RebalanceResult.Status.DONE) {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setDryRun(false);
-          Future<RebalanceResult> rebalanceResultFuture = _executorService.submit(() -> {
-            try {
-              return _pinotHelixResourceManager.rebalanceTable(
-                  tableNameWithType, rebalanceConfig, rebalanceJobId, true);
-            } catch (Throwable t) {
+          CompletableFuture<RebalanceResult> rebalanceResultFuture =
+              _tableRebalanceManager.rebalanceTableAsync(tableNameWithType, rebalanceConfig, rebalanceJobId, true);
+          rebalanceResultFuture.whenComplete((rebalanceResult, throwable) -> {
+            if (throwable != null) {
               String errorMsg = String.format("Caught exception/error while rebalancing table: %s", tableNameWithType);
-              LOGGER.error(errorMsg, t);
-              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null,
-                  null, null);
+              LOGGER.error(errorMsg, throwable);
             }
           });
-          boolean isJobIdPersisted = waitForRebalanceToPersist(
-              dryRunResult.getJobId(), tableNameWithType, rebalanceResultFuture);
+          boolean isJobIdPersisted =
+              waitForRebalanceToPersist(dryRunResult.getJobId(), tableNameWithType, rebalanceResultFuture);
 
           if (rebalanceResultFuture.isDone()) {
             try {
@@ -722,6 +773,8 @@ public class PinotTableRestletResource {
       }
     } catch (TableNotFoundException e) {
       throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND);
+    } catch (RebalanceInProgressException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT);
     }
   }
 
@@ -745,7 +798,7 @@ public class PinotTableRestletResource {
   }
 
   public Map<String, String> getControllerJobMetadata(String jobId) {
-    return _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobType.TABLE_REBALANCE);
+    return _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TABLE_REBALANCE);
   }
 
   @DELETE
@@ -761,29 +814,7 @@ public class PinotTableRestletResource {
       @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     String tableNameWithType = constructTableNameWithType(tableName, tableTypeStr);
-    List<String> cancelledJobIds = new ArrayList<>();
-    boolean updated =
-        _pinotHelixResourceManager.updateJobsForTable(tableNameWithType, ControllerJobType.TABLE_REBALANCE,
-            jobMetadata -> {
-              String jobId = jobMetadata.get(CommonConstants.ControllerJob.JOB_ID);
-              try {
-                String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
-                TableRebalanceProgressStats jobStats =
-                    JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
-                if (jobStats.getStatus() != RebalanceResult.Status.IN_PROGRESS) {
-                  return;
-                }
-                cancelledJobIds.add(jobId);
-                LOGGER.info("Cancel rebalance job: {} for table: {}", jobId, tableNameWithType);
-                jobStats.setStatus(RebalanceResult.Status.CANCELLED);
-                jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
-                    JsonUtils.objectToString(jobStats));
-              } catch (Exception e) {
-                LOGGER.error("Failed to cancel rebalance job: {} for table: {}", jobId, tableNameWithType, e);
-              }
-            });
-    LOGGER.info("Tried to cancel existing jobs at best effort and done: {}", updated);
-    return cancelledJobIds;
+    return _tableRebalanceManager.cancelRebalance(tableNameWithType);
   }
 
   @GET
@@ -796,30 +827,7 @@ public class PinotTableRestletResource {
   public ServerRebalanceJobStatusResponse rebalanceStatus(
       @ApiParam(value = "Rebalance Job Id", required = true) @PathParam("jobId") String jobId)
       throws JsonProcessingException {
-    Map<String, String> controllerJobZKMetadata = getControllerJobMetadata(jobId);
-
-    if (controllerJobZKMetadata == null) {
-      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + jobId,
-          Response.Status.NOT_FOUND);
-    }
-    ServerRebalanceJobStatusResponse serverRebalanceJobStatusResponse = new ServerRebalanceJobStatusResponse();
-    TableRebalanceProgressStats tableRebalanceProgressStats = JsonUtils.stringToObject(
-        controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
-        TableRebalanceProgressStats.class);
-    serverRebalanceJobStatusResponse.setTableRebalanceProgressStats(tableRebalanceProgressStats);
-
-    long timeSinceStartInSecs = 0L;
-    if (RebalanceResult.Status.DONE != tableRebalanceProgressStats.getStatus()) {
-      timeSinceStartInSecs = (System.currentTimeMillis() - tableRebalanceProgressStats.getStartTimeMs()) / 1000;
-    }
-    serverRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
-
-    String jobCtxInStr = controllerJobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT);
-    if (StringUtils.isNotEmpty(jobCtxInStr)) {
-      TableRebalanceContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceContext.class);
-      serverRebalanceJobStatusResponse.setTableRebalanceContext(jobCtx);
-    }
-    return serverRebalanceJobStatusResponse;
+    return _tableRebalanceManager.getRebalanceStatus(jobId);
   }
 
   @GET
@@ -1154,15 +1162,24 @@ public class PinotTableRestletResource {
     List<String> tableNamesWithType =
         ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName, tableTypeFromRequest,
             LOGGER);
-    Set<String> jobTypesToFilter = null;
+    Set<ControllerJobType> jobTypesToFilter = null;
     if (StringUtils.isNotEmpty(jobTypesString)) {
-      jobTypesToFilter = new HashSet<>(java.util.Arrays.asList(StringUtils.split(jobTypesString, ',')))
-          .stream().collect(Collectors.toSet());
+      jobTypesToFilter = new HashSet<>();
+      for (String jobTypeStr : StringUtils.split(jobTypesString, ',')) {
+        ControllerJobTypes jobType;
+        try {
+          jobType = ControllerJobTypes.valueOf(jobTypeStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+          throw new ControllerApplicationException(LOGGER, "Unknown job type: " + jobTypeStr,
+              Response.Status.BAD_REQUEST);
+        }
+        jobTypesToFilter.add(jobType);
+      }
     }
     Map<String, Map<String, String>> result = new HashMap<>();
     for (String tableNameWithType : tableNamesWithType) {
       result.putAll(_pinotHelixResourceManager.getAllJobs(jobTypesToFilter == null
-              ? ControllerJobType.VALID_CONTROLLER_JOB_TYPE : jobTypesToFilter,
+              ? new HashSet<>(EnumSet.allOf(ControllerJobTypes.class)) : jobTypesToFilter,
           jobMetadata -> jobMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE)
               .equals(tableNameWithType)));
     }
@@ -1277,24 +1294,6 @@ public class PinotTableRestletResource {
     }
 
     return timeBoundaryMs;
-  }
-
-  /**
-   * Handles the legacy schema configuration for a given table configuration.
-   * This method updates the schema name in the validation configuration of the table config
-   * to ensure it is correctly translated based on the provided HTTP headers.
-   * This is necessary to maintain compatibility with older configurations that may not
-   * have the schema name properly set or formatted.
-   *
-   * @param tableConfig The {@link TableConfig} object containing the table configuration.
-   * @param httpHeaders The {@link HttpHeaders} object containing the HTTP headers, used to
-   *                    translate the schema name if necessary.
-   */
-  private void handleLegacySchemaConfig(TableConfig tableConfig, HttpHeaders httpHeaders) {
-    SegmentsValidationAndRetentionConfig validationConfig = tableConfig.getValidationConfig();
-    if (validationConfig.getSchemaName() != null) {
-      validationConfig.setSchemaName(DatabaseUtils.translateTableName(validationConfig.getSchemaName(), httpHeaders));
-    }
   }
 
   /**

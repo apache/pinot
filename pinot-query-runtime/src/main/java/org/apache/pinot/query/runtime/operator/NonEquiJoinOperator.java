@@ -22,14 +22,12 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.calcite.rel.core.JoinRelType;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.JoinNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.JoinOverFlowMode;
 
 
 /**
@@ -42,6 +40,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
   private final List<Object[]> _rightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
   // TODO: Revisit whether we should use IntList or RoaringBitmap for smaller memory footprint.
+  @Nullable
   private BitSet _matchedRightRows;
 
   public NonEquiJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
@@ -59,65 +58,39 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
   }
 
   @Override
-  protected void buildRightTable()
-      throws ProcessingException {
-    LOGGER.trace("Building right table for join operator");
-    long startTime = System.currentTimeMillis();
-    TransferableBlock rightBlock = _rightInput.nextBlock();
-    while (!TransferableBlockUtils.isEndOfStream(rightBlock)) {
-      List<Object[]> rows = rightBlock.getContainer();
-      int numRowsInRightTable = _rightTable.size();
-      // Row based overflow check.
-      if (rows.size() + numRowsInRightTable > _maxRowsInJoin) {
-        if (_joinOverflowMode == JoinOverFlowMode.THROW) {
-          throwProcessingExceptionForJoinRowLimitExceeded(
-              "Cannot build in memory right table for join operator, reached number of rows limit: " + _maxRowsInJoin);
-        } else {
-          // Just fill up the buffer.
-          int remainingRows = _maxRowsInJoin - numRowsInRightTable;
-          rows = rows.subList(0, remainingRows);
-          _statMap.merge(StatKey.MAX_ROWS_IN_JOIN_REACHED, true);
-          // setting only the rightTableOperator to be early terminated and awaits EOS block next.
-          _rightInput.earlyTerminate();
-        }
-      }
-      _rightTable.addAll(rows);
-      sampleAndCheckInterruption();
-      rightBlock = _rightInput.nextBlock();
-    }
-    if (rightBlock.isErrorBlock()) {
-      _upstreamErrorBlock = rightBlock;
-    } else {
-      _isRightTableBuilt = true;
-      if (needUnmatchedRightRows()) {
-        _matchedRightRows = new BitSet(_rightTable.size());
-      }
-      _rightSideStats = rightBlock.getQueryStats();
-      assert _rightSideStats != null;
-    }
-    _statMap.merge(StatKey.TIME_BUILDING_HASH_TABLE_MS, System.currentTimeMillis() - startTime);
-    LOGGER.trace("Finished building right table for join operator");
+  protected void addRowsToRightTable(List<Object[]> rows) {
+    _rightTable.addAll(rows);
   }
 
   @Override
-  protected List<Object[]> buildJoinedRows(TransferableBlock leftBlock)
-      throws ProcessingException {
+  protected void finishBuildingRightTable() {
+    if (needUnmatchedRightRows()) {
+      _matchedRightRows = new BitSet(_rightTable.size());
+    }
+  }
+
+  @Override
+  protected void onEosProduced() {
+    _matchedRightRows = null;
+  }
+
+  @Override
+  protected List<Object[]> buildJoinedRows(MseBlock.Data leftBlock) {
     ArrayList<Object[]> rows = new ArrayList<>();
-    for (Object[] leftRow : leftBlock.getContainer()) {
+    for (Object[] leftRow : leftBlock.asRowHeap().getRows()) {
       // NOTE: Empty key selector will always give same hash code.
       boolean hasMatchForLeftRow = false;
       int numRightRows = _rightTable.size();
       boolean maxRowsLimitReached = false;
       for (int i = 0; i < numRightRows; i++) {
         Object[] rightRow = _rightTable.get(i);
-        // TODO: Optimize this to avoid unnecessary object copy.
-        Object[] resultRow = joinRow(leftRow, rightRow);
-        if (matchNonEquiConditions(resultRow)) {
+        List<Object> joinRowView = joinRowView(leftRow, rightRow);
+        if (matchNonEquiConditions(joinRowView)) {
           if (isMaxRowsLimitReached(rows.size())) {
             maxRowsLimitReached = true;
             break;
           }
-          rows.add(resultRow);
+          rows.add(joinRowView.toArray());
           hasMatchForLeftRow = true;
           if (_matchedRightRows != null) {
             _matchedRightRows.set(i);
@@ -139,6 +112,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
 
   @Override
   protected List<Object[]> buildNonMatchRightRows() {
+    assert _matchedRightRows != null : "Matched right rows should not be null when building non-matched right rows";
     int numRightRows = _rightTable.size();
     int numMatchedRightRows = _matchedRightRows.cardinality();
     if (numMatchedRightRows == numRightRows) {

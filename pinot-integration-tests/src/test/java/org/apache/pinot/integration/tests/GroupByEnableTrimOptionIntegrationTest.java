@@ -207,7 +207,7 @@ public class GroupByEnableTrimOptionIntegrationTest extends BaseClusterIntegrati
     JsonNode plan = postV2Query(option + " set explainAskingServers=true; explain plan for " + query);
 
     Assert.assertEquals(GroupByOptionsIntegrationTest.toResultStr(result), expectedResult);
-    Assert.assertEquals(GroupByOptionsIntegrationTest.toExplainStr(plan), expectedPlan);
+    Assert.assertEquals(GroupByOptionsIntegrationTest.toExplainStr(plan, true), expectedPlan);
   }
 
   private JsonNode postV2Query(String query)

@@ -4,7 +4,6 @@
   "segmentsConfig": {
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "fineFoodReviews",
     "replication": "1"
   },
   "tenants": {
@@ -13,7 +12,10 @@
     "loadMode": "MMAP",
     "noDictionaryColumns": ["Text"],
     "invertedIndexColumns": [
-    ]
+    ],
+    "multiColumnTextIndexConfig": {
+      "columns": ["UserId", "ProductId", "Summary"]
+    }
   },
   "metadata": {
     "customConfigs": {
@@ -28,16 +30,19 @@
         "vectorIndexType": "HNSW",
         "vectorDimension": 1536,
         "vectorDistanceFunction": "COSINE",
-        "version": 1
+        "version": 1,
+        "commitDocs": "1"
       }
     },
     {
-      "encodingType": "RAW",
-      "indexType": "TEXT",
       "name": "Text",
-      "properties": {
-        "deriveNumDocsPerChunkForRawIndex": "true",
-        "rawIndexWriterVersion": "3"
+      "encodingType": "RAW",
+      "indexes": {
+        "text": {
+          "deriveNumDocsPerChunkForRawIndex": "true",
+          "rawIndexWriterVersion": "3",
+          "caseSensitive": "true"
+        }
       }
     }
   ]

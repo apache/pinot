@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.doubles.AbstractDoubleCollection;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.doubles.DoubleCollection;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
@@ -27,7 +27,7 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
 
 
-public abstract class BaseArrayAggDoubleFunction<I extends AbstractDoubleCollection>
+public abstract class BaseArrayAggDoubleFunction<I extends DoubleCollection>
     extends BaseArrayAggFunction<I, DoubleArrayList> {
   public BaseArrayAggDoubleFunction(ExpressionContext expression, boolean nullHandlingEnabled) {
     super(expression, FieldSpec.DataType.DOUBLE, nullHandlingEnabled);
@@ -77,10 +77,10 @@ public abstract class BaseArrayAggDoubleFunction<I extends AbstractDoubleCollect
   }
 
   @Override
-  public DoubleArrayList extractFinalResult(I doubleArrayList) {
-    if (doubleArrayList == null) {
+  public DoubleArrayList extractFinalResult(I doubles) {
+    if (doubles == null) {
       return new DoubleArrayList();
     }
-    return new DoubleArrayList(doubleArrayList);
+    return new DoubleArrayList(doubles);
   }
 }

@@ -31,6 +31,17 @@ import {
   TableData,
 } from 'Models';
 import Loading from '../components/Loading';
+import moment from "moment";
+import {RebalanceServerOption} from "../components/Homepage/Operations/RebalanceServer/RebalanceServerOptions";
+
+const getRebalanceConfigValue = (
+    rebalanceConfig: { [optionName: string]: string | boolean | number },
+    option: RebalanceServerOption
+) => {
+  return (
+      Object.keys(rebalanceConfig).includes(option.name) ? rebalanceConfig[option.name] : option.defaultValue
+  );
+}
 
 const sortArray = function (sortingArr, keyName, ascendingFlag) {
   if (ascendingFlag) {
@@ -363,6 +374,7 @@ const encodeString = (str: string) => {
 }
 
 const formatBytes = (bytes: number, decimals = 2) => {
+  if (bytes < 0) return 'N/A';
   if (bytes === 0) return '0 Bytes';
 
   const k = 1024;
@@ -463,6 +475,10 @@ const getLoadingTableData = (columns: string[]): TableData => {
   };
 }
 
+const formatTime = (time: number, format?: string): string => {
+  return moment(time).format(format ?? "MMMM Do YYYY, HH:mm:ss")
+}
+
 export default {
   sortArray,
   tableFormat,
@@ -477,5 +493,7 @@ export default {
   splitStringByLastUnderscore,
   pinotTableDetailsFormat,
   pinotTableDetailsFromArray,
-  getLoadingTableData
+  getLoadingTableData,
+  formatTime,
+  getRebalanceConfigValue
 };

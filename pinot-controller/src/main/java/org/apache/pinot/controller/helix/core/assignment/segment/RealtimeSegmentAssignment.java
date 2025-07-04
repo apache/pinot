@@ -28,6 +28,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
@@ -106,8 +107,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
    */
   private List<String> assignConsumingSegment(String segmentName, InstancePartitions instancePartitions) {
     int segmentPartitionId =
-        SegmentAssignmentUtils.getRealtimeSegmentPartitionId(segmentName, _tableNameWithType, _helixManager,
-            _partitionColumn);
+        SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableNameWithType, _helixManager, _partitionColumn);
     return assignConsumingSegment(segmentPartitionId, instancePartitions);
   }
 
@@ -120,7 +120,7 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       // Uniformly spray the partitions and replicas across the instances.
       // E.g. (6 instances, 3 partitions, 4 replicas)
       // "0_0": [i0,  i1,  i2,  i3,  i4,  i5  ]
-      //         p0r0 p0r1 p0r2 p1r3 p1r0 p1r1
+      //         p0r0 p0r1 p0r2 p0r3 p1r0 p1r1
       //         p1r2 p1r3 p2r0 p2r1 p2r2 p2r3
 
       List<String> instances =

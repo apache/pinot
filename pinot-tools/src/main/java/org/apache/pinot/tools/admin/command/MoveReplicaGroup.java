@@ -42,7 +42,7 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -119,7 +119,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
       throws IOException, InterruptedException {
     validateParams();
 
-    _zkChanger = new PinotZKChanger(_zkHost, _zkPath);
+    _zkChanger = new PinotZKChanger("MoveReplicaGroup", _zkHost, _zkPath);
     _helix = _zkChanger.getHelixAdmin();
 
     if (!isExistingTable(_tableName)) {
@@ -420,7 +420,7 @@ public class MoveReplicaGroup extends AbstractBaseAdminCommand implements Comman
     String path = PropertyPathBuilder.propertyStore(_zkPath);
     ZkHelixPropertyStore<ZNRecord> propertyStore = new ZkHelixPropertyStore<>(_zkHost, serializer, path);
     ZNRecord tcZnRecord = propertyStore.get("/CONFIGS/TABLE/" + tableName, null, 0);
-    TableConfig tableConfig = TableConfigUtils.fromZNRecord(tcZnRecord);
+    TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(tcZnRecord);
     LOGGER.debug("Loaded table config");
     return tableConfig;
   }

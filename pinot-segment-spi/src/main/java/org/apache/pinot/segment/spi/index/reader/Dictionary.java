@@ -27,6 +27,7 @@ import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
 /**
@@ -202,6 +203,18 @@ public interface Dictionary extends IndexReader {
     return new ByteArray(getBytesValue(dictId));
   }
 
+  default int get32BitsMurmur3HashValue(int dictId) {
+    return MurmurHashFunctions.murmurHash3X64Bit32(getBytesValue(dictId), 0);
+  }
+
+  default long get64BitsMurmur3HashValue(int dictId) {
+    return MurmurHashFunctions.murmurHash3X64Bit64(getBytesValue(dictId), 0);
+  }
+
+  default long[] get128BitsMurmur3HashValue(int dictId) {
+    return MurmurHashFunctions.murmurHash3X64Bit128AsLongs(getBytesValue(dictId), 0);
+  }
+
   // Batch read APIs
 
   default void readIntValues(int[] dictIds, int length, int[] outValues) {
@@ -273,6 +286,24 @@ public interface Dictionary extends IndexReader {
   default void readMapValues(int[] dictIds, int length, Map[] outValues) {
     for (int i = 0; i < length; i++) {
       outValues[i] = MapUtils.deserializeMap(getBytesValue(dictIds[i]));
+    }
+  }
+
+  default void read32BitsMurmur3HashValues(int[] dictIds, int length, int[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get32BitsMurmur3HashValue(dictIds[i]);
+    }
+  }
+
+  default void read64BitsMurmur3HashValues(int[] dictIds, int length, long[] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get64BitsMurmur3HashValue(dictIds[i]);
+    }
+  }
+
+  default void read128BitsMurmur3HashValues(int[] dictIds, int length, long[][] outValues) {
+    for (int i = 0; i < length; i++) {
+      outValues[i] = get128BitsMurmur3HashValue(dictIds[i]);
     }
   }
 

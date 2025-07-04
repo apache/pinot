@@ -19,11 +19,11 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import java.io.File;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -34,10 +34,8 @@ import org.apache.pinot.segment.local.realtime.impl.RealtimeSegmentStatsHistory;
 import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
-import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
-import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.Schema;
 
@@ -55,11 +53,15 @@ public class MutableSegmentImplTestUtils {
   private static final String STREAM_NAME = "testStream";
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "MutableSegmentImplTestUtils");
 
+  public static MutableSegmentImpl createMutableSegmentImpl(Schema schema) {
+    return createMutableSegmentImpl(schema, Set.of(), Set.of(), Set.of(), false);
+  }
+
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
-      List<AggregationConfig> preAggregationConfigs) {
+      @Nullable List<AggregationConfig> preAggregationConfigs) {
     return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
-        Collections.emptyMap(), false, false, null, null, null, null, null, null, preAggregationConfigs);
+        Map.of(), false, preAggregationConfigs, false, null, null, null, null);
   }
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
@@ -72,42 +74,44 @@ public class MutableSegmentImplTestUtils {
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, boolean aggregateMetrics,
       boolean nullHandlingEnabled) {
     return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
-        aggregateMetrics, nullHandlingEnabled, null, null, null, null, null);
+        aggregateMetrics, nullHandlingEnabled, null, null, null);
+  }
+
+  public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, boolean nullHandlingEnabled,
+      @Nullable String timeColumnName, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager) {
+    return createMutableSegmentImpl(schema, Set.of(), Set.of(), Set.of(), false, nullHandlingEnabled, timeColumnName,
+        partitionUpsertMetadataManager, partitionDedupMetadataManager);
   }
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns, boolean aggregateMetrics,
-      boolean nullHandlingEnabled, UpsertConfig upsertConfig, String timeColumnName,
-      PartitionUpsertMetadataManager partitionUpsertMetadataManager, DedupConfig dedupConfig,
-      PartitionDedupMetadataManager partitionDedupMetadataManager) {
+      boolean nullHandlingEnabled, @Nullable String timeColumnName,
+      @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager) {
     return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
-        Collections.emptyMap(), aggregateMetrics, nullHandlingEnabled, upsertConfig, timeColumnName,
-        partitionUpsertMetadataManager, dedupConfig, partitionDedupMetadataManager, null, Collections.emptyList());
+        Map.of(), aggregateMetrics, null, nullHandlingEnabled, timeColumnName, partitionUpsertMetadataManager,
+        partitionDedupMetadataManager, null);
   }
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
-      Map<String, JsonIndexConfig> jsonIndexConfigs, ServerMetrics serverMetrics) {
+      Map<String, JsonIndexConfig> jsonIndexConfigs, @Nullable ServerMetrics serverMetrics) {
     return createMutableSegmentImpl(schema, noDictionaryColumns, varLengthDictionaryColumns, invertedIndexColumns,
-        jsonIndexConfigs, false, true, null, null, null, null, null, serverMetrics, Collections.emptyList());
+        jsonIndexConfigs, false, null, true, null, null, null, serverMetrics);
   }
 
   public static MutableSegmentImpl createMutableSegmentImpl(Schema schema, Set<String> noDictionaryColumns,
       Set<String> varLengthDictionaryColumns, Set<String> invertedIndexColumns,
-      Map<String, JsonIndexConfig> jsonIndexConfigs, boolean aggregateMetrics, boolean nullHandlingEnabled,
-      UpsertConfig upsertConfig, String timeColumnName, PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      DedupConfig dedupConfig, PartitionDedupMetadataManager partitionDedupMetadataManager, ServerMetrics serverMetrics,
-      List<AggregationConfig> aggregationConfigs) {
+      Map<String, JsonIndexConfig> jsonIndexConfigs, boolean aggregateMetrics,
+      @Nullable List<AggregationConfig> aggregationConfigs, boolean nullHandlingEnabled,
+      @Nullable String timeColumnName, @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, @Nullable ServerMetrics serverMetrics) {
 
     RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
     when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
     when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
 
-    UpsertConfig.Mode upsertMode = upsertConfig == null ? UpsertConfig.Mode.NONE : upsertConfig.getMode();
-    List<String> comparisonColumns = upsertConfig == null ? null : upsertConfig.getComparisonColumns();
-    boolean isUpsertDropOutOfOrderRecord = upsertConfig == null ? false : upsertConfig.isDropOutOfOrderRecord();
-    String upsertOutOfOrderRecordColumn = upsertConfig == null ? null : upsertConfig.getOutOfOrderRecordColumn();
-    String dedupTimeColumn = dedupConfig == null ? null : dedupConfig.getDedupTimeColumn();
     DictionaryIndexConfig varLengthDictConf = new DictionaryIndexConfig(false, true);
 
     RealtimeSegmentConfig.Builder segmentConfBuilder = new RealtimeSegmentConfig.Builder()
@@ -125,15 +129,10 @@ public class MutableSegmentImplTestUtils {
         .setMemoryManager(new DirectMemoryManager(SEGMENT_NAME))
         .setStatsHistory(statsHistory)
         .setAggregateMetrics(aggregateMetrics)
-        .setNullHandlingEnabled(nullHandlingEnabled)
-        .setUpsertMode(upsertMode)
-        .setUpsertComparisonColumns(comparisonColumns)
-        .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setIngestionAggregationConfigs(aggregationConfigs)
-        .setUpsertDropOutOfOrderRecord(isUpsertDropOutOfOrderRecord)
-        .setUpsertOutOfOrderRecordColumn(upsertOutOfOrderRecordColumn)
+        .setDefaultNullHandlingEnabled(nullHandlingEnabled)
+        .setPartitionUpsertMetadataManager(partitionUpsertMetadataManager)
         .setPartitionDedupMetadataManager(partitionDedupMetadataManager)
-        .setDedupTimeColumn(dedupTimeColumn)
         .setConsumerDir(TEMP_DIR.getAbsolutePath() + "/" + UUID.randomUUID() + "/consumerDir");
 
     for (Map.Entry<String, JsonIndexConfig> entry : jsonIndexConfigs.entrySet()) {

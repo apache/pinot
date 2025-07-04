@@ -23,10 +23,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
-import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 
 
 /**
@@ -38,9 +37,7 @@ class SingletonExchange extends BlockExchange {
   SingletonExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter,
       Function<List<SendingMailbox>, Integer> statsIndexChooser) {
     super(sendingMailboxes, splitter, statsIndexChooser);
-    Preconditions.checkArgument(
-        sendingMailboxes.size() == 1 && sendingMailboxes.get(0) instanceof InMemorySendingMailbox,
-        "Expect single InMemorySendingMailbox for SingletonExchange");
+    Preconditions.checkArgument(sendingMailboxes.size() == 1, "Expect single mailbox in Singleton Exchange");
   }
 
   SingletonExchange(List<SendingMailbox> sendingMailboxes, BlockSplitter splitter) {
@@ -48,7 +45,7 @@ class SingletonExchange extends BlockExchange {
   }
 
   @Override
-  protected void route(List<SendingMailbox> sendingMailboxes, TransferableBlock block)
+  protected void route(List<SendingMailbox> sendingMailboxes, MseBlock.Data block)
       throws IOException, TimeoutException {
     sendBlock(sendingMailboxes.get(0), block);
   }

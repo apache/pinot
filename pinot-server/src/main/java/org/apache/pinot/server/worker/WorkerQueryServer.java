@@ -19,12 +19,11 @@
 package org.apache.pinot.server.worker;
 
 import javax.annotation.Nullable;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
+import org.apache.pinot.server.starter.helix.SendStatsPredicate;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
@@ -32,18 +31,17 @@ import org.apache.pinot.spi.utils.NetUtils;
 
 public class WorkerQueryServer {
   private final int _queryServicePort;
-  private final PinotConfiguration _configuration;
-
   private final QueryServer _queryWorkerService;
 
-  public WorkerQueryServer(PinotConfiguration configuration, InstanceDataManager instanceDataManager,
-      HelixManager helixManager, ServerMetrics serverMetrics, @Nullable TlsConfig tlsConfig) {
-    _configuration = toWorkerQueryConfig(configuration);
-    _queryServicePort = _configuration.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
+  public WorkerQueryServer(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
+      @Nullable TlsConfig tlsConfig, SendStatsPredicate sendStats) {
+    serverConf = toWorkerQueryConfig(serverConf);
+    String instanceId = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
+    _queryServicePort = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     QueryRunner queryRunner = new QueryRunner();
-    queryRunner.init(_configuration, instanceDataManager, helixManager, serverMetrics, tlsConfig);
-    _queryWorkerService = new QueryServer(_queryServicePort, queryRunner, tlsConfig);
+    queryRunner.init(serverConf, instanceDataManager, tlsConfig, sendStats::isSendStats);
+    _queryWorkerService = new QueryServer(instanceId, _queryServicePort, queryRunner, tlsConfig, serverConf);
   }
 
   private static PinotConfiguration toWorkerQueryConfig(PinotConfiguration configuration) {

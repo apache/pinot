@@ -29,7 +29,12 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 
-
+/**
+ * Quick start for Time Series Engine.
+ *
+ * To test this quick start, you can run the following command in pinot-tools/src/main/resources/scripts/timeseries/
+ * python3 run_ts_query.py
+ */
 public class TimeSeriesEngineQuickStart extends Quickstart {
   private static final String[] TIME_SERIES_TABLE_DIRECTORIES = new String[]{
       "examples/batch/airlineStats",
@@ -77,7 +82,8 @@ public class TimeSeriesEngineQuickStart extends Quickstart {
     Preconditions.checkState(quickstartRunnerDir.mkdirs());
     List<QuickstartTableRequest> quickstartTableRequests = bootstrapStreamTableDirectories(quickstartTmpDir);
     final QuickstartRunner runner =
-        new QuickstartRunner(quickstartTableRequests, 1, 1, 2, 1, quickstartRunnerDir, getConfigOverrides());
+        new QuickstartRunner(quickstartTableRequests, 1, 1, 2, 1, quickstartRunnerDir, getConfigOverrides(),
+          getAuthProvider());
 
     startKafka();
     startAllDataStreams(_kafkaStarter, quickstartTmpDir);

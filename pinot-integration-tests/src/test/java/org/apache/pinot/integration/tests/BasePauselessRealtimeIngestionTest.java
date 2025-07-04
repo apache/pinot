@@ -30,7 +30,6 @@ import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.controller.BaseControllerStarter;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
-import org.apache.pinot.controller.helix.core.realtime.SegmentCompletionConfig;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingControllerStarter;
 import org.apache.pinot.integration.tests.realtime.utils.FailureInjectingPinotLLCRealtimeSegmentManager;
 import org.apache.pinot.integration.tests.realtime.utils.PauselessRealtimeTestUtils;
@@ -48,11 +47,10 @@ import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
-import static org.apache.pinot.spi.stream.StreamConfigProperties.SEGMENT_COMPLETION_FSM_SCHEME;
 import static org.testng.Assert.assertTrue;
 
 
-public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterIntegrationTest {
+public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterIntegrationTestSet {
   protected static final int NUM_REALTIME_SEGMENTS = 48;
   protected static final long DEFAULT_COUNT_STAR_RESULT = 115545L;
   protected static final String DEFAULT_TABLE_NAME_2 = DEFAULT_TABLE_NAME + "_2";
@@ -79,16 +77,8 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
   protected void overrideControllerConf(Map<String, Object> properties) {
     properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
     properties.put(ControllerConf.ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, true);
-    properties.put(SegmentCompletionConfig.FSM_SCHEME + "pauseless",
-        "org.apache.pinot.controller.helix.core.realtime.PauselessSegmentCompletionFSM");
     properties.put(ControllerConf.ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
         500);
-  }
-
-  @Override
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    super.overrideBrokerConf(brokerConf);
-    brokerConf.setProperty(CommonConstants.Broker.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA, true);
   }
 
   @Override
@@ -120,7 +110,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     waitForAllDocsLoaded(600_000L);
   }
 
-  private void setupNonPauselessTable()
+  protected void setupNonPauselessTable()
       throws Exception {
     _avroFiles = unpackAvroData(_tempDir);
     startKafka();
@@ -144,7 +134,7 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     }, 1000, 100000, "Some segments still have missing url");
   }
 
-  private void setupPauselessTable()
+  protected void setupPauselessTable()
       throws Exception {
     Schema schema = createSchema();
     schema.setSchemaName(DEFAULT_TABLE_NAME);
@@ -158,17 +148,13 @@ public abstract class BasePauselessRealtimeIngestionTest extends BaseClusterInte
     ingestionConfig.setStreamIngestionConfig(
         new StreamIngestionConfig(List.of(tableConfig.getIndexingConfig().getStreamConfigs())));
     ingestionConfig.getStreamIngestionConfig().setPauselessConsumptionEnabled(true);
-    ingestionConfig.getStreamIngestionConfig()
-        .getStreamConfigMaps()
-        .get(0)
-        .put(SEGMENT_COMPLETION_FSM_SCHEME, "pauseless");
     tableConfig.getIndexingConfig().setStreamConfigs(null);
     tableConfig.setIngestionConfig(ingestionConfig);
 
     addTableConfig(tableConfig);
   }
 
-  private void setMaxSegmentCompletionTimeMillis() {
+  protected void setMaxSegmentCompletionTimeMillis() {
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
       ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager)

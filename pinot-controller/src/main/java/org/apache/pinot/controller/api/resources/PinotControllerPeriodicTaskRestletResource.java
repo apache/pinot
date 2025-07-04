@@ -26,8 +26,10 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
@@ -100,6 +102,43 @@ public class PinotControllerPeriodicTaskRestletResource {
 
     return Response.ok()
         .entity(_pinotHelixResourceManager.invokeControllerPeriodicTask(tableName, periodicTaskName, null))
+        .build();
+  }
+
+  @POST
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/run")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.EXECUTE_TASK)
+  @ApiOperation(value = "Run periodic task against table with custom properties. If table name is missing, task will "
+      + "run against all tables.")
+  public Response runPeriodicTaskWithProperties(
+      @ApiParam(value = "Periodic task name", required = true) @QueryParam("taskname") String periodicTaskName,
+      @ApiParam(value = "Name of the table") @QueryParam("tableName") String tableName,
+      @ApiParam(value = "OFFLINE | REALTIME") @QueryParam("type") String tableType,
+      @ApiParam(value = "Task properties") Map<String, String> taskProperties,
+      @Context HttpHeaders headers) {
+
+    if (!_periodicTaskScheduler.hasTask(periodicTaskName)) {
+      throw new WebApplicationException("Periodic task '" + periodicTaskName + "' not found.",
+          Response.Status.NOT_FOUND);
+    }
+
+    if (tableName != null) {
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+      List<String> matchingTableNamesWithType =
+          ResourceUtils.getExistingTableNamesWithType(_pinotHelixResourceManager, tableName,
+              Constants.validateTableType(tableType), LOGGER);
+
+      if (matchingTableNamesWithType.size() > 1) {
+        throw new WebApplicationException(
+            "More than one table matches Table '" + tableName + "'. Matching names: " + matchingTableNamesWithType);
+      }
+
+      tableName = matchingTableNamesWithType.get(0);
+    }
+
+    return Response.ok()
+        .entity(_pinotHelixResourceManager.invokeControllerPeriodicTask(tableName, periodicTaskName, taskProperties))
         .build();
   }
 

@@ -25,7 +25,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.utils.DataSizeUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
@@ -100,8 +99,6 @@ public class StreamConfig {
     Preconditions.checkNotNull(_topicName, "Stream topic name " + topicNameKey + " cannot be null");
 
     _tableNameWithType = tableNameWithType;
-
-    validateConsumerType(_type, streamConfigMap);
 
     String consumerFactoryClassKey =
         StreamConfigProperties.constructStreamProperty(_type, StreamConfigProperties.STREAM_CONSUMER_FACTORY_CLASS);
@@ -203,19 +200,6 @@ public class StreamConfig {
     _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
 
     _streamConfigMap.putAll(streamConfigMap);
-  }
-
-  public static void validateConsumerType(String streamType, Map<String, String> streamConfigMap) {
-    String consumerTypesKey =
-        StreamConfigProperties.constructStreamProperty(streamType, StreamConfigProperties.STREAM_CONSUMER_TYPES);
-    String consumerTypes = streamConfigMap.get(consumerTypesKey);
-    if (consumerTypes == null) {
-      return;
-    }
-    for (String consumerType : StringUtils.split(consumerTypes, ',')) {
-      Preconditions.checkState(!consumerType.equalsIgnoreCase("highlevel"),
-          "Realtime tables with HLC consumer (consumer.type=highlevel) is no longer supported in Apache Pinot");
-    }
   }
 
   @Nullable
@@ -332,16 +316,6 @@ public class StreamConfig {
 
   public String getTopicName() {
     return _topicName;
-  }
-
-  @Deprecated
-  public boolean hasHighLevelConsumerType() {
-    return false;
-  }
-
-  @Deprecated
-  public boolean hasLowLevelConsumerType() {
-    return true;
   }
 
   public String getConsumerFactoryClassName() {

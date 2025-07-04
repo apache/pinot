@@ -24,16 +24,17 @@ import org.apache.pinot.common.response.CursorResponse;
 
 
 @JsonPropertyOrder({
-    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "timeUsedMs",
-    "requestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter",
-    "numServersQueried", "numServersResponded", "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched",
-    "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched",
-    "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer",
-    "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue", "brokerReduceTimeMs",
-    "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
-    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
+    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "brokerId", "numDocsScanned", "totalDocs",
+    "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
+    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
+    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
+    "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
+    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tableQueries",
+    "groupsTrimmed",
     // Fields specific to CursorResponse
     "offset", "numRows", "cursorResultWriteTimeMs", "cursorFetchTimeMs", "submissionTimeMs", "expirationTimeMs",
     "brokerHost", "brokerPort", "bytesWritten"
@@ -57,7 +58,9 @@ public class CursorResponseNative extends BrokerResponseNative implements Cursor
     setResultTable(response.getResultTable());
     setNumRowsResultSet(response.getNumRowsResultSet());
     setExceptions(response.getExceptions());
+    setGroupsTrimmed(response.isGroupsTrimmed());
     setNumGroupsLimitReached(response.isNumGroupsLimitReached());
+    setNumGroupsWarningLimitReached(response.isNumGroupsWarningLimitReached());
     setTimeUsedMs(response.getTimeUsedMs());
     setRequestId(response.getRequestId());
     setBrokerId(response.getBrokerId());

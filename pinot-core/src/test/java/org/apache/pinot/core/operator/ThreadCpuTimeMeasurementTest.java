@@ -19,8 +19,9 @@
 
 package org.apache.pinot.core.operator;
 
-import org.locationtech.jts.util.Assert;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
 
 
 public class ThreadCpuTimeMeasurementTest {
@@ -59,7 +60,7 @@ public class ThreadCpuTimeMeasurementTest {
       long actualSystemActivitiesCpuTimeNs = InstanceResponseOperator
           .calSystemActivitiesCpuTimeNs(totalWallClockTimeNs, multipleThreadCpuTimeNs, singleThreadCpuTimeNs,
               numServerThreads);
-      Assert.equals(expectedSystemActivitiesCpuTimeNs, actualSystemActivitiesCpuTimeNs);
+      assertEquals(actualSystemActivitiesCpuTimeNs, expectedSystemActivitiesCpuTimeNs);
     }
   }
 }

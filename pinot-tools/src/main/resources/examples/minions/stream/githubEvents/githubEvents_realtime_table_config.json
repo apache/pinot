@@ -5,7 +5,6 @@
     "timeColumnName": "created_at_timestamp",
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "githubEvents",
     "replication": "1",
     "replicasPerPartition": "1"
   },
@@ -27,7 +26,6 @@
     "segmentNameGeneratorType": "normalizedDate",
     "streamConfigs": {
       "streamType": "kafka",
-      "stream.kafka.consumer.type": "simple",
       "stream.kafka.topic.name": "githubEvents",
       "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
       "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",

@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -28,15 +29,35 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 public class FastLookupDimensionTable implements DimensionTable {
-  private final Map<PrimaryKey, GenericRow> _lookupTable;
+
+  private final Object2ObjectOpenCustomHashMap<Object[], Object[]> _lookupTable;
   private final Schema _tableSchema;
   private final List<String> _primaryKeyColumns;
+  private final List<String> _valueColumns;
+  private final int _keysNum;
 
-  FastLookupDimensionTable(Schema tableSchema, List<String> primaryKeyColumns,
-      Map<PrimaryKey, GenericRow> lookupTable) {
+  private final Object2IntOpenHashMap<String> _columnNamesToIdx;
+
+  FastLookupDimensionTable(Schema tableSchema,
+      List<String> primaryKeyColumns,
+      List<String> valueColumns,
+      Object2ObjectOpenCustomHashMap<Object[], Object[]> lookupTable) {
     _lookupTable = lookupTable;
     _tableSchema = tableSchema;
     _primaryKeyColumns = primaryKeyColumns;
+    _keysNum = _primaryKeyColumns.size();
+    _valueColumns = valueColumns;
+
+    _columnNamesToIdx = new Object2IntOpenHashMap<>(_primaryKeyColumns.size() + valueColumns.size());
+    _columnNamesToIdx.defaultReturnValue(Integer.MIN_VALUE);
+
+    int idx = 0;
+    for (String column : primaryKeyColumns) {
+      _columnNamesToIdx.put(column, idx++);
+    }
+    for (String column : valueColumns) {
+      _columnNamesToIdx.put(column, idx++);
+    }
   }
 
   @Override
@@ -57,35 +78,71 @@ public class FastLookupDimensionTable implements DimensionTable {
 
   @Override
   public boolean containsKey(PrimaryKey pk) {
-    return _lookupTable.containsKey(pk);
+    return _lookupTable.containsKey(pk.getValues());
   }
 
+  /**
+   * This method returns GenericRow, which has big memory and cpu overhead.
+   */
+  @Deprecated
   @Nullable
   @Override
   public GenericRow getRow(PrimaryKey pk) {
-    return _lookupTable.get(pk);
+    Object[] rawPk = pk.getValues();
+    Object[] value = _lookupTable.get(rawPk);
+    if (value == null) {
+      return null;
+    }
+
+    GenericRow row = new GenericRow();
+    int pIdx = 0;
+    for (String column : _primaryKeyColumns) {
+      row.putValue(column, rawPk[pIdx++]);
+    }
+
+    int vIdx = 0;
+    for (String column : _valueColumns) {
+      row.putValue(column, value[vIdx++]);
+    }
+
+    return row;
   }
 
   @Nullable
   @Override
   public Object getValue(PrimaryKey pk, String columnName) {
-    GenericRow row = _lookupTable.get(pk);
-    return row != null ? row.getValue(columnName) : null;
+    Object[] value = _lookupTable.get(pk.getValues());
+    if (value == null) {
+      return null;
+    }
+
+    return getValue(pk, columnName, value);
+  }
+
+  private Object getValue(PrimaryKey pk, String columnName, Object[] values) {
+    int idx = _columnNamesToIdx.getInt(columnName);
+    if (idx < 0) {
+      return null;
+    } else if (idx < _keysNum) {
+      return pk.getValues()[idx];
+    } else {
+      return values[idx - _keysNum];
+    }
   }
 
   @Nullable
   @Override
   public Object[] getValues(PrimaryKey pk, String[] columnNames) {
-    GenericRow row = _lookupTable.get(pk);
-    if (row == null) {
+    Object[] rowValues = _lookupTable.get(pk.getValues());
+    if (rowValues == null) {
       return null;
     }
     int numColumns = columnNames.length;
-    Object[] values = new Object[numColumns];
+    Object[] result = new Object[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      values[i] = row.getValue(columnNames[i]);
+      result[i] = getValue(pk, columnNames[i], rowValues);
     }
-    return values;
+    return result;
   }
 
   @Override

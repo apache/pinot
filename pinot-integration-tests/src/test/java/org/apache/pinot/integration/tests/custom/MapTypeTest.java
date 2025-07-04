@@ -384,13 +384,13 @@ public class MapTypeTest extends CustomDataQueryClusterIntegrationTest {
 
     // Select non-existing key with proper filter
     query = "SELECT jsonExtractScalar(intKeyMapStr, '$.123', 'INT') FROM " + getTableName()
-        + " WHERE jsonExtractKey(intKeyMapStr, '$.*') = \"$['123']\"";
+        + " WHERE jsonExtractKey(intKeyMapStr, '$.*') = '$[''123'']'";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
     assertEquals(rows.size(), 0);
     query = "SELECT jsonExtractScalar(stringKeyMapStr, '$.k3', 'INT') FROM " + getTableName()
-        + " WHERE jsonExtractKey(stringKeyMapStr, '$.*') = \"$['k3']\"";
+        + " WHERE jsonExtractKey(stringKeyMapStr, '$.*') = '$[''k3'']'";
     pinotResponse = postQuery(query);
     assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");

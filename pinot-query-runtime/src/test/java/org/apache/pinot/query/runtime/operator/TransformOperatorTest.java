@@ -19,15 +19,16 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -36,6 +37,7 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -66,7 +68,7 @@ public class TransformOperatorTest {
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     List<RexExpression> projects = List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1, "a"});
     assertEquals(resultRows.get(1), new Object[]{2, "b"});
@@ -84,7 +86,7 @@ public class TransformOperatorTest {
     List<RexExpression> projects =
         List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1, "str"});
     assertEquals(resultRows.get(1), new Object[]{1, "str"});
@@ -104,7 +106,7 @@ public class TransformOperatorTest {
         List.of(new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), operands),
             new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), operands));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{2.0, 0.0});
     assertEquals(resultRows.get(1), new Object[]{5.0, -1.0});
@@ -124,9 +126,12 @@ public class TransformOperatorTest {
         List.of(new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.PLUS.name(), operands),
             new RexExpression.FunctionCall(ColumnDataType.DOUBLE, SqlKind.MINUS.name(), operands));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("NumberFormatException"));
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isError());
+    Map<QueryErrorCode, String> exceptions = ((ErrorMseBlock) block).getErrorMessages();
+    String errorMsg = exceptions.get(QueryErrorCode.QUERY_EXECUTION);
+    assertNotNull(errorMsg, "Expected QUERY_EXECUTION error but found " + exceptions);
+    assertTrue(errorMsg.contains("Invalid conversion"), "Expected 'Invalid conversion' but found " + errorMsg);
   }
 
   @Test
@@ -135,15 +140,15 @@ public class TransformOperatorTest {
         ColumnDataType.STRING, ColumnDataType.STRING
     });
     when(_input.nextBlock()).thenReturn(
-        TransferableBlockUtils.getErrorTransferableBlock(new Exception("transformError")));
+        ErrorMseBlock.fromException(new Exception("transformError")));
     DataSchema resultSchema = new DataSchema(new String[]{"inCol", "strCol"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     List<RexExpression> projects =
         List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("transformError"));
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isError());
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.UNKNOWN).contains("transformError"));
   }
 
   @Test
@@ -162,12 +167,12 @@ public class TransformOperatorTest {
         List.of(RexExpression.Literal.TRUE, new RexExpression.Literal(ColumnDataType.STRING, "str"));
     TransformOperator operator = getOperator(inputSchema, resultSchema, projects);
     // First block has 1 row.
-    List<Object[]> resultRows1 = operator.nextBlock().getContainer();
+    List<Object[]> resultRows1 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows1.size(), 2);
     assertEquals(resultRows1.get(0), new Object[]{1, "str"});
     assertEquals(resultRows1.get(1), new Object[]{1, "str"});
     // Second block has 2 rows.
-    List<Object[]> resultRows2 = operator.nextBlock().getContainer();
+    List<Object[]> resultRows2 = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows2.size(), 3);
     assertEquals(resultRows2.get(0), new Object[]{1, "str"});
     assertEquals(resultRows2.get(1), new Object[]{1, "str"});

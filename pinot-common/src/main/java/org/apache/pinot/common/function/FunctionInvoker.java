@@ -20,9 +20,11 @@ package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
 
 
@@ -126,8 +128,27 @@ public class FunctionInvoker {
   /**
    * Invoke the function with the given arguments. The arguments should match the parameter classes. Use
    * {@link #convertTypes(Object[])} to convert the argument types if needed before calling this method.
+   *
+   * @throws IllegalStateException if any exception is thrown during the invocation.
    */
+  @Nullable
   public Object invoke(Object[] arguments) {
+    try {
+      return invokeDirectly(arguments);
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Caught exception while invoking method: " + _method.getName() + " with arguments: "
+              + Arrays.toString(arguments), e);
+    }
+  }
+
+  /// Like [#invoke], but does not catch exceptions.
+  ///
+  /// @throws InvocationTargetException if the underlying method throws an exception.
+  /// @throws IllegalAccessException if the underlying method is inaccessible.
+  @Nullable
+  public Object invokeDirectly(Object[] arguments)
+      throws InvocationTargetException, IllegalAccessException {
     if (_isNullIntolerant) {
       for (Object arg : arguments) {
         if (arg == null) {
@@ -135,11 +156,6 @@ public class FunctionInvoker {
         }
       }
     }
-    try {
-      return _method.invoke(_instance, arguments);
-    } catch (Exception e) {
-      throw new IllegalStateException(
-          "Caught exception while invoking method: " + _method + " with arguments: " + Arrays.toString(arguments), e);
-    }
+    return _method.invoke(_instance, arguments);
   }
 }

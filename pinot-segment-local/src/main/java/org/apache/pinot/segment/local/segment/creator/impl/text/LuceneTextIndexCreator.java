@@ -35,6 +35,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.LogByteSizeMergePolicy;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -160,6 +161,13 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         indexWriterConfig.setMergePolicy(new LuceneNRTCachingMergePolicy(dir));
         _indexDirectory = dir;
       } else {
+        // LogByteSizeMergePolicy doesn't seem to guarantee that document order is preserved,
+        // but it produces sequential ids way more often than default TieredMergePolicy
+        // This is used by StarTree Json index
+        if (config.isUseLogByteSizeMergePolicy()) {
+          indexWriterConfig.setMergePolicy(new LogByteSizeMergePolicy());
+        }
+
         _indexDirectory = FSDirectory.open(_indexFile.toPath());
       }
       _indexWriter = new IndexWriter(_indexDirectory, indexWriterConfig);
@@ -240,7 +248,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         // Therefore, the mapping file can be built without doing an additional docId conversion
         if (immutableToMutableIdMap == null) {
           for (int i = 0; i < numDocs; i++) {
-            Document document = indexSearcher.doc(i);
+            Document document = indexSearcher.storedFields().document(i);
             int pinotDocId = Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
             buffer.putInt(i * Integer.BYTES, pinotDocId);
           }
@@ -248,7 +256,7 @@ public class LuceneTextIndexCreator extends AbstractTextIndexCreator {
         }
 
         for (int i = 0; i < numDocs; i++) {
-          Document document = indexSearcher.doc(i);
+          Document document = indexSearcher.storedFields().document(i);
           int mutablePinotDocId =
               Integer.parseInt(document.get(LuceneTextIndexCreator.LUCENE_INDEX_DOC_ID_COLUMN_NAME));
           int immutablePinotDocId = immutableToMutableIdMap[mutablePinotDocId];

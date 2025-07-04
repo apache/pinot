@@ -20,15 +20,15 @@ package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
 import org.apache.calcite.sql.SqlKind;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.FilterNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -58,14 +58,14 @@ public class FilterOperatorTest {
 
   @Test
   public void shouldPropagateUpstreamErrorBlock() {
-    when(_input.nextBlock()).thenReturn(TransferableBlockUtils.getErrorTransferableBlock(new Exception("filterError")));
+    when(_input.nextBlock()).thenReturn(ErrorMseBlock.fromException(new Exception("filterError")));
     DataSchema inputSchema = new DataSchema(new String[]{"boolCol"}, new ColumnDataType[]{
         ColumnDataType.BOOLEAN
     });
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isErrorBlock());
-    assertTrue(block.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains("filterError"));
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isError());
+    assertTrue(((ErrorMseBlock) block).getErrorMessages().get(QueryErrorCode.UNKNOWN).contains("filterError"));
   }
 
   @Test
@@ -73,10 +73,10 @@ public class FilterOperatorTest {
     DataSchema inputSchema = new DataSchema(new String[]{"intCol"}, new ColumnDataType[]{
         ColumnDataType.INT
     });
-    when(_input.nextBlock()).thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+    when(_input.nextBlock()).thenReturn(SuccessMseBlock.INSTANCE);
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
-    TransferableBlock block = operator.nextBlock();
-    assertTrue(block.isEndOfStreamBlock());
+    MseBlock block = operator.nextBlock();
+    assertTrue(block.isEos());
   }
 
   @Test
@@ -85,9 +85,9 @@ public class FilterOperatorTest {
         ColumnDataType.INT
     });
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{0}, new Object[]{1}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.TRUE);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{0});
     assertEquals(resultRows.get(1), new Object[]{1});
@@ -99,9 +99,9 @@ public class FilterOperatorTest {
         ColumnDataType.INT
     });
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1}, new Object[]{2}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     FilterOperator operator = getOperator(inputSchema, RexExpression.Literal.FALSE);
-    assertTrue(operator.nextBlock().isSuccessfulEndOfStreamBlock());
+    assertTrue(operator.nextBlock().isSuccess());
   }
 
   @Test(expectedExceptions = IllegalStateException.class, expectedExceptionsMessageRegExp = "Filter operand must "
@@ -134,7 +134,7 @@ public class FilterOperatorTest {
     });
     when(_input.nextBlock()).thenReturn(OperatorTestUtil.block(inputSchema, new Object[]{1, 1}, new Object[]{2, 0}));
     FilterOperator operator = getOperator(inputSchema, ref1);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{1, 1});
   }
@@ -149,7 +149,7 @@ public class FilterOperatorTest {
     RexExpression.FunctionCall andCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.AND.name(),
         List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
     FilterOperator operator = getOperator(inputSchema, andCall);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{1, 1});
   }
@@ -164,7 +164,7 @@ public class FilterOperatorTest {
     RexExpression.FunctionCall orCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.OR.name(),
         List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
     FilterOperator operator = getOperator(inputSchema, orCall);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 2);
     assertEquals(resultRows.get(0), new Object[]{1, 1});
     assertEquals(resultRows.get(1), new Object[]{1, 0});
@@ -180,7 +180,7 @@ public class FilterOperatorTest {
     RexExpression.FunctionCall notCall = new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.NOT.name(),
         List.of(new RexExpression.InputRef(0)));
     FilterOperator operator = getOperator(inputSchema, notCall);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0)[0], 0);
     assertEquals(resultRows.get(0)[1], 0);
@@ -197,7 +197,7 @@ public class FilterOperatorTest {
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.GREATER_THAN.name(),
             List.of(new RexExpression.InputRef(0), new RexExpression.InputRef(1)));
     FilterOperator operator = getOperator(inputSchema, greaterThan);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{3, 2});
   }
@@ -213,7 +213,7 @@ public class FilterOperatorTest {
         new RexExpression.FunctionCall(ColumnDataType.BOOLEAN, SqlKind.STARTS_WITH.name(),
             List.of(new RexExpression.InputRef(0), new RexExpression.Literal(ColumnDataType.STRING, "star")));
     FilterOperator operator = getOperator(inputSchema, startsWith);
-    List<Object[]> resultRows = operator.nextBlock().getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) operator.nextBlock()).asRowHeap().getRows();
     assertEquals(resultRows.size(), 1);
     assertEquals(resultRows.get(0), new Object[]{"starTree"});
   }

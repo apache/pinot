@@ -24,6 +24,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Query.Request;
 
 public class BrokerGrpcRequestBuilder {
   private long _requestId;
+  private String _cid;
   private String _brokerId = "unknown";
   private boolean _enableTrace;
   private boolean _enableStreaming;
@@ -31,6 +32,11 @@ public class BrokerGrpcRequestBuilder {
 
   public BrokerGrpcRequestBuilder setRequestId(long requestId) {
     _requestId = requestId;
+    return this;
+  }
+
+  public BrokerGrpcRequestBuilder setCid(String cid) {
+    _cid = cid;
     return this;
   }
 
@@ -55,8 +61,11 @@ public class BrokerGrpcRequestBuilder {
   }
 
   public Broker.BrokerRequest build() {
+    String requestId = Long.toString(_requestId);
+    String cid = _cid == null ? _cid : requestId;
     return Broker.BrokerRequest.newBuilder()
-        .putMetadata(Request.MetadataKeys.REQUEST_ID, Long.toString(_requestId))
+        .putMetadata(Request.MetadataKeys.REQUEST_ID, requestId)
+        .putMetadata(Request.MetadataKeys.CORRELATION_ID, cid)
         .putMetadata(Request.MetadataKeys.BROKER_ID, _brokerId)
         .putMetadata(Request.MetadataKeys.ENABLE_TRACE, Boolean.toString(_enableTrace))
         .putMetadata(Request.MetadataKeys.ENABLE_STREAMING, Boolean.toString(_enableStreaming))

@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.segment.spi.index.reader;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 public interface TextIndexReader extends IndexReader {
-
   /**
    * Returns the matching dictionary ids for the given search query (optional).
    */
@@ -32,6 +32,27 @@ public interface TextIndexReader extends IndexReader {
 
   /**
    * Returns the matching document ids for the given search query.
+   * This is the legacy method for backward compatibility with native/FST text index readers.
    */
   MutableRoaringBitmap getDocIds(String searchQuery);
+
+  /**
+   * Returns the matching document ids for the given search query with options string.
+   * This method allows passing options as a string parameter that will be parsed internally.
+   * Lucene-based text index readers should implement this method.
+   * @param searchQuery The search query string
+   * @param optionsString Options string in format "key1=value1,key2=value2", can be null
+   * @return Matching document ids
+   */
+  default MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
+    // Default implementation falls back to the regular method for backward compatibility
+    return getDocIds(searchQuery);
+  }
+
+  /**
+   * Marker method that allows to differentiate between single-column and multi-column text index reader .
+   */
+  default boolean isMultiColumn() {
+    return false;
+  }
 }

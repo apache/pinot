@@ -21,26 +21,15 @@ package org.apache.pinot.core.operator.blocks.results;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
-import org.apache.pinot.spi.exception.QueryCancelledException;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 
 
 public class ExceptionResultsBlock extends BaseResultsBlock {
-
-  public ExceptionResultsBlock(ProcessingException processingException, Throwable t) {
-    addToProcessingExceptions(QueryException.getException(processingException, t));
-  }
-
-  public ExceptionResultsBlock(Throwable t) {
-    this(QueryException.QUERY_EXECUTION_ERROR, t);
-  }
-
-  public ExceptionResultsBlock(QueryCancelledException t) {
-    this(QueryException.QUERY_CANCELLATION_ERROR, t);
+  public ExceptionResultsBlock(QueryErrorMessage queryErrorMessage) {
+    addErrorMessage(queryErrorMessage);
   }
 
   @Override

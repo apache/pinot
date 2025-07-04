@@ -142,7 +142,7 @@ public class Connection {
    * @return name of all the tables used in a sql query.
    */
   @Nullable
-  private static String[] resolveTableName(String query) {
+  public static String[] resolveTableName(String query) {
     try {
       SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
       Set<String> tableNames =

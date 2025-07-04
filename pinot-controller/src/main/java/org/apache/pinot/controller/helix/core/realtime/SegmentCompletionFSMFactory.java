@@ -34,9 +34,10 @@ public class SegmentCompletionFSMFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(SegmentCompletionFSMFactory.class);
   private static final Map<String, Class<? extends SegmentCompletionFSM>> FSM_CLASS_MAP = new HashMap<>();
 
-  // Static block to register the default FSM
+  // Static block to register the default FSM and pauseless FSM
   static {
     register(SegmentCompletionConfig.DEFAULT_FSM_SCHEME, BlockingSegmentCompletionFSM.class);
+    register(SegmentCompletionConfig.DEFAULT_PAUSELESS_FSM_SCHEME, PauselessSegmentCompletionFSM.class);
   }
 
   /**
@@ -48,8 +49,12 @@ public class SegmentCompletionFSMFactory {
   public static void register(String scheme, Class<? extends SegmentCompletionFSM> fsmClass) {
     Preconditions.checkNotNull(scheme, "Scheme cannot be null");
     Preconditions.checkNotNull(fsmClass, "FSM Class cannot be null");
-    Preconditions.checkState(FSM_CLASS_MAP.put(scheme, fsmClass) == null,
-        "FSM class already registered for scheme: " + scheme);
+
+    Class<? extends SegmentCompletionFSM> previousFsmClass = FSM_CLASS_MAP.put(scheme, fsmClass);
+    if (previousFsmClass != null) {
+      LOGGER.warn("Replacing existing FSM: {} for scheme: {} with: {}",
+          previousFsmClass, scheme, fsmClass);
+    }
     LOGGER.info("Registered SegmentCompletionFSM class {} for scheme {}", fsmClass, scheme);
   }
 

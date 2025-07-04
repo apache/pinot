@@ -40,14 +40,18 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.HelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.restlet.resources.DiskUsageInfo;
+import org.apache.pinot.common.restlet.resources.PrimaryKeyCountInfo;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
+import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.server.starter.ServerInstance;
 
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
@@ -67,6 +71,8 @@ public class InstanceResource {
   private String _instanceId;
   @Inject
   private HelixManager _helixManager;
+  @Inject
+  private ServerInstance _serverInstance;
 
   @GET
   @Path("tags")
@@ -110,15 +116,36 @@ public class InstanceResource {
   @ApiOperation(value = "Show disk utilization", notes = "Disk capacity and usage shown in bytes")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
-      @ApiResponse(code = 400, message = "Bad Request – Invalid disk utilization path in header")
+      @ApiResponse(code = 500, message = "Internal Server Error – Invalid disk utilization path in header")
   })
   public String getDiskUsageInfo(@Context HttpHeaders headers)
       throws WebApplicationException, IOException {
-    String pathStr = headers.getHeaderString("diskUtilizationPath");
+    // Use the instance data directory as the path to compute disk usage. Note that the diskUtilizationPath passed in
+    // the header is ignored as of now.
+    String pathStr = _serverInstance.getInstanceDataManager().getInstanceDataDir();
     if (StringUtils.isEmpty(pathStr)) {
-      throw new WebApplicationException("Invalid disk utilization path in header", 400);
+      throw new WebApplicationException("Disk utilization path(instanceDataDir) was null or empty.", 500);
     }
     DiskUsageInfo diskUsageInfo = DiskUtilization.computeDiskUsage(_instanceId, pathStr);
     return ResourceUtils.convertToJsonString(diskUsageInfo);
+  }
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/primaryKeyCount")
+  @ApiOperation(value = "Show number of primary keys", notes = "Total number of upsert / dedup primary keys")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"), @ApiResponse(code = 500, message = "Internal server error")
+  })
+  public String getPrimaryKeyCountInfo(@Context HttpHeaders headers)
+      throws WebApplicationException {
+    // Use InstanceDataManager to fetch details about the number of primary keys across all upsert / dedup tables
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    if (instanceDataManager == null) {
+      throw new WebApplicationException("Invalid server initialization", Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    PrimaryKeyCountInfo primaryKeyCountInfo =
+        PrimaryKeyCount.computeNumberOfPrimaryKeys(_instanceId, instanceDataManager);
+    return ResourceUtils.convertToJsonString(primaryKeyCountInfo);
   }
 }

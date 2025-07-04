@@ -32,6 +32,7 @@ import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,6 +112,26 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
     List<SegmentZKMetadata> selectedSegmentZKMetadataList = new ArrayList<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
       if (segmentsForTable.contains(segmentZKMetadata.getSegmentName())) {
+        selectedSegmentZKMetadataList.add(segmentZKMetadata);
+      }
+    }
+    return selectedSegmentZKMetadataList;
+  }
+
+  public List<SegmentZKMetadata> getNonConsumingSegmentsZKMetadataForRealtimeTable(String tableNameWithType) {
+    IdealState idealState = _clusterInfoAccessor.getIdealState(tableNameWithType);
+    Set<String> idealStateSegments = idealState.getPartitionSet();
+    List<SegmentZKMetadata> segmentZKMetadataList = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
+    List<SegmentZKMetadata> selectedSegmentZKMetadataList = new ArrayList<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentZKMetadataList) {
+      String segmentName = segmentZKMetadata.getSegmentName();
+      if (idealStateSegments.contains(segmentName)
+          && segmentZKMetadata.getStatus().isCompleted() // skip consuming segments
+          && !idealState.getInstanceStateMap(segmentName).containsValue(SegmentStateModel.CONSUMING)) {
+        // The last check is for an edge case where
+        //   1. SegmentZKMetadata was updated to DONE in segment commit protocol, but
+        //   2. IdealState for the segment was not updated to ONLINE due to some issue in the controller.
+        // We avoid picking up such segments to allow RealtimeSegmentValidationManager to fix them.
         selectedSegmentZKMetadataList.add(segmentZKMetadata);
       }
     }

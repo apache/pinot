@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.FilterConfig;
@@ -37,8 +38,10 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -543,7 +546,7 @@ public class RecordTransformerTest {
     ingestionConfig.setTransformConfigs(List.of(new TransformConfig("expressionTestColumn", "plus(x,10)")));
     ingestionConfig.setSchemaConformingTransformerConfig(
         new SchemaConformingTransformerConfig(null, "indexableExtras", false, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null, null, null, null));
+            null, null, null, null, null, null, null, null, null, null, null, null, null));
     ingestionConfig.setRowTimeValueCheck(true);
     ingestionConfig.setContinueOnError(false);
 
@@ -914,6 +917,66 @@ public class RecordTransformerTest {
     for (int i = 0; i < NUM_ROUNDS; i++) {
       record = transformer.transform(record);
       assertNotNull(record);
+    }
+  }
+
+  @Test
+  public void testConfigurableJsonDefaults() {
+    // Save original defaults
+    FieldSpec.MaxLengthExceedStrategy originalStrategy = FieldSpec.getDefaultJsonMaxLengthExceedStrategy();
+    int originalMaxLength = FieldSpec.getDefaultJsonMaxLength();
+
+    try {
+      // Test configurable default strategy
+      FieldSpec.setDefaultJsonMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.SUBSTITUTE_DEFAULT_VALUE);
+      FieldSpec.setDefaultJsonMaxLength(1024);
+
+      Schema.SchemaBuilder schemaBuilder = new Schema.SchemaBuilder();
+      schemaBuilder.addSingleValueDimension("jsonCol", DataType.JSON);
+      DimensionFieldSpec explicitJsonSpec =
+          new DimensionFieldSpec("explicitJsonCol", DataType.JSON, true, 2048, "");
+      explicitJsonSpec.setMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.TRIM_LENGTH);
+      schemaBuilder.addField(explicitJsonSpec);
+
+      Schema schema = schemaBuilder.build();
+
+      // Verify max length defaults
+      FieldSpec jsonSpec = schema.getFieldSpecFor("jsonCol");
+      FieldSpec explicitSpec = schema.getFieldSpecFor("explicitJsonCol");
+
+      assertEquals(jsonSpec.getEffectiveMaxLength(), 1024); // Uses JSON default
+      assertEquals(explicitSpec.getEffectiveMaxLength(), 2048); // Explicit override
+
+      // Test strategy defaults with sanitization
+      jsonSpec.setMaxLength(10);
+      RecordTransformer transformer = new SanitizationTransformer(schema);
+      GenericRow record = new GenericRow();
+      record.putValue("jsonCol", "{\"test\": \"exceeds 10 chars\"}");
+      record.putValue("explicitJsonCol", "{\"test\": \"exceeds 2048 chars easily\"}");
+
+      GenericRow result = transformer.transform(record);
+      assertEquals(result.getValue("jsonCol"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_JSON);
+      assertEquals(result.getValue("explicitJsonCol"), "{\"test\": \"exceeds 2048 chars easily\"}");
+
+      // Test strategy change
+      FieldSpec.setDefaultJsonMaxLengthExceedStrategy(FieldSpec.MaxLengthExceedStrategy.ERROR);
+      RecordTransformer finalTransformer = new SanitizationTransformer(schema);
+      record.putValue("jsonCol", "{\"test\": \"exceeds 10 chars\"}");
+      assertThrows(IllegalStateException.class, () -> finalTransformer.transform(record));
+
+      // Test ServiceStartableUtils configuration
+      PinotConfiguration config = new PinotConfiguration();
+      config.setProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH, "2048");
+      config.setProperty(CommonConstants.FieldSpecConfigs.CONFIG_OF_DEFAULT_JSON_MAX_LENGTH_EXCEED_STRATEGY,
+          "NO_ACTION");
+
+      ServiceStartableUtils.initFieldSpecConfig(config);
+      assertEquals(FieldSpec.getDefaultJsonMaxLength(), 2048);
+      assertEquals(FieldSpec.getDefaultJsonMaxLengthExceedStrategy(), FieldSpec.MaxLengthExceedStrategy.NO_ACTION);
+    } finally {
+      // Restore original defaults
+      FieldSpec.setDefaultJsonMaxLengthExceedStrategy(originalStrategy);
+      FieldSpec.setDefaultJsonMaxLength(originalMaxLength);
     }
   }
 }

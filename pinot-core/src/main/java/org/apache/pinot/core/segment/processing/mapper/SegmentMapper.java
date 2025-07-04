@@ -48,6 +48,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFileConfig;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
+import org.apache.pinot.spi.tasks.MinionTaskBaseObserverStats;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,14 +77,22 @@ public class SegmentMapper {
   private final Map<String, GenericRowFileManager> _partitionToFileManagerMap = new TreeMap<>();
   private final AdaptiveSizeBasedWriter _adaptiveSizeBasedWriter;
   private final List<RecordReaderFileConfig> _recordReaderFileConfigs;
+  private int _incompleteRowsFound = 0;
+  private int _skippedRowsFound = 0;
+  private int _sanitizedRowsFound = 0;
 
   public SegmentMapper(List<RecordReaderFileConfig> recordReaderFileConfigs,
       List<RecordTransformer> customRecordTransformers, SegmentProcessorConfig processorConfig, File mapperOutputDir) {
     this(recordReaderFileConfigs,
         new TransformPipeline(
-            CompositeTransformer.composeAllTransformers(customRecordTransformers, processorConfig.getTableConfig(),
-                processorConfig.getSchema()),
-            ComplexTypeTransformer.getComplexTypeTransformer(processorConfig.getTableConfig())),
+            // pre-complex type transformers
+            CompositeTransformer.getPreComplexTypeTransformers(processorConfig.getTableConfig()),
+            // complex type transformer
+            ComplexTypeTransformer.getComplexTypeTransformer(processorConfig.getTableConfig()),
+            // plain record transformations
+            CompositeTransformer.composeAllTransformers(
+                customRecordTransformers, processorConfig.getTableConfig(), processorConfig.getSchema()
+            )),
         processorConfig, mapperOutputDir);
   }
 
@@ -186,11 +195,20 @@ public class SegmentMapper {
         for (GenericRow transformedRow : reusedResult.getTransformedRows()) {
           writeRecord(transformedRow);
         }
+        _incompleteRowsFound += reusedResult.getIncompleteRowCount();
+        _skippedRowsFound += reusedResult.getSkippedRowCount();
+        _sanitizedRowsFound += reusedResult.getSanitizedRowCount();
       } catch (Exception e) {
+        String logMessage = "Caught exception while reading data.";
+        observer.accept(new MinionTaskBaseObserverStats.StatusEntry.Builder()
+            .withLevel(MinionTaskBaseObserverStats.StatusEntry.LogLevel.ERROR)
+            .withStatus(logMessage + " Reason: " + e.getMessage())
+            .build());
         if (!continueOnError) {
-          throw new RuntimeException("Caught exception while reading data", e);
+          throw new RuntimeException(logMessage, e);
         } else {
-          LOGGER.debug("Caught exception while reading data", e);
+          LOGGER.debug(logMessage, e);
+          _incompleteRowsFound++;
           continue;
         }
       }
@@ -238,5 +256,17 @@ public class SegmentMapper {
 
     // Write the row.
     _adaptiveSizeBasedWriter.write(fileWriter, row);
+  }
+
+  public int getIncompleteRowsFound() {
+    return _incompleteRowsFound;
+  }
+
+  public int getSkippedRowsFound() {
+    return _skippedRowsFound;
+  }
+
+  public int getSanitizedRowsFound() {
+    return _sanitizedRowsFound;
   }
 }

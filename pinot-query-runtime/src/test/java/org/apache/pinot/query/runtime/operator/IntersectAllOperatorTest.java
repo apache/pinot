@@ -21,11 +21,10 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.routing.VirtualServerAddress;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockTestUtils;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -67,20 +66,20 @@ public class IntersectAllOperatorTest {
 
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{4}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
 
     IntersectAllOperator intersectOperator =
         new IntersectAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
-    TransferableBlock result = intersectOperator.nextBlock();
-    while (result.getType() != DataBlock.Type.ROW) {
+    MseBlock result = intersectOperator.nextBlock();
+    while (result.isEos()) {
       result = intersectOperator.nextBlock();
     }
-    List<Object[]> resultRows = result.getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{1}, new Object[]{2});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
@@ -96,20 +95,20 @@ public class IntersectAllOperatorTest {
     Mockito.when(_leftOperator.nextBlock())
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{2}, new Object[]{3},
             new Object[]{3}, new Object[]{3}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{2}, new Object[]{3}, new Object[]{3}, new Object[]{4}))
-        .thenReturn(TransferableBlockTestUtils.getEndOfStreamTransferableBlock(0));
+        .thenReturn(SuccessMseBlock.INSTANCE);
 
     IntersectAllOperator intersectOperator =
         new IntersectAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
-    TransferableBlock result = intersectOperator.nextBlock();
-    while (result.getType() != DataBlock.Type.ROW) {
+    MseBlock result = intersectOperator.nextBlock();
+    while (result.isEos()) {
       result = intersectOperator.nextBlock();
     }
-    List<Object[]> resultRows = result.getContainer();
+    List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
     List<Object[]> expectedRows = Arrays.asList(new Object[]{2}, new Object[]{3}, new Object[]{3});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {

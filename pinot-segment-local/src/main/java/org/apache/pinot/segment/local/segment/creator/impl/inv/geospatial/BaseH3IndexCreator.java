@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv.geospatial;
 
-import com.google.common.base.Preconditions;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
@@ -27,9 +26,14 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.segment.index.h3.H3IndexType;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
 import org.apache.pinot.segment.spi.V1Constants;
@@ -67,6 +71,7 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   static final String BITMAP_OFFSET_FILE_NAME = "bitmap.offset.buf";
   static final String BITMAP_VALUE_FILE_NAME = "bitmap.value.buf";
 
+  final String _tableNameWithType;
   final File _indexFile;
   final File _tempDir;
   final File _dictionaryFile;
@@ -83,8 +88,9 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
 
   int _nextDocId;
 
-  BaseH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution)
+  BaseH3IndexCreator(File indexDir, String columnName, String tableNameWithType, H3IndexResolution resolution)
       throws IOException {
+    _tableNameWithType = tableNameWithType;
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
     if (_tempDir.exists()) {
@@ -108,13 +114,18 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   }
 
   @Override
-  public void add(Geometry geometry)
+  public void add(@Nullable Geometry geometry)
       throws IOException {
-    Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
-        geometry.getGeometryType());
+    if (geometry == null || !(geometry instanceof Point)) {
+      String metricKeyName =
+          _tableNameWithType + "-" + H3IndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+      ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      _nextDocId++;
+      return;
+    }
     Coordinate coordinate = geometry.getCoordinate();
     // TODO: support multiple resolutions
-    long h3Id = H3Utils.H3_CORE.geoToH3(coordinate.y, coordinate.x, _lowestResolution);
+    long h3Id = H3Utils.H3_CORE.latLngToCell(coordinate.y, coordinate.x, _lowestResolution);
     RoaringBitmapWriter<RoaringBitmap> bitmapWriter = _postingListMap.get(h3Id);
     if (bitmapWriter == null) {
       bitmapWriter = _bitmapWriterWizard.get();

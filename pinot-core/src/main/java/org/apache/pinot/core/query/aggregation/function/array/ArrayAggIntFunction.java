@@ -20,8 +20,10 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -37,7 +39,8 @@ public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     int[] value = blockValSet.getIntValuesSV();
-    IntArrayList valueArray = new IntArrayList(length);
+    IntArrayList valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new IntArrayList(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -55,5 +58,16 @@ public class ArrayAggIntFunction extends BaseArrayAggIntFunction<IntArrayList> {
       resultHolder.setValueForKey(groupKey, valueArray);
     }
     valueArray.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(IntArrayList intArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntArrayList.getValue(),
+        ObjectSerDeUtils.INT_ARRAY_LIST_SER_DE.serialize(intArrayList));
+  }
+
+  @Override
+  public IntArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.INT_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 }

@@ -74,15 +74,29 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
   }
 
   @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    VectorIndexConfig vectorIndexConfig = indexConfigs.getConfig(StandardIndexes.vector());
+    if (vectorIndexConfig.isEnabled()) {
+      String column = fieldSpec.getName();
+      Preconditions.checkState(!fieldSpec.isSingleValueField(), "Cannot create vector index on single-value column: %s",
+          column);
+      Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.FLOAT,
+          "Cannot create vector index on column: %s of stored type other than FLOAT", column);
+      String vectorIndexType = vectorIndexConfig.getVectorIndexType();
+      Preconditions.checkState("HNSW".equals(vectorIndexType),
+          "Unsupported vector index type: %s for column: %s, only 'HNSW' is supported", vectorIndexType, column);
+    }
+  }
+
+  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
 
   @Override
-  public ColumnConfigDeserializer<VectorIndexConfig> createDeserializer() {
-    return IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass()).withExclusiveAlternative(
-        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.VECTOR,
-            (tableConfig, fieldConfig) -> new VectorIndexConfig(fieldConfig.getProperties())));
+  protected ColumnConfigDeserializer<VectorIndexConfig> createDeserializerForLegacyConfigs() {
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.VECTOR,
+        (tableConfig, fieldConfig) -> new VectorIndexConfig(fieldConfig.getProperties()));
   }
 
   @Override
@@ -103,8 +117,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new VectorIndexHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new VectorIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
   @Override

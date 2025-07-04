@@ -32,6 +32,10 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 public class PinotProjectJoinTransposeRule extends ProjectJoinTransposeRule {
   public static final PinotProjectJoinTransposeRule INSTANCE = new PinotProjectJoinTransposeRule(Config.DEFAULT);
 
+  public static PinotProjectJoinTransposeRule instanceWithDescription(String description) {
+    return new PinotProjectJoinTransposeRule((Config) Config.DEFAULT.withDescription(description));
+  }
+
   private PinotProjectJoinTransposeRule(Config config) {
     super(config);
   }

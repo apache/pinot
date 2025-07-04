@@ -39,6 +39,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.protocols.SegmentCompletionProtocol;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -70,6 +71,9 @@ public class LLCSegmentCompletionHandlers {
 
   @Inject
   SegmentCompletionManager _segmentCompletionManager;
+
+  @Inject
+  ControllerMetrics _controllerMetrics;
 
   @VisibleForTesting
   public static String getScheme() {
@@ -227,7 +231,13 @@ public class LLCSegmentCompletionHandlers {
       URI segmentFileURI =
           URIUtils.getUri(ControllerFilePathProvider.getInstance().getDataDirURI().toString(), rawTableName,
               URIUtils.encode(SegmentCompletionUtils.generateTmpSegmentFileName(segmentName)));
+      // Emit metrics related to deep-store upload operation
+      long startTimeMs = System.currentTimeMillis();
+      long segmentSizeBytes = localTempFile.length();
+      ResourceUtils.emitPreSegmentUploadMetrics(_controllerMetrics, rawTableName, segmentSizeBytes);
       PinotFSFactory.create(segmentFileURI.getScheme()).copyFromLocalFile(localTempFile, segmentFileURI);
+      ResourceUtils.emitPostSegmentUploadMetrics(_controllerMetrics, rawTableName, startTimeMs, segmentSizeBytes);
+
       SegmentCompletionProtocol.Response.Params responseParams = new SegmentCompletionProtocol.Response.Params()
           .withStreamPartitionMsgOffset(requestParams.getStreamPartitionMsgOffset())
           .withSegmentLocation(segmentFileURI.toString())
@@ -295,6 +305,28 @@ public class LLCSegmentCompletionHandlers {
         .toJsonString();
     LOGGER.info("Response to segmentCommitEndWithMetadata for segment: {} is: {}", segmentName, response);
     return response;
+  }
+
+  @GET
+  @Path(SegmentCompletionProtocol.MSG_TYPE_BUILD_DETERMINISTIC_FAILURE)
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_ADMIN_INFO)
+  @Produces(MediaType.APPLICATION_JSON)
+  public String reduceSegmentSize(@QueryParam(SegmentCompletionProtocol.PARAM_INSTANCE_ID) String instanceId,
+      @QueryParam(SegmentCompletionProtocol.PARAM_SEGMENT_NAME) String segmentName,
+      @QueryParam(SegmentCompletionProtocol.PARAM_ROW_COUNT) int numRows) {
+    if (instanceId == null || segmentName == null || numRows <= 0) {
+      LOGGER.error("Invalid call: segmentName={}, instanceId={}, numRowsCount={}", segmentName, instanceId,
+          numRows);
+      return SegmentCompletionProtocol.RESP_FAILED.toJsonString();
+    }
+
+    SegmentCompletionProtocol.Request.Params requestParams = new SegmentCompletionProtocol.Request.Params()
+        .withInstanceId(instanceId)
+        .withSegmentName(segmentName)
+        .withNumRows(numRows);
+    LOGGER.info("Processing segmentStoppedConsuming: {}", requestParams);
+
+    return _segmentCompletionManager.reduceSegmentSizeAndReset(requestParams).toJsonString();
   }
 
   /**

@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import it.unimi.dsi.fastutil.objects.Object2LongOpenCustomHashMap;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
 public class MemoryOptimizedDimensionTable implements DimensionTable {
   private static final Logger LOGGER = LoggerFactory.getLogger(MemoryOptimizedDimensionTable.class);
 
-  private final Map<PrimaryKey, LookupRecordLocation> _lookupTable;
+  private final Object2LongOpenCustomHashMap<Object[]> _lookupTable;
   private final Schema _tableSchema;
   private final List<String> _primaryKeyColumns;
   private final ThreadLocal<GenericRow> _reuse = ThreadLocal.withInitial(GenericRow::new);
@@ -43,9 +43,12 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
   private final List<PinotSegmentRecordReader> _recordReaders;
   private final TableDataManager _tableDataManager;
 
-  MemoryOptimizedDimensionTable(Schema tableSchema, List<String> primaryKeyColumns,
-      Map<PrimaryKey, LookupRecordLocation> lookupTable, List<SegmentDataManager> segmentDataManagers,
-      List<PinotSegmentRecordReader> recordReaders, TableDataManager tableDataManager) {
+  MemoryOptimizedDimensionTable(Schema tableSchema,
+      List<String> primaryKeyColumns,
+      Object2LongOpenCustomHashMap<Object[]> lookupTable,
+      List<SegmentDataManager> segmentDataManagers,
+      List<PinotSegmentRecordReader> recordReaders,
+      TableDataManager tableDataManager) {
     _tableSchema = tableSchema;
     _primaryKeyColumns = primaryKeyColumns;
     _lookupTable = lookupTable;
@@ -71,39 +74,59 @@ public class MemoryOptimizedDimensionTable implements DimensionTable {
 
   @Override
   public boolean containsKey(PrimaryKey pk) {
-    return _lookupTable.containsKey(pk);
+    return _lookupTable.containsKey(pk.getValues());
   }
 
   @Nullable
   @Override
   public GenericRow getRow(PrimaryKey pk) {
-    LookupRecordLocation lookupRecordLocation = _lookupTable.get(pk);
-    if (lookupRecordLocation == null) {
+    long readerIdxAndDocId = _lookupTable.getLong(pk.getValues());
+    if (readerIdxAndDocId < 0) {
       return null;
     }
+
     GenericRow reuse = _reuse.get();
     reuse.clear();
-    return lookupRecordLocation.getRecord(reuse);
+
+    int docId = (int) (readerIdxAndDocId & 0xffffffffL);
+    int readerIdx = (int) (readerIdxAndDocId >> 32);
+
+    PinotSegmentRecordReader recordReader = _recordReaders.get(readerIdx);
+    recordReader.getRecord(docId, reuse);
+    return reuse;
   }
 
   @Nullable
   @Override
   public Object getValue(PrimaryKey pk, String columnName) {
-    LookupRecordLocation lookupRecordLocation = _lookupTable.get(pk);
-    return lookupRecordLocation != null ? lookupRecordLocation.getValue(columnName) : null;
+    long readerIdxAndDocId = _lookupTable.getLong(pk.getValues());
+    if (readerIdxAndDocId < 0) {
+      return null;
+    }
+
+    int docId = (int) (readerIdxAndDocId & 0xffffffffL);
+    int readerIdx = (int) (readerIdxAndDocId >> 32);
+
+    PinotSegmentRecordReader recordReader = _recordReaders.get(readerIdx);
+    return recordReader.getValue(docId, columnName);
   }
 
   @Nullable
   @Override
   public Object[] getValues(PrimaryKey pk, String[] columnNames) {
-    LookupRecordLocation lookupRecordLocation = _lookupTable.get(pk);
-    if (lookupRecordLocation == null) {
+    long readerIdxAndDocId = _lookupTable.getLong(pk.getValues());
+    if (readerIdxAndDocId < 0) {
       return null;
     }
+
+    int docId = (int) (readerIdxAndDocId & 0xffffffffL);
+    int readerIdx = (int) (readerIdxAndDocId >> 32);
+    PinotSegmentRecordReader recordReader = _recordReaders.get(readerIdx);
+
     int numColumns = columnNames.length;
     Object[] values = new Object[numColumns];
     for (int i = 0; i < numColumns; i++) {
-      values[i] = lookupRecordLocation.getValue(columnNames[i]);
+      values[i] = recordReader.getValue(docId, columnNames[i]);
     }
     return values;
   }

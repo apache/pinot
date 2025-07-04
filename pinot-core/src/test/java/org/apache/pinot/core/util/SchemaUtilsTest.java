@@ -193,7 +193,6 @@ public class SchemaUtilsTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.consumer.type", "lowlevel");
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
@@ -289,6 +288,35 @@ public class SchemaUtilsTest {
     pinotSchema = new Schema.SchemaBuilder().addDateTime("datetime4", FieldSpec.DataType.STRING,
         "1:DAYS:SIMPLE_DATE_FORMAT:M/d/yyyy", "1:DAYS").build();
     checkValidationFails(pinotSchema);
+  }
+
+  @Test
+  public void testValidateMultiValueFieldSpec() {
+    Schema pinotSchema;
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
+
+    checkValidationFails(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addMultiValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
+
+    checkValidationFails(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myJsonCol", FieldSpec.DataType.JSON).build();
+
+    SchemaUtils.validate(pinotSchema);
+
+    pinotSchema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
+        .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myBigDecimalCol", FieldSpec.DataType.BIG_DECIMAL).build();
+
+    SchemaUtils.validate(pinotSchema);
   }
 
   @Test

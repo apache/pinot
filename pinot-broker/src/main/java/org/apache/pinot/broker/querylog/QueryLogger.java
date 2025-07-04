@@ -24,9 +24,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.broker.api.RequesterIdentity;
 import org.apache.pinot.broker.requesthandler.BaseSingleStageBrokerRequestHandler.ServerStats;
 import org.apache.pinot.common.response.BrokerResponse;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -50,6 +50,7 @@ public class QueryLogger {
   private final int _maxQueryLengthToLog;
   private final RateLimiter _logRateLimiter;
   private final boolean _enableIpLogging;
+  private final boolean _logBeforeProcessing;
   private final Logger _logger;
   private final RateLimiter _droppedLogRateLimiter;
   private final AtomicLong _numDroppedLogs = new AtomicLong(0L);
@@ -59,26 +60,38 @@ public class QueryLogger {
             Broker.DEFAULT_BROKER_QUERY_LOG_MAX_RATE_PER_SECOND)),
         config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_LENGTH, Broker.DEFAULT_BROKER_QUERY_LOG_LENGTH),
         config.getProperty(Broker.CONFIG_OF_BROKER_REQUEST_CLIENT_IP_LOGGING,
-            Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING), LOGGER, RateLimiter.create(1)
+            Broker.DEFAULT_BROKER_REQUEST_CLIENT_IP_LOGGING),
+        config.getProperty(Broker.CONFIG_OF_BROKER_QUERY_LOG_BEFORE_PROCESSING,
+            Broker.DEFAULT_BROKER_QUERY_LOG_BEFORE_PROCESSING), LOGGER, RateLimiter.create(1)
         // log once a second for dropped log count
     );
   }
 
   @VisibleForTesting
-  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, Logger logger,
-      RateLimiter droppedLogRateLimiter) {
+  QueryLogger(RateLimiter logRateLimiter, int maxQueryLengthToLog, boolean enableIpLogging, boolean logBeforeProcessing,
+      Logger logger, RateLimiter droppedLogRateLimiter) {
     _logRateLimiter = logRateLimiter;
     _maxQueryLengthToLog = maxQueryLengthToLog;
     _enableIpLogging = enableIpLogging;
     _logger = logger;
     _droppedLogRateLimiter = droppedLogRateLimiter;
+    _logBeforeProcessing = logBeforeProcessing;
+  }
+
+  public void log(long requestId, String query) {
+    if (!_logBeforeProcessing || !checkRateLimiter(null)) {
+      return;
+    }
+
+    _logger.info("SQL query for request {}: {}", requestId, query);
+
+    tryLogDropped();
   }
 
   public void log(QueryLogParams params) {
     _logger.debug("Broker Response: {}", params._response);
 
-    if (!(_logRateLimiter.tryAcquire() || shouldForceLog(params))) {
-      _numDroppedLogs.incrementAndGet();
+    if (!checkRateLimiter(params)) {
       return;
     }
 
@@ -93,6 +106,18 @@ public class QueryLogger {
         .append(StringUtils.substring(params._requestContext.getQuery(), 0, _maxQueryLengthToLog));
     _logger.info(queryLogBuilder.toString());
 
+    tryLogDropped();
+  }
+
+  private boolean checkRateLimiter(@Nullable QueryLogParams params) {
+    boolean allowed = _logRateLimiter.tryAcquire() || shouldForceLog(params);
+    if (!allowed) {
+      _numDroppedLogs.incrementAndGet();
+    }
+    return allowed;
+  }
+
+  private void tryLogDropped() {
     if (_droppedLogRateLimiter.tryAcquire()) {
       // use getAndSet to 0 so that there will be no race condition between
       // loggers that increment this counter and this thread
@@ -112,7 +137,10 @@ public class QueryLogger {
     return _logRateLimiter.getRate();
   }
 
-  private boolean shouldForceLog(QueryLogParams params) {
+  private boolean shouldForceLog(@Nullable QueryLogParams params) {
+    if (params == null) {
+      return false;
+    }
     return params._response.isPartialResult() || params._response.getTimeUsedMs() > TimeUnit.SECONDS.toMillis(1);
   }
 
@@ -217,10 +245,22 @@ public class QueryLogger {
             .append(params._response.getNumServersQueried());
       }
     },
+    GROUPS_TRIMMED("groupsTrimmed") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isGroupsTrimmed());
+      }
+    },
     GROUP_LIMIT_REACHED("groupLimitReached") {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._response.isNumGroupsLimitReached());
+      }
+    },
+    GROUP_WARNING_LIMIT_REACHED("groupWarningLimitReached") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.isNumGroupsWarningLimitReached());
       }
     },
     BROKER_REDUCE_TIME_MS("brokerReduceTimeMs") {
@@ -277,6 +317,34 @@ public class QueryLogger {
       @Override
       void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
         builder.append(params._queryEngine.getName());
+      }
+    },
+    OFFLINE_MEM_ALLOCATED_BYTES("offlineMemAllocatedBytes(total/thread/resSer)", ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getOfflineTotalMemAllocatedBytes()).append('/')
+            .append(params._response.getOfflineThreadMemAllocatedBytes()).append('/')
+            .append(params._response.getOfflineResponseSerMemAllocatedBytes());
+      }
+    },
+    REALTIME_MEM_ALLOCATED_BYTES("realtimeMemAllocatedBytes(total/thread/resSer)", ':') {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getRealtimeTotalMemAllocatedBytes()).append('/')
+            .append(params._response.getRealtimeThreadMemAllocatedBytes()).append('/')
+            .append(params._response.getRealtimeResponseSerMemAllocatedBytes());
+      }
+    },
+    POOLS("pools") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+          builder.append(params._response.getPools());
+      }
+    },
+    RLS_FILTERS_APPLIED("rlsFiltersApplied") {
+      @Override
+      void doFormat(StringBuilder builder, QueryLogger logger, QueryLogParams params) {
+        builder.append(params._response.getRLSFiltersApplied());
       }
     };
 

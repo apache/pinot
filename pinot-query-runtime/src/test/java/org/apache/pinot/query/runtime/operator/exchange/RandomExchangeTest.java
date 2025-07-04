@@ -19,10 +19,12 @@
 package org.apache.pinot.query.runtime.operator.exchange;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.pinot.common.datablock.DataBlock;
+import java.util.Collections;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.SendingMailbox;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.BlockSplitter;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Mockito;
@@ -40,13 +42,12 @@ public class RandomExchangeTest {
   private SendingMailbox _mailbox1;
   @Mock
   private SendingMailbox _mailbox2;
-  @Mock
-  TransferableBlock _block;
+  RowHeapDataBlock _block;
 
   @BeforeMethod
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_block.getType()).thenReturn(DataBlock.Type.METADATA);
+    _block = new RowHeapDataBlock(Collections.emptyList(), DataSchema.EXPLAIN_RESULT_SCHEMA);
   }
 
   @AfterMethod
@@ -62,9 +63,9 @@ public class RandomExchangeTest {
     ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
 
     // When:
-    new RandomExchange(destinations, size -> 1, TransferableBlockUtils::splitBlock).route(destinations, _block);
+    new RandomExchange(destinations, size -> 1, BlockSplitter.NO_OP).route(destinations, _block);
 
-    ArgumentCaptor<TransferableBlock> captor = ArgumentCaptor.forClass(TransferableBlock.class);
+    ArgumentCaptor<MseBlock.Data> captor = ArgumentCaptor.forClass(MseBlock.Data.class);
     // Then:
     Mockito.verify(_mailbox2, Mockito.times(1)).send(captor.capture());
     Assert.assertEquals(captor.getValue(), _block);

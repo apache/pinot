@@ -19,12 +19,11 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
@@ -35,7 +34,10 @@ import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -61,23 +63,29 @@ public class CombineErrorOperatorsTest {
     _executorService = Executors.newFixedThreadPool(NUM_THREADS);
   }
 
-  @Test
-  public void testCombineExceptionOperator() {
+  @DataProvider(name = "getErrorCodes")
+  public static Object[][] getErrorCodes() {
+    return Arrays.stream(QueryErrorCode.values())
+      .map(queryErrorCode -> new Object[]{queryErrorCode})
+      .toArray(Object[][]::new);
+  }
+
+  @Test(dataProvider = "getErrorCodes")
+  public void testCombineExceptionOperator(QueryErrorCode queryErrorCode) {
     List<Operator> operators = new ArrayList<>(NUM_OPERATORS);
     for (int i = 0; i < NUM_OPERATORS - 1; i++) {
       operators.add(new RegularOperator());
     }
-    operators.add(new ExceptionOperator());
+    operators.add(new ExceptionOperator(queryErrorCode.asException("Test exception message")));
     SelectionOnlyCombineOperator combineOperator =
         new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
-    List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
-    assertNotNull(processingExceptions);
-    assertEquals(processingExceptions.size(), 1);
-    ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
-    assertTrue(processingException.getMessage().contains("java.lang.RuntimeException: Exception"));
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    QueryErrorMessage errorMsg = errorMsgs.get(0);
+    assertEquals(errorMsg.getErrCode(), queryErrorCode);
   }
 
   @Test
@@ -91,41 +99,44 @@ public class CombineErrorOperatorsTest {
         new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
-    List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
-    assertNotNull(processingExceptions);
-    assertEquals(processingExceptions.size(), 1);
-    ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
-    assertTrue(processingException.getMessage().contains("java.lang.Error: Error"));
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    QueryErrorMessage errorMsg = errorMsgs.get(0);
+    assertEquals(errorMsg.getErrCode(), QueryErrorCode.QUERY_EXECUTION);
   }
 
-  @Test
-  public void testCombineExceptionAndErrorOperator() {
+  @Test(dataProvider = "getErrorCodes")
+  public void testCombineExceptionAndErrorOperator(QueryErrorCode queryErrorCode) {
     List<Operator> operators = new ArrayList<>(NUM_OPERATORS);
     for (int i = 0; i < NUM_OPERATORS - 2; i++) {
       operators.add(new RegularOperator());
     }
-    operators.add(new ExceptionOperator());
+    operators.add(new ExceptionOperator(queryErrorCode.asException("Test exception message")));
     operators.add(new ErrorOperator());
     SelectionOnlyCombineOperator combineOperator =
         new SelectionOnlyCombineOperator(operators, QUERY_CONTEXT, _executorService);
     BaseResultsBlock resultsBlock = combineOperator.nextBlock();
     assertTrue(resultsBlock instanceof ExceptionResultsBlock);
-    List<ProcessingException> processingExceptions = resultsBlock.getProcessingExceptions();
-    assertNotNull(processingExceptions);
-    assertEquals(processingExceptions.size(), 1);
-    ProcessingException processingException = processingExceptions.get(0);
-    assertEquals(processingException.getErrorCode(), QueryException.QUERY_EXECUTION_ERROR_CODE);
-    String message = processingException.getMessage();
-    assertTrue(message.contains("java.lang.RuntimeException: Exception") || message.contains("java.lang.Error: Error"));
+    List<QueryErrorMessage> errorMsgs = resultsBlock.getErrorMessages();
+    assertNotNull(errorMsgs);
+    assertEquals(errorMsgs.size(), 1);
+    QueryErrorMessage errorMsg = errorMsgs.get(0);
+    assertTrue(errorMsg.getErrCode() == QueryErrorCode.QUERY_EXECUTION || errorMsg.getErrCode() == queryErrorCode,
+        "Expected error code to be either QUERY_EXECUTION or " + queryErrorCode + ", got " + errorMsg.getErrCode());
   }
 
   private static class ExceptionOperator extends BaseOperator {
     private static final String EXPLAIN_NAME = "EXCEPTION";
+    private final RuntimeException _exception;
+
+    private ExceptionOperator(RuntimeException exception) {
+      _exception = exception;
+    }
 
     @Override
     protected Block getNextBlock() {
-      throw new RuntimeException("Exception");
+      throw _exception;
     }
 
     @Override

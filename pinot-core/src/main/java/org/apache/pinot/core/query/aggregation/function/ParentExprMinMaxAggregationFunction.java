@@ -22,9 +22,11 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -423,6 +425,17 @@ public class ParentExprMinMaxAggregationFunction extends ParentAggregationFuncti
   @Override
   public DataSchema.ColumnDataType getIntermediateResultColumnType() {
     return DataSchema.ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ExprMinMaxObject exprMinMaxObject) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.ExprMinMaxObject.getValue(),
+        ObjectSerDeUtils.ARG_MIN_MAX_OBJECT_SER_DE.serialize(exprMinMaxObject));
+  }
+
+  @Override
+  public ExprMinMaxObject deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.ARG_MIN_MAX_OBJECT_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

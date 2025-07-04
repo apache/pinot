@@ -35,7 +35,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.trace.Tracing;
 
 
-public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {
+public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> implements AutoCloseable {
   private static final String EXPLAIN_NAME = "PROJECT";
 
   private final Map<String, DataSource> _dataSourceMap;
@@ -70,6 +70,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {
     assert _docIdSetOperator != null;
     DocIdSetBlock docIdSetBlock = _docIdSetOperator.nextBlock();
     if (docIdSetBlock == null) {
+      _dataBlockCache.close();
       return null;
     } else {
       Tracing.activeRecording().setNumChildren(_dataSourceMap.size());
@@ -115,5 +116,10 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> {
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     return _docIdSetOperator != null ? _docIdSetOperator.getExecutionStatistics() : new ExecutionStatistics(0, 0, 0, 0);
+  }
+
+  @Override
+  public void close() {
+    _dataBlockCache.close();
   }
 }

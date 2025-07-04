@@ -20,8 +20,8 @@ package org.apache.pinot.core.query.scheduler.fcfs;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.core.query.executor.QueryExecutor;
@@ -30,6 +30,7 @@ import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -47,11 +48,12 @@ public class FCFSQueryScheduler extends QueryScheduler {
   @Override
   public ListenableFuture<byte[]> submit(ServerQueryRequest queryRequest) {
     if (!_isRunning) {
-      return immediateErrorResponse(queryRequest, QueryException.SERVER_SCHEDULER_DOWN_ERROR);
+      return shuttingDown(queryRequest);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
     QueryExecutorService queryExecutorService = _resourceManager.getExecutorService(queryRequest, null);
-    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, queryExecutorService);
+    ExecutorService innerExecutorService = QueryThreadContext.contextAwareExecutorService(queryExecutorService);
+    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, innerExecutorService);
     _resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;
   }

@@ -123,6 +123,7 @@ public class SegmentCompletionProtocol {
   public static final String MSG_TYPE_COMMIT_END_METADATA = "segmentCommitEndWithMetadata";
   public static final String MSG_TYPE_STOPPED_CONSUMING = "segmentStoppedConsuming";
   public static final String MSG_TYPE_EXTEND_BUILD_TIME = "extendBuildTime";
+  public static final String MSG_TYPE_BUILD_DETERMINISTIC_FAILURE = "segmentBuildDeterministicFailure";
 
   public static final String PARAM_SEGMENT_LOCATION = "location";
   public static final String PARAM_SEGMENT_NAME = "name";
@@ -431,6 +432,12 @@ public class SegmentCompletionProtocol {
   public static class SegmentStoppedConsuming extends Request {
     public SegmentStoppedConsuming(Params params) {
       super(params, MSG_TYPE_STOPPED_CONSUMING);
+    }
+  }
+
+  public static class SegmentCannotBuildRequest extends Request {
+    public SegmentCannotBuildRequest(Params params) {
+      super(params, MSG_TYPE_BUILD_DETERMINISTIC_FAILURE);
     }
   }
 

@@ -163,6 +163,30 @@ public class ProjectionBlockValSet implements BlockValSet {
   }
 
   @Override
+  public int[] get32BitsMurmur3HashValuesSV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
+      recordReadValues(scope, DataType.BYTES, true);
+      return _dataBlockCache.get32BitsMurmur3HashValuesForSVColumn(_column);
+    }
+  }
+
+  @Override
+  public long[] get64BitsMurmur3HashValuesSV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
+      recordReadValues(scope, DataType.BYTES, true);
+      return _dataBlockCache.get64BitsMurmur3HashValuesForSVColumn(_column);
+    }
+  }
+
+  @Override
+  public long[][] get128BitsMurmur3HashValuesSV() {
+    try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
+      recordReadValues(scope, DataType.BYTES, true);
+      return _dataBlockCache.get128BitsMurmur3HashValuesForSVColumn(_column);
+    }
+  }
+
+  @Override
   public int[][] getDictionaryIdsMV() {
     try (InvocationScope scope = Tracing.getTracer().createScope(ProjectionBlockValSet.class)) {
       recordReadValues(scope, DataType.INT, false);

@@ -33,7 +33,6 @@ import java.util.Map;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.function.JsonPathCache;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -41,6 +40,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
@@ -339,9 +339,9 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     JsonNode pinotResponse = postQuery(query);
     int expectedStatusCode;
     if (useMultiStageQueryEngine) {
-      expectedStatusCode = QueryException.UNKNOWN_COLUMN_ERROR_CODE;
+      expectedStatusCode = QueryErrorCode.UNKNOWN_COLUMN.getId();
     } else {
-      expectedStatusCode = QueryException.SQL_PARSING_ERROR_CODE;
+      expectedStatusCode = QueryErrorCode.SQL_PARSING.getId();
     }
     Assert.assertEquals(pinotResponse.get("exceptions").get(0).get("errorCode").asInt(), expectedStatusCode);
     Assert.assertEquals(pinotResponse.get("numDocsScanned").asInt(), 0);

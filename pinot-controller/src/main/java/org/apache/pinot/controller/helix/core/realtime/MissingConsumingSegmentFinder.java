@@ -81,7 +81,7 @@ public class MissingConsumingSegmentFinder {
       return streamConfig;
     });
     try {
-      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList())
+      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), false)
           .forEach(metadata -> {
             _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
           });

@@ -23,14 +23,15 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.apache.pinot.common.datablock.ColumnarDataBlock;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockUtils;
+import org.apache.pinot.common.datablock.MetadataBlock;
 import org.apache.pinot.common.datablock.RowDataBlock;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -45,19 +46,18 @@ public class DataBlockTest {
   public void testException()
       throws IOException {
     Exception originalException = new UnsupportedOperationException("Expected test exception.");
-    ProcessingException processingException =
-        QueryException.getException(QueryException.QUERY_EXECUTION_ERROR, originalException);
-    String expected = processingException.getMessage();
+    String expected = "Expected test error";
 
-    DataBlock dataBlock = DataBlockUtils.getErrorDataBlock(originalException);
-    dataBlock.addException(processingException);
+    String ex = DataBlockUtils.extractErrorMsg(originalException);
+    DataBlock dataBlock = MetadataBlock.newError(-1, -1, null, Map.of(QueryErrorCode.UNKNOWN.getId(), ex));
+    dataBlock.addException(QueryErrorCode.QUERY_EXECUTION, expected);
     Assert.assertEquals(dataBlock.getNumberOfRows(), 0);
 
     // Assert processing exception and original exception both matches.
-    String actual = dataBlock.getExceptions().get(QueryException.QUERY_EXECUTION_ERROR.getErrorCode());
+    String actual = dataBlock.getExceptions().get(QueryErrorCode.QUERY_EXECUTION.getId());
     Assert.assertEquals(actual, expected);
     Assert.assertTrue(
-        dataBlock.getExceptions().get(QueryException.UNKNOWN_ERROR_CODE).contains(originalException.getMessage()));
+        dataBlock.getExceptions().get(QueryErrorCode.UNKNOWN.getId()).contains(originalException.getMessage()));
   }
 
   @Test(dataProvider = "testTypeNullPercentile")

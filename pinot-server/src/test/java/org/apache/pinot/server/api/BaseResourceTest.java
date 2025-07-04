@@ -26,9 +26,11 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import javax.ws.rs.client.ClientBuilder;
 import javax.ws.rs.client.WebTarget;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -43,21 +45,23 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentIndexCreationDriver;
 import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
-import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.NetUtils;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -66,6 +70,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public abstract class BaseResourceTest {
@@ -88,6 +94,7 @@ public abstract class BaseResourceTest {
   protected AdminApiApplication _adminApiApplication;
   protected WebTarget _webTarget;
   protected String _instanceId;
+  protected ServerInstance _serverInstance;
 
   @SuppressWarnings("SuspiciousMethodCalls")
   @BeforeClass
@@ -96,9 +103,9 @@ public abstract class BaseResourceTest {
     ServerMetrics.register(mock(ServerMetrics.class));
 
     FileUtils.deleteQuietly(TEMP_DIR);
-    Assert.assertTrue(TEMP_DIR.mkdirs());
+    assertTrue(TEMP_DIR.mkdirs());
     URL resourceUrl = getClass().getClassLoader().getResource(AVRO_DATA_PATH);
-    Assert.assertNotNull(resourceUrl);
+    assertNotNull(resourceUrl);
     _avroFile = new File(resourceUrl.getFile());
 
     // Mock the instance data manager
@@ -108,12 +115,19 @@ public abstract class BaseResourceTest {
     when(instanceDataManager.getAllTables()).thenReturn(_tableDataManagerMap.keySet());
 
     // Mock the server instance
-    ServerInstance serverInstance = mock(ServerInstance.class);
-    when(serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
-    when(serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
-    when(serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
+    _serverInstance = mock(ServerInstance.class);
+    when(_serverInstance.getServerMetrics()).thenReturn(mock(ServerMetrics.class));
+    when(_serverInstance.getInstanceDataManager()).thenReturn(instanceDataManager);
+    when(_serverInstance.getInstanceDataManager().getSegmentFileDirectory()).thenReturn(
         FileUtils.getTempDirectoryPath());
-    when(serverInstance.getHelixManager()).thenReturn(mock(HelixManager.class));
+
+    // Create a single HelixManager mock with proper segment data
+    HelixManager helixManager = mock(HelixManager.class);
+    HelixAdmin helixAdmin = mock(HelixAdmin.class);
+    when(helixManager.getClusterManagmentTool()).thenReturn(helixAdmin);
+    when(helixManager.getClusterName()).thenReturn("testCluster");
+
+    when(_serverInstance.getHelixManager()).thenReturn(helixManager);
 
     // Mock the segment uploader
     SegmentUploader segmentUploader = mock(SegmentUploader.class);
@@ -140,7 +154,7 @@ public abstract class BaseResourceTest {
         CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
     _instanceId = CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE + hostname + "_" + port;
     serverConf.setProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _instanceId);
-    _adminApiApplication = new AdminApiApplication(serverInstance, new AllowAllAccessFactory(), serverConf);
+    _adminApiApplication = new AdminApiApplication(_serverInstance, new AllowAllAccessFactory(), serverConf);
     _adminApiApplication.start(Collections.singletonList(
         new ListenerConfig(CommonConstants.HTTP_PROTOCOL, "0.0.0.0", CommonConstants.Server.DEFAULT_ADMIN_API_PORT,
             CommonConstants.HTTP_PROTOCOL, new TlsConfig(), HttpServerThreadPoolConfig.defaultInstance())));
@@ -195,14 +209,21 @@ public abstract class BaseResourceTest {
   protected void addTable(String tableNameWithType) {
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
-    TableConfig tableConfig = mock(TableConfig.class);
-    when(tableConfig.getTableName()).thenReturn(tableNameWithType);
-    when(tableConfig.getValidationConfig()).thenReturn(mock(SegmentsValidationAndRetentionConfig.class));
-    // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager requires
-    //       table config.
+    when(instanceDataManagerConfig.getInstanceId()).thenReturn("Server_1_100.89.121.12");
+    TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
+    assertNotNull(tableType);
+    TableConfig tableConfig = new TableConfigBuilder(tableType).setTableName(tableNameWithType).build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName(TableNameBuilder.extractRawTableName(tableNameWithType)).build();
+
+    // Get the HelixManager from the server instance (already configured in setUp)
+    HelixManager helixManager = _serverInstance.getHelixManager();
+
+    // NOTE: Use OfflineTableDataManager for both OFFLINE and REALTIME table because RealtimeTableDataManager performs
+    //       more checks
     TableDataManager tableDataManager = new OfflineTableDataManager();
-    tableDataManager.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), tableConfig, null,
-        null, null);
+    tableDataManager.init(instanceDataManagerConfig, helixManager, new SegmentLocks(), tableConfig, schema,
+        new SegmentReloadSemaphore(1), Executors.newSingleThreadExecutor(), null, null, null);
     tableDataManager.start();
     _tableDataManagerMap.put(tableNameWithType, tableDataManager);
   }

@@ -37,6 +37,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.SegmentUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -49,6 +50,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.DataSizeUtils;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -155,7 +157,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
       // get server to segment mappings
       PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
-      Map<String, List<String>> serverToSegments = pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+      Map<String, List<String>> serverToSegments =
+          pinotHelixResourceManager.getServerToOnlineSegmentsMapFromEV(tableNameWithType, true);
       BiMap<String, String> serverToEndpoints;
       try {
         serverToEndpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
@@ -218,6 +221,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.DOWNLOAD_URL_KEY, getDownloadUrl(groups.get(0)));
         configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, getSegmentCrcList(groups.get(0)));
+        configs.put(MinionConstants.UpsertCompactMergeTask.MAX_ZK_CREATION_TIME_MILLIS_KEY,
+            String.valueOf(getMaxZKCreationTimeMillis(groups.get(0))));
         configs.put(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY, String.valueOf(
             Long.parseLong(
                 taskConfigs.getOrDefault(MinionConstants.UpsertCompactMergeTask.MAX_NUM_RECORDS_PER_SEGMENT_KEY,
@@ -285,6 +290,16 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
           continue;
         }
 
+        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
+        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
+        if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
+            .equals(ServiceStatus.Status.GOOD)) {
+          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
+              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
+              MinionConstants.UpsertCompactMergeTask.TASK_TYPE, segmentName);
+          continue;
+        }
+
         // segments eligible for deletion with no valid records
         long totalDocs = validDocIdsMetadata.getTotalDocs();
         if (totalInvalidDocs == totalDocs) {
@@ -294,7 +309,7 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
               MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
           break;
         } else {
-          Integer partitionID = SegmentUtils.getPartitionIdFromRealtimeSegmentName(segmentName);
+          Integer partitionID = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
           if (partitionID == null) {
             LOGGER.warn("Partition ID not found for segment: {}, skipping it for {}", segmentName,
                 MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
@@ -429,21 +444,20 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
   public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
     // check table is realtime
     Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        String.format("%s only supports realtime tables!", MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
+        "%s only supports realtime tables!", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
     // check upsert enabled
     Preconditions.checkState(tableConfig.isUpsertEnabled(),
-        String.format("Upsert must be enabled for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
+        "Upsert must be enabled for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
+    // check snapshot enabled
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
+    Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+        "'snapshot' from UpsertConfig must not be 'DISABLE' for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE);
     // check no malformed period
     if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY)) {
       TimeUtils.convertPeriodToMillis(taskConfigs.get(MinionConstants.UpsertCompactMergeTask.BUFFER_TIME_PERIOD_KEY));
     }
-    // check enableSnapshot = true
-    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-    Preconditions.checkNotNull(upsertConfig,
-        String.format("UpsertConfig must be provided for %s", MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
-    Preconditions.checkState(upsertConfig.isEnableSnapshot(),
-        String.format("'enableSnapshot' from UpsertConfig must be enabled for %s",
-            MinionConstants.UpsertCompactMergeTask.TASK_TYPE));
     // check valid task config for maxOutputSegmentSize
     if (taskConfigs.containsKey(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY)) {
       DataSizeUtils.toBytes(taskConfigs.get(MinionConstants.UpsertCompactMergeTask.OUTPUT_SEGMENT_MAX_SIZE_KEY));
@@ -461,5 +475,11 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
     return StringUtils.join(
         segmentMergerMetadataList.stream().map(x -> String.valueOf(x.getSegmentZKMetadata().getCrc()))
             .collect(Collectors.toList()), ",");
+  }
+
+  @VisibleForTesting
+  protected long getMaxZKCreationTimeMillis(List<SegmentMergerMetadata> segmentMergerMetadataList) {
+    return segmentMergerMetadataList.stream().mapToLong(x -> x.getSegmentZKMetadata().getCreationTime()).max()
+        .orElse(-1);
   }
 }

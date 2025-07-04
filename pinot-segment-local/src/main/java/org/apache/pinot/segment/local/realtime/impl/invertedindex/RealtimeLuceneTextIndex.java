@@ -20,8 +20,10 @@ package org.apache.pinot.segment.local.realtime.impl.invertedindex;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
+import javax.annotation.Nullable;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
@@ -133,6 +135,65 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
 
   @Override
   public MutableRoaringBitmap getDocIds(String searchQuery) {
+    return getDocIdsWithoutOptions(searchQuery);
+  }
+
+  @Override
+  public MutableRoaringBitmap getDocIds(String searchQuery, @Nullable String optionsString) {
+    if (optionsString != null && !optionsString.trim().isEmpty()) {
+      LuceneTextIndexUtils.LuceneTextIndexOptions options = LuceneTextIndexUtils.createOptions(optionsString);
+      Map<String, String> optionsMap = options.getOptions();
+      if (!optionsMap.isEmpty()) {
+        return getDocIdsWithOptions(searchQuery, options);
+      }
+    }
+    return getDocIdsWithoutOptions(searchQuery);
+  }
+
+  // TODO: Consider creating a base class (e.g., BaseLuceneTextIndexReader) to avoid code duplication
+  // for getDocIdsWithOptions method across LuceneTextIndexReader, MultiColumnLuceneTextIndexReader,
+  // RealtimeLuceneTextIndex, and MultiColumnRealtimeLuceneTextIndex
+  private MutableRoaringBitmap getDocIdsWithOptions(String actualQuery,
+      LuceneTextIndexUtils.LuceneTextIndexOptions options) {
+    MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
+    RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
+    // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
+    // which the SearcherManager is created with. To ensure the index is never corrupted the search is executed
+    // in a child thread and the interrupt is handled in the current thread by canceling the search gracefully.
+    // See https://github.com/apache/lucene/issues/3315 and https://github.com/apache/lucene/issues/9309
+    Callable<MutableRoaringBitmap> searchCallable = () -> {
+      IndexSearcher indexSearcher = null;
+      try {
+        Query query = LuceneTextIndexUtils.createQueryParserWithOptions(actualQuery, options, _column, _analyzer);
+        indexSearcher = _searcherManager.acquire();
+        indexSearcher.search(query, docIDCollector);
+        return getPinotDocIds(indexSearcher, docIDs);
+      } finally {
+        try {
+          if (indexSearcher != null) {
+            _searcherManager.release(indexSearcher);
+          }
+        } catch (Exception e) {
+          LOGGER.error(
+              "Failed while releasing the searcher manager for realtime text index for column {}, exception {}",
+              _column, e.getMessage());
+        }
+      }
+    };
+    Future<MutableRoaringBitmap> searchFuture = SEARCHER_POOL.getExecutorService().submit(searchCallable);
+    try {
+      return searchFuture.get();
+    } catch (InterruptedException e) {
+      docIDCollector.markShouldCancel();
+      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment " + _segmentName
+          + " for column " + _column + " with search query: " + actualQuery, e);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed while searching the realtime text index for segment " + _segmentName
+          + " for column " + _column + " with search query: " + actualQuery, e);
+    }
+  }
+
+  private MutableRoaringBitmap getDocIdsWithoutOptions(String searchQuery) {
     MutableRoaringBitmap docIDs = new MutableRoaringBitmap();
     RealtimeLuceneDocIdCollector docIDCollector = new RealtimeLuceneDocIdCollector(docIDs);
     // A thread interrupt during indexSearcher.search() can break the underlying FSDirectory used by the IndexWriter
@@ -181,13 +242,11 @@ public class RealtimeLuceneTextIndex implements MutableTextIndex {
       return searchFuture.get();
     } catch (InterruptedException e) {
       docIDCollector.markShouldCancel();
-      LOGGER.warn("TEXT_MATCH query interrupted while querying the consuming segment {}, column {}, search query {}",
-          _segmentName, _column, searchQuery);
-      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment");
+      throw new RuntimeException("TEXT_MATCH query interrupted while querying the consuming segment " + _segmentName
+          + " for column " + _column + " with search query: " + searchQuery, e);
     } catch (Exception e) {
-      LOGGER.error("Failed while searching the realtime text index for segment {}, column {}, search query {},"
-          + " exception {}", _segmentName, _column, searchQuery, e.getMessage());
-      throw new RuntimeException(e);
+      throw new RuntimeException("Failed while searching the realtime text index for segment " + _segmentName
+          + " for column " + _column + " with search query: " + searchQuery, e);
     }
   }
 

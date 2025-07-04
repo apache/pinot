@@ -21,6 +21,7 @@ package org.apache.pinot.spi.accounting;
 import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 
 
 public interface ThreadResourceUsageAccountant {
@@ -37,22 +38,40 @@ public interface ThreadResourceUsageAccountant {
   boolean isAnchorThreadInterrupted();
 
   /**
-   * Task tracking info
+   * This method has been deprecated and replaced by {@link setupRunner(String, int, ThreadExecutionContext.TaskType)}
+   * and {@link setupWorker(int, ThreadExecutionContext.TaskType, ThreadExecutionContext)}.
+   */
+  @Deprecated
+  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+      @Nullable ThreadExecutionContext parentContext);
+
+  /**
+   * Set up the thread execution context for an anchor a.k.a runner thread.
    * @param queryId query id string
    * @param taskId a unique task id
-   * @param parentContext the parent execution context, null for root(runner) thread
+   * @param taskType the type of the task - SSE or MSE
    */
-  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+  void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType);
+
+  /**
+   * Set up the thread execution context for a worker thread.
+   * @param taskId a unique task id
+   * @param taskType the type of the task - SSE or MSE
+   * @param parentContext the parent execution context
+   */
+  void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
       @Nullable ThreadExecutionContext parentContext);
 
   /**
    * get the executon context of current thread
    */
+  @Nullable
   ThreadExecutionContext getThreadExecutionContext();
 
   /**
    * set resource usage provider
    */
+  @Deprecated
   void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider);
 
   /**
@@ -70,12 +89,20 @@ public interface ThreadResourceUsageAccountant {
    * ser/de threads where the thread execution context cannot be setup before hands as
    * queryId/taskId is unknown and the execution process is hard to instrument
    */
+  void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes);
+
+  @Deprecated
   void updateQueryUsageConcurrently(String queryId);
 
   /**
    * start the periodical task
    */
   void startWatcherTask();
+
+  @Nullable
+  default PinotClusterConfigChangeListener getClusterConfigChangeListener() {
+    return null;
+  }
 
   /**
    * get error status if the query is preempted

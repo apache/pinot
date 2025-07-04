@@ -57,11 +57,16 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
       String targetType = ((LiteralTransformFunction) castFormatTransformFunction).getStringLiteral().toUpperCase();
       switch (targetType) {
+        case "BYTES":
+        case "VARBINARY":
+          _resultMetadata = sourceSV ? BYTES_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
+          break;
         case "INT":
         case "INTEGER":
           _resultMetadata = sourceSV ? INT_SV_NO_DICTIONARY_METADATA : INT_MV_NO_DICTIONARY_METADATA;
           break;
         case "LONG":
+        case "BIGINT":
           _resultMetadata = sourceSV ? LONG_SV_NO_DICTIONARY_METADATA : LONG_MV_NO_DICTIONARY_METADATA;
           break;
         case "FLOAT":

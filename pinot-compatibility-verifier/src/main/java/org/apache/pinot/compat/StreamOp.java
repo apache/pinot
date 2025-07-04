@@ -37,7 +37,6 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -47,6 +46,7 @@ import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -280,8 +280,7 @@ public class StreamOp extends BaseOp {
           String.format("Failed when running query: '%s'; got exceptions:\n%s\n", query, response.toPrettyString());
       JsonNode exceptions = response.get(EXCEPTIONS);
       JsonNode errorCode = exceptions.get(ERROR_CODE);
-      if (String.valueOf(QueryException.BROKER_INSTANCE_MISSING_ERROR).equals(String.valueOf(errorCode))
-          && errorCode != null) {
+      if (QueryErrorCode.BROKER_INSTANCE_MISSING.getId() == errorCode.asInt()) {
         LOGGER.warn("{}.Trying again", errorMsg);
         return 0;
       }

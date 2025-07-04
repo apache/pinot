@@ -22,6 +22,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -167,6 +168,17 @@ public class FastHLLAggregationFunction extends BaseSingleInputAggregationFuncti
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(HyperLogLog hyperLogLog) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLog.getValue(),
+        ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog));
+  }
+
+  @Override
+  public HyperLogLog deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

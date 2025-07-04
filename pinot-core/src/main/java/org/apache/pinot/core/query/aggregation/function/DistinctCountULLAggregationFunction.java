@@ -22,6 +22,7 @@ import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -348,6 +349,17 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(UltraLogLog ultraLogLog) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.UltraLogLog.getValue(),
+        ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize(ultraLogLog));
+  }
+
+  @Override
+  public UltraLogLog deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

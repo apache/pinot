@@ -24,7 +24,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.PropertyKey;
 import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.ResourceConfig;
-import org.apache.pinot.common.utils.HashUtil;
+import org.apache.pinot.common.function.scalar.HashFunctions;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,7 +40,7 @@ public class LeadControllerUtils {
 
   /**
    * Given a raw table name and number of partitions, returns the partition id in lead controller resource.
-   * Uses murmur2 function to get hashcode for table, ignores the most significant bit.
+   * Uses murmurHash2 function to get hashcode for table, ignores the most significant bit.
    * Note: This method CANNOT be changed when lead controller resource is enabled.
    * Otherwise it will assign different controller for the same table, which will mess up the controller periodic
    * tasks and realtime segment completion.
@@ -48,7 +48,7 @@ public class LeadControllerUtils {
    * @return partition id in lead controller resource.
    */
   public static int getPartitionIdForTable(String rawTableName) {
-    return (HashUtil.murmur2(rawTableName.getBytes(UTF_8)) & Integer.MAX_VALUE)
+    return (HashFunctions.murmurHash2(rawTableName.getBytes(UTF_8)) & Integer.MAX_VALUE)
         % Helix.NUMBER_OF_PARTITIONS_IN_LEAD_CONTROLLER_RESOURCE;
   }
 

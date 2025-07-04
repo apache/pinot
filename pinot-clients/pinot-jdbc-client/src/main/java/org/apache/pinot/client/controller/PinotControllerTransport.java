@@ -126,7 +126,7 @@ public class PinotControllerTransport {
 
   public ControllerTenantBrokerResponse getBrokersFromController(String controllerAddress, String tenant) {
     try {
-      String url = _scheme + "://" + controllerAddress + "/v2/brokers/tenants/" + tenant;
+      String url = _scheme + "://" + controllerAddress + "/v2/brokers/tenants/" + tenant + "?state=ONLINE";
       BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
       if (_headers != null) {
         _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));

@@ -43,6 +43,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,7 +73,9 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String taskType = pinotTaskConfig.getTaskType();
 
-    LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Starting task: {} with configs: {}", taskType, Obfuscator.DEFAULT.toJsonString(configs));
+    }
 
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
@@ -94,7 +97,7 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     // TODO: Instead of relying on needPreprocess(), process segment metadata file to determine if refresh is needed.
     // BaseDefaultColumnHandler part of needPreprocess() does not process any changes to existing columns like datatype,
     // change from dimension to metric, etc.
-    boolean needPreprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig, schema);
+    boolean needPreprocess = ImmutableSegmentLoader.needPreprocess(segmentDirectory, indexLoadingConfig);
     closeSegmentDirectoryQuietly(segmentDirectory);
     Set<String> refreshColumnSet = new HashSet<>();
 
@@ -148,6 +151,9 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, recordReader);
       driver.build();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
+              + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
     }
 
     File refreshedSegmentFile = new File(workingDir, segmentName);
@@ -157,8 +163,10 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
         .build();
 
     long endMillis = System.currentTimeMillis();
-    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType, configs,
-        (endMillis - _taskStartTime));
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms", taskType,
+          Obfuscator.DEFAULT.toJsonString(configs), (endMillis - _taskStartTime));
+    }
 
     return result;
   }

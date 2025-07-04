@@ -142,7 +142,6 @@ public class SegmentZKMetadataTest {
     record.setLongField(CommonConstants.Segment.CRC, 1234);
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 3000);
     record.setIntField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_SIZE, 1234);
-    record.setSimpleField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_TIME, "6h");
     return record;
   }
 
@@ -157,7 +156,6 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setCrc(1234);
     realtimeSegmentMetadata.setCreationTime(3000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
-    realtimeSegmentMetadata.setTimeThresholdToFlushSegment("6h");
     return realtimeSegmentMetadata;
   }
 
@@ -170,7 +168,6 @@ public class SegmentZKMetadataTest {
     record.setSimpleField(CommonConstants.Segment.TIME_UNIT, TimeUnit.HOURS.toString());
     record.setLongField(CommonConstants.Segment.CREATION_TIME, 1000);
     record.setIntField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_SIZE, 1234);
-    record.setSimpleField(CommonConstants.Segment.Realtime.FLUSH_THRESHOLD_TIME, "6h");
     return record;
   }
 
@@ -182,7 +179,6 @@ public class SegmentZKMetadataTest {
     realtimeSegmentMetadata.setStatus(Status.IN_PROGRESS);
     realtimeSegmentMetadata.setCreationTime(1000);
     realtimeSegmentMetadata.setSizeThresholdToFlushSegment(1234);
-    realtimeSegmentMetadata.setTimeThresholdToFlushSegment("6h");
     return realtimeSegmentMetadata;
   }
 

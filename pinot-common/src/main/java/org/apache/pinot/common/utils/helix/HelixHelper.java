@@ -45,6 +45,7 @@ import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.pinot.common.helix.ExtraInstanceConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -610,6 +611,15 @@ public class HelixHelper {
   }
 
   /**
+   * Return the grpcPort for a given Pinot instance config
+   * @param instanceConfig the instance config to fetch
+   * @return the grpc port, -1 if not found
+   */
+  public static String getGrpcPort(InstanceConfig instanceConfig) {
+    return instanceConfig.getRecord().getStringField(CommonConstants.Helix.Instance.GRPC_PORT_KEY, "-1");
+  }
+
+  /**
    * Adds default tags to the instance config if no tag exists, returns {@code true} if the default tags are added,
    * {@code false} otherwise.
    * <p>The {@code defaultTagsSupplier} is a function which is only invoked when the instance does not have any tag.
@@ -641,5 +651,16 @@ public class HelixHelper {
     boolean listUpdated = record.getListFields().remove(disabledPartitionsKey) != null;
     boolean mapUpdated = record.getMapFields().remove(disabledPartitionsKey) != null;
     return listUpdated | mapUpdated;
+  }
+
+  public static boolean updatePinotVersion(InstanceConfig instanceConfig) {
+    ZNRecord record = instanceConfig.getRecord();
+    String currentVer = PinotVersion.VERSION;
+    String oldVer = record.getSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY);
+    if (!currentVer.equals(oldVer)) {
+      record.setSimpleField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, currentVer);
+      return true;
+    }
+    return false;
   }
 }

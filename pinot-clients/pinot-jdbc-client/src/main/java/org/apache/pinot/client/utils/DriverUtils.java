@@ -81,6 +81,12 @@ public class DriverUtils {
       String authToken = BasicAuthUtils.toBasicAuthToken(username, password);
       headers.put(AUTH_HEADER, authToken);
     }
+    for (Object key : info.keySet()) {
+      if (key.toString().equalsIgnoreCase(AUTH_HEADER)) {
+        headers.put(AUTH_HEADER, info.getProperty(key.toString()));
+        break;
+      }
+    }
   }
 
   public static List<String> getBrokersFromURL(String url) {
@@ -116,6 +122,14 @@ public class DriverUtils {
     URI uri = URI.create(url);
     String controllerUrl = String.format("%s:%d", uri.getHost(), uri.getPort());
     return controllerUrl;
+  }
+
+  public static String getPinotScheme(String url) {
+    if (url.regionMatches(true, 0, SCHEME, 0, SCHEME.length())) {
+      url = url.substring(5);
+    }
+    URI uri = URI.create(url);
+    return uri.getScheme();
   }
 
   public static Map<String, String> getURLParams(String url) {
@@ -249,5 +263,32 @@ public class DriverUtils {
 
     optionBuilder.append(";\n");
     return optionBuilder.toString();
+  }
+
+  public static Object parseOptionValue(Object value) {
+    if (value instanceof String) {
+      String str = (String) value;
+      try {
+        Long numVal = Long.valueOf(str);
+        if (numVal != null) {
+          return numVal;
+        }
+      } catch (NumberFormatException e) {
+      }
+
+      try {
+        Double numVal = Double.valueOf(str);
+        if (numVal != null) {
+          return numVal;
+        }
+      } catch (NumberFormatException e) {
+      }
+
+      Boolean boolVal = Boolean.valueOf(str.toLowerCase());
+      if (boolVal != null) {
+        return boolVal;
+      }
+    }
+    return value;
   }
 }

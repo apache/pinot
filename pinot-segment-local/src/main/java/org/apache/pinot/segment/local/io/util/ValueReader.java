@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.io.util;
 import java.io.Closeable;
 import java.math.BigDecimal;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
 /**
@@ -41,15 +42,29 @@ public interface ValueReader extends Closeable {
   }
 
   /**
+   * Reads the unpadded bytes into the given buffer and returns the length.
+   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
+   */
+  int readUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer);
+
+  /**
    * Returns un-padded bytes for string.
    * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
    */
-  byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer);
+  default byte[] getUnpaddedBytes(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    byte[] value = new byte[length];
+    System.arraycopy(buffer, 0, value, 0, length);
+    return value;
+  }
 
   /**
    * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
    */
-  String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer);
+  default String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    return new String(buffer, 0, length);
+  }
 
   /**
    * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
@@ -60,6 +75,30 @@ public interface ValueReader extends Closeable {
    * NOTE: Do not reuse buffer for BYTES because the return value can have variable length.
    */
   byte[] getBytes(int index, int numBytesPerValue);
+
+  /**
+   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
+   */
+  default int get32BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    return MurmurHashFunctions.murmurHash3X64Bit32(buffer, length, 0);
+  }
+
+  /**
+   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
+   */
+  default long get64BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    return MurmurHashFunctions.murmurHash3X64Bit64(buffer, length, 0);
+  }
+
+  /**
+   * NOTE: The passed in reusable buffer should have capacity of at least {@code numBytesPerValue}.
+   */
+  default long[] get128BitsMurmur3Hash(int index, int numBytesPerValue, byte[] buffer) {
+    int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
+    return MurmurHashFunctions.murmurHash3X64Bit128AsLongs(buffer, length, 0);
+  }
 
   /**
    * Returns the comparison result of the UTF-8 decoded values.

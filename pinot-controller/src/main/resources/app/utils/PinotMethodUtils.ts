@@ -19,7 +19,17 @@
 
 import jwtDecode from "jwt-decode";
 import { get, each, isEqual, isArray, keys, union } from 'lodash';
-import { DataTable, InstanceType, SchemaInfo, SegmentMetadata, SqlException, SQLResult } from 'Models';
+import {
+  DataTable,
+  InstanceType,
+  RebalanceTableSegmentJob,
+  RebalanceTableSegmentJobs,
+  SchemaInfo,
+  SegmentMetadata,
+  SqlException,
+  SQLResult,
+  TaskType
+} from 'Models';
 import moment from 'moment';
 import {
   getTenants,
@@ -30,6 +40,7 @@ import {
   setTableState,
   dropInstance,
   getPeriodicTaskNames,
+  runPeriodicTask,
   getTaskTypes,
   getTaskTypeDebug,
   getTables,
@@ -69,6 +80,7 @@ import {
   getBrokerListOfTenant,
   getServerListOfTenant,
   deleteSegment,
+  resetSegment,
   putTable,
   putSchema,
   deleteTable,
@@ -97,7 +109,11 @@ import {
   getTaskRuntimeConfig,
   getSchemaInfo,
   getSegmentsStatus,
-  getServerToSegmentsCount
+  getConsumingSegmentsInfo,
+  getServerToSegmentsCount,
+  pauseConsumption,
+  resumeConsumption,
+  getPauseStatus
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -321,6 +337,7 @@ const getQueryResults = (params) => {
       'numEntriesScannedInFilter',
       'numEntriesScannedPostFilter',
       'numGroupsLimitReached',
+      'numGroupsWarningLimitReached',
       'partialResponse',
       'minConsumingFreshnessTimeMs',
       'offlineThreadCpuTimeNs',
@@ -343,7 +360,7 @@ const getQueryResults = (params) => {
         columns: columnStats,
         records: [[queryResponse.timeUsedMs, queryResponse.numDocsScanned, queryResponse.totalDocs, queryResponse.numServersQueried, queryResponse.numServersResponded,
           queryResponse.numSegmentsQueried, queryResponse.numSegmentsProcessed, queryResponse.numSegmentsMatched, queryResponse.numConsumingSegmentsQueried,
-          queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached,
+          queryResponse.numEntriesScannedInFilter, queryResponse.numEntriesScannedPostFilter, queryResponse.numGroupsLimitReached, queryResponse.numGroupsWarningLimitReached,
           queryResponse.partialResponse ? queryResponse.partialResponse : '-', queryResponse.minConsumingFreshnessTimeMs,
           queryResponse.offlineThreadCpuTimeNs, queryResponse.realtimeThreadCpuTimeNs,
           queryResponse.offlineSystemActivitiesCpuTimeNs, queryResponse.realtimeSystemActivitiesCpuTimeNs,
@@ -419,7 +436,14 @@ const getAllSchemaDetails = async (schemaList) => {
     columns: allSchemaDetailsColumnHeader,
     records: schemaDetails
   };
-}
+};
+
+// Fetch consuming segments info for a given table
+// API: /tables/{tableName}/consumingSegmentsInfo
+// Expected Output: ConsumingSegmentsInfo
+const getConsumingSegmentsInfoData = (tableName) => {
+  return getConsumingSegmentsInfo(tableName).then(({ data }) => data);
+};
 
 const allTableDetailsColumnHeader = [
   'Table Name',
@@ -801,6 +825,19 @@ const toggleTableState = (tableName, state, tableType) => {
     return response.data;
   });
 };
+// Pause or resume consumption of a realtime table
+// Returns PauseStatusDetails
+const pauseConsumptionOp = (tableName, comment) => {
+  return pauseConsumption(tableName, comment).then((response) => response.data);
+};
+
+const resumeConsumptionOp = (tableName, comment, consumeFrom) => {
+  return resumeConsumption(tableName, comment, consumeFrom).then((response) => response.data);
+};
+
+const getPauseStatusData = (tableName) => {
+  return getPauseStatus(tableName).then((response) => response.data);
+};
 
 const deleteInstance = (instanceName) => {
   return dropInstance(instanceName).then((response)=>{
@@ -953,6 +990,12 @@ const reloadStatusOp = (tableName, tableType) => {
   });
 }
 
+const resetSegmentOp = (tableName, segmentName) => {
+  return resetSegment(tableName, segmentName).then((response) => {
+    return response.data;
+  });
+};
+
 const deleteSegmentOp = (tableName, segmentName) => {
   return deleteSegment(tableName, segmentName).then((response)=>{
     return response.data;
@@ -963,6 +1006,18 @@ const fetchTableJobs = async (tableName: string, jobTypes?: string) => {
   const response = await getTableJobs(tableName, jobTypes);
   
   return response.data;
+}
+
+const fetchRebalanceTableJobs = async (tableName: string): Promise<RebalanceTableSegmentJob[]> => {
+  const response = await getTableJobs(tableName, "TABLE_REBALANCE");
+  if (response.data.error) {
+    return [];
+  }
+
+  const rebalanceTableSegmentJobs: RebalanceTableSegmentJob[] = Object.keys(response.data as RebalanceTableSegmentJobs)
+      .map(jobId => response.data[jobId] as RebalanceTableSegmentJob)
+      .sort((j1, j2) => j1.submissionTimeMs < j2.submissionTimeMs ? 1 : -1);
+  return rebalanceTableSegmentJobs;
 }
 
 const fetchSegmentReloadStatus = async (jobId: string) => {
@@ -1008,6 +1063,11 @@ const rebalanceBrokersForTableOp = (tableName) => {
   });
 };
 
+const repairTableOp = (tableName, tableType) => {
+  return runPeriodicTask(TaskType.RealtimeSegmentValidationManager, tableName, tableType).then((response) => {
+    return response.data;
+  });
+};
 const validateSchemaAction = (schemaObj) => {
   return validateSchema(schemaObj).then((response)=>{
     return response.data;
@@ -1308,6 +1368,7 @@ export default {
   getAllPeriodicTaskNames,
   getAllTaskTypes,
   fetchTableJobs,
+  fetchRebalanceTableJobs,
   fetchSegmentReloadStatus,
   getTaskTypeDebugData,
   getTableData,
@@ -1328,6 +1389,7 @@ export default {
   getTaskProgressData,
   getTaskGeneratorDebugData,
   deleteSegmentOp,
+  resetSegmentOp,
   reloadSegmentOp,
   reloadStatusOp,
   reloadAllSegmentsOp,
@@ -1337,6 +1399,7 @@ export default {
   deleteSchemaOp,
   rebalanceServersForTableOp,
   rebalanceBrokersForTableOp,
+  repairTableOp,
   validateSchemaAction,
   validateTableAction,
   saveSchemaAction,
@@ -1358,5 +1421,10 @@ export default {
   updateUser,
   getAuthUserNameFromAccessToken,
   getAuthUserEmailFromAccessToken,
-  fetchServerToSegmentsCountData
+  // Pause/resume consumption of realtime tables
+  pauseConsumptionOp,
+  resumeConsumptionOp,
+  getPauseStatusData,
+  fetchServerToSegmentsCountData,
+  getConsumingSegmentsInfoData
 };

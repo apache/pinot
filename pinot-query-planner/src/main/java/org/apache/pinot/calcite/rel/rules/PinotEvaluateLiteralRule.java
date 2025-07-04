@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
+import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -44,8 +45,8 @@ import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
 import org.apache.calcite.util.NlsString;
 import org.apache.pinot.common.function.FunctionInfo;
-import org.apache.pinot.common.function.FunctionInvoker;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.QueryFunctionInvoker;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.spi.utils.TimestampUtils;
@@ -58,10 +59,14 @@ import org.apache.pinot.sql.parsers.SqlCompilationException;
 public class PinotEvaluateLiteralRule {
 
   public static class Project extends RelOptRule {
-    public static final Project INSTANCE = new Project(PinotRuleUtils.PINOT_REL_FACTORY);
+    public static final Project INSTANCE = new Project(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-    private Project(RelBuilderFactory factory) {
-      super(operand(LogicalProject.class, any()), factory, null);
+    public static Project instanceWithDescription(String description) {
+      return new Project(PinotRuleUtils.PINOT_REL_FACTORY, description);
+    }
+
+    private Project(RelBuilderFactory factory, @Nullable String description) {
+      super(operand(LogicalProject.class, any()), factory, description);
     }
 
     @Override
@@ -102,10 +107,14 @@ public class PinotEvaluateLiteralRule {
   }
 
   public static class Filter extends RelOptRule {
-    public static final Filter INSTANCE = new Filter(PinotRuleUtils.PINOT_REL_FACTORY);
+    public static final Filter INSTANCE = new Filter(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-    private Filter(RelBuilderFactory factory) {
-      super(operand(LogicalFilter.class, any()), factory, null);
+    public static Filter instanceWithDescription(String description) {
+      return new Filter(PinotRuleUtils.PINOT_REL_FACTORY, description);
+    }
+
+    private Filter(RelBuilderFactory factory, @Nullable String description) {
+      super(operand(LogicalFilter.class, any()), factory, description);
     }
 
     @Override
@@ -176,9 +185,12 @@ public class PinotEvaluateLiteralRule {
       return rexCall;
     }
     RelDataType rexNodeType = rexCall.getType();
+    if (rexNodeType.getSqlTypeName() == SqlTypeName.DECIMAL) {
+      rexNodeType = convertDecimalType(rexNodeType, rexBuilder);
+    }
     Object resultValue;
     try {
-      FunctionInvoker invoker = new FunctionInvoker(functionInfo);
+      QueryFunctionInvoker invoker = new QueryFunctionInvoker(functionInfo);
       if (functionInfo.getMethod().isVarArgs()) {
         resultValue = invoker.invoke(new Object[]{arguments});
       } else {
@@ -197,8 +209,8 @@ public class PinotEvaluateLiteralRule {
       }
     } catch (Exception e) {
       throw new SqlCompilationException(
-          "Caught exception while invoking method: " + functionInfo.getMethod() + " with arguments: " + Arrays.toString(
-              arguments), e);
+          "Caught exception while invoking method: " + functionInfo.getMethod().getName() + " with arguments: "
+              + Arrays.toString(arguments) + ": " + e.getMessage(), e);
     }
     try {
       resultValue = convertResultValue(resultValue, rexNodeType);
@@ -212,8 +224,16 @@ public class PinotEvaluateLiteralRule {
     try {
       if (rexNodeType instanceof ArraySqlType) {
         List<Object> resultValues = new ArrayList<>();
-        for (Object value : (Object[]) resultValue) {
-          resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
+
+        // SQL FLOAT and DOUBLE literals are represented as Java double
+        if (resultValue instanceof double[]) {
+          for (double value: (double[]) resultValue) {
+            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
+          }
+        } else {
+          for (Object value : (Object[]) resultValue) {
+            resultValues.add(convertResultValue(value, rexNodeType.getComponentType()));
+          }
         }
         return rexBuilder.makeLiteral(resultValues, rexNodeType, false);
       }
@@ -222,6 +242,11 @@ public class PinotEvaluateLiteralRule {
       throw new SqlCompilationException(
           "Caught exception while making literal with value: " + resultValue + " and type: " + rexNodeType, e);
     }
+  }
+
+  private static RelDataType convertDecimalType(RelDataType relDataType, RexBuilder rexBuilder) {
+    Preconditions.checkArgument(relDataType.getSqlTypeName() == SqlTypeName.DECIMAL);
+    return RelToPlanNodeConverter.convertToColumnDataType(relDataType).toType(rexBuilder.getTypeFactory());
   }
 
   @Nullable
@@ -258,12 +283,17 @@ public class PinotEvaluateLiteralRule {
         return TimestampUtils.toMillisSinceEpoch(resultValue.toString());
       }
     }
-    // Return BigDecimal for numbers
-    if (resultValue instanceof Integer || resultValue instanceof Long) {
+    // Use BigDecimal for INTEGER / BIGINT / DECIMAL literals
+    if (relDataType.getSqlTypeName() == SqlTypeName.INTEGER || relDataType.getSqlTypeName() == SqlTypeName.BIGINT) {
       return new BigDecimal(((Number) resultValue).longValue());
     }
-    if (resultValue instanceof Float || resultValue instanceof Double) {
+    if (relDataType.getSqlTypeName() == SqlTypeName.DECIMAL) {
       return new BigDecimal(resultValue.toString());
+    }
+    // Use double for FLOAT / DOUBLE literals
+    if (relDataType.getSqlTypeName() == SqlTypeName.FLOAT || relDataType.getSqlTypeName() == SqlTypeName.DOUBLE
+        || relDataType.getSqlTypeName() == SqlTypeName.REAL) {
+      return ((Number) resultValue).doubleValue();
     }
     // Return ByteString for byte[]
     if (resultValue instanceof byte[]) {

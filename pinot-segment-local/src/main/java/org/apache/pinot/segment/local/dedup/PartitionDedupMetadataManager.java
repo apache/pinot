@@ -26,6 +26,9 @@ import org.apache.pinot.spi.data.readers.PrimaryKey;
 
 
 public interface PartitionDedupMetadataManager extends Closeable {
+
+  DedupContext getContext();
+
   /**
    * Initializes the dedup metadata for the given immutable segment.
    */
@@ -90,4 +93,6 @@ public interface PartitionDedupMetadataManager extends Closeable {
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();
+
+  long getNumPrimaryKeys();
 }

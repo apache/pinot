@@ -27,8 +27,8 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.segment.local.segment.index.loader.columnminmaxvalue.ColumnMinMaxValueGeneratorMode;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
@@ -84,6 +85,8 @@ public class IndexLoadingConfig {
   private Map<String, FieldIndexConfigs> _indexConfigsByColName = new HashMap<>();
 
   private boolean _dirty = true;
+
+  private MultiColumnTextIndexConfig _multiColTextIndexConfig;
 
   /**
    * NOTE: This step might modify the passed in table config and schema.
@@ -212,6 +215,7 @@ public class IndexLoadingConfig {
     _enableDynamicStarTreeCreation = indexingConfig.isEnableDynamicStarTreeCreation();
     _starTreeIndexConfigs = indexingConfig.getStarTreeIndexConfigs();
     _enableDefaultStarTree = indexingConfig.isEnableDefaultStarTree();
+    _multiColTextIndexConfig = indexingConfig.getMultiColumnTextIndexConfig();
     _dirty = false;
   }
 
@@ -256,6 +260,14 @@ public class IndexLoadingConfig {
       refreshIndexConfigs();
     }
     return unmodifiable(_starTreeIndexConfigs);
+  }
+
+  @Nullable
+  public MultiColumnTextIndexConfig getMultiColTextIndexConfig() {
+    if (_dirty) {
+      refreshIndexConfigs();
+    }
+    return _multiColTextIndexConfig;
   }
 
   public boolean isEnableDefaultStarTree() {

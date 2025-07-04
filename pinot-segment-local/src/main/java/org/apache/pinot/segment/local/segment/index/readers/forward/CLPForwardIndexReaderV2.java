@@ -241,8 +241,7 @@ public class CLPForwardIndexReaderV2 implements ForwardIndexReader<CLPForwardInd
     }
 
     @Override
-    public void close()
-        throws IOException {
+    public void close() {
       if (null != _logTypeIdReaderContext) {
         _logTypeIdReaderContext.close();
       }

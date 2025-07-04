@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -107,6 +108,17 @@ public class FirstIntValueWithTimeAggregationFunction extends FirstWithTimeAggre
     } else {
       return getType().getName().toLowerCase() + "(" + _expression + "," + _timeCol + ",'INT')";
     }
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(ValueLongPair<Integer> intLongPair) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.IntLongPair.getValue(),
+        ObjectSerDeUtils.INT_LONG_PAIR_SER_DE.serialize((IntLongPair) intLongPair));
+  }
+
+  @Override
+  public ValueLongPair<Integer> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.INT_LONG_PAIR_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

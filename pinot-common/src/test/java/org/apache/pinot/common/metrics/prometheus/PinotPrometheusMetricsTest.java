@@ -165,8 +165,8 @@ public abstract class PinotPrometheusMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      for (String meterType : TIMER_TYPES) {
-        PromMetric expectedTimer = PromMetric.withName(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType);
+      for (String timerType : TIMER_TYPES) {
+        PromMetric expectedTimer = PromMetric.withName(exportedMetricPrefix + exportedTimerPrefix + "_" + timerType);
         Assert.assertTrue(promMetrics.contains(expectedTimer),
             "Cannot find timer: " + expectedTimer + " in exported metrics");
       }
@@ -180,9 +180,9 @@ public abstract class PinotPrometheusMetricsTest {
     List<PromMetric> promMetrics;
     try {
       promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
-      for (String meterType : METER_TYPES) {
+      for (String timerType : TIMER_TYPES) {
         PromMetric expectedTimer =
-            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + meterType, labels);
+            PromMetric.withNameAndLabels(exportedMetricPrefix + exportedTimerPrefix + "_" + timerType, labels);
         Assert.assertTrue(promMetrics.contains(expectedTimer),
             "Cannot find timer: " + expectedTimer + " in exported metrics");
       }
@@ -329,6 +329,13 @@ public abstract class PinotPrometheusMetricsTest {
         List.of(ExportedLabelKeys.TABLE, ExportedLabelValues.TABLENAME, ExportedLabelKeys.TABLETYPE,
             ExportedLabelValues.TABLETYPE_REALTIME, ExportedLabelKeys.TASKTYPE,
             ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT);
+
+    public static final List<String> JOBSTATUS_TABLENAME_TABLETYPE =
+        List.of(STATUS, ExportedLabelValues.DONE, TABLE, ExportedLabelValues.TABLENAME, TABLETYPE, TABLETYPE_REALTIME);
+
+    public static final List<String> TASKTYPE_TABLENAME_TABLETYPE =
+        List.of(TASKTYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, TABLE, ExportedLabelValues.TABLENAME,
+            TABLETYPE, TABLETYPE_REALTIME);
   }
 
   public static class ExportedLabelKeys {
@@ -351,6 +358,7 @@ public abstract class PinotPrometheusMetricsTest {
     public static final String CONTROLLER_PERIODIC_TASK_CHC = "ClusterHealthCheck";
     public static final String MINION_TASK_SEGMENT_IMPORT = "SegmentImportTask";
     public static final String IN_PROGRESS = "IN_PROGRESS";
+    public static final String DONE = "DONE";
   }
 
   /*

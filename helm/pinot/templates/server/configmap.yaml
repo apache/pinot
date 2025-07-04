@@ -24,8 +24,10 @@ metadata:
   namespace: {{ include "pinot.namespace" . }}
 data:
   pinot-server.conf: |-
+{{ if .Values.server.ConfigureServerPort }}
     pinot.server.netty.port={{ .Values.server.service.nettyPort }}
     pinot.server.adminapi.port={{ .Values.server.service.adminPort }}
+{{ end }}
     pinot.server.instance.dataDir={{ .Values.server.dataDir }}
     pinot.server.instance.segmentTarDir={{ .Values.server.segmentTarDir }}
 {{ .Values.server.extra.configs | indent 4 }}

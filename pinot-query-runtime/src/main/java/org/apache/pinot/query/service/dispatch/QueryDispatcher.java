@@ -25,6 +25,9 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ConnectivityState;
 import io.grpc.Deadline;
+import java.io.DataInputStream;
+import java.io.InputStream;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -43,28 +46,29 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.calcite.runtime.PairList;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datablock.DataBlock;
-import org.apache.pinot.common.exception.QueryException;
-import org.apache.pinot.common.exception.QueryInfoException;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.DataBlockExtractUtils;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
+import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
-import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.serde.PlanNodeDeserializer;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
@@ -72,16 +76,22 @@ import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.WorkerMetadata;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
-import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.BaseMailboxReceiveOperator;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesBrokerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchClient;
 import org.apache.pinot.query.service.dispatch.timeseries.TimeSeriesDispatchObserver;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -115,6 +125,7 @@ public class QueryDispatcher {
   private final PhysicalTimeSeriesBrokerPlanVisitor _timeSeriesBrokerPlanVisitor
       = new PhysicalTimeSeriesBrokerPlanVisitor();
   private final FailureDetector _failureDetector;
+  private final Duration _cancelTimeout;
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector) {
     this(mailboxService, failureDetector, null, false);
@@ -122,6 +133,12 @@ public class QueryDispatcher {
 
   public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
       boolean enableCancellation) {
+    this(mailboxService, failureDetector, tlsConfig, enableCancellation, Duration.ofSeconds(1));
+  }
+
+  public QueryDispatcher(MailboxService mailboxService, FailureDetector failureDetector, @Nullable TlsConfig tlsConfig,
+      boolean enableCancellation, Duration cancelTimeout) {
+    _cancelTimeout = cancelTimeout;
     _mailboxService = mailboxService;
     _executorService = Executors.newFixedThreadPool(2 * Runtime.getRuntime().availableProcessors(),
         new TracedThreadFactory(Thread.NORM_PRIORITY, false, PINOT_BROKER_QUERY_DISPATCHER_FORMAT));
@@ -139,19 +156,65 @@ public class QueryDispatcher {
     _mailboxService.start();
   }
 
+  /// Submits a query to the server and waits for the result.
+  ///
+  /// This method may throw almost any exception but QueryException or TimeoutException, which are caught and converted
+  /// into a QueryResult with the error code (and stats, if any can be collected).
   public QueryResult submitAndReduce(RequestContext context, DispatchableSubPlan dispatchableSubPlan, long timeoutMs,
       Map<String, String> queryOptions)
       throws Exception {
     long requestId = context.getRequestId();
     Set<QueryServerInstance> servers = new HashSet<>();
+    boolean cancelled = false;
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      return runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
-    } catch (Throwable e) {
-      // TODO: Consider always cancel when it returns (early terminate)
-      cancel(requestId, servers);
-      throw e;
+      QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
+      if (result.getProcessingException() != null) {
+        MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
+        cancelled = true;
+        return result.withStats(statsFromCancel);
+      }
+      return result;
+    } catch (Exception ex) {
+      QueryResult queryResult = tryRecover(context.getRequestId(), servers, ex);
+      cancelled = true;
+      return queryResult;
+    } finally {
+      if (!cancelled) {
+        cancel(requestId, servers);
+      }
     }
+  }
+
+  /// Tries to recover from an exception thrown during query dispatching.
+  ///
+  /// [QueryException] and [TimeoutException] are handled by returning a [QueryResult] with the error code and stats,
+  /// while other exceptions are not known, so they are directly rethrown.
+  private QueryResult tryRecover(long requestId, Set<QueryServerInstance> servers, Exception ex)
+      throws Exception {
+    if (servers.isEmpty()) {
+      throw ex;
+    }
+    if (ex instanceof ExecutionException && ex.getCause() instanceof Exception) {
+      ex = (Exception) ex.getCause();
+    }
+    QueryErrorCode errorCode;
+    if (ex instanceof TimeoutException) {
+      errorCode = QueryErrorCode.EXECUTION_TIMEOUT;
+    } else if (ex instanceof QueryException) {
+      errorCode = ((QueryException) ex).getErrorCode();
+    } else {
+      // in case of unknown exceptions, the exception will be rethrown, so we don't need stats
+      throw ex;
+    }
+    // in case of known exceptions (timeout or query exception), we need can build here the erroneous QueryResult
+    // that include the stats.
+    MultiStageQueryStats stats = cancelWithStats(requestId, servers);
+    if (stats == null) {
+      throw ex;
+    }
+    QueryProcessingException processingException = new QueryProcessingException(errorCode, ex.getMessage());
+    return new QueryResult(processingException, stats, 0L);
   }
 
   public List<PlanNode> explain(RequestContext context, DispatchablePlanFragment fragment, long timeoutMs,
@@ -163,7 +226,7 @@ public class QueryDispatcher {
     Set<DispatchablePlanFragment> plans = Collections.singleton(fragment);
     Set<QueryServerInstance> servers = new HashSet<>();
     try {
-      SendRequest<List<Worker.ExplainResponse>> requestSender = DispatchClient::explain;
+      SendRequest<Worker.QueryRequest, List<Worker.ExplainResponse>> requestSender = DispatchClient::explain;
       execute(requestId, plans, timeoutMs, queryOptions, requestSender, servers, (responses, serverInstance) -> {
         for (Worker.ExplainResponse response : responses) {
           if (response.containsMetadata(CommonConstants.Query.Response.ServerResponseStatus.STATUS_ERROR)) {
@@ -200,7 +263,7 @@ public class QueryDispatcher {
       long requestId, DispatchableSubPlan dispatchableSubPlan, long timeoutMs, Set<QueryServerInstance> serversOut,
       Map<String, String> queryOptions)
       throws Exception {
-    SendRequest<Worker.QueryResponse> requestSender = DispatchClient::submit;
+    SendRequest<Worker.QueryRequest, Worker.QueryResponse> requestSender = DispatchClient::submit;
     Set<DispatchablePlanFragment> plansWithoutRoot = dispatchableSubPlan.getQueryStagesWithoutRoot();
     execute(requestId, plansWithoutRoot, timeoutMs, queryOptions, requestSender, serversOut,
         (response, serverInstance) -> {
@@ -247,7 +310,7 @@ public class QueryDispatcher {
 
   private <E> void execute(long requestId, Set<DispatchablePlanFragment> stagePlans,
       long timeoutMs, Map<String, String> queryOptions,
-      SendRequest<E> sendRequest, Set<QueryServerInstance> serverInstancesOut,
+      SendRequest<Worker.QueryRequest, E> sendRequest, Set<QueryServerInstance> serverInstancesOut,
       BiConsumer<E, QueryServerInstance> resultConsumer)
       throws ExecutionException, InterruptedException, TimeoutException {
 
@@ -257,35 +320,47 @@ public class QueryDispatcher {
         serializePlanFragments(stagePlans, serverInstancesOut, deadline);
 
     if (serverInstancesOut.isEmpty()) {
-      throw new RuntimeException("No server instances to dispatch query to");
+      return;
     }
 
-    Map<String, String> requestMetadata = prepareRequestMetadata(requestId, queryOptions, deadline);
+    Map<String, String> requestMetadata =
+        prepareRequestMetadata(requestId, QueryThreadContext.getCid(), queryOptions, deadline);
     ByteString protoRequestMetadata = QueryPlanSerDeUtils.toProtoProperties(requestMetadata);
 
     // Submit the query plan to all servers in parallel
-    int numServers = serverInstancesOut.size();
-    BlockingQueue<AsyncResponse<E>> dispatchCallbacks = new ArrayBlockingQueue<>(numServers);
+    BlockingQueue<AsyncResponse<E>> dispatchCallbacks = dispatch(sendRequest, serverInstancesOut, deadline,
+        serverInstance -> createRequest(serverInstance, stageInfos, protoRequestMetadata));
+
+    processResults(requestId, serverInstancesOut.size(), resultConsumer, deadline, dispatchCallbacks);
+  }
+
+  private <R, E> BlockingQueue<AsyncResponse<E>> dispatch(SendRequest<R, E> sendRequest,
+      Set<QueryServerInstance> serverInstancesOut, Deadline deadline, Function<QueryServerInstance, R> requestBuilder) {
+    BlockingQueue<AsyncResponse<E>> dispatchCallbacks = new ArrayBlockingQueue<>(serverInstancesOut.size());
 
     for (QueryServerInstance serverInstance : serverInstancesOut) {
       Consumer<AsyncResponse<E>> callbackConsumer = response -> {
         if (!dispatchCallbacks.offer(response)) {
-          LOGGER.warn("Failed to offer response to dispatchCallbacks queue for query: {} on server: {}", requestId,
-              serverInstance);
+          LOGGER.warn("Failed to offer response to dispatchCallbacks queue for query on server: {}", serverInstance);
         }
       };
-      Worker.QueryRequest requestBuilder = createRequest(serverInstance, stageInfos, protoRequestMetadata);
+      R request = requestBuilder.apply(serverInstance);
       DispatchClient dispatchClient = getOrCreateDispatchClient(serverInstance);
 
       try {
-        sendRequest.send(dispatchClient, requestBuilder, serverInstance, deadline, callbackConsumer);
+        sendRequest.send(dispatchClient, request, serverInstance, deadline, callbackConsumer);
       } catch (Throwable t) {
-        LOGGER.warn("Caught exception while dispatching query: {} to server: {}", requestId, serverInstance, t);
+        LOGGER.warn("Caught exception while dispatching query to server: {}", serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
         _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
       }
     }
+    return dispatchCallbacks;
+  }
 
+  private <E> void processResults(long requestId, int numServers, BiConsumer<E, QueryServerInstance> resultConsumer,
+      Deadline deadline, BlockingQueue<AsyncResponse<E>> dispatchCallbacks)
+      throws InterruptedException, TimeoutException {
     int numSuccessCalls = 0;
     // TODO: Cancel all dispatched requests if one of the dispatch errors out or deadline is breached.
     while (!deadline.isExpired() && numSuccessCalls < numServers) {
@@ -308,6 +383,8 @@ public class QueryDispatcher {
           resultConsumer.accept(response, resp.getServerInstance());
           numSuccessCalls++;
         }
+      } else {
+        LOGGER.info("No response from server for query");
       }
     }
     if (deadline.isExpired()) {
@@ -368,12 +445,15 @@ public class QueryDispatcher {
     return requestBuilder.build();
   }
 
-  private static Map<String, String> prepareRequestMetadata(long requestId, Map<String, String> queryOptions,
-      Deadline deadline) {
+  private static Map<String, String> prepareRequestMetadata(long requestId, String cid,
+      Map<String, String> queryOptions, Deadline deadline) {
     Map<String, String> requestMetadata = new HashMap<>();
     requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID, Long.toString(requestId));
+    requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID, cid);
     requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
+    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
+        Long.toString(QueryThreadContext.getPassiveDeadlineMs()));
     requestMetadata.putAll(queryOptions);
     return requestMetadata;
   }
@@ -381,7 +461,7 @@ public class QueryDispatcher {
   private Map<DispatchablePlanFragment, StageInfo> serializePlanFragments(
       Set<DispatchablePlanFragment> stagePlans,
       Set<QueryServerInstance> serverInstances, Deadline deadline)
-      throws InterruptedException, ExecutionException, TimeoutException {
+      throws InterruptedException, ExecutionException {
     List<CompletableFuture<Pair<DispatchablePlanFragment, StageInfo>>> stageInfoFutures =
         new ArrayList<>(stagePlans.size());
     for (DispatchablePlanFragment stagePlan : stagePlans) {
@@ -429,13 +509,14 @@ public class QueryDispatcher {
     }
   }
 
+  ///  Cancels a request without waiting for the stats in the response.
   private boolean cancel(long requestId, @Nullable Set<QueryServerInstance> servers) {
     if (servers == null) {
       return false;
     }
     for (QueryServerInstance queryServerInstance : servers) {
       try {
-        getOrCreateDispatchClient(queryServerInstance).cancel(requestId);
+        getOrCreateDispatchClient(queryServerInstance).cancelAsync(requestId);
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while cancelling query: {} on server: {}", requestId, queryServerInstance, t);
       }
@@ -444,6 +525,43 @@ public class QueryDispatcher {
       _serversByQuery.remove(requestId);
     }
     return true;
+  }
+
+
+  @Nullable
+  private MultiStageQueryStats cancelWithStats(long requestId, @Nullable Set<QueryServerInstance> servers) {
+    if (servers == null) {
+      return null;
+    }
+
+    Deadline deadline = Deadline.after(_cancelTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    SendRequest<Long, Worker.CancelResponse> sendRequest = DispatchClient::cancel;
+    BlockingQueue<AsyncResponse<Worker.CancelResponse>> dispatchCallbacks = dispatch(sendRequest, servers, deadline,
+        serverInstance -> requestId);
+
+    MultiStageQueryStats stats = MultiStageQueryStats.emptyStats(0);
+    StatMap<BaseMailboxReceiveOperator.StatKey> rootStats = new StatMap<>(BaseMailboxReceiveOperator.StatKey.class);
+    stats.getCurrentStats().addLastOperator(MultiStageOperator.Type.MAILBOX_RECEIVE, rootStats);
+    try {
+      processResults(requestId, servers.size(), (response, server) -> {
+        Map<Integer, ByteString> statsByStage = response.getStatsByStageMap();
+        for (Map.Entry<Integer, ByteString> entry : statsByStage.entrySet()) {
+          try (InputStream is = entry.getValue().newInput();
+              DataInputStream dis = new DataInputStream(is)) {
+            MultiStageQueryStats.StageStats.Closed closed = MultiStageQueryStats.StageStats.Closed.deserialize(dis);
+            stats.mergeUpstream(entry.getKey(), closed);
+          } catch (Exception e) {
+            LOGGER.debug("Caught exception while deserializing stats on server: {}", server, e);
+          }
+        }
+      }, deadline, dispatchCallbacks);
+      return stats;
+    } catch (InterruptedException e) {
+      throw QueryErrorCode.INTERNAL.asException("Interrupted while waiting for cancel response", e);
+    } catch (TimeoutException e) {
+      LOGGER.debug("Timed out waiting for cancel response", e);
+      return stats;
+    }
   }
 
   private DispatchClient getOrCreateDispatchClient(QueryServerInstance queryServerInstance) {
@@ -461,38 +579,54 @@ public class QueryDispatcher {
     return _timeSeriesDispatchClientMap.computeIfAbsent(key, k -> new TimeSeriesDispatchClient(hostname, port));
   }
 
-  // There is no reduction happening here, results are simply concatenated.
+  /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
+  ///
+  /// This method assumes the caller thread is a query thread and therefore [QueryThreadContext] has been initialized.
+  private static QueryResult runReducer(
+      DispatchableSubPlan subPlan,
+      Map<String, String> queryOptions,
+      MailboxService mailboxService
+  ) {
+    return runReducer(
+        QueryThreadContext.getRequestId(),
+        subPlan,
+        QueryThreadContext.getActiveDeadlineMs(),
+        QueryThreadContext.getPassiveDeadlineMs(),
+        queryOptions,
+        mailboxService
+    );
+  }
+
+  /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
+  ///
+  /// This method should be called from a query thread and therefore using
+  /// [#runReducer(DispatchableSubPlan, Map, MailboxService)] is preferred.
+  ///
+  /// Remember that in MSE there is no actual reduce but rather a single stage that concatenates the results.
   @VisibleForTesting
   public static QueryResult runReducer(long requestId,
       DispatchableSubPlan subPlan,
-      long timeoutMs,
+      long activeDeadlineMs,
+      long passiveDeadlineMs,
       Map<String, String> queryOptions,
       MailboxService mailboxService) {
-
     long startTimeMs = System.currentTimeMillis();
-    long deadlineMs = startTimeMs + timeoutMs;
     // NOTE: Reduce stage is always stage 0
     DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
     PlanFragment planFragment = stagePlan.getPlanFragment();
     PlanNode rootNode = planFragment.getFragmentRoot();
-
-    Preconditions.checkState(rootNode instanceof MailboxReceiveNode,
-        "Expecting mailbox receive node as root of reduce stage, got: %s", rootNode.getClass().getSimpleName());
-
-    MailboxReceiveNode receiveNode = (MailboxReceiveNode) rootNode;
     List<WorkerMetadata> workerMetadata = stagePlan.getWorkerMetadataList();
-
     Preconditions.checkState(workerMetadata.size() == 1,
         "Expecting single worker for reduce stage, got: %s", workerMetadata.size());
 
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadata.get(0), null, parentContext);
+        new OpChainExecutionContext(mailboxService, requestId, activeDeadlineMs, passiveDeadlineMs,
+            queryOptions, stageMetadata, workerMetadata.get(0), null, parentContext, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
-    DataSchema sourceSchema = receiveNode.getDataSchema();
+    DataSchema sourceSchema = rootNode.getDataSchema();
     int numColumns = resultFields.size();
     String[] columnNames = new String[numColumns];
     ColumnDataType[] columnTypes = new ColumnDataType[numColumns];
@@ -504,11 +638,17 @@ public class QueryDispatcher {
     DataSchema resultSchema = new DataSchema(columnNames, columnTypes);
 
     ArrayList<Object[]> resultRows = new ArrayList<>();
-    TransferableBlock block;
-    try (MailboxReceiveOperator receiveOperator = new MailboxReceiveOperator(executionContext, receiveNode)) {
-      block = receiveOperator.nextBlock();
-      while (!TransferableBlockUtils.isEndOfStream(block)) {
-        DataBlock dataBlock = block.getDataBlock();
+    MseBlock block;
+    MultiStageQueryStats queryStats;
+    try (
+        QueryThreadContext.CloseableContext mseCloseableCtx = MseWorkerThreadContext.open();
+        OpChain opChain = PlanNodeToOpChain.convert(rootNode, executionContext, (a, b) -> { })) {
+      MseWorkerThreadContext.setStageId(0);
+      MseWorkerThreadContext.setWorkerId(0);
+      MultiStageOperator rootOperator = opChain.getRoot();
+      block = rootOperator.nextBlock();
+      while (block.isData()) {
+        DataBlock dataBlock = ((MseBlock.Data) block).asSerialized().getDataBlock();
         int numRows = dataBlock.getNumberOfRows();
         if (numRows > 0) {
           resultRows.ensureCapacity(resultRows.size() + numRows);
@@ -525,26 +665,55 @@ public class QueryDispatcher {
             resultRows.add(row);
           }
         }
-        block = receiveOperator.nextBlock();
+        block = rootOperator.nextBlock();
       }
+      queryStats = rootOperator.calculateStats();
     }
     // TODO: Improve the error handling, e.g. return partial response
-    if (block.isErrorBlock()) {
-      Map<Integer, String> queryExceptions = block.getExceptions();
-      String errorMessage = "Received error query execution result block: " + queryExceptions;
-      if (queryExceptions.containsKey(QueryException.QUERY_VALIDATION_ERROR_CODE)) {
-        QueryInfoException queryInfoException = new QueryInfoException(errorMessage);
-        queryInfoException.setProcessingException(QueryException.QUERY_VALIDATION_ERROR);
-        throw queryInfoException;
-      }
+    if (block.isError()) {
+      ErrorMseBlock errorBlock = (ErrorMseBlock) block;
+      Map<QueryErrorCode, String> queryExceptions = errorBlock.getErrorMessages();
 
-      throw new RuntimeException(errorMessage);
+      String errorMessage;
+      Map.Entry<QueryErrorCode, String> error;
+      String from;
+      if (errorBlock.getStageId() >= 0) {
+        from = " from stage " + errorBlock.getStageId();
+        if (errorBlock.getServerId() != null) {
+          from += " on " + errorBlock.getServerId();
+        }
+      } else {
+        from = "";
+      }
+      if (queryExceptions.size() == 1) {
+        error = queryExceptions.entrySet().iterator().next();
+        errorMessage = "Received 1 error" + from + ": " + error.getValue();
+      } else {
+        error = queryExceptions.entrySet().stream()
+            .max(QueryDispatcher::compareErrors)
+            .orElseThrow();
+        errorMessage = "Received " + queryExceptions.size() + " errors" + from + ". "
+                + "The one with highest priority is: " + error.getValue();
+      }
+      QueryProcessingException processingEx = new QueryProcessingException(error.getKey().getId(), errorMessage);
+      return new QueryResult(processingEx, queryStats, System.currentTimeMillis() - startTimeMs);
     }
-    assert block.isSuccessfulEndOfStreamBlock();
-    MultiStageQueryStats queryStats = block.getQueryStats();
-    assert queryStats != null;
+    assert block.isSuccess();
     return new QueryResult(new ResultTable(resultSchema, resultRows), queryStats,
         System.currentTimeMillis() - startTimeMs);
+  }
+
+  // TODO: Improve the way the errors are compared
+  private static int compareErrors(Map.Entry<QueryErrorCode, String> entry1, Map.Entry<QueryErrorCode, String> entry2) {
+    QueryErrorCode errorCode1 = entry1.getKey();
+    QueryErrorCode errorCode2 = entry2.getKey();
+    if (errorCode1 == QueryErrorCode.QUERY_VALIDATION) {
+      return 1;
+    }
+    if (errorCode2 == QueryErrorCode.QUERY_VALIDATION) {
+      return -1;
+    }
+    return Integer.compare(errorCode1.getId(), errorCode2.getId());
   }
 
   public void shutdown() {
@@ -609,10 +778,16 @@ public class QueryDispatcher {
   }
 
   public static class QueryResult {
+    @Nullable
     private final ResultTable _resultTable;
+    @Nullable
+    private final QueryProcessingException _processingException;
     private final List<MultiStageQueryStats.StageStats.Closed> _queryStats;
     private final long _brokerReduceTimeMs;
 
+    /**
+     * Creates a successful query result.
+     */
     public QueryResult(ResultTable resultTable, MultiStageQueryStats queryStats, long brokerReduceTimeMs) {
       _resultTable = resultTable;
       Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
@@ -624,10 +799,45 @@ public class QueryDispatcher {
         _queryStats.add(queryStats.getUpstreamStageStats(i));
       }
       _brokerReduceTimeMs = brokerReduceTimeMs;
+      _processingException = null;
     }
 
+    /**
+     * Creates a failed query result.
+     * @param processingException the exception that occurred during query processing
+     * @param queryStats the query stats, which may be empty
+     */
+    public QueryResult(QueryProcessingException processingException, MultiStageQueryStats queryStats,
+        long brokerReduceTimeMs) {
+      _processingException = processingException;
+      _resultTable = null;
+      _brokerReduceTimeMs = brokerReduceTimeMs;
+      Preconditions.checkArgument(queryStats.getCurrentStageId() == 0, "Expecting query stats for stage 0, got: %s",
+          queryStats.getCurrentStageId());
+      int numStages = queryStats.getMaxStageId() + 1;
+      _queryStats = new ArrayList<>(numStages);
+      _queryStats.add(queryStats.getCurrentStats().close());
+      for (int i = 1; i < numStages; i++) {
+        _queryStats.add(queryStats.getUpstreamStageStats(i));
+      }
+    }
+
+    public QueryResult withStats(MultiStageQueryStats newQueryStats) {
+      if (_processingException != null) {
+        return new QueryResult(_processingException, newQueryStats, _brokerReduceTimeMs);
+      } else {
+        return new QueryResult(_resultTable, newQueryStats, _brokerReduceTimeMs);
+      }
+    }
+
+    @Nullable
     public ResultTable getResultTable() {
       return _resultTable;
+    }
+
+    @Nullable
+    public QueryProcessingException getProcessingException() {
+      return _processingException;
     }
 
     public List<MultiStageQueryStats.StageStats.Closed> getQueryStats() {
@@ -639,8 +849,8 @@ public class QueryDispatcher {
     }
   }
 
-  private interface SendRequest<E> {
-    void send(DispatchClient dispatchClient, Worker.QueryRequest request, QueryServerInstance serverInstance,
+  private interface SendRequest<R, E> {
+    void send(DispatchClient dispatchClient, R request, QueryServerInstance serverInstance,
         Deadline deadline, Consumer<AsyncResponse<E>> callbackConsumer);
   }
 }

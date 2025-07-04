@@ -160,7 +160,7 @@ public class QueryExecutorTest {
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
     TableDataManagerProvider tableDataManagerProvider = new DefaultTableDataManagerProvider();
     tableDataManagerProvider.init(instanceDataManagerConfig, mock(HelixManager.class), new SegmentLocks(), null);
-    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig);
+    TableDataManager tableDataManager = tableDataManagerProvider.getTableDataManager(tableConfig, schema);
     tableDataManager.start();
     for (ImmutableSegment indexSegment : _indexSegments) {
       tableDataManager.addSegment(indexSegment);

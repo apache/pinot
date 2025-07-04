@@ -52,12 +52,12 @@ import org.testng.annotations.Test;
 
 public class JsonDataTypeQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "JsonDataTypeQueriesTest");
-  private static final String RAW_TABLE_NAME = "testTable";
+  protected static final String RAW_TABLE_NAME = "testTable";
   private static final String SEGMENT_NAME = "testSegment";
   private static final int NUM_RECORDS = 10;
 
   private static final String INT_COLUMN = "intColumn";
-  private static final String JSON_COLUMN = "jsonColumn";
+  protected static final String JSON_COLUMN = "jsonColumn";
   private static final String STRING_COLUMN = "stringColumn";
   //@formatter:off
   private static final Schema SCHEMA = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
@@ -66,9 +66,6 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(STRING_COLUMN, DataType.STRING)
       .build();
   //@formatter:on
-  private static final TableConfig TABLE_CONFIG =
-      new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setJsonIndexColumns(List.of(JSON_COLUMN))
-          .build();
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
@@ -141,17 +138,26 @@ public class JsonDataTypeQueriesTest extends BaseQueriesTest {
         "{\"name\": {\"first\": \"multi-dimensional-1\",\"last\": \"array\"},\"id\": 111,\"data\": [[[1,2],[3,4]],"
             + "[[\"a\",\"b\"],[\"c\",\"d\"]]]}"));
 
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    TableConfig config = getTableConfig();
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(config, SCHEMA);
     segmentGeneratorConfig.setSegmentName(SEGMENT_NAME);
     segmentGeneratorConfig.setOutDir(INDEX_DIR.getPath());
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
     driver.build();
 
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(config, SCHEMA);
     ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = segment;
     _indexSegments = List.of(segment, segment);
+  }
+
+  protected TableConfig getTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(RAW_TABLE_NAME)
+        .setJsonIndexColumns(List.of(JSON_COLUMN))
+        .build();
   }
 
   /** Verify result column type of a simple select query against JSON column */

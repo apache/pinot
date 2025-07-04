@@ -63,6 +63,8 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.DictionaryBasedInvertedIndexCreator;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
@@ -71,6 +73,7 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.utils.SegmentMetadataUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -127,6 +130,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   protected final File _indexDir;
   protected final SegmentMetadata _segmentMetadata;
   protected final IndexLoadingConfig _indexLoadingConfig;
+  protected final TableConfig _tableConfig;
   protected final Schema _schema;
   protected final SegmentDirectory.Writer _segmentWriter;
 
@@ -135,11 +139,14 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
   private PropertiesConfiguration _segmentProperties;
 
   protected BaseDefaultColumnHandler(File indexDir, SegmentMetadata segmentMetadata,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, SegmentDirectory.Writer segmentWriter) {
+      IndexLoadingConfig indexLoadingConfig, SegmentDirectory.Writer segmentWriter) {
     _indexDir = indexDir;
     _segmentMetadata = segmentMetadata;
     _indexLoadingConfig = indexLoadingConfig;
-    _schema = schema;
+    _tableConfig = _indexLoadingConfig.getTableConfig();
+    Preconditions.checkArgument(_tableConfig != null, "Table config must be provided");
+    _schema = _indexLoadingConfig.getSchema();
+    Preconditions.checkArgument(_schema != null, "Schema must be provided");
     _segmentWriter = segmentWriter;
   }
 
@@ -360,13 +367,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    *
    * @param column column name.
    */
-  protected void removeColumnIndices(String column)
-      throws IOException {
+  protected void removeColumnIndices(String column) {
     String segmentName = _segmentMetadata.getName();
     LOGGER.info("Removing default column: {} from segment: {}", column, segmentName);
-    // Delete existing dictionary and forward index
-    _segmentWriter.removeIndex(column, StandardIndexes.dictionary());
-    _segmentWriter.removeIndex(column, StandardIndexes.forward());
+    // Remove indexes
+    for (IndexType<?, ?, ?> indexType : IndexService.getInstance().getAllIndexes()) {
+      _segmentWriter.removeIndex(column, indexType);
+    }
     // Remove the column metadata
     SegmentColumnarIndexCreator.removeColumnMetadataInfo(_segmentProperties, column);
     LOGGER.info("Removed default column: {} from segment: {}", column, segmentName);
@@ -378,11 +385,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
    */
   protected boolean createColumnV1Indices(String column)
       throws Exception {
-    TableConfig tableConfig = _indexLoadingConfig.getTableConfig();
     boolean errorOnFailure = _indexLoadingConfig.isErrorOnColumnBuildFailure();
-    if (tableConfig != null && tableConfig.getIngestionConfig() != null
-        && tableConfig.getIngestionConfig().getTransformConfigs() != null) {
-      List<TransformConfig> transformConfigs = tableConfig.getIngestionConfig().getTransformConfigs();
+    IngestionConfig ingestionConfig = _tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getTransformConfigs() != null) {
+      List<TransformConfig> transformConfigs = ingestionConfig.getTransformConfigs();
       for (TransformConfig transformConfig : transformConfigs) {
         if (transformConfig.getColumnName().equals(column)) {
           String transformFunction = transformConfig.getTransformFunction();
@@ -572,9 +578,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     if (_schema.isEnableColumnBasedNullHandling()) {
       return fieldSpec.isNullable();
     } else {
-      return _indexLoadingConfig.getTableConfig() != null
-          && _indexLoadingConfig.getTableConfig().getIndexingConfig() != null
-          && _indexLoadingConfig.getTableConfig().getIndexingConfig().isNullHandlingEnabled();
+      return _tableConfig.getIndexingConfig().isNullHandlingEnabled();
     }
   }
 
@@ -663,8 +667,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
           fieldIndexConfigs != null ? fieldIndexConfigs.getConfig(StandardIndexes.dictionary())
               : DictionaryIndexConfig.DEFAULT;
       boolean createDictionary = dictionaryIndexConfig.isEnabled();
-      StatsCollectorConfig statsCollectorConfig =
-          new StatsCollectorConfig(_indexLoadingConfig.getTableConfig(), _schema, null);
+      StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_tableConfig, _schema, null);
       ColumnIndexCreationInfo indexCreationInfo;
       boolean isSingleValue = fieldSpec.isSingleValueField();
       switch (fieldSpec.getDataType().getStoredType()) {
@@ -1196,6 +1199,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         .withColumnIndexCreationInfo(indexCreationInfo)
         .withTotalDocs(numDocs)
         .withDictionary(hasDictionary)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
 
     ForwardIndexConfig forwardIndexConfig = null;
@@ -1204,7 +1208,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
       forwardIndexConfig = fieldIndexConfig.getConfig(new ForwardIndexPlugin().getIndexType());
     }
     if (forwardIndexConfig == null) {
-      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null);
+      forwardIndexConfig = new ForwardIndexConfig(false, null, null, null, null, null, null);
     }
 
     return ForwardIndexCreatorFactory.createIndexCreator(indexCreationContext, forwardIndexConfig);

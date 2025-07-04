@@ -92,8 +92,8 @@ public class CompactedPinotSegmentRecordReaderTest {
     List<GenericRow> outputRows = new ArrayList<>();
     List<GenericRow> rewoundOuputRows = new ArrayList<>();
 
-    CompactedPinotSegmentRecordReader compactedReader =
-        new CompactedPinotSegmentRecordReader(_segmentIndexDir, validDocIds);
+    CompactedPinotSegmentRecordReader compactedReader = new CompactedPinotSegmentRecordReader(validDocIds);
+    compactedReader.init(_segmentIndexDir, null, null);
     while (compactedReader.hasNext()) {
       outputRows.add(compactedReader.next());
     }
@@ -137,8 +137,9 @@ public class CompactedPinotSegmentRecordReaderTest {
       validDocIds.add(i);
     }
     List<GenericRow> evenOutputRows = new ArrayList<>();
-    try (CompactedPinotSegmentRecordReader compactedReader = new CompactedPinotSegmentRecordReader(_segmentIndexDir,
-        validDocIds, DELETE_COLUMN)) {
+    try (CompactedPinotSegmentRecordReader compactedReader = new CompactedPinotSegmentRecordReader(validDocIds,
+        DELETE_COLUMN)) {
+      compactedReader.init(_segmentIndexDir, null, null);
       while (compactedReader.hasNext()) {
         evenOutputRows.add(compactedReader.next());
       }
@@ -149,8 +150,9 @@ public class CompactedPinotSegmentRecordReaderTest {
       validDocIds.add(i);
     }
     List<GenericRow> oddOutputRows = new ArrayList<>();
-    try (CompactedPinotSegmentRecordReader compactedReader = new CompactedPinotSegmentRecordReader(_segmentIndexDir,
-        validDocIds, DELETE_COLUMN)) {
+    try (CompactedPinotSegmentRecordReader compactedReader = new CompactedPinotSegmentRecordReader(validDocIds,
+        DELETE_COLUMN)) {
+      compactedReader.init(_segmentIndexDir, null, null);
       while (compactedReader.hasNext()) {
         oddOutputRows.add(compactedReader.next());
       }

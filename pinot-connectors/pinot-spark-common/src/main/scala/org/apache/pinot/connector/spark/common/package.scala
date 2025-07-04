@@ -20,17 +20,21 @@ package org.apache.pinot.connector.spark
 
 import java.util.Optional
 
-import io.circe.{Decoder, parser}
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 package object common {
 
+  // Define a singleton ObjectMapper instance
+  private val objectMapper: ObjectMapper = new ObjectMapper().registerModule(DefaultScalaModule)
+
   /** Parse json string to given model. */
-  def decodeTo[A: Decoder](jsonString: String): A = {
-    parser.decode[A](jsonString) match {
-      case Left(error) =>
-        throw new IllegalStateException(s"Error occurred while parsing json string, $error")
-      case Right(value) =>
-        value
+  def decodeTo[A](jsonString: String, clazz: Class[A]): A = {
+    try {
+      objectMapper.readValue(jsonString, clazz)
+    } catch {
+      case e: Exception =>
+        throw new IllegalStateException(s"Error occurred while parsing JSON string: ${e.getMessage}", e)
     }
   }
 

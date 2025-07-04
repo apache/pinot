@@ -22,9 +22,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
@@ -66,6 +66,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
   private final boolean _segmentAutoResetOnErrorAtValidation;
 
   public static final String OFFSET_CRITERIA = "offsetCriteria";
+  public static final String RUN_SEGMENT_LEVEL_VALIDATION = "runSegmentLevelValidation";
+  public static final String REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP =
+      "repairErrorSegmentsForPartialUpsertOrDedup";
 
   public RealtimeSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
@@ -90,12 +93,13 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     Context context = new Context();
     // Run segment level validation only if certain time has passed after previous run
     long currentTimeMs = System.currentTimeMillis();
-    if (TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationRunTimeMs)
-        >= _segmentLevelValidationIntervalInSeconds) {
+    if (shouldRunSegmentValidation(periodicTaskProperties, currentTimeMs)) {
       LOGGER.info("Run segment-level validation");
       context._runSegmentLevelValidation = true;
       _lastSegmentLevelValidationRunTimeMs = currentTimeMs;
     }
+    context._repairErrorSegmentsForPartialUpsertOrDedup =
+        shouldRepairErrorSegmentsForPartialUpsertOrDedup(periodicTaskProperties);
     String offsetCriteriaStr = periodicTaskProperties.getProperty(OFFSET_CRITERIA);
     if (offsetCriteriaStr != null) {
       context._offsetCriteria = new OffsetCriteria.OffsetCriteriaBuilder().withOffsetString(offsetCriteriaStr);
@@ -114,9 +118,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
       return;
     }
-    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigMaps(tableConfig).stream().map(
-        streamConfig -> new StreamConfig(tableConfig.getTableName(), streamConfig)
-    ).collect(Collectors.toList());
+    List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
 
     if (shouldEnsureConsuming(tableNameWithType)) {
       _llcRealtimeSegmentManager.ensureAllPartitionsConsuming(tableConfig, streamConfigs, context._offsetCriteria);
@@ -130,7 +132,9 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
     boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     if (isPauselessConsumptionEnabled) {
-      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig.getTableName());
+      // For pauseless tables without dedup or partial upsert, repair segments in error state
+      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig,
+          context._repairErrorSegmentsForPartialUpsertOrDedup);
     } else if (_segmentAutoResetOnErrorAtValidation) {
       // Reset for pauseless tables is already handled in repairSegmentsInErrorStateForPauselessConsumption method with
       // additional checks for pauseless consumption
@@ -152,9 +156,10 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       return false; // if table is paused by admin, then skip subsequent checks
     }
     // Perform resource utilization checks.
-    boolean isResourceUtilizationWithinLimits =
-        _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType);
-    if (!isResourceUtilizationWithinLimits) {
+    UtilizationChecker.CheckResult isResourceUtilizationWithinLimits =
+        _resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+            UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
+    if (isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.FAIL) {
       LOGGER.warn("Resource utilization limit exceeded for table: {}", tableNameWithType);
       _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
           1L);
@@ -165,14 +170,22 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
             PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization limit exceeded.");
       }
       return false; // if resource utilization check failed, then skip subsequent checks
+    } else if ((isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.PASS) && isTablePaused
+        && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
       // within limits and table previously paused by resource utilization --> unpause
-    } else if (isTablePaused && pauseStatus.getReasonCode()
-        .equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+      LOGGER.info("Resource utilization limit is back within limits for table: {}", tableNameWithType);
       // unset the pause state and allow consuming segment recreation.
       _llcRealtimeSegmentManager.updatePauseStateInIdealState(tableNameWithType, false,
           PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, "Resource utilization within limits");
       pauseStatus = _llcRealtimeSegmentManager.getPauseStatusDetails(tableNameWithType);
       isTablePaused = pauseStatus.getPauseFlag();
+    } else if ((isResourceUtilizationWithinLimits == UtilizationChecker.CheckResult.UNDETERMINED) && isTablePaused
+        && pauseStatus.getReasonCode().equals(PauseState.ReasonCode.RESOURCE_UTILIZATION_LIMIT_EXCEEDED)) {
+      // The table was previously paused due to exceeding resource utilization, but the current status cannot be
+      // determined. To be safe, leave it as paused and once the status is available take the correct action
+      LOGGER.warn("Resource utilization limit could not be determined for for table: {}, and it is paused, leave it as "
+              + "paused", tableNameWithType);
+      return false;
     }
     _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
         0L);
@@ -244,6 +257,36 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
     }
   }
 
+  private boolean shouldRunSegmentValidation(Properties periodicTaskProperties, long currentTimeMs) {
+    boolean runValidation = Optional.ofNullable(
+            periodicTaskProperties.getProperty(RUN_SEGMENT_LEVEL_VALIDATION))
+        .map(value -> {
+          try {
+            return Boolean.parseBoolean(value);
+          } catch (Exception e) {
+            return false;
+          }
+        })
+        .orElse(false);
+
+    boolean timeThresholdMet = TimeUnit.MILLISECONDS.toSeconds(currentTimeMs - _lastSegmentLevelValidationRunTimeMs)
+        >= _segmentLevelValidationIntervalInSeconds;
+
+    return runValidation || timeThresholdMet;
+  }
+
+  private boolean shouldRepairErrorSegmentsForPartialUpsertOrDedup(Properties periodicTaskProperties) {
+    return Optional.ofNullable(periodicTaskProperties.getProperty(REPAIR_ERROR_SEGMENTS_FOR_PARTIAL_UPSERT_OR_DEDUP))
+        .map(value -> {
+          try {
+            return Boolean.parseBoolean(value);
+          } catch (Exception e) {
+            return false;
+          }
+        })
+        .orElse(false);
+  }
+
   @Override
   protected void nonLeaderCleanup(List<String> tableNamesWithType) {
     for (String tableNameWithType : tableNamesWithType) {
@@ -271,6 +314,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
 
   public static final class Context {
     private boolean _runSegmentLevelValidation;
+    private boolean _repairErrorSegmentsForPartialUpsertOrDedup;
     private OffsetCriteria _offsetCriteria;
   }
 

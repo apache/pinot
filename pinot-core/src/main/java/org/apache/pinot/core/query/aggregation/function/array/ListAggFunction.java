@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.core.query.aggregation.function.array;
 
-import it.unimi.dsi.fastutil.objects.AbstractObjectCollection;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import java.util.Arrays;
 import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.function.NullableSingleInputAggregationFunction;
@@ -34,8 +36,7 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
-public class ListAggFunction
-    extends NullableSingleInputAggregationFunction<AbstractObjectCollection<String>, String> {
+public class ListAggFunction extends NullableSingleInputAggregationFunction<ObjectCollection<String>, String> {
 
   private final String _separator;
 
@@ -62,7 +63,7 @@ public class ListAggFunction
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    AbstractObjectCollection<String> valueSet = getObjectCollection(aggregationResultHolder);
+    ObjectCollection<String> valueSet = getObjectCollection(aggregationResultHolder);
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     String[] values = blockValSet.getStringValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
@@ -70,7 +71,7 @@ public class ListAggFunction
     });
   }
 
-  protected AbstractObjectCollection<String> getObjectCollection(AggregationResultHolder aggregationResultHolder) {
+  protected ObjectCollection<String> getObjectCollection(AggregationResultHolder aggregationResultHolder) {
     ObjectArrayList<String> valueSet = aggregationResultHolder.getResult();
     if (valueSet == null) {
       valueSet = new ObjectArrayList<>();
@@ -79,7 +80,7 @@ public class ListAggFunction
     return valueSet;
   }
 
-  protected AbstractObjectCollection<String> getObjectCollection(GroupByResultHolder groupByResultHolder,
+  protected ObjectCollection<String> getObjectCollection(GroupByResultHolder groupByResultHolder,
       int groupKey) {
     ObjectArrayList<String> valueSet = groupByResultHolder.getResult(groupKey);
     if (valueSet == null) {
@@ -96,7 +97,7 @@ public class ListAggFunction
     String[] values = blockValSet.getStringValuesSV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
-        AbstractObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
+        ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKeyArray[i]);
         groupValueList.add(values[i]);
       }
     });
@@ -110,7 +111,7 @@ public class ListAggFunction
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         for (int groupKey : groupKeysArray[i]) {
-          AbstractObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
+          ObjectCollection<String> groupValueList = getObjectCollection(groupByResultHolder, groupKey);
           groupValueList.add(values[i]);
         }
       }
@@ -118,18 +119,18 @@ public class ListAggFunction
   }
 
   @Override
-  public AbstractObjectCollection<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+  public ObjectCollection<String> extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
     return aggregationResultHolder.getResult();
   }
 
   @Override
-  public AbstractObjectCollection<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+  public ObjectCollection<String> extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
     return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
-  public AbstractObjectCollection<String> merge(AbstractObjectCollection<String> intermediateResult1,
-      AbstractObjectCollection<String> intermediateResult2) {
+  public ObjectCollection<String> merge(ObjectCollection<String> intermediateResult1,
+      ObjectCollection<String> intermediateResult2) {
     if (intermediateResult1 == null) {
       return intermediateResult2;
     }
@@ -141,17 +142,29 @@ public class ListAggFunction
   }
 
   @Override
-  public DataSchema.ColumnDataType getIntermediateResultColumnType() {
-    return DataSchema.ColumnDataType.OBJECT;
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.OBJECT;
   }
 
   @Override
-  public DataSchema.ColumnDataType getFinalResultColumnType() {
-    return DataSchema.ColumnDataType.STRING;
+  public SerializedIntermediateResult serializeIntermediateResult(ObjectCollection<String> strings) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.StringArrayList.getValue(),
+        ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.serialize((ObjectArrayList<String>) strings));
   }
 
   @Override
-  public String extractFinalResult(AbstractObjectCollection<String> strings) {
+  public ObjectCollection<String> deserializeIntermediateResult(CustomObject customObject) {
+    //noinspection unchecked
+    return ObjectSerDeUtils.STRING_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
+  }
+
+  @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.STRING;
+  }
+
+  @Override
+  public String extractFinalResult(ObjectCollection<String> strings) {
     if (strings == null) {
       return null;
     }

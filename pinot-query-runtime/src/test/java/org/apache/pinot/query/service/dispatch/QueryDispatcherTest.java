@@ -39,12 +39,15 @@ import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.query.testutils.QueryTestUtils;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.DefaultRequestContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
@@ -56,6 +59,7 @@ public class QueryDispatcherTest extends QueryTestSet {
 
   private QueryEnvironment _queryEnvironment;
   private QueryDispatcher _queryDispatcher;
+  private QueryThreadContext.CloseableContext _closeMe;
 
   @BeforeClass
   public void setUp()
@@ -74,6 +78,19 @@ public class QueryDispatcherTest extends QueryTestSet {
         QueryEnvironmentTestBase.TABLE_SCHEMAS, QueryEnvironmentTestBase.SERVER1_SEGMENTS,
         QueryEnvironmentTestBase.SERVER2_SEGMENTS, null);
     _queryDispatcher = new QueryDispatcher(Mockito.mock(MailboxService.class), Mockito.mock(FailureDetector.class));
+  }
+
+  @BeforeMethod
+  public void createThreadContext() {
+    _closeMe = QueryThreadContext.open();
+    QueryThreadContext.setIds(1234, "test");
+  }
+
+  @AfterMethod
+  public void closeThreadContext() {
+    if (QueryThreadContext.isInitialized()) {
+      _closeMe.close();
+    }
   }
 
   @AfterClass

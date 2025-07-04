@@ -35,7 +35,7 @@ import org.apache.pinot.spi.exception.BadQueryRequestException;
 
 
 public class MinAggregationFunction extends NullableSingleInputAggregationFunction<Double, Double> {
-  private static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
+  protected static final double DEFAULT_VALUE = Double.POSITIVE_INFINITY;
 
   public MinAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
     this(verifySingleArgument(arguments, "MIN"), nullHandlingEnabled);
@@ -148,7 +148,7 @@ public class MinAggregationFunction extends NullableSingleInputAggregationFuncti
     }
   }
 
-  private void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Number min) {
+  protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, Number min) {
     if (min != null) {
       if (_nullHandlingEnabled) {
         Double otherMin = aggregationResultHolder.getResult();

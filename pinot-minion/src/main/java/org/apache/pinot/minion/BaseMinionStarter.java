@@ -36,6 +36,7 @@ import org.apache.helix.SystemPropertyKeys;
 import org.apache.helix.manager.zk.ZKHelixManager;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.helix.task.TaskStateModelFactory;
+import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.auth.AuthProviderUtils;
 import org.apache.pinot.common.config.TlsConfig;
@@ -54,6 +55,7 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.core.transport.ListenerConfig;
 import org.apache.pinot.core.util.ListenerConfigUtil;
+import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.minion.event.DefaultMinionTaskObserverStorageManager;
 import org.apache.pinot.minion.event.EventObserverFactoryRegistry;
 import org.apache.pinot.minion.event.MinionEventObserverFactory;
@@ -105,10 +107,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();
     ServiceStartableUtils.applyClusterConfig(_config, zkAddress, helixClusterName, ServiceRole.MINION);
+    applyCustomConfigs(_config);
 
-    PinotInsecureMode.setPinotInInsecureMode(
-        Boolean.valueOf(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE,
-            CommonConstants.DEFAULT_PINOT_INSECURE_MODE)));
+    PinotInsecureMode.setPinotInInsecureMode(_config.getProperty(CommonConstants.CONFIG_OF_PINOT_INSECURE_MODE, false));
 
     setupHelixSystemProperties();
     _hostname = _config.getHostName();
@@ -131,20 +132,12 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _executorService =
         Executors.newCachedThreadPool(new ThreadFactoryBuilder().setNameFormat("async-task-thread-%d").build());
     MinionEventObservers.init(_config, _executorService);
+
+    ContinuousJfrStarter.init(_config);
   }
 
-  private void updateInstanceConfigIfNeeded() {
-    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
-    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
-    if (_tlsPort > 0) {
-      updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
-    }
-    updated |= HelixHelper.addDefaultTags(instanceConfig,
-        () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
-    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
-    if (updated) {
-      HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
-    }
+  /// Can be overridden to apply custom configs to the minion conf.
+  protected void applyCustomConfigs(MinionConf minionConf) {
   }
 
   private void setupHelixSystemProperties() {
@@ -239,6 +232,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     MinionMetrics minionMetrics = new MinionMetrics(_config.getMetricsPrefix(), metricsRegistry);
     minionMetrics.initializeGlobalMeters();
     minionMetrics.setValueOfGlobalGauge(MinionGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    minionMetrics.setValueOfGlobalGauge(MinionGauge.ZK_JUTE_MAX_BUFFER,
+        Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     MinionMetrics.register(minionMetrics);
     minionContext.setMinionMetrics(minionMetrics);
     minionContext.setAllowDownloadFromServer(_config.isAllowDownloadFromServer());
@@ -346,6 +341,21 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     minionMetrics.addTimedValue(MinionTimer.STARTUP_SUCCESS_DURATION_MS,
         System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
     LOGGER.info("Pinot minion started");
+  }
+
+  private void updateInstanceConfigIfNeeded() {
+    InstanceConfig instanceConfig = HelixHelper.getInstanceConfig(_helixManager, _instanceId);
+    boolean updated = HelixHelper.updateHostnamePort(instanceConfig, _hostname, _port);
+    if (_tlsPort > 0) {
+      updated |= HelixHelper.updateTlsPort(instanceConfig, _tlsPort);
+    }
+    updated |= HelixHelper.addDefaultTags(instanceConfig,
+        () -> Collections.singletonList(CommonConstants.Helix.UNTAGGED_MINION_INSTANCE));
+    updated |= HelixHelper.removeDisabledPartitions(instanceConfig);
+    updated |= HelixHelper.updatePinotVersion(instanceConfig);
+    if (updated) {
+      HelixHelper.updateInstanceConfig(_helixManager, instanceConfig);
+    }
   }
 
   /**

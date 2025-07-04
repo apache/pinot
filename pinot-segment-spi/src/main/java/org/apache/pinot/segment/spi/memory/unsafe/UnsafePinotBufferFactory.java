@@ -21,15 +21,15 @@ package org.apache.pinot.segment.spi.memory.unsafe;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteOrder;
+import org.apache.commons.lang3.SystemUtils;
 import org.apache.pinot.segment.spi.memory.NonNativePinotDataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotBufferFactory;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import xerial.larray.impl.OSInfo;
 
 
 public class UnsafePinotBufferFactory implements PinotBufferFactory {
   public UnsafePinotBufferFactory() {
-    if (OSInfo.isWindows()) {
+    if (SystemUtils.IS_OS_WINDOWS) {
       throw new IllegalStateException(getClass().getCanonicalName() + " cannot be used in Windows");
     }
   }

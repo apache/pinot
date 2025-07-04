@@ -29,17 +29,21 @@
 [![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot)
 [![Twitter Follow](https://img.shields.io/twitter/follow/apachepinot.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=apachepinot)
 [![License](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/apache/pinot)
+
 
 </div>
 
 - [What is Apache Pinot?](#what-is-apache-pinot)
-- [Features](#features)
-- [When should I use Pinot?](#when-should-i-use-pinot)
-- [Building Pinot](#building-pinot)
-- [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
-- [Join the Community](#join-the-community)
-- [Documentation](#documentation)
-- [License](#license)
+  - [Features](#features)
+  - [When should I use Pinot?](#when-should-i-use-pinot)
+  - [Contributing to Pinot](#contributing-to-pinot)
+  - [Apache Pinot YouTube Channel](#apache-pinot-youtube-channel)
+  - [Building Pinot](#building-pinot)
+  - [Deploying Pinot to Kubernetes](#deploying-pinot-to-kubernetes)
+  - [Join the Community](#join-the-community)
+  - [Documentation](#documentation)
+  - [License](#license)
 
 # What is Apache Pinot?
 
@@ -95,7 +99,7 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
 
 ## Contributing to Pinot
 
-Want to contribute to apache/pinot? 👋🍷
+Want to contribute to Apache Pinot? 👋🍷
 
 Want to join the ranks of open source committers to Apache Pinot? Then check out the [Contribution Guide](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines) for how you can get involved in the code.
 
@@ -103,7 +107,12 @@ If you have a bug or an idea for a new feature, browse the [open issues](https:/
 
 We also tagged some [beginner issues](https://github.com/apache/pinot/issues?q=is%3Aopen+is%3Aissue+label%3Abeginner-task) new contributors can tackle.
 
+## Apache Pinot YouTube Channel
 
+Share Your Pinot Videos with the Community!
+
+Have a Pinot use case, tutorial, or conference/meetup recording to share? We’d love to feature it on the [Pinot OSS YouTube channel](https://www.youtube.com/@Apache_Pinot/videos)!
+Drop your video or a link to your session in the [#pinot-youtube-channel](https://apache-pinot.slack.com/archives/C08GH2MAVT4) on Pinot Slack, and we’ll showcase it for the community!
 
 ## Building Pinot
 

@@ -38,7 +38,6 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
   private final ForwardIndexReader _reader;
-  // TODO: Figure out a way to close the reader context
   private final ForwardIndexReaderContext _readerContext;
   private final int _numDocs;
   private final int _maxNumValuesPerMVEntry;
@@ -69,6 +68,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
         return nextDocId;
       }
     }
+    close();
     return Constants.EOF;
   }
 
@@ -249,6 +249,13 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
       int length = _reader.getBytesMV(docId, _buffer, _readerContext);
       _numEntriesScanned += length;
       return _predicateEvaluator.applyMV(_buffer, length);
+    }
+  }
+
+  @Override
+  public void close() {
+    if (_readerContext != null) {
+      _readerContext.close();
     }
   }
 }

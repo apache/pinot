@@ -28,6 +28,9 @@ import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
+import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.MapUtils;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
 
 /**
@@ -373,6 +376,53 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     }
   }
 
+  default void readValuesSV(int[] docIds, int length, String[] values, T context) {
+    switch (getStoredType()) {
+      case INT:
+        for (int i = 0; i < length; i++) {
+          values[i] = Integer.toString(getInt(docIds[i], context));
+        }
+        break;
+      case LONG:
+        for (int i = 0; i < length; i++) {
+          values[i] = Long.toString(getLong(docIds[i], context));
+        }
+        break;
+      case FLOAT:
+        for (int i = 0; i < length; i++) {
+          values[i] = Float.toString(getFloat(docIds[i], context));
+        }
+        break;
+      case DOUBLE:
+        for (int i = 0; i < length; i++) {
+          values[i] = Double.toString(getDouble(docIds[i], context));
+        }
+        break;
+      case BIG_DECIMAL:
+        for (int i = 0; i < length; i++) {
+          values[i] = getBigDecimal(docIds[i], context).toPlainString();
+        }
+        break;
+      case STRING:
+        for (int i = 0; i < length; i++) {
+          values[i] = getString(docIds[i], context);
+        }
+        break;
+      case BYTES:
+        for (int i = 0; i < length; i++) {
+          values[i] = BytesUtils.toHexString(getBytes(docIds[i], context));
+        }
+        break;
+      case MAP:
+        for (int i = 0; i < length; i++) {
+          values[i] = MapUtils.toString(getMap(docIds[i], context));
+        }
+        break;
+      default:
+        throw new IllegalStateException();
+    }
+  }
+
   /**
    * Reads the INT value at the given document id.
    *
@@ -461,6 +511,18 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
     throw new UnsupportedOperationException("This ForwardIndexReader does not support MAP types. "
         + "This indicates that either the column is getting mistyped or the wrong "
         + "ForwardIndexReader is being created to read this column.");
+  }
+
+  default int get32BitsMurmur3Hash(int docId, T context) {
+    return MurmurHashFunctions.murmurHash3X64Bit32(getBytes(docId, context), 0);
+  }
+
+  default long get64BitsMurmur3Hash(int docId, T context) {
+    return MurmurHashFunctions.murmurHash3X64Bit64(getBytes(docId, context), 0);
+  }
+
+  default long[] get128BitsMurmur3Hash(int docId, T context) {
+    return MurmurHashFunctions.murmurHash3X64Bit128AsLongs(getBytes(docId, context), 0);
   }
 
   /**
@@ -946,10 +1008,10 @@ public interface ForwardIndexReader<T extends ForwardIndexReaderContext> extends
 
   /**
    * Returns whether the forward index supports recording the byte ranges accessed while reading a given docId.
-   * For readers that do support this info, caller should check if the buffer is a {@link isFixedOffsetMappingType()}.
-   * If yes, the byte range mapping for a docId can be calculated using the {@link getRawDataStartOffset()} and the
-   * {@link getDocLength()} functions.
-   * if not, caller should use the {@link recordDocIdByteRanges()} function to get the list of byte ranges accessed
+   * For readers that do support this info, caller should check if the buffer is a {@link #isFixedOffsetMappingType}.
+   * If yes, the byte range mapping for a docId can be calculated using the {@link #getRawDataStartOffset} and the
+   * {@link #getDocLength} functions.
+   * if not, caller should use the {@link #recordDocIdByteRanges} function to get the list of byte ranges accessed
    * for a docId.
    */
   default boolean isBufferByteRangeInfoSupported() {

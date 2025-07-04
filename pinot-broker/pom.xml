@@ -45,6 +45,10 @@
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-timeseries-planner</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
 
     <!-- Test -->
     <dependency>
@@ -67,6 +71,12 @@
     <dependency>
       <groupId>org.apache.pinot</groupId>
       <artifactId>pinot-controller</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-query-planner</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>

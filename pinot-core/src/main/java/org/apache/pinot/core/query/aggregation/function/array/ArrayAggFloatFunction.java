@@ -20,8 +20,10 @@ package org.apache.pinot.core.query.aggregation.function.array;
 
 import it.unimi.dsi.fastutil.floats.FloatArrayList;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 
@@ -36,7 +38,8 @@ public class ArrayAggFloatFunction extends BaseArrayAggFloatFunction<FloatArrayL
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
     float[] value = blockValSet.getFloatValuesSV();
-    FloatArrayList valueArray = new FloatArrayList(length);
+    FloatArrayList valueArray =
+        aggregationResultHolder.getResult() != null ? aggregationResultHolder.getResult() : new FloatArrayList(length);
 
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -54,5 +57,16 @@ public class ArrayAggFloatFunction extends BaseArrayAggFloatFunction<FloatArrayL
       resultHolder.setValueForKey(groupKey, valueArray);
     }
     valueArray.add(value);
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(FloatArrayList floatArrayList) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.FloatArrayList.getValue(),
+        ObjectSerDeUtils.FLOAT_ARRAY_LIST_SER_DE.serialize(floatArrayList));
+  }
+
+  @Override
+  public FloatArrayList deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.FLOAT_ARRAY_LIST_SER_DE.deserialize(customObject.getBuffer());
   }
 }

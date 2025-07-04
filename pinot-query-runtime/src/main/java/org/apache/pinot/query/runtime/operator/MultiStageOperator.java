@@ -35,19 +35,20 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
-import org.apache.pinot.query.runtime.blocks.TransferableBlock;
-import org.apache.pinot.query.runtime.blocks.TransferableBlockUtils;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 
 
 public abstract class MultiStageOperator
-    implements Operator<TransferableBlock>, AutoCloseable {
+    implements Operator<MseBlock>, AutoCloseable {
 
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
@@ -72,12 +73,35 @@ public abstract class MultiStageOperator
 
   public abstract void registerExecution(long time, int numRows);
 
-  // Samples resource usage of the operator. The operator should call this function for every block of data or
-  // assuming the block holds 10000 rows or more.
+  /// This method should be called periodically by the operator to check whether the execution should be interrupted.
+  ///
+  /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
+  /// due to resource constraints.
+  ///
+  /// Normally, callers should call [#sampleAndCheckInterruption(long deadlineMs)] passing the correct deadline, but
+  /// given most operators use either the active or the passive deadline, this method is provided as a convenience
+  /// method. By default, it uses the active deadline, which is the one that should be used for most operators, but
+  /// if the operator does not actively process data (ie both mailbox operators), it should override this method to
+  /// use the passive deadline instead.
+  /// See for example [MailboxSendOperator][org.apache.pinot.query.runtime.operator.MailboxSendOperator]).
   protected void sampleAndCheckInterruption() {
+    sampleAndCheckInterruption(_context.getActiveDeadlineMs());
+  }
+
+  /// This method should be called periodically by the operator to check whether the execution should be interrupted.
+  ///
+  /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
+  /// due to resource constraints.
+  protected void sampleAndCheckInterruption(long deadlineMs) {
+    if (System.currentTimeMillis() >= deadlineMs) {
+      earlyTerminate();
+      throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on " + getExplainName());
+    }
     Tracing.ThreadAccountantOps.sampleMSE();
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       earlyTerminate();
+      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "
+          + getExplainName());
     }
   }
 
@@ -87,7 +111,7 @@ public abstract class MultiStageOperator
    * no more call should be made.
    */
   @Override
-  public TransferableBlock nextBlock() {
+  public MseBlock nextBlock() {
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       throw new EarlyTerminationException("Interrupted while processing next block");
     }
@@ -95,24 +119,25 @@ public abstract class MultiStageOperator
       logger().debug("Operator {}: Reading next block", _operatorId);
     }
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
-      TransferableBlock nextBlock;
+      MseBlock nextBlock;
       Stopwatch executeStopwatch = Stopwatch.createStarted();
       try {
         nextBlock = getNextBlock();
       } catch (Exception e) {
-        nextBlock = TransferableBlockUtils.getErrorTransferableBlock(e);
+        nextBlock = ErrorMseBlock.fromException(e);
       }
-      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), nextBlock.getNumRows());
+      int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;
+      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), numRows);
 
       if (logger().isDebugEnabled()) {
-        logger().debug("Operator {}. Block of type {} ready to send", _operatorId, nextBlock.getType());
+        logger().debug("Operator {}. Block {} ready to send", _operatorId, nextBlock);
       }
       return nextBlock;
     }
   }
 
   // Make it protected because we should always call nextBlock()
-  protected abstract TransferableBlock getNextBlock()
+  protected abstract MseBlock getNextBlock()
       throws Exception;
 
   protected void earlyTerminate() {
@@ -122,24 +147,36 @@ public abstract class MultiStageOperator
     }
   }
 
-  /**
-   * Adds the current operator stats as the last operator in the open stats of the given holder.
-   *
-   * It is assumed that:
-   * <ol>
-   *   <li>The current stage of the holder is equal to the stage id of this operator.</li>
-   *   <li>The holder already contains the stats of the previous operators of the same stage in inorder</li>
-   * </ol>
-   */
-  protected void addStats(MultiStageQueryStats holder, StatMap<?> statMap) {
-    Preconditions.checkArgument(holder.getCurrentStageId() == _context.getStageId(),
-        "The holder's stage id should be the same as the current operator's stage id. Expected %s, got %s",
-        _context.getStageId(), holder.getCurrentStageId());
-    holder.getCurrentStats().addLastOperator(getOperatorType(), statMap);
-  }
-
   @Override
   public abstract List<MultiStageOperator> getChildOperators();
+
+  /**
+   * Calculates and returns the stats for the operator.
+   *
+   * Each time this method is called, a new instance of the stats is created. This is because the stats are mutable and
+   * can be updated by the operator or the caller after the stats are returned.
+   */
+  public final MultiStageQueryStats calculateStats() {
+    MultiStageQueryStats upstreamStats = calculateUpstreamStats();
+
+    Preconditions.checkArgument(upstreamStats.getCurrentStageId() == _context.getStageId(),
+        "The holder's stage id should be the same as the current operator's stage id. Expected %s, got %s",
+        _context.getStageId(), upstreamStats.getCurrentStageId());
+    upstreamStats.getCurrentStats().addLastOperator(getOperatorType(), copyStatMaps());
+    return upstreamStats;
+  }
+
+  protected MultiStageQueryStats calculateUpstreamStats() {
+    return getChildOperators().stream()
+        .map(MultiStageOperator::calculateStats)
+        .reduce((s1, s2) -> {
+          s1.mergeSameStage(s2);
+          return s1;
+        })
+        .orElse(MultiStageQueryStats.emptyStats(_context.getStageId()));
+  }
+
+  protected abstract StatMap<?> copyStatMaps();
 
   // TODO: Ideally close() call should finish within request deadline.
   // TODO: Consider passing deadline as part of the API.
@@ -164,22 +201,6 @@ public abstract class MultiStageOperator
         // Continue processing because even one operator failed to be cancelled, we should still cancel the rest.
       }
     }
-  }
-
-  /**
-   * Receives the EOS block from upstream operator and updates the stats.
-   * <p>
-   * The fact that the EOS belongs to the upstream operator is not an actual requirement. Actual requirements are listed
-   * in {@link #addStats(MultiStageQueryStats, StatMap)}
-   * @param upstreamEos
-   * @return
-   */
-  protected TransferableBlock updateEosBlock(TransferableBlock upstreamEos, StatMap<?> statMap) {
-    assert upstreamEos.isSuccessfulEndOfStreamBlock();
-    MultiStageQueryStats queryStats = upstreamEos.getQueryStats();
-    assert queryStats != null;
-    addStats(queryStats, statMap);
-    return upstreamEos;
   }
 
   @Override
@@ -215,20 +236,17 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        response.mergeGroupsTrimmed(stats.getBoolean(AggregateOperator.StatKey.GROUPS_TRIMMED));
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
+        response.mergeNumGroupsWarningLimitReached(
+            stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));
         response.mergeMaxRowsInOperator(stats.getLong(AggregateOperator.StatKey.EMITTED_ROWS));
       }
 
-      @Override
-      public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics) {
-        super.updateServerMetrics(map, serverMetrics);
-        @SuppressWarnings("unchecked")
-        StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
-        boolean limitReached = stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED);
-        if (limitReached) {
-          serverMetrics.addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED, 1);
-        }
-      }
+      /// So far this keys do not need to be modified from here because they are incremented in a per-worker basis:
+      /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED
+      /// ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED
+      /// public void updateServerMetrics(StatMap<?> map, ServerMetrics serverMetrics);
     },
     FILTER(FilterOperator.StatKey.class) {
       @Override
@@ -268,16 +286,15 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    LEAF(LeafStageTransferableBlockOperator.StatKey.class) {
+    LEAF(LeafOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
-        StatMap<LeafStageTransferableBlockOperator.StatKey> stats =
-            (StatMap<LeafStageTransferableBlockOperator.StatKey>) map;
-        response.mergeMaxRowsInOperator(stats.getLong(LeafStageTransferableBlockOperator.StatKey.EMITTED_ROWS));
+        StatMap<LeafOperator.StatKey> stats = (StatMap<LeafOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(LeafOperator.StatKey.EMITTED_ROWS));
 
         StatMap<BrokerResponseNativeV2.StatKey> brokerStats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
-        for (LeafStageTransferableBlockOperator.StatKey statKey : stats.keySet()) {
+        for (LeafOperator.StatKey statKey : stats.keySet()) {
           statKey.updateBrokerMetadata(brokerStats, stats);
         }
         response.addBrokerStats(brokerStats);

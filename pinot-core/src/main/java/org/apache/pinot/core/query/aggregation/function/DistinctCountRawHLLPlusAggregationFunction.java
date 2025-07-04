@@ -21,6 +21,7 @@ package org.apache.pinot.core.query.aggregation.function;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -101,6 +102,16 @@ public class DistinctCountRawHLLPlusAggregationFunction
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return _distinctCountHLLPlusAggregationFunction.getIntermediateResultColumnType();
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
+    return _distinctCountHLLPlusAggregationFunction.serializeIntermediateResult(hyperLogLogPlus);
+  }
+
+  @Override
+  public HyperLogLogPlus deserializeIntermediateResult(CustomObject customObject) {
+    return _distinctCountHLLPlusAggregationFunction.deserializeIntermediateResult(customObject);
   }
 
   @Override

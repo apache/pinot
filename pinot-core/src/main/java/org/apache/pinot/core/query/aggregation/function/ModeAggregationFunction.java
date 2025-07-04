@@ -34,9 +34,11 @@ import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.ObjectAggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
@@ -490,6 +492,32 @@ public class ModeAggregationFunction
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(Map<? extends Number, Long> longMap) {
+    if (longMap instanceof Int2LongMap) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Int2LongMap.getValue(),
+          ObjectSerDeUtils.INT_2_LONG_MAP_SER_DE.serialize((Int2LongMap) longMap));
+    } else if (longMap instanceof Long2LongMap) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Long2LongMap.getValue(),
+          ObjectSerDeUtils.LONG_2_LONG_MAP_SER_DE.serialize((Long2LongMap) longMap));
+    } else if (longMap instanceof Float2LongMap) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Float2LongMap.getValue(),
+          ObjectSerDeUtils.FLOAT_2_LONG_MAP_SER_DE.serialize((Float2LongMap) longMap));
+    } else if (longMap instanceof Double2LongMap) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.Double2LongMap.getValue(),
+          ObjectSerDeUtils.DOUBLE_2_LONG_MAP_SER_DE.serialize((Double2LongMap) longMap));
+    } else {
+      throw new IllegalStateException(
+          "Illegal data type for Intermediate Result of MODE aggregation function: " + longMap.getClass()
+              .getSimpleName());
+    }
+  }
+
+  @Override
+  public Map<? extends Number, Long> deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.deserialize(customObject);
   }
 
   @Override

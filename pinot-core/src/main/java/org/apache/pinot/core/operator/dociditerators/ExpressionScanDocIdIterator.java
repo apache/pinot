@@ -88,13 +88,15 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     while (_blockEndDocId < _endDocId) {
       int blockStartDocId = _blockEndDocId;
       _blockEndDocId = Math.min(blockStartDocId + DocIdSetPlanNode.MAX_DOC_PER_CALL, _endDocId);
-      ProjectionBlock projectionBlock = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-          new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId)).nextBlock();
-      RoaringBitmap matchingDocIds = new RoaringBitmap();
-      processProjectionBlock(projectionBlock, matchingDocIds);
-      if (!matchingDocIds.isEmpty()) {
-        _docIdIterator = matchingDocIds.getIntIterator();
-        return _docIdIterator.next();
+      try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
+          new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId))) {
+        ProjectionBlock projectionBlock = projectionOperator.nextBlock();
+        RoaringBitmap matchingDocIds = new RoaringBitmap();
+        processProjectionBlock(projectionBlock, matchingDocIds);
+        if (!matchingDocIds.isEmpty()) {
+          _docIdIterator = matchingDocIds.getIntIterator();
+          return _docIdIterator.next();
+        }
       }
     }
 
@@ -122,26 +124,28 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
     IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
-    ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-        new BitmapDocIdSetOperator(intIterator, _docIdBuffer));
-    MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-    ProjectionBlock projectionBlock;
-    while ((projectionBlock = projectionOperator.nextBlock()) != null) {
-      processProjectionBlock(projectionBlock, matchingDocIds);
+    try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
+        new BitmapDocIdSetOperator(intIterator, _docIdBuffer))) {
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      ProjectionBlock projectionBlock;
+      while ((projectionBlock = projectionOperator.nextBlock()) != null) {
+        processProjectionBlock(projectionBlock, matchingDocIds);
+      }
+      return matchingDocIds;
     }
-    return matchingDocIds;
   }
 
   @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
-    ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap, new BitmapDocIdSetOperator(docIds, _docIdBuffer));
-    MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
-    ProjectionBlock projectionBlock;
-    while ((projectionBlock = projectionOperator.nextBlock()) != null) {
-      processProjectionBlock(projectionBlock, matchingDocIds);
+    try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
+        new BitmapDocIdSetOperator(docIds, _docIdBuffer))) {
+      MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
+      ProjectionBlock projectionBlock;
+      while ((projectionBlock = projectionOperator.nextBlock()) != null) {
+        processProjectionBlock(projectionBlock, matchingDocIds);
+      }
+      return matchingDocIds;
     }
-    return matchingDocIds;
   }
 
   private void processProjectionBlock(ProjectionBlock projectionBlock, BitmapDataProvider matchingDocIds) {

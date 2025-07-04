@@ -47,7 +47,6 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Segment;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -250,30 +249,25 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
    */
   private void getCompletedSegmentsInfo(String realtimeTableName, List<SegmentZKMetadata> completedSegmentsZKMetadata,
       Map<Integer, String> partitionToLatestLLCSegmentName, Set<Integer> allPartitions) {
-    List<SegmentZKMetadata> segmentsZKMetadata = getSegmentsZKMetadataForTable(realtimeTableName);
+    List<SegmentZKMetadata> segmentsZKMetadata = getNonConsumingSegmentsZKMetadataForRealtimeTable(realtimeTableName);
 
     Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
-      Segment.Realtime.Status status = segmentZKMetadata.getStatus();
-      if (status.isCompleted()) {
-        completedSegmentsZKMetadata.add(segmentZKMetadata);
-      }
+      completedSegmentsZKMetadata.add(segmentZKMetadata);
 
       // Skip UPLOADED segments that don't conform to the LLC segment name
       LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
       if (llcSegmentName != null) {
         int partitionId = llcSegmentName.getPartitionGroupId();
         allPartitions.add(partitionId);
-        if (status.isCompleted()) {
-          latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
-            if (latestLLCSegmentName == null
-                || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
-              return llcSegmentName;
-            } else {
-              return latestLLCSegmentName;
-            }
-          });
-        }
+        latestLLCSegmentNameMap.compute(partitionId, (k, latestLLCSegmentName) -> {
+          if (latestLLCSegmentName == null
+              || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
+            return llcSegmentName;
+          } else {
+            return latestLLCSegmentName;
+          }
+        });
       }
     }
 

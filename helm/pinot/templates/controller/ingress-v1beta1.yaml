@@ -20,7 +20,7 @@
 {{- if .Values.controller.ingress.v1beta1.enabled }}
 {{- $ingressPath := .Values.controller.ingress.v1beta1.path }}
 {{- $serviceName := include "pinot.controller.fullname" . }}
-{{- $servicePort := .Values.controller.service.port }}
+{{- $servicePort := .Values.controller.ingress.v1beta1.port | default .Values.controller.service.port }}
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:

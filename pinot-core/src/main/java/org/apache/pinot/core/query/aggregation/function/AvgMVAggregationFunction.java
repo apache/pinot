@@ -24,13 +24,14 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
+import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 
 
 public class AvgMVAggregationFunction extends AvgAggregationFunction {
 
-  public AvgMVAggregationFunction(List<ExpressionContext> arguments) {
-    super(verifySingleArgument(arguments, "AVG_MV"), false);
+  public AvgMVAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "AVG_MV"), nullHandlingEnabled);
   }
 
   @Override
@@ -41,38 +42,50 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
   @Override
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    double sum = 0.0;
-    long count = 0L;
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      for (double value : values) {
-        sum += value;
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+
+    AvgPair avgPair = new AvgPair();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        for (double value : valuesArray[i]) {
+          avgPair.apply(value);
+        }
       }
-      count += values.length;
+    });
+
+    if (avgPair.getCount() != 0) {
+      updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
     }
-    updateAggregationResult(aggregationResultHolder, sum, count);
   }
 
   @Override
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
-    }
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
+      }
+    });
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
-    double[][] valuesArray = blockValSetMap.get(_expression).getDoubleValuesMV();
-    for (int i = 0; i < length; i++) {
-      double[] values = valuesArray[i];
-      for (int groupKey : groupKeysArray[i]) {
-        aggregateOnGroupKey(groupKey, groupByResultHolder, values);
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          aggregateOnGroupKey(groupKey, groupByResultHolder, values);
+        }
       }
-    }
+    });
   }
 
   private void aggregateOnGroupKey(int groupKey, GroupByResultHolder groupByResultHolder, double[] values) {
@@ -81,6 +94,8 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
       sum += value;
     }
     long count = values.length;
-    updateGroupByResult(groupKey, groupByResultHolder, sum, count);
+    if (count != 0) {
+      updateGroupByResult(groupKey, groupByResultHolder, sum, count);
+    }
   }
 }

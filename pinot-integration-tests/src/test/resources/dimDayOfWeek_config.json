@@ -1,0 +1,18 @@
+{
+  "tableName": "daysOfWeek",
+  "tableType": "OFFLINE",
+  "isDimTable": true,
+  "segmentsConfig": {
+    "segmentPushType": "REFRESH",
+    "replication": "1"
+  },
+  "tenants": {
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP"
+  },
+  "metadata": {
+    "customConfigs": {
+    }
+  }
+}

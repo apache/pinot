@@ -82,6 +82,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final ForwardIndexConfig _forwardIndexConfig;
   private final SegmentDirectory.Writer _segmentWriter;
   private final boolean _isTemporaryForwardIndex;
+  private final String _tableNameWithType;
 
   // Metadata
   private final SegmentDirectory _segmentDirectory;
@@ -114,13 +115,14 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
   public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
       boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
-      boolean isTemporaryForwardIndex)
+      boolean isTemporaryForwardIndex, String tableNameWithType)
       throws IOException {
     _columnName = columnName;
     _segmentDirectory = segmentDirectory;
     _segmentMetadata = segmentDirectory.getSegmentMetadata();
     _segmentWriter = segmentWriter;
     _isTemporaryForwardIndex = isTemporaryForwardIndex;
+    _tableNameWithType = tableNameWithType;
 
     _columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     _singleValue = _columnMetadata.isSingleValue();
@@ -268,8 +270,10 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withForwardIndexDisabled(false)
           .withDictionary(_dictionaryEnabled)
           .withLengthOfLongestEntry(lengthOfLongestEntry)
+          .withTableNameWithType(_tableNameWithType)
           .build();
 
+      // note: this method closes buffers and removes files
       writeToForwardIndex(dictionary, context);
 
       // Setup and return the metadata properties to update
@@ -353,6 +357,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withMaxNumberOfMultiValueElements(maxNumberOfMultiValues[0])
           .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
           .withLengthOfLongestEntry(lengthOfLongestEntry)
+          .withTableNameWithType(_tableNameWithType)
           .build();
 
       writeToForwardIndex(dictionary, context);

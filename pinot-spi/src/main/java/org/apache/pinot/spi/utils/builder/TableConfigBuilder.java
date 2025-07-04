@@ -29,6 +29,8 @@ import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.DimensionTableConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -104,6 +106,7 @@ public class TableConfigBuilder {
   private SegmentPartitionConfig _segmentPartitionConfig;
   private boolean _nullHandlingEnabled;
   private boolean _columnMajorSegmentBuilderEnabled = true;
+  private boolean _skipSegmentPreprocess;
   private List<String> _varLengthDictionaryColumns;
   private List<StarTreeIndexConfig> _starTreeIndexConfigs;
   private List<String> _jsonIndexColumns;
@@ -133,6 +136,8 @@ public class TableConfigBuilder {
   private List<TierConfig> _tierConfigList;
   private List<TunerConfig> _tunerConfigList;
   private JsonNode _tierOverwrites;
+  private Map<String, JsonIndexConfig> _jsonIndexConfigs;
+  private MultiColumnTextIndexConfig _multiColumnTextIndexConfig;
 
   public TableConfigBuilder(TableType tableType) {
     _tableType = tableType;
@@ -334,6 +339,12 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setMultiColumnTextIndexConfig(
+      MultiColumnTextIndexConfig multiColumnTextIndexConfig) {
+    _multiColumnTextIndexConfig = multiColumnTextIndexConfig;
+    return this;
+  }
+
   public TableConfigBuilder setJsonIndexColumns(List<String> jsonIndexColumns) {
     _jsonIndexColumns = jsonIndexColumns;
     return this;
@@ -362,6 +373,11 @@ public class TableConfigBuilder {
 
   public TableConfigBuilder setColumnMajorSegmentBuilderEnabled(boolean columnMajorSegmentBuilderEnabled) {
     _columnMajorSegmentBuilderEnabled = columnMajorSegmentBuilderEnabled;
+    return this;
+  }
+
+  public TableConfigBuilder setSkipSegmentPreprocess(boolean skipSegmentPreprocess) {
+    _skipSegmentPreprocess = skipSegmentPreprocess;
     return this;
   }
 
@@ -452,6 +468,11 @@ public class TableConfigBuilder {
     return this;
   }
 
+  public TableConfigBuilder setJsonIndexConfigs(Map<String, JsonIndexConfig> jsonIndexConfigs) {
+    _jsonIndexConfigs = jsonIndexConfigs;
+    return this;
+  }
+
   public TableConfig build() {
     // Validation config
     SegmentsValidationAndRetentionConfig validationConfig = new SegmentsValidationAndRetentionConfig();
@@ -489,8 +510,10 @@ public class TableConfigBuilder {
     indexingConfig.setSegmentPartitionConfig(_segmentPartitionConfig);
     indexingConfig.setNullHandlingEnabled(_nullHandlingEnabled);
     indexingConfig.setColumnMajorSegmentBuilderEnabled(_columnMajorSegmentBuilderEnabled);
+    indexingConfig.setSkipSegmentPreprocess(_skipSegmentPreprocess);
     indexingConfig.setVarLengthDictionaryColumns(_varLengthDictionaryColumns);
     indexingConfig.setStarTreeIndexConfigs(_starTreeIndexConfigs);
+    indexingConfig.setMultiColumnTextIndexConfig(_multiColumnTextIndexConfig);
     indexingConfig.setJsonIndexColumns(_jsonIndexColumns);
     indexingConfig.setAggregateMetrics(_aggregateMetrics);
     indexingConfig.setOptimizeDictionary(_optimizeDictionary);
@@ -499,6 +522,7 @@ public class TableConfigBuilder {
     indexingConfig.setNoDictionarySizeRatioThreshold(_noDictionarySizeRatioThreshold);
     indexingConfig.setNoDictionaryCardinalityRatioThreshold(_noDictionaryCardinalityRatioThreshold);
     indexingConfig.setTierOverwrites(_tierOverwrites);
+    indexingConfig.setJsonIndexConfigs(_jsonIndexConfigs);
 
     if (_customConfig == null) {
       _customConfig = new TableCustomConfig(null);

@@ -48,4 +48,5 @@
 
   <suppress checks="IllegalImport" files="Unsafer.java"/>
   <suppress checks="IllegalImport" files="UnsafePinotBuffer.java"/>
+  <suppress checks="IllegalImport" files="BaseOffHeapSet.java"/>
 </suppressions>

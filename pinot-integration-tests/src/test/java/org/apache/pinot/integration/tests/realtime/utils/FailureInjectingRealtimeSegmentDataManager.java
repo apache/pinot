@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.integration.tests.realtime.utils;
 
-import java.util.concurrent.Semaphore;
+import java.util.function.BooleanSupplier;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.core.data.manager.realtime.ConsumerCoordinator;
 import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
+import org.apache.pinot.core.data.manager.realtime.SegmentBuildFailureException;
+import org.apache.pinot.segment.local.dedup.PartitionDedupMetadataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -43,21 +46,22 @@ public class FailureInjectingRealtimeSegmentDataManager extends RealtimeSegmentD
   /**
    * Creates a manager that will forcibly fail the commit segment step.
    */
-  public FailureInjectingRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata,
-      TableConfig tableConfig, RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir,
-      IndexLoadingConfig indexLoadingConfig, Schema schema, LLCSegmentName llcSegmentName,
-      Semaphore partitionGroupConsumerSemaphore, ServerMetrics serverMetrics,
-      boolean failCommit) throws AttemptsExceededException, RetriableOperationException {
+  public FailureInjectingRealtimeSegmentDataManager(SegmentZKMetadata segmentZKMetadata, TableConfig tableConfig,
+      RealtimeTableDataManager realtimeTableDataManager, String resourceDataDir, IndexLoadingConfig indexLoadingConfig,
+      Schema schema, LLCSegmentName llcSegmentName, ConsumerCoordinator consumerCoordinator,
+      ServerMetrics serverMetrics, boolean failCommit, PartitionDedupMetadataManager partitionDedupMetadataManager,
+      BooleanSupplier isTableReadyToConsumeData)
+      throws AttemptsExceededException, RetriableOperationException {
     // Pass through to the real parent constructor
-    super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir,
-        indexLoadingConfig, schema, llcSegmentName, partitionGroupConsumerSemaphore, serverMetrics,
-        null /* no PartitionUpsertMetadataManager */, null /* no PartitionDedupMetadataManager */,
-        () -> true /* isReadyToConsumeData always true for tests */);
+    super(segmentZKMetadata, tableConfig, realtimeTableDataManager, resourceDataDir, indexLoadingConfig, schema,
+        llcSegmentName, consumerCoordinator, serverMetrics, null /* no PartitionUpsertMetadataManager */,
+        partitionDedupMetadataManager, isTableReadyToConsumeData);
 
     _failCommit = failCommit;
   }
 
-  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+  protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit)
+      throws SegmentBuildFailureException {
      if (_failCommit) {
        throw new RuntimeException("Forced failure in buildSegmentInternal");
      }

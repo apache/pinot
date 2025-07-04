@@ -34,10 +34,11 @@ service PinotQueryWorker {
 
 message CancelRequest {
   int64 requestId = 1;
+  string cid = 2;
 }
 
 message CancelResponse {
-  // intentionally left empty
+  map<int32, bytes> statsByStage = 1; // stageId -> serialized MultiStageQueryStats.StageStats.Closed
 }
 
 // QueryRequest is the dispatched content for all query stages to a physical worker.

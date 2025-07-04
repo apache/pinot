@@ -31,11 +31,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import javax.validation.constraints.NotNull;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -44,32 +43,37 @@ import org.apache.pinot.spi.utils.JsonUtils;
  * This class can be used to serialize/deserialize the broker response.
  */
 @JsonPropertyOrder({
-    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached", "timeUsedMs",
-    "requestId", "clientRequestId", "brokerId", "numDocsScanned", "totalDocs", "numEntriesScannedInFilter",
-    "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded", "numSegmentsQueried",
-    "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried", "numConsumingSegmentsProcessed",
-    "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs", "numSegmentsPrunedByBroker",
-    "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit", "numSegmentsPrunedByValue",
-    "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs", "offlineSystemActivitiesCpuTimeNs",
-    "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
+    "resultTable", "numRowsResultSet", "partialResult", "exceptions", "numGroupsLimitReached",
+    "numGroupsWarningLimitReached", "timeUsedMs", "requestId", "clientRequestId", "brokerId", "numDocsScanned",
+    "totalDocs", "numEntriesScannedInFilter", "numEntriesScannedPostFilter", "numServersQueried", "numServersResponded",
+    "numSegmentsQueried", "numSegmentsProcessed", "numSegmentsMatched", "numConsumingSegmentsQueried",
+    "numConsumingSegmentsProcessed", "numConsumingSegmentsMatched", "minConsumingFreshnessTimeMs",
+    "numSegmentsPrunedByBroker", "numSegmentsPrunedByServer", "numSegmentsPrunedInvalid", "numSegmentsPrunedByLimit",
+    "numSegmentsPrunedByValue", "brokerReduceTimeMs", "offlineThreadCpuTimeNs", "realtimeThreadCpuTimeNs",
+    "offlineSystemActivitiesCpuTimeNs", "realtimeSystemActivitiesCpuTimeNs", "offlineResponseSerializationCpuTimeNs",
     "realtimeResponseSerializationCpuTimeNs", "offlineTotalCpuTimeNs", "realtimeTotalCpuTimeNs",
-    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried"
+    "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
+    "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
+    "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
+    "pools", "rlsFiltersApplied", "groupsTrimmed"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
   public static final BrokerResponseNative EMPTY_RESULT = BrokerResponseNative.empty();
   public static final BrokerResponseNative NO_TABLE_RESULT =
-      new BrokerResponseNative(QueryException.BROKER_RESOURCE_MISSING_ERROR);
+      new BrokerResponseNative(QueryErrorCode.BROKER_RESOURCE_MISSING);
   public static final BrokerResponseNative TABLE_DOES_NOT_EXIST =
-      new BrokerResponseNative(QueryException.TABLE_DOES_NOT_EXIST_ERROR);
+      new BrokerResponseNative(QueryErrorCode.TABLE_DOES_NOT_EXIST);
   public static final BrokerResponseNative TABLE_IS_DISABLED =
-      new BrokerResponseNative(QueryException.TABLE_IS_DISABLED_ERROR);
+      new BrokerResponseNative(QueryErrorCode.TABLE_IS_DISABLED);
   public static final BrokerResponseNative BROKER_ONLY_EXPLAIN_PLAN_OUTPUT = getBrokerResponseExplainPlanOutput();
 
   private ResultTable _resultTable;
   private int _numRowsResultSet = 0;
   private List<QueryProcessingException> _exceptions = new ArrayList<>();
+  private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
+  private boolean _numGroupsWarningLimitReached = false;
   private long _timeUsedMs = 0L;
   private String _requestId;
   private String _clientRequestId;
@@ -99,22 +103,39 @@ public class BrokerResponseNative implements BrokerResponse {
   private long _realtimeSystemActivitiesCpuTimeNs = 0L;
   private long _offlineResponseSerializationCpuTimeNs = 0L;
   private long _realtimeResponseSerializationCpuTimeNs = 0L;
+  private long _offlineThreadMemAllocatedBytes = 0L;
+  private long _realtimeThreadMemAllocatedBytes = 0L;
+  private long _offlineResponseSerMemAllocatedBytes = 0L;
+  private long _realtimeResponseSerMemAllocatedBytes = 0L;
+  private long _offlineTotalMemAllocatedBytes = 0L;
+  private long _realtimeTotalMemAllocatedBytes = 0L;
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
   private Map<String, String> _traceInfo = new HashMap<>();
   private Set<String> _tablesQueried = Set.of();
 
+  private Set<Integer> _pools = Set.of();
+  private boolean _rlsFiltersApplied = false;
+
   public BrokerResponseNative() {
   }
 
-  public BrokerResponseNative(ProcessingException exception) {
-    _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+  public BrokerResponseNative(QueryErrorCode errorCode, String errMsg) {
+    _exceptions.add(new QueryProcessingException(errorCode.getId(), errorCode.getDefaultMessage() + ": " + errMsg));
   }
 
-  public BrokerResponseNative(List<ProcessingException> exceptions) {
-    for (ProcessingException exception : exceptions) {
-      _exceptions.add(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
-    }
+  public BrokerResponseNative(QueryErrorCode errorCode) {
+    _exceptions.add(new QueryProcessingException(errorCode.getId(), errorCode.getDefaultMessage()));
+  }
+
+  public BrokerResponseNative(QueryErrorMessage errorMsg) {
+    _exceptions.add(QueryProcessingException.fromQueryErrorMessage(errorMsg));
+  }
+
+  public static BrokerResponseNative fromBrokerErrors(List<QueryProcessingException> exceptions) {
+    BrokerResponseNative brokerResponse = new BrokerResponseNative();
+    brokerResponse.setExceptions(exceptions);
+    return brokerResponse;
   }
 
   /** Generate EXPLAIN PLAN output when queries are evaluated by Broker without going to the Server. */
@@ -184,8 +205,13 @@ public class BrokerResponseNative implements BrokerResponse {
     _exceptions.add(exception);
   }
 
-  public void addException(ProcessingException exception) {
-    addException(new QueryProcessingException(exception.getErrorCode(), exception.getMessage()));
+  @Override
+  public boolean isGroupsTrimmed() {
+    return _groupsTrimmed;
+  }
+
+  public void setGroupsTrimmed(boolean groupsTrimmed) {
+    _groupsTrimmed = groupsTrimmed;
   }
 
   @Override
@@ -195,6 +221,15 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void setNumGroupsLimitReached(boolean numGroupsLimitReached) {
     _numGroupsLimitReached = numGroupsLimitReached;
+  }
+
+  @Override
+  public boolean isNumGroupsWarningLimitReached() {
+    return _numGroupsWarningLimitReached;
+  }
+
+  public void setNumGroupsWarningLimitReached(boolean numGroupsWarningLimitReached) {
+    _numGroupsWarningLimitReached = numGroupsWarningLimitReached;
   }
 
   @JsonIgnore
@@ -501,13 +536,67 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @Override
-  public void setTablesQueried(@NotNull Set<String> tablesQueried) {
+  public void setTablesQueried(Set<String> tablesQueried) {
     _tablesQueried = tablesQueried;
   }
 
   @Override
-  @NotNull
   public Set<String> getTablesQueried() {
     return _tablesQueried;
+  }
+
+  @Override
+  public long getOfflineThreadMemAllocatedBytes() {
+    return _offlineThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeThreadMemAllocatedBytes() {
+    return _realtimeThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public long getOfflineResponseSerMemAllocatedBytes() {
+    return _offlineResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeResponseSerMemAllocatedBytes() {
+    return _realtimeResponseSerMemAllocatedBytes;
+  }
+
+  public void setOfflineThreadMemAllocatedBytes(long offlineThreadMemAllocatedBytes) {
+    _offlineThreadMemAllocatedBytes = offlineThreadMemAllocatedBytes;
+  }
+  public void setRealtimeThreadMemAllocatedBytes(long realtimeThreadMemAllocatedBytes) {
+    _realtimeThreadMemAllocatedBytes = realtimeThreadMemAllocatedBytes;
+  }
+  public void setOfflineResponseSerMemAllocatedBytes(long offlineResponseSerMemAllocatedBytes) {
+    _offlineResponseSerMemAllocatedBytes = offlineResponseSerMemAllocatedBytes;
+  }
+  public void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes) {
+    _realtimeResponseSerMemAllocatedBytes = realtimeResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public void setPools(Set<Integer> pools) {
+    _pools = pools;
+  }
+
+  @Override
+  public Set<Integer> getPools() {
+    return _pools;
+  }
+
+  @JsonProperty("rlsFiltersApplied")
+  @Override
+  public void setRLSFiltersApplied(boolean rlsFiltersApplied) {
+    _rlsFiltersApplied = rlsFiltersApplied;
+  }
+
+  @JsonProperty("rlsFiltersApplied")
+  @Override
+  public boolean getRLSFiltersApplied() {
+    return _rlsFiltersApplied;
   }
 }

@@ -72,13 +72,28 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
       _controllerMetrics.addTimedValue(controllerTimer, 30_000, TimeUnit.MILLISECONDS);
       assertTimerExportedCorrectly(controllerTimer.getTimerName(), EXPORTED_METRIC_PREFIX);
     } else {
-      _controllerMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, controllerTimer, 30_000L, TimeUnit.MILLISECONDS);
-      _controllerMetrics.addTimedTableValue(ExportedLabelValues.TABLENAME, controllerTimer, 30_000L,
-          TimeUnit.MILLISECONDS);
+      if (controllerTimer == ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS) {
+        _controllerMetrics.addTimedTableValue(String.format("%s.%s", TABLE_NAME_WITH_TYPE, ExportedLabelValues.DONE
 
-      assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.TABLENAME_TABLETYPE,
-          EXPORTED_METRIC_PREFIX);
-      assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.TABLENAME, EXPORTED_METRIC_PREFIX);
+            ),
+            ControllerTimer.TABLE_REBALANCE_EXECUTION_TIME_MS, 100_000, TimeUnit.MILLISECONDS);
+        assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.JOBSTATUS_TABLENAME_TABLETYPE,
+            EXPORTED_METRIC_PREFIX);
+      } else if (controllerTimer == ControllerTimer.CRON_SCHEDULER_JOB_EXECUTION_TIME_MS) {
+        _controllerMetrics.addTimedTableValue(String.format("%s.%s", TABLE_NAME_WITH_TYPE,
+                ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT),
+            ControllerTimer.CRON_SCHEDULER_JOB_EXECUTION_TIME_MS, 100_000, TimeUnit.MILLISECONDS);
+        assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.TASKTYPE_TABLENAME_TABLETYPE,
+            EXPORTED_METRIC_PREFIX);
+      } else {
+        _controllerMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, controllerTimer, 30_000L, TimeUnit.MILLISECONDS);
+        _controllerMetrics.addTimedTableValue(ExportedLabelValues.TABLENAME, controllerTimer, 30_000L,
+            TimeUnit.MILLISECONDS);
+
+        assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.TABLENAME_TABLETYPE,
+            EXPORTED_METRIC_PREFIX);
+        assertTimerExportedCorrectly(controllerTimer.getTimerName(), ExportedLabels.TABLENAME, EXPORTED_METRIC_PREFIX);
+      }
     }
   }
 

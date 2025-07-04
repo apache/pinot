@@ -31,7 +31,7 @@ import org.apache.pinot.tools.utils.SampleQueries;
 
 
 public class MultistageEngineQuickStart extends Quickstart {
-  private static final String[] MULTI_STAGE_TABLE_DIRECTORIES = new String[]{
+  protected static final String[] MULTI_STAGE_TABLE_DIRECTORIES = new String[]{
       "examples/batch/airlineStats",
       "examples/batch/baseballStats",
       "examples/batch/billing",
@@ -47,6 +47,9 @@ public class MultistageEngineQuickStart extends Quickstart {
       "examples/batch/fineFoodReviews",
   };
 
+  protected static final Map<String, String> OPTIONS_TO_USE_MSE = Map.of("queryOptions",
+      CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
+
   @Override
   public List<String> types() {
     return Collections.singletonList("MULTI_STAGE");
@@ -55,27 +58,24 @@ public class MultistageEngineQuickStart extends Quickstart {
   @Override
   public void runSampleQueries(QuickstartRunner runner)
       throws Exception {
-
     printStatus(Quickstart.Color.YELLOW, "***** Multi-stage engine quickstart setup complete *****");
-    Map<String, String> queryOptions = Collections.singletonMap("queryOptions",
-        CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE + "=true");
     printStatus(Quickstart.Color.YELLOW, "Total number of documents in the table");
     printStatus(Quickstart.Color.CYAN, "Query : " + SampleQueries.COUNT_BASEBALL_STATS);
     printStatus(Quickstart.Color.YELLOW,
-        prettyPrintResponse(runner.runQuery(SampleQueries.COUNT_BASEBALL_STATS, queryOptions)));
+        prettyPrintResponse(runner.runQuery(SampleQueries.COUNT_BASEBALL_STATS, OPTIONS_TO_USE_MSE)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
     printStatus(Quickstart.Color.YELLOW, "Correlate the same player(s) with more than 160-run some year(s) and"
         + " with less than 2-run some other year(s)");
     printStatus(Quickstart.Color.CYAN, "Query : " + SampleQueries.BASEBALL_STATS_SELF_JOIN);
     printStatus(Quickstart.Color.YELLOW,
-        prettyPrintResponse(runner.runQuery(SampleQueries.BASEBALL_STATS_SELF_JOIN, queryOptions)));
+        prettyPrintResponse(runner.runQuery(SampleQueries.BASEBALL_STATS_SELF_JOIN, OPTIONS_TO_USE_MSE)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
     printStatus(Quickstart.Color.YELLOW, "Baseball Stats with joined team names");
     printStatus(Quickstart.Color.CYAN, "Query : " + SampleQueries.BASEBALL_JOIN_DIM_BASEBALL_TEAMS);
     printStatus(Quickstart.Color.YELLOW,
-        prettyPrintResponse(runner.runQuery(SampleQueries.BASEBALL_JOIN_DIM_BASEBALL_TEAMS, queryOptions)));
+        prettyPrintResponse(runner.runQuery(SampleQueries.BASEBALL_JOIN_DIM_BASEBALL_TEAMS, OPTIONS_TO_USE_MSE)));
     printStatus(Quickstart.Color.GREEN, "***************************************************");
 
     String q4 =

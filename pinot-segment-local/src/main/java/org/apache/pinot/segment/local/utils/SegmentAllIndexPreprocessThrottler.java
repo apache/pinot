@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,5 +58,15 @@ public class SegmentAllIndexPreprocessThrottler extends BaseSegmentOperationsThr
         CommonConstants.Helix.CONFIG_OF_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES,
         CommonConstants.Helix.DEFAULT_MAX_SEGMENT_PREPROCESS_PARALLELISM_BEFORE_SERVING_QUERIES);
     LOGGER.info("Updated SegmentAllIndexPreprocessThrottler configs with latest clusterConfigs");
+  }
+
+  @Override
+  public void updateThresholdMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_ALL_PREPROCESS_THROTTLE_THRESHOLD, value);
+  }
+
+  @Override
+  public void updateCountMetric(int value) {
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.SEGMENT_ALL_PREPROCESS_COUNT, value);
   }
 }

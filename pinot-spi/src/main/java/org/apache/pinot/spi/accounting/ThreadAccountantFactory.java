@@ -18,9 +18,10 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
 public interface ThreadAccountantFactory {
-  ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId);
+  ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType);
 }

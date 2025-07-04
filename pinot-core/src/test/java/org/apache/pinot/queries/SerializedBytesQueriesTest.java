@@ -25,7 +25,6 @@ import com.tdunning.math.stats.TDigest;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
@@ -142,6 +141,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       throws Exception {
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
+      GenericRow row = new GenericRow();
+
       int numValues = RANDOM.nextInt(MAX_NUM_VALUES_TO_PRE_AGGREGATE) + 1;
       int[] values = new int[numValues];
       for (int j = 0; j < numValues; j++) {
@@ -150,9 +151,8 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       _valuesArray[i] = values;
       int groupId = i % NUM_GROUPS;
 
-      HashMap<String, Object> valueMap = new HashMap<>();
-      valueMap.put(GROUP_BY_SV_COLUMN, GROUPS[groupId]);
-      valueMap.put(GROUP_BY_MV_COLUMN, GROUPS);
+      row.putValue(GROUP_BY_SV_COLUMN, GROUPS[groupId]);
+      row.putValue(GROUP_BY_MV_COLUMN, GROUPS);
 
       double sum = 0.0;
       for (int value : values) {
@@ -160,14 +160,14 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       }
       AvgPair avgPair = new AvgPair(sum, numValues);
       _avgPairs[i] = avgPair;
-      valueMap.put(AVG_COLUMN, ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
+      row.putValue(AVG_COLUMN, ObjectSerDeUtils.AVG_PAIR_SER_DE.serialize(avgPair));
 
       HyperLogLog hyperLogLog = new HyperLogLog(DISTINCT_COUNT_HLL_LOG2M);
       for (int value : values) {
         hyperLogLog.offer(value);
       }
       _hyperLogLogs[i] = hyperLogLog;
-      valueMap.put(DISTINCT_COUNT_HLL_COLUMN, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog));
+      row.putValue(DISTINCT_COUNT_HLL_COLUMN, ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize(hyperLogLog));
 
       double min = Double.POSITIVE_INFINITY;
       double max = Double.NEGATIVE_INFINITY;
@@ -181,33 +181,31 @@ public class SerializedBytesQueriesTest extends BaseQueriesTest {
       }
       MinMaxRangePair minMaxRangePair = new MinMaxRangePair(min, max);
       _minMaxRangePairs[i] = minMaxRangePair;
-      valueMap.put(MIN_MAX_RANGE_COLUMN, ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair));
+      row.putValue(MIN_MAX_RANGE_COLUMN, ObjectSerDeUtils.MIN_MAX_RANGE_PAIR_SER_DE.serialize(minMaxRangePair));
 
       QuantileDigest quantileDigest = new QuantileDigest(PERCENTILE_EST_MAX_ERROR);
       for (int value : values) {
         quantileDigest.add(value);
       }
       _quantileDigests[i] = quantileDigest;
-      valueMap.put(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
+      row.putValue(PERCENTILE_EST_COLUMN, ObjectSerDeUtils.QUANTILE_DIGEST_SER_DE.serialize(quantileDigest));
 
       TDigest tDigest = MergingDigest.createDigest(PERCENTILE_TDIGEST_COMPRESSION);
       for (int value : values) {
         tDigest.add(value);
       }
       _tDigests[i] = tDigest;
-      valueMap.put(PERCENTILE_TDIGEST_COLUMN, ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
+      row.putValue(PERCENTILE_TDIGEST_COLUMN, ObjectSerDeUtils.TDIGEST_SER_DE.serialize(tDigest));
 
       HyperLogLogPlus hyperLogLogPlus = new HyperLogLogPlus(DISTINCT_COUNT_HLL_PLUS_P);
       for (int value : values) {
         hyperLogLogPlus.offer(value);
       }
       _hyperLogLogPluses[i] = hyperLogLogPlus;
-      valueMap.put(DISTINCT_COUNT_HLL_PLUS_COLUMN,
+      row.putValue(DISTINCT_COUNT_HLL_PLUS_COLUMN,
           ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus));
 
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(valueMap);
-      rows.add(genericRow);
+      rows.add(row);
     }
 
     Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)

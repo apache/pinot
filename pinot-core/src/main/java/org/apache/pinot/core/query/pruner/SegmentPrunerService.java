@@ -105,7 +105,7 @@ public class SegmentPrunerService {
   public List<IndexSegment> prune(List<IndexSegment> segments, QueryContext query, SegmentPrunerStatistics stats,
       @Nullable ExecutorService executorService) {
     try (InvocationScope scope = Tracing.getTracer().createScope(SegmentPrunerService.class)) {
-      segments = removeInvalidSegments(segments, query, stats);
+      segments = removeEmptySegments(segments);
       int invokedPrunersCount = 0;
       for (SegmentPruner segmentPruner : _segmentPruners) {
         if (segmentPruner.isApplicableTo(query)) {
@@ -124,7 +124,7 @@ public class SegmentPrunerService {
   }
 
   /**
-   * Filters the given list, returning a list that only contains the valid segments, modifying the list received as
+   * Filters the given list, returning a list that only contains the non-empty segments, modifying the list received as
    * argument.
    *
    * <p>
@@ -136,28 +136,17 @@ public class SegmentPrunerService {
    *                 undefined way. Therefore, this list should not be used after calling this method.
    * @return the new list with filtered elements. This is the list that have to be used.
    */
-  private static List<IndexSegment> removeInvalidSegments(List<IndexSegment> segments, QueryContext query,
-      SegmentPrunerStatistics stats) {
+  private static List<IndexSegment> removeEmptySegments(List<IndexSegment> segments) {
     int selected = 0;
-    int invalid = 0;
     for (IndexSegment segment : segments) {
       if (!isEmptySegment(segment)) {
-        if (isInvalidSegment(segment, query)) {
-          invalid++;
-        } else {
-          segments.set(selected++, segment);
-        }
+        segments.set(selected++, segment);
       }
     }
-    stats.setInvalidSegments(invalid);
     return segments.subList(0, selected);
   }
 
   private static boolean isEmptySegment(IndexSegment segment) {
     return segment.getSegmentMetadata().getTotalDocs() == 0;
-  }
-
-  private static boolean isInvalidSegment(IndexSegment segment, QueryContext query) {
-    return !segment.getColumnNames().containsAll(query.getColumns());
   }
 }

@@ -40,6 +40,7 @@ public class PinotVersion {
    * in a local, non-maven build this will resolve to {@code UNKNOWN}.
    */
   public static final String VERSION;
+  public static final String UNKNOWN = "UNKNOWN";
 
   /**
    * A sanitized version string with all dots replaced with underscores, which is necessary
@@ -61,13 +62,13 @@ public class PinotVersion {
       version = String.valueOf(properties.get("pinot.version"));
     } catch (IOException e) {
       LOGGER.error("Could not load version properties; setting version to UNKNOWN.", e);
-      version = "UNKNOWN";
+      version = UNKNOWN;
     }
 
     // if building this via some non-maven environment (e.g. IntelliJ) it is possible that
     // the properties file will not be properly filtered, in which case just return UNKNOWN
     if (version.equals("${project.version}")) {
-      VERSION = "UNKNOWN";
+      VERSION = UNKNOWN;
       LOGGER.warn("Using UNKNOWN version properties because project.version was not resolved during build.");
     } else {
       VERSION = version;

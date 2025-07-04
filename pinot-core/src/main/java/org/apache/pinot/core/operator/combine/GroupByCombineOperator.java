@@ -25,8 +25,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.apache.pinot.common.exception.QueryException;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -42,7 +40,9 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryErrorMessage;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +66,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private final CountDownLatch _operatorLatch;
 
   private volatile IndexedTable _indexedTable;
+  private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
+  private volatile boolean _numGroupsWarningLimitReached;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -119,9 +121,15 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           }
         }
 
+        if (resultsBlock.isGroupsTrimmed()) {
+          _groupsTrimmed = true;
+        }
         // Set groups limit reached flag.
         if (resultsBlock.isNumGroupsLimitReached()) {
           _numGroupsLimitReached = true;
+        }
+        if (resultsBlock.isNumGroupsWarningLimitReached()) {
+          _numGroupsWarningLimitReached = true;
         }
 
         // Merge aggregation group-by result.
@@ -197,19 +205,29 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return
-      String errorMessage =
-          String.format("Timed out while combining group-by order-by results after %dms, queryContext = %s", timeoutMs,
-              _queryContext);
-      LOGGER.error(errorMessage);
-      return new ExceptionResultsBlock(new TimeoutException(errorMessage));
+      String userError = "Timed out while combining group-by order-by results after " + timeoutMs + "ms";
+      String logMsg = userError + ", queryContext = " + _queryContext;
+      LOGGER.error(logMsg);
+      return new ExceptionResultsBlock(new QueryErrorMessage(QueryErrorCode.EXECUTION_TIMEOUT, userError, logMsg));
     }
 
-    Throwable processingException = _processingException.get();
-    if (processingException != null) {
-      if (processingException instanceof BadQueryRequestException) {
-        return new ExceptionResultsBlock(QueryException.QUERY_VALIDATION_ERROR, processingException);
+    Throwable ex = _processingException.get();
+    if (ex != null) {
+      String userError = "Caught exception while processing group-by order-by query";
+      String devError = userError + ": " + ex.getMessage();
+      QueryErrorMessage errMsg;
+      if (ex instanceof QueryException) {
+        // If the exception is a QueryException, use the error code from the exception and trust the error message
+        errMsg = new QueryErrorMessage(((QueryException) ex).getErrorCode(), devError, devError);
+      } else {
+        // If the exception is not a QueryException, use the generic error code and don't expose the exception message
+        errMsg = new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, userError, devError);
       }
-      return new ExceptionResultsBlock(processingException);
+      return new ExceptionResultsBlock(errMsg);
+    }
+
+    if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
+      _groupsTrimmed = true;
     }
 
     IndexedTable indexedTable = _indexedTable;
@@ -221,7 +239,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       indexedTable.finish(false);
     }
     GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
+    mergedBlock.setGroupsTrimmed(_groupsTrimmed);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+    mergedBlock.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
     return mergedBlock;

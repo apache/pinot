@@ -152,7 +152,6 @@ public class PulsarConsumerTest {
   public StreamConfig getStreamConfig(String topicName) {
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", "pulsar");
-    streamConfigMap.put("stream.pulsar.consumer.type", "simple");
     streamConfigMap.put("stream.pulsar.topic.name", topicName);
     streamConfigMap.put("stream.pulsar.bootstrap.servers", _pulsar.getPulsarBrokerUrl());
     streamConfigMap.put("stream.pulsar.serviceHttpUrl", _pulsar.getHttpServiceUrl());

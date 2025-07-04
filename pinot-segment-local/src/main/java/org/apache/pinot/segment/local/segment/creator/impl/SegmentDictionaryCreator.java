@@ -28,7 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.ByteOrder;
-import javax.annotation.Nonnull;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
@@ -86,13 +86,13 @@ public class SegmentDictionaryCreator implements IndexCreator {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId)
+  public void add(Object value, int dictId)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+  public void add(Object[] values, @Nullable int[] dictIds)
       throws IOException {
     throw new UnsupportedOperationException("Dictionaries should not be built as a normal index");
   }
@@ -253,6 +253,27 @@ public class SegmentDictionaryCreator implements IndexCreator {
 
       default:
         throw new UnsupportedOperationException("Unsupported data type: " + _storedType);
+    }
+  }
+
+  /** Only call after build(). Used by StarTree json index.  */
+  @SuppressWarnings({"unused"})
+  public Map getValueToIndexMap() {
+    switch (_storedType) {
+      case INT:
+        return _intValueToIndexMap;
+      case LONG:
+        return _longValueToIndexMap;
+      case FLOAT:
+        return _floatValueToIndexMap;
+      case DOUBLE:
+        return _doubleValueToIndexMap;
+      case STRING:
+      case BIG_DECIMAL:
+      case BYTES:
+        return _objectValueToIndexMap;
+      default:
+        throw new UnsupportedOperationException("Unsupported data type : " + _storedType);
     }
   }
 

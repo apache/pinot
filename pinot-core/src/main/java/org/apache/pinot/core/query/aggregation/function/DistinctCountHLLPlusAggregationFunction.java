@@ -22,6 +22,7 @@ import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -365,6 +366,17 @@ public class DistinctCountHLLPlusAggregationFunction extends BaseSingleInputAggr
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(HyperLogLogPlus hyperLogLogPlus) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLogPlus.getValue(),
+        ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.serialize(hyperLogLogPlus));
+  }
+
+  @Override
+  public HyperLogLogPlus deserializeIntermediateResult(CustomObject customObject) {
+    return ObjectSerDeUtils.HYPER_LOG_LOG_PLUS_SER_DE.deserialize(customObject.getBuffer());
   }
 
   @Override

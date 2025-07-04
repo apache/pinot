@@ -19,6 +19,7 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import com.google.common.base.Preconditions;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import org.apache.datasketches.theta.Union;
 import org.apache.datasketches.theta.UpdateSketch;
 import org.apache.datasketches.theta.UpdateSketchBuilder;
 import org.apache.datasketches.thetacommon.ThetaUtil;
+import org.apache.pinot.common.CustomObject;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
@@ -42,6 +44,7 @@ import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.request.context.predicate.Predicate;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
@@ -1011,6 +1014,62 @@ public class DistinctCountThetaSketchAggregationFunction
   @Override
   public ColumnDataType getIntermediateResultColumnType() {
     return ColumnDataType.OBJECT;
+  }
+
+  @Override
+  public SerializedIntermediateResult serializeIntermediateResult(
+      List<ThetaSketchAccumulator> thetaSketchAccumulators) {
+    return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.List.getValue(),
+        serialize(thetaSketchAccumulators));
+  }
+
+  private static byte[] serialize(List<ThetaSketchAccumulator> thetaSketchAccumulators) {
+    int size = thetaSketchAccumulators.size();
+
+    // Directly return the size (0) for empty list
+    if (size == 0) {
+      return new byte[Integer.BYTES];
+    }
+
+    // Besides the value bytes, we store: size, value type, length for each value
+    long bufferSize = (2 + (long) size) * Integer.BYTES;
+    byte[][] valueBytesArray = new byte[size][];
+    int index = 0;
+    for (ThetaSketchAccumulator value : thetaSketchAccumulators) {
+      byte[] valueBytes = ObjectSerDeUtils.DATA_SKETCH_THETA_ACCUMULATOR_SER_DE.serialize(value);
+      bufferSize += valueBytes.length;
+      valueBytesArray[index++] = valueBytes;
+    }
+    Preconditions.checkState(bufferSize <= Integer.MAX_VALUE, "Buffer size exceeds 2GB");
+    byte[] bytes = new byte[(int) bufferSize];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
+    byteBuffer.putInt(size);
+    byteBuffer.putInt(ObjectSerDeUtils.ObjectType.ThetaSketchAccumulator.getValue());
+    for (byte[] valueBytes : valueBytesArray) {
+      byteBuffer.putInt(valueBytes.length);
+      byteBuffer.put(valueBytes);
+    }
+    return bytes;
+  }
+
+  @Override
+  public List<ThetaSketchAccumulator> deserializeIntermediateResult(CustomObject customObject) {
+    ByteBuffer buffer = customObject.getBuffer();
+    int size = buffer.getInt();
+    if (size == 0) {
+      return List.of();
+    }
+    ArrayList<ThetaSketchAccumulator> thetaSketchAccumulators = new ArrayList<>(size);
+    // Skip the value type
+    buffer.getInt();
+    for (int i = 0; i < size; i++) {
+      int numBytes = buffer.getInt();
+      ByteBuffer slice = buffer.slice();
+      slice.limit(numBytes);
+      thetaSketchAccumulators.add(ObjectSerDeUtils.DATA_SKETCH_THETA_ACCUMULATOR_SER_DE.deserialize(slice));
+      buffer.position(buffer.position() + numBytes);
+    }
+    return thetaSketchAccumulators;
   }
 
   @Override

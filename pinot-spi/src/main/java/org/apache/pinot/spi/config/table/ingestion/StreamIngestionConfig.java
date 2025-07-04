@@ -23,7 +23,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 
 
 /**
@@ -38,10 +40,24 @@ public class StreamIngestionConfig extends BaseJsonConfig {
   private boolean _columnMajorSegmentBuilderEnabled = true;
 
   @JsonPropertyDescription("Whether to track offsets of the filtered stream messages during consumption.")
-  private boolean _trackFilteredMessageOffsets = false;
+  private boolean _trackFilteredMessageOffsets;
 
   @JsonPropertyDescription("Whether pauseless consumption is enabled for the table")
-  private boolean _pauselessConsumptionEnabled = false;
+  private boolean _pauselessConsumptionEnabled;
+
+  @JsonPropertyDescription("Enforce consumption of segments in order of segment creation by the controller")
+  private boolean _enforceConsumptionInOrder;
+
+  @JsonPropertyDescription("If enabled, Server always relies on ideal state to get previous segment. If disabled, "
+      + "server uses sequence id - 1 for previous segment")
+  private boolean _useIdealStateToCalculatePreviousSegment;
+
+  @JsonPropertyDescription("Policy to determine the behaviour of parallel consumption.")
+  private ParallelSegmentConsumptionPolicy _parallelSegmentConsumptionPolicy;
+
+  @JsonPropertyDescription("Recovery mode which is used to decide how to recover a segment online in IS but having no"
+      + " completed (immutable) replica on any server in pause-less ingestion")
+  private DisasterRecoveryMode _disasterRecoveryMode = DisasterRecoveryMode.DEFAULT;
 
   @JsonCreator
   public StreamIngestionConfig(@JsonProperty("streamConfigMaps") List<Map<String, String>> streamConfigMaps) {
@@ -74,5 +90,38 @@ public class StreamIngestionConfig extends BaseJsonConfig {
 
   public void setPauselessConsumptionEnabled(boolean pauselessConsumptionEnabled) {
     _pauselessConsumptionEnabled = pauselessConsumptionEnabled;
+  }
+
+  public boolean isEnforceConsumptionInOrder() {
+    return _enforceConsumptionInOrder;
+  }
+
+  public void setEnforceConsumptionInOrder(boolean enforceConsumptionInOrder) {
+    _enforceConsumptionInOrder = enforceConsumptionInOrder;
+  }
+
+  public boolean isUseIdealStateToCalculatePreviousSegment() {
+    return _useIdealStateToCalculatePreviousSegment;
+  }
+
+  public void setUseIdealStateToCalculatePreviousSegment(boolean useIdealStateToCalculatePreviousSegment) {
+    _useIdealStateToCalculatePreviousSegment = useIdealStateToCalculatePreviousSegment;
+  }
+
+  @Nullable
+  public ParallelSegmentConsumptionPolicy getParallelSegmentConsumptionPolicy() {
+    return _parallelSegmentConsumptionPolicy;
+  }
+
+  public void setParallelSegmentConsumptionPolicy(ParallelSegmentConsumptionPolicy parallelSegmentConsumptionPolicy) {
+    _parallelSegmentConsumptionPolicy = parallelSegmentConsumptionPolicy;
+  }
+
+  public DisasterRecoveryMode getDisasterRecoveryMode() {
+    return _disasterRecoveryMode;
+  }
+
+  public void setDisasterRecoveryMode(DisasterRecoveryMode disasterRecoveryMode) {
+    _disasterRecoveryMode = disasterRecoveryMode;
   }
 }

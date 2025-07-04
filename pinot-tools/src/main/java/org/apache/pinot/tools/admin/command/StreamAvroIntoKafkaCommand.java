@@ -31,10 +31,10 @@ import org.apache.avro.generic.GenericRecord;
 import org.apache.avro.io.BinaryEncoder;
 import org.apache.avro.io.DatumWriter;
 import org.apache.avro.io.EncoderFactory;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
+import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 import org.apache.pinot.tools.Command;
 import org.apache.pinot.tools.utils.KafkaStarterUtils;
 import org.slf4j.Logger;
@@ -134,7 +134,7 @@ public class StreamAvroIntoKafkaCommand extends AbstractBaseAdminCommand impleme
             break;
         }
         // Write the message to Kafka
-        streamDataProducer.produce(_kafkaTopic, Longs.toByteArray(HashUtil.hash64(bytes, bytes.length)), bytes);
+        streamDataProducer.produce(_kafkaTopic, Longs.toByteArray(MurmurHashFunctions.murmurHash2Bit64(bytes)), bytes);
 
         // Sleep between messages
         if (sleepRequired) {

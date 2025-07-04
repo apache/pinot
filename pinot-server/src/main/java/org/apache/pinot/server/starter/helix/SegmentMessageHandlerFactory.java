@@ -33,6 +33,7 @@ import org.apache.pinot.common.messages.ForceCommitMessage;
 import org.apache.pinot.common.messages.IngestionMetricsRemoveMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.messages.TableConfigSchemaRefreshMessage;
 import org.apache.pinot.common.messages.TableDeletionMessage;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -41,7 +42,6 @@ import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
-import org.apache.pinot.core.util.SegmentRefreshSemaphore;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,12 +54,10 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   // The reason for that is segment refresh/reload will temporarily use double-sized memory
   private final InstanceDataManager _instanceDataManager;
   private final ServerMetrics _metrics;
-  private final SegmentRefreshSemaphore _segmentRefreshSemaphore;
 
   public SegmentMessageHandlerFactory(InstanceDataManager instanceDataManager, ServerMetrics metrics) {
     _instanceDataManager = instanceDataManager;
     _metrics = metrics;
-    _segmentRefreshSemaphore = new SegmentRefreshSemaphore(instanceDataManager.getMaxParallelRefreshThreads(), true);
   }
 
   // Called each time a message is received.
@@ -77,6 +75,8 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new ForceCommitMessageHandler(new ForceCommitMessage(message), _metrics, context);
       case IngestionMetricsRemoveMessage.INGESTION_METRICS_REMOVE_MSG_SUB_TYPE:
         return new IngestionMetricsRemoveMessageHandler(new IngestionMetricsRemoveMessage(message), _metrics, context);
+      case TableConfigSchemaRefreshMessage.REFRESH_TABLE_CONFIG_AND_SCHEMA:
+        return new TableSchemaRefreshMessageHandler(new TableConfigSchemaRefreshMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -102,11 +102,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult result = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
-      _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
       try {
         // The number of retry times depends on the retry count in Constants.
         _instanceDataManager.replaceSegment(_tableNameWithType, _segmentName);
@@ -114,8 +112,6 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       } catch (Exception e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.REFRESH_FAILURES, 1);
         Utils.rethrowException(e);
-      } finally {
-        _segmentRefreshSemaphore.releaseSema();
       }
       return result;
     }
@@ -133,28 +129,21 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling message: {}", _message);
       try {
         if (CollectionUtils.isNotEmpty(_segmentList)) {
-          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload,
-              _segmentRefreshSemaphore);
+          _instanceDataManager.reloadSegments(_tableNameWithType, _segmentList, _forceDownload);
         } else if (StringUtils.isNotEmpty(_segmentName)) {
           // TODO: check _segmentName to be backward compatible. Moving forward, we just need to check the list to
           //       reload one or more segments. If the list or the segment name is empty, all segments are reloaded.
-          _segmentRefreshSemaphore.acquireSema(_segmentName, _logger);
-          try {
-            _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
-          } finally {
-            _segmentRefreshSemaphore.releaseSema();
-          }
+          _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
         } else {
           // NOTE: the method continues if any segment reload encounters an unhandled exception,
           // and failed segments are logged out in the end. We don't acquire any permit here as they'll be acquired
           // by worked threads later.
-          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload, _segmentRefreshSemaphore);
+          _instanceDataManager.reloadAllSegments(_tableNameWithType, _forceDownload);
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
@@ -175,8 +164,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling table deletion message: {}", _message);
       try {
@@ -201,20 +189,19 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         Arrays.stream(ServerTimer.values())
             .filter(t -> !t.isGlobal())
             .forEach(t -> _metrics.removeTableTimer(_tableNameWithType, t));
-        Arrays.stream(ServerQueryPhase.values())
-            .forEach(p -> _metrics.removePhaseTiming(_tableNameWithType, p));
+        Arrays.stream(ServerQueryPhase.values()).forEach(p -> _metrics.removePhaseTiming(_tableNameWithType, p));
       } catch (Exception e) {
-        LOGGER.warn("Error while removing metrics of removed table {}. "
-            + "Some metrics may survive until the next restart.", _tableNameWithType);
+        LOGGER.warn(
+            "Error while removing metrics of removed table {}. " + "Some metrics may survive until the next restart.",
+            _tableNameWithType);
       }
       return helixTaskResult;
     }
   }
 
   private class ForceCommitMessageHandler extends DefaultMessageHandler {
-
-    private String _tableName;
-    private Set<String> _segmentNames;
+    private final String _tableName;
+    private final Set<String> _segmentNames;
 
     public ForceCommitMessageHandler(ForceCommitMessage forceCommitMessage, ServerMetrics metrics,
         NotificationContext ctx) {
@@ -224,8 +211,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       _logger.info("Handling force commit message for table {} segments {}", _tableName, _segmentNames);
       try {
@@ -260,6 +246,33 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
   }
 
+  private class TableSchemaRefreshMessageHandler extends DefaultMessageHandler {
+    TableSchemaRefreshMessageHandler(TableConfigSchemaRefreshMessage message, ServerMetrics metrics,
+                                     NotificationContext context) {
+      super(message, metrics, context);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage() {
+      _logger.info("Handling table schema refresh message for table: {}", _tableNameWithType);
+      try {
+        TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(_tableNameWithType);
+        if (tableDataManager != null) {
+          // Update the table config and schema by fetching from ZK
+          tableDataManager.fetchIndexLoadingConfig();
+        } else {
+          _logger.warn("No data manager found for table: {}", _tableNameWithType);
+        }
+      } catch (Exception e) {
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES, 1);
+        Utils.rethrowException(e);
+      }
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      helixTaskResult.setSuccess(true);
+      return helixTaskResult;
+    }
+  }
+
   private static class DefaultMessageHandler extends MessageHandler {
     final String _segmentName;
     final String _tableNameWithType;
@@ -275,8 +288,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
     }
 
     @Override
-    public HelixTaskResult handleMessage()
-        throws InterruptedException {
+    public HelixTaskResult handleMessage() {
       HelixTaskResult helixTaskResult = new HelixTaskResult();
       helixTaskResult.setSuccess(true);
       return helixTaskResult;

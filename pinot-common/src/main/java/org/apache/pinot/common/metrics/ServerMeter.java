@@ -98,6 +98,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
+  SEGMENT_BUILD_FAILURE("segments", false),
   SEGMENT_UPLOAD_FAILURE("segments", false),
   SEGMENT_UPLOAD_SUCCESS("segments", false),
   // Emitted only by Server to Deep-store segment uploader.
@@ -130,7 +131,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
   LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
   TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
+  THREAD_MEM_ALLOCATED_BYTES("bytes", false),
+  RESPONSE_SER_MEM_ALLOCATED_BYTES("bytes", false),
+  TOTAL_MEM_ALLOCATED_BYTES("bytes", false),
   LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
+
+  GRPC_MEMORY_REJECTIONS("rejections", true, "Number of grpc requests rejected due to memory pressure"),
+
+  DIRECT_MEMORY_OOM("directMemoryOOMCount", true),
+
+  TABLE_CONFIG_AND_SCHEMA_REFRESH_FAILURES("tables", true, "Number of failures to refresh table config and schema"),
 
   // Multi-stage
   /**
@@ -141,13 +151,23 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    */
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
   /**
+   * Number of times group by results were trimmed.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+   */
+  AGGREGATE_TIMES_GROUPS_TRIMMED("times", true),
+  /**
    * Number of times the max number of groups has been reached.
-   * It is increased at most one by one each time per stage.
-   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
-   * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be increased
-   * by 2.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
    */
   AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
+  /**
+   * Number of times the warning threshold for number of groups has been reached.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+   */
+  AGGREGATE_TIMES_NUM_GROUPS_WARNING_LIMIT_REACHED("times", true),
   /**
    * The number of blocks that have been sent to the next stage without being serialized.
    * This is the sum of all blocks sent by all workers in the stage.
@@ -169,7 +189,30 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
    * But if a single query has 2 different window operators and each one reaches the limit, this will be increased by 2.
    */
-  WINDOW_TIMES_MAX_ROWS_REACHED("times", true);
+  WINDOW_TIMES_MAX_ROWS_REACHED("times", true),
+
+  /// Number of tasks started by the MSE query runner
+  MULTI_STAGE_RUNNER_STARTED_TASKS("tasks", true),
+  /// Number of stats completed by the MSE query runner
+  MULTI_STAGE_RUNNER_COMPLETED_TASKS("tasks", true),
+  /// Number of tasks started by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_STARTED_TASKS("tasks", true),
+  /// Number of tasks completed by the MSE query submission executor
+  MULTI_STAGE_SUBMISSION_COMPLETED_TASKS("tasks", true),
+
+  // predownload metrics
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_COUNT("predownloadSegmentCount", true),
+  PREDOWNLOAD_SEGMENT_DOWNLOAD_FAILURE_COUNT("predownloadSegmentFailureCount", true),
+  PREDOWNLOAD_SUCCEED("predownloadSucceed", true),
+  PREDOWNLOAD_FAILED("predownloadFailed", true),
+
+  // reingestion metrics
+  SEGMENT_REINGESTION_FAILURE("segments", false),
+
+  /**
+   * Approximate heap bytes used by the mutable JSON index at the time of index close.
+   */
+  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false);
 
   private final String _meterName;
   private final String _unit;

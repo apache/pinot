@@ -123,17 +123,15 @@ public abstract class DistinctFromTransformFunctionTest {
     }
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      Map<String, Object> map = new HashMap<>();
-      map.put(INT_SV_COLUMN, _intSVValues[i]);
-      if (isEqualRow(i)) {
-        map.put(INT_SV_NULL_COLUMN, _intSVValues[i]);
-      } else if (isNotEqualRow(i)) {
-        map.put(INT_SV_NULL_COLUMN, _intSVValues[i] + 1);
-      } else if (isNullRow(i)) {
-        map.put(INT_SV_NULL_COLUMN, null);
-      }
       GenericRow row = new GenericRow();
-      row.init(map);
+      row.putValue(INT_SV_COLUMN, _intSVValues[i]);
+      if (isEqualRow(i)) {
+        row.putValue(INT_SV_NULL_COLUMN, _intSVValues[i]);
+      } else if (isNotEqualRow(i)) {
+        row.putValue(INT_SV_NULL_COLUMN, _intSVValues[i] + 1);
+      } else if (isNullRow(i)) {
+        row.putValue(INT_SV_NULL_COLUMN, null);
+      }
       rows.add(row);
     }
 

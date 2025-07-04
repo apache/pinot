@@ -113,6 +113,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "periodictask", "run?taskname=" + taskName);
   }
 
+  public String forPeriodTaskRun(String taskName, String tableName, TableType tableType) {
+    return StringUtil.join("/", _baseUrl, "periodictask", "run?taskname=" + taskName + "&tableName=" + tableName
+        + "&type=" + tableType);
+  }
+
   public String forUpdateUserConfig(String username, String componentTypeStr, boolean passwordChanged) {
     StringBuilder params = new StringBuilder();
     if (StringUtils.isNotBlank(username)) {
@@ -174,6 +179,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tenants", tenant) + "?type=" + tenantType + "&state=" + state;
   }
 
+  public String forToggleTableState(String tableName, TableType type, boolean enable) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "state") + "?type=" + type
+        + "&state=" + (enable ? "enable" : "disable");
+  }
+
   public String forLiveBrokerTablesGet() {
     return StringUtil.join("/", _baseUrl, "tables", "livebrokers");
   }
@@ -206,24 +216,17 @@ public class ControllerRequestURLBuilder {
 
   public String forTableRebalance(String tableName, String tableType, boolean dryRun, boolean reassignInstances,
       boolean includeConsuming, boolean downtime, int minAvailableReplicas) {
-    StringBuilder stringBuilder =
-        new StringBuilder(StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance?type=" + tableType));
-    if (dryRun) {
-      stringBuilder.append("&dryRun=").append(dryRun);
-    }
-    if (reassignInstances) {
-      stringBuilder.append("&reassignInstances=").append(reassignInstances);
-    }
-    if (includeConsuming) {
-      stringBuilder.append("&includeConsuming=").append(includeConsuming);
-    }
-    if (downtime) {
-      stringBuilder.append("&downtime=").append(downtime);
-    }
-    if (minAvailableReplicas != 1) {
-      stringBuilder.append("&minAvailableReplicas=").append(minAvailableReplicas);
-    }
-    return stringBuilder.toString();
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "rebalance")
+        + "?type=" + tableType
+        + "&dryRun=" + dryRun
+        + "&reassignInstances=" + reassignInstances
+        + "&includeConsuming=" + includeConsuming
+        + "&downtime=" + downtime
+        + "&minAvailableReplicas=" + minAvailableReplicas;
+  }
+
+  public String forTableConsumingSegmentsInfo(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "consumingSegmentsInfo");
   }
 
   public String forTableForceCommit(String tableName) {
@@ -278,11 +281,27 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableGet(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName);
+    return forTableGet(tableName, null);
+  }
+
+  public String forTableGet(String tableName, TableType tableType) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName);
+    if (tableType != null) {
+      url += "?type=" + tableType.name();
+    }
+    return url;
   }
 
   public String forTableDelete(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName);
+    return forTableDelete(tableName, null);
+  }
+
+  public String forTableDelete(String tableName, String retention) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName);
+    if (retention != null) {
+      url += "?retention=" + retention;
+    }
+    return url;
   }
 
   public String forTableView(String tableName, String view, @Nullable String tableType) {
@@ -415,6 +434,10 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentMetadata(String tableName, String segmentName) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName), "metadata");
+  }
+
+  public String forSegmentMetadata(String tableName, TableType tableType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata") + "?type=" + tableType.name();
   }
 
   public String forListAllSegmentLineages(String tableName, String tableType) {
@@ -625,5 +648,29 @@ public class ControllerRequestURLBuilder {
 
   public String forIdealState(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "idealstate");
+  }
+
+  public String forLogicalTableCreate() {
+    return StringUtil.join("/", _baseUrl, "logicalTables");
+  }
+
+  public String forLogicalTableUpdate(String logicalTableName) {
+    return StringUtil.join("/", _baseUrl, "logicalTables", logicalTableName);
+  }
+
+  public String forLogicalTableGet(String logicalTableName) {
+    return StringUtil.join("/", _baseUrl, "logicalTables", logicalTableName);
+  }
+
+  public String forLogicalTableNamesGet() {
+    return StringUtil.join("/", _baseUrl, "logicalTables");
+  }
+
+  public String forLogicalTableDelete(String logicalTableName) {
+    return StringUtil.join("/", _baseUrl, "logicalTables", logicalTableName);
+  }
+
+  public String forTableTimeBoundary(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "timeBoundary");
   }
 }

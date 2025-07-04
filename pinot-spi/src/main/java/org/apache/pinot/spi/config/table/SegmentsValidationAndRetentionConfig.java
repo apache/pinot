@@ -38,8 +38,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   private String _replication;
   @Deprecated // Use _replication instead
   private String _replicasPerPartition;
-  @Deprecated // Schema name should be the same as raw table name
-  private String _schemaName;
   private String _timeColumnName;
   private TimeUnit _timeType;
   @Deprecated  // Use SegmentAssignmentConfig instead
@@ -54,6 +52,8 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   // using the specified download scheme. Both realtime tables and offline tables can set this field.
   // For more usage of this field, please refer to this design doc: https://tinyurl.com/f63ru4sb
   private String _peerSegmentDownloadScheme;
+
+  private String _untrackedSegmentsDeletionBatchSize;
 
   /**
    * @deprecated Use {@link InstanceAssignmentConfig} instead
@@ -169,19 +169,6 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   }
 
   /**
-   * @deprecated Schema name should be the same as raw table name
-   */
-  @Deprecated
-  public String getSchemaName() {
-    return _schemaName;
-  }
-
-  @Deprecated
-  public void setSchemaName(String schemaName) {
-    _schemaName = schemaName;
-  }
-
-  /**
    * @deprecated Use {@link InstanceAssignmentConfig} instead.
    */
   @Deprecated
@@ -249,5 +236,13 @@ public class SegmentsValidationAndRetentionConfig extends BaseJsonConfig {
   @Deprecated
   public void setMinimizeDataMovement(boolean minimizeDataMovement) {
     _minimizeDataMovement = minimizeDataMovement;
+  }
+
+  public String getUntrackedSegmentsDeletionBatchSize() {
+    return _untrackedSegmentsDeletionBatchSize;
+  }
+
+  public void setUntrackedSegmentsDeletionBatchSize(String untrackedSegmentsDeletionBatchSize) {
+    _untrackedSegmentsDeletionBatchSize = untrackedSegmentsDeletionBatchSize;
   }
 }

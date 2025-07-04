@@ -46,6 +46,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.assertj.core.api.Assertions;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -322,8 +323,9 @@ public class HistogramQueriesTest extends BaseQueriesTest {
       assertTrue(operator instanceof AggregationOperator);
       operator.nextBlock();
     } catch (Exception e) {
-      assertEquals(e.getMessage(),
-          "Caught exception while parsing query: SELECT HISTOGRAM(intColumn,FUNCTION[0, 10, 20]) FROM testTable");
+      Assertions.assertThat(e.getMessage())
+          .startsWith("Caught exception while parsing query: SELECT HISTOGRAM(intColumn,FUNCTION[0, 10, 20]) "
+              + "FROM testTable");
     }
 
     try {

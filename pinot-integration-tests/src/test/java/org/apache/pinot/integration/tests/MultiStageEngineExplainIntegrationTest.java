@@ -163,7 +163,7 @@ public class MultiStageEngineExplainIntegrationTest extends BaseClusterIntegrati
     explainLogical("SELECT 1 FROM mytable",
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
-            + "  LogicalTableScan(table=[[default, mytable]])\n");
+            + "  PinotLogicalTableScan(table=[[default, mytable]])\n");
   }
 
   @AfterClass

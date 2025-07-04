@@ -19,22 +19,28 @@
 package org.apache.pinot.common.response;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.metrics.BrokerMeter;
+import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Interface for broker response.
  */
 public interface BrokerResponse {
-
+  static final Logger LOGGER = LoggerFactory.getLogger(BrokerResponse.class);
   /**
    * Convert the broker response to JSON String.
    */
@@ -49,6 +55,37 @@ public interface BrokerResponse {
   default void toOutputStream(OutputStream outputStream)
       throws IOException {
     JsonUtils.objectToOutputStream(this, outputStream);
+  }
+
+  /**
+   * Convert the broker response metadata to JSON String.
+   */
+  default String toMetadataJsonString()
+      throws IOException {
+    ObjectNode objectNode = (ObjectNode) JsonUtils.objectToJsonNode(this);
+    objectNode.remove("resultTable");
+    return JsonUtils.objectToString(objectNode);
+  }
+
+  /**
+   * Emits metrics for the BrokerResponse. Currently only emits metrics for exceptions.
+   * If a broker response has multiple exceptions, we will emit metrics for all of them.
+   * Thus, the sum total of all exceptions is >= total number of queries impacted.
+   * Additionally, some parts of code might already be emitting metrics for individual error codes.
+   * But that list isn't accurate with a many-to-many relationship (or no metrics) between error codes and metrics.
+   * This method ensures we emit metrics for all queries that have exceptions with a one-to-one mapping.
+   */
+  default void emitBrokerResponseMetrics(BrokerMetrics brokerMetrics) {
+    for (QueryProcessingException exception : this.getExceptions()) {
+      QueryErrorCode queryErrorCode;
+      try {
+        queryErrorCode = QueryErrorCode.fromErrorCode(exception.getErrorCode());
+      } catch (IllegalArgumentException e) {
+        LOGGER.warn("Invalid error code: " + exception.getErrorCode(), e);
+        queryErrorCode = QueryErrorCode.UNKNOWN;
+      }
+      brokerMetrics.addMeteredGlobalValue(BrokerMeter.getQueryErrorMeter(queryErrorCode), 1);
+    }
   }
 
   /**
@@ -90,9 +127,19 @@ public interface BrokerResponse {
   }
 
   /**
+   * Returns whether groups were trimmed (reduced in size after sorting).
+   */
+  boolean isGroupsTrimmed();
+
+  /**
    * Returns whether the number of groups limit has been reached.
    */
   boolean isNumGroupsLimitReached();
+
+  /**
+   * Returns whether the number of groups warning limit has been reached.
+   */
+  boolean isNumGroupsWarningLimitReached();
 
   /**
    * Returns whether the limit for max rows in join has been reached.
@@ -292,6 +339,41 @@ public interface BrokerResponse {
   }
 
   /**
+   * Returns the thread memory bytes allocated for query execution against offline table.
+   */
+  long getOfflineThreadMemAllocatedBytes();
+
+  /**
+   * Returns the thread memory bytes allocated for query execution against realtime table.
+   */
+  long getRealtimeThreadMemAllocatedBytes();
+
+  /**
+   * Returns the memory bytes allocated  for response serialization against offline table.
+   */
+  long getOfflineResponseSerMemAllocatedBytes();
+
+  /**
+   * Returns the memory bytes allocated  for response serialization against realtime table.
+   */
+  long getRealtimeResponseSerMemAllocatedBytes();
+
+  /**
+   * Returns the total memory bytes allocated for query execution and response serialization against offline table.
+   */
+  default long getOfflineTotalMemAllocatedBytes() {
+    return getOfflineThreadMemAllocatedBytes() + getOfflineResponseSerMemAllocatedBytes();
+  }
+
+  /**
+   * Returns the total memory bytes allocated for query execution and response serialization against offline table.
+   */
+  default long getRealtimeTotalMemAllocatedBytes() {
+    return getRealtimeThreadMemAllocatedBytes() + getRealtimeResponseSerMemAllocatedBytes();
+  }
+
+
+  /**
    * Returns the total number of segments with an EmptyFilterOperator when Explain Plan is called.
    */
   long getExplainPlanNumEmptyFilterSegments();
@@ -317,4 +399,28 @@ public interface BrokerResponse {
    * @return Set of tables queried
    */
   Set<String> getTablesQueried();
+
+  /**
+   * Set the pools queried in the request
+   * @param pools
+   */
+  void setPools(Set<Integer> pools);
+
+  /**
+   * Get the pools queried in the request
+   * @return
+   */
+  Set<Integer> getPools();
+
+  /**
+   * Set whether RLS (row level security) filters were applied to the query.
+   * @param rlsFiltersApplied true if RLS filters were applied, false otherwise
+   */
+  void setRLSFiltersApplied(boolean rlsFiltersApplied);
+
+  /**
+   * Get whether RLS (row level security) filters were applied to the query.
+   * @return true if RLS filters were applied, false otherwise
+   */
+  boolean getRLSFiltersApplied();
 }
