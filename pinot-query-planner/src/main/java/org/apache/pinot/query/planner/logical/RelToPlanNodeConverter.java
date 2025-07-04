@@ -97,10 +97,6 @@ public final class RelToPlanNodeConverter {
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
   private final String _hashFunction;
 
-  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
-    this(tracker, KeySelector.DEFAULT_HASH_ALGORITHM);
-  }
-
   public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
       String hashFunction) {
     _tracker = tracker;
