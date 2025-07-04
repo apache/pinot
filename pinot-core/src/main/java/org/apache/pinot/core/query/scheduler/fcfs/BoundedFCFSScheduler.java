@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.scheduler.SchedulerPriorityQueue;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -39,8 +40,9 @@ import org.apache.pinot.spi.env.PinotConfiguration;
  */
 public class BoundedFCFSScheduler extends PriorityScheduler {
   public static BoundedFCFSScheduler create(PinotConfiguration config, QueryExecutor queryExecutor,
-      ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
-    final ResourceManager rm = new PolicyBasedResourceManager(config);
+      ServerMetrics serverMetrics, LongAccumulator latestQueryTime,
+      ThreadResourceUsageAccountant resourceUsageAccountant) {
+    final ResourceManager rm = new PolicyBasedResourceManager(config, resourceUsageAccountant);
     final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
       public SchedulerGroup create(PinotConfiguration config, String groupName) {

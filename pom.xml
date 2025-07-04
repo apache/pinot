@@ -159,12 +159,12 @@
     <immutables.version>2.11.0</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.23.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.23.1</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.33</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
-    <zstd-jni.version>1.5.7-3</zstd-jni.version>
+    <zstd-jni.version>1.5.7-4</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.22.0</libthrift.verion>
     <log4j.version>2.25.0</log4j.version>
@@ -177,7 +177,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.74</aws.sdk.version>
+    <aws.sdk.version>2.31.76</aws.sdk.version>
     <azure.sdk.version>1.2.36</azure.sdk.version>
     <azure.msal4j.version>1.21.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -190,7 +190,7 @@
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
-    <enforcer-api.version>3.5.0</enforcer-api.version>
+    <enforcer-api.version>3.6.0</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.6</spark3.version>
@@ -239,7 +239,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.8</protobuf.version>
     <grpc.version>1.73.0</grpc.version>
-    <google.cloud.libraries.version>26.62.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.63.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.39.0</google.errorprone.version>
@@ -271,7 +271,7 @@
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.2.0</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
-    <okio.version>3.14.0</okio.version>
+    <okio.version>3.15.0</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>

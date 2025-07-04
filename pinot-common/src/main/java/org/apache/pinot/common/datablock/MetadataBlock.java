@@ -23,8 +23,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -32,8 +30,6 @@ import org.slf4j.LoggerFactory;
  * For the different types of metadata blocks see {@link MetadataBlockType}.
  */
 public class MetadataBlock extends BaseDataBlock {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(MetadataBlock.class);
   @Nullable
   private List<DataBuffer> _statsByStage;
   private final int _stageId;

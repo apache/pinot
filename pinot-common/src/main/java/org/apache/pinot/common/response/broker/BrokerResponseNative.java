@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import javax.validation.constraints.NotNull;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -56,7 +55,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
     "explainPlanNumEmptyFilterSegments", "explainPlanNumMatchAllFilterSegments", "traceInfo", "tablesQueried",
     "offlineThreadMemAllocatedBytes", "realtimeThreadMemAllocatedBytes", "offlineResponseSerMemAllocatedBytes",
     "realtimeResponseSerMemAllocatedBytes", "offlineTotalMemAllocatedBytes", "realtimeTotalMemAllocatedBytes",
-    "pools", "rlsFiltersApplied"
+    "pools", "rlsFiltersApplied", "groupsTrimmed"
 })
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class BrokerResponseNative implements BrokerResponse {
@@ -72,6 +71,7 @@ public class BrokerResponseNative implements BrokerResponse {
   private ResultTable _resultTable;
   private int _numRowsResultSet = 0;
   private List<QueryProcessingException> _exceptions = new ArrayList<>();
+  private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
   private long _timeUsedMs = 0L;
@@ -203,6 +203,15 @@ public class BrokerResponseNative implements BrokerResponse {
 
   public void addException(QueryProcessingException exception) {
     _exceptions.add(exception);
+  }
+
+  @Override
+  public boolean isGroupsTrimmed() {
+    return _groupsTrimmed;
+  }
+
+  public void setGroupsTrimmed(boolean groupsTrimmed) {
+    _groupsTrimmed = groupsTrimmed;
   }
 
   @Override
@@ -527,12 +536,11 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @Override
-  public void setTablesQueried(@NotNull Set<String> tablesQueried) {
+  public void setTablesQueried(Set<String> tablesQueried) {
     _tablesQueried = tablesQueried;
   }
 
   @Override
-  @NotNull
   public Set<String> getTablesQueried() {
     return _tablesQueried;
   }
@@ -571,21 +579,22 @@ public class BrokerResponseNative implements BrokerResponse {
   }
 
   @Override
-  public void setPools(@NotNull Set<Integer> pools) {
+  public void setPools(Set<Integer> pools) {
     _pools = pools;
   }
 
   @Override
-  @NotNull
   public Set<Integer> getPools() {
     return _pools;
   }
 
+  @JsonProperty("rlsFiltersApplied")
   @Override
   public void setRLSFiltersApplied(boolean rlsFiltersApplied) {
     _rlsFiltersApplied = rlsFiltersApplied;
   }
 
+  @JsonProperty("rlsFiltersApplied")
   @Override
   public boolean getRLSFiltersApplied() {
     return _rlsFiltersApplied;

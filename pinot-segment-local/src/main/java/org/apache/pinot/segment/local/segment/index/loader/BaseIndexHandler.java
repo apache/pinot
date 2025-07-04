@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -33,6 +32,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,15 +49,16 @@ public abstract class BaseIndexHandler implements IndexHandler {
   protected final Set<String> _tmpForwardIndexColumns;
   protected final SegmentDirectory _segmentDirectory;
   protected final Map<String, FieldIndexConfigs> _fieldIndexConfigs;
-  @Nullable
   protected final TableConfig _tableConfig;
+  protected final Schema _schema;
 
   public BaseIndexHandler(SegmentDirectory segmentDirectory, IndexLoadingConfig indexLoadingConfig) {
-    this(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getTableConfig());
+    this(segmentDirectory, indexLoadingConfig.getFieldIndexConfigByColName(), indexLoadingConfig.getTableConfig(),
+        indexLoadingConfig.getSchema());
   }
 
   public BaseIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      @Nullable TableConfig tableConfig) {
+      TableConfig tableConfig, Schema schema) {
     _segmentDirectory = segmentDirectory;
     SegmentMetadataImpl segmentMetadata = segmentDirectory.getSegmentMetadata();
     if (fieldIndexConfigs.keySet().equals(segmentMetadata.getAllColumns())) {
@@ -68,7 +69,10 @@ public abstract class BaseIndexHandler implements IndexHandler {
         _fieldIndexConfigs.putIfAbsent(column, FieldIndexConfigs.EMPTY);
       }
     }
+    Preconditions.checkArgument(tableConfig != null, "Table config must be provided");
     _tableConfig = tableConfig;
+    Preconditions.checkArgument(schema != null, "Schema must be provided");
+    _schema = schema;
     _tmpForwardIndexColumns = new HashSet<>();
   }
 
@@ -111,7 +115,7 @@ public abstract class BaseIndexHandler implements IndexHandler {
 
     InvertedIndexAndDictionaryBasedForwardIndexCreator creator =
         new InvertedIndexAndDictionaryBasedForwardIndexCreator(columnName, _segmentDirectory, dictionaryEnabled,
-            forwardIndexConfig, segmentWriter, isTemporaryForwardIndex);
+            forwardIndexConfig, segmentWriter, isTemporaryForwardIndex, _tableConfig.getTableName());
     creator.regenerateForwardIndex();
     // Validate that the forward index is created.
     if (!segmentWriter.hasIndexFor(columnName, StandardIndexes.forward())) {

@@ -48,8 +48,6 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
-import org.junit.Assert;
 import org.testng.annotations.Test;
 
 import static org.apache.avro.Schema.create;
@@ -59,7 +57,7 @@ import static org.apache.pinot.integration.tests.GroupByOptionsIntegrationTest.t
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.fail;
+import static org.testng.Assert.fail;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")
@@ -132,7 +130,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     return null;
   }
 
-  protected static @NotNull MultiColumnTextIndexConfig getMultiColumnTextIndexConfig() {
+  protected static MultiColumnTextIndexConfig getMultiColumnTextIndexConfig() {
     return new MultiColumnTextIndexConfig(TEXT_COLUMNS, null,
         Map.of(
             TEXT_COL_CASE_SENSITIVE, Map.of(FieldConfig.TEXT_INDEX_CASE_SENSITIVE_KEY, "true"),
@@ -374,7 +372,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     long previousResult = 0;
     while (getCurrentCountStarResult() < NUM_RECORDS) {
       long result = getQueryResult(String.format(TEST_TEXT_COLUMN_QUERY_NATIVE, getTableName()));
-      assertTrue(result >= previousResult);
+      org.testng.Assert.assertTrue(result >= previousResult);
       previousResult = result;
       Thread.sleep(100);
     }
@@ -457,7 +455,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     String suffix = "              FilterTextIndex(predicate=[text_match(nullable_skills,'test')], "
         + "indexLookUp=[text_index], multiColumnIndex=[true], operator=[TEXT_MATCH])\n";
-    Assert.assertTrue(plan + " doesn't end with: " + suffix, plan.endsWith(suffix));
+    assertTrue(plan.endsWith(suffix), plan + " doesn't end with: " + suffix);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -512,8 +510,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
     while ((System.currentTimeMillis() - start) < 60000) {
       JsonNode node =
           postQuery(String.format("SELECT COUNT(*) FROM %s WHERE TEXT_MATCH(%s, 'x')", getTableName(), TEXT_COL));
-      if (node.get("exceptions") != null
-          && node.get("exceptions").size() > 0) {
+      if (node.get("exceptions") != null && !node.get("exceptions").isEmpty()) {
         columnDisabled = true;
         break;
       }
@@ -561,8 +558,7 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     for (int i = 0; i < columnDisabled.length; i++) {
       if (!columnDisabled[i]) {
-        Assert.fail(
-            "Not all columns were removed from multi-column text index, flags:" + Arrays.toString(columnDisabled));
+        fail("Not all columns were removed from multi-column text index, flags:" + Arrays.toString(columnDisabled));
       }
     }
   }
@@ -581,10 +577,9 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     try {
       updateTableConfig(tableConfig);
-      Assert.fail();
+      fail();
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
-          "Cannot create TEXT index on duplicate columns: [skills]"));
+      assertTrue(e.getMessage().contains("Cannot create TEXT index on duplicate columns: [skills]"), e.getMessage());
     }
   }
 
@@ -598,10 +593,9 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     try {
       updateTableConfig(tableConfig);
-      Assert.fail();
+      fail();
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
-          "Multi-column text index's list of columns can't be empty"));
+      assertTrue(e.getMessage().contains("Multi-column text index's list of columns can't be empty"), e.getMessage());
     }
   }
 
@@ -618,10 +612,10 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     try {
       updateTableConfig(tableConfig);
-      Assert.fail();
+      fail();
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
-          "Multi-column text index doesn't allow: XXX as shared property"));
+      assertTrue(e.getMessage().contains("Multi-column text index doesn't allow: XXX as shared property"),
+          e.getMessage());
     }
   }
 
@@ -639,10 +633,10 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     try {
       updateTableConfig(tableConfig);
-      Assert.fail();
+      fail();
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
-          "Multi-column text index doesn't allow: XXX as property for column: skills"));
+      assertTrue(e.getMessage().contains("Multi-column text index doesn't allow: XXX as property for column: skills"),
+          e.getMessage());
     }
 
     newConfig = new MultiColumnTextIndexConfig(newColumns, null, Map.of("bogus", Map.of("XXX", "YYY")));
@@ -650,10 +644,10 @@ public class MultiColumnTextIndicesTest extends CustomDataQueryClusterIntegratio
 
     try {
       updateTableConfig(tableConfig);
-      Assert.fail();
+      fail();
     } catch (IOException e) {
-      Assert.assertTrue(e.getMessage(), e.getMessage().contains(
-          "Multi-column text index per-column property refers to unknown column: bogus"));
+      assertTrue(e.getMessage().contains("Multi-column text index per-column property refers to unknown column: bogus"),
+          e.getMessage());
     }
   }
 

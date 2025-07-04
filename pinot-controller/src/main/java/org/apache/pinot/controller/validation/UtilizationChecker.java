@@ -32,11 +32,12 @@ public interface UtilizationChecker {
   String getName();
 
   /**
-   * Returns true if the resource's utilization is within limits
+   * Returns whether the resource's utilization is within limits
    * @param tableNameWithType table name with type
    * @param purpose purpose of this check
+   * @return CheckResult, UNDETERMINED if result cannot be determined, PASS if within limits, FAIL if not within limits
    */
-  boolean isResourceUtilizationWithinLimits(String tableNameWithType, CheckPurpose purpose);
+  CheckResult isResourceUtilizationWithinLimits(String tableNameWithType, CheckPurpose purpose);
 
   /**
    * Computes the resource's utilization
@@ -54,5 +55,12 @@ public interface UtilizationChecker {
     // REALTIME_INGESTION if the check is performed from the realtime ingestion code path to pause ingestion
     // TASK_GENERATION if the check is performed from the task generation framework to pause creation of new tasks
     REALTIME_INGESTION, TASK_GENERATION
+  }
+
+  enum CheckResult {
+    // PASS if the resource's utilization is within limits
+    // FAIL if the resource's utilization is not within limits
+    // UNDETERMINED if the result cannot be determined due to not having sufficient information
+    PASS, FAIL, UNDETERMINED
   }
 }

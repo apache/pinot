@@ -144,6 +144,8 @@ public interface RequestContext {
   long getRealtimeTotalMemAllocatedBytes();
   void setRealtimeTotalMemAllocatedBytes(long realtimeTotalMemAllocatedBytes);
 
+  boolean isGroupsTrimmed();
+
   boolean isNumGroupsLimitReached();
 
   int getNumExceptions();
@@ -175,6 +177,8 @@ public interface RequestContext {
   void setNumServersQueried(int numServersQueried);
 
   void setNumServersResponded(int numServersResponded);
+
+  void setGroupsTrimmed(boolean groupsTrimmed);
 
   void setNumGroupsLimitReached(boolean numGroupsLimitReached);
 

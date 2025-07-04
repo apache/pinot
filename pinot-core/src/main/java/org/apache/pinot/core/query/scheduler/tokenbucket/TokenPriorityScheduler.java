@@ -28,6 +28,7 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupFactory;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -42,8 +43,8 @@ public class TokenPriorityScheduler extends PriorityScheduler {
   private static final int DEFAULT_TOKEN_LIFETIME_MS = 100;
 
   public static TokenPriorityScheduler create(PinotConfiguration config, QueryExecutor queryExecutor,
-      ServerMetrics metrics, LongAccumulator latestQueryTime) {
-    final ResourceManager rm = new PolicyBasedResourceManager(config);
+      ServerMetrics metrics, LongAccumulator latestQueryTime, ThreadResourceUsageAccountant resourceUsageAccountant) {
+    final ResourceManager rm = new PolicyBasedResourceManager(config, resourceUsageAccountant);
     final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
       @Override
       public SchedulerGroup create(PinotConfiguration config, String groupName) {

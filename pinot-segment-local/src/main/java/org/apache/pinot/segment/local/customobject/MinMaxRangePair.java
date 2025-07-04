@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.customobject;
 
 import java.nio.ByteBuffer;
-import javax.annotation.Nonnull;
 
 
 public class MinMaxRangePair implements Comparable<MinMaxRangePair> {
@@ -48,7 +47,7 @@ public class MinMaxRangePair implements Comparable<MinMaxRangePair> {
     }
   }
 
-  public void apply(@Nonnull MinMaxRangePair minMaxRangePair) {
+  public void apply(MinMaxRangePair minMaxRangePair) {
     if (minMaxRangePair._min < _min) {
       _min = minMaxRangePair._min;
     }
@@ -65,7 +64,6 @@ public class MinMaxRangePair implements Comparable<MinMaxRangePair> {
     return _max;
   }
 
-  @Nonnull
   public byte[] toBytes() {
     ByteBuffer byteBuffer = ByteBuffer.allocate(Double.BYTES + Double.BYTES);
     byteBuffer.putDouble(_min);
@@ -73,18 +71,16 @@ public class MinMaxRangePair implements Comparable<MinMaxRangePair> {
     return byteBuffer.array();
   }
 
-  @Nonnull
   public static MinMaxRangePair fromBytes(byte[] bytes) {
     return fromByteBuffer(ByteBuffer.wrap(bytes));
   }
 
-  @Nonnull
   public static MinMaxRangePair fromByteBuffer(ByteBuffer byteBuffer) {
     return new MinMaxRangePair(byteBuffer.getDouble(), byteBuffer.getDouble());
   }
 
   @Override
-  public int compareTo(@Nonnull MinMaxRangePair minMaxRangePair) {
+  public int compareTo(MinMaxRangePair minMaxRangePair) {
     double minMaxRange1 = _max - _min;
     double minMaxRange2 = minMaxRangePair._max - minMaxRangePair._min;
     if (minMaxRange1 > minMaxRange2) {
