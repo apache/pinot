@@ -72,9 +72,9 @@ public class QuerySchedulerFactoryTest {
   public static final class TestQueryScheduler extends QueryScheduler {
 
     public TestQueryScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ServerMetrics serverMetrics,
-        LongAccumulator latestQueryTime) {
+        LongAccumulator latestQueryTime, ThreadResourceUsageAccountant resourceUsageAccountant) {
       super(config, queryExecutor,
-          new UnboundedResourceManager(config, new Tracing.DefaultThreadResourceUsageAccountant()), serverMetrics,
+          new UnboundedResourceManager(config, resourceUsageAccountant), serverMetrics,
           latestQueryTime);
     }
 
