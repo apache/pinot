@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ConsumerCoordinator {
   private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerCoordinator.class);
-  private static final long WAIT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(3);
+  private static final long WAIT_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
 
   private final boolean _enforceConsumptionInOrder;
   private final RealtimeTableDataManager _realtimeTableDataManager;
@@ -97,6 +97,9 @@ public class ConsumerCoordinator {
     while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
       LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
           System.currentTimeMillis() - startTimeMs);
+      _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
+          String.valueOf(llcSegmentName.getPartitionGroupId()), ServerTimer.CONSUMER_SEMAPHORE_ACQUIRE_TIME_MS,
+          WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS);
       checkSegmentStatus(segmentName);
     }
   }
