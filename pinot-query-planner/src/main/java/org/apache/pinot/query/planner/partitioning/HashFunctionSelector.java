@@ -69,12 +69,12 @@ public class HashFunctionSelector {
     }
 
     switch (hashFunction.toLowerCase()) {
-      case MURMUR2: return multiHash(values, keyIds, HashFunctionSelector::murmur2);
-      case MURMUR3: return multiHash(values, keyIds, HashFunctionSelector::murmur3);
+      case MURMUR2: return murmur2(values, keyIds);
+      case MURMUR3: return murmur3(values, keyIds);
       // hashCode and absHashCode are treated the same for multi hash.
       case HASH_CODE:
         // We should hashCode instead of absHashCode for multi hash to maintain consistency with legacy behavior.
-      default: return multiHash(values, keyIds, HashFunctionSelector::hashCode);
+      default: return hashCode(values, keyIds);
     }
   }
 
@@ -94,11 +94,31 @@ public class HashFunctionSelector {
     return MurmurHashFunctions.murmurHash3X64Bit32(toBytes(value), 0) & Integer.MAX_VALUE;
   }
 
-  private static int multiHash(Object[] values, int[] keyIds, java.util.function.ToIntFunction<Object> hashFunction) {
+  private static int murmur2(Object[] values, int[] keyIds) {
     int hash = 0;
     for (int keyId : keyIds) {
       if (keyId < values.length && values[keyId] != null) {
-        hash += hashFunction.applyAsInt(values[keyId]);
+        hash += murmur2(values[keyId]);
+      }
+    }
+    return hash & Integer.MAX_VALUE;
+  }
+
+  private static int murmur3(Object[] values, int[] keyIds) {
+    int hash = 0;
+    for (int keyId : keyIds) {
+      if (keyId < values.length && values[keyId] != null) {
+        hash += murmur3(values[keyId]);
+      }
+    }
+    return hash & Integer.MAX_VALUE;
+  }
+
+  private static int hashCode(Object[] values, int[] keyIds) {
+    int hash = 0;
+    for (int keyId : keyIds) {
+      if (keyId < values.length && values[keyId] != null) {
+        hash += hashCode(values[keyId]);
       }
     }
     return hash & Integer.MAX_VALUE;
