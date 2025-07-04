@@ -69,9 +69,6 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   PREV_SEGMENT_WAIT_TIME_MS("milliseconds", false,
       "Time spent while waiting on previous segment to be registered."),
 
-  CONSUMER_SEMAPHORE_ACQUIRE_TIME_MS("milliseconds", false,
-      "Time spent while trying to acquire the consumer semaphore."),
-
   // Multi-stage
   /**
    * Time spent building the hash table for the join.

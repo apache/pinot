@@ -29,6 +29,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.helix.model.IdealState;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.AbstractMetrics;
+import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.utils.LLCSegmentName;
@@ -97,9 +100,9 @@ public class ConsumerCoordinator {
     while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
       LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
           System.currentTimeMillis() - startTimeMs);
-      _serverMetrics.addTimedTableValue(_realtimeTableDataManager.getTableName(),
-          String.valueOf(llcSegmentName.getPartitionGroupId()), ServerTimer.CONSUMER_SEMAPHORE_ACQUIRE_TIME_MS,
-          WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS);
+      _serverMetrics.addMeteredTableValue(_realtimeTableDataManager.getTableName(),
+          String.valueOf(llcSegmentName.getPartitionGroupId()), ServerMeter.CONSUMER_LOCK_WAIT_TIME_MS,
+          WAIT_INTERVAL_MS);
       checkSegmentStatus(segmentName);
     }
   }
