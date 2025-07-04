@@ -251,7 +251,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     @Override
     public boolean throttleQuerySubmission() {
-      return getWatcherTask().getHeapUsageBytes() > getWatcherTask().getQueryMonitorConfig().getCriticalLevel();
+      return getWatcherTask().getHeapUsageBytes() > getWatcherTask().getQueryMonitorConfig().getAlarmingLevel();
     }
 
     @Override
