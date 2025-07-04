@@ -250,6 +250,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
+    public boolean throttleQuerySubmission() {
+      return getWatcherTask().getHeapUsageBytes() > getWatcherTask().getQueryMonitorConfig().getAlarmingLevel();
+    }
+
+    @Override
     public boolean isAnchorThreadInterrupted() {
       ThreadExecutionContext context = _threadLocalEntry.get().getCurrentThreadTaskStatus();
       if (context != null && context.getAnchorThread() != null) {
@@ -630,6 +635,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       public QueryMonitorConfig getQueryMonitorConfig() {
         return _queryMonitorConfig.get();
+      }
+
+      public long getHeapUsageBytes() {
+        return _usedBytes;
       }
 
       @Override
