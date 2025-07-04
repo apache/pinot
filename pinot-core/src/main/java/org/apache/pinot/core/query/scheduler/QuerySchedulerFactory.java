@@ -85,7 +85,8 @@ public class QuerySchedulerFactory {
         break;
       default:
         scheduler =
-            getQuerySchedulerByClassName(schedulerName, schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+            getQuerySchedulerByClassName(schedulerName, schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
+                resourceUsageAccountant);
         break;
     }
 
@@ -105,13 +106,15 @@ public class QuerySchedulerFactory {
 
   @Nullable
   private static QueryScheduler getQuerySchedulerByClassName(String className, PinotConfiguration schedulerConfig,
-      QueryExecutor queryExecutor, ServerMetrics serverMetrics, LongAccumulator latestQueryTime) {
+      QueryExecutor queryExecutor, ServerMetrics serverMetrics, LongAccumulator latestQueryTime,
+      ThreadResourceUsageAccountant resourceUsageAccountant) {
     try {
       Constructor<?> constructor = PluginManager.get().loadClass(className)
           .getDeclaredConstructor(PinotConfiguration.class, QueryExecutor.class, ServerMetrics.class,
-              LongAccumulator.class);
+              LongAccumulator.class, ThreadResourceUsageAccountant.class);
       constructor.setAccessible(true);
-      return (QueryScheduler) constructor.newInstance(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime);
+      return (QueryScheduler) constructor.newInstance(schedulerConfig, queryExecutor, serverMetrics, latestQueryTime,
+          resourceUsageAccountant);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate scheduler class by name: {}", className, e);
       return null;
