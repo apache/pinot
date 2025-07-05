@@ -47,7 +47,7 @@ public class ConcurrentSortedIndexedTableTest {
     Comparator<Key> comparator = OrderByComparatorFactory.getGroupKeyComparator(queryContext.getOrderByExpressions(),
         queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
     ConcurrentSortedIndexedTable table =
-        new ConcurrentSortedIndexedTable(dataSchema, false, queryContext, 10, executor, comparator);
+        new ConcurrentSortedIndexedTable(dataSchema, false, queryContext, 3, executor, comparator);
 
     // Insert out-of-order keys
     upsert(table, new Object[]{"zebra", 1L});

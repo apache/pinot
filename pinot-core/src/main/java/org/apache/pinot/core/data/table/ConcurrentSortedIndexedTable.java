@@ -47,6 +47,10 @@ public class ConcurrentSortedIndexedTable extends IndexedTable {
 
   @Override
   public boolean upsert(Key key, Record record) {
+    // TODO: short-circuit LIMIT 0 case
+    if (_resultSize == 0) {
+      return true;
+    }
     _lock.readLock().lock();
     TreeMap<Key, Record> map = (TreeMap<Key, Record>) _lookupMap;
     if (map.size() < _resultSize) {
@@ -58,9 +62,8 @@ public class ConcurrentSortedIndexedTable extends IndexedTable {
         return true;
       }
       Key lastKey = map.lastKey();
-      if (lastKey == null || _keyComparator.compare(key, lastKey) > 0) {
+      if (_keyComparator.compare(key, lastKey) > 0) {
         // check lastKey should not be null unless _resultSize = 0;
-        assert (lastKey != null || _resultSize == 0);
         _lock.writeLock().unlock();
         return true;
       }
@@ -73,18 +76,16 @@ public class ConcurrentSortedIndexedTable extends IndexedTable {
     }
     // if size is full, evict the smallest key
     Key lastKey = map.lastKey();
-    if (lastKey == null || _keyComparator.compare(key, lastKey) > 0) {
+    if (_keyComparator.compare(key, lastKey) > 0) {
       // check lastKey should not be null unless _resultSize = 0;
-      assert (lastKey != null || _resultSize == 0);
       _lock.readLock().unlock();
       return true;
     }
     _lock.readLock().unlock();
     _lock.writeLock().lock();
     lastKey = map.lastKey();
-    if (lastKey == null || _keyComparator.compare(key, lastKey) > 0) {
+    if (_keyComparator.compare(key, lastKey) > 0) {
       // check lastKey should not be null unless _resultSize = 0;
-      assert (lastKey != null || _resultSize == 0);
       _lock.writeLock().unlock();
       return true;
     }

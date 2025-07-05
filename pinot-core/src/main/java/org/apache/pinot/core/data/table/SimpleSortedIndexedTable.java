@@ -43,6 +43,10 @@ public class SimpleSortedIndexedTable extends IndexedTable {
 
   @Override
   public boolean upsert(Key key, Record record) {
+    // TODO: short-circuit LIMIT 0 case
+    if (_resultSize == 0) {
+      return true;
+    }
     TreeMap<Key, Record> map = (TreeMap<Key, Record>) _lookupMap;
     if (map.size() < _resultSize) {
       addOrUpdateRecord(key, record);
@@ -50,9 +54,8 @@ public class SimpleSortedIndexedTable extends IndexedTable {
     }
     // if size is full, evict the smallest key
     Key lastKey = map.lastKey();
-    if (lastKey == null || _keyComparator.compare(key, lastKey) < 0) {
+    if (_keyComparator.compare(key, lastKey) > 0) {
       // check lastKey should not be null unless _resultSize = 0;
-      assert (lastKey != null || _resultSize == 0);
       return true;
     }
     addOrUpdateRecord(key, record);

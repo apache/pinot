@@ -78,6 +78,9 @@ public final class GroupByUtils {
     if (orderByExpressions == null) {
       return false;
     }
+    if (orderByExpressions.size() != groupByExpressions.size()) {
+      return false;
+    }
     Set<String> orderByIdentifiers = new HashSet<>();
     orderByExpressions.forEach(expr -> orderByIdentifiers.add(expr.getExpression().getIdentifier()));
     Set<String> groupByIdentifiers = new HashSet<>();
