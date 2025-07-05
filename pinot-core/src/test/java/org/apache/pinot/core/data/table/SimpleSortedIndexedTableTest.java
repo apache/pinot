@@ -302,7 +302,7 @@ public class SimpleSortedIndexedTableTest {
     Comparator<Key> comparator = OrderByComparatorFactory.getGroupKeyComparator(queryContext.getOrderByExpressions(),
         queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
     SimpleSortedIndexedTable table =
-        new SimpleSortedIndexedTable(dataSchema, false, queryContext, 3, executor, comparator);
+        new SimpleSortedIndexedTable(dataSchema, false, queryContext, 0, executor, comparator);
 
     // Insert out-of-order keys
     upsert2cols(table, new Object[]{"zebra", "z", 1L});
