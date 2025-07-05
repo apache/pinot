@@ -159,6 +159,7 @@ message MailboxSendNode {
   repeated Collation collations = 6;
   bool sort = 7;
   repeated int32 receiverStageIds = 8;
+  string hashFunction = 9;
 }
 
 message ProjectNode {
