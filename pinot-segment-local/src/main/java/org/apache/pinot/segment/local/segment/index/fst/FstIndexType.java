@@ -118,7 +118,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
     if (indexConfig.getFstType() == FSTType.NATIVE) {
       return new NativeFSTIndexCreator(context);
     } else {
-      return new LuceneFSTIndexCreator(context);
+      return new LuceneFSTIndexCreator(context, indexConfig);
     }
   }
 

@@ -60,8 +60,7 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     uniqueValues[2] = "still";
 
     FieldSpec fieldSpec = new DimensionFieldSpec("testFSTColumn", FieldSpec.DataType.STRING, true);
-    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(
-        INDEX_DIR, "testFSTColumn", uniqueValues);
+    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", uniqueValues, true);
     creator.seal();
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer pinotDataBuffer =
