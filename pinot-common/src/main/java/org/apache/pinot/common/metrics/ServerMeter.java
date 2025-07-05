@@ -212,9 +212,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   /**
    * Approximate heap bytes used by the mutable JSON index at the time of index close.
    */
-  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),
-  CONSUMER_LOCK_WAIT_TIME_MS("milliseconds", false,
-      "Indicates the time consumer spends while waiting on the consumer lock.");
+  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false);
 
   private final String _meterName;
   private final String _unit;
