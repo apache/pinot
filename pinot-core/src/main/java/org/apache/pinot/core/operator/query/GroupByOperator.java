@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -112,6 +113,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     }
     ValueBlock valueBlock;
+
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
       groupByExecutor.process(valueBlock);
@@ -138,8 +140,16 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
     int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
-    if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
-      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
+    int trimSize = -1;
+    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
+    if (GroupByUtils.isOrderByOnGroupByKeys(orderByExpressions, _queryContext.getGroupByExpressions())) {
+      // if orderby key is groupby key, keep at most `limit` rows only
+      trimSize = _queryContext.getLimit();
+    } else if (orderByExpressions != null && minGroupTrimSize > 0) {
+      // max(minSegmentGroupTrimSize, 5 * LIMIT)
+      trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
+    }
+    if (trimSize > 0) {
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
