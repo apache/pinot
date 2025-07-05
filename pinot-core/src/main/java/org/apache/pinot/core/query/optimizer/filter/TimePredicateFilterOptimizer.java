@@ -92,6 +92,7 @@ public class TimePredicateFilterOptimizer implements FilterOptimizer {
       }
     } else if (filterKind.isRange() || filterKind == FilterKind.EQUALS) {
       Expression expression = operands.get(0);
+      // Switch the operand
       if (expression.getType() == ExpressionType.LITERAL) {
         switch (filterKind) {
           case GREATER_THAN:
