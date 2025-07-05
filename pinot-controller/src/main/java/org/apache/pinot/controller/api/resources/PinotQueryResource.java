@@ -20,6 +20,7 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.swagger.annotations.ApiOperation;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,7 +51,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.response.ProcessingException;
@@ -71,7 +72,6 @@ import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
@@ -113,7 +113,7 @@ public class PinotQueryResource {
     }
     if (!requestJson.has("sql")) {
       return constructQueryExceptionResponse(QueryErrorCode.JSON_PARSING,
-          "JSON Payload is missing the query string field 'sql'");
+        "JSON Payload is missing the query string field 'sql'");
     }
     String sqlQuery = requestJson.get("sql").asText();
     String traceEnabled = "false";
@@ -131,8 +131,18 @@ public class PinotQueryResource {
   @Path("sql")
   @ManualAuthorization
   public StreamingOutput handleGetSql(@QueryParam("sql") String sqlQuery, @QueryParam("trace") String traceEnabled,
-      @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
+    @QueryParam("queryOptions") String queryOptions, @Context HttpHeaders httpHeaders) {
     return executeSqlQueryCatching(httpHeaders, sqlQuery, traceEnabled, queryOptions);
+  }
+
+  @GET
+  @Path("timeseries/api/v1/query_range")
+  @ManualAuthorization
+  @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
+  public StreamingOutput handleTimeSeriesQueryRange(@QueryParam("language") String language,
+    @QueryParam("query") String query, @QueryParam("start") String start, @QueryParam("end") String end,
+    @QueryParam("step") String step, @Context HttpHeaders httpHeaders) {
+    return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step);
   }
 
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
@@ -182,10 +192,7 @@ public class PinotQueryResource {
             ? getMultiStageQueryResponse(sqlQuery, queryOptions, httpHeaders, traceEnabled)
             : getQueryResponse(sqlQuery, sqlNodeAndOptions.getSqlNode(), traceEnabled, queryOptions, httpHeaders);
       case DML:
-        Map<String, String> headers = httpHeaders.getRequestHeaders().entrySet().stream()
-            .filter(entry -> !entry.getValue().isEmpty())
-            .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
-            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+        Map<String, String> headers = extractHeaders(httpHeaders);
         return output -> {
           try (OutputStream os = output) {
             _sqlQueryExecutor.executeDMLStatement(sqlNodeAndOptions, headers).toOutputStream(os);
@@ -372,31 +379,16 @@ public class PinotQueryResource {
 
   private StreamingOutput sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,
       HttpHeaders httpHeaders) {
-    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
-    if (instanceConfig == null) {
-      LOGGER.error("Instance {} not found", instanceId);
-      throw QueryErrorCode.INTERNAL.asException();
-    }
-
-    String hostName = instanceConfig.getHostName();
-    // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
-    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
-      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
-    }
-
+    String hostName = getHost(instanceId);
     String protocol = _controllerConf.getControllerBrokerProtocol();
-    int port = _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
-        : Integer.parseInt(instanceConfig.getPort());
+    int port = getPort(instanceId);
     String url = getQueryURL(protocol, hostName, port);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions);
 
-    // forward client-supplied headers
-    Map<String, String> headers =
-        httpHeaders.getRequestHeaders().entrySet().stream().filter(entry -> !entry.getValue().isEmpty())
-            .map(entry -> Pair.of(entry.getKey(), entry.getValue().get(0)))
-            .collect(Collectors.toMap(Pair::getKey, Pair::getValue));
+    // Forward client-supplied headers
+    Map<String, String> headers = extractHeaders(httpHeaders);
 
-    return sendRequestRaw(url, query, requestJson, headers);
+    return sendRequestRaw(url, "POST", query, requestJson, headers);
   }
 
   private ObjectNode getRequestJson(String query, String traceEnabled, String queryOptions) {
@@ -415,47 +407,47 @@ public class PinotQueryResource {
     return String.format("%s://%s:%d/query/sql", protocol, hostName, port);
   }
 
-  public void sendPostRaw(String urlStr, String requestStr, Map<String, String> headers, OutputStream outputStream) {
+  public void sendRequestRaw(String urlStr, String method, String requestStr, Map<String, String> headers,
+    OutputStream outputStream) {
     HttpURLConnection conn = null;
     try {
-      LOGGER.info("url string passed is : {}", urlStr);
+      LOGGER.debug("Sending {} request to: {}", method, urlStr);
       final URL url = new URL(urlStr);
       conn = (HttpURLConnection) url.openConnection();
-      conn.setDoOutput(true);
-      conn.setRequestMethod("POST");
-      // conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-
+      conn.setRequestMethod(method);
       conn.setRequestProperty("Accept-Encoding", "gzip");
+      conn.setRequestProperty("http.keepAlive", "true");
+      conn.setRequestProperty("default", "true");
 
-      final byte[] requestBytes = requestStr.getBytes(StandardCharsets.UTF_8);
-      conn.setRequestProperty("Content-Length", String.valueOf(requestBytes.length));
-      conn.setRequestProperty("http.keepAlive", String.valueOf(true));
-      conn.setRequestProperty("default", String.valueOf(true));
+      // Set headers
+      if (headers != null) {
+        headers.forEach(conn::setRequestProperty);
+      }
 
-      if (headers != null && !headers.isEmpty()) {
-        final Set<Entry<String, String>> entries = headers.entrySet();
-        for (final Entry<String, String> entry : entries) {
-          conn.setRequestProperty(entry.getKey(), entry.getValue());
+      // Handle POST request body
+      if ("POST".equalsIgnoreCase(method)) {
+        conn.setDoOutput(true);
+        final byte[] requestBytes = requestStr.getBytes(StandardCharsets.UTF_8);
+        conn.setRequestProperty("Content-Length", String.valueOf(requestBytes.length));
+
+        try (final OutputStream os = new BufferedOutputStream(conn.getOutputStream())) {
+          os.write(requestBytes);
+          os.flush();
         }
       }
 
-      try (final OutputStream os = new BufferedOutputStream(conn.getOutputStream())) {
-        os.write(requestBytes);
-        os.flush();
-      }
       final int responseCode = conn.getResponseCode();
 
       if (responseCode == HttpURLConnection.HTTP_FORBIDDEN) {
         throw new WebApplicationException("Permission denied", Response.Status.FORBIDDEN);
       } else if (responseCode != HttpURLConnection.HTTP_OK) {
         InputStream errorStream = conn.getErrorStream();
-        throw new IOException(
-            "Failed : HTTP error code : " + responseCode + ". Root Cause: " + (errorStream != null ? IOUtils.toString(
-                errorStream, StandardCharsets.UTF_8) : "Unknown"));
+        String errorMessage = errorStream != null ? IOUtils.toString(errorStream, StandardCharsets.UTF_8) : "Unknown";
+        throw new IOException("HTTP error code: " + responseCode + ". Root Cause: " + errorMessage);
       }
       IOUtils.copy(conn.getInputStream(), outputStream);
     } catch (final Exception ex) {
-      LOGGER.error("Caught exception while sending query request", ex);
+      LOGGER.error("Caught exception while sending {} request", method, ex);
       Utils.rethrowException(ex);
       throw new AssertionError("Should not reach this");
     } finally {
@@ -465,13 +457,13 @@ public class PinotQueryResource {
     }
   }
 
-  public StreamingOutput sendRequestRaw(String url, String query, ObjectNode requestJson, Map<String, String> headers) {
+  public StreamingOutput sendRequestRaw(String url, String method, String query, ObjectNode requestJson,
+    Map<String, String> headers) {
     return outputStream -> {
       final long startTime = System.currentTimeMillis();
-      sendPostRaw(url, requestJson.toString(), headers, outputStream);
-
+      sendRequestRaw(url, method, requestJson.toString(), headers, outputStream);
       final long queryTime = System.currentTimeMillis() - startTime;
-      LOGGER.info("Query: {} Time: {}", query, queryTime);
+      LOGGER.info("Query: {} Time: {}ms", query, queryTime);
     };
   }
 
@@ -483,8 +475,110 @@ public class PinotQueryResource {
     };
   }
 
+  private StreamingOutput executeTimeSeriesQueryCatching(HttpHeaders httpHeaders, String language, String query,
+    String start, String end, String step) {
+    try {
+      return executeTimeSeriesQuery(httpHeaders, language, query, start, end, step);
+    } catch (ProcessingException pe) {
+      LOGGER.error("Caught exception while processing timeseries request {}", pe.getMessage());
+      return constructQueryExceptionResponse(QueryErrorCode.fromErrorCode(pe.getErrorCode()), pe.getMessage());
+    } catch (QueryException ex) {
+      LOGGER.warn("Caught exception while processing timeseries request {}", ex.getMessage());
+      return constructQueryExceptionResponse(ex.getErrorCode(), ex.getMessage());
+    } catch (WebApplicationException wae) {
+      LOGGER.error("Caught exception while processing timeseries request", wae);
+      throw wae;
+    } catch (Exception e) {
+      LOGGER.error("Caught unknown exception while processing timeseries request", e);
+      return constructQueryExceptionResponse(QueryErrorCode.INTERNAL, e.getMessage());
+    }
+  }
 
-  private static StreamingOutput constructQueryExceptionResponse(QueryErrorMessage message) {
-    return constructQueryExceptionResponse(message.getErrCode(), message.getUsrMsg());
+  private StreamingOutput executeTimeSeriesQuery(HttpHeaders httpHeaders, String language, String query,
+    String start, String end, String step) throws Exception {
+    LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}", language, query, start, end, step);
+
+    // Get available broker instances for timeseries queries
+    List<String> instanceIds = _pinotHelixResourceManager.getAllBrokerInstances();
+    if (instanceIds.isEmpty()) {
+      throw QueryErrorCode.BROKER_INSTANCE_MISSING.asException("No online broker found for timeseries query");
+    }
+
+    String instanceId = selectRandomInstanceId(instanceIds);
+    return sendTimeSeriesRequestToBroker(language, query, start, end, step, instanceId, httpHeaders);
+  }
+
+  private StreamingOutput sendTimeSeriesRequestToBroker(String language, String query, String start, String end,
+    String step, String instanceId, HttpHeaders httpHeaders) {
+    String hostName = getHost(instanceId);
+    String protocol = _controllerConf.getControllerBrokerProtocol();
+    int port = getPort(instanceId);
+    String url = getTimeSeriesQueryURL(protocol, hostName, port, language, query, start, end, step);
+
+    // Forward client-supplied headers
+    Map<String, String> headers = extractHeaders(httpHeaders);
+
+    return sendRequestRaw(url, "GET", query, JsonUtils.newObjectNode(), headers);
+  }
+
+  private String getTimeSeriesQueryURL(String protocol, String hostName, int port, String language, String query,
+    String start, String end, String step) {
+    try {
+      URIBuilder uriBuilder = new URIBuilder()
+        .setScheme(protocol)
+        .setHost(hostName)
+        .setPort(port)
+        .setPath("/timeseries/api/v1/query_range")
+        .addParameter("language", language);
+
+      // Add optional parameters
+      if (query != null && !query.isEmpty()) {
+        uriBuilder.addParameter("query", query);
+      }
+      if (start != null && !start.isEmpty()) {
+        uriBuilder.addParameter("start", start);
+      }
+      if (end != null && !end.isEmpty()) {
+        uriBuilder.addParameter("end", end);
+      }
+      if (step != null && !step.isEmpty()) {
+        uriBuilder.addParameter("step", step);
+      }
+
+      return uriBuilder.build().toString();
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to build timeseries query URL", e);
+    }
+  }
+
+  private Map<String, String> extractHeaders(HttpHeaders httpHeaders) {
+    return httpHeaders.getRequestHeaders().entrySet().stream()
+      .filter(entry -> !entry.getValue().isEmpty())
+      .collect(Collectors.toMap(Entry::getKey, entry -> entry.getValue().get(0)));
+  }
+
+  private InstanceConfig getInstanceConfig(String instanceId) {
+    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
+    if (instanceConfig == null) {
+      LOGGER.error("Instance {} not found", instanceId);
+      throw QueryErrorCode.INTERNAL.asException();
+    }
+    return instanceConfig;
+  }
+
+  private String getHost(String instanceId) {
+    InstanceConfig instanceConfig = getInstanceConfig(instanceId);
+    String hostName = instanceConfig.getHostName();
+    // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
+    if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
+      hostName = hostName.substring(CommonConstants.Helix.BROKER_INSTANCE_PREFIX_LENGTH);
+    }
+    return hostName;
+  }
+
+  private int getPort(String instanceId) {
+    InstanceConfig instanceConfig = getInstanceConfig(instanceId);
+    return _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
+      : Integer.parseInt(instanceConfig.getPort());
   }
 }
