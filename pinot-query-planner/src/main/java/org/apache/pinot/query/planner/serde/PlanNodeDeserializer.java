@@ -32,6 +32,7 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.query.planner.logical.RexExpression;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -129,12 +130,16 @@ public class PlanNodeDeserializer {
     } else {
       receiverIds = protoReceiverIds;
     }
+    String hashFunction = protoMailboxSendNode.getHashFunction();
+    if (hashFunction == null || hashFunction.isEmpty()) {
+      hashFunction = KeySelector.DEFAULT_HASH_ALGORITHM;
+    }
 
     return new MailboxSendNode(protoNode.getStageId(), extractDataSchema(protoNode), extractInputs(protoNode),
         receiverIds, convertExchangeType(protoMailboxSendNode.getExchangeType()),
         convertDistributionType(protoMailboxSendNode.getDistributionType()), protoMailboxSendNode.getKeysList(),
         protoMailboxSendNode.getPrePartitioned(), convertCollations(protoMailboxSendNode.getCollationsList()),
-        protoMailboxSendNode.getSort());
+        protoMailboxSendNode.getSort(), hashFunction);
   }
 
   private static ProjectNode deserializeProjectNode(Plan.PlanNode protoNode) {

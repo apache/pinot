@@ -34,6 +34,7 @@ import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.MailboxReceiveNode;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
@@ -380,8 +381,8 @@ public class StagesTestBase {
 
       PlanNode input = _childBuilder.build(_senderStageId);
       DataSchema mySchema = input.getDataSchema();
-      _sender = new MailboxSendNode(_senderStageId, mySchema, List.of(input), null,
-          null, null, false, null, false);
+      _sender = new MailboxSendNode(_senderStageId, mySchema, List.of(input), 0, null,
+          null, null, false, null, false, KeySelector.DEFAULT_HASH_ALGORITHM);
     }
 
     /**
