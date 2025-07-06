@@ -97,12 +97,12 @@ public class ConsumerCoordinator {
     long startTimeMs = System.currentTimeMillis();
     try {
       while (!_semaphore.tryAcquire(WAIT_INTERVAL_MS, TimeUnit.MILLISECONDS)) {
-        LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
-            System.currentTimeMillis() - startTimeMs);
-        _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
-            llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS,
-            System.currentTimeMillis() - startTimeMs);
         checkSegmentStatus(segmentName);
+        long waitTimeMs = System.currentTimeMillis() - startTimeMs;
+        LOGGER.warn("Failed to acquire consumer semaphore for segment: {} in: {}ms. Retrying.", segmentName,
+            waitTimeMs);
+        _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
+            llcSegmentName.getPartitionGroupId(), ServerGauge.CONSUMER_LOCK_WAIT_TIME_MS, waitTimeMs);
       }
     } finally {
       _serverMetrics.setValueOfPartitionGauge(_realtimeTableDataManager.getTableName(),
