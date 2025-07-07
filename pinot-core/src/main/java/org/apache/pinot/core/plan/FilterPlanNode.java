@@ -30,6 +30,7 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikeCiPredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
@@ -49,6 +50,7 @@ import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
@@ -308,6 +310,26 @@ public class FilterPlanNode implements PlanNode {
                 predicateEvaluator =
                     FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
                         dataSource.getFSTIndex(), dataSource.getDictionary());
+              } else {
+                predicateEvaluator =
+                    PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                        dataSource.getDataSourceMetadata().getDataType());
+              }
+              _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
+              return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
+            case REGEXP_LIKE_CI:
+              // IFST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
+              // consuming segments.
+              //
+              // Rolled out segments (immutable): IFST Index reader is available use IFSTBasedEvaluator
+              // else use regular flow of getting predicate evaluator.
+              //
+              // Consuming segments: When IFST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
+              // similar to that of IFSTBasedEvaluator, else use regular flow of getting predicate evaluator.
+              if (dataSource.getIFSTIndex() != null) {
+                predicateEvaluator =
+                    IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator((RegexpLikeCiPredicate) predicate,
+                        dataSource.getIFSTIndex(), dataSource.getDictionary());
               } else {
                 predicateEvaluator =
                     PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),

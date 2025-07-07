@@ -42,4 +42,10 @@ public class RegexpLikeVarFunctions {
     String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
     return regexpLikeVar(inputStr, regexPatternStr);
   }
+
+  @ScalarFunction
+  public static boolean regexpLikeCiVar(String inputStr, String regexPatternStr) {
+    Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+    return pattern.matcher(inputStr).find();
+  }
 }
