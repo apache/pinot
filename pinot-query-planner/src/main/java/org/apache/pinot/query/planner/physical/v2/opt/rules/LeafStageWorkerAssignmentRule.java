@@ -57,6 +57,7 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.logical.LeafStageToPinotQuery;
+import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
@@ -281,7 +282,9 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
     int keyIndex = fieldNames.indexOf(tablePartitionInfo.getPartitionColumn());
     String function = tablePartitionInfo.getPartitionFunctionName();
     int numSelectedServers = instanceIdToSegmentsMap.size();
-    if (keyIndex == -1) {
+    if (!DistHashFunction.isSupported(function)) {
+      return null;
+    } else if (keyIndex == -1) {
       LOGGER.warn("Unable to find partition column {} in table scan fields {}", tablePartitionInfo.getPartitionColumn(),
           fieldNames);
       return null;

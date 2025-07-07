@@ -29,6 +29,7 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
+import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
@@ -106,7 +107,8 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
           RelDistribution.Type.SINGLETON, liteModeWorkers, liteModeWorkers.hashCode(), null, null);
     }
     return new PhysicalExchange(nodeId(), leafStageRoot, pdd, Collections.emptyList(),
-        ExchangeStrategy.SINGLETON_EXCHANGE, collation, PinotExecStrategyTrait.getDefaultExecStrategy());
+        ExchangeStrategy.SINGLETON_EXCHANGE, collation, PinotExecStrategyTrait.getDefaultExecStrategy(),
+        _context.getDefaultHashFunction());
   }
 
   /**
