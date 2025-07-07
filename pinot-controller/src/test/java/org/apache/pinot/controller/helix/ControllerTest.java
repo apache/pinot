@@ -29,6 +29,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
@@ -428,7 +429,7 @@ public class ControllerTest {
         .setBrokerTenant(brokerTenant)
         .setRefOfflineTableName(offlineTableName)
         .setRefRealtimeTableName(realtimeTableName)
-        .setQuotaConfig(new QuotaConfig(null, "99999"))
+        .setQuotaConfig(new QuotaConfig(null, TimeUnit.SECONDS, 1d, 99999d))
         .setQueryConfig(new QueryConfig(1L, true, false, null, 1L, 1L))
         .setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of("includedTables", physicalTableNames)))
         .setPhysicalTableConfigMap(physicalTableConfigMap);
