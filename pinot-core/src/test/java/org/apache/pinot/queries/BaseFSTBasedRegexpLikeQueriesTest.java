@@ -82,17 +82,16 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
       .addMetric(INT_COL_NAME, FieldSpec.DataType.INT).build();
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private static List<FieldConfig> getFieldConfigs(boolean caseSensitive) {
+  private static List<FieldConfig> getFieldConfigs(String indexType) {
     try {
-      // Create FST index configuration JSON
-      ObjectNode fstIndexConfig = OBJECT_MAPPER.createObjectNode();
-      fstIndexConfig.put("type", "LUCENE");
-      fstIndexConfig.put("caseSensitive", caseSensitive);
+      // Create index configuration JSON
+      ObjectNode indexConfig = OBJECT_MAPPER.createObjectNode();
+      indexConfig.put("type", "LUCENE");
 
       ObjectNode indexes = OBJECT_MAPPER.createObjectNode();
-      indexes.set("fst", fstIndexConfig);
+      indexes.set(indexType, indexConfig);
 
-      // Create FieldConfig with the FST index configuration
+      // Create FieldConfig with the index configuration
       return List.of(
           new FieldConfig(DOMAIN_NAMES_COL, EncodingType.DICTIONARY, null, null, null, null, indexes, null, null),
           new FieldConfig(URL_COL, EncodingType.DICTIONARY, null, null, null, null, indexes, null, null));
@@ -106,9 +105,9 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
   private List<IndexSegment> _indexSegments;
 
   /**
-   * Abstract method to be implemented by derived classes to specify case sensitivity.
+   * Abstract method to be implemented by derived classes to specify index type.
    */
-  protected abstract boolean isCaseSensitive();
+  protected abstract String getIndexType();
 
   @Override
   protected String getFilter() {
@@ -132,7 +131,7 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
 
     List<IndexSegment> segments = new ArrayList<>();
     for (FSTType fstType : Arrays.asList(FSTType.LUCENE, FSTType.NATIVE)) {
-      buildSegment(fstType, isCaseSensitive());
+      buildSegment(fstType, getIndexType());
       IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(_tableConfig, SCHEMA);
       ImmutableSegment segment = ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
       segments.add(segment);
@@ -182,11 +181,11 @@ public abstract class BaseFSTBasedRegexpLikeQueriesTest extends BaseQueriesTest 
     return rows;
   }
 
-  private void buildSegment(FSTType fstType, boolean caseSensitive)
+  private void buildSegment(FSTType fstType, String indexType)
       throws Exception {
     List<GenericRow> rows = createTestData();
     _tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
-        .setFieldConfigList(getFieldConfigs(caseSensitive)).build();
+        .setFieldConfigList(getFieldConfigs(indexType)).build();
     _tableConfig.getIndexingConfig().setFSTIndexType(fstType);
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(_tableConfig, SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());

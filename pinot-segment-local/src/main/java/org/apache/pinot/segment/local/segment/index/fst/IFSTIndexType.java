@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.segment.local.segment.index.fst;
 
 import com.google.common.base.Preconditions;
@@ -25,12 +24,9 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
-import org.apache.pinot.segment.local.segment.index.loader.invertedindex.FSTIndexHandler;
-import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
-import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
-import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexCreator;
-import org.apache.pinot.segment.local.utils.nativefst.NativeFSTIndexReader;
+import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneIFSTIndexCreator;
+import org.apache.pinot.segment.local.segment.index.loader.invertedindex.IFSTIndexHandler;
+import org.apache.pinot.segment.local.segment.index.readers.LuceneIFSTIndexReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -56,16 +52,14 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 
 
-public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator> {
-  public static final String INDEX_DISPLAY_NAME = "fst";
-  private static final List<String> EXTENSIONS =
-      ImmutableList.of(V1Constants.Indexes.LUCENE_FST_INDEX_FILE_EXTENSION,
-          V1Constants.Indexes.LUCENE_V9_FST_INDEX_FILE_EXTENSION,
-          V1Constants.Indexes.LUCENE_V99_FST_INDEX_FILE_EXTENSION,
-          V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
+public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator> {
+  public static final String INDEX_DISPLAY_NAME = "ifst";
+  private static final List<String> EXTENSIONS = ImmutableList.of(V1Constants.Indexes.LUCENE_IFST_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_V9_IFST_INDEX_FILE_EXTENSION, V1Constants.Indexes.LUCENE_V99_IFST_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION);
 
-  protected FstIndexType() {
-    super(StandardIndexes.FST_ID);
+  protected IFSTIndexType() {
+    super(StandardIndexes.IFST_ID);
   }
 
   @Override
@@ -80,15 +74,15 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
-    FstIndexConfig fstIndexConfig = indexConfigs.getConfig(StandardIndexes.fst());
+    FstIndexConfig fstIndexConfig = indexConfigs.getConfig(StandardIndexes.ifst());
     if (fstIndexConfig.isEnabled()) {
       String column = fieldSpec.getName();
       Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
-          "Cannot create FST index on column: %s without dictionary", column);
-      Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot create FST index on multi-value column: %s",
+          "Cannot create IFST index on column: %s without dictionary", column);
+      Preconditions.checkState(fieldSpec.isSingleValueField(), "Cannot create IFST index on multi-value column: %s",
           column);
       Preconditions.checkState(fieldSpec.getDataType().getStoredType() == FieldSpec.DataType.STRING,
-          "Cannot create FST index on column: %s of stored type other than STRING", column);
+          "Cannot create IFST index on column: %s of stored type other than STRING", column);
     }
   }
 
@@ -99,7 +93,7 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   protected ColumnConfigDeserializer<FstIndexConfig> createDeserializerForLegacyConfigs() {
-    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.FST, (tableConfig, fieldConfig) -> {
+    return IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.IFST, (tableConfig, fieldConfig) -> {
       IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
       FSTType fstIndexType = indexingConfig != null ? indexingConfig.getFSTIndexType() : null;
       return new FstIndexConfig(fstIndexType);
@@ -110,16 +104,17 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
   public FSTIndexCreator createIndexCreator(IndexCreationContext context, FstIndexConfig indexConfig)
       throws IOException {
     Preconditions.checkState(context.getFieldSpec().isSingleValueField(),
-        "FST index is currently only supported on single-value columns");
+        "IFST index is currently only supported on single-value columns");
     Preconditions.checkState(context.getFieldSpec().getDataType().getStoredType() == FieldSpec.DataType.STRING,
-        "FST index is currently only supported on STRING type columns");
+        "IFST index is currently only supported on STRING type columns");
     Preconditions.checkState(context.hasDictionary(),
-        "FST index is currently only supported on dictionary-encoded columns");
+        "IFST index is currently only supported on dictionary-encoded columns");
+    // IFST only supports Lucene implementation, not native FST
     if (indexConfig.getFstType() == FSTType.NATIVE) {
-      return new NativeFSTIndexCreator(context);
-    } else {
-      return new LuceneFSTIndexCreator(context);
+      throw new UnsupportedOperationException(
+          "Native FST is not supported for IFST index. Only Lucene implementation is supported.");
     }
+    return new LuceneIFSTIndexCreator(context, indexConfig);
   }
 
   @Override
@@ -134,8 +129,8 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      Schema schema, TableConfig tableConfig) {
-    return new FSTIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
+      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+    return new IFSTIndexHandler(segmentDirectory, configsByCol, tableConfig);
   }
 
   @Override
@@ -148,21 +143,16 @@ public class FstIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRea
 
     @Override
     protected IndexType<FstIndexConfig, TextIndexReader, ?> getIndexType() {
-      return StandardIndexes.fst();
+      return StandardIndexes.ifst();
     }
 
     protected TextIndexReader createIndexReader(PinotDataBuffer dataBuffer, ColumnMetadata metadata)
         throws IndexReaderConstraintException, IOException {
       if (!metadata.hasDictionary()) {
-        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.fst(),
+        throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.ifst(),
             "This index requires a dictionary");
       }
-      int magicHeader = dataBuffer.getInt(0);
-      if (magicHeader == FSTHeader.FST_MAGIC) {
-        return new NativeFSTIndexReader(dataBuffer);
-      } else {
-        return new LuceneFSTIndexReader(dataBuffer);
-      }
+      return new LuceneIFSTIndexReader(dataBuffer);
     }
 
     @Override

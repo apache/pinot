@@ -78,48 +78,5 @@ public class FstIndexConfigTest {
 
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected type");
-    assertTrue(config.isCaseSensitive(), "Unexpected caseSensitive - should default to true");
-  }
-
-  @Test
-  public void withCaseSensitiveTrue()
-      throws JsonProcessingException {
-    String confStr = "{\n"
-        + "        \"type\": \"NATIVE\",\n"
-        + "        \"caseSensitive\": true\n"
-        + "}";
-    FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
-
-    assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected type");
-    assertTrue(config.isCaseSensitive(), "Unexpected caseSensitive");
-  }
-
-  @Test
-  public void withCaseSensitiveFalse()
-      throws JsonProcessingException {
-    String confStr = "{\n"
-        + "        \"type\": \"NATIVE\",\n"
-        + "        \"caseSensitive\": false\n"
-        + "}";
-    FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
-
-    assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected type");
-    assertFalse(config.isCaseSensitive(), "Unexpected caseSensitive");
-  }
-
-  @Test
-  public void withCaseSensitiveNull()
-      throws JsonProcessingException {
-    String confStr = "{\n"
-        + "        \"type\": \"NATIVE\",\n"
-        + "        \"caseSensitive\": null\n"
-        + "}";
-    FstIndexConfig config = JsonUtils.stringToObject(confStr, FstIndexConfig.class);
-
-    assertFalse(config.isDisabled(), "Unexpected disabled");
-    assertEquals(config.getFstType(), FSTType.NATIVE, "Unexpected type");
-    assertTrue(config.isCaseSensitive(), "Unexpected caseSensitive - should default to true when null");
   }
 }
