@@ -53,6 +53,12 @@ public class Record {
     return _values;
   }
 
+  ///  deepcopy of the record
+  public Record copy() {
+    Object[] copied = Arrays.copyOf(_values, _values.length);
+    return new Record(copied);
+  }
+
   // NOTE: Not check class for performance concern
   @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
   @Override

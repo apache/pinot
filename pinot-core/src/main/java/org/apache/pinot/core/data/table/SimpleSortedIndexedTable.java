@@ -47,12 +47,12 @@ public class SimpleSortedIndexedTable extends IndexedTable {
     if (_resultSize == 0) {
       return true;
     }
-    TreeMap<Key, Record> map = (TreeMap<Key, Record>) _lookupMap;
-    if (map.size() < _resultSize) {
+    if (_lookupMap.size() < _resultSize) {
       addOrUpdateRecord(key, record);
       return true;
     }
     // if size is full, evict the smallest key
+    TreeMap<Key, Record> map = (TreeMap<Key, Record>) _lookupMap;
     Key lastKey = map.lastKey();
     if (_keyComparator.compare(key, lastKey) > 0) {
       // check lastKey should not be null unless _resultSize = 0;
@@ -60,13 +60,20 @@ public class SimpleSortedIndexedTable extends IndexedTable {
     }
     addOrUpdateRecord(key, record);
     if (map.size() > _resultSize) {
-      map.remove(map.lastKey());
+      _numResizes++;
+      map.pollLastEntry();
     }
     return true;
   }
 
   @Override
   public void finish(boolean sort) {
+    if (_lookupMap.size() > _resultSize) {
+      _numResizes++;
+      while (_lookupMap.size() > _resultSize) {
+        ((TreeMap<Key, Record>) _lookupMap).pollLastEntry();
+      }
+    }
     // don't sort again since the map itself is sorted
     super.finish(false);
   }

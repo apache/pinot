@@ -20,15 +20,9 @@ package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import javax.annotation.Nullable;
 import org.apache.arrow.util.Preconditions;
 import org.apache.pinot.common.datatable.DataTable;
-import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
@@ -68,24 +62,6 @@ public final class GroupByUtils {
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
     return capacityByLimit > Integer.MAX_VALUE ? Integer.MAX_VALUE : Math.max((int) capacityByLimit, minNumGroups);
-  }
-
-  /**
-   * Returns whether the order by key is the group by key
-   */
-  public static boolean isOrderByOnGroupByKeys(@Nullable List<OrderByExpressionContext> orderByExpressions,
-      List<ExpressionContext> groupByExpressions) {
-    if (orderByExpressions == null) {
-      return false;
-    }
-    if (orderByExpressions.size() != groupByExpressions.size()) {
-      return false;
-    }
-    Set<String> orderByIdentifiers = new HashSet<>();
-    orderByExpressions.forEach(expr -> orderByIdentifiers.add(expr.getExpression().getIdentifier()));
-    Set<String> groupByIdentifiers = new HashSet<>();
-    groupByExpressions.forEach(expr -> groupByIdentifiers.add(expr.getIdentifier()));
-    return orderByIdentifiers.equals(groupByIdentifiers);
   }
 
   /**
@@ -159,12 +135,11 @@ public final class GroupByUtils {
     if (queryContext.isServerReturnFinalResult() && !hasHaving) {
       // When server is asked to return final result and there is no HAVING clause, return only LIMIT groups
       resultSize = limit;
-    } else if (GroupByUtils.isOrderByOnGroupByKeys(queryContext.getOrderByExpressions(),
-        queryContext.getGroupByExpressions())) {
-      // When the orderby keys are group keys, keep only LIMIT groups and create indexTable that is sorted to ratain
-      // only first groups
-      resultSize = limit;
-      return getGroupKeyOrderedIndexTable(dataSchema, false, queryContext, resultSize, numThreads, executorService);
+    } else if (QueryContext.isSameOrderAndGroupByColumns(queryContext) && !hasHaving) {
+      // When the orderby keys are group keys, keep only min(LIMIT, trimSize) groups
+      resultSize = Math.min(limit, trimSize);
+      return getGroupKeyOrderedIndexTable(dataSchema, false, queryContext, resultSize, trimSize, numThreads,
+          executorService);
     } else {
       resultSize = trimSize;
     }
@@ -250,12 +225,10 @@ public final class GroupByUtils {
   }
 
   private static IndexedTable getGroupKeyOrderedIndexTable(DataSchema dataSchema, boolean hasFinalInput,
-      QueryContext queryContext, int resultSize, int numThreads,
+      QueryContext queryContext, int resultSize, int trimSize, int numThreads,
       ExecutorService executorService) {
-    Preconditions.checkState(
-        isOrderByOnGroupByKeys(queryContext.getOrderByExpressions(), queryContext.getGroupByExpressions()));
+    Preconditions.checkState(QueryContext.isSameOrderAndGroupByColumns(queryContext));
     // when group key is same as order by key, we need to get a ident -> groupBy key idx mapping for the comparator
-    // to work
     Comparator<Key> comparator =
         OrderByComparatorFactory.getGroupKeyComparator(queryContext.getOrderByExpressions(),
             queryContext.getGroupByExpressions(),
@@ -265,7 +238,7 @@ public final class GroupByUtils {
           executorService, comparator);
     } else {
       return new ConcurrentSortedIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize,
-          executorService, comparator);
+          trimSize, executorService, comparator);
     }
   }
 }

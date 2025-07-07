@@ -58,7 +58,7 @@ public abstract class IndexedTable extends BaseTable {
   protected final int _chunkSizeExtractFinalResult;
 
   protected Collection<Record> _topRecords;
-  private int _numResizes;
+  protected int _numResizes;
   private long _resizeTimeNs;
 
   /**
@@ -123,7 +123,10 @@ public abstract class IndexedTable extends BaseTable {
     _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
   }
 
-  private Record updateRecord(Record existingRecord, Record newRecord) {
+  /**
+   * update existingRecord in-place with newRecord
+   */
+  protected Record updateRecord(Record existingRecord, Record newRecord) {
     Object[] existingValues = existingRecord.getValues();
     Object[] newValues = newRecord.getValues();
     int numAggregations = _aggregationFunctions.length;
