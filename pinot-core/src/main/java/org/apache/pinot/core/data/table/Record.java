@@ -49,6 +49,11 @@ public class Record {
     _values = values;
   }
 
+  ///  deep copy
+  public Record copy() {
+    return new Record(Arrays.copyOf(_values, _values.length));
+  }
+
   public Object[] getValues() {
     return _values;
   }
