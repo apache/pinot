@@ -165,7 +165,7 @@ public class QueryContext {
     _explain = explain;
   }
 
-  private boolean isSameOrderAndGroupByColumns(QueryContext context) {
+  public static boolean isSameOrderAndGroupByColumns(QueryContext context) {
     List<ExpressionContext> groupByKeys = context.getGroupByExpressions();
     List<OrderByExpressionContext> orderByKeys = context.getOrderByExpressions();
 

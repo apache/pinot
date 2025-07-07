@@ -69,6 +69,7 @@ public class ConcurrentSortedIndexedTable extends IndexedTable {
       }
       addOrUpdateRecord(key, record);
       if (map.size() > _resultSize) {
+        _numResizes++;
         map.remove(map.lastKey());
       }
       _lock.writeLock().unlock();
@@ -91,6 +92,7 @@ public class ConcurrentSortedIndexedTable extends IndexedTable {
     }
     addOrUpdateRecord(key, record);
     if (map.size() > _resultSize) {
+      _numResizes++;
       map.remove(map.lastKey());
     }
     _lock.writeLock().unlock();

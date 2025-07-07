@@ -60,6 +60,7 @@ public class SimpleSortedIndexedTable extends IndexedTable {
     }
     addOrUpdateRecord(key, record);
     if (map.size() > _resultSize) {
+      _numResizes++;
       map.remove(map.lastKey());
     }
     return true;
