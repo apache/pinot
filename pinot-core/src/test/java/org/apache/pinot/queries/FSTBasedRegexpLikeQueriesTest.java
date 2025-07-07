@@ -25,14 +25,14 @@ import org.testng.annotations.Test;
 
 
 /**
- * Case-sensitive FST-based regexp like queries test.
- * Extends the base class and implements case-sensitive behavior.
+ * FST-based regexp like queries test.
+ * Extends the base class and uses FST index type.
  */
 public class FSTBasedRegexpLikeQueriesTest extends BaseFSTBasedRegexpLikeQueriesTest {
 
   @Override
-  protected boolean isCaseSensitive() {
-    return true;
+  protected String getIndexType() {
+    return "fst";
   }
 
   @Test

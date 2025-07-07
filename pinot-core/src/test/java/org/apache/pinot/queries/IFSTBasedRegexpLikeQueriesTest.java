@@ -25,19 +25,19 @@ import org.testng.annotations.Test;
 
 
 /**
- * Case-insensitive FST-based regexp like queries test.
- * Extends the base class and implements case-insensitive behavior.
+ * IFST-based regexp like queries test.
+ * Extends the base class and uses IFST index type.
  */
-public class FSTBasedCaseInsensitiveRegexpLikeQueriesTest extends BaseFSTBasedRegexpLikeQueriesTest {
+public class IFSTBasedRegexpLikeQueriesTest extends BaseFSTBasedRegexpLikeQueriesTest {
 
   @Override
-  protected boolean isCaseSensitive() {
-    return false;
+  protected String getIndexType() {
+    return "ifst";
   }
 
   @Test
-  public void testCaseInsensitiveSpecificQueries() {
-    // Test : Basic case-insensitive matching (uppercase pattern should match lowercase data)
+  public void testIFSTBasedRegexpLike() {
+    // Test : Basic IFST matching (case-insensitive pattern should match data)
     String query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'WWW.DOMAIN1.*') LIMIT 50000";
     testInnerSegmentSelectionQuery(query, 256, null);
 

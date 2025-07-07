@@ -50,13 +50,17 @@ public class V1Constants {
     public static final String BLOOM_FILTER_FILE_EXTENSION = ".bloom";
     public static final String NULLVALUE_VECTOR_FILE_EXTENSION = ".bitmap.nullvalue";
     public static final String LUCENE_FST_INDEX_FILE_EXTENSION = ".lucene.fst";
+    public static final String LUCENE_IFST_INDEX_FILE_EXTENSION = ".lucene.ifst";
     public static final String LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION = ".lucene.mapping";
     public static final String LUCENE_TEXT_INDEX_FILE_EXTENSION = ".lucene.index";
     public static final String LUCENE_V9_FST_INDEX_FILE_EXTENSION = ".lucene.v9.fst";
+    public static final String LUCENE_V9_IFST_INDEX_FILE_EXTENSION = ".lucene.v9.ifst";
     public static final String LUCENE_V9_TEXT_INDEX_FILE_EXTENSION = ".lucene.v9.index";
     public static final String LUCENE_V99_FST_INDEX_FILE_EXTENSION = ".lucene.v99.fst";
+    public static final String LUCENE_V99_IFST_INDEX_FILE_EXTENSION = ".lucene.v99.ifst";
     public static final String LUCENE_V99_TEXT_INDEX_FILE_EXTENSION = ".lucene.v99.index";
     public static final String LUCENE_V912_FST_INDEX_FILE_EXTENSION = ".lucene.v912.fst";
+    public static final String LUCENE_V912_IFST_INDEX_FILE_EXTENSION = ".lucene.v912.ifst";
     public static final String LUCENE_V912_TEXT_INDEX_FILE_EXTENSION = ".lucene.v912.index";
     public static final String LUCENE_TEXT_INDEX_PROPERTIES_FILE = "lucene.properties";
     public static final String VECTOR_INDEX_FILE_EXTENSION = ".vector.index";
