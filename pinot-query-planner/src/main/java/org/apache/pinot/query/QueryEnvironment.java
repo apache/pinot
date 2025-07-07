@@ -90,6 +90,7 @@ import org.apache.pinot.query.type.TypeFactory;
 import org.apache.pinot.query.validate.BytesCastVisitor;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
@@ -276,6 +277,8 @@ public class QueryEnvironment {
         queryNode = sqlNode;
       }
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
+      // Accounts for resource usage of the compilation phase
+      Tracing.ThreadAccountantOps.sampleMSE();
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
     } catch (QueryException e) {
       throw e;
