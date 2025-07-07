@@ -140,6 +140,19 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     protected final InstanceType _instanceType;
 
+    protected PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, boolean isThreadCPUSamplingEnabled,
+        boolean isThreadMemorySamplingEnabled, boolean isThreadSamplingEnabledForMSE, Set<String> inactiveQuery,
+        String instanceId, InstanceType instanceType) {
+      _config = config;
+      _isThreadCPUSamplingEnabled = isThreadCPUSamplingEnabled;
+      _isThreadMemorySamplingEnabled = isThreadMemorySamplingEnabled;
+      _isThreadSamplingEnabledForMSE = isThreadSamplingEnabledForMSE;
+      _inactiveQuery = inactiveQuery;
+      _instanceId = instanceId;
+      _instanceType = instanceType;
+      _watcherTask = new WatcherTask();
+    }
+
     public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
 
@@ -185,26 +198,19 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     /**
      * This function aggregates resource usage from all active threads and groups by queryId.
-     * It is inspired by {@link PerQueryCPUMemResourceUsageAccountant::aggregate}. The major difference is that
-     * it only reads from thread entries and does not update them.
      * @return A map of query id, QueryResourceTracker.
      */
     @Override
     public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+      return getQueryResourcesImpl();
+    }
+
+    protected Map<String, AggregatedStats> getQueryResourcesImpl() {
       HashMap<String, AggregatedStats> ret = new HashMap<>();
 
       // for each {pqr, pqw}
-      for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
-        // sample current usage
-        CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-        long currentCPUSample = _isThreadCPUSamplingEnabled
-            ? threadEntry._currentThreadCPUTimeSampleMS : 0;
-        long currentMemSample = _isThreadMemorySamplingEnabled
-            ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
-        // sample current running task status
+      for (CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry : _threadEntriesMap.values()) {
         CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
-        Thread thread = entry.getKey();
-        LOGGER.trace("tid: {}, task: {}", thread.getId(), currentTaskStatus);
 
         // if current thread is not idle
         if (currentTaskStatus != null) {
@@ -213,10 +219,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           if (queryId != null) {
             Thread anchorThread = currentTaskStatus.getAnchorThread();
             boolean isAnchorThread = currentTaskStatus.isAnchorThread();
+            long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
+            long currentMemSample =
+                _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
             ret.compute(queryId,
                 (k, v) -> v == null ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
                     isAnchorThread, threadEntry._errorStatus, queryId)
-                    : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
+                    : v.merge(currentCPUSample, currentMemSample, isAnchorThread,
+                        threadEntry._errorStatus));
           }
         }
       }
@@ -224,6 +234,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       // if triggered, accumulate stats of finished tasks of each active query
       for (Map.Entry<String, AggregatedStats> queryIdResult : ret.entrySet()) {
         String activeQueryId = queryIdResult.getKey();
+        AggregatedStats queryStats = queryIdResult.getValue();
         long accumulatedCPUValue =
             _isThreadCPUSamplingEnabled ? _finishedTaskCPUStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
         long concurrentCPUValue =
@@ -232,7 +243,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             _isThreadMemorySamplingEnabled ? _finishedTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
         long concurrentMemValue =
             _isThreadMemorySamplingEnabled ? _concurrentTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-        queryIdResult.getValue()
+        queryStats
             .merge(accumulatedCPUValue + concurrentCPUValue, accumulatedMemValue + concurrentMemValue, false, null);
       }
       return ret;
@@ -419,28 +430,25 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     /**
-     * aggregated the stats if the query killing process is triggered
-     * @param isTriggered if the query killing process is triggered
-     * @return aggregated stats of active queries if triggered
+     * This function moves finished tasks through 2 stages.
+     * Initially, task metadata is stored in threadEntry._currentThreadTaskStatus etc.
+     * In the first step, it moves this metadata to threadEntry._previousThreadTaskStatus etc.
+     *
+     * At the same time, the function moves the information in _threadEntry._previousThreadTaskStatus into the second
+     * state. It is aggregated into _finishedTaskCPUStatsAggregator and _finishedTaskMemStatsAggregator.
+     *
+     * Finally it cleans up _inactiveQueries AND _threadEntriesMap.
      */
-    public Map<String, AggregatedStats> aggregate(boolean isTriggered) {
-      HashMap<String, AggregatedStats> ret = null;
-      if (isTriggered) {
-        ret = new HashMap<>();
-      }
-
+    public void reapFinishedTasks() {
       // for each {pqr, pqw}
       for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
         // sample current usage
         CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-
         long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
         long currentMemSample =
             _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
         // sample current running task status
         CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
-        Thread thread = entry.getKey();
-        LOGGER.trace("tid: {}, task: {}", thread.getId(), currentTaskStatus);
 
         // get last task on the thread
         CPUMemThreadLevelAccountingObjects.TaskEntry lastQueryTask = threadEntry._previousThreadTaskStatus;
@@ -478,42 +486,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           // update inactive queries for cleanInactive()
           _inactiveQuery.remove(queryId);
           // if triggered, accumulate active query task stats
-          if (isTriggered) {
-            Thread anchorThread = currentTaskStatus.getAnchorThread();
-            boolean isAnchorThread = currentTaskStatus.isAnchorThread();
-            ret.compute(queryId, (k, v) -> v == null
-                ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
-                isAnchorThread, threadEntry._errorStatus, queryId)
-                : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
-          }
         }
 
+        Thread thread = entry.getKey();
         if (!thread.isAlive()) {
           _threadEntriesMap.remove(thread);
           LOGGER.debug("Removing thread from _threadLocalEntry: {}", thread.getName());
         }
       }
-
-      // if triggered, accumulate stats of finished tasks of each active query
-      if (isTriggered) {
-        for (Map.Entry<String, AggregatedStats> queryIdResult : ret.entrySet()) {
-          String activeQueryId = queryIdResult.getKey();
-          long accumulatedCPUValue = _isThreadCPUSamplingEnabled
-              ? _finishedTaskCPUStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-          long concurrentCPUValue = _isThreadCPUSamplingEnabled
-              ? _concurrentTaskCPUStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-          long accumulatedMemValue = _isThreadMemorySamplingEnabled
-              ? _finishedTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-          long concurrentMemValue = _isThreadMemorySamplingEnabled
-              ? _concurrentTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-          queryIdResult.getValue().merge(accumulatedCPUValue + concurrentCPUValue,
-              accumulatedMemValue + concurrentMemValue, false, null);
-        }
-      }
-      return ret;
     }
 
-    public void postAggregation(Map<String, AggregatedStats> aggregatedUsagePerActiveQuery) {
+    protected void postAggregation(Map<String, AggregatedStats> aggregatedUsagePerActiveQuery) {
     }
 
     protected void logQueryResourceUsage(Map<String, ? extends QueryResourceTracker> aggregatedUsagePerActiveQuery) {
@@ -731,7 +714,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             // Check for other triggers
             evalTriggers();
             // Refresh thread usage and aggregate to per query usage if triggered
-            _aggregatedUsagePerActiveQuery = aggregate(_triggeringLevel.ordinal() > TriggeringLevel.Normal.ordinal());
+            reapFinishedTasks();
+            if (_triggeringLevel.ordinal() > TriggeringLevel.Normal.ordinal()) {
+              _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
+            }
             // post aggregation function
             postAggregation(_aggregatedUsagePerActiveQuery);
             // Act on one triggered actions
@@ -774,8 +760,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           _metrics.addMeteredGlobalValue(_heapMemoryPanicExceededMeter, 1);
           LOGGER.error("Heap used bytes {}, greater than _panicLevel {}, Killed all queries and triggered gc!",
               _usedBytes, panicLevel);
-          // call aggregate here as will throw exception and
-          aggregate(false);
+          // read finished tasks here as will throw exception and
+          reapFinishedTasks();
           return true;
         }
         return false;
