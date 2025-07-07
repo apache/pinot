@@ -108,8 +108,10 @@ public class H3IndexType extends AbstractIndexType<H3IndexConfig, H3IndexReader,
         "H3 index is currently only supported on BYTES columns");
     H3IndexResolution resolution = Objects.requireNonNull(indexConfig).getResolution();
     return context.isOnHeap()
-        ? new OnHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), resolution)
-        : new OffHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(), resolution);
+        ? new OnHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+        context.getTableNameWithType(), resolution)
+        : new OffHeapH3IndexCreator(context.getIndexDir(), context.getFieldSpec().getName(),
+            context.getTableNameWithType(), resolution);
   }
 
   @Override

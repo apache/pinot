@@ -117,6 +117,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     try (BloomFilterCreator bloomFilterCreator =
         StandardIndexes.bloomFilter().createIndexCreator(context, bloomFilterConfig);
@@ -136,6 +137,7 @@ public class BloomFilterHandler extends BaseIndexHandler {
     IndexCreationContext context = IndexCreationContext.builder()
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     try (BloomFilterCreator bloomFilterCreator = StandardIndexes.bloomFilter()
         .createIndexCreator(context, bloomFilterConfig);

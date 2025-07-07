@@ -84,6 +84,10 @@ public interface ThreadResourceUsageAccountant {
    */
   void sampleUsageMSE();
 
+  default boolean throttleQuerySubmission() {
+    return false;
+  }
+
   /**
    * special interface to aggregate usage to the stats store only once, it is used for response
    * ser/de threads where the thread execution context cannot be setup before hands as

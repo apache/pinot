@@ -16,38 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.planner.partitioning;
+package org.apache.pinot.spi.query;
 
-import javax.annotation.Nullable;
+/**
+ * Defines the behavior when query thread limits are exceeded in multistage engine
+ */
+public enum QueryThreadExceedStrategy {
+  /**
+   * Wait for resources to become available
+   * @implNote Not supported by server
+   */
+  WAIT,
 
+  /**
+   * Throw an error immediately
+   * @implNote Not supported by broker
+   */
+  ERROR,
 
-public class SingleColumnKeySelector implements KeySelector<Object> {
-  private final int _keyId;
-  private final String _hashFunction;
-
-  public SingleColumnKeySelector(int keyId) {
-    this(keyId, KeySelector.DEFAULT_HASH_ALGORITHM);
-  }
-
-  public SingleColumnKeySelector(int keyId, String hashFunction) {
-    _keyId = keyId;
-    _hashFunction = hashFunction;
-  }
-
-  @Nullable
-  @Override
-  public Object getKey(Object[] row) {
-    return row[_keyId];
-  }
-
-  @Override
-  public int computeHash(Object[] input) {
-    Object key = input[_keyId];
-    return HashFunctionSelector.computeHash(key, _hashFunction);
-  }
-
-  @Override
-  public String hashAlgorithm() {
-    return _hashFunction;
-  }
+  /**
+   * Logs warning when limits exceeded but allows operations to proceed
+   *
+   */
+  LOG
 }

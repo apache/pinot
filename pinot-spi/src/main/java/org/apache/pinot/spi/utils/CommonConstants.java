@@ -405,6 +405,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS = "pinot.broker.mse.max.server.query.threads";
     public static final int DEFAULT_MSE_MAX_SERVER_QUERY_THREADS = -1;
+    public static final String CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY =
+        "pinot.broker.mse.max.server.query.threads.exceed.strategy";
+    public static final String DEFAULT_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY = "WAIT";
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
@@ -529,6 +532,10 @@ public class CommonConstants {
     public static final String CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT =
         "pinot.broker.multistage.lite.mode.leaf.stage.limit";
     public static final int DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT = 100_000;
+
+    // Config for default hash function used in KeySelector for data shuffling
+    public static final String CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION = "pinot.broker.multistage.default.hash.function";
+    public static final String DEFAULT_BROKER_DEFAULT_HASH_FUNCTION = "absHashCode";
 
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
     // would set the pool to -1 in the routing table for that server.
@@ -1036,6 +1043,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_MAX_EXECUTION_THREADS =
         MSE_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
     public static final int DEFAULT_MSE_MAX_EXECUTION_THREADS = -1;
+    public static final String CONFIG_OF_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY =
+        MSE_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS + ".exceed.strategy";
+    public static final String DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY = "ERROR";
 
     // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
     // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When
@@ -1098,6 +1108,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = MULTISTAGE_EXECUTOR_CONFIG_PREFIX;
     @Deprecated
     public static final String DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = DEFAULT_MULTISTAGE_EXECUTOR_TYPE;
+
+    // Enable SSE & MSE task throttling on critical heap usage.
+    public static final String CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".enableThrottlingOnHeapUsage";
+    public static final boolean DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE = false;
 
     /**
      * The ExecutorServiceProvider to be used for timeseries threads.

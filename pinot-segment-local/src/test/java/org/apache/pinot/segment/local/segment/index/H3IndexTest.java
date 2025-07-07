@@ -47,6 +47,7 @@ import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.MultiPoint;
 import org.locationtech.jts.geom.Point;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
@@ -91,9 +92,9 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
 
     try (MutableH3Index mutableH3Index = new MutableH3Index(h3IndexResolution)) {
       try (GeoSpatialIndexCreator onHeapCreator = new OnHeapH3IndexCreator(TEMP_DIR, onHeapColumnName,
-          h3IndexResolution);
+          "myTable_OFFLINE", h3IndexResolution);
           GeoSpatialIndexCreator offHeapCreator = new OffHeapH3IndexCreator(TEMP_DIR, offHeapColumnName,
-              h3IndexResolution)) {
+              "myTable_OFFLINE", h3IndexResolution)) {
         int docId = 0;
         while (expectedCardinalities.size() < numUniqueH3Ids) {
           double longitude = RANDOM.nextDouble() * 360 - 180;
@@ -123,6 +124,87 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
           }
         }
       }
+    }
+  }
+
+  @Test
+  public void testSkipInvalidGeometry()
+      throws Exception {
+    String columnName = "skipInvalid";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE",
+        resolution)) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
+      creator.add(point);
+
+      // Invalid serialized bytes should be skipped without throwing exception
+      creator.add(new byte[]{1, 2, 3}, -1);
+
+      creator.seal();
+    }
+
+    File indexFile = new File(TEMP_DIR, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        H3IndexReader reader = new ImmutableH3IndexReader(buffer)) {
+      long h3Id = H3Utils.H3_CORE.latLngToCell(20, 10, res);
+      Assert.assertEquals(reader.getDocIds(h3Id).getCardinality(), 1);
+    }
+  }
+
+  @Test
+  public void testSkipNullGeometry()
+      throws Exception {
+    String columnName = "skipNull";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE",
+        resolution)) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
+      creator.add(point);
+
+      // Explicit null geometry should also be skipped
+      creator.add(null);
+
+      creator.seal();
+    }
+
+    File indexFile = new File(TEMP_DIR, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        H3IndexReader reader = new ImmutableH3IndexReader(buffer)) {
+      long h3Id = H3Utils.H3_CORE.latLngToCell(20, 10, res);
+      Assert.assertEquals(reader.getDocIds(h3Id).getCardinality(), 1);
+    }
+  }
+
+  @Test
+  public void testSkipNonPointGeometry()
+      throws Exception {
+    String columnName = "skipInvalidGeometryType";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE",
+        resolution)) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 42));
+      creator.add(point);
+
+      // Explicit non-point geometry should also be skipped
+      Point[] points = new Point[1];
+      points[0] = point;
+      MultiPoint multiPoint = GeometryUtils.GEOMETRY_FACTORY.createMultiPoint(points);
+      creator.add(multiPoint);
+
+      creator.seal();
+    }
+
+    File indexFile = new File(TEMP_DIR, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer buffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
+        H3IndexReader reader = new ImmutableH3IndexReader(buffer)) {
+      long h3Id = H3Utils.H3_CORE.latLngToCell(42, 10, res);
+      Assert.assertEquals(reader.getDocIds(h3Id).getCardinality(), 1);
     }
   }
 

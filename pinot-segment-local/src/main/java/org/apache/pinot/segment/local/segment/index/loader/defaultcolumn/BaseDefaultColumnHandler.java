@@ -1199,6 +1199,7 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         .withColumnIndexCreationInfo(indexCreationInfo)
         .withTotalDocs(numDocs)
         .withDictionary(hasDictionary)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
 
     ForwardIndexConfig forwardIndexConfig = null;
