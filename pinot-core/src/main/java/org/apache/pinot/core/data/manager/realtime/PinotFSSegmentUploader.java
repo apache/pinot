@@ -53,7 +53,7 @@ public class PinotFSSegmentUploader implements SegmentUploader {
   private final ServerMetrics _serverMetrics;
 
   public PinotFSSegmentUploader(String segmentStoreDirUri, int timeoutMillis, ServerMetrics serverMetrics) {
-    _segmentStoreUriStr = "file:/Users/stardeepthi/Documents/data/rocksDB/quickstart";
+    _segmentStoreUriStr = segmentStoreDirUri;
     _timeoutInMs = timeoutMillis;
     _serverMetrics = serverMetrics;
   }
