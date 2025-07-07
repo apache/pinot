@@ -28,7 +28,7 @@ public class RegexpLikeCiConstFunctionsTest {
 
   @Test
   public void testRegexpLikeCi() {
-    RegexpLikeConstFunctions f = new RegexpLikeConstFunctions();
+    RegexpLikeCiConstFunctions f = new RegexpLikeCiConstFunctions();
 
     // Case-insensitive matching
     assertTrue(f.regexpLikeCi("Hello", "hello"));

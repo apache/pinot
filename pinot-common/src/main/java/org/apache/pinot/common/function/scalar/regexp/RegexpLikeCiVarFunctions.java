@@ -19,27 +19,22 @@
 package org.apache.pinot.common.function.scalar.regexp;
 
 import java.util.regex.Pattern;
-import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
 /**
- * Optimized regexp_like implementation that accepts variable pattern that needs compiling on each call.
+ * Case-insensitive regexp_like implementation for variable pattern.
  */
-public class RegexpLikeVarFunctions {
-
-  private RegexpLikeVarFunctions() {
+public class RegexpLikeCiVarFunctions {
+  private RegexpLikeCiVarFunctions() {
   }
 
+  /**
+   * Returns true if the input string matches the given regular expression (case-insensitive, variable pattern).
+   */
   @ScalarFunction
-  public static boolean regexpLikeVar(String inputStr, String regexPatternStr) {
+  public static boolean regexpLikeCiVar(String inputStr, String regexPatternStr) {
     Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
     return pattern.matcher(inputStr).find();
-  }
-
-  @ScalarFunction
-  public static boolean likeVar(String inputStr, String likePatternStr) {
-    String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
-    return regexpLikeVar(inputStr, regexPatternStr);
   }
 }
