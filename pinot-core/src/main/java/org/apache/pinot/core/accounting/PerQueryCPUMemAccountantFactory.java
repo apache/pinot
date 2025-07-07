@@ -56,6 +56,8 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.pinot.spi.utils.CommonConstants.Accounting.*;
+
 
 /**
  * Accounting mechanism for thread task execution status and thread resource usage sampling
@@ -330,15 +332,16 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
     }
 
+    @Deprecated
     @Override
     public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
-      setupRunner(queryId, taskId, taskType, null);
+      setupRunner(queryId, taskId, taskType, DEFAULT_WORKLOAD_NAME);
     }
 
 
     @Override
     public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-                            @Nullable String workloadName) {
+        String workloadName) {
       _threadLocalEntry.get()._errorStatus.set(null);
       if (queryId != null) {
         _threadLocalEntry.get()

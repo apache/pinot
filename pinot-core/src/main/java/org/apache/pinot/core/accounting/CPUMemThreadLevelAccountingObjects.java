@@ -114,7 +114,7 @@ public class CPUMemThreadLevelAccountingObjects {
     }
 
     public void setThreadTaskStatus(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-        Thread anchorThread, @Nullable String workloadName) {
+        Thread anchorThread, String workloadName) {
       _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread, workloadName));
       _threadResourceSnapshot.reset();
     }
@@ -150,8 +150,7 @@ public class CPUMemThreadLevelAccountingObjects {
       return _taskId == CommonConstants.Accounting.ANCHOR_TASK_ID;
     }
 
-    public TaskEntry(String queryId, int taskId, TaskType taskType, Thread anchorThread,
-        @Nullable String workloadName) {
+    public TaskEntry(String queryId, int taskId, TaskType taskType, Thread anchorThread, String workloadName) {
       _queryId = queryId;
       _taskId = taskId;
       _anchorThread = anchorThread;

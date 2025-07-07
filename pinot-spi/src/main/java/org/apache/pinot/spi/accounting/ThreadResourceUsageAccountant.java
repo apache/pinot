@@ -61,7 +61,7 @@ public interface ThreadResourceUsageAccountant {
    * @param taskType the type of the task - SSE or MSE
    * @param workloadName the name of the workload, can be null
    */
-  void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, @Nullable String workloadName);
+  void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, String workloadName);
 
   /**
    * Set up the thread execution context for a worker thread.

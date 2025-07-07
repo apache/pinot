@@ -32,14 +32,16 @@ import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Accounting.*;
 
 
 public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
@@ -49,7 +51,7 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     return new ResourceUsageAccountant(config, instanceId, instanceType);
   }
 
-  public static class ResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
+  public static class ResourceUsageAccountant implements ThreadResourceUsageAccountant {
     private static final Logger LOGGER = LoggerFactory.getLogger(ResourceUsageAccountant.class);
     private static final String ACCOUNTANT_TASK_NAME = "ResourceUsageAccountant";
     private static final int ACCOUNTANT_PRIORITY = 4;
@@ -157,8 +159,43 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     }
 
     @Override
-    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-                            @Nullable String workloadName) {
+    public boolean isAnchorThreadInterrupted() {
+      ThreadExecutionContext context = _threadLocalEntry.get().getCurrentThreadTaskStatus();
+      if (context != null && context.getAnchorThread() != null) {
+        return context.getAnchorThread().isInterrupted();
+      }
+
+      return false;
+    }
+
+    @Override
+    @Deprecated
+    public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nullable ThreadExecutionContext parentContext) {
+    }
+
+    @Override
+    @Deprecated
+    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
+    }
+
+    @Override
+    @Deprecated
+    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes) {
+    }
+
+    @Override
+    @Deprecated
+    public void updateQueryUsageConcurrently(String queryId) {
+    }
+
+    @Override
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+      setupRunner(queryId, taskId, taskType, DEFAULT_WORKLOAD_NAME);
+    }
+
+    @Override
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, String workloadName) {
       _threadLocalEntry.get()._errorStatus.set(null);
       if (queryId != null) {
         _threadLocalEntry.get()
@@ -247,8 +284,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
       // clear task info + stats
       threadEntry.setToIdle();
-      // clear _anchorThread
-      super.clear();
     }
 
     @Override

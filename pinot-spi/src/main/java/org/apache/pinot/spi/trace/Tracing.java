@@ -227,8 +227,7 @@ public class Tracing {
     }
 
     @Override
-    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-                            @Nullable String workloadName) {
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, String workloadName) {
     }
 
     @Override
@@ -273,21 +272,19 @@ public class Tracing {
     private ThreadAccountantOps() {
     }
 
-
+    @Deprecated
     public static void setupRunner(String queryId) {
-      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE, null);
     }
 
-    public static void setupRunner(String queryId, @Nullable String workloadName) {
+    @Deprecated
+    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType) {
+    }
+
+    public static void setupRunner(String queryId, String workloadName) {
       setupRunner(queryId, ThreadExecutionContext.TaskType.SSE, workloadName);
     }
 
-    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType) {
-      setupRunner(queryId, taskType, null);
-    }
-
-    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType,
-                                   @Nullable String workloadName) {
+    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType, String workloadName) {
       // Set up the runner thread with the given query ID and workload name
       Tracing.getThreadAccountant().setupRunner(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType,
           workloadName);
