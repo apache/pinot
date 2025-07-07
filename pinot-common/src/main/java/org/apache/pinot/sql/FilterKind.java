@@ -33,7 +33,7 @@ public enum FilterKind {
   IN,
   NOT_IN,
   LIKE,
-  REGEXP_LIKE,
+  REGEXP_LIKE, REGEXP_LIKE_CI,
   TEXT_CONTAINS,
   TEXT_MATCH,
   JSON_MATCH,

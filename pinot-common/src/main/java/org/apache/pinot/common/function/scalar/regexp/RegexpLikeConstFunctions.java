@@ -49,4 +49,13 @@ public class RegexpLikeConstFunctions {
 
     return _matcher.reset(inputStr).find();
   }
+
+  @ScalarFunction
+  public boolean regexpLikeCi(String inputStr, String regexPatternStr) {
+    if (_matcher == null) {
+      _matcher = PatternFactory.compile(regexPatternStr).matcher("");
+    }
+
+    return _matcher.reset(inputStr).find();
+  }
 }

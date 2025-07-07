@@ -108,6 +108,12 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(function.getOperands().size(), 1);
     Assert.assertEquals(function.getOperands().get(0).getIdentifier().getName(), "AbC");
 
+    expression = compileToExpression("ReGeXpLiKe_Ci(AbC)");
+    function = expression.getFunctionCall();
+    Assert.assertEquals(function.getOperator(), FilterKind.REGEXP_LIKE_CI.name());
+    Assert.assertEquals(function.getOperands().size(), 1);
+    Assert.assertEquals(function.getOperands().get(0).getIdentifier().getName(), "AbC");
+
     expression = compileToExpression("aBc > DeF");
     function = expression.getFunctionCall();
     Assert.assertEquals(function.getOperator(), FilterKind.GREATER_THAN.name());
@@ -345,6 +351,14 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(func.getOperator(), "REGEXP_LIKE");
       Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
       Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^U.*");
+    }
+
+    {
+      PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where regexp_like_ci(E, '^u.*')");
+      Function func = pinotQuery.getFilterExpression().getFunctionCall();
+      Assert.assertEquals(func.getOperator(), "REGEXP_LIKE_CI");
+      Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
+      Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^u.*");
     }
 
     {
