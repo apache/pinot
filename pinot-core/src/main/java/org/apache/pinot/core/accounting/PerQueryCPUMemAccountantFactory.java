@@ -115,7 +115,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         = ThreadLocal.withInitial(() -> {
           CPUMemThreadLevelAccountingObjects.ThreadEntry ret =
               new CPUMemThreadLevelAccountingObjects.ThreadEntry();
-          _threadEntriesMap.put(Thread.currentThread(), ret);
+          addThreadEntry(Thread.currentThread(), ret);
           LOGGER.debug("Adding thread to _threadLocalEntry: {}", Thread.currentThread().getName());
           return ret;
         }
@@ -379,6 +379,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return _threadLocalEntry.get();
     }
 
+    public void addThreadEntry(Thread thread, CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry) {
+      _threadEntriesMap.put(thread, threadEntry);
+    }
+
     /**
      * clears thread accounting info once a runner/worker thread has finished a particular run
      */
@@ -427,6 +431,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         _inactiveQuery.addAll(_finishedTaskMemStatsAggregator.keySet());
         _inactiveQuery.addAll(_concurrentTaskMemStatsAggregator.keySet());
       }
+    }
+
+    public Set<String> getInactiveQueries() {
+      return Collections.unmodifiableSet(_inactiveQuery);
     }
 
     /**
