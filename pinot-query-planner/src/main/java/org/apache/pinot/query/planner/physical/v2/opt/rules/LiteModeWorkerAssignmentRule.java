@@ -29,7 +29,6 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
-import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
