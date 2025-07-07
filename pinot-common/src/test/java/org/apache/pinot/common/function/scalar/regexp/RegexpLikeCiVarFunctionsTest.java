@@ -29,24 +29,24 @@ public class RegexpLikeCiVarFunctionsTest {
   @Test
   public void testRegexpLikeCi() {
     // Case-insensitive matching
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("Hello", "hello"));
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("HELLO", "hello"));
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("hello", "HELLO"));
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("Hello World", ".*world.*"));
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("HELLO WORLD", ".*world.*"));
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("hello world", ".*WORLD.*"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("Hello", "hello"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("HELLO", "hello"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("hello", "HELLO"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("Hello World", ".*world.*"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("HELLO WORLD", ".*world.*"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("hello world", ".*WORLD.*"));
 
     // Case-sensitive patterns should still work
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("ab", ".*ab.*"));
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("aaba", ".*ab.*"));
-    assertTrue(RegexpLikeVarFunctions.regexpLikeCiVar("$ab$", ".*ab.*"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("ab", ".*ab.*"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("aaba", ".*ab.*"));
+    assertTrue(RegexpLikeCiVarFunctions.regexpLikeCiVar("$ab$", ".*ab.*"));
 
     // Negative cases
-    assertFalse(RegexpLikeVarFunctions.regexpLikeCiVar("", ".*ab.*"));
-    assertFalse(RegexpLikeVarFunctions.regexpLikeCiVar("_", ".*ab.*"));
-    assertFalse(RegexpLikeVarFunctions.regexpLikeCiVar("a", ".*ab.*"));
-    assertFalse(RegexpLikeVarFunctions.regexpLikeCiVar("b", ".*ab.*"));
-    assertFalse(RegexpLikeVarFunctions.regexpLikeCiVar("xyz", "hello"));
-    assertFalse(RegexpLikeVarFunctions.regexpLikeCiVar("HELLO", "world"));
+    assertFalse(RegexpLikeCiVarFunctions.regexpLikeCiVar("", ".*ab.*"));
+    assertFalse(RegexpLikeCiVarFunctions.regexpLikeCiVar("_", ".*ab.*"));
+    assertFalse(RegexpLikeCiVarFunctions.regexpLikeCiVar("a", ".*ab.*"));
+    assertFalse(RegexpLikeCiVarFunctions.regexpLikeCiVar("b", ".*ab.*"));
+    assertFalse(RegexpLikeCiVarFunctions.regexpLikeCiVar("xyz", "hello"));
+    assertFalse(RegexpLikeCiVarFunctions.regexpLikeCiVar("HELLO", "world"));
   }
 }

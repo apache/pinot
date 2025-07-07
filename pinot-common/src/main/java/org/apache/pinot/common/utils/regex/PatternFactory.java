@@ -51,4 +51,11 @@ public class PatternFactory {
         return new JavaUtilPattern(regex);
     }
   }
+
+  /**
+   * Compiles a pattern with CASE_INSENSITIVE and UNICODE_CASE flags.
+   */
+  public static org.apache.pinot.common.utils.regex.Pattern compileCaseInsensitive(String regex) {
+    return new JavaUtilPattern(regex, true);
+  }
 }
