@@ -64,7 +64,7 @@ public class SegmentCommitterFactory {
     }
 
     String peerSegmentDownloadScheme = _tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-    String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();;
+    String segmentStoreUri = _indexLoadingConfig.getSegmentStoreURI();
 
     SegmentUploader segmentUploader;
     if (uploadToFs || peerSegmentDownloadScheme != null) {
