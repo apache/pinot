@@ -67,6 +67,7 @@ import org.apache.pinot.spi.ingestion.batch.spec.PinotClusterSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.PushJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.SegmentGenerationJobSpec;
 import org.apache.pinot.spi.ingestion.batch.spec.TableSpec;
+import org.apache.pinot.spi.utils.CommonConstants.Minion;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -203,9 +204,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     try {
       AtomicInteger recordCount = new AtomicInteger(0);
       List<File> inputSegmentDirs = Collections.synchronizedList(new ArrayList<>(downloadURLs.length));
-      int nThreads = Integer.parseInt(taskConfigs.getOrDefault(MinionConstants.SEGMENT_DOWNLOAD_THREAD_POOL_SIZE,
-          String.valueOf(MinionConstants.DEFAULT_SEGMENT_DOWNLOAD_THREAD_POOL_SIZE)));
-      if (nThreads == 1) {
+      int nThreads = getThreadPoolSize(taskConfigs);
+      nThreads = Math.min(nThreads, downloadURLs.length);
+      if (nThreads <= 1) {
         for (int index = 0; index < downloadURLs.length; index++) {
           downloadAndUntarSegment(tableNameWithType, taskType, segmentNames[index], downloadURLs[index],
               tempDataDir, index, recordCount, inputSegmentDirs);
@@ -346,6 +347,14 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     } finally {
       FileUtils.deleteQuietly(tempDataDir);
     }
+  }
+
+  private int getThreadPoolSize(Map<String, String> taskConfigs) {
+    int nThreads = _minionConf.getProperty(Minion.SEGMENT_DOWNLOAD_THREAD_POOL_SIZE,
+        MinionConstants.DEFAULT_SEGMENT_DOWNLOAD_THREAD_POOL_SIZE);
+    nThreads = Integer.parseInt(taskConfigs.getOrDefault(MinionConstants.SEGMENT_DOWNLOAD_THREAD_POOL_SIZE,
+        String.valueOf(nThreads)));
+    return nThreads;
   }
 
   private void parallelDownloadAndUntarSegments(int nThreads, String tableNameWithType, String taskType,

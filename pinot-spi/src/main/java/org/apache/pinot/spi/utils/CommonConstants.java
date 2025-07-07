@@ -1409,6 +1409,12 @@ public class CommonConstants {
     public static final char TASK_LIST_SEPARATOR = ',';
     public static final String CONFIG_OF_ALLOW_DOWNLOAD_FROM_SERVER = "pinot.minion.task.allow.download.from.server";
     public static final String DEFAULT_ALLOW_DOWNLOAD_FROM_SERVER = "false";
+
+    /**
+     * The number of threads to use for downloading segments from the deepstore.
+     * This is a global setting that applies to all tasks of BaseMultipleSegmentsConversionExecutor class.
+     */
+    public static final String SEGMENT_DOWNLOAD_THREAD_POOL_SIZE = "pinot.minion.task.segmentDownloadThreadPoolSize";
   }
 
   public static class ControllerJob {

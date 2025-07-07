@@ -73,7 +73,7 @@ public class MinionConstants {
   public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
 
   /**
-   * Segment download thread pool size.
+   * Segment download thread pool size to be set at task level.
    */
   public static final String SEGMENT_DOWNLOAD_THREAD_POOL_SIZE = "segmentDownloadThreadPoolSize";
   public static final int DEFAULT_SEGMENT_DOWNLOAD_THREAD_POOL_SIZE = 1;
