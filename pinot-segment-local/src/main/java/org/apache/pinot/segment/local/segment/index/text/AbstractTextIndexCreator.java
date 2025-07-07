@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.segment.index.text;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 
@@ -27,12 +26,12 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 public abstract class AbstractTextIndexCreator implements TextIndexCreator {
 
   @Override
-  public void add(@Nonnull Object value, int dictId) {
+  public void add(Object value, int dictId) {
     add((String) value);
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  public void add(Object[] values, @Nullable int[] dictIds) {
     int length = values.length;
     if (values instanceof String[]) {
       add((String[]) values, length);

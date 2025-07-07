@@ -142,7 +142,7 @@ public class PinotSchemaRestletResourceTest {
 
     // Get the schema and verify the default null value and max length have been changed
     remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getMaxLength(), 2000);
+    assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getEffectiveMaxLength(), 2000);
     assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDefaultNullValue(), "0");
 
     // Change another column max length from 1000
@@ -156,7 +156,7 @@ public class PinotSchemaRestletResourceTest {
 
     // Get the schema and verify the default null value and max length have been changed
     remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getMaxLength(), 1000);
+    assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getEffectiveMaxLength(), 1000);
     assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDefaultNullValue(), "1");
 
     // Add a new BOOLEAN column

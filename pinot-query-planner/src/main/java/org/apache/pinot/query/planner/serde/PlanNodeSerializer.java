@@ -161,6 +161,7 @@ public class PlanNodeSerializer {
           .setDistributionType(convertDistributionType(node.getDistributionType()))
           .addAllKeys(node.getKeys())
           .setPrePartitioned(node.isPrePartitioned())
+          .setHashFunction(node.getHashFunction())
           .addAllCollations(convertCollations(node.getCollations()))
           .setSort(node.isSort())
           .build();

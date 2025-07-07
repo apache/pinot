@@ -48,7 +48,7 @@ import static org.apache.avro.Schema.createUnion;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.fail;
+import static org.testng.Assert.fail;
 
 
 @Test(suiteName = "CustomClusterIntegrationTest")

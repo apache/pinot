@@ -31,7 +31,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION;
-import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 
 public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
@@ -71,23 +71,23 @@ public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckR
     try (NativeTextIndexReader reader = new NativeTextIndexReader("testFSTColumn", fstFile.getParentFile())) {
       try {
         int[] matchedDocIds = reader.getDocIds("hello.*").toArray();
-        assertEquals(2, matchedDocIds.length);
-        assertEquals(0, matchedDocIds[0]);
-        assertEquals(1, matchedDocIds[1]);
+        assertEquals(matchedDocIds.length, 2);
+        assertEquals(matchedDocIds[0], 0);
+        assertEquals(matchedDocIds[1], 1);
 
         matchedDocIds = reader.getDocIds(".*llo").toArray();
-        assertEquals(2, matchedDocIds.length);
-        assertEquals(0, matchedDocIds[0]);
-        assertEquals(1, matchedDocIds[1]);
+        assertEquals(matchedDocIds.length, 2);
+        assertEquals(matchedDocIds[0], 0);
+        assertEquals(matchedDocIds[1], 1);
 
         matchedDocIds = reader.getDocIds("wor.*").toArray();
-        assertEquals(2, matchedDocIds.length);
-        assertEquals(0, matchedDocIds[0]);
-        assertEquals(1, matchedDocIds[1]);
+        assertEquals(matchedDocIds.length, 2);
+        assertEquals(matchedDocIds[0], 0);
+        assertEquals(matchedDocIds[1], 1);
 
         matchedDocIds = reader.getDocIds("zoo.*").toArray();
-        assertEquals(1, matchedDocIds.length);
-        assertEquals(3, matchedDocIds[0]);
+        assertEquals(matchedDocIds.length, 1);
+        assertEquals(matchedDocIds[0], 3);
       } finally {
         reader.closeInTest();
       }

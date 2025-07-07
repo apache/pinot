@@ -141,7 +141,7 @@ class ConcurrentMapPartitionDedupMetadataManager extends BasePartitionDedupMetad
   }
 
   @Override
-  protected long getNumPrimaryKeys() {
+  public long getNumPrimaryKeys() {
     return _primaryKeyToSegmentAndTimeMap.size();
   }
 

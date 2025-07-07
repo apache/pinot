@@ -113,6 +113,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Long getPassiveTimeoutMs(Map<String, String> queryOptions) {
+    String passiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
+    return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, passiveTimeoutMsString, 0);
+  }
+
+  @Nullable
   public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
     String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
     return checkedParseLongPositive(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, responseSize);
@@ -431,20 +437,29 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_PHYSICAL_OPTIMIZER, "false"));
+  public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_PHYSICAL_OPTIMIZER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isUseLiteMode(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_LITE_MODE, "false"));
+  public static boolean isUseLiteMode(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_LITE_MODE);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isUseBrokerPruning(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.USE_BROKER_PRUNING, "true"));
+  public static boolean isUseBrokerPruning(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_BROKER_PRUNING);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static boolean isRunInBroker(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.RUN_IN_BROKER, "true"));
+  public static boolean isRunInBroker(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.RUN_IN_BROKER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static int getLiteModeServerStageLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT, option) : defaultValue;
   }
 
   @Nullable

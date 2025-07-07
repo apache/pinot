@@ -22,6 +22,7 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -431,6 +432,522 @@ public class TenantRebalancerTest extends ControllerTest {
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
     }
+  }
+
+  @Test
+  public void testTenantRebalanceResultAggregation()
+      throws Exception {
+    // Test data setup
+    String jobId = "test-job-123";
+    String testTenant = "TestTenant";
+    String offlineTag = TagNameUtils.getOfflineTagForTenant(testTenant);
+    String realtimeTag = TagNameUtils.getRealtimeTagForTenant(testTenant);
+
+    // Create mock RebalanceResult objects for different tables
+    Map<String, RebalanceResult> tableResults = new HashMap<>();
+
+    // Table A: Scale out scenario - adding servers
+    RebalanceResult tableAResult = createMockRebalanceResult("tableA_job",
+        RebalanceResult.Status.DONE, "Table A rebalanced successfully",
+        createMockServerInfo(
+            2, // servers getting new segments
+            new RebalanceSummaryResult.RebalanceChangeInfo(3, 5), // 3 -> 5 servers
+            Set.of("server4", "server5"), // servers added
+            null, // servers removed
+            Set.of("server1", "server2", "server3"), // servers unchanged
+            Set.of("server4", "server5"), // servers getting new segments
+            Map.of(
+                "server1", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 10, 10, 0, 0, 10, List.of(offlineTag)),
+                "server2", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 10, 10, 0, 0, 10, List.of(offlineTag)),
+                "server3", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 10, 10, 0, 0, 10, List.of(offlineTag)),
+                "server4", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.ADDED, 5, 0, 5, 0, 0, List.of(offlineTag)),
+                "server5", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.ADDED, 5, 0, 5, 0, 0, List.of(offlineTag))
+            )
+        ),
+        createMockSegmentInfo(
+            10, // segments to be moved
+            0,  // segments to be deleted
+            5,  // max segments added to single server
+            1000L, // average segment size
+            10000L, // total data to be moved
+            new RebalanceSummaryResult.RebalanceChangeInfo(3, 4), // replication factor unchanged
+            new RebalanceSummaryResult.RebalanceChangeInfo(10, 10), // segments in single replica
+            new RebalanceSummaryResult.RebalanceChangeInfo(30, 40), // segments across all replicas
+            null // no consuming segments for offline table
+        ),
+        List.of(new RebalanceSummaryResult.TagInfo(offlineTag, 10, 30, 5))
+    );
+    tableResults.put("tableA_OFFLINE", tableAResult);
+
+    // Table B: Scale in scenario - removing servers
+    RebalanceResult tableBResult = createMockRebalanceResult("tableB_job",
+        RebalanceResult.Status.DONE, "Table B rebalanced successfully",
+        createMockServerInfo(
+            0, // servers getting new segments
+            new RebalanceSummaryResult.RebalanceChangeInfo(4, 3), // 4 -> 3 servers
+            null, // servers added
+            Set.of("server6"), // servers removed
+            Set.of("server7", "server8", "server9"), // servers unchanged
+            null, // servers getting new segments
+            Map.of(
+                "server6", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.REMOVED, 0, 8, 0, 8, 0, List.of(realtimeTag)),
+                "server7", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 12, 8, 4, 0, 8, List.of(realtimeTag)),
+                "server8", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 12, 8, 4, 0, 8, List.of(realtimeTag)),
+                "server9", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 8, 8, 0, 0, 8, List.of(realtimeTag))
+            )
+        ),
+        createMockSegmentInfo(
+            8,  // segments to be moved
+            8,  // segments to be deleted
+            4,  // max segments added to single server
+            2000L, // average segment size
+            16000L, // total data to be moved
+            new RebalanceSummaryResult.RebalanceChangeInfo(2, 2), // replication factor unchanged
+            new RebalanceSummaryResult.RebalanceChangeInfo(16, 16), // segments in single replica
+            new RebalanceSummaryResult.RebalanceChangeInfo(32, 32), // segments across all replicas
+            null // no consuming segments for offline table
+        ),
+        List.of(new RebalanceSummaryResult.TagInfo(realtimeTag, 8, 24, 3))
+    );
+    tableResults.put("tableB_REALTIME", tableBResult);
+
+    // Table C: No operation scenario
+    RebalanceResult tableCResult = createMockRebalanceResult("tableC_job",
+        RebalanceResult.Status.NO_OP, "Table C - no rebalancing needed",
+        createMockServerInfo(
+            0, // servers getting new segments
+            new RebalanceSummaryResult.RebalanceChangeInfo(2, 2), // 2 -> 2 servers
+            null, // servers added
+            null, // servers removed
+            Set.of("server10", "server11"), // servers unchanged
+            null, // servers getting new segments
+            Map.of(
+                "server10", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 6, 6, 0, 0, 6, List.of(offlineTag)),
+                "server11", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 6, 6, 0, 0, 6, List.of(offlineTag))
+            )
+        ),
+        createMockSegmentInfo(
+            0,  // segments to be moved
+            0,  // segments to be deleted
+            0,  // max segments added to single server
+            0L, // average segment size
+            0L, // total data to be moved
+            new RebalanceSummaryResult.RebalanceChangeInfo(2, 2), // replication factor unchanged
+            new RebalanceSummaryResult.RebalanceChangeInfo(6, 6), // segments in single replica
+            new RebalanceSummaryResult.RebalanceChangeInfo(12, 12), // segments across all replicas
+            null // no consuming segments for offline table
+        ),
+        List.of(new RebalanceSummaryResult.TagInfo(offlineTag, 0, 12, 2))
+    );
+    tableResults.put("tableC_OFFLINE", tableCResult);
+
+    // Create TenantRebalanceResult and verify aggregations
+    TenantRebalanceResult tenantResult = new TenantRebalanceResult(jobId, tableResults, true);
+
+    // Verify basic properties
+    assertEquals(tenantResult.getJobId(), jobId);
+    assertEquals(tenantResult.getTotalTables(), 3);
+
+    // Verify status summary aggregation
+    Map<RebalanceResult.Status, Integer> statusSummary = tenantResult.getStatusSummary();
+    assertEquals(statusSummary.get(RebalanceResult.Status.DONE), Integer.valueOf(2));
+    assertEquals(statusSummary.get(RebalanceResult.Status.NO_OP), Integer.valueOf(1));
+    assertNull(statusSummary.get(RebalanceResult.Status.FAILED));
+
+    // Verify aggregated rebalance summary
+    RebalanceSummaryResult aggregatedSummary = tenantResult.getAggregatedRebalanceSummary();
+    assertNotNull(aggregatedSummary);
+
+    // Verify aggregated server info
+    RebalanceSummaryResult.ServerInfo serverInfo = aggregatedSummary.getServerInfo();
+    assertNotNull(serverInfo);
+    assertEquals(serverInfo.getNumServersGettingNewSegments(), 4); // server4, server5, server7, and server8
+    assertEquals(serverInfo.getNumServers().getValueBeforeRebalance(), 9); // 3 + 4 + 2 unique servers before
+    assertEquals(serverInfo.getNumServers().getExpectedValueAfterRebalance(), 10); // 5 + 3 + 2 unique servers after
+
+    // Verify server sets
+    assertEquals(serverInfo.getServersAdded(), Set.of("server4", "server5"));
+    assertEquals(serverInfo.getServersRemoved(), Set.of("server6"));
+    assertEquals(serverInfo.getServersUnchanged(),
+        Set.of("server1", "server2", "server3", "server7", "server8", "server9", "server10", "server11"));
+    assertEquals(serverInfo.getServersGettingNewSegments(), Set.of("server4", "server5", "server7", "server8"));
+
+    // Verify server segment change info aggregation
+    Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfo =
+        serverInfo.getServerSegmentChangeInfo();
+    assertNotNull(serverSegmentChangeInfo);
+
+    // Verify a few key servers
+    RebalanceSummaryResult.ServerSegmentChangeInfo server1Info = serverSegmentChangeInfo.get("server1");
+    assertEquals(server1Info.getTotalSegmentsBeforeRebalance(), 10);
+    assertEquals(server1Info.getTotalSegmentsAfterRebalance(), 10);
+    assertEquals(server1Info.getSegmentsAdded(), 0);
+    assertEquals(server1Info.getSegmentsDeleted(), 0);
+    assertEquals(server1Info.getSegmentsUnchanged(), 10);
+    assertEquals(server1Info.getServerStatus(), RebalanceSummaryResult.ServerStatus.UNCHANGED);
+
+    RebalanceSummaryResult.ServerSegmentChangeInfo server4Info = serverSegmentChangeInfo.get("server4");
+    assertEquals(server4Info.getTotalSegmentsBeforeRebalance(), 0);
+    assertEquals(server4Info.getTotalSegmentsAfterRebalance(), 5);
+    assertEquals(server4Info.getSegmentsAdded(), 5);
+    assertEquals(server4Info.getSegmentsDeleted(), 0);
+    assertEquals(server4Info.getSegmentsUnchanged(), 0);
+    assertEquals(server4Info.getServerStatus(), RebalanceSummaryResult.ServerStatus.ADDED);
+
+    RebalanceSummaryResult.ServerSegmentChangeInfo server6Info = serverSegmentChangeInfo.get("server6");
+    assertEquals(server6Info.getTotalSegmentsBeforeRebalance(), 8);
+    assertEquals(server6Info.getTotalSegmentsAfterRebalance(), 0);
+    assertEquals(server6Info.getSegmentsAdded(), 0);
+    assertEquals(server6Info.getSegmentsDeleted(), 8);
+    assertEquals(server6Info.getSegmentsUnchanged(), 0);
+    assertEquals(server6Info.getServerStatus(), RebalanceSummaryResult.ServerStatus.REMOVED);
+
+    // Verify aggregated segment info
+    RebalanceSummaryResult.SegmentInfo segmentInfo = aggregatedSummary.getSegmentInfo();
+    assertNotNull(segmentInfo);
+    assertEquals(segmentInfo.getTotalSegmentsToBeMoved(), 18); // 10 + 8 + 0
+    assertEquals(segmentInfo.getTotalSegmentsToBeDeleted(), 8); // 0 + 8 + 0
+    assertEquals(segmentInfo.getMaxSegmentsAddedToASingleServer(), 5); // max(5, 4, 0)
+    assertEquals(segmentInfo.getEstimatedAverageSegmentSizeInBytes(),
+        (10000L + 16000L) / 18); // weighted average: (10*1000 + 8*2000 + 0*0) / 18
+    assertEquals(segmentInfo.getTotalEstimatedDataToBeMovedInBytes(), 26000L); // 10000 + 16000 + 0
+
+    // Verify segment counts aggregation
+    assertEquals(segmentInfo.getNumSegmentsInSingleReplica().getValueBeforeRebalance(), 32); // 10 + 16 + 6
+    assertEquals(segmentInfo.getNumSegmentsInSingleReplica().getExpectedValueAfterRebalance(), 32); // 10 + 16 + 6
+    assertEquals(segmentInfo.getNumSegmentsAcrossAllReplicas().getValueBeforeRebalance(), 74); // 30 + 32 + 12
+    assertEquals(segmentInfo.getNumSegmentsAcrossAllReplicas().getExpectedValueAfterRebalance(), 84); // 40 + 32 + 12
+
+    // Verify aggregated tag info
+    List<RebalanceSummaryResult.TagInfo> tagsInfo = aggregatedSummary.getTagsInfo();
+    assertNotNull(tagsInfo);
+    assertEquals(tagsInfo.size(), 2);
+
+    // Find and verify offline tag info
+    RebalanceSummaryResult.TagInfo offlineTagInfo = tagsInfo.stream()
+        .filter(tag -> tag.getTagName().equals(offlineTag))
+        .findFirst()
+        .orElse(null);
+    assertNotNull(offlineTagInfo);
+    assertEquals(offlineTagInfo.getNumSegmentsToDownload(), 10); // 10 + 0 + 0 (only table A and C have offline tags)
+    assertEquals(offlineTagInfo.getNumSegmentsUnchanged(), 42); // 30 + 0 + 12
+    assertEquals(offlineTagInfo.getNumServerParticipants(), 7); // servers 1,2,3,4,5,10,11
+
+    // Find and verify realtime tag info
+    RebalanceSummaryResult.TagInfo realtimeTagInfo = tagsInfo.stream()
+        .filter(tag -> tag.getTagName().equals(realtimeTag))
+        .findFirst()
+        .orElse(null);
+    assertNotNull(realtimeTagInfo);
+    assertEquals(realtimeTagInfo.getNumSegmentsToDownload(), 8); // only table B has realtime tags
+    assertEquals(realtimeTagInfo.getNumSegmentsUnchanged(), 24);
+    assertEquals(realtimeTagInfo.getNumServerParticipants(), 3); // servers 7,8,9 (server6 is removed)
+
+    // Verify original table results are preserved
+    assertEquals(tenantResult.getRebalanceTableResults().size(), 3);
+    assertEquals(tenantResult.getRebalanceTableResults().get("tableA_OFFLINE").getStatus(),
+        RebalanceResult.Status.DONE);
+    assertEquals(tenantResult.getRebalanceTableResults().get("tableB_REALTIME").getStatus(),
+        RebalanceResult.Status.DONE);
+    assertEquals(tenantResult.getRebalanceTableResults().get("tableC_OFFLINE").getStatus(),
+        RebalanceResult.Status.NO_OP);
+  }
+
+  @Test
+  public void testTenantRebalanceResultAggregationWithOverlappingServers()
+      throws Exception {
+    // Test data setup with overlapping servers between tables
+    String jobId = "test-job-overlapping-456";
+    String testTenant = "TestTenant";
+    String offlineTag = TagNameUtils.getOfflineTagForTenant(testTenant);
+    String realtimeTag = TagNameUtils.getRealtimeTagForTenant(testTenant);
+
+    // Create mock RebalanceResult objects with overlapping servers
+    Map<String, RebalanceResult> tableResults = new HashMap<>();
+
+    // Table A (offline): servers 1,2,3 -> 1,2,3,4 (add server 4)
+    // Server 2 and 3 will also appear in Table B
+    RebalanceResult tableAResult = createMockRebalanceResult("tableA_job",
+        RebalanceResult.Status.DONE, "Table A rebalanced successfully",
+        createMockServerInfo(
+            1, // servers getting new segments (server 4)
+            new RebalanceSummaryResult.RebalanceChangeInfo(3, 3),
+            Set.of("server4"), // servers added
+            Set.of("server1"), // servers removed
+            Set.of("server2", "server3"), // servers unchanged
+            Set.of("server4"), // servers getting new segments
+            Map.of(
+                "server1", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.REMOVED, 0, 8, 0, 8, 0, List.of(offlineTag)),
+                "server2", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 8, 8, 0, 0, 8, List.of(offlineTag)),
+                "server3", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 8, 8, 0, 0, 8, List.of(offlineTag, realtimeTag)),
+                "server4", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.ADDED, 8, 0, 8, 0, 0, List.of(offlineTag, realtimeTag))
+            )
+        ),
+        createMockSegmentInfo(
+            8, // segments to be moved
+            8, // segments to be deleted
+            8, // max segments added to single server
+            1500L, // average segment size
+            12000L, // total data to be moved
+            new RebalanceSummaryResult.RebalanceChangeInfo(3, 3), // replication factor unchanged
+            new RebalanceSummaryResult.RebalanceChangeInfo(8, 8), // segments in single replica
+            new RebalanceSummaryResult.RebalanceChangeInfo(24, 24), // segments across all replicas
+            null // no consuming segments for offline table
+        ),
+        List.of(new RebalanceSummaryResult.TagInfo(offlineTag, 8, 24, 3))
+    );
+    tableResults.put("tableA_OFFLINE", tableAResult);
+
+    // Table B (realtime): servers 2,3,4 -> 3,4,5 (remove server 2, add server 5)
+    // Server 2 is being removed from Table B but still exists in Table A
+    // Server 3 and 4 overlap with Table A
+    RebalanceResult tableBResult = createMockRebalanceResult("tableB_job",
+        RebalanceResult.Status.DONE, "Table B rebalanced successfully",
+        createMockServerInfo(
+            1, // servers getting new segments (server 5)
+            new RebalanceSummaryResult.RebalanceChangeInfo(3, 3), // 3 -> 3 servers (same count)
+            Set.of("server5"), // servers added
+            Set.of("server2"), // servers removed (but still exists in Table A)
+            Set.of("server3", "server4"), // servers unchanged
+            Set.of("server5"), // servers getting new segments
+            Map.of(
+                "server2", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.REMOVED, 0, 6, 0, 6, 0, List.of(offlineTag)),
+                "server3", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 9, 6, 3, 0, 6, List.of(offlineTag, realtimeTag)),
+                "server4", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 9, 6, 3, 0, 6, List.of(offlineTag, realtimeTag)),
+                "server5", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.ADDED, 9, 0, 9, 0, 0, List.of(offlineTag, realtimeTag))
+            )
+        ),
+        createMockSegmentInfo(
+            15, // segments to be moved (6 from server2 + 6 to server5)
+            6, // segments to be deleted
+            9, // max segments added to single server
+            1800L, // average segment size
+            27000L, // total data to be moved
+            new RebalanceSummaryResult.RebalanceChangeInfo(3, 3), // replication factor unchanged
+            new RebalanceSummaryResult.RebalanceChangeInfo(6, 9), // segments in single replica
+            new RebalanceSummaryResult.RebalanceChangeInfo(18, 27), // segments across all replicas
+            null // no consuming segments for realtime table
+        ),
+        List.of(new RebalanceSummaryResult.TagInfo(realtimeTag, 15, 12, 3))
+    );
+    tableResults.put("tableB_REALTIME", tableBResult);
+
+    // Table C (offline): servers 4,5,6 -> 4,5,6 (no change)
+    // Server 4 and 5 overlap with previous tables
+    RebalanceResult tableCResult = createMockRebalanceResult("tableC_job",
+        RebalanceResult.Status.NO_OP, "Table C - no rebalancing needed",
+        createMockServerInfo(
+            0, // servers getting new segments
+            new RebalanceSummaryResult.RebalanceChangeInfo(3, 3), // 3 -> 3 servers
+            null, // servers added
+            null, // servers removed
+            Set.of("server4", "server5", "server6"), // servers unchanged
+            null, // servers getting new segments
+            Map.of(
+                "server4", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 4, 4, 0, 0, 4, List.of(offlineTag, realtimeTag)),
+                "server5", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 4, 4, 0, 0, 4, List.of(offlineTag, realtimeTag)),
+                "server6", new RebalanceSummaryResult.ServerSegmentChangeInfo(
+                    RebalanceSummaryResult.ServerStatus.UNCHANGED, 4, 4, 0, 0, 4, List.of(offlineTag))
+            )
+        ),
+        createMockSegmentInfo(
+            0, // segments to be moved
+            0, // segments to be deleted
+            0, // max segments added to single server
+            0L, // average segment size
+            0L, // total data to be moved
+            new RebalanceSummaryResult.RebalanceChangeInfo(2, 2), // replication factor unchanged
+            new RebalanceSummaryResult.RebalanceChangeInfo(6, 6), // segments in single replica
+            new RebalanceSummaryResult.RebalanceChangeInfo(12, 12), // segments across all replicas
+            null // no consuming segments for offline table
+        ),
+        List.of(new RebalanceSummaryResult.TagInfo(offlineTag, 0, 12, 3))
+    );
+    tableResults.put("tableC_OFFLINE", tableCResult);
+
+    // Create TenantRebalanceResult and verify aggregations with overlapping servers
+    TenantRebalanceResult tenantResult = new TenantRebalanceResult(jobId, tableResults, true);
+
+    // Verify basic properties
+    assertEquals(tenantResult.getJobId(), jobId);
+    assertEquals(tenantResult.getTotalTables(), 3);
+
+    // Verify status summary aggregation
+    Map<RebalanceResult.Status, Integer> statusSummary = tenantResult.getStatusSummary();
+    assertEquals(statusSummary.get(RebalanceResult.Status.DONE), Integer.valueOf(2));
+    assertEquals(statusSummary.get(RebalanceResult.Status.NO_OP), Integer.valueOf(1));
+    assertNull(statusSummary.get(RebalanceResult.Status.FAILED));
+
+    // Verify aggregated rebalance summary
+    RebalanceSummaryResult aggregatedSummary = tenantResult.getAggregatedRebalanceSummary();
+    assertNotNull(aggregatedSummary);
+
+    // Verify aggregated server info with overlapping servers
+    RebalanceSummaryResult.ServerInfo serverInfo = aggregatedSummary.getServerInfo();
+    assertNotNull(serverInfo);
+
+    // Servers getting new segments: server4 (from Table A), server3, server4, server5 (from Table B)
+    assertEquals(serverInfo.getNumServersGettingNewSegments(), 3);
+
+    // Unique servers across all tables: 1,2,3,4,5,6
+    // Before rebalance: server1,2,3 (Table A) + server2,3,4 (Table B) + server4,5,6 (Table C) = 6 unique servers
+    assertEquals(serverInfo.getNumServers().getValueBeforeRebalance(), 6);
+    // After rebalance: server2,3,4 (Table A) + server3,4,5 (Table B) + server4,5,6 (Table C) = 5 unique servers
+    assertEquals(serverInfo.getNumServers().getExpectedValueAfterRebalance(), 5);
+
+    // Verify server sets - with overlapping servers, aggregation should be more complex
+    assertTrue(serverInfo.getServersAdded().isEmpty());
+    // Server1 is removed from Table A, Server2 is removed from Table B but still exists in TableA so it shouldn't be
+    // in serversRemoved
+    assertEquals(serverInfo.getServersRemoved(), Set.of("server1"));
+    // Servers that are unchanged in at least one table
+    assertEquals(serverInfo.getServersUnchanged(), Set.of("server2", "server3", "server4", "server5", "server6"));
+    assertEquals(serverInfo.getServersGettingNewSegments(), Set.of("server3", "server4", "server5"));
+
+    // Verify server segment change info aggregation with overlapping servers
+    Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfo =
+        serverInfo.getServerSegmentChangeInfo();
+    assertNotNull(serverSegmentChangeInfo);
+
+    // Verify overlapping servers have combined information
+    // Server 2: exists in Table A (unchanged) and Table B (removed)
+    RebalanceSummaryResult.ServerSegmentChangeInfo server1Info = serverSegmentChangeInfo.get("server1");
+    assertEquals(server1Info.getTotalSegmentsBeforeRebalance(), 8); // 8 (Table A) + 6 (Table B)
+    assertEquals(server1Info.getTotalSegmentsAfterRebalance(), 0); // 8 (Table A) + 0 (Table B)
+    assertEquals(server1Info.getSegmentsAdded(), 0);
+    assertEquals(server1Info.getSegmentsDeleted(), 8); // removed from Table B
+    assertEquals(server1Info.getSegmentsUnchanged(), 0); // unchanged in Table A
+    // Server status should reflect the most significant change (removed from one table)
+    assertEquals(server1Info.getServerStatus(), RebalanceSummaryResult.ServerStatus.REMOVED);
+
+    // Server 2: exists in Table A (unchanged) and Table B (removed)
+    RebalanceSummaryResult.ServerSegmentChangeInfo server2Info = serverSegmentChangeInfo.get("server2");
+    assertEquals(server2Info.getTotalSegmentsBeforeRebalance(), 14); // 8 (Table A) + 6 (Table B)
+    assertEquals(server2Info.getTotalSegmentsAfterRebalance(), 8); // 8 (Table A) + 0 (Table B)
+    assertEquals(server2Info.getSegmentsAdded(), 0);
+    assertEquals(server2Info.getSegmentsDeleted(), 6); // removed from Table B
+    assertEquals(server2Info.getSegmentsUnchanged(), 8); // unchanged in Table A
+    // Server status should reflect the most significant change (removed from one table)
+    assertEquals(server2Info.getServerStatus(), RebalanceSummaryResult.ServerStatus.UNCHANGED);
+
+    // Server 3: exists in Table A (unchanged) and Table B (unchanged)
+    RebalanceSummaryResult.ServerSegmentChangeInfo server3Info = serverSegmentChangeInfo.get("server3");
+    assertEquals(server3Info.getTotalSegmentsBeforeRebalance(), 14); // 8 (Table A) + 6 (Table B)
+    assertEquals(server3Info.getTotalSegmentsAfterRebalance(), 17); // 8 (Table A) + 9 (Table B)
+    assertEquals(server3Info.getSegmentsAdded(), 3); // 0 (Table A) + 3 (Table B)
+    assertEquals(server3Info.getSegmentsDeleted(), 0);
+    assertEquals(server3Info.getSegmentsUnchanged(), 14); // 8 (Table A) + 6 (Table B)
+    assertEquals(server3Info.getServerStatus(), RebalanceSummaryResult.ServerStatus.UNCHANGED);
+
+    // Server 4: exists in Table A (added), Table B (unchanged), Table C (unchanged)
+    RebalanceSummaryResult.ServerSegmentChangeInfo server4Info = serverSegmentChangeInfo.get("server4");
+    assertEquals(server4Info.getTotalSegmentsBeforeRebalance(), 10); // 0 (Table A) + 6 (Table B) + 4 (Table C)
+    assertEquals(server4Info.getTotalSegmentsAfterRebalance(), 21); // 8 (Table A) + 9 (Table B) + 4 (Table C)
+    assertEquals(server4Info.getSegmentsAdded(), 11); // 8 (Table A) + 3 (Table B) + 0 (Table C)
+    assertEquals(server4Info.getSegmentsDeleted(), 0);
+    assertEquals(server4Info.getSegmentsUnchanged(), 10); // 0 (Table A) + 6 (Table B) + 4 (Table C)
+    assertEquals(server4Info.getServerStatus(), RebalanceSummaryResult.ServerStatus.UNCHANGED);
+
+    // Server 5: exists in Table B (added) and Table C (unchanged)
+    RebalanceSummaryResult.ServerSegmentChangeInfo server5Info = serverSegmentChangeInfo.get("server5");
+    assertEquals(server5Info.getTotalSegmentsBeforeRebalance(), 4); // 0 (Table B) + 4 (Table C)
+    assertEquals(server5Info.getTotalSegmentsAfterRebalance(), 13); // 9 (Table B) + 4 (Table C)
+    assertEquals(server5Info.getSegmentsAdded(), 9); // 9 (Table B) + 0 (Table C)
+    assertEquals(server5Info.getSegmentsDeleted(), 0);
+    assertEquals(server5Info.getSegmentsUnchanged(), 4); // 0 (Table B) + 4 (Table C)
+    assertEquals(server5Info.getServerStatus(), RebalanceSummaryResult.ServerStatus.UNCHANGED);
+
+    // Verify aggregated segment info
+    RebalanceSummaryResult.SegmentInfo segmentInfo = aggregatedSummary.getSegmentInfo();
+    assertNotNull(segmentInfo);
+    assertEquals(segmentInfo.getTotalSegmentsToBeMoved(), 23); // 8 + 15 + 0
+    assertEquals(segmentInfo.getTotalSegmentsToBeDeleted(), 14); // 8 + 6 + 0
+    assertEquals(segmentInfo.getMaxSegmentsAddedToASingleServer(),
+        11); // server4 has 11 segments added (8 from Table A, 3 from Table B)
+    // Weighted average: (6*1500 + 12*1800 + 0*0) / 18 = 30600 / 18 = 1700
+    assertEquals(segmentInfo.getEstimatedAverageSegmentSizeInBytes(), (12000L + 27000L) / 23);
+    assertEquals(segmentInfo.getTotalEstimatedDataToBeMovedInBytes(), 12000L + 27000L); // 9000 + 21600 + 0
+
+    // Verify aggregated tag info
+    List<RebalanceSummaryResult.TagInfo> tagsInfo = aggregatedSummary.getTagsInfo();
+    assertNotNull(tagsInfo);
+    assertEquals(tagsInfo.size(), 2);
+
+    // Find and verify offline tag info (Table A and C)
+    RebalanceSummaryResult.TagInfo offlineTagInfo = tagsInfo.stream()
+        .filter(tag -> tag.getTagName().equals(offlineTag))
+        .findFirst()
+        .orElse(null);
+    assertNotNull(offlineTagInfo);
+    assertEquals(offlineTagInfo.getNumSegmentsToDownload(), 8); // 8 (Table A) + 0 (Table C)
+    assertEquals(offlineTagInfo.getNumSegmentsUnchanged(), 36); // server 1-6
+    assertEquals(offlineTagInfo.getNumServerParticipants(), 5); // servers 2,3,4,5,6 (unique count from both tables)
+
+    // Find and verify realtime tag info (Table B only)
+    RebalanceSummaryResult.TagInfo realtimeTagInfo = tagsInfo.stream()
+        .filter(tag -> tag.getTagName().equals(realtimeTag))
+        .findFirst()
+        .orElse(null);
+    assertNotNull(realtimeTagInfo);
+    assertEquals(realtimeTagInfo.getNumSegmentsToDownload(), 15); // only server 3,4,5 from Table B
+    assertEquals(realtimeTagInfo.getNumSegmentsUnchanged(), 12);
+    assertEquals(realtimeTagInfo.getNumServerParticipants(), 3); // servers 3,4,5 (server2 is removed)
+
+    // Verify original table results are preserved
+    assertEquals(tenantResult.getRebalanceTableResults().size(), 3);
+    assertEquals(tenantResult.getRebalanceTableResults().get("tableA_OFFLINE").getStatus(),
+        RebalanceResult.Status.DONE);
+    assertEquals(tenantResult.getRebalanceTableResults().get("tableB_REALTIME").getStatus(),
+        RebalanceResult.Status.DONE);
+    assertEquals(tenantResult.getRebalanceTableResults().get("tableC_OFFLINE").getStatus(),
+        RebalanceResult.Status.NO_OP);
+  }
+
+  private RebalanceResult createMockRebalanceResult(String jobId, RebalanceResult.Status status, String description,
+      RebalanceSummaryResult.ServerInfo serverInfo, RebalanceSummaryResult.SegmentInfo segmentInfo,
+      List<RebalanceSummaryResult.TagInfo> tagsInfo) {
+    RebalanceSummaryResult summaryResult = new RebalanceSummaryResult(serverInfo, segmentInfo, tagsInfo);
+    return new RebalanceResult(jobId, status, description, null, null, null, null, summaryResult);
+  }
+
+  private RebalanceSummaryResult.ServerInfo createMockServerInfo(int numServersGettingNewSegments,
+      RebalanceSummaryResult.RebalanceChangeInfo numServers, Set<String> serversAdded, Set<String> serversRemoved,
+      Set<String> serversUnchanged, Set<String> serversGettingNewSegments,
+      Map<String, RebalanceSummaryResult.ServerSegmentChangeInfo> serverSegmentChangeInfo) {
+    return new RebalanceSummaryResult.ServerInfo(numServersGettingNewSegments, numServers, serversAdded,
+        serversRemoved, serversUnchanged, serversGettingNewSegments, serverSegmentChangeInfo);
+  }
+
+  private RebalanceSummaryResult.SegmentInfo createMockSegmentInfo(int totalSegmentsToBeMoved,
+      int totalSegmentsToBeDeleted, int maxSegmentsAddedToASingleServer, long estimatedAverageSegmentSizeInBytes,
+      long totalEstimatedDataToBeMovedInBytes, RebalanceSummaryResult.RebalanceChangeInfo replicationFactor,
+      RebalanceSummaryResult.RebalanceChangeInfo numSegmentsInSingleReplica,
+      RebalanceSummaryResult.RebalanceChangeInfo numSegmentsAcrossAllReplicas,
+      RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary consumingSegmentToBeMovedSummary) {
+    return new RebalanceSummaryResult.SegmentInfo(totalSegmentsToBeMoved, totalSegmentsToBeDeleted,
+        maxSegmentsAddedToASingleServer, estimatedAverageSegmentSizeInBytes, totalEstimatedDataToBeMovedInBytes,
+        replicationFactor, numSegmentsInSingleReplica, numSegmentsAcrossAllReplicas, consumingSegmentToBeMovedSummary);
   }
 
   private boolean waitForCompletion(String jobId) {
