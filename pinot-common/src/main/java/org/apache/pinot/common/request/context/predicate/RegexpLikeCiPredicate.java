@@ -47,7 +47,7 @@ public class RegexpLikeCiPredicate extends BasePredicate {
 
   public Pattern getPattern() {
     if (_pattern == null) {
-      _pattern = PatternFactory.compile(_value);
+      _pattern = PatternFactory.compileCaseInsensitive(_value);
     }
     return _pattern;
   }
