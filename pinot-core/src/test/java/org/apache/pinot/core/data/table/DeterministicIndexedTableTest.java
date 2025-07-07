@@ -19,7 +19,9 @@
 package org.apache.pinot.core.data.table;
 
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.utils.DataSchema;
@@ -123,6 +125,64 @@ public class DeterministicIndexedTableTest {
     }
     Assert.assertEquals(i, 3);
   }
+
+  @Test
+  public void testMultiThreadedWritersTop5000Asc()
+      throws Exception {
+    for (int i = 0; i < 5; i++) {
+      testMultiThreadedWritersTop5000AscInternal();
+    }
+  }
+
+  public void testMultiThreadedWritersTop5000AscInternal()
+      throws Exception {
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(
+        "SELECT COUNT(*) FROM testTable GROUP BY d1 LIMIT 5000 OPTION(accurateGroupByWithoutOrderBy=true)");
+    DataSchema dataSchema = new DataSchema(new String[]{"d1", "count(*)"}, new ColumnDataType[]{
+        ColumnDataType.INT, ColumnDataType.LONG
+    });
+
+    ExecutorService executor = Executors.newCachedThreadPool();
+
+    int numThreads = 5;
+    int max = 10000;
+
+    DeterministicConcurrentIndexedTable table = new DeterministicConcurrentIndexedTable(
+        dataSchema, false, queryContext, 5000, Integer.MAX_VALUE, Integer.MAX_VALUE, 16, executor);
+
+    Runnable writerTask = () -> {
+      for (int i = 1; i <= max; i++) {
+        Object[] row = new Object[]{i, 1L};
+        table.upsert(new Record(row));
+      }
+    };
+
+    // Launch writer threads
+    List<Thread> threads = new ArrayList<>();
+    for (int t = 0; t < numThreads; t++) {
+      Thread thread = new Thread(writerTask);
+      thread.start();
+      threads.add(thread);
+    }
+
+    // Wait for all threads to finish
+    for (Thread thread : threads) {
+      thread.join();
+    }
+
+    // Finalize table
+    table.finish(false);
+
+    Iterator<Record> it = table.iterator();
+    int curVal = 1;
+    long count = 5;
+    while (it.hasNext()) {
+      Record record = it.next();
+      Assert.assertEquals(record.getValues()[0], curVal++);
+      Assert.assertEquals(record.getValues()[1], count);
+    }
+  }
+
   private void upsert(DeterministicConcurrentIndexedTable table, Object[] row) {
     Object[] key = new Object[]{row[0]};
     table.upsert(new Key(key), new Record(row));
