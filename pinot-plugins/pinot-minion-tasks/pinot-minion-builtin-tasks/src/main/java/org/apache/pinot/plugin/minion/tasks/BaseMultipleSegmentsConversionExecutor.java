@@ -35,7 +35,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.io.FileUtils;
@@ -198,8 +197,9 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(taskConfigs.get(MinionConstants.AUTH_TOKEN));
     File tempDataDir = new File(new File(MINION_CONTEXT.getDataDir(), taskType), "tmp-" + UUID.randomUUID());
     Preconditions.checkState(tempDataDir.mkdirs());
-    AtomicInteger recordCount = new AtomicInteger(0);
-    List<File> inputSegmentDirs = Collections.synchronizedList(new ArrayList<>(downloadURLs.length));
+    int numRecords;
+    List<File> inputSegmentDirs = new ArrayList<>(downloadURLs.length);
+    Map<String, SegmentMetadata> segmentMetadataMap = Collections.synchronizedMap(new HashMap<>(downloadURLs.length));
     int nThreads = Math.min(getThreadPoolSize(taskConfigs), downloadURLs.length);
     LOGGER.info(
         "Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}, thread pool size:{}",
@@ -208,13 +208,13 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
       if (nThreads <= 1) {
         for (int index = 0; index < downloadURLs.length; index++) {
           downloadAndUntarSegment(tableNameWithType, taskType, segmentNames[index], downloadURLs[index],
-              tempDataDir, index, recordCount, inputSegmentDirs);
+              tempDataDir, index, segmentMetadataMap, segmentNames.length);
         }
       } else {
         parallelDownloadAndUntarSegments(nThreads, tableNameWithType, taskType, segmentNames, downloadURLs,
-            tempDataDir, recordCount, inputSegmentDirs);
+            tempDataDir, segmentMetadataMap);
       }
-      int numRecords = recordCount.get();
+      numRecords = processSegmentMetadata(segmentNames, segmentMetadataMap, inputSegmentDirs);
 
       // Convert the segments
       File workingDir = new File(tempDataDir, "workingDir");
@@ -348,6 +348,19 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     }
   }
 
+  private int processSegmentMetadata(String[] segmentNames, Map<String, SegmentMetadata> segmentMetadataMap,
+      List<File> inputSegmentDirs) {
+    int numRecords = 0;
+    for (String segmentName : segmentNames) {
+      SegmentMetadata segmentMetadata = segmentMetadataMap.get(segmentName);
+      Preconditions.checkState(segmentMetadata != null,
+          "Segment metadata for segment: %s is null, please check the download and untar process", segmentName);
+      inputSegmentDirs.add(segmentMetadata.getIndexDir());
+      numRecords += segmentMetadata.getTotalDocs();
+    }
+    return numRecords;
+  }
+
   private int getThreadPoolSize(Map<String, String> taskConfigs) {
     int nThreads = _minionConf.getSegmentDownloadThreadPoolSize();
     nThreads = Integer.parseInt(
@@ -356,8 +369,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   }
 
   private void parallelDownloadAndUntarSegments(int nThreads, String tableNameWithType, String taskType,
-      String[] segmentNames, String[] downloadURLs, File tempDataDir, AtomicInteger recordCounter,
-      List<File> inputSegmentDirs)
+      String[] segmentNames, String[] downloadURLs, File tempDataDir, Map<String, SegmentMetadata> segmentMetadataMap)
       throws Exception {
 
     ExecutorService executorService = null;
@@ -369,7 +381,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         int index = i;
         futures.add(executorService.submit(() -> {
           downloadAndUntarSegment(tableNameWithType, taskType, segmentNames[index], downloadURLs[index],
-              tempDataDir, index, recordCounter, inputSegmentDirs);
+              tempDataDir, index, segmentMetadataMap, segmentNames.length);
           return null;
         }));
       }
@@ -393,20 +405,18 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
   }
 
   private void downloadAndUntarSegment(String tableNameWithType, String taskType,
-      String segmentName, String downloadURL, File tempDataDir, int index, AtomicInteger recordCounter,
-      List<File> inputSegmentDirs)
+      String segmentName, String downloadURL, File tempDataDir, int index,
+      Map<String, SegmentMetadata> segmentMetadataMap, int numOfSegments)
       throws Exception {
     try {
       _eventObserver.notifyProgress(_pinotTaskConfig, "Downloading and decompressing segment from: " + downloadURL
-          + " (" + (index + 1) + " out of " + inputSegmentDirs.size() + ")");
+          + " (" + (index + 1) + " out of " + numOfSegments + ")");
       // Download and decompress the segment file
       File indexDir = downloadSegmentToLocalAndUntar(tableNameWithType, segmentName, downloadURL, taskType,
           tempDataDir, "_" + index);
       reportSegmentDownloadMetrics(indexDir, tableNameWithType, taskType);
       SegmentMetadata segmentMetadata = new SegmentMetadataImpl(indexDir);
-      // Ensure segment directory placement is at same index as the segment name in the inputSegmentNames
-      inputSegmentDirs.set(index, indexDir);
-      recordCounter.addAndGet(segmentMetadata.getTotalDocs());
+      segmentMetadataMap.put(segmentName, segmentMetadata);
     } catch (Exception e) {
       LOGGER.error("Failed to download segment from download url: {}", downloadURL, e);
       _minionMetrics.addMeteredTableValue(tableNameWithType, MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT, 1L);
