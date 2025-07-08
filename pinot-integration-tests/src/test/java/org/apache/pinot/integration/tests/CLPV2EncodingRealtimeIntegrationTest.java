@@ -38,4 +38,4 @@ public class CLPV2EncodingRealtimeIntegrationTest extends CLPEncodingRealtimeInt
 
     return fieldConfigs;
   }
-} 
+}
