@@ -120,7 +120,7 @@ public class LeafStageWorkerAssignmentRuleTest {
     HashDistributionDesc desc = result._pinotDataDistribution.getHashDistributionDesc().iterator().next();
     assertEquals(desc.getNumPartitions(), OFFLINE_NUM_PARTITIONS);
     assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
-    assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
+    assertEquals(desc.getHashFunction().name(), PARTITION_FUNCTION.toUpperCase());
     validateTableScanAssignment(result, OFFLINE_INSTANCE_ID_TO_SEGMENTS._offlineTableSegmentsMap, "OFFLINE");
   }
 
@@ -136,7 +136,7 @@ public class LeafStageWorkerAssignmentRuleTest {
     HashDistributionDesc desc = result._pinotDataDistribution.getHashDistributionDesc().iterator().next();
     assertEquals(desc.getNumPartitions(), REALTIME_NUM_PARTITIONS);
     assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
-    assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
+    assertEquals(desc.getHashFunction().name(), PARTITION_FUNCTION.toUpperCase());
     validateTableScanAssignment(result, REALTIME_INSTANCE_ID_TO_SEGMENTS._realtimeTableSegmentsMap, "REALTIME");
   }
 
@@ -158,7 +158,7 @@ public class LeafStageWorkerAssignmentRuleTest {
       HashDistributionDesc desc = result._pinotDataDistribution.getHashDistributionDesc().iterator().next();
       assertEquals(desc.getNumPartitions(), REALTIME_NUM_PARTITIONS);
       assertEquals(desc.getKeys(), List.of(FIELDS_IN_SCAN.indexOf(PARTITION_COLUMN)));
-      assertEquals(desc.getHashFunction(), PARTITION_FUNCTION);
+      assertEquals(desc.getHashFunction().name(), PARTITION_FUNCTION.toUpperCase());
       validateTableScanAssignment(result,
           REALTIME_INSTANCE_ID_TO_SEGMENTS_WITH_INVALID_PARTITIONS._realtimeTableSegmentsMap, "REALTIME");
     }
