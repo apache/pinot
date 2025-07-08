@@ -46,6 +46,7 @@ import static org.testng.Assert.*;
 
 public class LeafStageWorkerAssignmentRuleTest {
   private static final String TABLE_NAME = "testTable";
+  private static final String TABLE_NAME_RT = "testTable_REALTIME";
   private static final String INVALID_SEGMENT_PARTITION = "testTable__1__35__20250509T1444Z";
   private static final List<String> FIELDS_IN_SCAN = List.of("userId", "orderId", "orderAmount", "cityId", "cityName");
   private static final String PARTITION_COLUMN = "userId";
@@ -268,6 +269,20 @@ public class LeafStageWorkerAssignmentRuleTest {
     assertEquals(Map.of(1, List.of("foobar__9__35__20250509T1444Z")),
         LeafStageWorkerAssignmentRule.getInvalidSegmentsByInferredPartition(List.of("foobar__9__35__20250509T1444Z"),
             inferPartitions, tableNameWithType, 8));
+  }
+
+  @Test
+  public void testAttemptPartitionedDistributionWhenInvalidHashFunction() {
+    TablePartitionInfo tablePartitionInfo = createRealtimeTablePartitionInfo();
+    // Test with this tablePartitionInfo to confirm partitioned distribution is generated.
+    assertNotNull(LeafStageWorkerAssignmentRule.attemptPartitionedDistribution(TABLE_NAME_RT, FIELDS_IN_SCAN, Map.of(),
+        tablePartitionInfo, false, false));
+    // Change TPI to set an invalid function name.
+    tablePartitionInfo = new TablePartitionInfo(tablePartitionInfo.getTableNameWithType(),
+        tablePartitionInfo.getPartitionColumn(), "foobar", tablePartitionInfo.getNumPartitions(),
+        tablePartitionInfo.getSegmentsByPartition(), tablePartitionInfo.getSegmentsWithInvalidPartition());
+    assertNull(LeafStageWorkerAssignmentRule.attemptPartitionedDistribution(TABLE_NAME_RT, FIELDS_IN_SCAN, Map.of(),
+        tablePartitionInfo, false, false));
   }
 
   @Test
