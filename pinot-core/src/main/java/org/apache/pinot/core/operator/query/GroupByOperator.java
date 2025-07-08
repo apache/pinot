@@ -20,9 +20,7 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -156,7 +154,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     if (trimSize > 0) {
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+        List<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
 
         ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
         boolean unsafeTrim = _queryContext.isUnsafeTrim(); // set trim flag only if it's not safe
@@ -170,7 +168,9 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         // if orderBy groupBy key, sort the array even if it's smaller than trimSize
         // to benefit combining
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        Collection<IntermediateRecord> intermediateRecords = tableResizer.sortInSegmentResults(groupByExecutor.getGroupKeyGenerator(), groupByExecutor.getGroupByResultHolders(), trimSize);
+        List<IntermediateRecord> intermediateRecords =
+            tableResizer.sortInSegmentResults(groupByExecutor.getGroupKeyGenerator(),
+                groupByExecutor.getGroupByResultHolders(), trimSize);
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setGroupsTrimmed(false);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
