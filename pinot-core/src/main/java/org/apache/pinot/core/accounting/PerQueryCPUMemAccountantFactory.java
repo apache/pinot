@@ -153,7 +153,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _instanceId = instanceId;
       _instanceType = instanceType;
       _cancelSentQueries = new HashSet<>();
-      _watcherTask = initWatcherTask();
+      _watcherTask = createWatcherTask();
     }
 
     public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId,
@@ -191,10 +191,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       // task/query tracking
       _inactiveQuery = new HashSet<>();
       _cancelSentQueries = new HashSet<>();
-      _watcherTask = initWatcherTask();
+      _watcherTask = createWatcherTask();
     }
 
-    protected WatcherTask initWatcherTask() {
+    protected WatcherTask createWatcherTask() {
       return new WatcherTask();
     }
 
@@ -891,8 +891,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
        * use XX:+ExplicitGCInvokesConcurrent to avoid a full gc when system.gc is triggered
        */
       private void killMostExpensiveQuery() {
+        if (!_isThreadMemorySamplingEnabled) {
+          LOGGER.warn("But unable to kill query memory tracking is enabled");
+          return;
+        }
         QueryMonitorConfig config = _queryMonitorConfig.get();
-        if (!_aggregatedUsagePerActiveQuery.isEmpty()
+        if (_aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()
             && _numQueriesKilledConsecutively >= config.getGcBackoffCount()) {
           _numQueriesKilledConsecutively = 0;
           System.gc();
@@ -907,43 +911,34 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           LOGGER.error("After GC, heap used bytes {} still exceeds _criticalLevelAfterGC level {}", _usedBytes,
               config.getCriticalLevelAfterGC());
         }
-        if (!(_isThreadMemorySamplingEnabled || _isThreadCPUSamplingEnabled)) {
-          LOGGER.warn("But unable to kill query because neither memory nor cpu tracking is enabled");
-          return;
-        }
         // Critical heap memory usage while no queries running
-        if (_aggregatedUsagePerActiveQuery.isEmpty()) {
-          LOGGER.debug("No active queries to kill");
-          return;
-        }
-        AggregatedStats maxUsageTuple;
-        if (_isThreadMemorySamplingEnabled) {
+        if (_aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()) {
+          AggregatedStats maxUsageTuple;
           maxUsageTuple = _aggregatedUsagePerActiveQuery.values().stream()
               .filter(stats -> !_cancelSentQueries.contains(stats.getQueryId()))
-              .max(Comparator.comparing(AggregatedStats::getAllocatedBytes))
-              .orElse(null);
+              .max(Comparator.comparing(AggregatedStats::getAllocatedBytes)).orElse(null);
           if (maxUsageTuple != null) {
-            boolean shouldKill = config.isOomKillQueryEnabled()
-                && maxUsageTuple._allocatedBytes > config.getMinMemoryFootprintForKill();
+            boolean shouldKill =
+                config.isOomKillQueryEnabled() && maxUsageTuple._allocatedBytes > config.getMinMemoryFootprintForKill();
             if (shouldKill) {
-              maxUsageTuple._exceptionAtomicReference
-                  .set(new RuntimeException(String.format(
-                      " Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
+              maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
+                  String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                       maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
               interruptRunnerThread(maxUsageTuple);
               logTerminatedQuery(maxUsageTuple, _usedBytes);
             } else if (!config.isOomKillQueryEnabled()) {
               LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
-                      + "because oomKillQueryEnabled is false",
-                  maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
+                  + "because oomKillQueryEnabled is false", maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
             } else {
               LOGGER.warn("But all queries are below quota, no query killed");
             }
           } else {
             LOGGER.warn("No query found to kill based on memory usage");
           }
+          logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
+        } else {
+          LOGGER.debug("No active queries to kill");
         }
-        logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
       }
 
       private void killCPUTimeExceedQueries() {

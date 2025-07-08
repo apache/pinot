@@ -45,7 +45,7 @@ public class PerQueryCPUMemAccountCancelTest {
     }
 
     @Override
-    public WatcherTask initWatcherTask() {
+    public WatcherTask createWatcherTask() {
       return new TerminatingWatcherTask();
     }
 
