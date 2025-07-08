@@ -789,7 +789,7 @@ public abstract class ClusterTest extends ControllerTest {
   /**
    * Execute a query and extract the count result
    */
-  protected int getTotalDocsFromQuery(String query) throws Exception {
+  protected int getTotalDocCountFromQuery(String query) throws Exception {
     JsonNode response = postQuery(query);
     JsonNode resTbl = response.get("resultTable");
     return (resTbl == null || resTbl.get("rows").isEmpty()) ? 0 : resTbl.get("rows").get(0).get(0).asInt();
