@@ -27,6 +27,7 @@ import java.util.Arrays;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.io.util.VarLengthValueReader;
 import org.apache.pinot.segment.local.segment.creator.impl.fwd.CLPForwardIndexCreatorV2;
+import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
@@ -78,9 +79,7 @@ public class CLPForwardIndexReaderV2 implements ForwardIndexReader<CLPForwardInd
   public CLPForwardIndexReaderV2(PinotDataBuffer pinotDataBuffer, int numDocs) {
     _numDocs = numDocs;
     int offset = 0;
-    int magicBytesLength = pinotDataBuffer.getInt(offset);
-    offset += Integer.BYTES;
-    byte[] magicBytes = new byte[magicBytesLength];
+    byte[] magicBytes = new byte[CLPForwardIndexCreatorV2.MAGIC_BYTES.length];
     pinotDataBuffer.copyTo(offset, magicBytes);
 
     // Validate against supported version
@@ -163,6 +162,10 @@ public class CLPForwardIndexReaderV2 implements ForwardIndexReader<CLPForwardInd
     }
   }
 
+  @Override
+  public ChunkCompressionType getCompressionType() {
+    return ChunkCompressionType.PASS_THROUGH;
+  }
   @Override
   public boolean isDictionaryEncoded() {
     return false;
