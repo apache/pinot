@@ -635,6 +635,9 @@ public class CommonConstants {
         // Query option key used to skip a given set of rules
         public static final String SKIP_PLANNER_RULES = "skipPlannerRules";
 
+        // Query option key used to enable a given set of defaultly disabled rules
+        public static final String USE_PLANNER_RULES = "usePlannerRules";
+
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
@@ -782,6 +785,8 @@ public class CommonConstants {
       public static final String AGGREGATE_PROJECT_MERGE = "AggregateProjectMerge";
       public static final String FILTER_MERGE = "FilterMerge";
       public static final String SORT_REMOVE = "SortRemove";
+      public static final String SORT_JOIN_TRANSPOSE = "SortJoinTranspose";
+      public static final String SORT_JOIN_COPY = "SortJoinCopy";
       public static final String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeExtended";
       public static final String PRUNE_EMPTY_AGGREGATE = "PruneEmptyAggregate";
       public static final String PRUNE_EMPTY_FILTER = "PruneEmptyFilter";
@@ -793,6 +798,20 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
     }
+
+    /**
+     * Set of planner rules that will be disabled by default
+     * and could be enabled by setting
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_PLANNER_RULES}.
+     *
+     * If a rule is enabled and disabled at the same time,
+     * it will be disabled
+     */
+    public static final Set<String> DEFAULT_DISABLED_RULES = Set.of(
+        PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
+        PlannerRuleNames.SORT_JOIN_TRANSPOSE,
+        PlannerRuleNames.SORT_JOIN_COPY
+    );
 
     public static class FailureDetector {
       public enum Type {
