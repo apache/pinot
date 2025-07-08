@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -326,17 +327,18 @@ public class TableResizer {
    */
   public List<IntermediateRecord> sortInSegmentResults(GroupKeyGenerator groupKeyGenerator,
       GroupByResultHolder[] groupByResultHolders, int size) {
+    // getNumKeys() does not count nulls
     assert groupKeyGenerator.getNumKeys() <= size;
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupKeyGenerator.getGroupKeys();
 
     // Initialize a heap with the first 'size' groups
-    IntermediateRecord[] arr = new IntermediateRecord[groupKeyGenerator.getNumKeys()];
-    for (int i = 0; i < groupKeyGenerator.getNumKeys(); i++) {
-      arr[i] = getIntermediateRecord(groupKeyIterator.next(), groupByResultHolders);
+    List<IntermediateRecord> arr = new ArrayList<>();
+    while (groupKeyIterator.hasNext()) {
+      arr.add(getIntermediateRecord(groupKeyIterator.next(), groupByResultHolders));
     }
 
-    Arrays.sort(arr, _intermediateRecordComparator);
-    return Arrays.asList(arr);
+    arr.sort(_intermediateRecordComparator);
+    return arr;
   }
 
   /**
