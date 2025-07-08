@@ -324,6 +324,25 @@ public class TableResizer {
    * Trims the aggregation results using a heap and returns the top records.
    * This method is to be called from individual segment if the intermediate results need to be trimmed.
    */
+  public List<IntermediateRecord> sortInSegmentResults(GroupKeyGenerator groupKeyGenerator,
+      GroupByResultHolder[] groupByResultHolders, int size) {
+    assert groupKeyGenerator.getNumKeys() <= size;
+    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupKeyGenerator.getGroupKeys();
+
+    // Initialize a heap with the first 'size' groups
+    IntermediateRecord[] arr = new IntermediateRecord[groupKeyGenerator.getNumKeys()];
+    for (int i = 0; i < groupKeyGenerator.getNumKeys(); i++) {
+      arr[i] = getIntermediateRecord(groupKeyIterator.next(), groupByResultHolders);
+    }
+
+    Arrays.sort(arr, _intermediateRecordComparator);
+    return Arrays.asList(arr);
+  }
+
+  /**
+   * Trims the aggregation results using a heap and returns the top records.
+   * This method is to be called from individual segment if the intermediate results need to be trimmed.
+   */
   public List<IntermediateRecord> trimInSegmentResults(GroupKeyGenerator groupKeyGenerator,
       GroupByResultHolder[] groupByResultHolders, int size) {
     // Should not reach here when numGroups <= heap size because there is no need to create a heap

@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.core.operator.combine;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -39,6 +42,7 @@ import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
+import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
@@ -112,6 +116,11 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
+        // if orderBy groupBy key, stream the result to main thread for merge scheduling
+        if (!_queryContext.isUnsafeTrim()) {
+          _blockingQueue.offer(resultsBlock);
+          continue;
+        }
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
@@ -226,6 +235,81 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return new ExceptionResultsBlock(errMsg);
     }
 
+    if (!_queryContext.isUnsafeTrim()) {
+      // re-use threadpool to merge results pair-wise
+      DataSchema dataSchema = null;
+      List<List<IntermediateRecord>> intermediateResults = new ArrayList<>();
+      // because processSegment returns void, we don't have a unified interface.
+      // await all process results before start merging
+      int numBlocksReceived = 0;
+      long endTimeMs = _queryContext.getEndTimeMs();
+      long waitTimeMs = endTimeMs - System.currentTimeMillis();
+      while (numBlocksReceived < _numOperators) {
+        BaseResultsBlock block = _blockingQueue.poll(waitTimeMs, TimeUnit.MILLISECONDS);
+        if (block == null) {
+          return getTimeoutResultsBlock(numBlocksReceived);
+        }
+        if (block.getErrorMessages() != null) {
+          // Caught exception while processing segment, skip merging the remaining results blocks and directly return the
+          // exception
+          return block;
+        }
+        if (dataSchema == null) {
+          dataSchema = block.getDataSchema();
+        }
+        intermediateResults.add(new ArrayList<>(((GroupByResultsBlock) block).getIntermediateRecords()));
+        numBlocksReceived++;
+      }
+      // schedule merges until reduced to 1 block
+      assert(numBlocksReceived == _numOperators);
+      while (intermediateResults.size() > 1) {
+        int size = intermediateResults.size();
+        List<List<IntermediateRecord>> newResults = new ArrayList<>();
+        List<Future<List<IntermediateRecord>>> futures = new ArrayList<>();
+        // schedule pair-wise merges
+        for (int i=0; i < size; i+=2) {
+          if (i + 1 < size) {
+            List<IntermediateRecord> block1 = intermediateResults.get(i);
+            List<IntermediateRecord> block2 = intermediateResults.get(i + 1);
+            Future<List<IntermediateRecord>> fut =  _executorService.submit(() -> mergeBlocks(block1, block2));
+            futures.add(fut);
+          } else {
+            // odd element
+            newResults.add(intermediateResults.get(i));
+          }
+        }
+        // get result
+        for (Future<List<IntermediateRecord>> fut : futures) {
+          try {
+            List<IntermediateRecord> mergedBlock = fut.get();
+            newResults.add(mergedBlock);
+          } catch (Exception e) {
+            LOGGER.error("Caught exception while merging results blocks (query: {})", _queryContext, e);
+            return new ExceptionResultsBlock(QueryErrorMessage.safeMsg(QueryErrorCode.INTERNAL,
+                "Caught exception while merging results blocks: " + e.getMessage()));
+          } finally {
+            for (Future future : futures) {
+              if (future != null && !future.isDone()) {
+                future.cancel(true);
+              }
+            }
+            _phaser.awaitAdvance(_phaser.arriveAndDeregister());
+          }
+        }
+        intermediateResults = newResults;
+      }
+      // return merged result
+      assert(intermediateResults.size() == 1);
+      GroupByResultsBlock mergedBlock = new GroupByResultsBlock(dataSchema, intermediateResults.get(0), _queryContext);
+      mergedBlock.setGroupsTrimmed(_groupsTrimmed);
+      mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+      mergedBlock.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
+      // TODO: add these stats?
+//      mergedBlock.setNumResizes(indexedTable.getNumResizes());
+//      mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
+      return mergedBlock;
+    }
+
     if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
       _groupsTrimmed = true;
     }
@@ -245,5 +329,11 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     mergedBlock.setNumResizes(indexedTable.getNumResizes());
     mergedBlock.setResizeTimeMs(indexedTable.getResizeTimeMs());
     return mergedBlock;
+  }
+
+  private List<IntermediateRecord> mergeBlocks(List<IntermediateRecord> block1, List<IntermediateRecord> block2) {
+    // TODO: implement actual merging
+    block1.addAll(block2);
+    return block1.subList(0, Math.min(_queryContext.getLimit(), block1.size()));
   }
 }
