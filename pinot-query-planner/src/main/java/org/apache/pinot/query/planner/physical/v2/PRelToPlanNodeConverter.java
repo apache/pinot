@@ -119,7 +119,7 @@ public class PRelToPlanNodeConverter {
         new ArrayList<>(), node.getRelExchangeType(), RelDistribution.Type.ANY, node.getDistributionKeys(),
         false, node.getRelCollation().getFieldCollations(), false,
         !node.getRelCollation().getKeys().isEmpty(), Set.of() /* table names */, node.getExchangeStrategy(),
-        KeySelector.DEFAULT_HASH_ALGORITHM);
+        node.getHashFunction().name());
   }
 
   public static SetOpNode convertSetOp(SetOp node) {
