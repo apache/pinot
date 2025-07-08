@@ -166,6 +166,7 @@ public class CLPForwardIndexReaderV2 implements ForwardIndexReader<CLPForwardInd
   public ChunkCompressionType getCompressionType() {
     return ChunkCompressionType.PASS_THROUGH;
   }
+
   @Override
   public boolean isDictionaryEncoded() {
     return false;
