@@ -39,6 +39,18 @@ public class LuceneTextIndexCreatorTest {
   public void setUp()
       throws IOException {
     FileUtils.forceMkdir(INDEX_DIR);
+
+    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
+        null, null, false, false, 0, false, null);
+    try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator("foo", INDEX_DIR, true, false, null, null,
+        config)) {
+      creator.add("{\"clean\":\"this\"}");
+      creator.add("{\"retain\":\"this\"}");
+      creator.add("{\"keep\":\"this\"}");
+      creator.add("{\"hold\":\"this\"}");
+      creator.add("{\"clean\":\"that\"}");
+      creator.seal();
+    }
   }
 
   @AfterMethod
@@ -48,36 +60,45 @@ public class LuceneTextIndexCreatorTest {
   }
 
   @Test
-  public void testIndexWriterReader()
+  public void testIndexWriterReaderMatchClean()
       throws IOException {
-    TextIndexConfig config = new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, null,
-        null, null, false, false, 0, false, null);
-    try (LuceneTextIndexCreator creator = new LuceneTextIndexCreator("foo", INDEX_DIR, true, false, null, null,
-            config)) {
-      creator.add("{\"clean\":\"this\"}");
-      creator.add("{\"retain\":\"this\"}");
-      creator.add("{\"keep\":\"this\"}");
-      creator.add("{\"hold\":\"this\"}");
-      creator.add("{\"clean\":\"that\"}");
-      creator.seal();
-    }
-
     // Use TextIndex reader to validate that reads work
     try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, new HashMap<>())) {
       int[] matchedDocIds = reader.getDocIds("clean").toArray();
       Assert.assertEquals(matchedDocIds.length, 2);
       Assert.assertEquals(matchedDocIds[0], 0);
       Assert.assertEquals(matchedDocIds[1], 4);
+    }
+  }
 
-      matchedDocIds = reader.getDocIds("hold").toArray();
+  @Test
+  public void testIndexWriterReaderMatchHold()
+      throws IOException {
+    // Use TextIndex reader to validate that reads work
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, new HashMap<>())) {
+      int[] matchedDocIds = reader.getDocIds("hold").toArray();
       Assert.assertEquals(matchedDocIds.length, 1);
       Assert.assertEquals(matchedDocIds[0], 3);
+    }
+  }
 
-      matchedDocIds = reader.getDocIds("retain").toArray();
+  @Test
+  public void testIndexWriterReaderMatchRetain()
+      throws IOException {
+    // Use TextIndex reader to validate that reads work
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, new HashMap<>())) {
+      int[] matchedDocIds = reader.getDocIds("retain").toArray();
       Assert.assertEquals(matchedDocIds.length, 1);
       Assert.assertEquals(matchedDocIds[0], 1);
+    }
+  }
 
-      matchedDocIds = reader.getDocIds("retain|keep").toArray();
+  @Test
+  public void testIndexWriterReaderMatchWithOrClause()
+      throws IOException {
+    // Use TextIndex reader to validate that reads work
+    try (LuceneTextIndexReader reader = new LuceneTextIndexReader("foo", INDEX_DIR, 5, new HashMap<>())) {
+      int[] matchedDocIds = reader.getDocIds("retain|keep").toArray();
       Assert.assertEquals(matchedDocIds.length, 2);
       Assert.assertEquals(matchedDocIds[0], 1);
       Assert.assertEquals(matchedDocIds[1], 2);
