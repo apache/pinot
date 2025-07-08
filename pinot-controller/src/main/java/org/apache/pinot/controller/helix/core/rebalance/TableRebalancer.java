@@ -67,6 +67,7 @@ import org.apache.pinot.common.metrics.ControllerTimer;
 import org.apache.pinot.common.tier.PinotServerTierStorage;
 import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.tier.TierFactory;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.api.resources.ForceCommitBatchConfig;
@@ -91,6 +92,7 @@ import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -527,6 +529,12 @@ public class TableRebalancer {
     PartitionIdFetcher partitionIdFetcher =
         new PartitionIdFetcherImpl(tableNameWithType, TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
             isStrictRealtimeSegmentAssignment);
+
+    // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
+    // for a table
+    DataLossRiskAssessor dataLossRiskAssessor = new DataLossRiskAssessorImpl(tableNameWithType, tableConfig,
+        _helixManager);
+
     // We repeat the following steps until the target assignment is reached:
     // 1. Wait for ExternalView to converge with the IdealState. Fail the rebalance if it doesn't make progress within
     //    the timeout.
@@ -639,7 +647,8 @@ public class TableRebalancer {
         if (shouldForceCommit) {
           nextAssignment =
               getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-                  lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
+                  lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
+                  tableRebalanceLogger);
           Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
 
           if (!consumingSegmentsToMoveNext.isEmpty()) {
@@ -695,7 +704,8 @@ public class TableRebalancer {
 
       nextAssignment =
           getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-              lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger);
+              lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
+              tableRebalanceLogger);
       tableRebalanceLogger.info(
           "Got the next assignment with number of segments to be added/removed for each instance: {}",
           SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, nextAssignment));
@@ -1404,8 +1414,7 @@ public class TableRebalancer {
           // Update unique segment list as IS-EV trigger must have processed these
           allSegmentsFromIdealState = idealState.getRecord().getMapFields().keySet();
           if (_tableRebalanceObserver.isStopped()) {
-            throw new RuntimeException(
-                String.format("Rebalance has already stopped with status: %s",
+            throw new RuntimeException(String.format("Rebalance has already stopped with status: %s",
                     _tableRebalanceObserver.getStopStatus()));
           }
           if (isExternalViewConverged(externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(),
@@ -1598,9 +1607,9 @@ public class TableRebalancer {
   static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
       boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher) {
+      PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor) {
     return getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, LOGGER);
+        lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, LOGGER);
   }
 
   /**
@@ -1626,19 +1635,19 @@ public class TableRebalancer {
   private static Map<String, Map<String, String>> getNextAssignment(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, int minAvailableReplicas, boolean enableStrictReplicaGroup,
       boolean lowDiskMode, int batchSizePerServer, Object2IntOpenHashMap<String> segmentPartitionIdMap,
-      PartitionIdFetcher partitionIdFetcher, Logger tableRebalanceLogger) {
+      PartitionIdFetcher partitionIdFetcher, DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger) {
     return enableStrictReplicaGroup
         ? getNextStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas, lowDiskMode,
-        batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, tableRebalanceLogger)
+        batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor, tableRebalanceLogger)
         : getNextNonStrictReplicaGroupAssignment(currentAssignment, targetAssignment, minAvailableReplicas,
-            lowDiskMode, batchSizePerServer);
+            lowDiskMode, batchSizePerServer, dataLossRiskAssessor);
   }
 
   private static Map<String, Map<String, String>> getNextStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
       int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer,
       Object2IntOpenHashMap<String> segmentPartitionIdMap, PartitionIdFetcher partitionIdFetcher,
-      Logger tableRebalanceLogger) {
+      DataLossRiskAssessor dataLossRiskAssessor, Logger tableRebalanceLogger) {
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
@@ -1649,7 +1658,7 @@ public class TableRebalancer {
       // Directly update the nextAssignment with anyServerExhaustedBatchSize = false and return if batching is disabled
       updateNextAssignmentForPartitionIdStrictReplicaGroup(currentAssignment, targetAssignment, nextAssignment,
           false, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
-          availableInstancesMap, serverToNumSegmentsAddedSoFar);
+          availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor);
       return nextAssignment;
     }
 
@@ -1673,7 +1682,8 @@ public class TableRebalancer {
         Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
         SingleSegmentAssignment firstAssignment =
             getNextSingleSegmentAssignment(firstEntryInstanceStateMap, targetAssignment.get(firstEntry.getKey()),
-                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap, firstEntry.getKey(),
+                dataLossRiskAssessor);
         Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
             firstAssignment._instanceStateMap);
         boolean anyServerExhaustedBatchSize = false;
@@ -1694,7 +1704,7 @@ public class TableRebalancer {
         }
         updateNextAssignmentForPartitionIdStrictReplicaGroup(curAssignment, targetAssignment, nextAssignment,
             anyServerExhaustedBatchSize, minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap,
-            availableInstancesMap, serverToNumSegmentsAddedSoFar);
+            availableInstancesMap, serverToNumSegmentsAddedSoFar, dataLossRiskAssessor);
       }
     }
 
@@ -1708,7 +1718,8 @@ public class TableRebalancer {
       Map<String, Map<String, String>> nextAssignment, boolean anyServerExhaustedBatchSize, int minAvailableReplicas,
       boolean lowDiskMode, Map<String, Integer> numSegmentsToOffloadMap,
       Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
-      Map<Set<String>, Set<String>> availableInstancesMap, Map<String, Integer> serverToNumSegmentsAddedSoFar) {
+      Map<Set<String>, Set<String>> availableInstancesMap, Map<String, Integer> serverToNumSegmentsAddedSoFar,
+      DataLossRiskAssessor dataLossRiskAssessor) {
     if (anyServerExhaustedBatchSize) {
       // Exhausted the batch size for at least 1 server, just copy over the remaining segments as is
       nextAssignment.putAll(currentAssignment);
@@ -1722,7 +1733,7 @@ public class TableRebalancer {
         Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
         SingleSegmentAssignment assignment =
             getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-                lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
+                lowDiskMode, numSegmentsToOffloadMap, assignmentMap, segmentName, dataLossRiskAssessor);
         Set<String> assignedInstances = assignment._instanceStateMap.keySet();
         Set<String> availableInstances = assignment._availableInstances;
         availableInstancesMap.compute(assignedInstances, (k, currentAvailableInstances) -> {
@@ -1837,9 +1848,63 @@ public class TableRebalancer {
     }
   }
 
+  @VisibleForTesting
+  @FunctionalInterface
+  interface DataLossRiskAssessor {
+    boolean hasDataLossRisk(String segmentName);
+  }
+
+  private static class DataLossRiskAssessorImpl implements DataLossRiskAssessor {
+    private final String _tableNameWithType;
+    private final HelixManager _helixManager;
+    private final boolean _isPeerDownloadEnabled;
+    private final boolean _isUpsertOrDedupTable;
+    private final boolean _isPauselessEnabled;
+
+    private DataLossRiskAssessorImpl(String tableNameWithType, TableConfig tableConfig, HelixManager helixManager) {
+      _tableNameWithType = tableNameWithType;
+      _helixManager = helixManager;
+      _isPeerDownloadEnabled = !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
+      _isUpsertOrDedupTable = tableConfig.isUpsertEnabled() || tableConfig.isDedupEnabled();
+      _isPauselessEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    }
+
+    @Override
+    public boolean hasDataLossRisk(String segmentName) {
+      // If peer-download is disabled, no data loss risk exists
+      if (!_isPeerDownloadEnabled) {
+        return false;
+      }
+
+      SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
+          .getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _tableNameWithType, segmentName);
+      if (segmentZKMetadata == null) {
+        return false;
+      }
+
+      // If the segment state is COMPLETED and the peer download URL is empty, there is a data loss risk
+      if (!segmentZKMetadata.getStatus().isCompleted()) {
+        return CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl());
+      }
+
+      // If the segment is not yet completed, then the following scenarios are possible:
+      // - Non-upsert / non-dedup table: data loss scenarios are not possible. Either the segment will restart
+      //   consumption or the RealtimeSegmentValidationManager will kick in to fix up the segment if pauseless is
+      //   enabled
+      // - Upsert / dedup table: For non-pauseless tables, it is safe to move the segment without data loss concerns.
+      //   For pauseless tables, if the segment is still in CONSUMING state, moving it is safe, but if it is in
+      //   COMMITTING state then there is a risk of data loss on segment build failures as well since the
+      //   RealtimeSegmentValidationManager does not automatically try to fix up these segments. To be safe it is best
+      //   to return that there is a risk of data loss in case of race conditions for pauseless enabled tables
+      //   (rebalance updates IS at the same time as segment commit protocol starts and moves it to COMMITTING)
+      return _isUpsertOrDedupTable && _isPauselessEnabled;
+    }
+  }
+
   private static Map<String, Map<String, String>> getNextNonStrictReplicaGroupAssignment(
       Map<String, Map<String, String>> currentAssignment, Map<String, Map<String, String>> targetAssignment,
-      int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer) {
+      int minAvailableReplicas, boolean lowDiskMode, int batchSizePerServer,
+      DataLossRiskAssessor dataLossRiskAssessor) {
     Map<String, Integer> serverToNumSegmentsAddedSoFar = new HashMap<>();
     Map<String, Map<String, String>> nextAssignment = new TreeMap<>();
     Map<String, Integer> numSegmentsToOffloadMap = getNumSegmentsToOffloadMap(currentAssignment, targetAssignment);
@@ -1850,7 +1915,7 @@ public class TableRebalancer {
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
       Map<String, String> nextInstanceStateMap =
           getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-              lowDiskMode, numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
+              lowDiskMode, numSegmentsToOffloadMap, assignmentMap, segmentName, dataLossRiskAssessor)._instanceStateMap;
       Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
           nextInstanceStateMap);
       boolean anyServerExhaustedBatchSize = false;
@@ -1923,7 +1988,13 @@ public class TableRebalancer {
   @VisibleForTesting
   static SingleSegmentAssignment getNextSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
       Map<String, String> targetInstanceStateMap, int minAvailableReplicas, boolean lowDiskMode,
-      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap) {
+      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
+      String segmentName, DataLossRiskAssessor dataLossRiskAssessor) {
+    if (dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
+      throw new IllegalStateException(String.format("Found data loss risk for segment: %s while rebalancing",
+          segmentName));
+    }
+
     Map<String, String> nextInstanceStateMap = new TreeMap<>();
 
     // Assign the segment the same way as other segments if the current and target instances are the same. We need this
