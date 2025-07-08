@@ -365,7 +365,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       workers.set(workerId, String.format("%s@%s", workerId, workers.get(workerId)));
       workerIdToSegmentsMap.put(workerId, ImmutableMap.of(tableType, segmentsForWorker));
     }
-    HashDistributionDesc desc = new HashDistributionDesc(ImmutableList.of(keyIndex), function, numPartitions);
+    HashDistributionDesc desc = new HashDistributionDesc(ImmutableList.of(keyIndex),
+        DistHashFunction.valueOf(function.toUpperCase()), numPartitions);
     PinotDataDistribution dataDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
         workers, workers.hashCode(), ImmutableSet.of(desc), null);
     return new TableScanWorkerAssignmentResult(dataDistribution, workerIdToSegmentsMap);

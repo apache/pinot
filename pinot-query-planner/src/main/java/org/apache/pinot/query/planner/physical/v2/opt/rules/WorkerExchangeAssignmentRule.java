@@ -43,7 +43,6 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
@@ -78,7 +77,6 @@ import org.slf4j.LoggerFactory;
 public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerExchangeAssignmentRule.class);
   private final PhysicalPlannerContext _physicalPlannerContext;
-  private static final String DEFAULT_HASH_FUNCTION = KeySelector.DEFAULT_HASH_ALGORITHM;
 
   public WorkerExchangeAssignmentRule(PhysicalPlannerContext context) {
     _physicalPlannerContext = context;
@@ -277,11 +275,10 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
           _physicalPlannerContext.getDefaultHashFunction());
     }
     if (distributionConstraint.getType() == RelDistribution.Type.HASH_DISTRIBUTED) {
-      HashDistributionDesc desc = new HashDistributionDesc(
-          distributionConstraint.getKeys(), DEFAULT_HASH_FUNCTION, currentNodeDistribution.getWorkers().size());
-      PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(
-          RelDistribution.Type.HASH_DISTRIBUTED, currentNodeDistribution.getWorkers(),
-          currentNodeDistribution.getWorkerHash(), ImmutableSet.of(desc), null);
+      HashDistributionDesc desc = new HashDistributionDesc(distributionConstraint.getKeys(),
+          _physicalPlannerContext.getDefaultHashFunction(), currentNodeDistribution.getWorkers().size());
+      PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
+          currentNodeDistribution.getWorkers(), currentNodeDistribution.getWorkerHash(), ImmutableSet.of(desc), null);
       return new PhysicalExchange(nodeId(), currentNode, pinotDataDistribution, distributionConstraint.getKeys(),
           ExchangeStrategy.PARTITIONING_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
           _physicalPlannerContext.getDefaultHashFunction());
@@ -370,7 +367,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     }
     // Re-partition.
     int numberOfPartitions = hashDistToMatch.getNumPartitions();
-    String hashFunction = hashDistToMatch.getHashFunction();
+    DistHashFunction hashFunction = hashDistToMatch.getHashFunction();
     HashDistributionDesc newDesc = new HashDistributionDesc(relDistribution.getKeys(), hashFunction,
         numberOfPartitions);
     PinotDataDistribution newDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
@@ -378,7 +375,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
         null);
     return new PhysicalExchange(nodeId(), currentNode, newDistribution, relDistribution.getKeys(),
         ExchangeStrategy.PARTITIONING_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
-        DistHashFunction.valueOf(hashFunction.toUpperCase()));
+        hashFunction);
   }
 
   private boolean complicatedButColocated(int partitionOne, int partitionTwo, int numStreams) {
