@@ -28,7 +28,6 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 public class MailboxSendNode extends BasePlanNode {
