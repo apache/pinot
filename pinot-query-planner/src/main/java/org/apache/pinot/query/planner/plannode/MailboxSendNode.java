@@ -28,7 +28,6 @@ import org.apache.calcite.rel.RelDistribution;
 import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
 
 
 public class MailboxSendNode extends BasePlanNode {
@@ -63,14 +62,6 @@ public class MailboxSendNode extends BasePlanNode {
       @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction) {
     this(stageId, dataSchema, inputs, toBitSet(receiverStages), exchangeType,
         distributionType, keys, prePartitioned, collations, sort, hashFunction);
-  }
-
-  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
-      int receiverStage, PinotRelExchangeType exchangeType,
-      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
-      @Nullable List<RelFieldCollation> collations, boolean sort) {
-    this(stageId, dataSchema, inputs, toBitSet(receiverStage), exchangeType, distributionType, keys, prePartitioned,
-        collations, sort, KeySelector.DEFAULT_HASH_ALGORITHM);
   }
 
   public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
