@@ -366,8 +366,15 @@ public class TableResizer {
       }
     }
 
+    for (int i = heap.length; i > 0; i--) {
+      downHeap(heap, i, 0, comparator);
+      // swap root with last
+      IntermediateRecord tmp = heap[0];
+      heap[0] = heap[i - 1];
+      heap[i - 1] = tmp;
+    }
+
     List<IntermediateRecord> result = Arrays.asList(heap);
-    Collections.reverse(result);
     return result;
   }
 
