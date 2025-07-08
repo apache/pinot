@@ -144,8 +144,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     int trimSize = -1;
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     if (!_queryContext.isUnsafeTrim()) {
-      // if orderby key is groupby key, and there's no having clause
-      // keep at most `limit` rows only
+      // if orderby key is groupby key, and there's no having clause, keep at most `limit` rows only
       trimSize = _queryContext.getLimit();
     } else if (orderByExpressions != null && minGroupTrimSize > 0) {
       // max(minSegmentGroupTrimSize, 5 * LIMIT)
