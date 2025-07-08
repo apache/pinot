@@ -102,7 +102,7 @@ public class PlanFragmentAndMailboxAssignment {
       MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, new ArrayList<>(),
           currentFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), false, physicalExchange.getRelCollation().getFieldCollations(),
-          false /* sort on sender */);
+          false /* sort on sender */, physicalExchange.getHashFunction().name());
       MailboxReceiveNode receiveNode = new MailboxReceiveNode(currentFragmentId, inputFragmentSchema,
           senderFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), physicalExchange.getRelCollation().getFieldCollations(),

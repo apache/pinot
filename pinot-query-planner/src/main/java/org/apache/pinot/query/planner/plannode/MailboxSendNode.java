@@ -68,14 +68,6 @@ public class MailboxSendNode extends BasePlanNode {
   public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
       int receiverStage, PinotRelExchangeType exchangeType,
       RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
-      @Nullable List<RelFieldCollation> collations, boolean sort) {
-    this(stageId, dataSchema, inputs, toBitSet(receiverStage), exchangeType, distributionType, keys, prePartitioned,
-        collations, sort, KeySelector.DEFAULT_HASH_ALGORITHM);
-  }
-
-  public MailboxSendNode(int stageId, DataSchema dataSchema, List<PlanNode> inputs,
-      int receiverStage, PinotRelExchangeType exchangeType,
-      RelDistribution.Type distributionType, @Nullable List<Integer> keys, boolean prePartitioned,
       @Nullable List<RelFieldCollation> collations, boolean sort, String hashFunction) {
     this(stageId, dataSchema, inputs, toBitSet(receiverStage), exchangeType, distributionType, keys, prePartitioned,
         collations, sort, hashFunction);

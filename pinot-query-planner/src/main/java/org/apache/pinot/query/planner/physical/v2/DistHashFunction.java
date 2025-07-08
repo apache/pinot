@@ -18,12 +18,20 @@
  */
 package org.apache.pinot.query.planner.physical.v2;
 
+/**
+ * Hash Functions supported by the v2 query optimizer. These are the hash functions supported by the Shuffle Exchange
+ * runtime, and the ones which are considered for the table-scan. If there's a hash-function in the table-scan that
+ * doesn't belong here, the table-scan won't be considered partitioned.
+ */
 public enum DistHashFunction {
   MURMUR,
   MURMUR3,
   HASHCODE,
   ABSHASHCODE;
 
+  /**
+   * Whether the given hash-function is considered by the v2 query optimizer for partitioning purposes.
+   */
   public static boolean isSupported(String hashFunction) {
     try {
       DistHashFunction.valueOf(hashFunction.toUpperCase());
@@ -31,12 +39,5 @@ public enum DistHashFunction {
     } catch (IllegalArgumentException e) {
       return false;
     }
-  }
-
-  /**
-   *
-   */
-  public static DistHashFunction defaultFunction() {
-    return MURMUR;
   }
 }

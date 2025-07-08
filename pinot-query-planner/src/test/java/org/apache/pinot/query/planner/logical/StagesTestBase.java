@@ -135,7 +135,8 @@ public class StagesTestBase {
           boolean prePartitioned, List<RelFieldCollation> collations, boolean sort, boolean sortedOnSender) {
         PlanNode input = childBuilder.build(nextStageId);
         MailboxSendNode mailboxSendNode = new MailboxSendNode(nextStageId, input.getDataSchema(), List.of(input),
-            stageId, exchangeType, distribution, keys, prePartitioned, collations, sort);
+            stageId, exchangeType, distribution, keys, prePartitioned, collations, sort,
+            KeySelector.DEFAULT_HASH_ALGORITHM);
         MailboxSendNode old = _stageRoots.put(nextStageId, mailboxSendNode);
         Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", nextStageId);
         return new MailboxReceiveNode(stageId, input.getDataSchema(), nextStageId, exchangeType, distribution, keys,
@@ -192,7 +193,7 @@ public class StagesTestBase {
     return (stageId, mySchema, myHints) -> {
       PlanNode input = childBuilder.build(stageId);
       MailboxSendNode mailboxSendNode = new MailboxSendNode(newStageId, mySchema, List.of(input), stageId, null,
-          null, null, false, null, false);
+          null, null, false, null, false, KeySelector.DEFAULT_HASH_ALGORITHM);
       MailboxSendNode old = _stageRoots.put(stageId, mailboxSendNode);
       Preconditions.checkState(old == null, "Mailbox already exists for stageId: %s", stageId);
       return mailboxSendNode;
