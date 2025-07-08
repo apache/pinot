@@ -749,10 +749,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return 0;
   }
 
-  protected void waitForMinionTaskCompletion(String taskId) {
+  protected void waitForMinionTaskCompletion(String taskId, long timeout) {
     TestUtils.waitForCondition(aVoid ->
             _controllerStarter.getHelixTaskResourceManager().getTaskState(taskId) == TaskState.COMPLETED,
-        300_000L, "Failed to complete the task " + taskId);
+        timeout, "Failed to complete the task " + taskId);
 
     // Validate that there were > 0 subtasks so that we know the task was actually run
     Assert.assertFalse(_controllerStarter.getHelixTaskResourceManager().getSubtaskStates(taskId).isEmpty());
