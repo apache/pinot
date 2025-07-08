@@ -21,7 +21,6 @@ package org.apache.pinot.core.accounting;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeClass;

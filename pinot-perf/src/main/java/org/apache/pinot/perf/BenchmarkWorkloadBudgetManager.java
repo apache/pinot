@@ -19,7 +19,7 @@
 package org.apache.pinot.perf;
 
 import java.util.concurrent.TimeUnit;
-import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
+import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.openjdk.jmh.annotations.Benchmark;

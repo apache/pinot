@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.accounting;
+package org.apache.pinot.core.accounting;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;

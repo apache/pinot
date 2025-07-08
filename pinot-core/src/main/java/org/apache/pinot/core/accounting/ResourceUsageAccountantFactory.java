@@ -41,8 +41,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.spi.utils.CommonConstants.Accounting.*;
-
 
 public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
 
@@ -191,7 +189,7 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
 
     @Override
     public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
-      setupRunner(queryId, taskId, taskType, DEFAULT_WORKLOAD_NAME);
+      setupRunner(queryId, taskId, taskType, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
     }
 
     @Override
