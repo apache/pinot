@@ -90,7 +90,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
     _numGroupByExpressions = groupByExpressions.size();
     _numColumns = _numAggregationFunctions + _numGroupByExpressions;
   }
-
   /**
    * Reduces and sets group by results into ResultTable.
    */

@@ -19,18 +19,24 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Comparator;
 import java.util.concurrent.ExecutorService;
+import org.apache.arrow.util.Preconditions;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
+import org.apache.pinot.core.data.table.ConcurrentSortedIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.data.table.SimpleSortedIndexedTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 
 
 public final class GroupByUtils {
@@ -41,17 +47,17 @@ public final class GroupByUtils {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns {@code max(limit * 5, 5000)} to
+   * ensure the result accuracy.
    */
   public static int getTableCapacity(int limit) {
     return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and
-   * result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns
+   * {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and result
+   * accuracy.
    */
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
@@ -129,6 +135,11 @@ public final class GroupByUtils {
     if (queryContext.isServerReturnFinalResult() && !hasHaving) {
       // When server is asked to return final result and there is no HAVING clause, return only LIMIT groups
       resultSize = limit;
+    } else if (QueryContext.isSameOrderAndGroupByColumns(queryContext) && !hasHaving) {
+      // When the orderby keys are group keys, keep only LIMIT groups and create indexTable that is sorted to ratain
+      // only first groups
+      resultSize = limit;
+      return getGroupKeyOrderedIndexTable(dataSchema, false, queryContext, resultSize, numThreads, executorService);
     } else {
       resultSize = trimSize;
     }
@@ -210,6 +221,25 @@ public final class GroupByUtils {
     } else {
       return new ConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
           initialCapacity, executorService);
+    }
+  }
+
+  private static IndexedTable getGroupKeyOrderedIndexTable(DataSchema dataSchema, boolean hasFinalInput,
+      QueryContext queryContext, int resultSize, int numThreads,
+      ExecutorService executorService) {
+    Preconditions.checkState(QueryContext.isSameOrderAndGroupByColumns(queryContext));
+    // when group key is same as order by key, we need to get a ident -> groupBy key idx mapping for the comparator
+    // to work
+    Comparator<Key> comparator =
+        OrderByComparatorFactory.getGroupKeyComparator(queryContext.getOrderByExpressions(),
+            queryContext.getGroupByExpressions(),
+            queryContext.isNullHandlingEnabled());
+    if (numThreads == 1) {
+      return new SimpleSortedIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize,
+          executorService, comparator);
+    } else {
+      return new ConcurrentSortedIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize,
+          executorService, comparator);
     }
   }
 }

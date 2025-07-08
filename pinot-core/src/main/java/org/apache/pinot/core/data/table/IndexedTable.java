@@ -58,7 +58,7 @@ public abstract class IndexedTable extends BaseTable {
   protected final int _chunkSizeExtractFinalResult;
 
   protected Collection<Record> _topRecords;
-  private int _numResizes;
+  protected int _numResizes;
   private long _resizeTimeNs;
 
   /**
