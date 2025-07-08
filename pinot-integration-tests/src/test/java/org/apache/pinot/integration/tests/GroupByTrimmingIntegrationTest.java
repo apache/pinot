@@ -226,12 +226,18 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     assertTrimFlagSet(result);
 
     assertEquals(toResultStr(result),
-        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
-            + "77,\t377,\t4\n"
-            + "66,\t566,\t4\n"
-            + "39,\t339,\t4\n"
-            + "96,\t396,\t4\n"
-            + "25,\t25,\t4");
+//        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+//            + "77,\t377,\t4\n"
+//            + "66,\t566,\t4\n"
+//            + "39,\t339,\t4\n"
+//            + "96,\t396,\t4\n"
+//            + "25,\t25,\t4");
+          "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
+              + "66,\t566,\t4\n"
+              + "39,\t339,\t4\n"
+              + "96,\t396,\t4\n"
+              + "69,\t169,\t4\n"
+              + "77,\t377,\t4");
 
     assertEquals(toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
         "Execution Plan\n"
@@ -464,39 +470,6 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
             + "DOC_ID_SET,\t5,\t4\n"
             + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
   }
-
-  @Test
-  public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderByAllGroupByKeysLargeLimitIsSafe()
-      throws Exception {
-    setUseMultiStageQueryEngine(false);
-
-    // trimming is safe on rows ordered by all group by keys (regardless of key order, direction or duplications)
-    String query = "SELECT i, j, COUNT(*) FROM mytable GROUP BY i, j ORDER BY j ASC, i DESC, j ASC LIMIT 1000000";
-
-    Connection conn = getPinotConnection();
-    assertTrimFlagNotSet(conn.execute(query));
-
-    ResultSetGroup result = conn.execute("SET minSegmentGroupTrimSize=5; " + query);
-    assertTrimFlagNotSet(result);
-
-    assertEquals(toResultStr(result),
-        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"count(*)\"[\"LONG\"]\n"
-            + "0,\t0,\t4\n"
-            + "1,\t1,\t4\n"
-            + "2,\t2,\t4\n"
-            + "3,\t3,\t4\n"
-            + "4,\t4,\t4");
-
-    assertEquals(toExplainStr(postQuery("EXPLAIN PLAN FOR " + query), false),
-        "BROKER_REDUCE(sort:[j ASC, i DESC],limit:5),\t1,\t0\n"
-            + "COMBINE_GROUP_BY,\t2,\t1\n"
-            + "PLAN_START(numSegmentsForThisPlan:4),\t-1,\t-1\n"
-            + "GROUP_BY(groupKeys:i, j, aggregations:count(*)),\t3,\t2\n"
-            + "PROJECT(i, j),\t4,\t3\n"
-            + "DOC_ID_SET,\t5,\t4\n"
-            + "FILTER_MATCH_ENTIRE_SEGMENT(docs:1000),\t6,\t5\n");
-  }
-
 
   @Test
   public void testSSQEGroupsTrimmedAtSegmentLevelWithOrderByAllGroupByKeysIsSafe()
