@@ -171,7 +171,6 @@ public class PhysicalExchange extends Exchange implements PRelNode {
         .itemIf("distKeys", _distributionKeys, CollectionUtils.isNotEmpty(_distributionKeys))
         .itemIf("execStrategy", getRelExchangeType(),
             getRelExchangeType() != PinotRelExchangeType.getDefaultExchangeType())
-        .itemIf("collation", _relCollation, CollectionUtils.isNotEmpty(_relCollation.getFieldCollations()))
-        .item("hashFunction", _hashFunction.toString());
+        .itemIf("collation", _relCollation, CollectionUtils.isNotEmpty(_relCollation.getFieldCollations()));
   }
 }
