@@ -366,7 +366,9 @@ public class TableResizer {
       }
     }
 
-    return Arrays.asList(heap);
+    List<IntermediateRecord> result = Arrays.asList(heap);
+    Collections.reverse(result);
+    return result;
   }
 
   /**
