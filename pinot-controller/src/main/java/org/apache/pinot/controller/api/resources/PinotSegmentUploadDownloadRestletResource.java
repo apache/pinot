@@ -427,12 +427,12 @@ public class PinotSegmentUploadDownloadRestletResource {
     } catch (FileNotFoundException e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, "Exception while uploading segment: " + e.getMessage(),
+      throw new ControllerApplicationException(LOGGER, String.format("Exception while uploading segment: %s", e.getMessage()),
           Response.Status.NOT_FOUND, e);
     } catch (Exception e) {
       _controllerMetrics.addMeteredGlobalValue(ControllerMeter.CONTROLLER_SEGMENT_UPLOAD_ERROR, 1L);
       _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.CONTROLLER_TABLE_SEGMENT_UPLOAD_ERROR, 1L);
-      throw new ControllerApplicationException(LOGGER, "Exception while uploading segment: " + e.getMessage(),
+      throw new ControllerApplicationException(LOGGER, String.format("Exception while uploading segment: %s" + e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
     } finally {
       FileUtils.deleteQuietly(tempEncryptedFile);

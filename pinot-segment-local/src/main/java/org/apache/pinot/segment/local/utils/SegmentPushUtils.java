@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.utils;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
@@ -107,7 +108,7 @@ public class SegmentPushUtils implements Serializable {
   }
 
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths)
-      throws RetriableOperationException, AttemptsExceededException {
+      throws RetriableOperationException, AttemptsExceededException, FileNotFoundException {
     String tableName = spec.getTableSpec().getTableName();
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
@@ -116,7 +117,7 @@ public class SegmentPushUtils implements Serializable {
   }
 
   public static void sendSegmentUris(SegmentGenerationJobSpec spec, List<String> segmentUris)
-      throws RetriableOperationException, AttemptsExceededException {
+      throws RetriableOperationException, AttemptsExceededException, FileNotFoundException {
     String tableName = spec.getTableSpec().getTableName();
     AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     List<Header> headers = AuthProviderUtils.toRequestHeaders(authProvider);
@@ -157,7 +158,7 @@ public class SegmentPushUtils implements Serializable {
 
   public static void pushSegments(SegmentGenerationJobSpec spec, PinotFS fileSystem, List<String> tarFilePaths,
       List<Header> headers, List<NameValuePair> parameters)
-      throws RetriableOperationException, AttemptsExceededException {
+      throws RetriableOperationException, AttemptsExceededException, FileNotFoundException {
     String tableName = spec.getTableSpec().getTableName();
     TableType tableType = tableName.endsWith("_" + TableType.REALTIME.name()) ? TableType.REALTIME : TableType.OFFLINE;
     boolean cleanUpOutputDir = spec.isCleanUpOutputDir();
@@ -220,7 +221,7 @@ public class SegmentPushUtils implements Serializable {
 
   public static void sendSegmentUris(SegmentGenerationJobSpec spec, List<String> segmentUris,
       List<Header> headers, List<NameValuePair> parameters)
-      throws RetriableOperationException, AttemptsExceededException {
+      throws RetriableOperationException, AttemptsExceededException, FileNotFoundException {
     String tableName = spec.getTableSpec().getTableName();
     LOGGER.info("Start sending table {} segment URIs: {} to locations: {}", tableName,
         Arrays.toString(segmentUris.subList(0, Math.min(5, segmentUris.size())).toArray()),

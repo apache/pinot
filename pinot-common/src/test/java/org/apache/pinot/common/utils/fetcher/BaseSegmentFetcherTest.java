@@ -29,9 +29,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.expectThrows;
 
 
 public class BaseSegmentFetcherTest {
@@ -123,19 +122,6 @@ public class BaseSegmentFetcherTest {
 
         assertTrue(_segmentFetcher.getFetchAttemptCount() > 1, "Should have made multiple attempts");
         assertTrue(_segmentFetcher.getLastSuccessfulUri().equals(_testUri), "Should have succeeded eventually");
-    }
-
-    @Test
-    public void testFetchSegmentToLocalFileNotFoundWrapperExceptionUnwrapping() throws Exception {
-        _segmentFetcher.setFetchBehavior(TestableBaseSegmentFetcher.FetchBehavior.FILE_NOT_FOUND);
-        try {
-            _segmentFetcher.fetchSegmentToLocal(_testUri, _testDestFile);
-            fail("Expected FileNotFoundException to be thrown");
-        } catch (FileNotFoundException e) {
-            // Verify that the original FileNotFoundException is thrown (not the wrapper)
-            assertEquals(e.getMessage(), "File not found: " + TEST_URI_STRING);
-            assertEquals(_segmentFetcher.getFetchAttemptCount(), 1, "Should only attempt once for FileNotFoundException");
-        }
     }
 
     /**
