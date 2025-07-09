@@ -188,8 +188,15 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
     int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
-    if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
-      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
+    int trimSize = -1;
+    boolean isSafe = false;
+    if (!_queryContext.isUnsafeTrim()) {
+      trimSize = _queryContext.getLimit();
+      isSafe = true;
+    } else if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
+      trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
+    }
+    if (trimSize > 0) {
       if (groupKeyGenerator.getNumKeys() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         List<IntermediateRecord> intermediateRecords =
@@ -199,6 +206,19 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         boolean unsafeTrim = _queryContext.isUnsafeTrim(); // set trim flag only if it's not safe
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setGroupsTrimmed(unsafeTrim);
+        resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
+        return resultsBlock;
+      }
+      if (isSafe) {
+        // if orderBy groupBy key, sort the array even if it's smaller than trimSize
+        // to benefit combining
+        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+        List<IntermediateRecord> intermediateRecords =
+            tableResizer.sortInSegmentResults(groupKeyGenerator,
+                groupByResultHolders, trimSize);
+        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
+        resultsBlock.setGroupsTrimmed(false);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
