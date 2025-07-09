@@ -215,11 +215,13 @@ public final class GroupByUtils {
     }
   }
 
-  public static IndexedTable getAndPopulateLinkedHashMapIndexedTable(GroupByResultsBlock block, boolean hasFinalInput,
-      QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, ExecutorService executorService) {
+  public static LinkedHashMapIndexedTable getAndPopulateLinkedHashMapIndexedTable(GroupByResultsBlock block,
+      boolean hasFinalInput,
+      QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, ExecutorService executorService,
+      int desiredNumMergedBlocks) {
     LinkedHashMapIndexedTable indexedTable =
         new LinkedHashMapIndexedTable(block.getDataSchema(), hasFinalInput, queryContext, resultSize, trimSize,
-            trimThreshold, executorService);
+            trimThreshold, executorService, 1, desiredNumMergedBlocks);
     for (IntermediateRecord intermediateRecord : block.getIntermediateRecords()) {
       indexedTable.upsert(intermediateRecord._key, intermediateRecord._record);
     }

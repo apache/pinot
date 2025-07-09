@@ -28,6 +28,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class LinkedHashMapIndexedTable extends IndexedTable {
+  private int _numMergedBlocks;
+  private final int _desiredNumMergedBlocks;
 
   /**
    * Constructor for the IndexedTable.
@@ -43,15 +45,15 @@ public class LinkedHashMapIndexedTable extends IndexedTable {
    */
   public LinkedHashMapIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
       QueryContext queryContext, int resultSize, int trimSize,
-      int trimThreshold, ExecutorService executorService) {
+      int trimThreshold, ExecutorService executorService, int numMergedBlocks, int desiredNumMergedBlocks) {
     super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, new LinkedHashMap<>(),
         executorService);
+    _desiredNumMergedBlocks = desiredNumMergedBlocks;
+    _numMergedBlocks = numMergedBlocks;
   }
 
-  protected LinkedHashMapIndexedTable(DataSchema dataSchema, boolean hasFinalInput,
-      QueryContext queryContext, int resultSize, int trimSize,
-      int trimThreshold, LinkedHashMap<Key, Record> map, ExecutorService executorService) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, map, executorService);
+  public boolean isSatisfied() {
+    return _numMergedBlocks == _desiredNumMergedBlocks;
   }
 
   ///  merge another sorted LinkedHashMapIndexedTable into this
@@ -62,14 +64,18 @@ public class LinkedHashMapIndexedTable extends IndexedTable {
     LinkedHashMap<Key, Record> thisMap = (LinkedHashMap<Key, Record>) _lookupMap;
     LinkedHashMap<Key, Record> thatMap = (LinkedHashMap<Key, Record>) other._lookupMap;
     if (thisMap.isEmpty()) {
+      other._numMergedBlocks += _numMergedBlocks;
       return other;
     }
     if (thatMap.isEmpty()) {
+      _numMergedBlocks += other._numMergedBlocks;
       return this;
     }
+    assert (_numMergedBlocks >= 1);
+    assert (other._numMergedBlocks >= 1);
     LinkedHashMapIndexedTable newTable =
         new LinkedHashMapIndexedTable(getDataSchema(), _hasFinalInput, queryContext, _resultSize, _trimSize,
-            _trimThreshold, executorService);
+            _trimThreshold, executorService, _numMergedBlocks + other._numMergedBlocks, _desiredNumMergedBlocks);
     newTable = mergeSortedMaps(thisMap, thatMap, comparator, limit, newTable);
     // TODO: add stats?
     return newTable;
