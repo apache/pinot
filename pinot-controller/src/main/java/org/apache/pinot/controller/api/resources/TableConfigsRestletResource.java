@@ -64,6 +64,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.tuner.TableConfigTunerUtils;
 import org.apache.pinot.controller.util.TaskConfigUtils;
@@ -107,6 +108,9 @@ public class TableConfigsRestletResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
+
+  @Inject
+  PinotHelixTaskResourceManager _pinotHelixTaskResourceManager;
 
   @Inject
   PinotTaskManager _pinotTaskManager;
@@ -231,9 +235,11 @@ public class TableConfigsRestletResource {
 
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
+        PinotTableRestletResource.tableTasksValidation(offlineTableConfig, _pinotHelixTaskResourceManager);
       }
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
+        PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
       }
       try {
         _pinotHelixResourceManager.addSchema(schema, false, false);
@@ -283,7 +289,9 @@ public class TableConfigsRestletResource {
   @ApiOperation(value = "Delete the TableConfigs", notes = "Delete the TableConfigs")
   public SuccessResponse deleteConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
-      String tableName, @Context HttpHeaders headers) {
+      String tableName,
+      @ApiParam(defaultValue = "false") @QueryParam("skipTasksValidation") boolean skipTasksValidation,
+      @Context HttpHeaders headers) {
     try {
       if (TableNameBuilder.isOfflineTableResource(tableName) || TableNameBuilder.isRealtimeTableResource(tableName)) {
         throw new ControllerApplicationException(LOGGER, "Invalid table name: " + tableName + ". Use raw table name.",
@@ -306,9 +314,13 @@ public class TableConfigsRestletResource {
       boolean tableExists =
           _pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager.hasOfflineTable(
               tableName);
+      PinotTableRestletResource.tableTasksCleanup(TableNameBuilder.REALTIME.tableNameWithType(tableName),
+          skipTasksValidation, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
       // Delete whether tables exist or not
       _pinotHelixResourceManager.deleteRealtimeTable(tableName);
       LOGGER.info("Deleted realtime table: {}", tableName);
+      PinotTableRestletResource.tableTasksCleanup(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
+          skipTasksValidation, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
       _pinotHelixResourceManager.deleteOfflineTable(tableName);
       LOGGER.info("Deleted offline table: {}", tableName);
       boolean schemaExists = _pinotHelixResourceManager.deleteSchema(tableName);
