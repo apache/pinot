@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -89,6 +88,7 @@ public class QueryContext {
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final ExplainMode _explain;
+  private Boolean _isUnsafeTrim = null;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -175,36 +175,11 @@ public class QueryContext {
       return false;
     }
 
-    BitSet orderByKeysMatched = new BitSet(orderByKeys.size());
-
-    OUTER_GROUP:
-    for (ExpressionContext groupExp : groupByKeys) {
-      for (int i = 0; i < orderByKeys.size(); i++) {
-        OrderByExpressionContext orderExp = orderByKeys.get(i);
-        if (groupExp.equals(orderExp.getExpression())) {
-          orderByKeysMatched.set(i);
-          continue OUTER_GROUP;
-        }
-      }
-
-      return false;
-    }
-
-    OUTER_ORDER:
-    for (int i = 0, n = orderByKeys.size(); i < n; i++) {
-      if (orderByKeysMatched.get(i)) {
-        continue;
-      }
-
-      for (ExpressionContext groupExp : groupByKeys) {
-        if (groupExp.equals(orderByKeys.get(i).getExpression())) {
-          continue OUTER_ORDER;
-        }
-      }
-      return false;
-    }
-
-    return true;
+    Set<String> groupByKeyIdentSet = new HashSet<>();
+    groupByKeys.forEach(key -> groupByKeyIdentSet.add(key.getIdentifier()));
+    Set<String> orderByKeyIdentSet = new HashSet<>();
+    orderByKeys.forEach(key -> orderByKeyIdentSet.add(key.getExpression().getIdentifier()));
+    return groupByKeyIdentSet.equals(orderByKeyIdentSet);
   }
 
   /**
@@ -564,7 +539,11 @@ public class QueryContext {
   }
 
   public boolean isUnsafeTrim() {
-    return !isSameOrderAndGroupByColumns(this) || getHavingFilter() != null;
+    if (_isUnsafeTrim != null) {
+      return _isUnsafeTrim;
+    }
+    _isUnsafeTrim = !isSameOrderAndGroupByColumns(this) || getHavingFilter() != null;
+    return _isUnsafeTrim;
   }
 
   public static class Builder {
