@@ -60,6 +60,7 @@ public class JsonFunctions {
       new Configuration.ConfigurationBuilder().jsonProvider(new ArrayAwareJacksonJsonProvider())
           .mappingProvider(new JacksonMappingProvider()).options(Option.SUPPRESS_EXCEPTIONS)
           .build());
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   static {
     // Set the JsonPath cache before the cache is accessed
@@ -252,10 +253,9 @@ public class JsonFunctions {
         setValuesToMap(keyColumnName, valueColumnName, obj, result);
       }
     } else {
-      ObjectMapper mapper = new ObjectMapper();
       JsonNode arrayNode;
       try {
-        arrayNode = mapper.readTree(keyValueArray.toString());
+        arrayNode = OBJECT_MAPPER.readTree(keyValueArray.toString());
       } catch (JsonProcessingException e) {
         throw new RuntimeException(e);
       }
@@ -321,14 +321,61 @@ public class JsonFunctions {
       Map<String, String> objMap = (Map) obj;
       result.put(objMap.get(keyColumnName), objMap.get(valueColumnName));
     } else {
-      ObjectMapper mapper = new ObjectMapper();
       JsonNode mapNode;
       try {
-        mapNode = mapper.readTree(obj.toString());
+        mapNode = OBJECT_MAPPER.readTree(obj.toString());
       } catch (JsonProcessingException e) {
         throw new RuntimeException(e);
       }
       result.put(mapNode.get(keyColumnName).asText(), mapNode.get(valueColumnName).asText());
+    }
+  }
+
+  /**
+   * Returns all key paths in a JSON object up to the specified depth.
+   * Each key path is dot-separated for nested keys.
+   * @param jsonObj JSON object or string
+   * @param maxDepth Maximum depth to recurse (inclusive)
+   * @return Array of key paths (dot notation)
+   */
+  @ScalarFunction(nullableParameters = true)
+  public static List jsonKeys(@Nullable Object jsonObj, int maxDepth) {
+    if (jsonObj == null || maxDepth < 1) {
+      return java.util.Collections.emptyList();
+    }
+    JsonNode root;
+    try {
+      if (jsonObj instanceof String) {
+        root = OBJECT_MAPPER.readTree((String) jsonObj);
+      } else if (jsonObj instanceof Map || jsonObj instanceof List) {
+        root = OBJECT_MAPPER.valueToTree(jsonObj);
+      } else if (jsonObj instanceof JsonNode) {
+        root = (JsonNode) jsonObj;
+      } else {
+        root = OBJECT_MAPPER.readTree(jsonObj.toString());
+      }
+    } catch (Exception e) {
+      return java.util.Collections.emptyList();
+    }
+    List<String> keys = new java.util.ArrayList<>();
+    collectKeysForJsonKeys(root, "", 1, maxDepth, keys);
+    return keys;
+  }
+
+  private static void collectKeysForJsonKeys(JsonNode node, String prefix, int depth, int maxDepth, List<String> keys) {
+    if (node == null || depth > maxDepth) {
+      return;
+    }
+    if (node.isObject()) {
+      node.fieldNames().forEachRemaining(field -> {
+        String path = prefix.isEmpty() ? field : prefix + "." + field;
+        keys.add(path);
+        collectKeysForJsonKeys(node.get(field), path, depth + 1, maxDepth, keys);
+      });
+    } else if (node.isArray()) {
+      for (JsonNode elem : node) {
+        collectKeysForJsonKeys(elem, prefix, depth + 1, maxDepth, keys);
+      }
     }
   }
 

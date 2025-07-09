@@ -114,6 +114,8 @@ public enum TransformFunctionType {
               SqlTypeFamily.CHARACTER), i -> i > 2)),
   JSON_EXTRACT_KEY("jsonExtractKey", ReturnTypes.TO_ARRAY,
       OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.CHARACTER))),
+  JSON_KEYS("jsonKeys", ReturnTypes.TO_ARRAY,
+      OperandTypes.family(List.of(SqlTypeFamily.CHARACTER, SqlTypeFamily.INTEGER))),
 
   // Date time functions
   TIME_CONVERT("timeConvert", ReturnTypes.BIGINT,

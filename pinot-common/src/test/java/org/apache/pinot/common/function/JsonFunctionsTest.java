@@ -448,7 +448,32 @@ public class JsonFunctionsTest {
     assertEquals(JsonFunctions.jsonStringToListOrMap(jsonMapString), expectedMap);
 
     String invalidJson = "[\"k1\":\"v1\"}";
-    assertEquals(JsonFunctions.jsonStringToMap(invalidJson), null);
-    assertEquals(JsonFunctions.jsonStringToListOrMap(invalidJson), null);
+    assertNull(JsonFunctions.jsonStringToMap(invalidJson));
+    assertNull(JsonFunctions.jsonStringToListOrMap(invalidJson));
+  }
+
+  @Test
+  public void testJsonKeysFlatAndNested() {
+    String flatJson = "{\"a\":1,\"b\":2}";
+    String nestedJson = "{\"a\":1,\"b\":{\"c\":2,\"d\":{\"e\":3}},\"f\":[{\"g\":4},{\"h\":5}]}";
+    // Flat
+    Assert.assertEqualsNoOrder(JsonFunctions.jsonKeys(flatJson, 1).toArray(), new String[]{"a", "b"});
+    // Nested, depth 2
+    Assert.assertEqualsNoOrder(JsonFunctions.jsonKeys(nestedJson, 2).toArray(),
+        new String[]{"a", "b", "b.c", "b.d", "f"});
+    // Nested, depth 3
+    Assert.assertEqualsNoOrder(JsonFunctions.jsonKeys(nestedJson, 3).toArray(),
+        new String[]{"a", "b", "b.c", "b.d", "b.d.e", "f", "f.g", "f.h"});
+    // Nested, depth 1
+    Assert.assertEqualsNoOrder(JsonFunctions.jsonKeys(nestedJson, 1).toArray(), new String[]{"a", "b", "f"});
+  }
+
+  @Test
+  public void testJsonKeysArrayAndNull() {
+    String arrayJson = "[{\"a\":1},{\"b\":2}]";
+    Assert.assertEqualsNoOrder(JsonFunctions.jsonKeys(arrayJson, 2).toArray(), new String[]{"a", "b"});
+    Assert.assertEquals(JsonFunctions.jsonKeys(null, 2).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonKeys("not a json", 2).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonKeys("{\"a\":1}", 0).size(), 0);
   }
 }
