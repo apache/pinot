@@ -306,7 +306,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       // return merged result
       assert (tables.size() == 1);
       IndexedTable indexedTable = tables.get(0);
-      indexedTable.finish(false);
+      if (_queryContext.isServerReturnFinalResult()) {
+        // indexedTable is already sorted
+        indexedTable.finish(false, true);
+      } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
+        indexedTable.finish(false, true);
+      } else {
+        indexedTable.finish(false);
+      }
       GroupByResultsBlock resultBlock = new GroupByResultsBlock(indexedTable, _queryContext);
       resultBlock.setGroupsTrimmed(false);
       resultBlock.setNumGroupsLimitReached(false);
