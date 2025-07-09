@@ -331,7 +331,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
   private LinkedHashMapIndexedTable mergeBlocks(LinkedHashMapIndexedTable block1, LinkedHashMapIndexedTable block2,
       Comparator<Key> comparator, QueryContext queryContext) {
-    // TODO: implement actual merging of aggragation results
     return block1.merge(block2, comparator, queryContext, _executorService);
   }
 }
