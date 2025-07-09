@@ -37,14 +37,18 @@ public class ServerRateLimitConfigChangeListener implements PinotClusterConfigCh
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)) {
-      LOGGER.info("ChangedConfigs: {} does not contain: {}. Skipping updates", changedConfigs,
-          CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT);
+    if (!changedConfigs.contains(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)
+        && !changedConfigs.contains(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE)) {
+      LOGGER.info("ChangedConfigs: {} does not contain: {} or: {}. Skipping updates", changedConfigs,
+          CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+          CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE);
       return;
     }
     // Init serverRateLimit as default rate limit in-case serverRateLimit config is deleted/removed from cluster
     // configs.
     double serverRateLimit = CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
+    double serverRateLimitPerCore = CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE;
+
     if (clusterConfigs.containsKey(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)) {
       try {
         serverRateLimit =
@@ -55,6 +59,19 @@ public class ServerRateLimitConfigChangeListener implements PinotClusterConfigCh
         return;
       }
     }
+
+    if (clusterConfigs.containsKey(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE)) {
+      try {
+        serverRateLimitPerCore = Double.parseDouble(
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE));
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid rate limit config value: {}. Ignoring the config change",
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT), e);
+        return;
+      }
+    }
+
+    serverRateLimit = RealtimeConsumptionRateManager.getServerRateLimit(serverRateLimit, serverRateLimitPerCore);
     RealtimeConsumptionRateManager.getInstance().updateServerRateLimiter(serverRateLimit, _serverMetrics);
   }
 }

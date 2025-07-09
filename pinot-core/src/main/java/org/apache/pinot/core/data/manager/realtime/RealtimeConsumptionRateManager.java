@@ -79,6 +79,15 @@ public class RealtimeConsumptionRateManager {
     return InstanceHolder.INSTANCE;
   }
 
+  public static double getServerRateLimit(double serverRateLimit, double serverRateLimitPerCore) {
+    if (serverRateLimitPerCore > 0) {
+      // Note: numCores will be according to the requested CPU resources at the time when server starts.
+      int numCores = Math.max(1, Runtime.getRuntime().availableProcessors());
+      return Math.max(serverRateLimit, serverRateLimitPerCore * numCores);
+    }
+    return serverRateLimit;
+  }
+
   public void enableThrottling() {
     _isThrottlingAllowed = true;
   }
@@ -87,6 +96,11 @@ public class RealtimeConsumptionRateManager {
     double serverRateLimit =
         serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
             CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
+    double serverRateLimitPerCore =
+        serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE,
+            CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE);
+
+    serverRateLimit = getServerRateLimit(serverRateLimit, serverRateLimitPerCore);
     _serverRateLimiter = createServerRateLimiter(serverRateLimit, serverMetrics);
     return _serverRateLimiter;
   }

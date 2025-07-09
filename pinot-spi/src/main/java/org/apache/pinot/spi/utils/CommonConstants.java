@@ -1218,6 +1218,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT = "pinot.server.consumption.rate.limit";
     // Default to 0.0 (no limit)
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE =
+        "pinot.server.consumption.rate.limit.per.core";
+    public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE = 0.0;
 
     public static final String CONFIG_OF_MMAP_DEFAULT_ADVICE = "pinot.server.mmap.advice.default";
     public static final String PREFIX_OF_CONFIG_OF_SEGMENT_FETCHER_FACTORY = "pinot.server.segment.fetcher";
