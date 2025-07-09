@@ -66,7 +66,7 @@ public class ServerRateLimitConfigChangeListener implements PinotClusterConfigCh
             clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE));
       } catch (NumberFormatException e) {
         LOGGER.error("Invalid rate limit config value: {}. Ignoring the config change",
-            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT), e);
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE), e);
         return;
       }
     }
