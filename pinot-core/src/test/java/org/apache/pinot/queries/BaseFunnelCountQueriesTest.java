@@ -213,7 +213,6 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
         expectedFilteredNumDocs, getExpectedNumEntriesScannedInFilter(), 2 * expectedFilteredNumDocs, NUM_RECORDS);
 
     List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
-//    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;
     Iterator<IntermediateRecord> groupKeyIterator = aggregationGroupByResult.iterator();
