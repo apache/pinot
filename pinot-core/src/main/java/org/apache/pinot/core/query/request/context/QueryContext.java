@@ -175,10 +175,9 @@ public class QueryContext {
       return false;
     }
 
-    Set<String> groupByKeyIdentSet = new HashSet<>();
-    groupByKeys.forEach(key -> groupByKeyIdentSet.add(key.getIdentifier()));
-    Set<String> orderByKeyIdentSet = new HashSet<>();
-    orderByKeys.forEach(key -> orderByKeyIdentSet.add(key.getExpression().getIdentifier()));
+    Set<ExpressionContext> groupByKeyIdentSet = new HashSet<>(groupByKeys);
+    Set<ExpressionContext> orderByKeyIdentSet = new HashSet<>();
+    orderByKeys.forEach(key -> orderByKeyIdentSet.add(key.getExpression()));
     return groupByKeyIdentSet.equals(orderByKeyIdentSet);
   }
 
