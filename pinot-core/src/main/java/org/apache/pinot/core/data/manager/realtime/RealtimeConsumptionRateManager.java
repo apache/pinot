@@ -81,7 +81,7 @@ public class RealtimeConsumptionRateManager {
 
   public static double getServerRateLimit(double serverRateLimit, double serverRateLimitPerCore) {
     if (serverRateLimitPerCore > 0) {
-      // Note: numCores will be according to the requested CPU resources at the time when server starts.
+      // Note: numCores will be according to the requested CPU resources at the time when this method is called.
       int numCores = Math.max(1, Runtime.getRuntime().availableProcessors());
       return Math.max(serverRateLimit, serverRateLimitPerCore * numCores);
     }
