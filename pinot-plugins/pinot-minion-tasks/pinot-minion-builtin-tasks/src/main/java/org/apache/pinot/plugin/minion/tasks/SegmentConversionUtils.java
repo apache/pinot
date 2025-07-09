@@ -204,12 +204,20 @@ public class SegmentConversionUtils {
   public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId,
       int socketTimeoutMs, @Nullable AuthProvider authProvider)
       throws Exception {
-    endSegmentReplace(tableNameWithType, uploadURL, null, segmentLineageEntryId, socketTimeoutMs, authProvider);
+    endSegmentReplace(tableNameWithType, uploadURL, null, segmentLineageEntryId,
+        socketTimeoutMs, authProvider, false);
+  }
+
+  public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId,
+      int socketTimeoutMs, @Nullable AuthProvider authProvider, boolean forceCleanup)
+      throws Exception {
+    endSegmentReplace(tableNameWithType, uploadURL, null, segmentLineageEntryId,
+        socketTimeoutMs, authProvider, forceCleanup);
   }
 
   public static void endSegmentReplace(String tableNameWithType, String uploadURL,
       @Nullable EndReplaceSegmentsRequest endReplaceSegmentsRequest, String segmentLineageEntryId, int socketTimeoutMs,
-      @Nullable AuthProvider authProvider)
+      @Nullable AuthProvider authProvider, boolean forceCleanup)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
