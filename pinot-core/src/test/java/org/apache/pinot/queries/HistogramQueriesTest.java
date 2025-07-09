@@ -28,11 +28,11 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -218,19 +218,21 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = ((GroupByOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
+    IntermediateRecord firstRecord = aggregationGroupByResult.get(0);
+//    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 0)).elements(),
+    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(0)._record.getValues()[1]).elements(),
         new double[]{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [0]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 1)).elements(),
+    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(1)._record.getValues()[1]).elements(),
         new double[]{99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [1-400]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 2)).elements(),
+    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(2)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [401-800]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 3)).elements(),
+    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(3)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0}); // [801-1200]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 4)).elements(),
+    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(4)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0}); // [1201-1600]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.getResultForGroupId(0, 5)).elements(),
+    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(5)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100}); // [1601-2000]
 
     // Inter segment

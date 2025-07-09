@@ -32,12 +32,11 @@ import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
-import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -213,16 +212,17 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(),
         expectedFilteredNumDocs, getExpectedNumEntriesScannedInFilter(), 2 * expectedFilteredNumDocs, NUM_RECORDS);
 
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
+//    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
     assertNotNull(aggregationGroupByResult);
     int numGroups = 0;
-    Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+    Iterator<IntermediateRecord> groupKeyIterator = aggregationGroupByResult.iterator();
     while (groupKeyIterator.hasNext()) {
       numGroups++;
-      GroupKeyGenerator.GroupKey groupKey = groupKeyIterator.next();
-      int key = ((Double) groupKey._keys[0]).intValue();
+      IntermediateRecord record = groupKeyIterator.next();
+      int key = ((Double) record._key.getValues()[0]).intValue();
       assertIntermediateResult(
-            aggregationGroupByResult.getResultForGroupId(0, groupKey._groupId),
+            record._record.getValues()[1],
             expectedResult[key]);
     }
     assertEquals(numGroups, expectedNumGroups);
