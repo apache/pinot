@@ -118,7 +118,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
         // if orderBy groupBy key, stream the result to main thread for merge scheduling
-        if (!_queryContext.isUnsafeTrim()) {
+        if (_queryContext.shouldSortAggregate()) {
           IndexedTable indexedTable =
               GroupByUtils.getAndPopulateLinkedHashMapIndexedTable(resultsBlock, false, _queryContext,
                   _queryContext.getLimit(), _queryContext.getLimit(), Integer.MAX_VALUE, _executorService);
@@ -239,7 +239,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return new ExceptionResultsBlock(errMsg);
     }
     // if is orderby groupby key case, do merge of received sorted indexedTable
-    if (!_queryContext.isUnsafeTrim()) {
+    if (_queryContext.shouldSortAggregate()) {
       // re-use threadpool to merge results pair-wise
       DataSchema dataSchema = null;
       List<LinkedHashMapIndexedTable> tables = new ArrayList<>();

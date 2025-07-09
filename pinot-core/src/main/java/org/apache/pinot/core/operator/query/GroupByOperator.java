@@ -141,12 +141,10 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     //       columns if no ordering is specified.
     int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
     int trimSize = -1;
-    boolean isSafe = false;
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     if (!_queryContext.isUnsafeTrim()) {
       // if orderby key is groupby key, and there's no having clause, keep at most `limit` rows only
       trimSize = _queryContext.getLimit();
-      isSafe = true;
     } else if (orderByExpressions != null && minGroupTrimSize > 0) {
       // max(minSegmentGroupTrimSize, 5 * LIMIT)
       trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
@@ -164,7 +162,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
-      if (isSafe) {
+      if (_queryContext.shouldSortAggregate()) {
         // if orderBy groupBy key, sort the array even if it's smaller than trimSize
         // to benefit combining
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);

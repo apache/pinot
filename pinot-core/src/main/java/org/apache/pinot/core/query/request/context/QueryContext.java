@@ -549,6 +549,11 @@ public class QueryContext {
     return _isUnsafeTrim;
   }
 
+  public boolean shouldSortAggregate() {
+    // TODO: expose this as a queryOption
+    return !isUnsafeTrim() && _limit < 100000;
+  }
+
   public Comparator<Key> getGroupKeyComparator() {
     if (_groupKeyComparator != null) {
       return _groupKeyComparator;
