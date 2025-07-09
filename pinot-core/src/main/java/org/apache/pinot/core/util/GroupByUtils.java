@@ -33,6 +33,7 @@ import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 public final class GroupByUtils {
@@ -222,8 +223,10 @@ public final class GroupByUtils {
     LinkedHashMapIndexedTable indexedTable =
         new LinkedHashMapIndexedTable(block.getDataSchema(), hasFinalInput, queryContext, resultSize, trimSize,
             trimThreshold, executorService, 1, desiredNumMergedBlocks);
+    int mergedKeys = 0;
     for (IntermediateRecord intermediateRecord : block.getIntermediateRecords()) {
       indexedTable.upsert(intermediateRecord._key, intermediateRecord._record);
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
     }
     return indexedTable;
   }

@@ -159,6 +159,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           }
           // if found waiting block, merge and loop
           table = mergeBlocks(table, waitingTable, _comparator, _queryContext);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
         }
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
