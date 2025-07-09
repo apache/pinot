@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
@@ -54,7 +53,7 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId, int docId) {
+  public void add(Object value, int dictId, int docId) {
     try {
       Geometry geometry = GeometrySerializer.deserialize((byte[]) value);
       add(geometry);
@@ -64,7 +63,7 @@ public class MutableH3Index implements H3IndexReader, MutableIndex {
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  public void add(Object[] values, @Nullable int[] dictIds, int docId) {
     throw new UnsupportedOperationException("Mutable H3 indexes are not supported for multi-valued columns");
   }
 

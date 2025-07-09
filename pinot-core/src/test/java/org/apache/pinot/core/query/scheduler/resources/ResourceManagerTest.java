@@ -23,6 +23,7 @@ import java.util.Map;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.Tracing;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -48,7 +49,7 @@ public class ResourceManagerTest {
 
   private ResourceManager getResourceManager(int runners, int workers, final int softLimit, final int hardLimit) {
 
-    return new ResourceManager(getConfig(runners, workers)) {
+    return new ResourceManager(getConfig(runners, workers), new Tracing.DefaultThreadResourceUsageAccountant()) {
 
       @Override
       public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {

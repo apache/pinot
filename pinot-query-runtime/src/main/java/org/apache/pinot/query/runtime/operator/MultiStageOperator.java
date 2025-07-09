@@ -73,9 +73,30 @@ public abstract class MultiStageOperator
 
   public abstract void registerExecution(long time, int numRows);
 
-  // Samples resource usage of the operator. The operator should call this function for every block of data or
-  // assuming the block holds 10000 rows or more.
+  /// This method should be called periodically by the operator to check whether the execution should be interrupted.
+  ///
+  /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
+  /// due to resource constraints.
+  ///
+  /// Normally, callers should call [#sampleAndCheckInterruption(long deadlineMs)] passing the correct deadline, but
+  /// given most operators use either the active or the passive deadline, this method is provided as a convenience
+  /// method. By default, it uses the active deadline, which is the one that should be used for most operators, but
+  /// if the operator does not actively process data (ie both mailbox operators), it should override this method to
+  /// use the passive deadline instead.
+  /// See for example [MailboxSendOperator][org.apache.pinot.query.runtime.operator.MailboxSendOperator]).
   protected void sampleAndCheckInterruption() {
+    sampleAndCheckInterruption(_context.getActiveDeadlineMs());
+  }
+
+  /// This method should be called periodically by the operator to check whether the execution should be interrupted.
+  ///
+  /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
+  /// due to resource constraints.
+  protected void sampleAndCheckInterruption(long deadlineMs) {
+    if (System.currentTimeMillis() >= deadlineMs) {
+      earlyTerminate();
+      throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on " + getExplainName());
+    }
     Tracing.ThreadAccountantOps.sampleMSE();
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       earlyTerminate();
@@ -215,6 +236,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        response.mergeGroupsTrimmed(stats.getBoolean(AggregateOperator.StatKey.GROUPS_TRIMMED));
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
         response.mergeNumGroupsWarningLimitReached(
             stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));

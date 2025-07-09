@@ -964,11 +964,15 @@ public class RealtimeSegmentDataManagerTest {
 
     private void terminateLoopIfNecessary() {
       if (_consumeOffsets.isEmpty() && _responses.isEmpty()) {
-        try {
-          _shouldStop.set(this, true);
-        } catch (Exception e) {
-          Assert.fail();
-        }
+        setShouldStop();
+      }
+    }
+
+    private void setShouldStop() {
+      try {
+        _shouldStop.set(this, true);
+      } catch (Exception e) {
+        Assert.fail();
       }
     }
 
@@ -993,9 +997,7 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
-      SegmentCompletionProtocol.Response response = _responses.remove();
-      terminateLoopIfNecessary();
-      return response;
+      return _responses.remove();
     }
 
     @Override
@@ -1030,17 +1032,20 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected void hold() {
+      terminateLoopIfNecessary();
       _timeSupplier.add(5000L);
     }
 
     @Override
     protected boolean buildSegmentAndReplace() {
+      terminateLoopIfNecessary();
       _buildAndReplaceCalled = true;
       return !_failSegmentBuildAndReplace;
     }
 
     @Override
     protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+      terminateLoopIfNecessary();
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
         try {
@@ -1064,17 +1069,20 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected boolean commitSegment(String controllerVipUrl) {
+      terminateLoopIfNecessary();
       _commitSegmentCalled = true;
       return true;
     }
 
     @Override
     protected void downloadSegmentAndReplace(SegmentZKMetadata metadata) {
+      terminateLoopIfNecessary();
       _downloadAndReplaceCalled = true;
     }
 
     @Override
     public void stop() {
+      setShouldStop();
       _timeSupplier.add(_stopWaitTimeMs);
     }
 

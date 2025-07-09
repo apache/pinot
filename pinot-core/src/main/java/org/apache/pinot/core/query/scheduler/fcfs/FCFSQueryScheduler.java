@@ -29,6 +29,7 @@ import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.QueryScheduler;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
 
@@ -41,8 +42,9 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 public class FCFSQueryScheduler extends QueryScheduler {
 
   public FCFSQueryScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ServerMetrics serverMetrics,
-      LongAccumulator latestQueryTime) {
-    super(config, queryExecutor, new UnboundedResourceManager(config), serverMetrics, latestQueryTime);
+      LongAccumulator latestQueryTime, ThreadResourceUsageAccountant resourceUsageAccountant) {
+    super(config, queryExecutor, new UnboundedResourceManager(config, resourceUsageAccountant), serverMetrics,
+        latestQueryTime);
   }
 
   @Override

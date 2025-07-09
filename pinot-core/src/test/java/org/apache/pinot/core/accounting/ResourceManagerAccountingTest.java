@@ -550,7 +550,7 @@ public class ResourceManagerAccountingTest {
   private ResourceManager getResourceManager(int runners, int workers, final int softLimit, final int hardLimit,
       Map<String, Object> map) {
 
-    return new ResourceManager(getConfig(runners, workers, map)) {
+    return new ResourceManager(getConfig(runners, workers, map), new Tracing.DefaultThreadResourceUsageAccountant()) {
 
       @Override
       public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {

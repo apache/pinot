@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -155,8 +154,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
   /**
    * Validates the schema against the given transformer's configuration.
    */
-  public static void validateSchema(@Nonnull Schema schema,
-      @Nonnull SchemaConformingTransformerConfig transformerConfig) {
+  public static void validateSchema(Schema schema, SchemaConformingTransformerConfig transformerConfig) {
     validateSchemaFieldNames(schema.getPhysicalColumnNames(), transformerConfig);
 
     String indexableExtrasFieldName = transformerConfig.getIndexableExtrasField();
@@ -228,8 +226,8 @@ public class SchemaConformingTransformer implements RecordTransformer {
    *   with an empty sub-key. E.g., the field name "a..b" corresponds to the JSON {"a": {"": {"b": ...}}}</li>
    * </ul>
    */
-  private static SchemaTreeNode validateSchemaAndCreateTree(@Nonnull Schema schema,
-      @Nonnull SchemaConformingTransformerConfig transformerConfig)
+  private static SchemaTreeNode validateSchemaAndCreateTree(Schema schema,
+      SchemaConformingTransformerConfig transformerConfig)
       throws IllegalArgumentException {
     Set<String> schemaFields = schema.getPhysicalColumnNames();
     Map<String, String> jsonKeyPathToColumnNameMap = new HashMap<>();
@@ -266,7 +264,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
   /**
    * @return The field type for the given extras field
    */
-  private static DataType getAndValidateExtrasFieldType(Schema schema, @Nonnull String extrasFieldName) {
+  private static DataType getAndValidateExtrasFieldType(Schema schema, String extrasFieldName) {
     FieldSpec fieldSpec = schema.getFieldSpecFor(extrasFieldName);
     Preconditions.checkState(null != fieldSpec, "Field '%s' doesn't exist in schema", extrasFieldName);
     DataType fieldDataType = fieldSpec.getDataType();
@@ -665,7 +663,6 @@ class SchemaTreeNode {
   // Taking the example of key "x.y.z", the keyName will be "z" and the parentPath will be "x.y"
   // Root node would have keyName as "" and parentPath as null
   // Root node's children will have keyName as the first level key and parentPath as ""
-  @Nonnull
   private final String _keyName;
   @Nullable
   private String _columnName;

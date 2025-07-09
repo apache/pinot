@@ -146,9 +146,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
           + "to table", needsReloadMetadata.size(), failedResponses);
       needsReload = needsReloadMetadata.values().stream().anyMatch(value -> value.get("needReload").booleanValue());
       if (!needsReload && failedResponses > 0) {
-        tableRebalanceLogger.warn(
-            "Received {} failed responses from servers and needsReload is false from returned responses, "
-                + "check needsReload status manually", failedResponses);
+        tableRebalanceLogger.warn("Received {} failed responses from servers and needsReload is false from returned "
+            + "responses, check needsReload status manually", failedResponses);
         needsReload = null;
       }
     } catch (InvalidConfigException | IOException e) {
@@ -204,13 +203,12 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
           }
           if (instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
             return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
-                ? RebalancePreCheckerResult.warn(
-                "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden "
-                    + "with disabled")
+                ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled for CONSUMING segments in table "
+                + "config but it's overridden with disabled")
                 : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
           }
-          return RebalancePreCheckerResult.warn(
-              "minimizeDataMovement is not enabled for CONSUMING segments, but instance assignment is allowed");
+          return RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled for CONSUMING segments, but "
+              + "instance assignment is allowed");
         }
         return RebalancePreCheckerResult.pass("Instance assignment not allowed, no need for minimizeDataMovement");
       }
@@ -234,44 +232,40 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         if (instanceAssignmentConfigCompleted.isMinimizeDataMovement()
             && instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
           return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
-              ? RebalancePreCheckerResult.warn(
-              "minimizeDataMovement is enabled for both COMPLETED and CONSUMING segments in table config but it's "
-                  + "overridden with disabled")
+              ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled for both COMPLETED and CONSUMING "
+              + "segments in table config but it's overridden with disabled")
               : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
-        return RebalancePreCheckerResult.warn(
-            "minimizeDataMovement is not enabled for either or both COMPLETED and CONSUMING segments, but instance "
-                + "assignment is allowed for both");
+        return RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled for either or both COMPLETED and "
+            + "CONSUMING segments, but instance assignment is allowed for both");
       } else if (instanceAssignmentConfigConsuming != null) {
         if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
           return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         if (instanceAssignmentConfigConsuming.isMinimizeDataMovement()) {
           return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
-              ? RebalancePreCheckerResult.warn(
-              "minimizeDataMovement is enabled for CONSUMING segments in table config but it's overridden with "
-                  + "disabled")
+              ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled for CONSUMING segments in table "
+              + "config but it's overridden with disabled")
               : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
-        return RebalancePreCheckerResult.warn(
-            "minimizeDataMovement is not enabled for CONSUMING segments, but instance assignment is allowed");
+        return RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled for CONSUMING segments, but "
+            + "instance assignment is allowed");
       } else {
         if (rebalanceConfig.getMinimizeDataMovement() == Enablement.ENABLE) {
           return RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
         if (instanceAssignmentConfigCompleted.isMinimizeDataMovement()) {
           return rebalanceConfig.getMinimizeDataMovement() == Enablement.DISABLE
-              ? RebalancePreCheckerResult.warn(
-              "minimizeDataMovement is enabled for COMPLETED segments in table config but it's overridden "
-                  + "with disabled")
+              ? RebalancePreCheckerResult.warn("minimizeDataMovement is enabled for COMPLETED segments in table "
+              + "config but it's overridden with disabled")
               : RebalancePreCheckerResult.pass("minimizeDataMovement is enabled");
         }
-        return RebalancePreCheckerResult.warn(
-            "minimizeDataMovement is not enabled for COMPLETED segments, but instance assignment is allowed");
+        return RebalancePreCheckerResult.warn("minimizeDataMovement is not enabled for COMPLETED segments, but "
+            + "instance assignment is allowed");
       }
     } catch (IllegalStateException e) {
-      tableRebalanceLogger.warn(
-          "Error while trying to fetch instance assignment config, assuming minimizeDataMovement is false", e);
+      tableRebalanceLogger.warn("Error while trying to fetch instance assignment config, assuming minimizeDataMovement "
+          + "is false", e);
     }
     return RebalancePreCheckerResult.error("Got exception when fetching instance assignment, check manually");
   }
@@ -307,8 +301,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       if (diskUsage.getTotalSpaceBytes() < 0) {
         return RebalancePreCheckerResult.warn(
             "Disk usage info has not been updated. Try later or set controller.resource.utilization.checker.initial"
-                + ".delay to a"
-                + " shorter period");
+                + ".delay to a shorter period");
       }
 
       Set<String> segmentSet = entry.getValue();
@@ -383,9 +376,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       }
       if (numReplicas == 1) {
         pass = false;
-        warnings.add(
-            "Replication of the table is 1, which is not recommended for pauseless tables as it may cause data loss "
-                + "during rebalance");
+        warnings.add("Replication of the table is 1, which is not recommended for pauseless tables as it may cause "
+            + "data loss during rebalance");
       } else if (rebalanceConfig.isDowntime() || minAvailableReplica <= 0) {
         pass = false;
         warnings.add("Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
@@ -398,8 +390,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
     if (rebalanceConfig.isBootstrap()) {
       pass = false;
-      warnings.add(
-          "bootstrap is enabled which can cause a large amount of data movement, double check if this is intended");
+      warnings.add("bootstrap is enabled which can cause a large amount of data movement, double check if this is "
+          + "intended");
     }
     if (CollectionUtils.isNotEmpty(tableConfig.getTierConfigsList()) && !rebalanceConfig.isUpdateTargetTier()) {
       pass = false;
@@ -448,8 +440,8 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       tierMessage = "\n" + StringUtil.join("\n", tierMessageList.toArray(String[]::new));
     }
     if (hasAnyReplicaGroup && !rebalanceConfig.isReassignInstances()) {
-      return RebalancePreCheckerResult.warn(
-          "reassignInstances is disabled, replica groups may not be updated.\n" + message + tierMessage);
+      return RebalancePreCheckerResult.warn("reassignInstances is disabled, replica groups may not be updated.\n"
+          + message + tierMessage);
     }
     return RebalancePreCheckerResult.pass(message + tierMessage);
   }
@@ -474,8 +466,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       return "numReplicaGroups: " + numReplicaGroups
           + ", numInstancesPerReplicaGroup: 0 (using as many instances as possible)";
     }
-    return "numReplicaGroups: " + numReplicaGroups
-        + ", numInstancesPerReplicaGroup: " + numInstancePerReplicaGroup;
+    return "numReplicaGroups: " + numReplicaGroups + ", numInstancesPerReplicaGroup: " + numInstancePerReplicaGroup;
   }
 
   private DiskUsageInfo getDiskUsageInfoOfInstance(String instanceId) {

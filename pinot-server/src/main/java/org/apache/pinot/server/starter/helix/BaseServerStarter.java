@@ -663,18 +663,24 @@ public abstract class BaseServerStarter implements ServiceStartable {
               segmentDownloadThrottler, segmentMultiColTextIndexPreprocessThrottler);
     }
 
-    SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
-    ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-        sendStatsPredicate);
-    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
-
-    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
     // initialize the thread accountant for query killing
     Tracing.ThreadAccountantOps.initializeThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+    if (Tracing.getThreadAccountant().getClusterConfigChangeListener() != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+          Tracing.getThreadAccountant().getClusterConfigChangeListener());
+    }
+
+    SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
+    ServerConf serverConf = new ServerConf(_serverConf);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
+        sendStatsPredicate, Tracing.getThreadAccountant());
+    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
+
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);

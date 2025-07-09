@@ -21,6 +21,7 @@ package org.apache.pinot.spi.accounting;
 import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 
 
 public interface ThreadResourceUsageAccountant {
@@ -83,6 +84,10 @@ public interface ThreadResourceUsageAccountant {
    */
   void sampleUsageMSE();
 
+  default boolean throttleQuerySubmission() {
+    return false;
+  }
+
   /**
    * special interface to aggregate usage to the stats store only once, it is used for response
    * ser/de threads where the thread execution context cannot be setup before hands as
@@ -97,6 +102,11 @@ public interface ThreadResourceUsageAccountant {
    * start the periodical task
    */
   void startWatcherTask();
+
+  @Nullable
+  default PinotClusterConfigChangeListener getClusterConfigChangeListener() {
+    return null;
+  }
 
   /**
    * get error status if the query is preempted
