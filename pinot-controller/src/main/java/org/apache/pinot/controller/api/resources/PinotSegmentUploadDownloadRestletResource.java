@@ -1008,8 +1008,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
       @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
-      @ApiParam(value = "Trigger cleanup immediately") @QueryParam("forceCleanup") @DefaultValue("false")
-      boolean forceCleanup,
+      @ApiParam(value = "Trigger an immediate segment prune") @QueryParam("prune") @DefaultValue("false")
+      boolean pruneSegments,
       @ApiParam(value = "Fields belonging to end replace segment request")
       EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -1025,7 +1025,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
       _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
           endReplaceSegmentsRequest);
-      if (forceCleanup) {
+      if (pruneSegments) {
         _pinotHelixResourceManager.invokeControllerPeriodicTask(tableNameWithType, RetentionManager.TASK_NAME, null);
       }
       return Response.ok().build();

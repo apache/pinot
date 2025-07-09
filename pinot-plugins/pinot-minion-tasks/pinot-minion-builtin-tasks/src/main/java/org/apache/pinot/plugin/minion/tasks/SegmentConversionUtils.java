@@ -224,7 +224,7 @@ public class SegmentConversionUtils {
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       URI uri = FileUploadDownloadClient.getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(),
-          segmentLineageEntryId);
+          segmentLineageEntryId, forceCleanup);
       SimpleHttpResponse response =
           fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs, endReplaceSegmentsRequest, authProvider);
       LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURL: {}, request:"
