@@ -32,6 +32,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -129,6 +130,7 @@ public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
   private static final String TENANT_NAME = "tenantName";
   private static final String TABLES = "tables";
+  public static final String TABLES_WITH_PROPERTIES = "tablesWithProperties";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -397,7 +399,7 @@ public class PinotTenantRestletResource {
   private String getTablesServedFromServerTenant(String tenantName, @Nullable String database,
       boolean withTableProperties) {
     Set<String> tables = new HashSet<>();
-    Set<TenantTableWithProperties> tablePropertiesMap = withTableProperties ? new HashSet<>() : null;
+    Map<String, TenantTableWithProperties> tablePropertiesMap = withTableProperties ? new HashMap<>() : null;
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
     for (String tableNameWithType : _pinotHelixResourceManager.getAllTables(database)) {
@@ -417,14 +419,14 @@ public class PinotTenantRestletResource {
           }
           TenantTableWithProperties tableWithProperties = new TenantTableWithProperties(tableConfig,
               idealState.getRecord().getMapFields(), _tableSizeReader);
-          tablePropertiesMap.add(tableWithProperties);
+          tablePropertiesMap.put(tableConfig.getTableName(), tableWithProperties);
         }
       }
     }
 
     resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
     if (withTableProperties) {
-      resourceGetRet.set("tablesWithProperties", JsonUtils.objectToJsonNode(tablePropertiesMap));
+      resourceGetRet.set(TABLES_WITH_PROPERTIES, JsonUtils.objectToJsonNode(tablePropertiesMap.values()));
     }
     return resourceGetRet.toString();
   }

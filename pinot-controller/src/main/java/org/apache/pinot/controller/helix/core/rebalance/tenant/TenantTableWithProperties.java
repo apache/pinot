@@ -41,14 +41,22 @@ public class TenantTableWithProperties {
   // Basic table identification
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantTableWithProperties.class);
 
-  private String _tableNameWithType;
-  private TableType _tableType;
-  private boolean _isDimTable;
-  private int _replication;
-  private int _totalSegments;
-  private long _estimatedTableSizeInBytes;
-  private boolean _isUpsertEnabled;
-  private boolean _isDedupEnabled;
+  @JsonProperty("tableNameWithType")
+  private final String _tableNameWithType;
+  @JsonProperty("tableType")
+  private final TableType _tableType;
+  @JsonProperty("isDimTable")
+  private final boolean _isDimTable;
+  @JsonProperty("replication")
+  private final int _replication;
+  @JsonProperty("totalSegments")
+  private final int _totalSegments;
+  @JsonProperty("estimatedTableSizeInBytes")
+  private final long _estimatedTableSizeInBytes;
+  @JsonProperty("isUpsertEnabled")
+  private final boolean _isUpsertEnabled;
+  @JsonProperty("isDedupEnabled")
+  private final boolean _isDedupEnabled;
 
   private static final int TABLE_SIZE_READER_TIMEOUT_MS = 10000; // 10 seconds
 
@@ -74,92 +82,22 @@ public class TenantTableWithProperties {
 
   public TenantTableWithProperties(TableConfig tableConfig, Map<String, Map<String, String>> idealStateInstanceStateMap,
       TableSizeReader tableSizeReader) {
+    long estimatedTableSizeInBytes;
     _tableNameWithType = tableConfig.getTableName();
     _tableType = tableConfig.getTableType();
     _isDimTable = tableConfig.isDimTable();
-    _replication = Integer.MAX_VALUE;
-    for (Map<String, String> instanceState : idealStateInstanceStateMap.values()) {
-      _replication = Math.min(instanceState.size(), _replication);
-    }
-    if (_replication == Integer.MAX_VALUE) {
-      _replication = 0; // No instances available
-    }
+    _replication = tableConfig.getReplication();
+    _totalSegments = idealStateInstanceStateMap.size();
     try {
-      _totalSegments = idealStateInstanceStateMap.size();
       TableSizeReader.TableSubTypeSizeDetails sizeDetails =
           tableSizeReader.getTableSubtypeSize(_tableNameWithType, TABLE_SIZE_READER_TIMEOUT_MS, false);
-      _estimatedTableSizeInBytes = sizeDetails._estimatedSizeInBytes;
+      estimatedTableSizeInBytes = sizeDetails._estimatedSizeInBytes;
     } catch (InvalidConfigException e) {
       LOGGER.warn("Failed to read table size for table: {}", _tableNameWithType, e);
-      _estimatedTableSizeInBytes = -1; // Indicate failure to read size
+      estimatedTableSizeInBytes = -1; // Indicate failure to read size
     }
+    _estimatedTableSizeInBytes = estimatedTableSizeInBytes;
     _isUpsertEnabled = tableConfig.isUpsertEnabled();
     _isDedupEnabled = tableConfig.isDedupEnabled();
-  }
-
-  // Basic table identification getters/setters
-  public String getTableNameWithType() {
-    return _tableNameWithType;
-  }
-
-  public void setTableNameWithType(String tableNameWithType) {
-    _tableNameWithType = tableNameWithType;
-  }
-
-  public TableType getTableType() {
-    return _tableType;
-  }
-
-  public void setTableType(TableType tableType) {
-    _tableType = tableType;
-  }
-
-  public boolean isDimTable() {
-    return _isDimTable;
-  }
-
-  public void setDimTable(boolean dimTable) {
-    _isDimTable = dimTable;
-  }
-
-  // Rebalance impact indicators getters/setters
-  public int getReplication() {
-    return _replication;
-  }
-
-  public void setReplication(int replication) {
-    _replication = replication;
-  }
-
-  public int getTotalSegments() {
-    return _totalSegments;
-  }
-
-  public void setTotalSegments(int totalSegments) {
-    _totalSegments = totalSegments;
-  }
-
-  public long getEstimatedTableSizeInBytes() {
-    return _estimatedTableSizeInBytes;
-  }
-
-  public void setEstimatedTableSizeInBytes(long estimatedTableSizeInBytes) {
-    _estimatedTableSizeInBytes = estimatedTableSizeInBytes;
-  }
-
-  public boolean isUpsertEnabled() {
-    return _isUpsertEnabled;
-  }
-
-  public void setUpsertEnabled(boolean upsertEnabled) {
-    _isUpsertEnabled = upsertEnabled;
-  }
-
-  public boolean isDedupEnabled() {
-    return _isDedupEnabled;
-  }
-
-  public void setDedupEnabled(boolean dedupEnabled) {
-    _isDedupEnabled = dedupEnabled;
   }
 }
