@@ -52,7 +52,7 @@ public class ServerRateLimitConfigChangeListenerTest {
     double initialRate = serverRateLimiter.getRate();
     assertEquals(initialRate, 5.0, DELTA);
 
-    // Simulate config change
+    // Simulate config change for server rate limiter
     Map<String, String> newConfig = new HashMap<>();
     newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "300.0");
     ServerRateLimitConfigChangeListener listener = new ServerRateLimitConfigChangeListener(MOCK_SERVER_METRICS);
@@ -66,6 +66,34 @@ public class ServerRateLimitConfigChangeListenerTest {
 
     double updatedRate = getServerRateLimiter().getRate();
     assertEquals(updatedRate, 300.0, DELTA);
+
+    // Simulate config change for server rate limiter per core
+    newConfig = new HashMap<>();
+    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE, "2.0");
+    changedConfigSet = new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE));
+    listener.onChange(changedConfigSet, newConfig);
+
+    // Verify that old rate remains same and the new rate is applied
+    rate = updatedRate;
+    assertEquals(rate, 300.0, DELTA);
+
+    updatedRate = getServerRateLimiter().getRate();
+    assertEquals(updatedRate, Math.max(1, Runtime.getRuntime().availableProcessors()) * 2.0, DELTA);
+
+    // Simulate config change for both server rate limiter per core and whole server level rate limiter config
+    newConfig = new HashMap<>();
+    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE, "12.0");
+    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "400000.0");
+    changedConfigSet = new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_PER_CORE));
+    changedConfigSet.add(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT);
+    listener.onChange(changedConfigSet, newConfig);
+
+    // Verify that old rate remains same and the new rate is applied
+    rate = updatedRate;
+    assertEquals(rate, Math.max(1, Runtime.getRuntime().availableProcessors()) * 2.0, DELTA);
+
+    updatedRate = getServerRateLimiter().getRate();
+    assertEquals(updatedRate, 400000, DELTA);
   }
 
   private RealtimeConsumptionRateManager.RateLimiterImpl getServerRateLimiter() {
