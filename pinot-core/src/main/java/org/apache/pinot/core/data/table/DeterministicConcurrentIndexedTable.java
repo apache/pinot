@@ -52,4 +52,24 @@ public class DeterministicConcurrentIndexedTable extends IndexedTable {
       map.pollLastEntry(); // evict the largest key after insertion
     }
   }
+
+  /**
+   * Adds a record with new key or updates a record with existing key.
+   * NOTE: {@code compute} method of {@code ConcurrentSkipListMap} is not atomic, thus it's not used
+   */
+  @Override
+  protected void addOrUpdateRecord(Key key, Record newRecord) {
+    Record existingRecord = _lookupMap.putIfAbsent(key, newRecord);
+    if (existingRecord == null) {
+      // if no key was associated
+      return;
+    }
+    while (true) {
+      Record oldRecord = _lookupMap.get(key);
+      Record updatedRecord = updateRecord(oldRecord.copy(), newRecord);
+      if (_lookupMap.replace(key, oldRecord, updatedRecord)) {
+        return;
+      }
+    }
+  }
 }
