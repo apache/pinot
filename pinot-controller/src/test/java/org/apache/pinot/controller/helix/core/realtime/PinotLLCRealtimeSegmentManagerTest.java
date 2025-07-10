@@ -1367,7 +1367,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   public void testGetPartitionIds()
       throws Exception {
     List<StreamConfig> streamConfigs = List.of(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs());
-    IdealState idealState = new IdealState("table");
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
     FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
     segmentManager._numPartitions = 2;
 

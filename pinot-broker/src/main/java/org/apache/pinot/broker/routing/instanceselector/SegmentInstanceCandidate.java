@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.annotations.VisibleForTesting;
 import javax.annotation.concurrent.Immutable;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
 
 /**
@@ -28,10 +31,20 @@ import javax.annotation.concurrent.Immutable;
 public class SegmentInstanceCandidate {
   private final String _instance;
   private final boolean _online;
+  private final int _pool;
 
+  @VisibleForTesting
   public SegmentInstanceCandidate(String instance, boolean online) {
     _instance = instance;
     _online = online;
+    // no group
+    _pool = FALLBACK_POOL_ID;
+  }
+
+  public SegmentInstanceCandidate(String instance, boolean online, int pool) {
+    _instance = instance;
+    _online = online;
+    _pool = pool;
   }
 
   public String getInstance() {
@@ -40,5 +53,9 @@ public class SegmentInstanceCandidate {
 
   public boolean isOnline() {
     return _online;
+  }
+
+  public int getPool() {
+    return _pool;
   }
 }

@@ -201,4 +201,10 @@ public interface InstanceDataManager {
    * Returns the instance data directory
    */
   String getInstanceDataDir();
+
+  /**
+   * Returns the logical table config and schema for the given logical table name.
+   */
+  @Nullable
+  LogicalTableContext getLogicalTableContext(String logicalTableName);
 }

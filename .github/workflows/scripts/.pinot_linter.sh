@@ -30,4 +30,4 @@ mvn -B -ntp -T1C license:check || exit 1
 mvn -B -ntp -T1C checkstyle:check || exit 1
 mvn -B -ntp -T1C spotless:check || exit 1
 mvn -B -ntp -T1C enforcer:enforce || exit 1
-
+mvn -B -ntp -T1C enforcer:enforce -Pdependency-verifier || exit 1

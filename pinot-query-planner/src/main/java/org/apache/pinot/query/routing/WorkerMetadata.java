@@ -43,6 +43,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  */
 public class WorkerMetadata {
   public static final String TABLE_SEGMENTS_MAP_KEY = "tableSegmentsMap";
+  public static final String LOGICAL_TABLE_SEGMENTS_MAP_KEY = "logicalTableSegmentsMap";
 
   private final int _workerId;
   private final Map<Integer, MailboxInfos> _mailboxInfosMap;
@@ -75,13 +76,17 @@ public class WorkerMetadata {
 
   @Nullable
   public Map<String, List<String>> getTableSegmentsMap() {
-    String tableSegmentsMapStr = _customProperties.get(TABLE_SEGMENTS_MAP_KEY);
+    return deserializeStringSegmentListMap(TABLE_SEGMENTS_MAP_KEY);
+  }
+
+  private Map<String, List<String>> deserializeStringSegmentListMap(String propertyKey) {
+    String tableSegmentsMapStr = _customProperties.get(propertyKey);
     if (tableSegmentsMapStr != null) {
       try {
         return JsonUtils.stringToObject(tableSegmentsMapStr, new TypeReference<Map<String, List<String>>>() {
         });
       } catch (IOException e) {
-        throw new RuntimeException("Unable to deserialize table segments map: " + tableSegmentsMapStr, e);
+        throw new RuntimeException("Unable to deserialize " + propertyKey + " : " + tableSegmentsMapStr, e);
       }
     } else {
       return null;
@@ -89,7 +94,8 @@ public class WorkerMetadata {
   }
 
   public boolean isLeafStageWorker() {
-    return _customProperties.containsKey(TABLE_SEGMENTS_MAP_KEY);
+    return _customProperties.containsKey(TABLE_SEGMENTS_MAP_KEY)
+        || _customProperties.containsKey(LOGICAL_TABLE_SEGMENTS_MAP_KEY);
   }
 
   public void setTableSegmentsMap(Map<String, List<String>> tableSegmentsMap) {
@@ -100,5 +106,20 @@ public class WorkerMetadata {
       throw new RuntimeException("Unable to serialize table segments map: " + tableSegmentsMap, e);
     }
     _customProperties.put(TABLE_SEGMENTS_MAP_KEY, tableSegmentsMapStr);
+  }
+
+  @Nullable
+  public Map<String, List<String>> getLogicalTableSegmentsMap() {
+    return deserializeStringSegmentListMap(LOGICAL_TABLE_SEGMENTS_MAP_KEY);
+  }
+
+  public void setLogicalTableSegmentsMap(Map<String, List<String>> logicalTableSegmentsMap) {
+    String logicalTableSegmentsMapStr;
+    try {
+      logicalTableSegmentsMapStr = JsonUtils.objectToString(logicalTableSegmentsMap);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Unable to serialize table segments map: " + logicalTableSegmentsMap, e);
+    }
+    _customProperties.put(LOGICAL_TABLE_SEGMENTS_MAP_KEY, logicalTableSegmentsMapStr);
   }
 }

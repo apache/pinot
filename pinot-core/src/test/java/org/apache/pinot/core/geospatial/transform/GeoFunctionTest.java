@@ -142,13 +142,10 @@ public abstract class GeoFunctionTest {
     }
     Schema schema = sb.build();
     for (int i = 0; i < length; i++) {
-
-      Map<String, Object> map = new HashMap<>();
-      for (Column column : columns) {
-        map.put(column._name, column._values[i]);
-      }
       GenericRow row = new GenericRow();
-      row.init(map);
+      for (Column column : columns) {
+        row.putValue(column._name, column._values[i]);
+      }
       rows.add(row);
     }
 

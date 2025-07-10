@@ -31,7 +31,7 @@ import java.util.Set;
 import javax.net.ssl.SSLPeerUnverifiedException;
 import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.server.access.AccessControlFactory;
-import org.apache.pinot.server.access.RequesterIdentity;
+import org.apache.pinot.spi.auth.server.RequesterIdentity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

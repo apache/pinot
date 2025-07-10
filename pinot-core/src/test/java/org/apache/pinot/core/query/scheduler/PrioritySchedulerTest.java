@@ -52,6 +52,7 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.trace.Tracing;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
@@ -241,7 +242,7 @@ public class PrioritySchedulerTest {
     }
 
     public static TestPriorityScheduler create(PinotConfiguration config) {
-      ResourceManager rm = new PolicyBasedResourceManager(config);
+      ResourceManager rm = new PolicyBasedResourceManager(config, new Tracing.DefaultThreadResourceUsageAccountant());
       QueryExecutor qe = new TestQueryExecutor();
       _groupFactory = new TestSchedulerGroupFactory();
       MultiLevelPriorityQueue queue =

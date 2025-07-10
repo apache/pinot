@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -27,11 +28,11 @@ import java.util.Random;
 import java.util.TreeMap;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,20 +71,15 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
   @Override
   public List<String> assignSegment(String segmentName, Map<String, Map<String, String>> currentAssignment,
       InstancePartitions instancePartitions, InstancePartitionsType instancePartitionsType) {
-    int numPartitions = instancePartitions.getNumPartitions();
     checkReplication(instancePartitions, _replication, _tableName);
+    int numPartitions = instancePartitions.getNumPartitions();
     int partitionId;
-    if (_partitionColumn == null || numPartitions == 1) {
+    if (numPartitions == 1) {
       partitionId = 0;
     } else {
-      // Uniformly spray the segment partitions over the instance partitions
-      if (_tableConfig.getTableType() == TableType.OFFLINE) {
-        partitionId = SegmentAssignmentUtils
-            .getOfflineSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn) % numPartitions;
-      } else {
-        partitionId = SegmentAssignmentUtils
-            .getRealtimeSegmentPartitionId(segmentName, _tableName, _helixManager, _partitionColumn) % numPartitions;
-      }
+      partitionId =
+          SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn)
+              % numPartitions;
     }
     return SegmentAssignmentUtils.assignSegmentWithReplicaGroup(currentAssignment, instancePartitions, partitionId);
   }
@@ -96,7 +92,7 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
 
     checkReplication(instancePartitions, _replication, _tableName);
 
-    if (_partitionColumn == null || numPartitions == 1) {
+    if (numPartitions == 1) {
       // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added
       //       servers, which might cause hotspot servers because queries tend to hit the new segments. Use the
       //       table name hash as the random seed for the shuffle so that the result is deterministic.
@@ -108,15 +104,12 @@ class ReplicaGroupSegmentAssignmentStrategy implements SegmentAssignmentStrategy
           .rebalanceReplicaGroupBasedPartition(currentAssignment, instancePartitions, 0, segments, newAssignment);
       return newAssignment;
     } else {
-      Map<Integer, List<String>> instancePartitionIdToSegmentsMap;
-      if (_tableConfig.getTableType() == TableType.OFFLINE) {
-        instancePartitionIdToSegmentsMap = SegmentAssignmentUtils
-            .getOfflineInstancePartitionIdToSegmentsMap(currentAssignment.keySet(),
-                instancePartitions.getNumPartitions(), _tableName, _helixManager, _partitionColumn);
-      } else {
-        instancePartitionIdToSegmentsMap = SegmentAssignmentUtils
-            .getRealtimeInstancePartitionIdToSegmentsMap(currentAssignment.keySet(),
-                instancePartitions.getNumPartitions(), _tableName, _helixManager, _partitionColumn);
+      Map<Integer, List<String>> instancePartitionIdToSegmentsMap = Maps.newHashMapWithExpectedSize(numPartitions);
+      for (String segmentName : currentAssignment.keySet()) {
+        int instancePartitionId =
+            SegmentUtils.getSegmentPartitionIdOrDefault(segmentName, _tableName, _helixManager, _partitionColumn)
+                % numPartitions;
+        instancePartitionIdToSegmentsMap.computeIfAbsent(instancePartitionId, k -> new ArrayList<>()).add(segmentName);
       }
 
       // NOTE: Shuffle the segments within the current assignment to avoid moving only new segments to the new added

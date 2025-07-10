@@ -30,10 +30,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  */
 public interface JsonIndexReader extends IndexReader {
 
-  /**
-   * Returns the matching document ids for the given filter.
-   */
   MutableRoaringBitmap getMatchingDocIds(String filterString);
+
+  /**
+   * Returns the matching document ids for the given filter Context.
+   */
+  MutableRoaringBitmap getMatchingDocIds(Object filterCtx);
 
   /**
    * Returns the matching document ids for the given filter.

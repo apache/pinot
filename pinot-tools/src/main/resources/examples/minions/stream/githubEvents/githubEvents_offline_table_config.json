@@ -5,7 +5,6 @@
     "timeColumnName": "created_at_timestamp",
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "githubEvents",
     "replication": "1"
   },
   "tenants": {

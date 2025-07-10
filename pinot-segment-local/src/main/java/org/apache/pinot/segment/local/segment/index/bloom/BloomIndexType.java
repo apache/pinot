@@ -19,6 +19,7 @@
 
 package org.apache.pinot.segment.local.segment.index.bloom;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +45,8 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.BloomFilterConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -67,20 +70,30 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
   }
 
   @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    BloomFilterConfig bloomFilterConfig = indexConfigs.getConfig(StandardIndexes.bloomFilter());
+    if (bloomFilterConfig.isEnabled()) {
+      DataType dataType = fieldSpec.getDataType();
+      Preconditions.checkState(dataType != DataType.BOOLEAN, "Cannot create bloom filter on BOOLEAN column: %s",
+          fieldSpec.getName());
+      Preconditions.checkState(dataType != DataType.MAP, "Cannot create bloom filter on MAP column: %s",
+          fieldSpec.getName());
+    }
+  }
+
+  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
 
   @Override
-  public ColumnConfigDeserializer<BloomFilterConfig> createDeserializer() {
-    ColumnConfigDeserializer<BloomFilterConfig> fromIndexes =
-        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+  protected ColumnConfigDeserializer<BloomFilterConfig> createDeserializerForLegacyConfigs() {
     ColumnConfigDeserializer<BloomFilterConfig> fromBloomFilterConfigs =
         IndexConfigDeserializer.fromMap(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterConfigs());
     ColumnConfigDeserializer<BloomFilterConfig> fromBloomFilterColumns =
         IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getBloomFilterColumns(),
             (accum, column) -> accum.put(column, BloomFilterConfig.DEFAULT));
-    return fromIndexes.withExclusiveAlternative(fromBloomFilterConfigs.withFallbackAlternative(fromBloomFilterColumns));
+    return fromBloomFilterConfigs.withFallbackAlternative(fromBloomFilterColumns);
   }
 
   @Override
@@ -104,8 +117,8 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new BloomFilterHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new BloomFilterHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
   @Override

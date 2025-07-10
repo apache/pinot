@@ -114,7 +114,6 @@ For this command above you'll need the following configuration files:
   "tableName": "tpch_lineitem",
   "segmentsConfig" : {
     "replication" : "1",
-    "schemaName" : "tpch_lineitem",
     "segmentAssignmentStrategy" : "BalanceNumSegmentAssignmentStrategy"
   },
   "tenants" : {

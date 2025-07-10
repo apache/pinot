@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.datablock;
 
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 
@@ -27,7 +26,6 @@ import org.apache.pinot.segment.spi.memory.DataBuffer;
  * Wrapper for row-wise data table. It stores data in row-major format.
  */
 public class RowDataBlock extends BaseDataBlock {
-  private static final int VERSION = 2;
   protected int[] _columnOffsets;
   protected int _rowSizeInBytes;
   private int _fixDataSize;
@@ -69,12 +67,6 @@ public class RowDataBlock extends BaseDataBlock {
   @Override
   public Type getDataBlockType() {
     return Type.ROW;
-  }
-
-  @Nonnull // the method is override just to override its nullability annotation
-  @Override
-  public DataSchema getDataSchema() {
-    return super.getDataSchema();
   }
 
 // TODO: add whole-row access methods.

@@ -112,13 +112,13 @@ public class AggregationPlanNode implements PlanNode {
     boolean hasNullValues = _queryContext.isNullHandlingEnabled() && hasNullValues(aggregationFunctions);
     if (!hasNullValues) {
       // Priority 2: Check if non-scan based aggregation is feasible
-      if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan(aggregationFunctions, _indexSegment)) {
+      if (filterOperator.isResultMatchingAll() && isFitForNonScanBasedPlan()) {
         DataSource[] dataSources = new DataSource[aggregationFunctions.length];
         for (int i = 0; i < aggregationFunctions.length; i++) {
           List<?> inputExpressions = aggregationFunctions[i].getInputExpressions();
           if (!inputExpressions.isEmpty()) {
             String column = ((ExpressionContext) inputExpressions.get(0)).getIdentifier();
-            dataSources[i] = _indexSegment.getDataSource(column);
+            dataSources[i] = _indexSegment.getDataSource(column, _queryContext.getSchema());
           }
         }
         return new NonScanBasedAggregationOperator(_queryContext, dataSources, numTotalDocs);
@@ -148,7 +148,7 @@ public class AggregationPlanNode implements PlanNode {
       for (ExpressionContext argument : aggregationFunction.getInputExpressions()) {
         switch (argument.getType()) {
           case IDENTIFIER:
-            DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier());
+            DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier(), _queryContext.getSchema());
             NullValueVectorReader nullValueVector = dataSource.getNullValueVector();
             if (nullValueVector != null && !nullValueVector.getNullBitmap().isEmpty()) {
               return true;
@@ -172,8 +172,9 @@ public class AggregationPlanNode implements PlanNode {
    * Returns {@code true} if the given aggregations can be solved with dictionary or column metadata, {@code false}
    * otherwise.
    */
-  private static boolean isFitForNonScanBasedPlan(AggregationFunction[] aggregationFunctions,
-      IndexSegment indexSegment) {
+  private boolean isFitForNonScanBasedPlan() {
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    assert aggregationFunctions != null;
     for (AggregationFunction<?, ?> aggregationFunction : aggregationFunctions) {
       if (aggregationFunction.getType() == COUNT) {
         continue;
@@ -182,7 +183,7 @@ public class AggregationPlanNode implements PlanNode {
       if (argument.getType() != ExpressionContext.Type.IDENTIFIER) {
         return false;
       }
-      DataSource dataSource = indexSegment.getDataSource(argument.getIdentifier());
+      DataSource dataSource = _indexSegment.getDataSource(argument.getIdentifier(), _queryContext.getSchema());
       if (DICTIONARY_BASED_FUNCTIONS.contains(aggregationFunction.getType())) {
         if (dataSource.getDictionary() != null) {
           continue;

@@ -37,6 +37,7 @@ import org.apache.pinot.sql.FilterKind;
  *
  * NOTE: This optimizer follows the {@link FlattenAndOrFilterOptimizer}, so all the AND/OR filters are already
  *       flattened.
+ * NOTE: This optimizer does not optimize TEXT_MATCH expressions that have options (third parameter)
  */
 public class TextMatchFilterOptimizer implements FilterOptimizer {
   private static final String SPACE = " ";
@@ -75,8 +76,13 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
         String childOperator = childFunction.getOperator();
         if (childOperator.equals(FilterKind.TEXT_MATCH.name())) {
           List<Expression> operands = childFunction.getOperands();
-          Expression identifier = operands.get(0);
-          textMatchMap.computeIfAbsent(identifier, k -> new ArrayList<>()).add(child);
+          // Don't optimize TEXT_MATCH expressions that have options (third parameter)
+          if (hasTextMatchOptions(operands)) {
+            newChildren.add(child);
+          } else {
+            Expression identifier = operands.get(0);
+            textMatchMap.computeIfAbsent(identifier, k -> new ArrayList<>()).add(child);
+          }
         } else if (childOperator.equals(FilterKind.NOT.name())) {
           assert childFunction.getOperands().size() == 1;
           Expression operand = childFunction.getOperands().get(0);
@@ -87,8 +93,13 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
           }
           if (notChildFunction.getOperator().equals(FilterKind.TEXT_MATCH.name())) {
             List<Expression> operands = notChildFunction.getOperands();
-            Expression identifier = operands.get(0);
-            textMatchMap.computeIfAbsent(identifier, k -> new ArrayList<>()).add(child);
+            // Don't optimize TEXT_MATCH expressions that have options (third parameter)
+            if (hasTextMatchOptions(operands)) {
+              newChildren.add(child);
+            } else {
+              Expression identifier = operands.get(0);
+              textMatchMap.computeIfAbsent(identifier, k -> new ArrayList<>()).add(child);
+            }
             continue;
           }
           newChildren.add(child);
@@ -118,10 +129,16 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
       Map<Expression, List<Expression>> textMatchMap) {
     // for each key in textMatchMap, build a TEXT_MATCH expression (merge list of filters)
     for (Map.Entry<Expression, List<Expression>> entry : textMatchMap.entrySet()) {
+      List<Expression> expressions = entry.getValue();
+      // If only one TEXT_MATCH for this column, add it as-is
+      if (expressions.size() == 1) {
+        newChildren.add(expressions.get(0));
+        continue;
+      }
       // special case: if all expressions are NOT, then wrap the merged text match inside a NOT. otherwise, push the
       // NOT down into the text match expression
       boolean allNot = true;
-      for (Expression expression : entry.getValue()) {
+      for (Expression expression : expressions) {
         if (!expression.getFunctionCall().getOperator().equals(FilterKind.NOT.name())) {
           allNot = false;
           break;
@@ -130,13 +147,13 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
 
       List<String> literals = new ArrayList<>();
       if (allNot) {
-        for (Expression expression : entry.getValue()) {
+        for (Expression expression : expressions) {
           Expression operand = expression.getFunctionCall().getOperands().get(0);
           literals.add(
               wrapWithParentheses(operand.getFunctionCall().getOperands().get(1).getLiteral().getStringValue()));
         }
       } else {
-        for (Expression expression : entry.getValue()) {
+        for (Expression expression : expressions) {
           if (expression.getFunctionCall().getOperator().equals(FilterKind.NOT.name())) {
             Expression operand = expression.getFunctionCall().getOperands().get(0);
 
@@ -189,5 +206,9 @@ public class TextMatchFilterOptimizer implements FilterOptimizer {
 
   private String wrapWithParentheses(String expression) {
     return "(" + expression + ")";
+  }
+
+  private boolean hasTextMatchOptions(List<Expression> operands) {
+    return operands.size() > 2;
   }
 }

@@ -26,17 +26,21 @@ public class KeySelectorFactory {
   }
 
   public static KeySelector<?> getKeySelector(List<Integer> keyIds) {
+    return getKeySelector(keyIds, KeySelector.DEFAULT_HASH_ALGORITHM);
+  }
+
+  public static KeySelector<?> getKeySelector(List<Integer> keyIds, String hashFunction) {
     int numKeys = keyIds.size();
     if (numKeys == 0) {
-      return EmptyKeySelector.INSTANCE;
+      return EmptyKeySelector.getInstance(hashFunction);
     } else if (numKeys == 1) {
-      return new SingleColumnKeySelector(keyIds.get(0));
+      return new SingleColumnKeySelector(keyIds.get(0), hashFunction);
     } else {
       int[] ids = new int[numKeys];
       for (int i = 0; i < numKeys; i++) {
         ids[i] = keyIds.get(i);
       }
-      return new MultiColumnKeySelector(ids);
+      return new MultiColumnKeySelector(ids, hashFunction);
     }
   }
 }

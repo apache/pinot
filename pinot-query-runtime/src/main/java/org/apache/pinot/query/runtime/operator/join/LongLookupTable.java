@@ -29,16 +29,16 @@ import javax.annotation.Nullable;
  * The {@code LongLookupTable} is a lookup table for long keys.
  */
 @SuppressWarnings("unchecked")
-public class LongLookupTable extends LookupTable {
+public class LongLookupTable extends PrimitiveLookupTable {
   private final Long2ObjectOpenHashMap<Object> _lookupTable = new Long2ObjectOpenHashMap<>(INITIAL_CAPACITY);
 
   @Override
-  public void addRow(Object key, Object[] row) {
+  public void addRowNotNullKey(Object key, Object[] row) {
     _lookupTable.compute((long) key, (k, v) -> computeNewValue(row, v));
   }
 
   @Override
-  public void finish() {
+  public void finishNotNullKey() {
     if (!_keysUnique) {
       for (Long2ObjectMap.Entry<Object> entry : _lookupTable.long2ObjectEntrySet()) {
         convertValueToList(entry);
@@ -47,19 +47,19 @@ public class LongLookupTable extends LookupTable {
   }
 
   @Override
-  public boolean containsKey(Object key) {
+  public boolean containsNotNullKey(Object key) {
     return _lookupTable.containsKey((long) key);
   }
 
   @Nullable
   @Override
-  public Object lookup(Object key) {
+  public Object lookupNotNullKey(Object key) {
     return _lookupTable.get((long) key);
   }
 
   @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> entrySet() {
+  public Set<Map.Entry<Object, Object>> notNullKeyEntrySet() {
     return (Set) _lookupTable.long2ObjectEntrySet();
   }
 }

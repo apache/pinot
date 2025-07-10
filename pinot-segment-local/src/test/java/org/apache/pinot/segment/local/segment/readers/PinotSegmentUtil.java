@@ -21,10 +21,8 @@ package org.apache.pinot.segment.local.segment.readers;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -46,29 +44,21 @@ import org.apache.pinot.spi.utils.TimeUtils;
  * Util class for pinot segment
  */
 public class PinotSegmentUtil {
-  private static final int DEFAULT_NUM_MULTIVALUE = 5;
-  private static final int DEFAULT_STRING_VALUE_LENGTH = 2;
-
   private PinotSegmentUtil() {
   }
 
+  private static final int DEFAULT_NUM_MULTIVALUE = 5;
+  private static final int DEFAULT_STRING_VALUE_LENGTH = 2;
+
   public static List<GenericRow> createTestData(Schema schema, int numRows) {
     List<GenericRow> rows = new ArrayList<>();
-    final ThreadLocalRandom random = ThreadLocalRandom.current();
-    Map<String, Object> fields;
+    ThreadLocalRandom random = ThreadLocalRandom.current();
     for (int i = 0; i < numRows; i++) {
-      fields = new HashMap<>();
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        Object value;
-        if (fieldSpec.isSingleValueField()) {
-          value = generateSingleValue(random, fieldSpec);
-        } else {
-          value = generateMultiValue(random, fieldSpec);
-        }
-        fields.put(fieldSpec.getName(), value);
-      }
       GenericRow row = new GenericRow();
-      row.init(fields);
+      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
+        row.putValue(fieldSpec.getName(), fieldSpec.isSingleValueField() ? generateSingleValue(random, fieldSpec)
+            : generateMultiValue(random, fieldSpec));
+      }
       rows.add(row);
     }
     return rows;

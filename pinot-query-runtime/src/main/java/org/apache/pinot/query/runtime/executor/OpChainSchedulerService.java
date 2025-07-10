@@ -75,8 +75,6 @@ public class OpChainSchedulerService {
   }
 
   public void register(OpChain operatorChain) {
-    _opChainCache.put(operatorChain.getId(), operatorChain.getRoot());
-
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
@@ -98,6 +96,7 @@ public class OpChainSchedulerService {
             LOGGER.error("({}): Completed erroneously {} {}", operatorChain, stats, errorBlock.getErrorMessages());
           } else {
             LOGGER.debug("({}): Completed {}", operatorChain, stats);
+            _opChainCache.invalidate(operatorChain.getId());
           }
         } catch (Exception e) {
           LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
@@ -114,6 +113,7 @@ public class OpChainSchedulerService {
         }
       }
     });
+    _opChainCache.put(operatorChain.getId(), operatorChain.getRoot());
     _submittedOpChainMap.put(operatorChain.getId(), scheduledFuture);
   }
 

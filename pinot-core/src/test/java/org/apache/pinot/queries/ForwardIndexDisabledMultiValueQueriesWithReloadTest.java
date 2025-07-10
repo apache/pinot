@@ -715,7 +715,7 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
 
     // Reload the segments to pick up the new configs
     File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
-    ImmutableSegment segment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
     _indexSegment.destroy();
     _indexSegment = segment;
     _indexSegments = List.of(segment, segment);
@@ -736,7 +736,7 @@ public class ForwardIndexDisabledMultiValueQueriesWithReloadTest extends BaseQue
 
     // Reload the segments to pick up the new configs
     File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
-    ImmutableSegment segment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
     _indexSegment.destroy();
     _indexSegment = segment;
     _indexSegments = List.of(segment, segment);

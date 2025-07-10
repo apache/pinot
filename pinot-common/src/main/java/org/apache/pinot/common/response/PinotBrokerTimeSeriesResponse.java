@@ -89,6 +89,10 @@ public class PinotBrokerTimeSeriesResponse {
     return OBJECT_MAPPER.writeValueAsString(this);
   }
 
+  public static PinotBrokerTimeSeriesResponse newEmptyResponse() {
+    return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, Data.EMPTY, null, null);
+  }
+
   public static PinotBrokerTimeSeriesResponse newSuccessResponse(Data data) {
     return new PinotBrokerTimeSeriesResponse(SUCCESS_STATUS, data, null, null);
   }

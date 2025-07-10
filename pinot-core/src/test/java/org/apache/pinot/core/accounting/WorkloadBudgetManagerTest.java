@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.accounting;
 
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -39,21 +38,11 @@ public class WorkloadBudgetManagerTest {
     _config = new PinotConfiguration();
     _config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
     _config.setProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS, _enforcementWindowMs);
-    // Initialize once for all tests
-    WorkloadBudgetManager.init(_config); // 10 seconds for reset window
-  }
-
-  @Test
-  void testSingletonInitialization() {
-    WorkloadBudgetManager first = WorkloadBudgetManager.getInstance();
-    WorkloadBudgetManager.init(_config); // Should not override
-    WorkloadBudgetManager second = WorkloadBudgetManager.getInstance();
-    assertSame(first, second, "WorkloadBudgetManager should be a singleton");
   }
 
   @Test
   void testAddOrUpdateAndRetrieveBudget() {
-    WorkloadBudgetManager manager = WorkloadBudgetManager.getInstance();
+    WorkloadBudgetManager manager = new WorkloadBudgetManager(_config);
     manager.addOrUpdateWorkload("test-workload", 1_000_000L, 1_000_000L);
 
     WorkloadBudgetManager.BudgetStats stats = manager.getRemainingBudgetForWorkload("test-workload");
@@ -63,7 +52,7 @@ public class WorkloadBudgetManagerTest {
 
   @Test
   void testTryChargeWithoutBudget() {
-    WorkloadBudgetManager mgr = WorkloadBudgetManager.getInstance();
+    WorkloadBudgetManager mgr = new WorkloadBudgetManager(_config);
     WorkloadBudgetManager.BudgetStats stats = mgr.tryCharge("unknown-workload", 100L, 100L);
     assertEquals(Long.MAX_VALUE, stats._cpuRemaining);
     assertEquals(Long.MAX_VALUE, stats._memoryRemaining);
@@ -71,7 +60,7 @@ public class WorkloadBudgetManagerTest {
 
   @Test
   void testBudgetResetAfterInterval() throws InterruptedException {
-    WorkloadBudgetManager mgr = WorkloadBudgetManager.getInstance();
+    WorkloadBudgetManager mgr = new WorkloadBudgetManager(_config);
     mgr.addOrUpdateWorkload("reset-test", 1_000_000L, 1_000_000L);
     mgr.tryCharge("reset-test", 500_000L, 500_000L);
 
@@ -91,7 +80,7 @@ public class WorkloadBudgetManagerTest {
 
   @Test
   void testConcurrentTryChargeSingleWorkload() throws InterruptedException {
-    WorkloadBudgetManager manager = WorkloadBudgetManager.getInstance();
+    WorkloadBudgetManager manager = new WorkloadBudgetManager(_config);
     String workload = "concurrent-test";
     long initialCpuBudget = 2_000_000L;
     long initialMemBudget = 2_000_000L;
@@ -125,28 +114,5 @@ public class WorkloadBudgetManagerTest {
         "CPU budget mismatch after concurrent updates");
     assertEquals(initialMemBudget - totalMemCharged, remaining._memoryRemaining,
         "Memory budget mismatch after concurrent updates");
-  }
-
-  @Test
-  void testCanAdmitQuery() {
-    WorkloadBudgetManager manager = WorkloadBudgetManager.getInstance();
-    // Scenario 1: No budget configured -> should admit
-    assertTrue(manager.canAdmitQuery("unconfigured-workload"), "Workload without budget should be admitted");
-
-    // Scenario 2: Budget configured with non-zero remaining -> should admit
-    String activeWorkload = "active-workload";
-    manager.addOrUpdateWorkload(activeWorkload, 100L, 200L);
-    assertTrue(manager.canAdmitQuery(activeWorkload), "Workload with available budget should be admitted");
-
-    // Scenario 3: Budget depleted -> should reject
-    String depletedWorkload = "depleted-workload";
-    manager.addOrUpdateWorkload(depletedWorkload, 50L, 50L);
-    manager.tryCharge(depletedWorkload, 50L, 50L); // deplete
-    assertFalse(manager.canAdmitQuery(depletedWorkload), "Workload with depleted budget should be rejected");
-
-    // Scenario 4: Budget configured with zero cpu remaining -> should reject
-    String zeroCpuWorkload = "zero-cpu-workload";
-    manager.addOrUpdateWorkload(zeroCpuWorkload, 0L, 100L);
-    assertFalse(manager.canAdmitQuery(zeroCpuWorkload), "Workload with zero CPU budget should be rejected");
   }
 }

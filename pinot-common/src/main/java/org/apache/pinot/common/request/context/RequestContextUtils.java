@@ -238,8 +238,9 @@ public class RequestContextUtils {
         return FilterContext.forPredicate(
             new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case TEXT_MATCH:
+        String options = operands.size() > 2 ? getStringValue(operands.get(2)) : null;
         return FilterContext.forPredicate(
-            new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+            new TextMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1)), options));
       case JSON_MATCH:
         return FilterContext.forPredicate(
             new JsonMatchPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1)),
@@ -403,7 +404,9 @@ public class RequestContextUtils {
       case TEXT_CONTAINS:
         return FilterContext.forPredicate(new TextContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
       case TEXT_MATCH:
-        return FilterContext.forPredicate(new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1))));
+        String options = operands.size() > 2 ? getStringValue(operands.get(2)) : null;
+        return FilterContext.forPredicate(
+            new TextMatchPredicate(operands.get(0), getStringValue(operands.get(1)), options));
       case JSON_MATCH:
           return FilterContext.forPredicate(new JsonMatchPredicate(operands.get(0), getStringValue(operands.get(1)),
                   operands.size() == 3?getStringValue(operands.get(2)): null));

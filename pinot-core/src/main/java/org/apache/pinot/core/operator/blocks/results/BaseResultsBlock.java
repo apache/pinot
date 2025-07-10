@@ -47,6 +47,7 @@ public abstract class BaseResultsBlock implements Block {
   private int _numConsumingSegmentsProcessed;
   private int _numConsumingSegmentsMatched;
   private long _executionThreadCpuTimeNs;
+  private long _executionThreadMemAllocatedBytes;
   private int _numServerThreads;
 
   @Nullable
@@ -141,8 +142,17 @@ public abstract class BaseResultsBlock implements Block {
     return _executionThreadCpuTimeNs;
   }
 
+
   public void setExecutionThreadCpuTimeNs(long executionThreadCpuTimeNs) {
     _executionThreadCpuTimeNs = executionThreadCpuTimeNs;
+  }
+
+  public long getExecutionThreadMemAllocatedBytes() {
+    return _executionThreadMemAllocatedBytes;
+  }
+
+  public void setExecutionThreadMemAllocatedBytes(long executionThreadMemAllocatedBytes) {
+    _executionThreadMemAllocatedBytes = executionThreadMemAllocatedBytes;
   }
 
   public int getNumServerThreads() {

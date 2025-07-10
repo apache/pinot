@@ -29,6 +29,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -57,6 +58,7 @@ import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
@@ -93,7 +95,8 @@ public class PinotLogicalTableResource {
   @Authorize(targetType = TargetType.CLUSTER, paramName = "tableName", action = Actions.Cluster.GET_TABLE)
   @ApiOperation(value = "List all logical table names", notes = "Lists all logical table names")
   public List<String> listLogicalTableNames(@Context HttpHeaders headers) {
-    return _pinotHelixResourceManager.getAllLogicalTableNames();
+    String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(headers);
+    return _pinotHelixResourceManager.getAllLogicalTableNames(databaseName);
   }
 
   @GET
@@ -140,8 +143,29 @@ public class PinotLogicalTableResource {
     ResourceUtils.checkPermissionAndAccess(tableName, request, httpHeaders, AccessType.CREATE,
         Actions.Table.CREATE_TABLE, _accessControlFactory, LOGGER);
 
+    translatePhysicalTableNamesWithDB(logicalTableConfig, httpHeaders);
     SuccessResponse successResponse = addLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
+  }
+
+  private void translatePhysicalTableNamesWithDB(LogicalTableConfig logicalTableConfig, HttpHeaders headers) {
+    // Translate physical table names to include the database name
+    Map<String, PhysicalTableConfig> physicalTableConfigMap = logicalTableConfig.getPhysicalTableConfigMap().entrySet()
+        .stream()
+        .map(entry -> Map.entry(DatabaseUtils.translateTableName(entry.getKey(), headers), entry.getValue()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+    logicalTableConfig.setPhysicalTableConfigMap(physicalTableConfigMap);
+
+    // Translate refOfflineTableName and refRealtimeTableName to include the database name
+    String refOfflineTableName = logicalTableConfig.getRefOfflineTableName();
+    if (refOfflineTableName != null) {
+      logicalTableConfig.setRefOfflineTableName(DatabaseUtils.translateTableName(refOfflineTableName, headers));
+    }
+    String refRealtimeTableName = logicalTableConfig.getRefRealtimeTableName();
+    if (refRealtimeTableName != null) {
+      logicalTableConfig.setRefRealtimeTableName(DatabaseUtils.translateTableName(refRealtimeTableName, headers));
+    }
   }
 
   @PUT
@@ -152,9 +176,10 @@ public class PinotLogicalTableResource {
   @Authenticate(AccessType.UPDATE)
   @ApiOperation(value = "Update a logical table", notes = "Updates a logical table")
   @ApiResponses(value = {
-      @ApiResponse(code = 200, message = "Successfully updated schema"), @ApiResponse(code = 404, message = "Schema "
-      + "not found"), @ApiResponse(code = 400, message = "Missing or invalid request body"), @ApiResponse(code = 500,
-      message = "Internal error")
+      @ApiResponse(code = 200, message = "Successfully updated logical table"),
+      @ApiResponse(code = 404, message = "Logical Table not found"),
+      @ApiResponse(code = 400, message = "Missing or invalid request body"),
+      @ApiResponse(code = 500, message = "Internal error")
   })
   public SuccessResponse updateLogicalTable(
       @ApiParam(value = "Name of the logical table", required = true) @PathParam("tableName") String tableName,
@@ -168,7 +193,7 @@ public class PinotLogicalTableResource {
 
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     logicalTableConfig.setTableName(tableName);
-
+    translatePhysicalTableNamesWithDB(logicalTableConfig, headers);
     SuccessResponse successResponse = updateLogicalTable(logicalTableConfig);
     return new ConfigSuccessResponse(successResponse.getStatus(), logicalTableConfigAndUnrecognizedProps.getRight());
   }

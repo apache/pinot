@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.operands;
 
+import java.util.List;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -39,7 +40,7 @@ public class ReferenceOperand implements TransformOperand {
 
   @Nullable
   @Override
-  public Object apply(Object[] row) {
-    return row[_index];
+  public Object apply(List<Object> row) {
+    return row.get(_index);
   }
 }

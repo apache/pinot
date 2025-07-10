@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.data;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -69,9 +70,8 @@ import org.apache.pinot.spi.utils.TimestampUtils;
     @JsonSubTypes.Type(value = DateTimeFieldSpec.class, name = "DATE_TIME"),
     @JsonSubTypes.Type(value = ComplexFieldSpec.class, name = "COMPLEX")
 })
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
-  public static final int DEFAULT_MAX_LENGTH = 512;
-
   public static final Integer DEFAULT_DIMENSION_NULL_VALUE_OF_INT = Integer.MIN_VALUE;
   public static final Long DEFAULT_DIMENSION_NULL_VALUE_OF_LONG = Long.MIN_VALUE;
   public static final Float DEFAULT_DIMENSION_NULL_VALUE_OF_FLOAT = Float.NEGATIVE_INFINITY;
@@ -94,6 +94,26 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
 
   public static final Map DEFAULT_COMPLEX_NULL_VALUE_OF_MAP = Map.of();
   public static final List DEFAULT_COMPLEX_NULL_VALUE_OF_LIST = List.of();
+  public static final int DEFAULT_MAX_LENGTH = 512;
+
+  private static MaxLengthExceedStrategy _defaultJsonMaxLengthExceedStrategy = MaxLengthExceedStrategy.NO_ACTION;
+  private static int _defaultJsonMaxLength = DEFAULT_MAX_LENGTH;
+
+  public static MaxLengthExceedStrategy getDefaultJsonMaxLengthExceedStrategy() {
+    return _defaultJsonMaxLengthExceedStrategy;
+  }
+
+  public static void setDefaultJsonMaxLengthExceedStrategy(MaxLengthExceedStrategy defaultJsonMaxLengthExceedStrategy) {
+    _defaultJsonMaxLengthExceedStrategy = defaultJsonMaxLengthExceedStrategy;
+  }
+
+  public static int getDefaultJsonMaxLength() {
+    return _defaultJsonMaxLength;
+  }
+
+  public static void setDefaultJsonMaxLength(int defaultJsonMaxLength) {
+    _defaultJsonMaxLength = defaultJsonMaxLength;
+  }
 
   static {
     // The metadata on the valid list of {@link DataType} for each {@link FieldType}
@@ -132,7 +152,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   protected boolean _notNull;
 
   // Max length applies to STRING, JSON, BYTES columns, and is enforced in {@link SanitizationTransformer}.
-  protected int _maxLength = DEFAULT_MAX_LENGTH;
+  protected Integer _maxLength;
   protected MaxLengthExceedStrategy _maxLengthExceedStrategy;
 
   // Whether to allow trailing zeros for BIG_DECIMAL columns. Trailing zeros are stripped by default in
@@ -155,19 +175,19 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField) {
-    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, null);
+    this(name, dataType, isSingleValueField, null, null);
   }
 
   public FieldSpec(String name, DataType dataType, boolean isSingleValueField, @Nullable Object defaultNullValue) {
-    this(name, dataType, isSingleValueField, DEFAULT_MAX_LENGTH, defaultNullValue);
+    this(name, dataType, isSingleValueField, null, defaultNullValue);
   }
 
-  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, @Nullable Integer maxLength,
       @Nullable Object defaultNullValue) {
     this(name, dataType, isSingleValueField, maxLength, defaultNullValue, null);
   }
 
-  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, int maxLength,
+  public FieldSpec(String name, DataType dataType, boolean isSingleValueField, @Nullable Integer maxLength,
       @Nullable Object defaultNullValue, @Nullable MaxLengthExceedStrategy maxLengthExceedStrategy) {
     _name = name;
     _dataType = dataType;
@@ -232,15 +252,63 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     _notNull = notNull;
   }
 
-  public int getMaxLength() {
+  /**
+   * Returns the effective max length to be used.
+   * This method should be used in business logic instead of {@code getMaxLength()},
+   * as it falls back to data type-specific or global defaults when the field is unset.
+   */
+  @JsonIgnore
+  public int getEffectiveMaxLength() {
+    // If explicitly set, return that value
+    if (_maxLength != null) {
+      return _maxLength;
+    }
+
+    // For JSON fields, use configurable default
+    if (_dataType == DataType.JSON) {
+      return getDefaultJsonMaxLength();
+    }
+
+    // For all other fields, use the standard default
+    return DEFAULT_MAX_LENGTH;
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  // Use getEffectiveMaxLength() for default-aware access.
+  @Nullable
+  public Integer getMaxLength() {
     return _maxLength;
   }
 
   // Required by JSON de-serializer. DO NOT REMOVE.
-  public void setMaxLength(int maxLength) {
+  public void setMaxLength(@Nullable Integer maxLength) {
     _maxLength = maxLength;
   }
 
+  /**
+   * Returns the effective max length exceed strategy to be used.
+   * This method should be used in business logic instead of {@code getMaxLengthExceedStrategy()},
+   * as it falls back to data type-specific or global defaults when the field is unset.
+   */
+  @JsonIgnore
+  public MaxLengthExceedStrategy getEffectiveMaxLengthExceedStrategy() {
+    if (_maxLengthExceedStrategy != null) {
+      return _maxLengthExceedStrategy;
+    }
+
+    // Apply data type-specific defaults
+    switch (_dataType) {
+      case STRING:
+        return MaxLengthExceedStrategy.TRIM_LENGTH;
+      case JSON:
+        return getDefaultJsonMaxLengthExceedStrategy();
+      default:
+        return MaxLengthExceedStrategy.NO_ACTION;
+    }
+  }
+
+  // Required by JSON de-serializer. DO NOT REMOVE.
+  // Use getEffectiveMaxLengthExceedStrategy() for default-aware access.
   @Nullable
   public MaxLengthExceedStrategy getMaxLengthExceedStrategy() {
     return _maxLengthExceedStrategy;
@@ -416,7 +484,7 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
     if (_notNull) {
       jsonObject.put("notNull", true);
     }
-    if (_maxLength != DEFAULT_MAX_LENGTH) {
+    if (_maxLength != null) {
       jsonObject.put("maxLength", _maxLength);
     }
     if (_maxLengthExceedStrategy != null) {
@@ -497,8 +565,8 @@ public abstract class FieldSpec implements Comparable<FieldSpec>, Serializable {
         && _dataType == that._dataType
         && _singleValueField == that._singleValueField
         && _notNull == that._notNull
-        && _maxLength == that._maxLength
-        && _maxLengthExceedStrategy == that._maxLengthExceedStrategy
+        && Objects.equals(_maxLength, that._maxLength)
+        && Objects.equals(_maxLengthExceedStrategy, that._maxLengthExceedStrategy)
         && _allowTrailingZeros == that._allowTrailingZeros
         && getStringValue(_defaultNullValue).equals(getStringValue(that._defaultNullValue))
         && Objects.equals(_transformFunction, that._transformFunction)

@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.spi.config.table.IndexConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.ingestion.AggregationConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -68,6 +69,8 @@ public class RealtimeSegmentConfig {
   @Nullable
   private final PartitionDedupMetadataManager _partitionDedupMetadataManager;
   private final String _consumerDir;
+  @Nullable
+  private final MultiColumnTextIndexConfig _multiColIndexConfig;
 
   // TODO: Clean up this constructor. Most of these things can be extracted from tableConfig.
 
@@ -75,14 +78,28 @@ public class RealtimeSegmentConfig {
    * @param nullHandlingEnabled whether null handling is enabled by default. This value is only used if
    * {@link Schema#isEnableColumnBasedNullHandling()} is false.
    */
-  private RealtimeSegmentConfig(String tableNameWithType, String segmentName, String streamName, Schema schema,
-      String timeColumnName, int capacity, int avgNumMultiValues, Map<String, FieldIndexConfigs> indexConfigByCol,
-      SegmentZKMetadata segmentZKMetadata, boolean offHeap, PinotDataBufferMemoryManager memoryManager,
-      RealtimeSegmentStatsHistory statsHistory, @Nullable String partitionColumn,
-      @Nullable PartitionFunction partitionFunction, int partitionId, boolean aggregateMetrics,
-      @Nullable List<AggregationConfig> ingestionAggregationConfigs, boolean nullHandlingEnabled,
+  private RealtimeSegmentConfig(
+      String tableNameWithType,
+      String segmentName,
+      String streamName,
+      Schema schema,
+      String timeColumnName,
+      int capacity,
+      int avgNumMultiValues,
+      Map<String, FieldIndexConfigs> indexConfigByCol,
+      SegmentZKMetadata segmentZKMetadata,
+      boolean offHeap, PinotDataBufferMemoryManager memoryManager,
+      RealtimeSegmentStatsHistory statsHistory,
+      @Nullable String partitionColumn,
+      @Nullable PartitionFunction partitionFunction,
+      int partitionId,
+      boolean aggregateMetrics,
+      @Nullable List<AggregationConfig> ingestionAggregationConfigs,
+      boolean nullHandlingEnabled,
       @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager,
-      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager, String consumerDir) {
+      @Nullable PartitionDedupMetadataManager partitionDedupMetadataManager,
+      String consumerDir,
+      @Nullable MultiColumnTextIndexConfig textIndexConfig) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
     _streamName = streamName;
@@ -104,6 +121,7 @@ public class RealtimeSegmentConfig {
     _partitionUpsertMetadataManager = partitionUpsertMetadataManager;
     _partitionDedupMetadataManager = partitionDedupMetadataManager;
     _consumerDir = consumerDir;
+    _multiColIndexConfig = textIndexConfig;
   }
 
   public String getTableNameWithType() {
@@ -195,6 +213,10 @@ public class RealtimeSegmentConfig {
     return _consumerDir;
   }
 
+  public MultiColumnTextIndexConfig getMultiColIndexConfig() {
+    return _multiColIndexConfig;
+  }
+
   public static class Builder {
     private String _tableNameWithType;
     private String _segmentName;
@@ -221,6 +243,7 @@ public class RealtimeSegmentConfig {
     private PartitionUpsertMetadataManager _partitionUpsertMetadataManager;
     private PartitionDedupMetadataManager _partitionDedupMetadataManager;
     private String _consumerDir;
+    private MultiColumnTextIndexConfig _textIndexConfig;
 
     public Builder() {
       _indexConfigByCol = new HashMap<>();
@@ -348,6 +371,11 @@ public class RealtimeSegmentConfig {
       return this;
     }
 
+    public Builder setTextIndexConfig(MultiColumnTextIndexConfig textIndexConfig) {
+      _textIndexConfig = textIndexConfig;
+      return this;
+    }
+
     /**
      * Whether null handling is enabled by default. This value is only used if
      * {@link Schema#isEnableColumnBasedNullHandling()} is false.
@@ -391,7 +419,7 @@ public class RealtimeSegmentConfig {
           _capacity, _avgNumMultiValues, Collections.unmodifiableMap(indexConfigByCol), _segmentZKMetadata, _offHeap,
           _memoryManager, _statsHistory, _partitionColumn, _partitionFunction, _partitionId, _aggregateMetrics,
           _ingestionAggregationConfigs, _defaultNullHandlingEnabled, _partitionUpsertMetadataManager,
-          _partitionDedupMetadataManager, _consumerDir);
+          _partitionDedupMetadataManager, _consumerDir, _textIndexConfig);
     }
   }
 }

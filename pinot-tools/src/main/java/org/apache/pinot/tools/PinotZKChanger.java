@@ -49,11 +49,11 @@ public class PinotZKChanger {
   protected String _clusterName;
   protected ZkHelixPropertyStore<ZNRecord> _propertyStore;
 
-  public PinotZKChanger(String zkAddress, String clusterName) {
+  public PinotZKChanger(String name, String zkAddress, String clusterName) {
     _clusterName = clusterName;
     _helixAdmin = new ZKHelixAdmin(zkAddress);
     _helixManager = HelixManagerFactory
-        .getZKHelixManager(clusterName, "PinotNumReplicaChanger", InstanceType.ADMINISTRATOR, zkAddress);
+        .getZKHelixManager(clusterName, name, InstanceType.ADMINISTRATOR, zkAddress);
     try {
       _helixManager.connect();
     } catch (Exception e) {

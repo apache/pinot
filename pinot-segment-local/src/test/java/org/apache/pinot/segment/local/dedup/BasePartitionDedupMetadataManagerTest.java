@@ -79,7 +79,7 @@ public class BasePartitionDedupMetadataManagerTest {
     }
 
     @Override
-    protected long getNumPrimaryKeys() {
+    public long getNumPrimaryKeys() {
       return 0;
     }
   }

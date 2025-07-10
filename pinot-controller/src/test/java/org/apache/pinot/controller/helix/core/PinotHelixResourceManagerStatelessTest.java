@@ -484,7 +484,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
       assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
       assertEquals(retrievedSegmentsZKMetadata.size(), 1);
-      ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName);
+      assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName));
       assertTrue(_helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME).isEmpty());
     }
 
@@ -500,7 +500,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
       assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
       assertEquals(segmentZKMetadata.getStatus(), Segment.Realtime.Status.DONE);
       assertEquals(retrievedSegmentsZKMetadata.size(), 1);
-      ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentName);
+      assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, REALTIME_TABLE_NAME, segmentName));
       assertTrue(_helixResourceManager.getSegmentsZKMetadata(REALTIME_TABLE_NAME).isEmpty());
     }
   }
@@ -519,22 +519,25 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadata);
     List<SegmentZKMetadata> retrievedSegmentsZKMetadata =
         _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    assertEquals(retrievedSegmentsZKMetadata.size(), 1);
     SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
     assertEquals(retrievedSegmentZKMetadata.getStartTimeMs(), -1);
     assertEquals(retrievedSegmentZKMetadata.getEndTimeMs(), -1);
-    assertEquals(retrievedSegmentsZKMetadata.size(), 1);
 
     DateTimeFieldSpec timeColumnFieldSpec =
         new DateTimeFieldSpec("timestamp", FieldSpec.DataType.STRING, "SIMPLE_DATE_FORMAT|yyyy-MM-dd'T'HH:mm:ss.SSS",
             "1:MILLISECONDS");
     _helixResourceManager.updateSegmentsZKTimeInterval(OFFLINE_TABLE_NAME, timeColumnFieldSpec);
     retrievedSegmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME);
+    assertEquals(retrievedSegmentsZKMetadata.size(), 1);
     retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertEquals(retrievedSegmentZKMetadata.getSegmentName(), segmentName);
     assertEquals(retrievedSegmentZKMetadata.getStartTimeMs(), currentTimeMs);
     assertEquals(retrievedSegmentZKMetadata.getEndTimeMs(), currentTimeMs);
-    assertEquals(retrievedSegmentsZKMetadata.size(), 1);
+
+    assertTrue(ZKMetadataProvider.removeSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentName));
+    assertTrue(_helixResourceManager.getSegmentsZKMetadata(OFFLINE_TABLE_NAME).isEmpty());
   }
 
   @Test
@@ -911,21 +914,20 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
   public void testUpdateTargetTier()
       throws Exception {
     TierConfig tierConfig =
-        new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Collections.singletonList("testSegment"),
+        new TierConfig("tier1", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, List.of("testSegment"),
             TierFactory.PINOT_SERVER_STORAGE_TYPE, SERVER_TENANT_NAME + "_OFFLINE", null, null);
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setBrokerTenant(BROKER_TENANT_NAME)
-            .setTierConfigList(Collections.singletonList(tierConfig)).setServerTenant(SERVER_TENANT_NAME).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setBrokerTenant(BROKER_TENANT_NAME)
+        .setServerTenant(SERVER_TENANT_NAME)
+        .setTierConfigList(List.of(tierConfig))
+        .build();
     waitForEVToDisappear(tableConfig.getTableName());
     addDummySchema(RAW_TABLE_NAME);
     _helixResourceManager.addTable(tableConfig);
 
     String segmentName = "testSegment";
-    SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(segmentName);
-    ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME, segmentZKMetadata);
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "testSegment"), "downloadUrl");
-    assertNull(segmentZKMetadata.getTier());
+        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, segmentName), "downloadUrl");
 
     // Move on to new tier
     Map<String, Set<String>> tierToSegmentsMap =
@@ -935,7 +937,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     SegmentZKMetadata retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
     assertEquals(tierToSegmentsMap.size(), 1);
-    assertEquals(tierToSegmentsMap.get("tier1"), Set.of("testSegment"));
+    assertEquals(tierToSegmentsMap.get("tier1"), Set.of(segmentName));
 
     // No tier move
     tierToSegmentsMap =
@@ -944,7 +946,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     retrievedSegmentZKMetadata = retrievedSegmentsZKMetadata.get(0);
     assertEquals(retrievedSegmentZKMetadata.getTier(), "tier1");
     assertEquals(tierToSegmentsMap.size(), 1);
-    assertEquals(tierToSegmentsMap.get("tier1"), Set.of("testSegment"));
+    assertEquals(tierToSegmentsMap.get("tier1"), Set.of(segmentName));
 
     // Move back to default tier
     tableConfig =
@@ -1421,6 +1423,15 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertSetEquals(_helixResourceManager.getSegmentsFor(OFFLINE_TABLE_NAME, true), "s3", "s4", "s5");
 
     // Re-upload (s9, s10, s11) to test the segment clean up from startReplaceSegments
+    // Wait for the segment ZK metadata to be deleted
+    TestUtils.waitForCondition(aVoid -> {
+      for (int i = 9; i < 12; i++) {
+        if (ZKMetadataProvider.isSegmentExisted(_propertyStore, OFFLINE_TABLE_NAME, "s" + i)) {
+          return false;
+        }
+      }
+      return true;
+    }, 10000L, "Failed to clean up ZK metadata for segments");
     for (int i = 9; i < 12; i++) {
       _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
           SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s" + i),
@@ -1562,9 +1573,6 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     assertEquals(segmentLineage.getLineageEntry(lineageEntryId10).getState(), LineageEntryState.IN_PROGRESS);
 
     // Finish the replacement
-    _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-        SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s24"),
-        getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s24"));
     _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
         SegmentMetadataMockUtils.mockSegmentMetadata(OFFLINE_TABLE_NAME, "s25"),
         getDownloadURL(_controllerDataDir, RAW_TABLE_NAME, "s25"));

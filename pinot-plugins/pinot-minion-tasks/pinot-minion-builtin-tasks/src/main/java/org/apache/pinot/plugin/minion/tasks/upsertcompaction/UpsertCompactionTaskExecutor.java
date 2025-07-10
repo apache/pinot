@@ -37,6 +37,7 @@ import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.Obfuscator;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
     Map<String, String> configs = pinotTaskConfig.getConfigs();
     String segmentName = configs.get(MinionConstants.SEGMENT_NAME_KEY);
     String taskType = pinotTaskConfig.getTaskType();
-    LOGGER.info("Starting task: {} with configs: {}", taskType, configs);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Starting task: {} with configs: {}", taskType, Obfuscator.DEFAULT.toJsonString(configs));
+    }
     long startMillis = System.currentTimeMillis();
 
     String tableNameWithType = configs.get(MinionConstants.TABLE_NAME_KEY);
@@ -104,6 +107,9 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, compactedRecordReader);
       driver.build();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
+              + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
       totalDocsAfterCompaction = driver.getSegmentStats().getTotalDocCount();
     }
 
@@ -115,9 +121,11 @@ public class UpsertCompactionTaskExecutor extends BaseSingleSegmentConversionExe
             segmentMetadata.getTotalDocs() - totalDocsAfterCompaction);
 
     long endMillis = System.currentTimeMillis();
-    LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms. Total docs before compaction: {}. "
-            + "Total docs after compaction: {}.", taskType, configs, (endMillis - startMillis),
-            segmentMetadata.getTotalDocs(), totalDocsAfterCompaction);
+    if (LOGGER.isInfoEnabled()) {
+      LOGGER.info("Finished task: {} with configs: {}. Total time: {}ms. Total docs before compaction: {}. "
+              + "Total docs after compaction: {}.", taskType, Obfuscator.DEFAULT.toJsonString(configs),
+          (endMillis - startMillis), segmentMetadata.getTotalDocs(), totalDocsAfterCompaction);
+    }
 
     return result;
   }

@@ -790,7 +790,8 @@ public class PinotHelixTaskResourceManager {
     }
     Map<String, TaskState> helixJobStates = workflowContext.getJobStates();
     for (String helixJobName : helixJobStates.keySet()) {
-      taskDebugInfos.put(getPinotTaskName(helixJobName), getTaskDebugInfo(workflowContext, helixJobName, verbosity));
+      taskDebugInfos.put(getPinotTaskName(helixJobName),
+          getTaskDebugInfo(workflowContext, helixJobName, null, verbosity));
     }
     return taskDebugInfos;
   }
@@ -826,11 +827,9 @@ public class PinotHelixTaskResourceManager {
         if (pinotConfigs != null) {
           String tableNameConfig = pinotConfigs.get(TABLE_NAME);
           if (tableNameConfig != null && tableNameConfig.equals(tableNameWithType)) {
-            // Found a match. Add task debug info to the result
-            // TODO: If a task consists of subtasks belonging to the current table and other tables at the same time,
-            //  we will collect debug info of them all. We may want to filter out debug info that does not belong
-            //  to the given table.
-            taskDebugInfos.put(pinotTaskName, getTaskDebugInfo(workflowContext, helixJobName, verbosity));
+            // Found a match. Add task debug info for this table to the result
+            taskDebugInfos.put(pinotTaskName,
+                getTaskDebugInfo(workflowContext, helixJobName, tableNameWithType, verbosity));
             break;
           }
         }
@@ -854,11 +853,11 @@ public class PinotHelixTaskResourceManager {
       return null;
     }
     String helixJobName = getHelixJobName(taskName);
-    return getTaskDebugInfo(workflowContext, helixJobName, verbosity);
+    return getTaskDebugInfo(workflowContext, helixJobName, null, verbosity);
   }
 
   private synchronized TaskDebugInfo getTaskDebugInfo(WorkflowContext workflowContext, String helixJobName,
-      int verbosity) {
+      @Nullable String tableNameWithType, int verbosity) {
     boolean showCompleted = verbosity > 0;
     TaskDebugInfo taskDebugInfo = new TaskDebugInfo();
     taskDebugInfo.setTaskState(workflowContext.getJobState(helixJobName));
@@ -910,6 +909,10 @@ public class PinotHelixTaskResourceManager {
         TaskConfig helixTaskConfig = jobConfig.getTaskConfig(taskIdForPartition);
         if (helixTaskConfig != null) {
           PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig);
+          if ((tableNameWithType != null) && (!tableNameWithType.equals(pinotTaskConfig.getTableName()))) {
+            // Filter task configs that match this table name
+            continue;
+          }
           subtaskDebugInfo.setTaskConfig(pinotTaskConfig);
         }
         taskDebugInfo.addSubtaskInfo(subtaskDebugInfo);
@@ -965,7 +968,7 @@ public class PinotHelixTaskResourceManager {
     String[] parts = name.split(TASK_NAME_SEPARATOR);
     if (parts.length < 2) {
       throw new IllegalArgumentException(String.format("Invalid task name : %s. Missing separator %s",
-              name, TASK_NAME_SEPARATOR));
+          name, TASK_NAME_SEPARATOR));
     }
     return parts[1];
   }
@@ -999,8 +1002,10 @@ public class PinotHelixTaskResourceManager {
     return MinionTaskMetadataUtils.getAllTaskMetadataLastUpdateTimeMs(propertyStore);
   }
 
-  @JsonPropertyOrder({"taskState", "subtaskCount", "startTime", "executionStartTime", "finishTime", "triggeredBy",
-      "subtaskInfos"})
+  @JsonPropertyOrder({
+      "taskState", "subtaskCount", "startTime", "executionStartTime", "finishTime", "triggeredBy",
+      "subtaskInfos"
+  })
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class TaskDebugInfo {
     // Time at which the task (which may have multiple subtasks) got created.

@@ -193,9 +193,13 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableExecutionInfo executionInfo;
     try {
+      if (queryRequest.getTableSegmentsContexts() != null && !queryRequest.getTableSegmentsContexts().isEmpty()) {
+        executionInfo = LogicalTableExecutionInfo.create(_instanceDataManager, queryRequest, queryContext);
+      } else {
         executionInfo =
             SingleTableExecutionInfo.create(_instanceDataManager, tableNameWithType, queryRequest.getSegmentsToQuery(),
                 queryRequest.getOptionalSegments(), queryContext);
+      }
     } catch (TableNotFoundException exception) {
       String errorMessage =
           "Failed to find table: " + exception.getMessage() + " on server: " + _instanceDataManager.getInstanceId();
@@ -211,6 +215,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           executionInfo.getSegmentDataManagers().stream().map(SegmentDataManager::getSegmentName)
               .collect(Collectors.toList()));
     }
+
+    queryContext.setSchema(executionInfo.getSchema());
 
     // Gather stats for realtime consuming segments
     // TODO: the freshness time should not be collected at query time because there is no guarantee that the consuming

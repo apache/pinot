@@ -67,7 +67,7 @@ public interface BlockSplitter {
       // Use estimated row size, this estimate is not accurate and is used to estimate numRowsPerChunk only.
       DataSchema dataSchema = block.getDataSchema();
       assert dataSchema != null;
-      int estimatedRowSizeInBytes = dataSchema.getColumnNames().length * MEDIAN_COLUMN_SIZE_BYTES;
+      int estimatedRowSizeInBytes = Math.max(1, dataSchema.getColumnNames().length * MEDIAN_COLUMN_SIZE_BYTES);
       int numRowsPerChunk = maxBlockSize / estimatedRowSizeInBytes;
       Preconditions.checkState(numRowsPerChunk > 0, "row size too large for query engine to handle, abort!");
 

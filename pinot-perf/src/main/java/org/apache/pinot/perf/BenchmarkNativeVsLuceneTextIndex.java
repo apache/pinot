@@ -138,8 +138,8 @@ public class BenchmarkNativeVsLuceneTextIndex {
     for (int i = 0; i < numRows; i++) {
       String domain = domainNames.get(i % domainNames.size());
       GenericRow row = new GenericRow();
-      row.putField(DOMAIN_NAMES_COL, domain);
-      row.putField(INT_COL, i);
+      row.putValue(DOMAIN_NAMES_COL, domain);
+      row.putValue(INT_COL, i);
       rows.add(row);
     }
     return rows;

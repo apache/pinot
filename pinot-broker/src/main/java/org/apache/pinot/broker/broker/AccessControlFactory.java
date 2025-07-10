@@ -18,9 +18,15 @@
  */
 package org.apache.pinot.broker.broker;
 
+import com.google.common.base.Preconditions;
+import java.util.Collection;
+import java.util.List;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.api.AccessControl;
+import org.apache.pinot.broker.api.HttpRequesterIdentity;
+import org.apache.pinot.broker.grpc.GrpcRequesterIdentity;
+import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,9 +35,10 @@ import org.slf4j.LoggerFactory;
 public abstract class AccessControlFactory {
   public static final Logger LOGGER = LoggerFactory.getLogger(AccessControlFactory.class);
   public static final String ACCESS_CONTROL_CLASS_CONFIG = "class";
+  public static final String HEADER_AUTHORIZATION = "authorization";
 
   public void init(PinotConfiguration configuration) {
-  };
+  }
 
   /**
    * Extend original init method inorder to support Zookeeper BasicAuthAccessControlFactory
@@ -41,7 +48,7 @@ public abstract class AccessControlFactory {
    * @param propertyStore Helix PropertyStore
    */
   public void init(PinotConfiguration configuration, ZkHelixPropertyStore<ZNRecord> propertyStore) {
-     init(configuration);
+    init(configuration);
   }
 
   public abstract AccessControl create();
@@ -62,5 +69,27 @@ public abstract class AccessControlFactory {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public static Collection<String> extractAuthorizationTokens(RequesterIdentity requesterIdentity) {
+    Preconditions.checkArgument(requesterIdentity instanceof HttpRequesterIdentity
+            || requesterIdentity instanceof GrpcRequesterIdentity,
+        "HttpRequesterIdentity or GrpcRequesterIdentity required");
+
+    if (requesterIdentity instanceof HttpRequesterIdentity) {
+      HttpRequesterIdentity identity = (HttpRequesterIdentity) requesterIdentity;
+      return identity.getHttpHeaders().get(HEADER_AUTHORIZATION);
+    }
+
+    if (requesterIdentity instanceof GrpcRequesterIdentity) {
+      GrpcRequesterIdentity identity = (GrpcRequesterIdentity) requesterIdentity;
+      for (String key : identity.getMetadata().keySet()) {
+        if (HEADER_AUTHORIZATION.equalsIgnoreCase(key)) {
+          return identity.getMetadata().get(key);
+        }
+      }
+    }
+
+    return List.of();
   }
 }

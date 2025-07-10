@@ -34,8 +34,8 @@ import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.SegmentTestUtils;
@@ -45,6 +45,7 @@ import org.apache.pinot.segment.local.segment.index.loader.LoaderTest;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
@@ -85,8 +86,10 @@ public class DimensionTableDataManagerTest {
   private static final String SCHEMA_PATH = "data/dimBaseballTeams_schema.json";
   private static final String TABLE_CONFIG_PATH = "data/dimBaseballTeams_config.json";
   private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
-      new SegmentAllIndexPreprocessThrottler(1, 2, true), new SegmentStarTreePreprocessThrottler(1, 2, true),
-      new SegmentDownloadThrottler(1, 2, true));
+      new SegmentAllIndexPreprocessThrottler(1, 2, true),
+      new SegmentStarTreePreprocessThrottler(1, 2, true),
+      new SegmentDownloadThrottler(1, 2, true),
+      new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
 
   private File _indexDir;
   private SegmentZKMetadata _segmentZKMetadata;
@@ -165,9 +168,9 @@ public class DimensionTableDataManagerTest {
       throws JsonProcessingException {
     HelixManager helixManager = mock(HelixManager.class);
     when(propertyStoreMock.get("/CONFIGS/TABLE/dimBaseballTeams_OFFLINE", null, AccessOption.PERSISTENT)).thenReturn(
-        TableConfigUtils.toZNRecord(tableConfig));
+        TableConfigSerDeUtils.toZNRecord(tableConfig));
     when(propertyStoreMock.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        SchemaUtils.toZNRecord(schema));
+        SchemaSerDeUtils.toZNRecord(schema));
     when(helixManager.getHelixPropertyStore()).thenReturn(propertyStoreMock);
     InstanceDataManagerConfig instanceDataManagerConfig = mock(InstanceDataManagerConfig.class);
     when(instanceDataManagerConfig.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
@@ -292,7 +295,7 @@ public class DimensionTableDataManagerTest {
     // Reload the segment with a new column
     Schema schemaWithExtraColumn = getSchemaWithExtraColumn();
     when(propertyStore.get("/SCHEMAS/dimBaseballTeams", null, AccessOption.PERSISTENT)).thenReturn(
-        SchemaUtils.toZNRecord(schemaWithExtraColumn));
+        SchemaSerDeUtils.toZNRecord(schemaWithExtraColumn));
     when(propertyStore.get("/SEGMENTS/dimBaseballTeams_OFFLINE/" + _segmentZKMetadata.getSegmentName(), null,
         AccessOption.PERSISTENT)).thenReturn(_segmentZKMetadata.toZNRecord());
     tableDataManager.reloadSegment(_segmentZKMetadata.getSegmentName(), false);

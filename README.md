@@ -29,6 +29,8 @@
 [![Join the chat at https://communityinviter.com/apps/apache-pinot/apache-pinot](https://img.shields.io/badge/slack-apache--pinot-brightgreen?logo=slack)](https://communityinviter.com/apps/apache-pinot/apache-pinot)
 [![Twitter Follow](https://img.shields.io/twitter/follow/apachepinot.svg?label=Follow&style=social)](https://twitter.com/intent/follow?screen_name=apachepinot)
 [![License](https://img.shields.io/github/license/apache/pinot.svg)](LICENSE)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/apache/pinot)
+
 
 </div>
 
@@ -97,7 +99,7 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
 
 ## Contributing to Pinot
 
-Want to contribute to apache/pinot? 👋🍷
+Want to contribute to Apache Pinot? 👋🍷
 
 Want to join the ranks of open source committers to Apache Pinot? Then check out the [Contribution Guide](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines) for how you can get involved in the code.
 

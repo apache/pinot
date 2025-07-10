@@ -35,11 +35,13 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TunerConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
@@ -610,6 +612,64 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
     Assert.assertEquals(configs.size(), 0);
+  }
+
+  @Test
+  public void testDeleteTableWithLogicalTable()
+      throws IOException {
+    String logicalTableName = "testDeleteLogicalTable";
+    String tableName = "physicalTable";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    TableConfig realtimeTableConfig = createRealtimeTableConfig(tableName);
+    ControllerRequestURLBuilder urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+    DEFAULT_INSTANCE.addDummySchema(logicalTableName);
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.addTableConfig(offlineTableConfig);
+    DEFAULT_INSTANCE.addTableConfig(realtimeTableConfig);
+
+    // Create logical table
+    String createLogicalTableUrl = urlBuilder.forLogicalTableCreate();
+    LogicalTableConfig logicalTableConfig = getDummyLogicalTableConfig(logicalTableName,
+        List.of(offlineTableConfig.getTableName(), realtimeTableConfig.getTableName()), "DefaultTenant");
+    String response = sendPostRequest(createLogicalTableUrl, logicalTableConfig.toJsonString());
+    Assert.assertTrue(response.contains("testDeleteLogicalTable logical table successfully added"), response);
+
+    // Delete table should fail because it is referenced by a logical table
+    String msg = Assert.expectThrows(
+        IOException.class, () -> sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName))).getMessage();
+    Assert.assertTrue(msg.contains("Cannot delete table config: " + tableName
+        + " because it is referenced in logical table: " + logicalTableName), msg);
+
+    //  Delete logical table
+    String deleteLogicalTableUrl = urlBuilder.forLogicalTableDelete(logicalTableName);
+    response = sendDeleteRequest(deleteLogicalTableUrl);
+    Assert.assertTrue(response.contains("testDeleteLogicalTable logical table successfully deleted"), response);
+
+    // physical table should be deleted successfully
+    response = sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName));
+    Assert.assertTrue(response.contains("Deleted TableConfigs: physicalTable"), response);
+  }
+
+  @Test
+  public void testDeleteTableConfigWithTableTypeValidation()
+      throws IOException {
+    ControllerRequestURLBuilder urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+    String tableName = "testDeleteWithTypeValidation";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.addTableConfig(offlineTableConfig);
+
+    // Delete table should fail because it is not a raw table name
+    String msg = Assert.expectThrows(
+            IOException.class,
+            () -> sendDeleteRequest(urlBuilder.forTableConfigsDelete(offlineTableConfig.getTableName())))
+        .getMessage();
+    Assert.assertTrue(msg.contains("Invalid table name: testDeleteWithTypeValidation_OFFLINE. Use raw table name."),
+        msg);
+
+    // Delete table with raw table name
+    String response = sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName));
+    Assert.assertTrue(response.contains("Deleted TableConfigs: testDeleteWithTypeValidation"), response);
   }
 
   @Test

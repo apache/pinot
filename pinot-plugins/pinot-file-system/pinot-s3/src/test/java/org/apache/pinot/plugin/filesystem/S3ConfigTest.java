@@ -67,4 +67,12 @@ public class S3ConfigTest {
     pinotConfig.setProperty("storageClass", "invalid-storage-class");
     S3Config cfg = new S3Config(pinotConfig);
   }
+
+  @Test
+  public void testLegacyMd5Plugin() {
+    PinotConfiguration pinotConfig = new PinotConfiguration();
+    pinotConfig.setProperty("useLegacyMd5Plugin", "true");
+    S3Config cfg = new S3Config(pinotConfig);
+    Assert.assertTrue(cfg.useLegacyMd5Plugin());
+  }
 }

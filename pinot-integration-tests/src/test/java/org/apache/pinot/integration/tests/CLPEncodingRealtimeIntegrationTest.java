@@ -22,6 +22,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Random;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -36,12 +37,18 @@ import org.testng.annotations.Test;
 
 public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTestSet {
   private List<File> _avroFiles;
+  private FieldConfig.CompressionCodec _selectedCompressionCodec;
+  private final Random _random = new Random();
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
     _avroFiles = unpackAvroData(_tempDir);
+
+    // Randomly select CLP or CLPV2 compression codec
+    _selectedCompressionCodec =
+        _random.nextBoolean() ? FieldConfig.CompressionCodec.CLP : FieldConfig.CompressionCodec.CLPV2;
 
     // Start the Pinot cluster
     startZk();
@@ -130,9 +137,8 @@ public class CLPEncodingRealtimeIntegrationTest extends BaseClusterIntegrationTe
   @Override
   protected List<FieldConfig> getFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
-    fieldConfigs.add(
-        new FieldConfig("logLine", FieldConfig.EncodingType.RAW, null, null, FieldConfig.CompressionCodec.CLP, null,
-            null, null, null));
+    fieldConfigs.add(new FieldConfig.Builder("logLine").withEncodingType(FieldConfig.EncodingType.RAW)
+        .withCompressionCodec(_selectedCompressionCodec).build());
 
     return fieldConfigs;
   }

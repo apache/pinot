@@ -18,12 +18,11 @@
  */
 package org.apache.pinot.common.tier;
 
-import com.google.common.collect.Sets;
-import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.TierConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,24 +43,23 @@ public final class TierFactory {
   /**
    * Constructs a {@link Tier} from the {@link TierConfig} in the table config
    */
-  public static Tier getTier(TierConfig tierConfig, HelixManager helixManager) {
-    return getTier(tierConfig, helixManager, null);
+  public static Tier getTier(TierConfig tierConfig) {
+    return getTier(tierConfig, null);
   }
 
-  public static Tier getTier(TierConfig tierConfig, HelixManager helixManager,
-      @Nullable Set<String> providedSegmentsForTier) {
+  public static Tier getTier(TierConfig tierConfig, @Nullable Set<String> providedSegmentsForTier) {
     TierSegmentSelector segmentSelector;
     TierStorage storageSelector;
     String segmentSelectorType = tierConfig.getSegmentSelectorType();
     if (providedSegmentsForTier != null) {
       LOGGER.debug("Provided segments: {} for tier: {}", providedSegmentsForTier, tierConfig.getName());
-      segmentSelector = new FixedTierSegmentSelector(helixManager, providedSegmentsForTier);
+      segmentSelector = new FixedTierSegmentSelector(providedSegmentsForTier);
     } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
-      segmentSelector = new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge());
+      segmentSelector = new TimeBasedTierSegmentSelector(tierConfig.getSegmentAge());
     } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.FIXED_SEGMENT_SELECTOR_TYPE)) {
-      segmentSelector = new FixedTierSegmentSelector(helixManager,
-          CollectionUtils.isEmpty(tierConfig.getSegmentList()) ? Collections.emptySet()
-              : Sets.newHashSet(tierConfig.getSegmentList()));
+      List<String> segments = tierConfig.getSegmentList();
+      segmentSelector =
+          new FixedTierSegmentSelector(CollectionUtils.isEmpty(segments) ? Set.of() : new HashSet<>(segments));
     } else {
       throw new IllegalStateException("Unsupported segmentSelectorType: " + segmentSelectorType);
     }

@@ -44,28 +44,35 @@ public class DiskUtilizationCheckerTest {
 
   private static final String DISK_UTILIZATION_PATH = "/disk/utilization/path";
   private PinotHelixResourceManager _helixResourceManager;
-  private ControllerConf _controllerConf;
   private DiskUtilizationChecker _diskUtilizationChecker;
 
   @BeforeMethod
   public void setUp() {
     _helixResourceManager = mock(PinotHelixResourceManager.class);
-    _controllerConf = mock(ControllerConf.class);
+    ControllerConf controllerConf = mock(ControllerConf.class);
 
-    when(_controllerConf.getDiskUtilizationPath()).thenReturn(DISK_UTILIZATION_PATH);
-    when(_controllerConf.getDiskUtilizationThreshold()).thenReturn(0.8);
-    when(_controllerConf.getDiskUtilizationCheckTimeoutMs()).thenReturn(5000);
-    when(_controllerConf.getResourceUtilizationCheckerFrequency()).thenReturn(120L);
+    when(controllerConf.getDiskUtilizationPath()).thenReturn(DISK_UTILIZATION_PATH);
+    when(controllerConf.getDiskUtilizationThreshold()).thenReturn(0.8);
+    when(controllerConf.getDiskUtilizationCheckTimeoutMs()).thenReturn(5000);
+    when(controllerConf.getResourceUtilizationCheckerFrequency()).thenReturn(120L);
 
-    _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, _controllerConf);
+    _diskUtilizationChecker = new DiskUtilizationChecker(_helixResourceManager, controllerConf);
   }
 
   @Test
   public void testIsDiskUtilizationWithinLimitsNullOrEmptyTableName() {
     Assert.assertThrows(IllegalArgumentException.class,
-        () -> _diskUtilizationChecker.isDiskUtilizationWithinLimits(null));
+        () -> _diskUtilizationChecker.isResourceUtilizationWithinLimits(null,
+            UtilizationChecker.CheckPurpose.REALTIME_INGESTION));
     Assert.assertThrows(IllegalArgumentException.class,
-        () -> _diskUtilizationChecker.isDiskUtilizationWithinLimits(""));
+        () -> _diskUtilizationChecker.isResourceUtilizationWithinLimits("",
+            UtilizationChecker.CheckPurpose.REALTIME_INGESTION));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> _diskUtilizationChecker.isResourceUtilizationWithinLimits(null,
+            UtilizationChecker.CheckPurpose.TASK_GENERATION));
+    Assert.assertThrows(IllegalArgumentException.class,
+        () -> _diskUtilizationChecker.isResourceUtilizationWithinLimits("",
+            UtilizationChecker.CheckPurpose.TASK_GENERATION));
   }
 
   @Test
@@ -73,17 +80,55 @@ public class DiskUtilizationCheckerTest {
     String tableName = "test_OFFLINE";
     when(_helixResourceManager.getOfflineTableConfig(tableName)).thenReturn(null);
 
-    boolean result = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableName);
-    Assert.assertTrue(result);
+    UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
+
+    result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
   }
 
   @Test
   public void testIsDiskUtilizationWithinLimitsNonExistentRealtimeTable() {
     String tableName = "test_REALTIME";
-    when(_helixResourceManager.getOfflineTableConfig(tableName)).thenReturn(null);
+    when(_helixResourceManager.getTableConfig(tableName)).thenReturn(null);
 
-    boolean result = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableName);
-    Assert.assertTrue(result);
+    UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
+
+    result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
+  }
+
+  @Test
+  public void testIsDiskUtilizationStale() {
+    String tableName = "test_OFFLINE";
+
+    TableConfig mockTableConfig = mock(TableConfig.class);
+    when(_helixResourceManager.getTableConfig(tableName)).thenReturn(mockTableConfig);
+
+    List<String> mockInstances = Arrays.asList("server1", "server2");
+    when(_helixResourceManager.getServerInstancesForTable(tableName, TableType.OFFLINE)).thenReturn(mockInstances);
+
+    // Mock disk usage
+    Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
+    DiskUsageInfo diskUsageInfo1 = new DiskUsageInfo("server1");
+    diskUsageInfoMap.put("server1", diskUsageInfo1);
+
+    DiskUsageInfo diskUsageInfo2 = new DiskUsageInfo("server2");
+    diskUsageInfoMap.put("server2", diskUsageInfo2);
+    ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
+
+    UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.UNDETERMINED);
+
+    result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.UNDETERMINED);
   }
 
   @Test
@@ -91,7 +136,7 @@ public class DiskUtilizationCheckerTest {
     String tableName = "test_OFFLINE";
 
     TableConfig mockTableConfig = mock(TableConfig.class);
-    when(_helixResourceManager.getOfflineTableConfig(tableName)).thenReturn(mockTableConfig);
+    when(_helixResourceManager.getTableConfig(tableName)).thenReturn(mockTableConfig);
 
     List<String> mockInstances = Arrays.asList("server1", "server2");
     when(_helixResourceManager.getServerInstancesForTable(tableName, TableType.OFFLINE)).thenReturn(mockInstances);
@@ -107,8 +152,13 @@ public class DiskUtilizationCheckerTest {
     diskUsageInfoMap.put("server2", diskUsageInfo2);
     ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
 
-    boolean result = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableName);
-    Assert.assertTrue(result);
+    UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
+
+    result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.PASS);
   }
 
   @Test
@@ -132,8 +182,13 @@ public class DiskUtilizationCheckerTest {
     diskUsageInfoMap.put("server2", diskUsageInfo2);
     ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
 
-    boolean result = _diskUtilizationChecker.isDiskUtilizationWithinLimits(tableName);
-    Assert.assertFalse(result);
+    UtilizationChecker.CheckResult result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.REALTIME_INGESTION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.FAIL);
+
+    result = _diskUtilizationChecker.isResourceUtilizationWithinLimits(tableName,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION);
+    Assert.assertEquals(result, UtilizationChecker.CheckResult.FAIL);
   }
 
   @Test
@@ -162,7 +217,7 @@ public class DiskUtilizationCheckerTest {
     when(completionServiceHelper.doMultiGetRequest(anyList(), anyString(), anyBoolean(), anyMap(), anyInt(),
         anyString())).thenReturn(serviceResponse);
 
-    _diskUtilizationChecker.computeDiskUtilization(instanceAdminEndpoints.inverse(), completionServiceHelper);
+    _diskUtilizationChecker.computeResourceUtilization(instanceAdminEndpoints.inverse(), completionServiceHelper);
 
     DiskUsageInfo diskUsageInfo1 = ResourceUtilizationInfo.getDiskUsageInfo("server1");
     DiskUsageInfo diskUsageInfo2 = ResourceUtilizationInfo.getDiskUsageInfo("server2");

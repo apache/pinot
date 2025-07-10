@@ -27,6 +27,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.grpc.GrpcConnection;
@@ -38,7 +39,23 @@ public class PinotJdbcExample {
   }
 
   public static void testPinotJdbcForQuickStart(String jdbcUrl, final String query) {
-    try (Connection connection = DriverManager.getConnection(jdbcUrl);
+    testPinotJdbcForQuickStart(jdbcUrl, query, new Properties());
+  }
+
+  public static void testPinotJdbcForQuickStart(String jdbcUrl, final String query, @Nullable String username,
+      @Nullable String password) {
+    Properties info = new Properties();
+    if (username != null) {
+      info.setProperty("user", username);
+    }
+    if (password != null) {
+      info.setProperty("password", password);
+    }
+    testPinotJdbcForQuickStart(jdbcUrl, query, info);
+  }
+
+  public static void testPinotJdbcForQuickStart(String jdbcUrl, final String query, Properties info) {
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, info);
         Statement statement = connection.createStatement(); ResultSet resultSet = statement.executeQuery(query)) {
 
       System.out.println("Connected to Apache Pinot with JDBC Url: " + jdbcUrl);
@@ -85,9 +102,23 @@ public class PinotJdbcExample {
     String query;
     // query = "SELECT count(*) FROM airlineStats";
     query = "SELECT * FROM airlineStats limit 1000";
+
+    // Test with JDBC connection methods: http(default), grpc.
     testPinotJdbcForQuickStart("jdbc:pinot://localhost:9000", query);
     testPinotJdbcForQuickStart("jdbc:pinotgrpc://localhost:9000?blockRowSize=100", query);
 
+    // Test with JDBC connection using grpc with authentication.
+    // Note: Run below with {@link org.apache.pinot.tools.AuthQuickstart} to enable authentication.
+    System.out.println("\n\nTesting JDBC connection with authentication");
+    testPinotJdbcForQuickStart("jdbc:pinotgrpc://localhost:9000?blockRowSize=100", query, "admin", "verysecret");
+
+    // Test with JDBC connection using grpc with authentication properties.
+    System.out.println("\n\nTesting JDBC connection with authentication properties");
+    Properties authProperties = new Properties();
+    authProperties.put("Authorization", "Basic YWRtaW46dmVyeXNlY3JldA==");
+    testPinotJdbcForQuickStart("jdbc:pinotgrpc://localhost:9000?blockRowSize=100", query, authProperties);
+
+    // Test with Java client using broker grpc client.
     testQuery(ConnectionFactory.fromControllerGrpc(properties, "localhost:9000"), query);
     testQuery(ConnectionFactory.fromZookeeperGrpc(properties, "localhost:2123/QuickStartCluster"), query);
     testQuery(ConnectionFactory.fromHostListGrpc(properties, List.of("localhost:8010")), query);

@@ -240,7 +240,7 @@ public class DebugResource {
     TableSizeReader.TableSizeDetails tableSizeDetails;
     try {
       tableSizeDetails = _tableSizeReader
-          .getTableSizeDetails(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+          .getTableSizeDetails(tableNameWithType, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000, true);
     } catch (Throwable t) {
       tableSizeDetails = null;
     }

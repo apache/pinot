@@ -19,12 +19,11 @@
 package org.apache.pinot.core.query.scheduler;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
-import javax.annotation.Nonnull;
 
 
 class TestSchedulerGroup extends AbstractSchedulerGroup {
 
-  TestSchedulerGroup(@Nonnull String name) {
+  TestSchedulerGroup(String name) {
     super(name);
   }
 

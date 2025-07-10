@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -123,8 +121,18 @@ public class GenericRow implements Serializable {
     return _fieldToValueMap.get(fieldName);
   }
 
-  public Object removeValue(String fieldName) {
-    return _fieldToValueMap.remove(fieldName);
+  /// Constructs a [PrimaryKey] from the given list of primary key columns.
+  public PrimaryKey getPrimaryKey(List<String> primaryKeyColumns) {
+    int numPrimaryKeyColumns = primaryKeyColumns.size();
+    Object[] values = new Object[numPrimaryKeyColumns];
+    for (int i = 0; i < numPrimaryKeyColumns; i++) {
+      Object value = getValue(primaryKeyColumns.get(i));
+      if (value instanceof byte[]) {
+        value = new ByteArray((byte[]) value);
+      }
+      values[i] = value;
+    }
+    return new PrimaryKey(values);
   }
 
   /**
@@ -207,17 +215,14 @@ public class GenericRow implements Serializable {
     _fieldToValueMap.put(fieldName, value);
   }
 
-  public PrimaryKey getPrimaryKey(List<String> primaryKeyColumns) {
-    int numPrimaryKeyColumns = primaryKeyColumns.size();
-    Object[] values = new Object[numPrimaryKeyColumns];
-    for (int i = 0; i < numPrimaryKeyColumns; i++) {
-      Object value = getValue(primaryKeyColumns.get(i));
-      if (value instanceof byte[]) {
-        value = new ByteArray((byte[]) value);
-      }
-      values[i] = value;
-    }
-    return new PrimaryKey(values);
+  /// Sets the values per the given map from fields to values.
+  public void putValues(Map<String, Object> fieldToValueMap) {
+    _fieldToValueMap.putAll(fieldToValueMap);
+  }
+
+  /// Removes the value for the given field.
+  public Object removeValue(String fieldName) {
+    return _fieldToValueMap.remove(fieldName);
   }
 
   /**
@@ -279,48 +284,11 @@ public class GenericRow implements Serializable {
 
   @Deprecated
   public void init(Map<String, Object> fieldToValueMap) {
-    _fieldToValueMap.putAll(fieldToValueMap);
-  }
-
-  @Deprecated
-  @JsonIgnore
-  public Set<Map.Entry<String, Object>> getEntrySet() {
-    return _fieldToValueMap.entrySet();
-  }
-
-  @Deprecated
-  @JsonIgnore
-  public String[] getFieldNames() {
-    return _fieldToValueMap.keySet().toArray(new String[0]);
+    putValues(fieldToValueMap);
   }
 
   @Deprecated
   public void putField(String fieldName, @Nullable Object value) {
-    _fieldToValueMap.put(fieldName, value);
-  }
-
-  @Deprecated
-  public static GenericRow fromBytes(byte[] buffer)
-      throws IOException {
-    Map<String, Object> fieldMap = JsonUtils.bytesToObject(buffer, Map.class);
-    GenericRow genericRow = new GenericRow();
-    genericRow.init(fieldMap);
-    return genericRow;
-  }
-
-  @Deprecated
-  public byte[] toBytes()
-      throws IOException {
-    return JsonUtils.objectToBytes(_fieldToValueMap);
-  }
-
-  @Deprecated
-  public static GenericRow createOrReuseRow(GenericRow row) {
-    if (row == null) {
-      return new GenericRow();
-    } else {
-      row.clear();
-      return row;
-    }
+    putValue(fieldName, value);
   }
 }

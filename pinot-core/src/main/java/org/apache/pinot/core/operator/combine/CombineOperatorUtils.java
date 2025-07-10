@@ -34,7 +34,7 @@ public class CombineOperatorUtils {
    * Sets the execution statistics into the results block.
    */
   public static void setExecutionStatistics(BaseResultsBlock resultsBlock, List<Operator> operators,
-      long threadCpuTimeNs, int numServerThreads) {
+      long threadCpuTimeNs, int numServerThreads, long threadMemAllocatedBytes) {
     int numSegmentsProcessed = operators.size();
     int numSegmentsMatched = 0;
     int numConsumingSegmentsProcessed = 0;
@@ -71,6 +71,7 @@ public class CombineOperatorUtils {
     resultsBlock.setNumEntriesScannedPostFilter(numEntriesScannedPostFilter);
     resultsBlock.setNumTotalDocs(numTotalDocs);
     resultsBlock.setExecutionThreadCpuTimeNs(threadCpuTimeNs);
+    resultsBlock.setExecutionThreadMemAllocatedBytes(threadMemAllocatedBytes);
     resultsBlock.setNumServerThreads(numServerThreads);
   }
 }

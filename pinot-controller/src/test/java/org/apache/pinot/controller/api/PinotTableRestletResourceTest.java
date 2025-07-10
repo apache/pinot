@@ -29,6 +29,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -51,13 +53,21 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
+import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
+import static org.testng.Assert.fail;
 
 
 /**
@@ -79,13 +89,17 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     _offlineBuilder.setTableName(OFFLINE_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5");
 
-    // add schema for realtime table
-    DEFAULT_INSTANCE.addDummySchema(REALTIME_TABLE_NAME);
-    DEFAULT_INSTANCE.addDummySchema(OFFLINE_TABLE_NAME);
     StreamConfig streamConfig = FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs();
     _realtimeBuilder.setTableName(REALTIME_TABLE_NAME).setTimeColumnName("timeColumn").setTimeType("DAYS")
         .setRetentionTimeUnit("DAYS").setRetentionTimeValue("5")
         .setStreamConfigs(streamConfig.getStreamConfigsMap());
+  }
+
+  @BeforeMethod
+  public void beforeMethod()
+      throws Exception {
+    DEFAULT_INSTANCE.addDummySchema(REALTIME_TABLE_NAME);
+    DEFAULT_INSTANCE.addDummySchema(OFFLINE_TABLE_NAME);
   }
 
   private void registerMinionTasks() {
@@ -634,6 +648,59 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     assertEquals(deleteResponse, "{\"status\":\"Tables: [table3_OFFLINE] deleted\"}");
   }
 
+  @Test(dataProvider = "tableTypeProvider")
+  public void testDeleteTableWithLogicalTable(TableType tableType)
+      throws IOException {
+    ControllerRequestURLBuilder urlBuilder = DEFAULT_INSTANCE.getControllerRequestURLBuilder();
+    String logicalTable = "logicalTable";
+    String tableName = "physicalTable";
+    String tableNameWithType = TableNameBuilder.forType(tableType).tableNameWithType(tableName);
+    DEFAULT_INSTANCE.addDummySchema(tableName);
+    DEFAULT_INSTANCE.addDummySchema(logicalTable);
+    DEFAULT_INSTANCE.addTableConfig(createDummyTableConfig(tableName, tableType));
+
+    LogicalTableConfig logicalTableConfig =
+        ControllerTest.getDummyLogicalTableConfig(logicalTable, List.of(tableNameWithType), "DefaultTenant");
+    String logicalTableUrl = urlBuilder.forLogicalTableCreate();
+    String response = ControllerTest.sendPostRequest(logicalTableUrl, logicalTableConfig.toSingleLineJsonString());
+    assertEquals(response,
+        "{\"unrecognizedProperties\":{},\"status\":\"logicalTable logical table successfully added.\"}");
+
+    // table deletion should fail
+    String tableDeleteUrl = urlBuilder.forTableDelete(tableNameWithType);
+    String msg = expectThrows(IOException.class, () -> ControllerTest.sendDeleteRequest(tableDeleteUrl)).getMessage();
+    assertTrue(msg.contains("Cannot delete table config: " + tableNameWithType
+        + " because it is referenced in logical table: logicalTable"), msg);
+
+    // table delete with name and type should also fail
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendDeleteRequest(tableDeleteUrl + "?type=" + tableType)).getMessage();
+    assertTrue(msg.contains("Cannot delete table config: " + tableNameWithType
+        + " because it is referenced in logical table: logicalTable"), msg);
+
+    // table delete with raw table name also should fail
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendDeleteRequest(urlBuilder.forTableDelete(tableName))).getMessage();
+    assertTrue(msg.contains(
+        "Cannot delete table config: " + tableName + " because it is referenced in logical table: logicalTable"), msg);
+
+    // table delete with raw table name and type also should fail
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendDeleteRequest(urlBuilder.forTableDelete(tableName + "?type=" + tableType)))
+            .getMessage();
+    assertTrue(msg.contains(
+        "Cannot delete table config: " + tableName + " because it is referenced in logical table: logicalTable"), msg);
+
+    // Delete logical table
+    String logicalTableDeleteUrl = urlBuilder.forLogicalTableDelete(logicalTable);
+    response = ControllerTest.sendDeleteRequest(logicalTableDeleteUrl);
+    assertEquals(response, "{\"status\":\"logicalTable logical table successfully deleted.\"}");
+
+    // Now table deletion should succeed
+    response = ControllerTest.sendDeleteRequest(tableDeleteUrl);
+    assertEquals(response, "{\"status\":\"Tables: [" + tableNameWithType + "] deleted\"}");
+  }
+
   @Test
   public void testCheckTableState()
       throws IOException {
@@ -895,6 +962,31 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         aThrows.getMessage());
   }
 
+  @Test
+  public void testGetNonExistentTableConfig()
+      throws IOException {
+    // Attempt to get a non-existent table config
+    String tableName = "nonExistentTable";
+    String url = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName);
+    Pair<Integer, String> respWithStatusCode = sendGetRequestWithStatusCode(url, null);
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
+    String msg = respWithStatusCode.getRight();
+    assertTrue(msg.contains("Table nonExistentTable does not exist"), msg);
+
+    // Attempt to get a non-existent table config with type
+    String offlineUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName, TableType.OFFLINE);
+    respWithStatusCode = sendGetRequestWithStatusCode(offlineUrl, null);
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
+    msg = respWithStatusCode.getRight();
+    assertTrue(msg.contains("Table nonExistentTable_OFFLINE does not exist"), msg);
+
+    String realtimeUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableGet(tableName, TableType.REALTIME);
+    respWithStatusCode = sendGetRequestWithStatusCode(realtimeUrl, null);
+    assertEquals(Response.Status.NOT_FOUND.getStatusCode(), respWithStatusCode.getLeft());
+    msg = respWithStatusCode.getRight();
+    assertTrue(msg.contains("Table nonExistentTable_REALTIME does not exist"), msg);
+  }
+
   /**
    * Updating existing REALTIME table with invalid replication factor should throw exception.
    */
@@ -996,6 +1088,13 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     return new InstanceAssignmentConfig(instanceTagPoolConfig, instanceConstraintConfig,
         instanceReplicaGroupPartitionConfig,
         InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR.name(), false);
+  }
+
+  @AfterMethod
+  public void cleanUp()
+      throws IOException {
+    // Delete all tables after each test
+    DEFAULT_INSTANCE.cleanup();
   }
 
   @AfterClass

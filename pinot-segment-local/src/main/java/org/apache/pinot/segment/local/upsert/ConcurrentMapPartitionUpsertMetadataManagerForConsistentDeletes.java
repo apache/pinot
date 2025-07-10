@@ -166,8 +166,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletes
               // current value, but the segment has a larger sequence number (the segment is newer than the current
               // segment).
               if (comparisonResult > 0 || (comparisonResult == 0 && shouldReplaceOnComparisonTie(segmentName,
-                  currentSegmentName, segment.getSegmentMetadata().getIndexCreationTime(),
-                  currentSegment.getSegmentMetadata().getIndexCreationTime()))) {
+                  currentSegmentName, getAuthoritativeCreationTime(segment),
+                  getAuthoritativeCreationTime(currentSegment)))) {
                 replaceDocId(segment, validDocIds, queryableDocIds, currentSegment, currentDocId, newDocId, recordInfo);
                 return new RecordLocation(segment, newDocId, newComparisonValue,
                     RecordLocation.incrementSegmentCount(currentDistinctSegmentCount));

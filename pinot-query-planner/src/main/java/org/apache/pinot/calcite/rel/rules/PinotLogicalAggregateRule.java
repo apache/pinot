@@ -71,7 +71,7 @@ public class PinotLogicalAggregateRule {
       }
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
-      if (!isGroupTrimmingEnabled(call, hintOptions)) {
+      if (!isGroupTrimmingEnabled(call, hintOptions, aggRel)) {
         return;
       }
       Sort sortRel = call.rel(0);
@@ -119,7 +119,7 @@ public class PinotLogicalAggregateRule {
       }
       Map<String, String> hintOptions =
           PinotHintStrategyTable.getHintOptions(aggRel.getHints(), PinotHintOptions.AGGREGATE_HINT_OPTIONS);
-      if (!isGroupTrimmingEnabled(call, hintOptions)) {
+      if (!isGroupTrimmingEnabled(call, hintOptions, aggRel)) {
         return;
       }
 
@@ -177,12 +177,16 @@ public class PinotLogicalAggregateRule {
         leafReturnFinalResult, collations, limit);
   }
 
-  private static boolean isGroupTrimmingEnabled(RelOptRuleCall call, @Nullable Map<String, String> hintOptions) {
+  private static boolean isGroupTrimmingEnabled(RelOptRuleCall call, @Nullable Map<String, String> hintOptions,
+      Aggregate aggRel) {
     if (hintOptions != null) {
       String option = hintOptions.get(PinotHintOptions.AggregateOptions.IS_ENABLE_GROUP_TRIM);
       if (option != null) {
         return Boolean.parseBoolean(option);
       }
+    }
+    if (aggRel.getAggCallList().isEmpty()) {
+      return true;
     }
 
     Context genericContext = call.getPlanner().getContext();

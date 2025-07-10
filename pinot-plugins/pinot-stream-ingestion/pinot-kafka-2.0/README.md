@@ -30,15 +30,13 @@ A stream plugin for another version of kafka, or another stream, can be added in
 ```
 
 * How to use Kafka 2.x connector
-Below is a sample `streamConfigs` used to create a realtime table with Kafka Stream(High) level consumer:
+Below is a sample `streamConfigs` used to create a real-time table with Kafka consumer:
 ```$xslt
 "streamConfigs": {
   "streamType": "kafka",
+  "stream.kafka.broker.list": "localhost:19092",
   "stream.kafka.topic.name": "meetupRSVPEvents",
-  "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder",
-  "stream.kafka.hlc.zk.connect.string": "localhost:2191/kafka",
   "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
-  "stream.kafka.zk.broker.url": "localhost:2191/kafka",
-  "stream.kafka.hlc.bootstrap.server": "localhost:19092"
+  "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
 }
 ```

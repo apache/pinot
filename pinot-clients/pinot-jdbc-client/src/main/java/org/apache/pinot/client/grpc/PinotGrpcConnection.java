@@ -47,6 +47,7 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
       CommonConstants.Broker.Grpc.BLOCK_ROW_SIZE,
       CommonConstants.Broker.Grpc.COMPRESSION,
       CommonConstants.Broker.Grpc.ENCODING,
+      DriverUtils.AUTH_HEADER,
   };
   private GrpcConnection _session;
   private PinotControllerTransport _controllerTransport;
@@ -56,7 +57,8 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
   private final Map<String, String> _metadataMap = new HashMap<>();
 
   public PinotGrpcConnection(Properties properties, String controllerURL, String tenant,
-      PinotControllerTransport controllerTransport) {
+      PinotControllerTransport controllerTransport)
+      throws SQLException {
     _closed = false;
     _controllerURL = controllerURL;
     if (controllerTransport == null) {
@@ -79,11 +81,15 @@ public class PinotGrpcConnection extends AbstractBaseConnection {
       }
     }
     for (String possibleMetadataMapOption : POSSIBLE_METADATA_MAP_OPTIONS) {
-      Object property = properties.getProperty(possibleMetadataMapOption);
-      if (property != null) {
-        _metadataMap.put(possibleMetadataMapOption, property.toString());
+      for (Object key : properties.keySet()) {
+        if (key.toString().equalsIgnoreCase(possibleMetadataMapOption)) {
+          // If the key is found, we use the value as metadata map option
+          _metadataMap.put(possibleMetadataMapOption, properties.getProperty(key.toString()));
+          break;
+        }
       }
     }
+    DriverUtils.handleAuth(properties, _metadataMap);
   }
 
   public GrpcConnection getSession() {

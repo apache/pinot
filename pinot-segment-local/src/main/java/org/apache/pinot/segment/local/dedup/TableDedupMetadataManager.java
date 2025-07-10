@@ -19,7 +19,10 @@
 package org.apache.pinot.segment.local.dedup;
 
 import java.io.Closeable;
+import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -30,7 +33,7 @@ public interface TableDedupMetadataManager extends Closeable {
    * Initialize TableDedupMetadataManager.
    */
   void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager);
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
   /**
    * Create a new PartitionDedupMetadataManager if not present already, otherwise return existing one.
@@ -47,4 +50,11 @@ public interface TableDedupMetadataManager extends Closeable {
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();
+
+  /**
+   * Retrieves a mapping of partition id to the primary key count for the partition.
+   *
+   * @return A {@code Map} where keys are partition id and values are count of primary keys for that specific partition
+   */
+  Map<Integer, Long> getPartitionToPrimaryKeyCount();
 }

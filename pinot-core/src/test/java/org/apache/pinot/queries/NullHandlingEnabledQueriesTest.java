@@ -48,8 +48,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
-import static org.testng.AssertJUnit.assertArrayEquals;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertTrue;
 
 
 public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
@@ -170,9 +169,9 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 3);
-    assertArrayEquals(rows.get(0), new Object[]{2, (long) 2 * NUM_OF_SEGMENT_COPIES});
-    assertArrayEquals(rows.get(1), new Object[]{1, (long) NUM_OF_SEGMENT_COPIES});
-    assertArrayEquals(rows.get(2), new Object[]{null, (long) 3 * NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(0), new Object[]{2, (long) 2 * NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(1), new Object[]{1, (long) NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(2), new Object[]{null, (long) 3 * NUM_OF_SEGMENT_COPIES});
   }
 
   @Test
@@ -195,7 +194,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertArrayEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
   }
 
   @Test
@@ -218,7 +217,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertArrayEquals(rows.get(0), new Object[]{1, (long) NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(0), new Object[]{1, (long) NUM_OF_SEGMENT_COPIES});
   }
 
   @Test
@@ -241,7 +240,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertArrayEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
   }
 
   @Test
@@ -264,7 +263,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertArrayEquals(rows.get(0), new Object[]{true, (long) NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(0), new Object[]{true, (long) NUM_OF_SEGMENT_COPIES});
   }
 
   @Test
@@ -287,7 +286,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertArrayEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
   }
 
   @Test
@@ -310,7 +309,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertArrayEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
+    assertEquals(rows.get(0), new Object[]{null, (long) 2 * NUM_OF_SEGMENT_COPIES});
   }
 
   @Test
@@ -593,7 +592,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
 
     ResultTable resultTable = brokerResponse.getResultTable();
     assertEquals(resultTable.getRows().size(), 1);
-    assertArrayEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
+    assertEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
   }
 
   @Test(dataProvider = "NumberTypes")
@@ -613,7 +612,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
 
     ResultTable resultTable = brokerResponse.getResultTable();
     assertEquals(resultTable.getRows().size(), 1);
-    assertArrayEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
+    assertEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
   }
 
   @Test(dataProvider = "NumberTypes")
@@ -704,7 +703,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
 
     ResultTable resultTable = brokerResponse.getResultTable();
     assertEquals(resultTable.getRows().size(), 1);
-    assertArrayEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
+    assertEquals(resultTable.getRows().get(0), new Object[]{1, "key"});
   }
 
   @Test
@@ -849,10 +848,10 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 4);
-    assertArrayEquals(rows.get(0), new Object[]{(long) 2 * NUM_OF_SEGMENT_COPIES, 1});
-    assertArrayEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 2});
-    assertArrayEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 3});
-    assertArrayEquals(rows.get(3), new Object[]{(long) NUM_OF_SEGMENT_COPIES, null});
+    assertEquals(rows.get(0), new Object[]{(long) 2 * NUM_OF_SEGMENT_COPIES, 1});
+    assertEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 2});
+    assertEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 3});
+    assertEquals(rows.get(3), new Object[]{(long) NUM_OF_SEGMENT_COPIES, null});
   }
 
   @Test
@@ -876,9 +875,9 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 3);
-    assertArrayEquals(rows.get(0), new Object[]{(long) NUM_OF_SEGMENT_COPIES, null});
-    assertArrayEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 3});
-    assertArrayEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 2});
+    assertEquals(rows.get(0), new Object[]{(long) NUM_OF_SEGMENT_COPIES, null});
+    assertEquals(rows.get(1), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 3});
+    assertEquals(rows.get(2), new Object[]{(long) NUM_OF_SEGMENT_COPIES, 2});
   }
 
   @Test
@@ -896,7 +895,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
 
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
-    assertArrayEquals(rows.get(0), new Object[]{(double) 2});
+    assertEquals(rows.get(0), new Object[]{(double) 2});
   }
 
   @Test
@@ -918,7 +917,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{false});
+    assertEquals(rows.get(0), new Object[]{false});
   }
 
   @Test
@@ -940,7 +939,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{false});
+    assertEquals(rows.get(0), new Object[]{false});
   }
 
   @Test
@@ -960,7 +959,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{-1});
+    assertEquals(rows.get(0), new Object[]{-1});
   }
 
   @Test
@@ -980,7 +979,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
+    assertEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
   }
 
   @Test
@@ -1026,7 +1025,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{-1});
+    assertEquals(rows.get(0), new Object[]{-1});
   }
 
   @Test
@@ -1079,7 +1078,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{-1, 1});
+    assertEquals(rows.get(0), new Object[]{-1, 1});
   }
 
   @Test
@@ -1099,7 +1098,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{true});
+    assertEquals(rows.get(0), new Object[]{true});
   }
 
   @Test
@@ -1189,7 +1188,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{1, DocIdSetPlanNode.MAX_DOC_PER_CALL});
+    assertEquals(rows.get(0), new Object[]{1, DocIdSetPlanNode.MAX_DOC_PER_CALL});
   }
 
   @Test
@@ -1212,7 +1211,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
+    assertEquals(rows.get(0), new Object[]{Integer.MIN_VALUE});
   }
 
   @Test
@@ -1251,7 +1250,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{null, 1});
+    assertEquals(rows.get(0), new Object[]{null, 1});
   }
 
   @Test
@@ -1273,7 +1272,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{1, 3});
+    assertEquals(rows.get(0), new Object[]{1, 3});
   }
 
   @Test
@@ -1296,7 +1295,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{1, 3});
+    assertEquals(rows.get(0), new Object[]{1, 3});
   }
 
   @Test
@@ -1318,7 +1317,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{null, 1});
+    assertEquals(rows.get(0), new Object[]{null, 1});
   }
 
   @Test
@@ -1340,7 +1339,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{null, 2});
+    assertEquals(rows.get(0), new Object[]{null, 2});
   }
 
   @Test
@@ -1364,7 +1363,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{null, null});
+    assertEquals(rows.get(0), new Object[]{null, null});
   }
 
   @Test
@@ -1385,7 +1384,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}, 1});
+    assertEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}, 1});
   }
 
   @Test
@@ -1420,7 +1419,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}});
+    assertEquals(rows.get(0), new Object[]{new Integer[]{1, 2, 3}});
   }
 
   @Test
@@ -1440,7 +1439,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 2 * NUM_OF_SEGMENT_COPIES);
     for (int i = 0; i < 2 * NUM_OF_SEGMENT_COPIES; i++) {
-      assertArrayEquals(rows.get(i), new Object[]{null});
+      assertEquals(rows.get(i), new Object[]{null});
     }
   }
 
@@ -1459,7 +1458,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), NUM_OF_SEGMENT_COPIES);
-    assertArrayEquals(rows.get(0), new Object[]{null});
+    assertEquals(rows.get(0), new Object[]{null});
   }
 
   @Test(dataProvider = "NumberTypes")
@@ -1500,7 +1499,7 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 1);
-    assertArrayEquals(rows.get(0), new Object[]{0.5, "key"});
+    assertEquals(rows.get(0), new Object[]{0.5, "key"});
   }
 
   @Test(dataProvider = "NumberTypes")
@@ -1523,8 +1522,8 @@ public class NullHandlingEnabledQueriesTest extends BaseQueriesTest {
     ResultTable resultTable = brokerResponse.getResultTable();
     List<Object[]> rows = resultTable.getRows();
     assertEquals(rows.size(), 2);
-    assertArrayEquals(rows.get(0), new Object[]{0.5, "key1"});
-    assertArrayEquals(rows.get(1), new Object[]{0.0, "key2"});
+    assertEquals(rows.get(0), new Object[]{0.5, "key1"});
+    assertEquals(rows.get(1), new Object[]{0.0, "key2"});
   }
 
   @Test

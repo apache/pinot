@@ -5,8 +5,7 @@
   },
   "segmentsConfig": {
     "segmentPushType": "REFRESH",
-    "replication": "1",
-    "schemaName": "partsupp"
+    "replication": "1"
   },
   "tableIndexConfig": {
     "loadMode": "MMAP",

@@ -25,6 +25,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
+import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 
 
 /**
@@ -59,6 +60,7 @@ public interface ColumnIndexContainer extends Closeable {
 
   class FromMap implements ColumnIndexContainer {
     private final Map<IndexType, ? extends IndexReader> _readersByIndex;
+    private final MultiColumnTextIndexReader _multiColTextReader;
 
     /**
      * @param readersByIndex it is assumed that each index is associated with a compatible reader, but there is no check
@@ -66,13 +68,23 @@ public interface ColumnIndexContainer extends Closeable {
      *                       {@link FromMap.Builder}
      */
     public FromMap(Map<IndexType, ? extends IndexReader> readersByIndex) {
+      this(readersByIndex, null);
+    }
+
+    public FromMap(Map<IndexType, ? extends IndexReader> readersByIndex,
+        MultiColumnTextIndexReader multiColTextReader) {
       _readersByIndex = readersByIndex;
+      _multiColTextReader = multiColTextReader;
     }
 
     @Nullable
     @Override
     public <I extends IndexReader, T extends IndexType<?, I, ?>> I getIndex(T indexType) {
       return (I) _readersByIndex.get(indexType);
+    }
+
+    public MultiColumnTextIndexReader getMultiColumnTextIndex() {
+      return _multiColTextReader;
     }
 
     @Override
@@ -82,6 +94,7 @@ public interface ColumnIndexContainer extends Closeable {
 
     public static class Builder {
       private final Map<IndexType, IndexReader> _readersByIndex = new HashMap<>();
+      private MultiColumnTextIndexReader _multiColTextReader;
 
       public Builder withAll(Map<IndexType, ? extends IndexReader> safeMap) {
         _readersByIndex.putAll(safeMap);
@@ -93,8 +106,13 @@ public interface ColumnIndexContainer extends Closeable {
         return this;
       }
 
+      public <R extends IndexReader> Builder with(MultiColumnTextIndexReader reader) {
+        _multiColTextReader = reader;
+        return this;
+      }
+
       public FromMap build() {
-        return new FromMap(_readersByIndex);
+        return new FromMap(_readersByIndex, _multiColTextReader);
       }
     }
   }

@@ -31,8 +31,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -221,14 +221,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     JsonNode response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(1, rows.size());
+    assertEquals(rows.size(), 1);
 
     if (expectedResult instanceof String) {
-      assertEquals(expectedResult, rows.get(0).get(0).asText());
+      assertEquals(rows.get(0).get(0).asText(), expectedResult);
     } else if (expectedResult instanceof Integer) {
-      assertEquals(expectedResult, rows.get(0).get(0).asInt());
+      assertEquals(rows.get(0).get(0).asInt(), expectedResult);
     } else if (expectedResult instanceof Boolean) {
-      assertEquals(expectedResult, rows.get(0).get(0).asBoolean());
+      assertEquals(rows.get(0).get(0).asBoolean(), expectedResult);
     } else {
       throw new IllegalArgumentException("Unexpected type for expectedResult: " + expectedResult.getClass());
     }
@@ -241,14 +241,14 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     JsonNode response = postQuery(sqlQuery);
     JsonNode rows = response.get("resultTable").get("rows");
     assertTrue(response.get("exceptions").isEmpty());
-    assertEquals(getCountStarResult(), rows.size());
+    assertEquals(rows.size(), getCountStarResult());
 
     if (expectedResult instanceof String) {
-      assertEquals(expectedResult, rows.get(0).get(0).asText());
+      assertEquals(rows.get(0).get(0).asText(), expectedResult);
     } else if (expectedResult instanceof Integer) {
-      assertEquals(expectedResult, rows.get(0).get(0).asInt());
+      assertEquals(rows.get(0).get(0).asInt(), expectedResult);
     } else if (expectedResult instanceof Boolean) {
-      assertEquals(expectedResult, rows.get(0).get(0).asBoolean());
+      assertEquals(rows.get(0).get(0).asBoolean(), expectedResult);
     } else {
       throw new IllegalArgumentException("Unexpected type for expectedResult: " + expectedResult.getClass());
     }
@@ -318,7 +318,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     String sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM mytable";
     JsonNode response = postQuery(sqlQuery);
     assertNoError(response);
-    assertEquals(5429377.34, response.get("resultTable").get("rows").get(0).get(0).asDouble(), 0.1);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asDouble(), 5429377.34, 0.1);
 
     sqlQuery = "SET serverReturnFinalResult = true; SELECT AVG(salary) FROM mytable WHERE city = 'does_not_exist'";
     response = postQuery(sqlQuery);
@@ -343,10 +343,10 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet {
     for (int i = 0; i < rows.size(); i++) {
       JsonNode row = rows.get(i);
       if (!row.get(0).isNull()) {
-        assertEquals(row.get(0).asInt(), row.get(1).asInt());
         lastSalary = row.get(0).asInt();
+        assertEquals(row.get(1).asInt(), lastSalary);
       } else {
-        assertEquals(lastSalary, row.get(1).numberValue());
+        assertEquals(row.get(1).numberValue(), lastSalary);
       }
     }
   }

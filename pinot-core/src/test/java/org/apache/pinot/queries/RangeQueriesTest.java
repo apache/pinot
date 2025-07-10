@@ -319,9 +319,9 @@ public class RangeQueriesTest extends BaseQueriesTest {
     IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
 
     File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
-    ImmutableSegment immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
+    _indexSegment = segment;
+    _indexSegments = Arrays.asList(segment, segment);
 
     Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof SelectionOnlyOperator);
@@ -335,9 +335,10 @@ public class RangeQueriesTest extends BaseQueriesTest {
     // Enable dictionary on RAW_DOUBLE_COL and reload the segment.
     indexLoadingConfig = createIndexLoadingConfig();
     indexDir = new File(INDEX_DIR, SEGMENT_NAME);
-    immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
+    _indexSegment.destroy();
+    _indexSegment = segment;
+    _indexSegments = Arrays.asList(segment, segment);
 
     operator = getOperator(query);
     assertTrue(operator instanceof SelectionOnlyOperator);
@@ -366,9 +367,9 @@ public class RangeQueriesTest extends BaseQueriesTest {
 
     IndexLoadingConfig indexLoadingConfig = createIndexLoadingConfig();
     File indexDir = new File(INDEX_DIR, SEGMENT_NAME);
-    ImmutableSegment immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    ImmutableSegment segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
+    _indexSegment = segment;
+    _indexSegments = Arrays.asList(segment, segment);
 
     Operator<?> operator = getOperator(query);
     assertTrue(operator instanceof FastFilteredCountOperator);
@@ -380,9 +381,10 @@ public class RangeQueriesTest extends BaseQueriesTest {
     // Enable dictionary on RAW_FLOAT_COL and reload the segment.
     _noDictionaryColumns.remove(RAW_FLOAT_COL);
     indexLoadingConfig = createIndexLoadingConfig();
-    immutableSegment = reloadSegment(indexDir, indexLoadingConfig, SCHEMA);
-    _indexSegment = immutableSegment;
-    _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
+    segment = ImmutableSegmentLoader.load(indexDir, indexLoadingConfig);
+    _indexSegment.destroy();
+    _indexSegment = segment;
+    _indexSegments = Arrays.asList(segment, segment);
 
     operator = getOperator(query);
     assertTrue(operator instanceof FastFilteredCountOperator);

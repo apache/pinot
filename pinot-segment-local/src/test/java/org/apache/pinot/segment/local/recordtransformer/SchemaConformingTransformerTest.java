@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -45,15 +44,10 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.AssertJUnit.fail;
+import static org.testng.Assert.*;
 
 
 public class SchemaConformingTransformerTest {
@@ -952,8 +946,8 @@ public class SchemaConformingTransformerTest {
       ((List<Object>) expectedMergedTextIndexValue).sort(null);
     }
 
-    Assert.assertNotNull(outputRecord);
-    Assert.assertEquals(outputRecord.getFieldToValueMap(), expectedOutputRecordMap);
+    assertNotNull(outputRecord);
+    assertEquals(outputRecord.getFieldToValueMap(), expectedOutputRecordMap);
   }
 
   /**
@@ -971,7 +965,6 @@ public class SchemaConformingTransformerTest {
   /**
    * @return A map representing the given JSON string
    */
-  @Nonnull
   private Map<String, Object> jsonStringToMap(String jsonString) {
     try {
       TypeReference<Map<String, Object>> typeRef = new TypeReference<>() {

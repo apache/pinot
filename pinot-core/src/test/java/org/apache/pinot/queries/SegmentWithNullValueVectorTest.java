@@ -161,7 +161,6 @@ public class SegmentWithNullValueVectorTest {
    * @return Array of string values for the rows in the generated index.
    * @throws Exception
    */
-
   private void buildIndex(TableConfig tableConfig, Schema schema)
       throws Exception {
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(tableConfig, schema);
@@ -183,9 +182,7 @@ public class SegmentWithNullValueVectorTest {
         map.put(fieldSpec.getName(), value);
       }
 
-      GenericRow genericRow = new GenericRow();
-      //Remove some values to simulate null
-      int rowId = i;
+      // Remove some values to simulate null
       Iterator<Map.Entry<String, Object>> iterator = map.entrySet().iterator();
       while (iterator.hasNext()) {
         Map.Entry<String, Object> entry = iterator.next();
@@ -196,20 +193,21 @@ public class SegmentWithNullValueVectorTest {
           } else {
             entry.setValue(null);
           }
-          _actualNullVectorMap.get(key)[rowId] = true;
+          _actualNullVectorMap.get(key)[i] = true;
         }
       }
 
-      if (_actualNullVectorMap.get(INT_COLUMN)[rowId]) {
+      if (_actualNullVectorMap.get(INT_COLUMN)[i]) {
         _nullIntKeyCount++;
-      } else if (!_actualNullVectorMap.get(LONG_COLUMN)[rowId]) {
+      } else if (!_actualNullVectorMap.get(LONG_COLUMN)[i]) {
         if ((long) map.get(LONG_COLUMN) > LONG_VALUE_THRESHOLD) {
           _longKeyCount++;
         }
       }
 
-      genericRow.init(map);
-      rows.add(genericRow);
+      GenericRow row = new GenericRow();
+      row.putValues(map);
+      rows.add(row);
     }
 
     RecordReader recordReader = new GenericRowRecordReader(rows);

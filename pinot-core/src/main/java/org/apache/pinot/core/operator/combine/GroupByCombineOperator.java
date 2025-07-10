@@ -66,6 +66,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private final CountDownLatch _operatorLatch;
 
   private volatile IndexedTable _indexedTable;
+  private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
 
@@ -120,6 +121,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           }
         }
 
+        if (resultsBlock.isGroupsTrimmed()) {
+          _groupsTrimmed = true;
+        }
         // Set groups limit reached flag.
         if (resultsBlock.isNumGroupsLimitReached()) {
           _numGroupsLimitReached = true;
@@ -222,6 +226,10 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return new ExceptionResultsBlock(errMsg);
     }
 
+    if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
+      _groupsTrimmed = true;
+    }
+
     IndexedTable indexedTable = _indexedTable;
     if (_queryContext.isServerReturnFinalResult()) {
       indexedTable.finish(true, true);
@@ -231,6 +239,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       indexedTable.finish(false);
     }
     GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
+    mergedBlock.setGroupsTrimmed(_groupsTrimmed);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
     mergedBlock.setNumResizes(indexedTable.getNumResizes());

@@ -36,7 +36,7 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.RAW_SV_FORWARD_IN
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.UNSORTED_SV_FORWARD_INDEX_FILE_EXTENSION;
 import static org.apache.pinot.segment.spi.index.startree.StarTreeV2Constants.STAR_TREE_INDEX_FILE_NAME;
 import static org.testng.Assert.assertNotNull;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertTrue;
 
 
 public class StarTreeIndexSeparatorTest {

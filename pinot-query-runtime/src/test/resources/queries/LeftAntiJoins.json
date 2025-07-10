@@ -1,0 +1,75 @@
+{
+  "left_join_null_filter_test": {
+    "extraProps": {
+      "enableColumnBasedNullHandling": true
+    },
+    "tables": {
+      "t1": {
+        "schema": [
+          {"name": "key_col", "type": "STRING", "notNull": false},
+          {"name": "event_time", "type": "INT", "notNull": false},
+          {"name": "nn_event_time", "type": "INT", "notNull": true}
+        ],
+        "inputs": [
+          ["a", 1, 1],
+          ["b", 2, 2],
+          ["c", 3, 3],
+          ["d", 4, 4],
+          ["e", 5, 5],
+          [null, null, 0],
+          ["f", null, 6]
+        ]
+      },
+      "t2": {
+        "schema": [
+          {"name": "key_col", "type": "STRING", "notNull": false},
+          {"name": "event_time", "type": "INT", "notNull": false},
+          {"name": "nn_event_time", "type": "INT", "notNull": true}
+        ],
+        "inputs": [
+          ["b", 2, 2],
+          ["a", 1, 1],
+          ["c", 3, 3],
+          ["a", 2, 2],
+          ["c", 1, 1],
+          ["b", 3, 3],
+          ["d", 5, 5],
+          [null, null, 0],
+          ["f", null, 6]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "LEFT JOIN with null filter on key_col and event_time comparison",
+        "sql": "SET enableNullHandling=true; SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.event_time > {t2}.event_time WHERE {t2}.key_col IS NULL",
+        "h2Sql": "SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.event_time > {t2}.event_time WHERE {t2}.key_col IS NULL"
+      },
+      {
+        "description": "LEFT JOIN with null filter on key_col and event_time >= comparison",
+        "sql": "SET enableNullHandling=true; SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.event_time >= {t2}.event_time WHERE {t2}.key_col IS NULL",
+        "h2Sql": "SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.event_time >= {t2}.event_time WHERE {t2}.key_col IS NULL"
+      },
+      {
+        "description": "LEFT JOIN with null filter on key_col and event_time < comparison",
+        "sql": "SET enableNullHandling=true; SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.event_time < {t2}.event_time WHERE {t2}.key_col IS NULL",
+        "h2Sql": "SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.event_time < {t2}.event_time WHERE {t2}.key_col IS NULL"
+      },
+      {
+        "description": "LEFT JOIN with null filter on key_col and event_time <= comparison",
+        "sql": "SET enableNullHandling=true; SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.event_time <= {t2}.event_time WHERE {t2}.key_col IS NULL",
+        "h2Sql": "SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.event_time <= {t2}.event_time WHERE {t2}.key_col IS NULL"
+      },
+      {
+        "description": "LEFT JOIN with null filter on key_col and non-nullable event_time comparison",
+        "sql": "SET enableNullHandling=true; SELECT {t1}.key_col, {t1}.nn_event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.nn_event_time > {t2}.nn_event_time WHERE {t2}.key_col IS NULL",
+        "h2Sql": "SELECT {t1}.key_col, {t1}.nn_event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col AND {t1}.nn_event_time > {t2}.nn_event_time WHERE {t2}.key_col IS NULL"
+      },
+      {
+        "description": "LEFT JOIN with null check on key_col",
+        "sql": "SET enableNullHandling=true; SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col WHERE {t1}.key_col IS NULL",
+        "h2Sql": "SELECT {t1}.key_col, {t1}.event_time FROM {t1} LEFT JOIN {t2} ON {t1}.key_col = {t2}.key_col WHERE {t1}.key_col IS NULL"
+      }
+    ]
+  }
+}

@@ -31,10 +31,10 @@ import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
+import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
@@ -87,7 +87,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     }
     _fstIndexFile = new File(_tempDir, FST_FILE_NAME);
     _invertedIndexFile = new File(_tempDir, INVERTED_INDEX_FILE_NAME);
-    _analyzer = new StandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET);
+    _analyzer = new CaseAwareStandardAnalyzer(LuceneTextIndexCreator.ENGLISH_STOP_WORDS_SET);
   }
 
   @Override

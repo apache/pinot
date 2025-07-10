@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.realtime.impl.forward;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -230,12 +229,12 @@ public class SameValueMutableForwardIndex implements MutableForwardIndex {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId, int docId) {
+  public void add(Object value, int dictId, int docId) {
     _delegate.add(_actualValue, dictId, docId);
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  public void add(Object[] values, @Nullable int[] dictIds, int docId) {
     _delegate.add(_actualValues, dictIds, docId);
   }
 }

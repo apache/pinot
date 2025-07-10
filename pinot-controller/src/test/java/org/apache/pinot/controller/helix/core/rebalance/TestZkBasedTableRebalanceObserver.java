@@ -24,9 +24,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.testng.annotations.Test;
 
@@ -35,6 +36,8 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.Segmen
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.OFFLINE;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
@@ -45,14 +48,15 @@ import static org.testng.Assert.assertTrue;
 public class TestZkBasedTableRebalanceObserver {
   @Test
   void testZkObserverProgressStats() {
-    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     // Mocking this. We will verify using numZkUpdate stat
-    when(pinotHelixResourceManager.addControllerJobToZK(any(), any(), any())).thenReturn(true);
+    when(propertyStore.set(anyString(), any(), anyInt())).thenReturn(true);
+
     ControllerMetrics controllerMetrics = ControllerMetrics.get();
     TableRebalanceContext retryCtx = new TableRebalanceContext();
     retryCtx.setConfig(new RebalanceConfig());
     ZkBasedTableRebalanceObserver observer =
-        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, pinotHelixResourceManager);
+        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, propertyStore);
     Map<String, Map<String, String>> source = new TreeMap<>();
     Map<String, Map<String, String>> target = new TreeMap<>();
     Map<String, Map<String, String>> targetIntermediate = new TreeMap<>();
@@ -113,7 +117,7 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
     checkProgressPercentMetrics(controllerMetrics, observer);
     // This simulates the first step of rebalance, where the IS is set to the intermediate assignment
-    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, source, targetIntermediate,
+    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, source, targetIntermediate,
         rebalanceContext);
     overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
     currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
@@ -167,7 +171,7 @@ public class TestZkBasedTableRebalanceObserver {
     assertEquals(currentStepStats._totalCarryOverSegmentsToBeDeleted, 0);
     checkProgressPercentMetrics(controllerMetrics, observer);
     // Next assignment calculated based on the IS, IS should be same as the previous targetAssignment
-    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, targetIntermediate, target,
+    observer.onTrigger(TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, targetIntermediate, target,
         rebalanceContext);
     overallStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsOverall();
     currentStepStats = observer.getTableRebalanceProgressStats().getRebalanceProgressStatsCurrentStep();
@@ -206,14 +210,15 @@ public class TestZkBasedTableRebalanceObserver {
   // This is a test to verify if Zk stats are pushed out correctly
   @Test
   void testZkObserverTracking() {
-    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+    ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     // Mocking this. We will verify using numZkUpdate stat
-    when(pinotHelixResourceManager.addControllerJobToZK(any(), any(), any())).thenReturn(true);
+    when(propertyStore.set(anyString(), any(), anyInt())).thenReturn(true);
+
     ControllerMetrics controllerMetrics = ControllerMetrics.get();
     TableRebalanceContext retryCtx = new TableRebalanceContext();
     retryCtx.setConfig(new RebalanceConfig());
     ZkBasedTableRebalanceObserver observer =
-        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, pinotHelixResourceManager);
+        new ZkBasedTableRebalanceObserver("dummy", "dummyId", retryCtx, propertyStore);
     Map<String, Map<String, String>> source = new TreeMap<>();
     Map<String, Map<String, String>> target = new TreeMap<>();
     target.put("segment1",
@@ -314,7 +319,7 @@ public class TestZkBasedTableRebalanceObserver {
 
     // Triggers to initialize the overall or step level progress stats - they should provide similar results
     List<TableRebalanceObserver.Trigger> triggers = Arrays.asList(TableRebalanceObserver.Trigger.START_TRIGGER,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER);
     for (TableRebalanceObserver.Trigger trigger : triggers) {
       Map<String, Map<String, String>> current = new TreeMap<>();
       current.put("segment1", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host1"), ONLINE));
@@ -586,7 +591,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 2);
@@ -753,7 +758,7 @@ public class TestZkBasedTableRebalanceObserver {
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 4);
@@ -885,7 +890,7 @@ public class TestZkBasedTableRebalanceObserver {
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 2);
@@ -1098,7 +1103,7 @@ public class TestZkBasedTableRebalanceObserver {
     nextAssignment.put("segment2", SegmentAssignmentUtils.getInstanceStateMap(Arrays.asList("host2", "host3"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 2);
@@ -1192,7 +1197,7 @@ public class TestZkBasedTableRebalanceObserver {
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, oldNextAssignment,
-        rebalanceContextIS, TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER,
+        rebalanceContextIS, TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER,
         tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 4);
     assertEquals(stats._totalSegmentsToBeDeleted, 0);
@@ -1366,7 +1371,7 @@ public class TestZkBasedTableRebalanceObserver {
         Arrays.asList("host2", "host3", "host4", "host5"), ONLINE));
 
     stats = ZkBasedTableRebalanceObserver.calculateUpdatedProgressStats(nextAssignment, current, rebalanceContextIS,
-        TableRebalanceObserver.Trigger.NEXT_ASSINGMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
+        TableRebalanceObserver.Trigger.NEXT_ASSIGNMENT_CALCULATION_TRIGGER, tableRebalanceProgressStats);
     assertEquals(stats._totalSegmentsToBeAdded, 2);
     assertEquals(stats._totalSegmentsToBeDeleted, 2);
     assertEquals(stats._totalRemainingSegmentsToBeAdded, 2);

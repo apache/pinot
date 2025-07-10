@@ -128,7 +128,7 @@ public class DefaultColumnHandlerTest {
   private void testComputeDefaultColumnActionMap(Map<String, DefaultColumnAction> expected) {
     BaseDefaultColumnHandler defaultColumnHandler =
         new V3DefaultColumnHandler(INDEX_DIR, _segmentDirectory.getSegmentMetadata(),
-            new IndexLoadingConfig(TABLE_CONFIG, _schema), _schema, _writer);
+            new IndexLoadingConfig(TABLE_CONFIG, _schema), _writer);
     assertEquals(defaultColumnHandler.computeDefaultColumnActionMap(), expected);
   }
 }

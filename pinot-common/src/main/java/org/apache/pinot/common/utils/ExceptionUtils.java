@@ -18,21 +18,45 @@
  */
 package org.apache.pinot.common.utils;
 
+import org.apache.commons.lang3.StringUtils;
+
+
 public class ExceptionUtils {
 
   private ExceptionUtils() {
   }
 
-  public static String consolidateExceptionMessages(Throwable e) {
+  public static String consolidateExceptionTraces(Throwable e) {
     StringBuilder sb = new StringBuilder();
     // No more than 10 causes
     int maxCauses = 10;
     while (e != null && maxCauses-- > 0) {
       sb.append(getStackTrace(e, 3));
+      if (e.getCause() == e) {
+        break;
+      }
       e = e.getCause();
     }
     return sb.toString();
   }
+
+  public static String consolidateExceptionMessages(Throwable e) {
+    StringBuilder sb = new StringBuilder();
+    while (e != null) {
+      if (StringUtils.isNotBlank(e.getMessage())) {
+        if (sb.length() > 0) {
+          sb.append(". ");
+        }
+        sb.append(e.getMessage());
+      }
+      if (e.getCause() == e) {
+        break;
+      }
+      e = e.getCause();
+    }
+    return sb.toString();
+  }
+
 
   public static String getStackTrace(Throwable e) {
     return getStackTrace(e, Integer.MAX_VALUE);

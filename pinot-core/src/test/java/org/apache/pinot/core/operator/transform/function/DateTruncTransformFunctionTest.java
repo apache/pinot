@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -82,8 +80,8 @@ public class DateTruncTransformFunctionTest {
       throws Exception {
     long zmillisInput = iso8601ToUtcEpochMillis(literalInput);
     GenericRow row = new GenericRow();
-    row.init(ImmutableMap.of(TIME_COLUMN, zmillisInput));
-    List<GenericRow> rows = ImmutableList.of(row);
+    row.putValue(TIME_COLUMN, zmillisInput);
+    List<GenericRow> rows = List.of(row);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("test").setTimeColumnName(TIME_COLUMN).build();
 

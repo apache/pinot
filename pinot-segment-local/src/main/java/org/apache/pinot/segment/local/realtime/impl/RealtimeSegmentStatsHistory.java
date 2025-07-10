@@ -31,7 +31,6 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,7 +134,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
       _memUsedBytes = memUsedBytes;
     }
 
-    public void setColumnStats(@Nonnull String columnName, @Nonnull ColumnStats columnStats) {
+    public void setColumnStats(String columnName, ColumnStats columnStats) {
       _colNameToStats.put(columnName, columnStats);
     }
 
@@ -275,7 +274,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
    * @param columnName
    * @return estimated
    */
-  public synchronized int getEstimatedCardinality(@Nonnull String columnName) {
+  public synchronized int getEstimatedCardinality(String columnName) {
     int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
       return DEFAULT_EST_CARDINALITY;
@@ -306,7 +305,7 @@ public class RealtimeSegmentStatsHistory implements Serializable {
    * @param columnName
    * @return estimated average string size
    */
-  public synchronized int getEstimatedAvgColSize(@Nonnull String columnName) {
+  public synchronized int getEstimatedAvgColSize(String columnName) {
     int numEntriesToScan = getNumEntriesToScan();
     if (numEntriesToScan == 0) {
       return DEFAULT_EST_AVG_COL_SIZE;

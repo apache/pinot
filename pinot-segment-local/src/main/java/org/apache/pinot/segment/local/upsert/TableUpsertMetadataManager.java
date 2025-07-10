@@ -23,8 +23,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.UpsertConfig;
@@ -39,7 +41,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 public interface TableUpsertMetadataManager extends Closeable {
 
   void init(PinotConfiguration instanceUpsertConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager);
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler);
 
   PartitionUpsertMetadataManager getOrCreatePartitionManager(int partitionId);
 

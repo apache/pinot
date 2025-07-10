@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.ProjectNode;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.testng.annotations.DataProvider;
+import org.testng.annotations.Ignore;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
@@ -91,6 +92,137 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
         + "      PinotLogicalAggregate(group=[{}], agg#0=[COUNT() FILTER $0], agg#1=[COUNT()], aggType=[LEAF])\n"
         + "        LogicalProject($f1=[=($0, _UTF-8'a')])\n"
         + "          PinotLogicalTableScan(table=[[default, a]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testAggregateCaseToFilter2() {
+    // queries like "SELECT SUM(CASE WHEN col1 = 'a' THEN cnt ELSE 0 END) FROM a" are rewritten to
+    // "SELECT SUM0(cnt) FROM a WHERE col1 = 'a'"
+    String query = "EXPLAIN PLAN FOR SELECT SUM(CASE WHEN col1 = 'a' THEN 3 ELSE 0 END) FROM a";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+      "Execution Plan\n"
+          + "LogicalProject(EXPR$0=[CASE(=($1, 0), null:BIGINT, $0)])\n"
+          + "  PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0)], agg#1=[COUNT($1)], aggType=[FINAL])\n"
+          + "    PinotLogicalExchange(distribution=[hash])\n"
+          + "      PinotLogicalAggregate(group=[{}], agg#0=[$SUM0($0) FILTER $1], agg#1=[COUNT()], aggType=[LEAF])\n"
+          + "        LogicalProject($f1=[3], $f2=[=($0, _UTF-8'a')])\n"
+          + "          PinotLogicalTableScan(table=[[default, a]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testPruneEmptyCorrelateLeft() {
+    // Test PruneEmptyRules.CORRELATE_LEFT_INSTANCE help unnest
+    // some queries involving correlate and dummy conditions
+    String query = "EXPLAIN PLAN FOR SELECT *\n"
+        + "FROM a WHERE EXISTS (\n"
+        + "  SELECT * FROM b WHERE a.col1 = b.col1\n"
+        + ") AND 1=0;\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalValues(tuples=[[]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testPruneEmptyJoinLeft() {
+    // Test query that produces join with dummy after unnesting
+    // should be optimized to dummy by PruneEmptyRules.PRUNE_EMPTY_JOIN_LEFT
+    String query = "EXPLAIN PLAN FOR SELECT *\n"
+        + "FROM (\n"
+        + "  SELECT * FROM a WHERE 1 = 0\n"
+        + ") t1\n"
+        + "WHERE EXISTS (\n"
+        + "  SELECT 1\n"
+        + "  FROM a\n"
+        + "  WHERE a.col1 = t1.col1\n"
+        + ");\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalValues(tuples=[[]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testJoinPushTransitivePredicate() {
+    // queries involving extra predicate on join keys
+    // should be optimized to push the predicate to both sides of the join if applicable
+    String query = "EXPLAIN PLAN FOR\n"
+        + "SELECT * FROM a\n"
+        + "JOIN b\n"
+        + "ON a.col1 = b.col1\n"
+        + "WHERE a.col1 = 1;\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalJoin(condition=[=($0, $9)], joinType=[inner])\n"
+            + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "    LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"
+            + "      PinotLogicalTableScan(table=[[default, a]])\n"
+            + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "    LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"
+            + "      PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Test
+  public void testJoinPushTransitivePredicateLookupJoin() {
+    // PinotJoinPushTransitivePredicatesRule
+    // should not push to the right under lookup join hint
+    String query = "EXPLAIN PLAN FOR\n"
+        + "SELECT /*+ joinOptions(join_strategy='lookup') */ \n"
+        + "* FROM a\n"
+        + "JOIN b\n"
+        + "ON a.col1 = b.col1\n"
+        + "WHERE a.col1 = 1;\n";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "LogicalJoin(condition=[=($0, $9)], joinType=[inner])\n"
+            + "  PinotLogicalExchange(distribution=[single])\n"
+            + "    LogicalFilter(condition=[=(CAST($0):INTEGER NOT NULL, 1)])\n"
+            + "      PinotLogicalTableScan(table=[[default, a]])\n"
+            + "  PinotLogicalTableScan(table=[[default, b]])\n");
+    //@formatter:on
+  }
+
+  @Ignore("This test requires PRUNE_RULES before BASIC_RULES to pass, however enabling that"
+      + "introduces changes that ~50 hardcoded plans in ResourceBasedQueriesTest would change."
+      + "It is also needed to investigate why there would be redundant Project and Exchange"
+      + "when the extra pruning is enabled")
+  @Test
+  public void testAggregateJoinRemove() {
+    // queries where join is left or right join and the aggregate above it has no aggCall
+    // or all aggCalls are DISTINCT
+    // should be optimized to remove the join completely
+    String query = "EXPLAIN PLAN FOR\n"
+        + "SELECT a.col1, COUNT(DISTINCT a.col3) \n"
+        + "FROM a \n"
+        + "LEFT JOIN b ON a.col2 = b.col2\n"
+        + "GROUP BY a.col1;";
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+    //@formatter:off
+    assertEquals(explain,
+    "Execution Plan\n"
+        + "PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($1)], aggType=[FINAL])\n"
+        + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+        + "    PinotLogicalAggregate(group=[{0}], agg#0=[DISTINCTCOUNT($2)], aggType=[LEAF])\n"
+        + "      PinotLogicalTableScan(table=[[default, a]])\n");
     //@formatter:on
   }
 
@@ -394,6 +526,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     RuntimeException e = expectThrows(RuntimeException.class, () -> _queryEnvironment.getTableNamesForQuery(query));
     assertTrue(e.getCause().getMessage().contains("Duplicate alias in WITH: 'tmp'"));
   }
+
 
   @Test
   public void testWindowFunctions() {

@@ -279,7 +279,7 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     int numColumns = columns.size();
     Map<String, DataSource> dataSourceMap = new HashMap<>();
     for (String column : columns) {
-      dataSourceMap.put(column, _indexSegment.getDataSource(column));
+      dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema()));
     }
 
     try (ProjectionOperator projectionOperator =

@@ -42,7 +42,6 @@
     "replication": "1",
     "retentionTimeUnit": "",
     "retentionTimeValue": "",
-    "schemaName": "FeatureTest3",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
     "segmentPushFrequency": "daily",
     "segmentPushType": "APPEND",

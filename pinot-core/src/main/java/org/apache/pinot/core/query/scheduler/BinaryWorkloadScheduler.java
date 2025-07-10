@@ -35,6 +35,7 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.BinaryWorkloadResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
@@ -73,8 +74,9 @@ public class BinaryWorkloadScheduler extends QueryScheduler {
   Thread _scheduler;
 
   public BinaryWorkloadScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ServerMetrics metrics,
-      LongAccumulator latestQueryTime) {
-    super(config, queryExecutor, new BinaryWorkloadResourceManager(config), metrics, latestQueryTime);
+      LongAccumulator latestQueryTime, ThreadResourceUsageAccountant resourceUsageAccountant) {
+    super(config, queryExecutor, new BinaryWorkloadResourceManager(config, resourceUsageAccountant), metrics,
+        latestQueryTime);
 
     _secondaryQueryQ = new SecondaryWorkloadQueue(config, _resourceManager);
     _numSecondaryRunners = config.getProperty(MAX_SECONDARY_QUERIES, DEFAULT_MAX_SECONDARY_QUERIES);

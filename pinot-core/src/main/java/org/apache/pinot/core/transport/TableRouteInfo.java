@@ -26,6 +26,7 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 
 
@@ -73,6 +74,20 @@ public interface TableRouteInfo {
    */
   @Nullable
   TableConfig getRealtimeTableConfig();
+
+  /**
+   * Gets the query config for the offline table, if available.
+   * @return the query config for the offline table, or null if not available
+   */
+  @Nullable
+  QueryConfig getOfflineTableQueryConfig();
+
+  /**
+   * Gets the query config for the realtime table, if available.
+   * @return the query config for the realtime table, or null if not available
+   */
+  @Nullable
+  QueryConfig getRealtimeTableQueryConfig();
 
   /**
    * Get the set of servers that will execute the query on the segments of the OFFLINE table.
@@ -155,9 +170,9 @@ public interface TableRouteInfo {
    */
   boolean isRouteExists();
 
-  boolean isOfflineTableDisabled();
+  boolean isOfflineRouteExists();
 
-  boolean isRealtimeTableDisabled();
+  boolean isRealtimeRouteExists();
 
   /**
    * Checks if all the physical tables are disabled.
@@ -165,6 +180,10 @@ public interface TableRouteInfo {
    * @return true if the table is disabled, false otherwise
    */
   boolean isDisabled();
+
+  boolean isOfflineTableDisabled();
+
+  boolean isRealtimeTableDisabled();
 
   @Nullable
   List<String> getDisabledTableNames();

@@ -29,16 +29,16 @@ import javax.annotation.Nullable;
  * The {@code FloatLookupTable} is a lookup table for float keys.
  */
 @SuppressWarnings("unchecked")
-public class FloatLookupTable extends LookupTable {
+public class FloatLookupTable extends PrimitiveLookupTable {
   private final Float2ObjectOpenHashMap<Object> _lookupTable = new Float2ObjectOpenHashMap<>(INITIAL_CAPACITY);
 
   @Override
-  public void addRow(Object key, Object[] row) {
+  public void addRowNotNullKey(Object key, Object[] row) {
     _lookupTable.compute((float) key, (k, v) -> computeNewValue(row, v));
   }
 
   @Override
-  public void finish() {
+  public void finishNotNullKey() {
     if (!_keysUnique) {
       for (Float2ObjectMap.Entry<Object> entry : _lookupTable.float2ObjectEntrySet()) {
         convertValueToList(entry);
@@ -47,19 +47,19 @@ public class FloatLookupTable extends LookupTable {
   }
 
   @Override
-  public boolean containsKey(Object key) {
+  public boolean containsNotNullKey(Object key) {
     return _lookupTable.containsKey((float) key);
   }
 
   @Nullable
   @Override
-  public Object lookup(Object key) {
+  public Object lookupNotNullKey(Object key) {
     return _lookupTable.get((float) key);
   }
 
   @SuppressWarnings("rawtypes")
   @Override
-  public Set<Map.Entry> entrySet() {
+  public Set<Map.Entry<Object, Object>> notNullKeyEntrySet() {
     return (Set) _lookupTable.float2ObjectEntrySet();
   }
 }

@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.sql.validate.SqlNameMatcher;
-import org.apache.pinot.common.utils.list.FlatViewList;
+import org.apache.pinot.common.collections.FlatViewList;
 
 
 /// A custom name matcher that, although matches names based on config-provided case-sensitiveness, always reports to be

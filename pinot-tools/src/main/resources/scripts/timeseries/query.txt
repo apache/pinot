@@ -1,0 +1,4 @@
+fetch{table="meetupRsvp_REALTIME",filter="",ts_column="__metadata$recordTimestamp",ts_unit="MILLISECONDS",value="1"}
+  | max{group_city}
+  | transformNull{0}
+  | keepLastValue{}

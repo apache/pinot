@@ -50,8 +50,11 @@ import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.segment.spi.index.reader.SortedIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
+import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.IndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 
 
@@ -76,18 +79,31 @@ public class InvertedIndexType
   }
 
   @Override
+  public void validate(FieldIndexConfigs indexConfigs, FieldSpec fieldSpec, TableConfig tableConfig) {
+    IndexConfig invertedIndexConfig = indexConfigs.getConfig(StandardIndexes.inverted());
+    if (invertedIndexConfig.isEnabled()) {
+      String column = fieldSpec.getName();
+      Preconditions.checkState(indexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled(),
+          "Cannot create inverted index on column: %s without dictionary", column);
+      Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
+          "Cannot create inverted index on MAP column: %s", column);
+    }
+  }
+
+  @Override
   public String getPrettyName() {
     return INDEX_DISPLAY_NAME;
   }
 
   @Override
-  public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
-    ColumnConfigDeserializer<IndexConfig> fromIndexes =
-        IndexConfigDeserializer.fromIndexes(getPrettyName(), getIndexConfigClass());
+  protected ColumnConfigDeserializer<IndexConfig> createDeserializerForLegacyConfigs() {
     ColumnConfigDeserializer<IndexConfig> fromInvertedIndexColumns =
         IndexConfigDeserializer.fromCollection(tableConfig -> tableConfig.getIndexingConfig().getInvertedIndexColumns(),
             (acum, column) -> acum.put(column, IndexConfig.ENABLED));
-    return fromIndexes.withExclusiveAlternative(fromInvertedIndexColumns);
+    ColumnConfigDeserializer<IndexConfig> fromFieldConfigs =
+        IndexConfigDeserializer.fromIndexTypes(FieldConfig.IndexType.INVERTED,
+            (tableConfig, fieldConfig) -> IndexConfig.ENABLED);
+    return fromInvertedIndexColumns.withFallbackAlternative(fromFieldConfigs);
   }
 
   public DictionaryBasedInvertedIndexCreator createIndexCreator(IndexCreationContext context)
@@ -130,8 +146,8 @@ public class InvertedIndexType
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new InvertedIndexHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new InvertedIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
   public static class ReaderFactory implements IndexReaderFactory<InvertedIndexReader> {

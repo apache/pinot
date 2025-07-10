@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.DateTimeGranularitySpec;
@@ -37,7 +36,7 @@ public class SDFToSDFTransformer extends BaseDateTimeTransformer<String[], Strin
   }
 
   @Override
-  public void transform(@Nonnull String[] input, @Nonnull String[] output, int length) {
+  public void transform(String[] input, String[] output, int length) {
     // NOTE: No need to bucket time because it's implicit in the output simple date format
     if (useCustomBucketingTimeZone()) {
       for (int i = 0; i < length; i++) {

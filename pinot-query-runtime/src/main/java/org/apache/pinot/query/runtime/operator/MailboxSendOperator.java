@@ -85,7 +85,7 @@ public class MailboxSendOperator extends MultiStageOperator {
    * Creates a {@link BlockExchange} for the given {@link MailboxSendNode}.
    *
    * In normal cases, where the sender sends data to a single receiver stage, this method just delegates on
-   * {@link #getBlockExchange(OpChainExecutionContext, int, RelDistribution.Type, List, StatMap, BlockSplitter)}.
+   * {@link #getBlockExchange(OpChainExecutionContext, int, MailboxSendNode, StatMap, BlockSplitter)}.
    *
    * In case of a multi-sender node, this method creates a two steps exchange:
    * <ol>
@@ -102,20 +102,20 @@ public class MailboxSendOperator extends MultiStageOperator {
     if (!node.isMultiSend()) {
       // it is guaranteed that there is exactly one receiver stage
       int receiverStageId = node.getReceiverStageIds().iterator().next();
-      return getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, mainSplitter);
+      return getBlockExchange(ctx, receiverStageId, node, statMap, mainSplitter);
     }
     List<SendingMailbox> perStageSendingMailboxes = new ArrayList<>();
     // The inner splitter is a NO_OP because the outer splitter will take care of splitting the blocks
     BlockSplitter innerSplitter = BlockSplitter.NO_OP;
     for (int receiverStageId : node.getReceiverStageIds()) {
       BlockExchange blockExchange =
-          getBlockExchange(ctx, receiverStageId, node.getDistributionType(), node.getKeys(), statMap, innerSplitter);
+          getBlockExchange(ctx, receiverStageId, node, statMap, innerSplitter);
       perStageSendingMailboxes.add(blockExchange.asSendingMailbox(Integer.toString(receiverStageId)));
     }
 
     Function<List<SendingMailbox>, Integer> statsIndexChooser = getStatsIndexChooser(ctx, node);
     return BlockExchange.getExchange(perStageSendingMailboxes, RelDistribution.Type.BROADCAST_DISTRIBUTED,
-        Collections.emptyList(), mainSplitter, statsIndexChooser);
+        Collections.emptyList(), mainSplitter, statsIndexChooser, node.getHashFunction());
   }
 
   private static Function<List<SendingMailbox>, Integer> getStatsIndexChooser(OpChainExecutionContext ctx,
@@ -154,12 +154,15 @@ public class MailboxSendOperator extends MultiStageOperator {
    * In case of a multi-sender node, this method will be called for each receiver stage.
    */
   private static BlockExchange getBlockExchange(OpChainExecutionContext context, int receiverStageId,
-      RelDistribution.Type distributionType, List<Integer> keys, StatMap<StatKey> statMap, BlockSplitter splitter) {
+      MailboxSendNode node, StatMap<StatKey> statMap, BlockSplitter splitter) {
+    RelDistribution.Type distributionType = node.getDistributionType();
     Preconditions.checkState(SUPPORTED_EXCHANGE_TYPES.contains(distributionType), "Unsupported distribution type: %s",
         distributionType);
     MailboxService mailboxService = context.getMailboxService();
     long requestId = context.getRequestId();
-    long deadlineMs = context.getDeadlineMs();
+    // It is important to use passive deadline here, otherwise the GRPC channel could be closed before
+    // the useful error block is sent
+    long deadlineMs = context.getPassiveDeadlineMs();
 
     List<MailboxInfo> mailboxInfos =
         context.getWorkerMetadata().getMailboxInfosMap().get(receiverStageId).getMailboxInfos();
@@ -170,7 +173,8 @@ public class MailboxSendOperator extends MultiStageOperator {
         .map(v -> mailboxService.getSendingMailbox(v.getHostname(), v.getPort(), v.getMailboxId(), deadlineMs, statMap))
         .collect(Collectors.toList());
     statMap.merge(StatKey.FAN_OUT, sendingMailboxes.size());
-    return BlockExchange.getExchange(sendingMailboxes, distributionType, keys, splitter);
+    return BlockExchange.getExchange(sendingMailboxes, distributionType, node.getKeys(), splitter,
+        node.getHashFunction());
   }
 
   @Override
@@ -204,11 +208,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     try {
       MseBlock block = _input.nextBlock();
       if (block.isEos()) {
-        if (_context.isSendStats()) {
-          sendEos((MseBlock.Eos) block);
-        } else {
-          sendEos(SuccessMseBlock.INSTANCE);
-        }
+        sendEos((MseBlock.Eos) block);
       } else {
         if (sendMseBlock(((MseBlock.Data) block))) {
           earlyTerminate();
@@ -234,24 +234,34 @@ public class MailboxSendOperator extends MultiStageOperator {
     }
   }
 
+  @Override
+  protected void sampleAndCheckInterruption() {
+    // mailbox send operator uses passive deadline instead of the active one
+    sampleAndCheckInterruption(_context.getPassiveDeadlineMs());
+  }
+
   private void sendEos(MseBlock.Eos eosBlockWithoutStats)
       throws Exception {
-    MultiStageQueryStats stats = calculateStats();
 
+    MultiStageQueryStats stats = null;
     List<DataBuffer> serializedStats;
-    try {
-      serializedStats = stats.serialize();
-    } catch (Exception e) {
-      LOGGER.warn("Failed to serialize stats", e);
+    if (_context.isSendStats()) {
+      stats = calculateStats();
+      try {
+        serializedStats = stats.serialize();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to serialize stats", e);
+        serializedStats = Collections.emptyList();
+      }
+    } else {
       serializedStats = Collections.emptyList();
     }
-
     // no need to check early terminate signal b/c the current block is already EOS
     sendMseBlock(eosBlockWithoutStats, serializedStats);
     // After sending its own stats, the sending operator of the stage 1 has the complete view of all stats
     // Therefore this is the only place we can update some of the metrics like total seen rows or time spent.
     if (_context.getStageId() == 1) {
-      updateMetrics(stats);
+      updateMetrics(stats == null ? calculateStats() : stats);
     }
   }
 

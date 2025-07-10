@@ -24,8 +24,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -51,6 +54,8 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -74,6 +79,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_REPLICAS = 3;
   private static final String SEGMENT_NAME_PREFIX = "segment_";
+  private static final String PARTITION_COLUMN = "partitionColumn";
 
   private static final String TIERED_TABLE_NAME = "testTable";
   private static final String OFFLINE_TIERED_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(TIERED_TABLE_NAME);
@@ -93,15 +99,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
   }
 
-  /**
-   * Dropping instance from cluster requires waiting for live instance gone and removing instance related ZNodes, which
-   * are not the purpose of the test, so combine different rebalance scenarios into one test:
-   * 1. NO_OP rebalance
-   * 2. Add servers and rebalance
-   * 3. Migrate to replica-group based segment assignment and rebalance
-   * 4. Migrate back to non-replica-group based segment assignment and rebalance
-   * 5. Remove (disable) servers and rebalance
-   */
+  /// Dropping instance from cluster requires waiting for live instance gone and removing instance related ZNodes, which
+  /// are not the purpose of the test, so combine different rebalance scenarios into one test:
+  /// 1. NO_OP rebalance
+  /// 2. Add servers and rebalance
+  /// 3. Migrate to replica-group based segment assignment and rebalance
+  /// 4. Migrate back to non-replica-group based segment assignment and rebalance
+  /// 5. Remove (disable) servers and rebalance
   @Test
   public void testRebalance()
       throws Exception {
@@ -113,16 +117,15 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       for (int i = 0; i < numServers; i++) {
         String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
         addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
-        DiskUsageInfo diskUsageInfo1 =
-            new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
-        diskUsageInfoMap.put(instanceId, diskUsageInfo1);
+        DiskUsageInfo diskUsageInfo = new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
+        diskUsageInfoMap.put(instanceId, diskUsageInfo);
       }
 
       ExecutorService executorService = Executors.newFixedThreadPool(10);
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
       TableRebalancer tableRebalancer =
-          new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader());
+          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
       TableConfig tableConfig =
           new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -169,8 +172,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 3);
       assertNotNull(rebalanceSummaryResult.getTagsInfo());
       assertEquals(rebalanceSummaryResult.getTagsInfo().size(), 1);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
-          TagNameUtils.getOfflineTagForTenant(null));
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(), TagNameUtils.getOfflineTagForTenant(null));
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 0);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(), numServers);
@@ -205,8 +207,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       for (int i = 0; i < numServersToAdd; i++) {
         String instanceId = SERVER_INSTANCE_ID_PREFIX + (numServers + i);
         addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
-        DiskUsageInfo diskUsageInfo =
-            new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
+        DiskUsageInfo diskUsageInfo = new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
         diskUsageInfoMap.put(instanceId, diskUsageInfo);
       }
 
@@ -221,18 +222,17 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertNotNull(rebalanceSummaryResult);
       assertNotNull(rebalanceSummaryResult.getServerInfo());
       assertNotNull(rebalanceSummaryResult.getSegmentInfo());
-      assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 14);
-      assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeDeleted(), 14);
+      assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 15);
+      assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeDeleted(), 15);
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 3);
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 3);
       assertNotNull(rebalanceSummaryResult.getTagsInfo());
       assertEquals(rebalanceSummaryResult.getTagsInfo().size(), 1);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
-          TagNameUtils.getOfflineTagForTenant(null));
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 14);
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(), TagNameUtils.getOfflineTagForTenant(null));
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 15);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
-          numSegments * NUM_REPLICAS - 14);
+          numSegments * NUM_REPLICAS - 15);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
           numServers + numServersToAdd);
       assertNotNull(rebalanceResult.getInstanceAssignment());
@@ -245,19 +245,19 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         // Original servers should be losing some segments
         String newServer = SERVER_INSTANCE_ID_PREFIX + i;
         RebalanceSummaryResult.ServerSegmentChangeInfo serverSegmentChange = serverSegmentChangeInfoMap.get(newServer);
-        assertTrue(serverSegmentChange.getSegmentsDeleted() > 0);
-        assertTrue(serverSegmentChange.getSegmentsUnchanged() > 0);
-        assertTrue(serverSegmentChange.getTotalSegmentsBeforeRebalance() > 0);
-        assertTrue(serverSegmentChange.getTotalSegmentsAfterRebalance() > 0);
+        assertEquals(serverSegmentChange.getTotalSegmentsBeforeRebalance(), 10);
+        assertEquals(serverSegmentChange.getTotalSegmentsAfterRebalance(), 5);
         assertEquals(serverSegmentChange.getSegmentsAdded(), 0);
+        assertEquals(serverSegmentChange.getSegmentsDeleted(), 5);
+        assertEquals(serverSegmentChange.getSegmentsUnchanged(), 5);
       }
       for (int i = 0; i < numServersToAdd; i++) {
         // New servers should only get new segments
         String newServer = SERVER_INSTANCE_ID_PREFIX + (numServers + i);
         RebalanceSummaryResult.ServerSegmentChangeInfo serverSegmentChange = serverSegmentChangeInfoMap.get(newServer);
-        assertTrue(serverSegmentChange.getSegmentsAdded() > 0);
         assertEquals(serverSegmentChange.getTotalSegmentsBeforeRebalance(), 0);
-        assertEquals(serverSegmentChange.getTotalSegmentsAfterRebalance(), serverSegmentChange.getSegmentsAdded());
+        assertEquals(serverSegmentChange.getTotalSegmentsAfterRebalance(), 5);
+        assertEquals(serverSegmentChange.getSegmentsAdded(), 5);
         assertEquals(serverSegmentChange.getSegmentsDeleted(), 0);
         assertEquals(serverSegmentChange.getSegmentsUnchanged(), 0);
       }
@@ -295,16 +295,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
           "Instance assignment not allowed, no need for minimizeDataMovement");
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertTrue(
-          preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
-              .getMessage()
-              .startsWith("Within threshold"));
+      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
+          .getMessage()
+          .startsWith("Within threshold"));
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertTrue(
-          preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
-              .getMessage()
-              .startsWith("Within threshold"));
+      assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+          .getMessage()
+          .startsWith("Within threshold"));
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
       assertEquals(preCheckResult.get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS).getMessage(),
@@ -330,17 +328,17 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       Map<String, IntIntPair> instanceToNumSegmentsToMoveMap =
           SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(oldSegmentAssignment, newSegmentAssignment);
       assertEquals(instanceToNumSegmentsToMoveMap.size(), numServers + numServersToAdd);
-      for (int i = 0; i < numServersToAdd; i++) {
-        IntIntPair numSegmentsToMove = instanceToNumSegmentsToMoveMap.get(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
-        assertNotNull(numSegmentsToMove);
-        assertTrue(numSegmentsToMove.leftInt() > 0);
-        assertEquals(numSegmentsToMove.rightInt(), 0);
-      }
       for (int i = 0; i < numServers; i++) {
         IntIntPair numSegmentsToMove = instanceToNumSegmentsToMoveMap.get(SERVER_INSTANCE_ID_PREFIX + i);
         assertNotNull(numSegmentsToMove);
         assertEquals(numSegmentsToMove.leftInt(), 0);
-        assertTrue(numSegmentsToMove.rightInt() > 0);
+        assertEquals(numSegmentsToMove.rightInt(), 5);
+      }
+      for (int i = 0; i < numServersToAdd; i++) {
+        IntIntPair numSegmentsToMove = instanceToNumSegmentsToMoveMap.get(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
+        assertNotNull(numSegmentsToMove);
+        assertEquals(numSegmentsToMove.leftInt(), 5);
+        assertEquals(numSegmentsToMove.rightInt(), 0);
       }
 
       // Dry-run mode should not change the IdealState
@@ -410,25 +408,25 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(
           rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.WARN);
-      assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO)
-              .getMessage(), "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments "
-          + "- numReplicaGroups: " + NUM_REPLICAS + ", numInstancesPerReplicaGroup: 0 (using as many instances as "
-          + "possible)");
+      assertEquals(
+          rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+          "reassignInstances is disabled, replica groups may not be updated.\nOFFLINE segments "
+              + "- numReplicaGroups: " + NUM_REPLICAS + ", numInstancesPerReplicaGroup: 0 (using as many instances as "
+              + "possible)");
       rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
       assertNotNull(rebalanceSummaryResult);
       assertNotNull(rebalanceSummaryResult.getServerInfo());
       assertNotNull(rebalanceSummaryResult.getSegmentInfo());
-      assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 11);
-      assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeDeleted(), 11);
+      assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 20);
+      assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeDeleted(), 20);
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
       assertNotNull(rebalanceSummaryResult.getTagsInfo());
       assertEquals(rebalanceSummaryResult.getTagsInfo().size(), 1);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
-          TagNameUtils.getOfflineTagForTenant(null));
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 11);
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(), TagNameUtils.getOfflineTagForTenant(null));
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 20);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
-          numSegments * NUM_REPLICAS - 11);
+          numSegments * NUM_REPLICAS - 20);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
           numServers + numServersToAdd);
       assertNotNull(rebalanceResult.getInstanceAssignment());
@@ -439,11 +437,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       for (int i = 0; i < numServers + numServersToAdd; i++) {
         String newServer = SERVER_INSTANCE_ID_PREFIX + i;
         RebalanceSummaryResult.ServerSegmentChangeInfo serverSegmentChange = serverSegmentChangeInfoMap.get(newServer);
+        assertEquals(serverSegmentChange.getTotalSegmentsBeforeRebalance(), 5);
         assertEquals(serverSegmentChange.getTotalSegmentsAfterRebalance(), 5);
-        // Ensure not all segments moved
-        assertTrue(serverSegmentChange.getSegmentsUnchanged() > 0);
-        // Ensure all segments has something assigned prior to rebalance
-        assertTrue(serverSegmentChange.getTotalSegmentsBeforeRebalance() > 0);
       }
 
       // Dry-run mode should not change the IdealState
@@ -509,8 +504,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(
           rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO)
-              .getMessage(), "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
+      assertEquals(
+          rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+          "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
       rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
       assertNotNull(rebalanceSummaryResult);
       assertNotNull(rebalanceSummaryResult.getServerInfo());
@@ -522,11 +518,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 0);
       assertNotNull(rebalanceSummaryResult.getTagsInfo());
       assertEquals(rebalanceSummaryResult.getTagsInfo().size(), 1);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
-          TagNameUtils.getOfflineTagForTenant(null));
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(), TagNameUtils.getOfflineTagForTenant(null));
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 0);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
-          numSegments * NUM_REPLICAS);
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
           numServers + numServersToAdd);
       assertNotNull(rebalanceResult.getInstanceAssignment());
@@ -551,8 +545,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(
           rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
           RebalancePreCheckerResult.PreCheckStatus.PASS);
-      assertEquals(rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO)
-              .getMessage(), "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
+      assertEquals(
+          rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getMessage(),
+          "OFFLINE segments - Replica Groups are not enabled, replication: " + NUM_REPLICAS);
       rebalanceSummaryResult = rebalanceResult.getRebalanceSummaryResult();
       assertNotNull(rebalanceSummaryResult);
       assertNotNull(rebalanceSummaryResult.getServerInfo());
@@ -565,11 +560,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 0);
       assertNotNull(rebalanceSummaryResult.getTagsInfo());
       assertEquals(rebalanceSummaryResult.getTagsInfo().size(), 1);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
-          TagNameUtils.getOfflineTagForTenant(null));
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(), TagNameUtils.getOfflineTagForTenant(null));
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 0);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
-          numSegments * NUM_REPLICAS);
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
           numServers + numServersToAdd);
       assertNotNull(rebalanceResult.getInstanceAssignment());
@@ -622,13 +615,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       assertEquals(rebalanceSummaryResult.getServerInfo().getNumServersGettingNewSegments(), 3);
       assertNotNull(rebalanceSummaryResult.getTagsInfo());
       assertEquals(rebalanceSummaryResult.getTagsInfo().size(), 1);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
-          TagNameUtils.getOfflineTagForTenant(null));
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(), TagNameUtils.getOfflineTagForTenant(null));
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 15);
       assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
           numSegments * NUM_REPLICAS - 15);
-      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
-          numServers);
+      assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(), numServers);
       assertNotNull(rebalanceResult.getInstanceAssignment());
       assertNotNull(rebalanceResult.getSegmentAssignment());
 
@@ -694,12 +685,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
       preChecker.init(_helixResourceManager, executorService, 1);
       TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
-          _helixResourceManager.getTableSizeReader());
+          _tableSizeReader, null);
       // Set up the table with 1 replication factor and strict replica group enabled
-      TableConfig tableConfig =
-          new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(1)
-              .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
-                  false)).build();
+      TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+          .setNumReplicas(1)
+          .setRoutingConfig(
+              new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+          .build();
 
       // Create the table
       addDummySchema(RAW_TABLE_NAME);
@@ -765,6 +757,202 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   }
 
   @Test
+  public void testRebalanceWithImplicitRealtimeTablePartitionSelectorAndMinimizeDataMovement()
+      throws Exception {
+    int numServers = 6;
+    int numPartitions = 18;
+    int numReplicas = 2;
+
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+    }
+
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 0, numReplicas, 0, 0, 1, false, null);
+    InstanceAssignmentConfig instanceAssignmentConfig = new InstanceAssignmentConfig(
+        new InstanceTagPoolConfig(TagNameUtils.getRealtimeTagForTenant(null), false, 0, null), null,
+        replicaGroupPartitionConfig,
+        InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR.name(), true);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(numReplicas)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(numPartitions).getStreamConfigsMap())
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+
+    // Create the table
+    addDummySchema(RAW_TABLE_NAME);
+    _helixResourceManager.addTable(tableConfig);
+
+    // Add the segments
+    int numSegmentsPerPartition = 4;
+    for (int i = 0; i < numPartitions; i++) {
+      for (int j = 0; j < numSegmentsPerPartition; j++) {
+        _helixResourceManager.addNewSegment(REALTIME_TABLE_NAME,
+            SegmentMetadataMockUtils.mockSegmentMetadataWithPartitionInfo(RAW_TABLE_NAME,
+                SEGMENT_NAME_PREFIX + (i * numSegmentsPerPartition + j), PARTITION_COLUMN, i), null);
+      }
+    }
+
+    Map<String, Map<String, String>> oldSegmentAssignment =
+        _helixResourceManager.getTableIdealState(REALTIME_TABLE_NAME).getRecord().getMapFields();
+    for (Map.Entry<String, Map<String, String>> entry : oldSegmentAssignment.entrySet()) {
+      assertEquals(entry.getValue().size(), numReplicas);
+    }
+
+    // Verify that segments are distributed equally across servers
+    Map<String, Integer> numSegmentsPerServer = getNumSegmentsPerServer(oldSegmentAssignment);
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
+      assertTrue(numSegmentsPerServer.containsKey(instanceId));
+      // Total number of segments is numReplicas * numPartitions * (numSegmentsPerPartition + 1) because of
+      // CONSUMING segments
+      assertEquals(numSegmentsPerServer.get(instanceId),
+          (numReplicas * numPartitions * (numSegmentsPerPartition + 1)) / numServers);
+    }
+
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, null, null, null);
+    // Rebalance should return NO_OP status since there has been no change
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+    RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+
+    // All servers should be assigned to the table
+    Map<InstancePartitionsType, InstancePartitions> instanceAssignment = rebalanceResult.getInstanceAssignment();
+    assertEquals(instanceAssignment.size(), 1);
+    InstancePartitions instancePartitions = instanceAssignment.get(InstancePartitionsType.CONSUMING);
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+
+    // Verify that replica partitions are distributed equally across servers
+    Map<String, Integer> numReplicaPartitionsPerServer = getNumReplicaPartitionsPerServer(instancePartitions);
+    for (int i = 0; i < numServers; i++) {
+      String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
+      assertTrue(numReplicaPartitionsPerServer.containsKey(instanceId));
+      // Total number of partitions is numReplicas * numPartitions
+      assertEquals(numReplicaPartitionsPerServer.get(instanceId), (numReplicas * numPartitions) / numServers);
+    }
+
+    // Segment assignment should not change
+    assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
+
+    // Add two new servers
+    int numServersToAdd = 2;
+    Set<String> newServers = new HashSet<>();
+    for (int i = 0; i < numServersToAdd; i++) {
+      String instanceId = SERVER_INSTANCE_ID_PREFIX + (numServers + i);
+      addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+      newServers.add(instanceId);
+    }
+
+    // Check number of segments moved when minimizeDataMovement is not enabled
+    rebalanceConfig.setReassignInstances(true);
+    rebalanceConfig.setIncludeConsuming(true);
+    rebalanceConfig.setDryRun(true);
+    rebalanceConfig.setMinimizeDataMovement(Enablement.DISABLE);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    // Most of the segments end up being moved when minimizeDataMovement is not enabled due to the round robin way in
+    // which partitions are assigned to instances (see InstanceReplicaGroupPartitionSelector)
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getTotalSegmentsToBeMoved(), 130);
+
+    // Rebalance with reassignInstances and minimizeDataMovement enabled
+    rebalanceConfig.setMinimizeDataMovement(Enablement.ENABLE);
+    rebalanceConfig.setDryRun(false);
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    instanceAssignment = rebalanceResult.getInstanceAssignment();
+    assertEquals(instanceAssignment.size(), 1);
+    instancePartitions = instanceAssignment.get(InstancePartitionsType.CONSUMING);
+    assertEquals(instancePartitions.getNumReplicaGroups(), numReplicas);
+    assertEquals(instancePartitions.getNumPartitions(), numPartitions);
+
+    // Get number of segments moved
+    int numSegmentsMoved = getNumSegmentsMoved(oldSegmentAssignment, rebalanceResult.getSegmentAssignment());
+    // This number is 130 when using the default partition selector in this same scenario since more segment partitions
+    // will be moved when the instance partitions don't match the segment partitions (we're setting numPartitions to
+    // the default value of 0 in the table's instance assignment config).
+    assertEquals(numSegmentsMoved, 30);
+
+    // "Repartition" and add two new partitions
+    int newNumPartitions = 20;
+    tableConfig.getIndexingConfig()
+        .setStreamConfigs(
+            FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs(newNumPartitions).getStreamConfigsMap());
+    _helixResourceManager.updateTableConfig(tableConfig);
+
+    // Add segments for the new partitions
+    for (int i = numPartitions; i < newNumPartitions; i++) {
+      for (int j = 0; j < numSegmentsPerPartition; j++) {
+        _helixResourceManager.addNewSegment(REALTIME_TABLE_NAME,
+            SegmentMetadataMockUtils.mockSegmentMetadataWithPartitionInfo(RAW_TABLE_NAME,
+                SEGMENT_NAME_PREFIX + (i * numSegmentsPerPartition + j), PARTITION_COLUMN, i), null);
+      }
+    }
+
+    rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+
+    // Verify that the new partitions are assigned to the new servers. Due to the minimizeDataMovement algorithm, the
+    // previous rebalance resulted in the older servers having 5 partition replicas each with the newer ones having 3
+    // partition replicas each.
+    instancePartitions = rebalanceResult.getInstanceAssignment().get(InstancePartitionsType.CONSUMING);
+    for (int i = numPartitions; i < newNumPartitions; i++) {
+      for (int j = 0; j < numReplicas; j++) {
+        for (String instanceId : instancePartitions.getInstances(i, j)) {
+          assertTrue(newServers.contains(instanceId),
+              "Expected new partition " + i + " to be assigned to a new server, but found it on " + instanceId);
+        }
+      }
+    }
+
+    _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
+
+    for (int i = 0; i < numServers + numServersToAdd; i++) {
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
+    }
+  }
+
+  private Map<String, Integer> getNumSegmentsPerServer(Map<String, Map<String, String>> segmentAssignment) {
+    Map<String, Integer> numSegmentsPerServer = new HashMap<>();
+    for (Map<String, String> instanceStateMap : segmentAssignment.values()) {
+      for (String instanceId : instanceStateMap.keySet()) {
+        numSegmentsPerServer.merge(instanceId, 1, Integer::sum);
+      }
+    }
+    return numSegmentsPerServer;
+  }
+
+  private Map<String, Integer> getNumReplicaPartitionsPerServer(InstancePartitions instancePartitions) {
+    Map<String, Integer> numPartitionsPerServer = new HashMap<>();
+    for (int i = 0; i < instancePartitions.getNumReplicaGroups(); i++) {
+      for (int j = 0; j < instancePartitions.getNumPartitions(); j++) {
+        List<String> instances = instancePartitions.getInstances(j, i);
+        for (String instanceId : instances) {
+          numPartitionsPerServer.merge(instanceId, 1, Integer::sum);
+        }
+      }
+    }
+    return numPartitionsPerServer;
+  }
+
+  private int getNumSegmentsMoved(Map<String, Map<String, String>> oldSegmentAssignment,
+      Map<String, Map<String, String>> newSegmentAssignment) {
+    int numSegmentsMoved = 0;
+    for (Map.Entry<String, Map<String, String>> entry : newSegmentAssignment.entrySet()) {
+      String segmentName = entry.getKey();
+      Map<String, String> newInstanceStateMap = entry.getValue();
+      Map<String, String> oldInstanceStateMap = oldSegmentAssignment.get(segmentName);
+      assertEquals(oldInstanceStateMap.size(), newInstanceStateMap.size());
+      Set<String> commonInstances = new HashSet<>(newInstanceStateMap.keySet());
+      commonInstances.retainAll(oldInstanceStateMap.keySet());
+      numSegmentsMoved += newInstanceStateMap.size() - commonInstances.size();
+    }
+    return numSegmentsMoved;
+  }
+
+  @Test
   public void testRebalanceBatchSizePerServerErrors()
       throws Exception {
     int numServers = 3;
@@ -777,13 +965,14 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 1);
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixManager, null, null, preChecker,
-        _helixResourceManager.getTableSizeReader());
+    TableRebalancer tableRebalancer =
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
     // Set up the table with 1 replication factor and strict replica group enabled
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(1)
-            .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
-                false)).build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
+        .setNumReplicas(1)
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .build();
 
     // Create the table
     addDummySchema(RAW_TABLE_NAME);
@@ -828,8 +1017,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (int i = 0; i < numServers; i++) {
       String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i;
       addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
-      DiskUsageInfo diskUsageInfo1 =
-          new DiskUsageInfo(instanceId, "", 1000L, 200L, System.currentTimeMillis());
+      DiskUsageInfo diskUsageInfo1 = new DiskUsageInfo(instanceId, "", 1000L, 200L, System.currentTimeMillis());
       diskUsageInfoMap.put(instanceId, diskUsageInfo1);
     }
 
@@ -837,7 +1025,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader());
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
 
@@ -859,8 +1047,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (int i = 0; i < numServersToAdd; i++) {
       String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + (numServers + i);
       addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
-      DiskUsageInfo diskUsageInfo =
-          new DiskUsageInfo(instanceId, "", 1000L, 200L, System.currentTimeMillis());
+      DiskUsageInfo diskUsageInfo = new DiskUsageInfo(instanceId, "", 1000L, 200L, System.currentTimeMillis());
       diskUsageInfoMap.put(instanceId, diskUsageInfo);
     }
 
@@ -878,22 +1065,19 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE));
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertTrue(
-        preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
-            .getMessage()
-            .startsWith("Within threshold"));
+    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_DURING_REBALANCE)
+        .getMessage()
+        .startsWith("Within threshold"));
     assertTrue(preCheckResult.containsKey(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE));
     assertEquals(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
-    assertTrue(
-        preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
-            .getMessage()
-            .startsWith("Within threshold"));
+    assertTrue(preCheckResult.get(DefaultRebalancePreChecker.DISK_UTILIZATION_AFTER_REBALANCE)
+        .getMessage()
+        .startsWith("Within threshold"));
 
     for (int i = 0; i < numServers + numServersToAdd; i++) {
       String instanceId = "preCheckerDiskUtil_" + SERVER_INSTANCE_ID_PREFIX + i;
-      DiskUsageInfo diskUsageInfo =
-          new DiskUsageInfo(instanceId, "", 1000L, 755L, System.currentTimeMillis());
+      DiskUsageInfo diskUsageInfo = new DiskUsageInfo(instanceId, "", 1000L, 755L, System.currentTimeMillis());
       diskUsageInfoMap.put(instanceId, diskUsageInfo);
     }
 
@@ -937,7 +1121,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
     preChecker.init(_helixResourceManager, executorService, 0.5);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader());
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(2)
@@ -984,13 +1168,12 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig.setUpdateTargetTier(false);
     rebalanceConfig.setBootstrap(false);
     rebalanceConfig.setBestEfforts(false);
-    tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
-            .setTierConfigList(Collections.singletonList(
-                new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
-                    TierFactory.PINOT_SERVER_STORAGE_TYPE,
-                    TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME), null, null)))
-            .build();
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setTierConfigList(Collections.singletonList(
+            new TierConfig("dummyTier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
+                TierFactory.PINOT_SERVER_STORAGE_TYPE,
+                TagNameUtils.getRealtimeTagForTenant(TagNameUtils.DEFAULT_TENANT_NAME), null, null)))
+        .build();
 
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
@@ -1015,8 +1198,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
         "Number of replicas (3) is greater than 1, downtime is not recommended.");
 
     // no downtime warning with 1 replica
-    newTableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(1).build();
+    newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(1).build();
 
     rebalanceConfig.setDowntime(true);
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
@@ -1025,8 +1207,93 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
 
-    // test pass
+    // trigger pauseless table rebalance warning
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(
+        Collections.singletonList(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
+    streamIngestionConfig.setPauselessConsumptionEnabled(true);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    newTableConfig.setIngestionConfig(ingestionConfig);
+
+    rebalanceConfig.setDowntime(true);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "Replication of the table is 1, which is not recommended for pauseless tables as it may cause data loss "
+            + "during rebalance");
+
+    newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(3).build();
+    newTableConfig.setIngestionConfig(ingestionConfig);
+
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "Number of replicas (3) is greater than 1, downtime is not recommended.\nDowntime or minAvailableReplicas=0 "
+            + "for pauseless tables may cause data loss during rebalance");
+
     rebalanceConfig.setDowntime(false);
+    rebalanceConfig.setMinAvailableReplicas(-3);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
+
+    rebalanceConfig.setDowntime(false);
+    rebalanceConfig.setMinAvailableReplicas(0);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
+
+    // test pass
+    rebalanceConfig.setMinAvailableReplicas(1);
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
+    assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
+
+    // Add more segments
+    int additionalNumSegments = DefaultRebalancePreChecker.SEGMENT_ADD_THRESHOLD + 1;
+    for (int i = 0; i < additionalNumSegments; i++) {
+      _helixResourceManager.addNewSegment(REALTIME_TABLE_NAME,
+          SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + (numSegments + i)), null);
+    }
+
+    // Add one more server instance
+    String instanceId = "preCheckerRebalanceConfig_" + SERVER_INSTANCE_ID_PREFIX + numServers;
+    addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
+
+    // change num replicas from 3 to 4
+    newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(4).build();
+
+    // now the new server (the 4th server) should expect to be added all the existing segments (including consuming)
+    rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
+    int expectedNumSegmentsToAdd = FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS + additionalNumSegments + numSegments;
+    assertEquals(rebalanceResult.getRebalanceSummaryResult()
+        .getServerInfo()
+        .getServerSegmentChangeInfo()
+        .get(instanceId)
+        .getSegmentsAdded(), expectedNumSegmentsToAdd);
+    assertEquals(rebalanceResult.getRebalanceSummaryResult().getSegmentInfo().getMaxSegmentsAddedToASingleServer(),
+        expectedNumSegmentsToAdd);
+    preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
+    assertNotNull(preCheckerResult);
+    assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
+    assertEquals(preCheckerResult.getMessage(),
+        "Number of segments to add to a single server (" + expectedNumSegmentsToAdd + ") is high (>"
+            + DefaultRebalancePreChecker.SEGMENT_ADD_THRESHOLD + "). It is recommended to set batchSizePerServer to "
+            + DefaultRebalancePreChecker.RECOMMENDED_BATCH_SIZE + " or lower to avoid excessive load on servers.");
+
+    rebalanceConfig.setBatchSizePerServer(DefaultRebalancePreChecker.RECOMMENDED_BATCH_SIZE);
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
@@ -1035,19 +1302,17 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
 
-    for (int i = 0; i < numServers; i++) {
+    for (int i = 0; i < numServers + 1; i++) {
       stopAndDropFakeInstance("preCheckerRebalanceConfig_" + SERVER_INSTANCE_ID_PREFIX + i);
     }
     executorService.shutdown();
   }
 
-  /**
-   * Tests rebalance with tier configs
-   * Add 10 segments, with segment metadata end time 3 days apart starting from now to 30 days ago
-   * 1. run rebalance - should see no change
-   * 2. add nodes for tiers and run rebalance - should see no change
-   * 3. add tier config and run rebalance - should see changed assignment
-   */
+  /// Tests rebalance with tier configs
+  /// Add 10 segments, with segment metadata end time 3 days apart starting from now to 30 days ago
+  /// 1. run rebalance - should see no change
+  /// 2. add nodes for tiers and run rebalance - should see no change
+  /// 3. add tier config and run rebalance - should see changed assignment
   @Test
   public void testRebalanceWithTiers()
       throws Exception {
@@ -1098,10 +1363,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(NO_TIER_NAME));
     assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
-        numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
-        numServers);
+    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
+    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(), numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
 
@@ -1139,10 +1402,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant(NO_TIER_NAME));
     assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
-        numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
-        numServers);
+    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
+    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(), numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
 
@@ -1266,7 +1527,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     ExecutorService executorService = Executors.newFixedThreadPool(10);
     preChecker.init(_helixResourceManager, executorService, 1);
     TableRebalancer tableRebalancer =
-        new TableRebalancer(_helixManager, null, null, preChecker, _helixResourceManager.getTableSizeReader());
+        new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
 
     // Try dry-run summary mode
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
@@ -1286,10 +1547,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME));
     assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
-        numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
-        numServers);
+    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
+    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(), numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
 
@@ -1323,10 +1582,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getTagName(),
         TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME));
     assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsToDownload(), 0);
-    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(),
-        numSegments * NUM_REPLICAS);
-    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(),
-        numServers);
+    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
+    assertEquals(rebalanceSummaryResult.getTagsInfo().get(0).getNumServerParticipants(), numServers);
     assertNotNull(rebalanceResult.getInstanceAssignment());
     assertNotNull(rebalanceResult.getSegmentAssignment());
 
@@ -1373,14 +1630,11 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
         .getNumSegmentsToDownload(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
-            .getNumSegmentsUnchanged(),
-        0);
+        .getNumSegmentsUnchanged(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
-            .getNumServerParticipants(),
-        0);
+        .getNumServerParticipants(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
-            .getNumSegmentsToDownload(),
-        numSegments * NUM_REPLICAS);
+        .getNumSegmentsToDownload(), numSegments * NUM_REPLICAS);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
         .getNumSegmentsUnchanged(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
@@ -1420,7 +1674,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     rebalanceConfig.setPreChecks(true);
     rebalanceConfig.setReassignInstances(true);
     rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     assertEquals(
         rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REPLICA_GROUPS_INFO).getPreCheckStatus(),
         RebalancePreCheckerResult.PreCheckStatus.PASS);
@@ -1432,7 +1686,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(rebalanceSummaryResult);
     assertNotNull(rebalanceSummaryResult.getServerInfo());
     assertNotNull(rebalanceSummaryResult.getSegmentInfo());
-    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 13);
+    assertEquals(rebalanceSummaryResult.getSegmentInfo().getTotalSegmentsToBeMoved(), 0);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getValueBeforeRebalance(), 6);
     assertEquals(rebalanceSummaryResult.getServerInfo().getNumServers().getExpectedValueAfterRebalance(), 6);
     assertNotNull(rebalanceSummaryResult.getTagsInfo());
@@ -1445,16 +1699,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
         .getNumSegmentsToDownload(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
-            .getNumSegmentsUnchanged(),
-        0);
+        .getNumSegmentsUnchanged(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
-            .getNumServerParticipants(),
-        0);
+        .getNumServerParticipants(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
-            .getNumSegmentsToDownload(),
-        13);
+        .getNumSegmentsToDownload(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
-        .getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS - 13);
+        .getNumSegmentsUnchanged(), numSegments * NUM_REPLICAS);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
         .getNumServerParticipants(), 6);
     assertNotNull(rebalanceResult.getInstanceAssignment());
@@ -1462,7 +1713,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(rebalanceResult.getSegmentAssignment());
 
     rebalanceResult = tableRebalancer.rebalance(tableConfig, new RebalanceConfig(), null);
-    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+    assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
     assertTrue(rebalanceResult.getTierInstanceAssignment().containsKey(TIER_A_NAME));
 
     InstancePartitions instancePartitions = rebalanceResult.getTierInstanceAssignment().get(TIER_A_NAME);
@@ -1534,26 +1785,20 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
         .getNumSegmentsToDownload(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
-            .getNumSegmentsUnchanged(),
-        0);
+        .getNumSegmentsUnchanged(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + NO_TIER_NAME))
-            .getNumServerParticipants(),
-        0);
+        .getNumServerParticipants(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
-            .getNumSegmentsToDownload(),
-        0);
+        .getNumSegmentsToDownload(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
         .getNumSegmentsUnchanged(), 0);
     assertEquals(tenantInfoMap.get(TagNameUtils.getOfflineTagForTenant("replicaAssignment" + TIER_A_NAME))
         .getNumServerParticipants(), 0);
-    assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumSegmentsToDownload(),
+    assertEquals(tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumSegmentsToDownload(),
         0);
-    assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumSegmentsUnchanged(),
+    assertEquals(tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumSegmentsUnchanged(),
         numSegments * NUM_REPLICAS);
-    assertEquals(
-        tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumServerParticipants(),
+    assertEquals(tenantInfoMap.get(RebalanceSummaryResult.TagInfo.TAG_FOR_OUTDATED_SERVERS).getNumServerParticipants(),
         6);
 
     _helixResourceManager.deleteOfflineTable(TIERED_TABLE_NAME);
@@ -1563,7 +1808,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   @Test
   public void testRebalanceWithMinimizeDataMovementBalanced()
       throws Exception {
-    int numServers = 6;
+    int numServers = 3;
     for (int i = 0; i < numServers; i++) {
       addFakeServerInstanceToAutoJoinHelixCluster("minimizeDataMovement_balance_" + SERVER_INSTANCE_ID_PREFIX + i,
           true);
@@ -1823,7 +2068,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
     ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
     TableRebalancer tableRebalancerOriginal =
-        new TableRebalancer(_helixManager, null, null, null, _helixResourceManager.getTableSizeReader());
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -1860,11 +2105,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentToBeMovedSummary.getNumServersGettingConsumingSegmentsAdded(), 0);
     assertEquals(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().size(), 0);
     assertEquals(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes().size(), 0);
-    assertEquals(consumingSegmentToBeMovedSummary
-        .getServerConsumingSegmentSummary()
-        .size(), 0);
-    assertTrue(consumingSegmentToBeMovedSummary
-        .getServerConsumingSegmentSummary()
+    assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(), 0);
+    assertTrue(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary()
         .values()
         .stream()
         .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0));
@@ -1879,11 +2121,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentToBeMovedSummary.getNumServersGettingConsumingSegmentsAdded(), 0);
     assertEquals(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().size(), 0);
     assertEquals(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes().size(), 0);
-    assertEquals(consumingSegmentToBeMovedSummary
-        .getServerConsumingSegmentSummary()
-        .size(), 0);
-    assertTrue(consumingSegmentToBeMovedSummary
-        .getServerConsumingSegmentSummary()
+    assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(), 0);
+    assertTrue(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary()
         .values()
         .stream()
         .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments() == 0));
@@ -1914,11 +2153,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
     assertEquals(consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes().size(),
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS);
-    assertEquals(consumingSegmentToBeMovedSummary
-        .getServerConsumingSegmentSummary()
-        .size(), numServers);
-    assertTrue(consumingSegmentToBeMovedSummary
-        .getServerConsumingSegmentSummary()
+    assertEquals(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary().size(), numServers);
+    assertTrue(consumingSegmentToBeMovedSummary.getServerConsumingSegmentSummary()
         .values()
         .stream()
         .allMatch(x -> x.getTotalOffsetsToCatchUpAcrossAllConsumingSegments()
@@ -1942,9 +2178,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
     }
 
-    ConsumingSegmentInfoReader mockConsumingSegmentInfoReader = Mockito.mock(ConsumingSegmentInfoReader.class);
     TableRebalancer tableRebalancerOriginal =
-        new TableRebalancer(_helixManager, null, null, null, _helixResourceManager.getTableSizeReader());
+        new TableRebalancer(_helixManager, null, null, null, _tableSizeReader, null);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
             .setNumReplicas(numReplica)
@@ -2048,6 +2283,69 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     for (int i = 0; i < numServers * 2; i++) {
       stopAndDropFakeInstance("consumingSegmentSummaryFailure_" + SERVER_INSTANCE_ID_PREFIX + i);
     }
+  }
+
+  @Test
+  public void testGetMovingConsumingSegments() {
+    // Setup: segment assignments with consuming segments moving
+    Map<String, Map<String, String>> currentAssignment = new HashMap<>();
+    Map<String, Map<String, String>> targetAssignment = new HashMap<>();
+
+    // Segment 1: CONSUMING, same instances, should not be considered moving
+    Map<String, String> cur1 = new HashMap<>();
+    cur1.put("server1", "CONSUMING");
+    cur1.put("server2", "CONSUMING");
+    currentAssignment.put("segment1", cur1);
+    Map<String, String> tgt1 = new HashMap<>();
+    tgt1.put("server1", "CONSUMING");
+    tgt1.put("server2", "CONSUMING");
+    targetAssignment.put("segment1", tgt1);
+
+    // Segment 2: CONSUMING, different instances, should be considered moving
+    Map<String, String> cur2 = new HashMap<>();
+    cur2.put("server1", "CONSUMING");
+    cur2.put("server2", "CONSUMING");
+    currentAssignment.put("segment2", cur2);
+    Map<String, String> tgt2 = new HashMap<>();
+    tgt2.put("server3", "CONSUMING");
+    tgt2.put("server4", "CONSUMING");
+    targetAssignment.put("segment2", tgt2);
+
+    // Segment 3: ONLINE, should not be considered
+    Map<String, String> cur3 = new HashMap<>();
+    cur3.put("server1", "ONLINE");
+    currentAssignment.put("segment3", cur3);
+    Map<String, String> tgt3 = new HashMap<>();
+    tgt3.put("server2", "ONLINE");
+    targetAssignment.put("segment3", tgt3);
+
+    // Segment 4: one instance is ONLINE, should not be considered
+    Map<String, String> cur4 = new HashMap<>();
+    cur4.put("server1", "ONLINE");
+    cur4.put("server2", "CONSUMING");
+    currentAssignment.put("segment4", cur4);
+    Map<String, String> tgt4 = new HashMap<>();
+    tgt4.put("server1", "ONLINE");
+    tgt4.put("server2", "CONSUMING");
+    targetAssignment.put("segment4", tgt4);
+
+    // Segment 5: no ONLINE instance, but at least one in CONSUMING, should be considered moving
+    Map<String, String> cur5 = new HashMap<>();
+    cur5.put("server1", "OFFLINE");
+    cur5.put("server2", "CONSUMING");
+    currentAssignment.put("segment5", cur5);
+    Map<String, String> tgt5 = new HashMap<>();
+    tgt5.put("server1", "OFFLINE");
+    tgt5.put("server3", "CONSUMING");
+    targetAssignment.put("segment5", tgt5);
+
+    Set<String> moving = TableRebalancer.getMovingConsumingSegments(currentAssignment, targetAssignment);
+    assertEquals(moving.size(), 2);
+    assertTrue(moving.contains("segment2"));
+    assertTrue(moving.contains("segment5"));
+    assertFalse(moving.contains("segment1"));
+    assertFalse(moving.contains("segment3"));
+    assertFalse(moving.contains("segment4"));
   }
 
   @AfterClass

@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,8 +35,9 @@ public class BinaryWorkloadResourceManager extends ResourceManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(BinaryWorkloadResourceManager.class);
   private final ResourceLimitPolicy _secondaryWorkloadPolicy;
 
-  public BinaryWorkloadResourceManager(PinotConfiguration config) {
-    super(config);
+  public BinaryWorkloadResourceManager(PinotConfiguration config,
+      ThreadResourceUsageAccountant resourceUsageAccountant) {
+    super(config, resourceUsageAccountant);
     _secondaryWorkloadPolicy = new ResourceLimitPolicy(config, _numQueryWorkerThreads);
   }
 

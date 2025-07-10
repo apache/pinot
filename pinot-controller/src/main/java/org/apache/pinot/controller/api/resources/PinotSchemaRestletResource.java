@@ -57,6 +57,7 @@ import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
+import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -550,6 +551,12 @@ public class PinotSchemaRestletResource {
             String.format("Cannot delete schema %s, as it is associated with table %s", schemaName, tableNameWithType),
             Response.Status.CONFLICT);
       }
+    }
+    // If the schema is associated with logical table, we should not delete it.
+    if (ZKMetadataProvider.isLogicalTableExists(_pinotHelixResourceManager.getPropertyStore(), schemaName)) {
+      throw new ControllerApplicationException(LOGGER,
+          String.format("Cannot delete schema %s, as it is associated with logical table", schemaName),
+          Response.Status.CONFLICT);
     }
 
     LOGGER.info("Trying to delete schema {}", schemaName);

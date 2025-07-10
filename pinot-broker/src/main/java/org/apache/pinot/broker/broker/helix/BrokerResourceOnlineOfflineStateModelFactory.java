@@ -75,32 +75,42 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "OFFLINE", to = "ONLINE")
     public void onBecomeOnlineFromOffline(Message message, NotificationContext context) {
-      String tableNameWithType = message.getPartitionName();
-      LOGGER.info("Processing transition from OFFLINE to ONLINE for table: {}", tableNameWithType);
+      String physicalOrLogicalTable = message.getPartitionName();
+      LOGGER.info("Processing transition from OFFLINE to ONLINE for table: {}", physicalOrLogicalTable);
       try {
-        _routingManager.buildRouting(tableNameWithType);
-        TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
-        _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig,
-            _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
-        _queryQuotaManager.createDatabaseRateLimiter(
-            DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(tableNameWithType));
+        if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
+          _routingManager.buildRoutingForLogicalTable(physicalOrLogicalTable);
+          _queryQuotaManager.initOrUpdateLogicalTableQueryQuota(physicalOrLogicalTable);
+        } else {
+          _routingManager.buildRouting(physicalOrLogicalTable);
+          TableConfig tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, physicalOrLogicalTable);
+          _queryQuotaManager.initOrUpdateTableQueryQuota(tableConfig,
+              _helixDataAccessor.getProperty(_helixDataAccessor.keyBuilder().externalView(BROKER_RESOURCE_INSTANCE)));
+          _queryQuotaManager.createDatabaseRateLimiter(
+              DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(physicalOrLogicalTable));
+        }
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from OFFLINE to ONLINE for table: {}",
-            tableNameWithType, e);
+            physicalOrLogicalTable, e);
         throw e;
       }
     }
 
     @Transition(from = "ONLINE", to = "OFFLINE")
     public void onBecomeOfflineFromOnline(Message message, NotificationContext context) {
-      String tableNameWithType = message.getPartitionName();
-      LOGGER.info("Processing transition from ONLINE to OFFLINE for table: {}", tableNameWithType);
+      String physicalOrLogicalTable = message.getPartitionName();
+      LOGGER.info("Processing transition from ONLINE to OFFLINE for table: {}", physicalOrLogicalTable);
       try {
-        _routingManager.removeRouting(tableNameWithType);
-        _queryQuotaManager.dropTableQueryQuota(tableNameWithType);
+        if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
+          _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTable);
+          _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        } else {
+          _routingManager.removeRouting(physicalOrLogicalTable);
+          _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        }
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from ONLINE to OFFLINE for table: {}",
-            tableNameWithType, e);
+            physicalOrLogicalTable, e);
         throw e;
       }
     }
@@ -112,14 +122,19 @@ public class BrokerResourceOnlineOfflineStateModelFactory extends StateModelFact
 
     @Transition(from = "ONLINE", to = "DROPPED")
     public void onBecomeDroppedFromOnline(Message message, NotificationContext context) {
-      String tableNameWithType = message.getPartitionName();
-      LOGGER.info("Processing transition from ONLINE to DROPPED for table: {}", tableNameWithType);
+      String physicalOrLogicalTable = message.getPartitionName();
+      LOGGER.info("Processing transition from ONLINE to DROPPED for table: {}", physicalOrLogicalTable);
       try {
-        _routingManager.removeRouting(tableNameWithType);
-        _queryQuotaManager.dropTableQueryQuota(tableNameWithType);
+        if (ZKMetadataProvider.isLogicalTableExists(_propertyStore, physicalOrLogicalTable)) {
+          _routingManager.removeRoutingForLogicalTable(physicalOrLogicalTable);
+          _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        } else {
+          _routingManager.removeRouting(physicalOrLogicalTable);
+          _queryQuotaManager.dropTableQueryQuota(physicalOrLogicalTable);
+        }
       } catch (Exception e) {
         LOGGER.error("Caught exception while processing transition from ONLINE to DROPPED for table: {}",
-            tableNameWithType, e);
+            physicalOrLogicalTable, e);
         throw e;
       }
     }

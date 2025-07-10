@@ -53,7 +53,7 @@ type Props = {
     columnName: Array<string>
 };
 
-export default function AddDeleteComponent({
+export default function MultipleSelectComponent({
     changeHandler,
     streamConfigsObj,
     columnName

@@ -110,7 +110,7 @@ public class ResourceManagerAccountingTest {
       int finalK = k;
       rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId, null);
+        Tracing.ThreadAccountantOps.setupRunner(queryId, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
@@ -172,7 +172,7 @@ public class ResourceManagerAccountingTest {
       int finalK = k;
       rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId, null);
+        Tracing.ThreadAccountantOps.setupRunner(queryId, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
@@ -239,10 +239,11 @@ public class ResourceManagerAccountingTest {
 
     String workloadName = CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    WorkloadBudgetManager.init(pinotCfg);
-    WorkloadBudgetManager.getInstance().addOrUpdateWorkload(workloadName, 88_000_000, 27_000_000);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testWorkloadMemoryAccounting",
         InstanceType.SERVER);
+    WorkloadBudgetManager workloadBudgetManager =
+        Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
+    workloadBudgetManager.addOrUpdateWorkload(workloadName, 88_000_000, 27_000_000);
     ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
 
     for (int k = 0; k < 30; k++) {
@@ -375,7 +376,6 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
-    WorkloadBudgetManager.init(config);
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER);
@@ -386,7 +386,8 @@ public class ResourceManagerAccountingTest {
     for (int i = 0; i < 100; i++) {
       int finalI = i;
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testSelectQueryId" + finalI, null);
+        Tracing.ThreadAccountantOps.setupRunner("testSelectQueryId" + finalI,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
         try {
           SelectionOperatorUtils.getDataTableFromRows(rows, dataSchema, false).toBytes();
         } catch (EarlyTerminationException e) {
@@ -444,8 +445,6 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
-    WorkloadBudgetManager.init(config);
-
 
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
@@ -457,7 +456,8 @@ public class ResourceManagerAccountingTest {
     for (int i = 0; i < 100; i++) {
       int finalI = i;
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testGroupByQueryId" + finalI, null);
+        Tracing.ThreadAccountantOps.setupRunner("testGroupByQueryId" + finalI,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
         try {
           groupByResultsBlock.getDataTable().toBytes();
         } catch (EarlyTerminationException e) {
@@ -502,7 +502,6 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.00f);
 
     PinotConfiguration config = getConfig(2, 2, configs);
-    WorkloadBudgetManager.init(config);
     ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM",
@@ -522,7 +521,7 @@ public class ResourceManagerAccountingTest {
     FileUtils.forceMkdir(indexDir);
     String colName = "col";
     try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(indexDir, colName, new JsonIndexConfig());
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig())) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig(), "table__0__1", "col")) {
       // build json indexes
       for (int i = 0; i < 1000000; i++) {
         String val = randomJsonValue.get();
@@ -536,7 +535,8 @@ public class ResourceManagerAccountingTest {
 
       // test mutable json index .getMatchingFlattenedDocsMap()
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId1", null);
+        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId1",
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
         try {
           mutableJsonIndex.getMatchingFlattenedDocsMap("key", null);
         } catch (EarlyTerminationException e) {
@@ -551,7 +551,8 @@ public class ResourceManagerAccountingTest {
       File indexFile = new File(indexDir, colName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
       AtomicBoolean immutableEarlyTerminationOccurred = new AtomicBoolean(false);
       rm.getQueryRunners().submit(() -> {
-        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId2", null);
+        Tracing.ThreadAccountantOps.setupRunner("testJsonExtractIndexId2",
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
         try {
           try (PinotDataBuffer offHeapDataBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(indexFile);
               ImmutableJsonIndexReader offHeapIndexReader = new ImmutableJsonIndexReader(offHeapDataBuffer, 1000000)) {
@@ -601,7 +602,7 @@ public class ResourceManagerAccountingTest {
       int finalK = k;
       futures[finalK] = rm.getQueryRunners().submit(() -> {
         String queryId = "q" + finalK;
-        Tracing.ThreadAccountantOps.setupRunner(queryId, null);
+        Tracing.ThreadAccountantOps.setupRunner(queryId, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
         Thread thread = Thread.currentThread();
         CountDownLatch countDownLatch = new CountDownLatch(10);
         Future[] futuresThread = new Future[10];
@@ -645,7 +646,7 @@ public class ResourceManagerAccountingTest {
   private ResourceManager getResourceManager(int runners, int workers, final int softLimit, final int hardLimit,
       Map<String, Object> map) {
 
-    return new ResourceManager(getConfig(runners, workers, map)) {
+    return new ResourceManager(getConfig(runners, workers, map), new Tracing.DefaultThreadResourceUsageAccountant()) {
 
       @Override
       public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {

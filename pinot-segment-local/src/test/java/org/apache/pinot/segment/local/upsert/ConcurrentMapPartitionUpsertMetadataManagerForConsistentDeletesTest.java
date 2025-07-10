@@ -105,7 +105,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
         invocation -> primaryKeys.get(invocation.getArgument(0)).getValues()[0]);
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
-    when(segmentMetadata.getIndexCreationTime()).thenReturn(System.currentTimeMillis());
+    long creationTimeMs = System.currentTimeMillis();
+    when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTimeMs);
+    when(segmentMetadata.getZkCreationTime()).thenReturn(creationTimeMs);
     if (primaryKeys != null) {
       when(segmentMetadata.getTotalDocs()).thenReturn(primaryKeys.size());
     }
@@ -133,6 +135,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerForConsistentDeletesTest
     when(dataSource.getForwardIndex()).thenReturn(forwardIndex);
     SegmentMetadataImpl segmentMetadata = mock(SegmentMetadataImpl.class);
     when(segmentMetadata.getIndexCreationTime()).thenReturn(creationTimeMs);
+    when(segmentMetadata.getZkCreationTime()).thenReturn(creationTimeMs);
     when(segmentMetadata.getTotalDocs()).thenReturn(primaryKeys.size());
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
     return segment;

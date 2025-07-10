@@ -23,9 +23,15 @@ import javax.annotation.Nullable;
 
 public class SingleColumnKeySelector implements KeySelector<Object> {
   private final int _keyId;
+  private final String _hashFunction;
 
   public SingleColumnKeySelector(int keyId) {
+    this(keyId, KeySelector.DEFAULT_HASH_ALGORITHM);
+  }
+
+  public SingleColumnKeySelector(int keyId, String hashFunction) {
     _keyId = keyId;
+    _hashFunction = hashFunction;
   }
 
   @Nullable
@@ -37,6 +43,11 @@ public class SingleColumnKeySelector implements KeySelector<Object> {
   @Override
   public int computeHash(Object[] input) {
     Object key = input[_keyId];
-    return key != null ? key.hashCode() & Integer.MAX_VALUE : 0;
+    return HashFunctionSelector.computeHash(key, _hashFunction);
+  }
+
+  @Override
+  public String hashAlgorithm() {
+    return _hashFunction;
   }
 }

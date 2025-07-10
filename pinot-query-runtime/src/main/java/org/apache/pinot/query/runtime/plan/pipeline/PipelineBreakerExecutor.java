@@ -38,6 +38,7 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,9 +67,33 @@ public class PipelineBreakerExecutor {
    *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
    */
   @Nullable
+  public static PipelineBreakerResult executePipelineBreakersFromQueryContext(OpChainSchedulerService scheduler,
+      MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
+      Map<String, String> opChainMetadata,
+      @Nullable ThreadExecutionContext parentContext, boolean sendStats) {
+    return executePipelineBreakers(scheduler, mailboxService, workerMetadata, stagePlan, opChainMetadata,
+        QueryThreadContext.getRequestId(), QueryThreadContext.getActiveDeadlineMs(),
+        QueryThreadContext.getPassiveDeadlineMs(), parentContext, sendStats);
+  }
+
+  /**
+   * Execute a pipeline breaker and collect the results (synchronously). Currently, pipeline breaker executor can only
+   *    execute mailbox receive pipeline breaker.
+   *
+   * @param scheduler scheduler service to run the pipeline breaker main thread.
+   * @param mailboxService mailbox service to attach the {@link MailboxReceiveNode} against.
+   * @param workerMetadata worker metadata for the current worker.
+   * @param stagePlan the distributed stage plan to run pipeline breaker on.
+   * @param opChainMetadata request metadata, including query options
+   * @param parentContext Parent thread metadata
+   * @return pipeline breaker result;
+   *   - If exception occurs, exception block will be wrapped in {@link MseBlock} and assigned to each PB node.
+   *   - Normal stats will be attached to each PB node and downstream execution should return with stats attached.
+   */
+  @Nullable
   public static PipelineBreakerResult executePipelineBreakers(OpChainSchedulerService scheduler,
       MailboxService mailboxService, WorkerMetadata workerMetadata, StagePlan stagePlan,
-      Map<String, String> opChainMetadata, long requestId, long deadlineMs,
+      Map<String, String> opChainMetadata, long requestId, long activeDeadlineMs, long passiveDeadlineMs,
       @Nullable ThreadExecutionContext parentContext, boolean sendStats) {
     PipelineBreakerContext pipelineBreakerContext = new PipelineBreakerContext();
     PipelineBreakerVisitor.visitPlanRoot(stagePlan.getRootNode(), pipelineBreakerContext);
@@ -78,7 +103,7 @@ public class PipelineBreakerExecutor {
         //     OpChain receive-mail callbacks.
         // see also: MailboxIdUtils TODOs, de-couple mailbox id from query information
         OpChainExecutionContext opChainExecutionContext =
-            new OpChainExecutionContext(mailboxService, requestId, deadlineMs, opChainMetadata,
+            new OpChainExecutionContext(mailboxService, requestId, activeDeadlineMs, passiveDeadlineMs, opChainMetadata,
                 stagePlan.getStageMetadata(), workerMetadata, null, parentContext, sendStats);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
@@ -125,7 +150,7 @@ public class PipelineBreakerExecutor {
     OpChain pipelineBreakerOpChain =
         new OpChain(opChainExecutionContext, pipelineBreakerOperator, (id) -> latch.countDown());
     scheduler.register(pipelineBreakerOpChain);
-    long timeoutMs = opChainExecutionContext.getDeadlineMs() - System.currentTimeMillis();
+    long timeoutMs = opChainExecutionContext.getPassiveDeadlineMs() - System.currentTimeMillis();
     if (latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
       return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), pipelineBreakerOperator.getResultMap(),
           pipelineBreakerOperator.getErrorBlock(), pipelineBreakerOperator.calculateStats());

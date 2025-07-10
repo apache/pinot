@@ -35,7 +35,7 @@ public abstract class LookupTable {
   /**
    * Adds a row to the lookup table.
    */
-  public abstract void addRow(Object key, Object[] row);
+  public abstract void addRow(@Nullable Object key, Object[] row);
 
   @SuppressWarnings("unchecked")
   protected Object computeNewValue(Object[] row, @Nullable Object currentValue) {
@@ -68,6 +68,13 @@ public abstract class LookupTable {
     }
   }
 
+  protected static Object convertValueToList(Object value) {
+    if (value instanceof Object[]) {
+      return Collections.singletonList(value);
+    }
+    return value;
+  }
+
   /**
    * Returns {@code true} when all the keys added to the lookup table are unique.
    * When all keys are unique, the value of the lookup table is a single row ({@code Object[]}). When keys are not
@@ -80,7 +87,7 @@ public abstract class LookupTable {
   /**
    * Returns {@code true} if the lookup table contains the given key.
    */
-  public abstract boolean containsKey(Object key);
+  public abstract boolean containsKey(@Nullable Object key);
 
   /**
    * Returns the row/rows for the given key. When {@link #isKeysUnique} returns {@code true}, this method returns a
@@ -88,7 +95,7 @@ public abstract class LookupTable {
    * ({@code List<Object[]>}). Returns {@code null} if the key does not exist in the lookup table.
    */
   @Nullable
-  public abstract Object lookup(Object key);
+  public abstract Object lookup(@Nullable Object key);
 
   /**
    * Returns all the entries in the lookup table. When {@link #isKeysUnique} returns {@code true}, the value of the
@@ -96,5 +103,5 @@ public abstract class LookupTable {
    * entries is a list of rows ({@code List<Object[]>}).
    */
   @SuppressWarnings("rawtypes")
-  public abstract Set<Map.Entry> entrySet();
+  public abstract Set<Map.Entry<Object, Object>> entrySet();
 }

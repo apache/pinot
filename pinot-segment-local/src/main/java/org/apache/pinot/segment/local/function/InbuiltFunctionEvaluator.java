@@ -141,12 +141,22 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
-      return !((Boolean) _argumentNode.execute(row));
+      Boolean res = (Boolean) _argumentNode.execute(row);
+      if (res == null) {
+        return null;
+      } else {
+        return !res;
+      }
     }
 
     @Override
     public Object execute(Object[] values) {
-      return !((Boolean) _argumentNode.execute(values));
+      Boolean res = (Boolean) _argumentNode.execute(values);
+      if (res == null) {
+        return null;
+      } else {
+        return !res;
+      }
     }
   }
 
@@ -159,24 +169,38 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
+      boolean hasNull = false;
+
       for (ExecutableNode executableNode : _argumentNodes) {
         Boolean res = (Boolean) executableNode.execute(row);
+        if (res == null) {
+          hasNull = true;
+          continue;
+        }
         if (res) {
           return true;
         }
       }
-      return false;
+
+      return hasNull ? null : false;
     }
 
     @Override
     public Object execute(Object[] values) {
+      boolean hasNull = false;
+
       for (ExecutableNode executableNode : _argumentNodes) {
         Boolean res = (Boolean) executableNode.execute(values);
+        if (res == null) {
+          hasNull = true;
+          continue;
+        }
         if (res) {
           return true;
         }
       }
-      return false;
+
+      return hasNull ? null : false;
     }
   }
 
@@ -189,24 +213,38 @@ public class InbuiltFunctionEvaluator implements FunctionEvaluator {
 
     @Override
     public Object execute(GenericRow row) {
+      boolean hasNull = false;
+
       for (ExecutableNode executableNode : _argumentNodes) {
         Boolean res = (Boolean) executableNode.execute(row);
+        if (res == null) {
+          hasNull = true;
+          continue;
+        }
         if (!res) {
           return false;
         }
       }
-      return true;
+
+      return hasNull ? null : true;
     }
 
     @Override
     public Object execute(Object[] values) {
+      boolean hasNull = false;
+
       for (ExecutableNode executableNode : _argumentNodes) {
         Boolean res = (Boolean) executableNode.execute(values);
+        if (res == null) {
+          hasNull = true;
+          continue;
+        }
         if (!res) {
           return false;
         }
       }
-      return true;
+
+      return hasNull ? null : true;
     }
   }
 

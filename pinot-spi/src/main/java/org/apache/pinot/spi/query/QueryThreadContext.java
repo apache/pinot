@@ -41,8 +41,9 @@ import org.slf4j.MDC;
  * <p>It is used to pass information between different layers of the query execution stack without changing the
  * method signatures. This is also used to populate the {@link MDC} context for logging.
  *
- * Use {@link #open()} to initialize the empty context. As any other {@link AutoCloseable} object, it should be used
- * within a try-with-resources block to ensure the context is properly closed and removed from the thread-local storage.
+ * Use {@link #open(String)} to initialize the empty context. As any other {@link AutoCloseable} object, it should be
+ * used within a try-with-resources block to ensure the context is properly closed and removed from the thread-local
+ * storage.
  *
  * Sometimes it is necessary to copy the state of the {@link QueryThreadContext} from one thread to another. In this
  * case, use the {@link #createMemento()} method to capture the state of the {@link QueryThreadContext} in the current
@@ -73,7 +74,7 @@ public class QueryThreadContext {
   /**
    * Private constructor to prevent instantiation.
    *
-   * Use {@link #open()} to initialize the context instead.
+   * Use {@link #open(String)} to initialize the context instead.
    */
   private QueryThreadContext() {
   }
@@ -85,6 +86,7 @@ public class QueryThreadContext {
     String mode = conf.getProperty(CommonConstants.Query.CONFIG_OF_QUERY_CONTEXT_MODE);
     if ("strict".equalsIgnoreCase(mode)) {
       _strictMode = true;
+      return;
     }
     if (mode != null && !mode.isEmpty()) {
       throw new IllegalArgumentException("Invalid value '" + mode + "' for "
@@ -111,7 +113,7 @@ public class QueryThreadContext {
       String errorMessage = "QueryThreadContext is not initialized";
       if (_strictMode) {
         LOGGER.error(errorMessage);
-        throw new IllegalStateException("QueryThreadContext is not initialized");
+        throw new IllegalStateException(errorMessage);
       } else {
         LOGGER.debug(errorMessage);
         // in non-strict mode, return the fake instance
@@ -124,8 +126,8 @@ public class QueryThreadContext {
   /**
    * Returns {@code true} if the {@link QueryThreadContext} is initialized in the current thread.
    *
-   * Initializing the context means that the {@link #open()} method was called and the returned object is not closed
-   * yet.
+   * Initializing the context means that the {@link #open(String)} method was called and the returned object is not
+   * closed yet.
    */
   public static boolean isInitialized() {
     return THREAD_LOCAL.get() != null;
@@ -155,11 +157,23 @@ public class QueryThreadContext {
    * @throws IllegalStateException if the {@link QueryThreadContext} is already initialized.
    */
   public static CloseableContext open() {
-    return open(null);
+    return open("unknown");
   }
 
+  public static CloseableContext open(String instanceId) {
+    CloseableContext open = open((Memento) null);
+    get()._instanceId = instanceId;
+    return open;
+  }
+
+  /// Just kept for backward compatibility.
+  @Deprecated
   public static CloseableContext openFromRequestMetadata(Map<String, String> requestMetadata) {
-    CloseableContext open = open();
+    return openFromRequestMetadata("unknown", requestMetadata);
+  }
+
+  public static CloseableContext openFromRequestMetadata(String instanceId, Map<String, String> requestMetadata) {
+    CloseableContext open = open(instanceId);
     String cid = requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID);
     long requestId = Long.parseLong(requestMetadata.get(CommonConstants.Query.Request.MetadataKeys.REQUEST_ID));
     if (cid == null) {
@@ -167,9 +181,12 @@ public class QueryThreadContext {
     }
     QueryThreadContext.setIds(requestId, cid);
     long timeoutMs = Long.parseLong(requestMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
+    long extraPassiveTimeoutMs = Long.parseLong(requestMetadata.getOrDefault(
+        CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, "0"));
     long startTimeMs = System.currentTimeMillis();
     QueryThreadContext.setStartTimeMs(startTimeMs);
-    QueryThreadContext.setDeadlineMs(startTimeMs + timeoutMs);
+    QueryThreadContext.setActiveDeadlineMs(startTimeMs + timeoutMs);
+    QueryThreadContext.setPassiveDeadlineMs(startTimeMs + timeoutMs + extraPassiveTimeoutMs);
 
     return open;
   }
@@ -203,12 +220,14 @@ public class QueryThreadContext {
     Instance context = new Instance();
     if (memento != null) {
       context.setStartTimeMs(memento._startTimeMs);
-      context.setDeadlineMs(memento._deadlineMs);
+      context.setActiveDeadlineMs(memento._activeDeadlineMs);
+      context.setPassiveDeadlineMs(memento._passiveDeadlineMs);
       context.setBrokerId(memento._brokerId);
       context.setRequestId(memento._requestId);
       context.setCid(memento._cid);
       context.setSql(memento._sql);
       context.setQueryEngine(memento._queryEngine);
+      context.setInstanceId(memento._instanceId);
     }
 
     THREAD_LOCAL.set(context);
@@ -280,23 +299,60 @@ public class QueryThreadContext {
   }
 
   /**
-   * Returns the deadline time of the query in milliseconds since epoch.
+   * Use {@link #getActiveDeadlineMs()} instead.
+   */
+  @Deprecated
+  public static long getDeadlineMs() {
+    return get().getActiveDeadlineMs();
+  }
+
+  /**
+   * @deprecated Use {@link #setActiveDeadlineMs(long)} instead.
+   * @throws IllegalStateException if deadline is already set or if the {@link QueryThreadContext} is not initialized
+   */
+  @Deprecated
+  public static void setDeadlineMs(long deadlineMs) {
+    get().setActiveDeadlineMs(deadlineMs);
+  }
+
+  /**
+   * Returns the active deadline time of the query in milliseconds since epoch.
    *
    * The default value of 0 means the deadline is not set.
    * @throws IllegalStateException if the {@link QueryThreadContext} is not initialized
    */
-  public static long getDeadlineMs() {
-    return get().getDeadlineMs();
+  public static long getActiveDeadlineMs() {
+    return get().getActiveDeadlineMs();
   }
 
   /**
-   * Sets the deadline time of the query in milliseconds since epoch.
+   * Sets the active deadline time of the query in milliseconds since epoch.
    *
    * The deadline can only be set once.
    * @throws IllegalStateException if deadline is already set or if the {@link QueryThreadContext} is not initialized
    */
-  public static void setDeadlineMs(long deadlineMs) {
-    get().setDeadlineMs(deadlineMs);
+  public static void setActiveDeadlineMs(long activeDeadlineMs) {
+    get().setActiveDeadlineMs(activeDeadlineMs);
+  }
+
+  /**
+   * Returns the passive deadline time of the query in milliseconds since epoch.
+   *
+   * The default value of 0 means the deadline is not set.
+   * @throws IllegalStateException if the {@link QueryThreadContext} is not initialized
+   */
+  public static long getPassiveDeadlineMs() {
+    return get().getPassiveDeadlineMs();
+  }
+
+  /**
+   * Sets the passive deadline time of the query in milliseconds since epoch.
+   *
+   * The deadline can only be set once.
+   * @throws IllegalStateException if deadline is already set or if the {@link QueryThreadContext} is not initialized
+   */
+  public static void setPassiveDeadlineMs(long passiveDeadlineMs) {
+    get().setPassiveDeadlineMs(passiveDeadlineMs);
   }
 
   /**
@@ -415,6 +471,18 @@ public class QueryThreadContext {
   }
 
   /**
+   * Returns the instanceid of the query.
+   *
+   * This is usually the id that identifies the server, broker, controller, etc.
+   *
+   * The default value of {@code null} means the instanceid is not set.
+   * @throws IllegalStateException if the {@link QueryThreadContext} is not initialized
+   */
+  public static String getInstanceId() {
+    return get().getInstanceId();
+  }
+
+  /**
    * This private class stores the actual state of the {@link QueryThreadContext} in a safe way.
    *
    * As part of the paranoid design of the {@link QueryThreadContext}, this class is used to store the state of the
@@ -429,12 +497,14 @@ public class QueryThreadContext {
    */
   private static class Instance implements CloseableContext {
     private long _startTimeMs;
-    private long _deadlineMs;
+    private long _activeDeadlineMs;
+    private long _passiveDeadlineMs;
     private String _brokerId;
     private long _requestId;
     private String _cid;
     private String _sql;
     private String _queryEngine;
+    private String _instanceId;
 
     public long getStartTimeMs() {
       return _startTimeMs;
@@ -446,14 +516,34 @@ public class QueryThreadContext {
       _startTimeMs = startTimeMs;
     }
 
+    @Deprecated
     public long getDeadlineMs() {
-      return _deadlineMs;
+      return getActiveDeadlineMs();
     }
 
+    public long getActiveDeadlineMs() {
+      return _activeDeadlineMs;
+    }
+
+    @Deprecated
     public void setDeadlineMs(long deadlineMs) {
-      Preconditions.checkState(getDeadlineMs() == 0, "Deadline already set to %s, cannot set again",
-          getDeadlineMs());
-      _deadlineMs = deadlineMs;
+      setActiveDeadlineMs(deadlineMs);
+    }
+
+    public void setActiveDeadlineMs(long activeDeadlineMs) {
+      Preconditions.checkState(getActiveDeadlineMs() == 0, "Deadline already set to %s, cannot set again",
+          getActiveDeadlineMs());
+      _activeDeadlineMs = activeDeadlineMs;
+    }
+
+    public long getPassiveDeadlineMs() {
+      return _passiveDeadlineMs;
+    }
+
+    public void setPassiveDeadlineMs(long passiveDeadlineMs) {
+      Preconditions.checkState(getPassiveDeadlineMs() == 0, "Passive deadline already set to %s, cannot set again",
+          getPassiveDeadlineMs());
+      _passiveDeadlineMs = passiveDeadlineMs;
     }
 
     public String getBrokerId() {
@@ -507,6 +597,16 @@ public class QueryThreadContext {
       _queryEngine = queryType;
     }
 
+    public void setInstanceId(String instanceId) {
+      Preconditions.checkState(_instanceId == null, "Service id already set to %s, cannot set again",
+          getInstanceId());
+      _instanceId = instanceId;
+    }
+
+    public String getInstanceId() {
+      return _instanceId;
+    }
+
     @Override
     public String toString() {
       try {
@@ -538,8 +638,13 @@ public class QueryThreadContext {
     }
 
     @Override
-    public void setDeadlineMs(long deadlineMs) {
-      LOGGER.debug("Setting deadline to {} in a fake context", deadlineMs);
+    public void setActiveDeadlineMs(long activeDeadlineMs) {
+      LOGGER.debug("Setting active deadline to {} in a fake context", activeDeadlineMs);
+    }
+
+    @Override
+    public void setPassiveDeadlineMs(long passiveDeadlineMs) {
+      LOGGER.debug("Setting passive deadline to {} in a fake context", passiveDeadlineMs);
     }
 
     @Override
@@ -568,6 +673,11 @@ public class QueryThreadContext {
     }
 
     @Override
+    public void setInstanceId(String instanceId) {
+      LOGGER.debug("Setting instance id to {} in a fake context", instanceId);
+    }
+
+    @Override
     public void close() {
       // Do nothing
     }
@@ -583,27 +693,31 @@ public class QueryThreadContext {
    *
    * Given the only way to create a {@link QueryThreadContext} with known state is through the {@link Memento} class,
    * we can be sure that the state is always copied between threads. The alternative would be to create an
-   * {@link #open()} method that accepts a {@link QueryThreadContext} as an argument, but that would allow the receiver
-   * thread to use the received {@link QueryThreadContext} directly, which is not safe because it belongs to another
-   * thread.
+   * {@link #open(String)} method that accepts a {@link QueryThreadContext} as an argument, but that would allow the
+   * receiver thread to use the received {@link QueryThreadContext} directly, which is not safe because it belongs to
+   * another thread.
    */
   public static class Memento {
     private final long _startTimeMs;
-    private final long _deadlineMs;
+    private final long _activeDeadlineMs;
+    private final long _passiveDeadlineMs;
     private final String _brokerId;
     private final long _requestId;
     private final String _cid;
     private final String _sql;
     private final String _queryEngine;
+    private final String _instanceId;
 
     private Memento(Instance instance) {
       _startTimeMs = instance.getStartTimeMs();
-      _deadlineMs = instance.getDeadlineMs();
+      _activeDeadlineMs = instance.getActiveDeadlineMs();
+      _passiveDeadlineMs = instance.getPassiveDeadlineMs();
       _brokerId = instance.getBrokerId();
       _requestId = instance.getRequestId();
       _cid = instance.getCid();
       _sql = instance.getSql();
       _queryEngine = instance.getQueryEngine();
+      _instanceId = instance.getInstanceId();
     }
   }
 

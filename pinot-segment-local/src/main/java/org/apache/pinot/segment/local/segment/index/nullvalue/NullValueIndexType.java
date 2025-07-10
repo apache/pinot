@@ -79,19 +79,18 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
   }
 
   @Override
-  public ColumnConfigDeserializer<IndexConfig> createDeserializer() {
+  public ColumnConfigDeserializer<IndexConfig> createDeserializerForLegacyConfigs() {
     return (TableConfig tableConfig, Schema schema) -> {
       Collection<FieldSpec> allFieldSpecs = schema.getAllFieldSpecs();
       Map<String, IndexConfig> configMap = Maps.newHashMapWithExpectedSize(allFieldSpecs.size());
 
-      boolean enableColumnBasedNullHandling = schema.isEnableColumnBasedNullHandling();
-      boolean nullHandlingEnabled = tableConfig.getIndexingConfig() != null
-          && tableConfig.getIndexingConfig().isNullHandlingEnabled();
+      boolean columnBasedNullHandlingEnabled = schema.isEnableColumnBasedNullHandling();
+      boolean nullHandlingEnabled = tableConfig.getIndexingConfig().isNullHandlingEnabled();
 
       for (FieldSpec fieldSpec : allFieldSpecs) {
         IndexConfig indexConfig;
         boolean enabled;
-        if (enableColumnBasedNullHandling) {
+        if (columnBasedNullHandlingEnabled) {
           enabled = fieldSpec.isNullable();
         } else {
           enabled = nullHandlingEnabled;
@@ -114,7 +113,7 @@ public class NullValueIndexType extends AbstractIndexType<IndexConfig, NullValue
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+      Schema schema, TableConfig tableConfig) {
     return IndexHandler.NoOp.INSTANCE;
   }
 

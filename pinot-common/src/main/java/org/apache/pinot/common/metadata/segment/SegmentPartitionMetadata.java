@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -45,7 +44,7 @@ public class SegmentPartitionMetadata {
    * @param columnPartitionMap Column name to ColumnPartitionMetadata map.
    */
   public SegmentPartitionMetadata(
-      @Nonnull @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionMetadata> columnPartitionMap) {
+      @JsonProperty("columnPartitionMap") Map<String, ColumnPartitionMetadata> columnPartitionMap) {
     Preconditions.checkNotNull(columnPartitionMap);
     _columnPartitionMap = columnPartitionMap;
   }
@@ -66,7 +65,7 @@ public class SegmentPartitionMetadata {
    * @return Partition function for the column.
    */
   @Nullable
-  public String getFunctionName(@Nonnull String column) {
+  public String getFunctionName(String column) {
     ColumnPartitionMetadata columnPartitionMetadata = _columnPartitionMap.get(column);
     return (columnPartitionMetadata != null) ? columnPartitionMetadata.getFunctionName() : null;
   }

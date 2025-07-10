@@ -111,6 +111,8 @@ public interface IndexCreationContext {
    */
   int[] getImmutableToMutableIdMap();
 
+  String getTableNameWithType();
+
   final class Builder {
     private ColumnStatistics _columnStatistics;
     private File _indexDir;
@@ -134,6 +136,7 @@ public interface IndexCreationContext {
     private boolean _realtimeConversion = false;
     private File _consumerDir;
     private int[] _immutableToMutableIdMap;
+    private String _tableNameWithType;
 
     public Builder withColumnIndexCreationInfo(ColumnIndexCreationInfo columnIndexCreationInfo) {
       return withLengthOfLongestEntry(columnIndexCreationInfo.getLengthOfLongestEntry())
@@ -266,12 +269,17 @@ public interface IndexCreationContext {
       return this;
     }
 
+    public Builder withTableNameWithType(String tableNameWithType) {
+      _tableNameWithType = tableNameWithType;
+      return this;
+    }
+
     public Common build() {
       return new Common(Objects.requireNonNull(_indexDir), _lengthOfLongestEntry, _maxNumberOfMultiValueElements,
           _maxRowLengthInBytes, _onHeap, Objects.requireNonNull(_fieldSpec), _sorted, _cardinality,
           _totalNumberOfEntries, _totalDocs, _hasDictionary, _minValue, _maxValue, _forwardIndexDisabled,
           _sortedUniqueElementsArray, _optimizedDictionary, _fixedLength, _textCommitOnClose, _columnStatistics,
-          _realtimeConversion, _consumerDir, _immutableToMutableIdMap);
+          _realtimeConversion, _consumerDir, _immutableToMutableIdMap, _tableNameWithType);
     }
 
     public Builder withSortedUniqueElementsArray(Object sortedUniqueElementsArray) {
@@ -308,14 +316,15 @@ public interface IndexCreationContext {
     private final boolean _realtimeConversion;
     private final File _consumerDir;
     private final int[] _immutableToMutableIdMap;
+    private final String _tableNameWithType;
 
-    public Common(File indexDir, int lengthOfLongestEntry,
+    private Common(File indexDir, int lengthOfLongestEntry,
         int maxNumberOfMultiValueElements, int maxRowLengthInBytes, boolean onHeap,
         FieldSpec fieldSpec, boolean sorted, int cardinality, int totalNumberOfEntries,
         int totalDocs, boolean hasDictionary, Comparable<?> minValue, Comparable<?> maxValue,
         boolean forwardIndexDisabled, Object sortedUniqueElementsArray, boolean optimizeDictionary, boolean fixedLength,
         boolean textCommitOnClose, ColumnStatistics columnStatistics, boolean realtimeConversion, File consumerDir,
-        int[] immutableToMutableIdMap) {
+        int[] immutableToMutableIdMap, String tableNameWithType) {
       _indexDir = indexDir;
       _lengthOfLongestEntry = lengthOfLongestEntry;
       _maxNumberOfMultiValueElements = maxNumberOfMultiValueElements;
@@ -338,6 +347,7 @@ public interface IndexCreationContext {
       _realtimeConversion = realtimeConversion;
       _consumerDir = consumerDir;
       _immutableToMutableIdMap = immutableToMutableIdMap;
+      _tableNameWithType = tableNameWithType;
     }
 
     public FieldSpec getFieldSpec() {
@@ -437,6 +447,11 @@ public interface IndexCreationContext {
     @Override
     public int[] getImmutableToMutableIdMap() {
       return _immutableToMutableIdMap;
+    }
+
+    @Override
+    public String getTableNameWithType() {
+      return _tableNameWithType;
     }
   }
 }

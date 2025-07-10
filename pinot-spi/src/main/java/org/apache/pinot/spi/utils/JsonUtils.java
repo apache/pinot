@@ -53,7 +53,6 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -754,7 +753,7 @@ public class JsonUtils {
    * @return the root node of the json index paths tree
    * @throws IllegalArgumentException
    */
-  private static JsonSchemaTreeNode createTree(@Nonnull JsonIndexConfig jsonIndexConfig)
+  private static JsonSchemaTreeNode createTree(JsonIndexConfig jsonIndexConfig)
       throws IllegalArgumentException {
     Set<String> indexPaths = jsonIndexConfig.getIndexPaths();
     JsonSchemaTreeNode rootNode = new JsonSchemaTreeNode("");

@@ -61,6 +61,6 @@ public class MultiStageStatsTreeBuilder {
       return jsonNodes;
     }
     InStageStatsTreeBuilder treeBuilder = new InStageStatsTreeBuilder(stageStats, this::jsonStatsByStage);
-    return planNode.visit(treeBuilder, null);
+    return planNode.visit(treeBuilder, new InStageStatsTreeBuilder.Context(1));
   }
 }

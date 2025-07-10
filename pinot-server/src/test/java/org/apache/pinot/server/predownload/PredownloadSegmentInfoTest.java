@@ -23,10 +23,10 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.server.predownload.PredownloadTestUtil.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertFalse;
-import static org.testng.AssertJUnit.assertNull;
 
 
 public class PredownloadSegmentInfoTest {
@@ -40,17 +40,17 @@ public class PredownloadSegmentInfoTest {
 
   @Test
   public void testSegmentInfo() {
-    assertEquals(SEGMENT_NAME, _predownloadSegmentInfo.getSegmentName());
-    assertEquals(TABLE_NAME, _predownloadSegmentInfo.getTableNameWithType());
+    assertEquals(_predownloadSegmentInfo.getSegmentName(), SEGMENT_NAME);
+    assertEquals(_predownloadSegmentInfo.getTableNameWithType(), TABLE_NAME);
   }
 
   @Test
   public void testUpdateSegmentInfo() {
     SegmentZKMetadata metadata = createSegmentZKMetadata();
     _predownloadSegmentInfo.updateSegmentInfo(metadata);
-    assertEquals(CRC, _predownloadSegmentInfo.getCrc());
-    assertEquals(CRYPTER_NAME, _predownloadSegmentInfo.getCrypterName());
-    assertEquals(DOWNLOAD_URL, _predownloadSegmentInfo.getDownloadUrl());
+    assertEquals(_predownloadSegmentInfo.getCrc(), CRC);
+    assertEquals(_predownloadSegmentInfo.getCrypterName(), CRYPTER_NAME);
+    assertEquals(_predownloadSegmentInfo.getDownloadUrl(), DOWNLOAD_URL);
 
     metadata.setDownloadUrl("");
     _predownloadSegmentInfo.updateSegmentInfo(metadata);

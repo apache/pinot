@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.query.executor;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -29,9 +30,14 @@ import org.apache.pinot.core.query.request.context.TimerContext;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
+import org.apache.pinot.spi.data.Schema;
 
 
 public interface TableExecutionInfo {
+
+  /// Returns the latest [Schema] for the table.
+  Schema getSchema();
+
   /**
    * Check if consuming segments are being queried.
    * @return true if consuming segments are being queried, false otherwise
@@ -119,10 +125,17 @@ public interface TableExecutionInfo {
    * the number of segments queried, the min index time, the min ingestion time and the max end time.
    */
   class ConsumingSegmentsInfo {
-    private final int _numConsumingSegmentsQueried;
-    private final long _minIndexTimeMs;
-    private final long _minIngestionTimeMs;
-    private final long _maxEndTimeMs;
+    private int _numConsumingSegmentsQueried;
+    private long _minIndexTimeMs;
+    private long _minIngestionTimeMs;
+    private long _maxEndTimeMs;
+
+    public ConsumingSegmentsInfo() {
+      _numConsumingSegmentsQueried = 0;
+      _minIndexTimeMs = Long.MAX_VALUE;
+      _minIngestionTimeMs = Long.MAX_VALUE;
+      _maxEndTimeMs = Long.MIN_VALUE;
+    }
 
     public ConsumingSegmentsInfo(int numConsumingSegmentsQueried, long minIndexTimeMs, long minIngestionTimeMs,
         long maxEndTimeMs) {
@@ -159,6 +172,13 @@ public interface TableExecutionInfo {
     public long getMaxEndTimeMs() {
       return _maxEndTimeMs;
     }
+
+    public void aggregate(ConsumingSegmentsInfo other) {
+      _numConsumingSegmentsQueried += other.getNumConsumingSegmentsQueried();
+      _minIndexTimeMs = Math.min(_minIndexTimeMs, other.getMinIndexTimeMs());
+      _minIngestionTimeMs = Math.min(_minIngestionTimeMs, other.getMinIngestionTimeMs());
+      _maxEndTimeMs = Math.max(_maxEndTimeMs, other.getMaxEndTimeMs());
+    }
   }
 
   /**
@@ -172,6 +192,18 @@ public interface TableExecutionInfo {
     private int _numTotalSegments;
     private int _numSelectedSegments;
     private List<SegmentContext> _selectedSegmentContexts;
+
+    public SelectedSegmentsInfo() {
+      _indexSegments = new ArrayList<>();
+      _numTotalDocs = 0;
+      _numTotalSegments = 0;
+      _numSelectedSegments = 0;
+      _selectedSegmentContexts = new ArrayList<>();
+      _prunerStats = new SegmentPrunerStatistics();
+      _prunerStats.setInvalidSegments(0);
+      _prunerStats.setValuePruned(0);
+      _prunerStats.setLimitPruned(0);
+    }
 
     public SelectedSegmentsInfo(List<IndexSegment> indexSegments, long numTotalDocs,
         SegmentPrunerStatistics prunerStats, int numTotalSegments, int numSelectedSegments,
@@ -206,6 +238,17 @@ public interface TableExecutionInfo {
 
     public List<SegmentContext> getSelectedSegmentContexts() {
       return _selectedSegmentContexts;
+    }
+
+    public void aggregate(SelectedSegmentsInfo other) {
+      _indexSegments.addAll(other._indexSegments);
+      _numTotalDocs += other._numTotalDocs;
+      _numTotalSegments += other._numTotalSegments;
+      _numSelectedSegments += other._numSelectedSegments;
+      _selectedSegmentContexts.addAll(other._selectedSegmentContexts);
+      _prunerStats.setInvalidSegments(_prunerStats.getInvalidSegments() + other._prunerStats.getInvalidSegments());
+      _prunerStats.setValuePruned(_prunerStats.getValuePruned() + other._prunerStats.getValuePruned());
+      _prunerStats.setLimitPruned(_prunerStats.getLimitPruned() + other._prunerStats.getLimitPruned());
     }
   }
 }

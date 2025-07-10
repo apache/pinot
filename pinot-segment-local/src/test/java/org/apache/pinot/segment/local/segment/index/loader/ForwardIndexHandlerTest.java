@@ -588,7 +588,7 @@ public class ForwardIndexHandlerTest {
   }
 
   private ForwardIndexHandler createForwardIndexHandler() {
-    return new ForwardIndexHandler(_segmentDirectory, createIndexLoadingConfig(), SCHEMA);
+    return new ForwardIndexHandler(_segmentDirectory, createIndexLoadingConfig());
   }
 
   private Map<String, List<ForwardIndexHandler.Operation>> computeOperations()

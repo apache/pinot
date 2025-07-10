@@ -34,6 +34,7 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
@@ -124,7 +125,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
 
       // get server to segment mappings
       PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
-      Map<String, List<String>> serverToSegments = pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+      Map<String, List<String>> serverToSegments =
+          pinotHelixResourceManager.getServerToOnlineSegmentsMapFromEV(tableNameWithType, true);
       BiMap<String, String> serverToEndpoints;
       try {
         serverToEndpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
@@ -226,6 +228,17 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
               segment.getCrc(), validDocIdsMetadata.getSegmentCrc());
           continue;
         }
+
+        // skipping segments for which their servers are not in READY state. The bitmaps would be inconsistent when
+        // server is NOT READY as UPDATING segments might be updating the ONLINE segments
+        if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
+            .equals(ServiceStatus.Status.GOOD)) {
+          LOGGER.warn("Server {} is in {} state, skipping {} generation for segment: {}",
+              validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(),
+              MinionConstants.UpsertCompactionTask.TASK_TYPE, segmentName);
+          continue;
+        }
+
         long totalDocs = validDocIdsMetadata.getTotalDocs();
         double invalidRecordPercent = ((double) totalInvalidDocs / totalDocs) * 100;
         if (totalInvalidDocs == totalDocs) {
@@ -234,15 +247,13 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         } else if (invalidRecordPercent >= invalidRecordsThresholdPercent
             && totalInvalidDocs >= invalidRecordsThresholdCount) {
           LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
-                          + "(count threshold: {}, percent threshold: {}), adding it to the compaction list",
-                  segmentName, totalInvalidDocs, totalDocs, invalidRecordsThresholdCount,
-                  invalidRecordsThresholdPercent);
+                  + "(count threshold: {}, percent threshold: {}), adding it to the compaction list", segmentName,
+              totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
           segmentsForCompaction.add(Pair.of(segment, totalInvalidDocs));
         } else {
           LOGGER.debug("Segment {} contains {} invalid records out of {} total records "
-                          + "(count threshold: {}, percent threshold: {}), skipping it for compaction",
-                  segmentName, totalInvalidDocs, totalDocs, invalidRecordsThresholdCount,
-                  invalidRecordsThresholdPercent);
+                  + "(count threshold: {}, percent threshold: {}), skipping it for compaction", segmentName,
+              totalInvalidDocs, totalDocs, invalidRecordsThresholdCount, invalidRecordsThresholdPercent);
         }
         break;
       }

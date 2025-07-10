@@ -56,10 +56,13 @@ import java.util.stream.Stream;
  * </pre>
  */
 public final class Obfuscator {
+
   private static final String DEFAULT_MASKED_VALUE = "*****";
   private static final List<Pattern> DEFAULT_PATTERNS =
-      Stream.of("(?i).*secret$", "(?i).*secret[\\s_-]*key$", "(?i).*password$", "(?i).*keytab$", "(?i).*token$")
+      Stream.of("(?i).*secret$", "(?i).*secret[\\s_-]*key$", "(?i).*api[\\s_-]*key$", "(?i).*password$",
+              "(?i).*keytab$", "(?i).*token$")
           .map(Pattern::compile).collect(Collectors.toList());
+  public static final Obfuscator DEFAULT = new Obfuscator();
 
   private final String _maskedValue;
   private final List<Pattern> _patterns;
@@ -69,8 +72,7 @@ public final class Obfuscator {
    * values with '*****'
    */
   public Obfuscator() {
-    _maskedValue = DEFAULT_MASKED_VALUE;
-    _patterns = DEFAULT_PATTERNS;
+    this(DEFAULT_MASKED_VALUE, DEFAULT_PATTERNS);
   }
 
   /**

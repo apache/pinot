@@ -57,6 +57,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerato
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegistry;
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
+import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -222,7 +223,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       LOGGER.info("Trying to create tasks of type: {}, table: {}", taskType, tableNameWithType);
       try {
-        if (!_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType)) {
+        if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+            UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
           LOGGER.warn("Resource utilization is above threshold, skipping task creation for table: {}", tableName);
           _controllerMetrics.setOrUpdateTableGauge(tableName, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED, 1L);
           continue;
@@ -721,7 +723,8 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     for (TableConfig tableConfig : enabledTableConfigs) {
       String tableName = tableConfig.getTableName();
       try {
-        if (!_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName)) {
+        if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableName,
+            UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
           String message = String.format("Skipping tasks generation as resource utilization is not within limits for "
               + "table: %s. Disk utilization for one or more servers hosting this table has exceeded the threshold. "
               + "Tasks won't be generated until the issue is mitigated.", tableName);

@@ -21,7 +21,6 @@ package org.apache.pinot.segment.local.realtime.impl.vector;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.document.Document;
@@ -96,12 +95,12 @@ public class MutableVectorIndex implements VectorIndexReader, MutableIndex {
   }
 
   @Override
-  public void add(@Nonnull Object value, int dictId, int docId) {
+  public void add(Object value, int dictId, int docId) {
     throw new UnsupportedOperationException("Mutable Vector indexes are not supported for single-valued columns");
   }
 
   @Override
-  public void add(@Nonnull Object[] values, @Nullable int[] dictIds, int docId) {
+  public void add(Object[] values, @Nullable int[] dictIds, int docId) {
     float[] floatValues = new float[_vectorDimension];
     for (int i = 0; i < values.length; i++) {
       floatValues[i] = (Float) values[i];

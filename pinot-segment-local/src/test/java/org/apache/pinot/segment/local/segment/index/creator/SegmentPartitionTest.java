@@ -193,17 +193,13 @@ public class SegmentPartitionTest implements PinotBuffersAfterClassCheckRule {
 
     List<GenericRow> rows = new ArrayList<>(NUM_ROWS);
     for (int i = 0; i < NUM_ROWS; i++) {
-      HashMap<String, Object> map = new HashMap<>();
-
+      GenericRow row = new GenericRow();
       int partition = random.nextInt(PARTITION_DIVISOR);
       int validPartitionedValue = random.nextInt(100) * 20 + partition;
       _expectedPartitions.add(partition);
-      map.put(PARTITIONED_COLUMN_NAME, validPartitionedValue);
-      map.put(NON_PARTITIONED_COLUMN_NAME, validPartitionedValue);
-
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      row.putValue(PARTITIONED_COLUMN_NAME, validPartitionedValue);
+      row.putValue(NON_PARTITIONED_COLUMN_NAME, validPartitionedValue);
+      rows.add(row);
     }
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

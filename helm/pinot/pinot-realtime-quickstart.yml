@@ -34,7 +34,6 @@ data:
         "retentionTimeValue": "3650",
         "segmentPushType": "APPEND",
         "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-        "schemaName": "airlineStats",
         "replication": "1",
         "replicasPerPartition": "1"
       },
@@ -70,7 +69,6 @@ data:
         "retentionTimeValue": "3650",
         "segmentPushType": "APPEND",
         "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-        "schemaName": "airlineStatsAvro",
         "replication": "1",
         "replicasPerPartition": "1"
       },

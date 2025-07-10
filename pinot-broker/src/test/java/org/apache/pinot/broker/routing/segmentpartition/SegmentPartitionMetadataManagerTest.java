@@ -36,7 +36,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.core.routing.TablePartitionInfo;
+import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
@@ -95,9 +95,11 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
 
     // Initial state should be all empty
     segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
-    TablePartitionInfo tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    assertEquals(tablePartitionInfo.getPartitionInfoMap(), new TablePartitionInfo.PartitionInfo[NUM_PARTITIONS]);
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo = partitionMetadataManager
+        .getTablePartitionReplicatedServersInfo();
+    assertEquals(tablePartitionReplicatedServersInfo.getPartitionInfoMap(),
+        new TablePartitionReplicatedServersInfo.PartitionInfo[NUM_PARTITIONS]);
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Adding segment without partition metadata should be recorded in the invalid segments
     String segmentWithoutPartitionMetadata = "segmentWithoutPartitionMetadata";
@@ -108,18 +110,20 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME,
         segmentZKMetadataWithoutPartitionMetadata);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    assertEquals(tablePartitionInfo.getPartitionInfoMap(), new TablePartitionInfo.PartitionInfo[NUM_PARTITIONS]);
-    assertEquals(tablePartitionInfo.getSegmentsWithInvalidPartition(),
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    assertEquals(tablePartitionReplicatedServersInfo.getPartitionInfoMap(),
+        new TablePartitionReplicatedServersInfo.PartitionInfo[NUM_PARTITIONS]);
+    assertEquals(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition(),
         Collections.singletonList(segmentWithoutPartitionMetadata));
 
     // Removing segment without partition metadata should remove it from the invalid segments
     onlineSegments.remove(segmentWithoutPartitionMetadata);
     segmentAssignment.remove(segmentWithoutPartitionMetadata);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    assertEquals(tablePartitionInfo.getPartitionInfoMap(), new TablePartitionInfo.PartitionInfo[NUM_PARTITIONS]);
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    assertEquals(tablePartitionReplicatedServersInfo.getPartitionInfoMap(),
+        new TablePartitionReplicatedServersInfo.PartitionInfo[NUM_PARTITIONS]);
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Same logic applies to the new segment
     onlineSegments.add(segmentWithoutPartitionMetadata);
@@ -129,16 +133,18 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     ZKMetadataProvider.setSegmentZKMetadata(_propertyStore, OFFLINE_TABLE_NAME,
         segmentZKMetadataWithoutPartitionMetadata);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    assertEquals(tablePartitionInfo.getPartitionInfoMap(), new TablePartitionInfo.PartitionInfo[NUM_PARTITIONS]);
-    assertEquals(tablePartitionInfo.getSegmentsWithInvalidPartition(),
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    assertEquals(tablePartitionReplicatedServersInfo.getPartitionInfoMap(),
+        new TablePartitionReplicatedServersInfo.PartitionInfo[NUM_PARTITIONS]);
+    assertEquals(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition(),
         Collections.singletonList(segmentWithoutPartitionMetadata));
     onlineSegments.remove(segmentWithoutPartitionMetadata);
     segmentAssignment.remove(segmentWithoutPartitionMetadata);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    assertEquals(tablePartitionInfo.getPartitionInfoMap(), new TablePartitionInfo.PartitionInfo[NUM_PARTITIONS]);
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    assertEquals(tablePartitionReplicatedServersInfo.getPartitionInfoMap(),
+        new TablePartitionReplicatedServersInfo.PartitionInfo[NUM_PARTITIONS]);
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Adding segments inline with the partition column config should yield correct partition results
     String segment0 = "segment0";
@@ -146,12 +152,13 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     segmentAssignment.put(segment0, Collections.singletonMap(SERVER_0, ONLINE));
     setSegmentZKMetadata(segment0, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    TablePartitionInfo.PartitionInfo[] partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap = tablePartitionReplicatedServersInfo
+        .getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertNull(partitionInfoMap[1]);
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Adding one more segments
     String segment1 = "segment1";
@@ -159,56 +166,57 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     segmentAssignment.put(segment1, Collections.singletonMap(SERVER_1, ONLINE));
     setSegmentZKMetadata(segment1, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_1));
     assertEquals(partitionInfoMap[1]._segments, Collections.singleton(segment1));
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Updating partition metadata without refreshing should have no effect
     setSegmentZKMetadata(segment0, PARTITION_COLUMN_FUNC_ALT, NUM_PARTITIONS_ALT, 0, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_1));
     assertEquals(partitionInfoMap[1]._segments, Collections.singleton(segment1));
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Refreshing the changed segment should update the partition info
     segmentZkMetadataFetcher.refreshSegment(segment0);
     // segment0 is no longer inline with the table config, and it should be recorded in the invalid segments
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertNull(partitionInfoMap[0]);
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_1));
     assertEquals(partitionInfoMap[1]._segments, Collections.singleton(segment1));
-    assertEquals(tablePartitionInfo.getSegmentsWithInvalidPartition(), Collections.singletonList(segment0));
+    assertEquals(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition(),
+        Collections.singletonList(segment0));
 
     // Refresh the changed segment back to inline, and both segments should now be back on the partition list
     setSegmentZKMetadata(segment0, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, 0L);
     segmentZkMetadataFetcher.refreshSegment(segment0);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_1));
     assertEquals(partitionInfoMap[1]._segments, Collections.singleton(segment1));
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Changing one of the segments to be on a different server should update the fully replicated servers
     segmentAssignment.put(segment1, Collections.singletonMap(SERVER_0, ONLINE));
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[1]._segments, Collections.singleton(segment1));
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Adding one more segment to partition-1 but located on a different server will update the partition map, but
     // remove the fully replicated server because it is no longer having full replica on a single server
@@ -217,37 +225,37 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     segmentAssignment.put(segment2, Collections.singletonMap(SERVER_1, ONLINE));
     setSegmentZKMetadata(segment2, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 1, 0L);
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertTrue(partitionInfoMap[1]._fullyReplicatedServers.isEmpty());
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Updating the segment to be replicated on 2 servers should add the fully replicated server back
     segmentAssignment.put(segment2, ImmutableMap.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Adding a newly created segment without available replica should not update the partition map
     String newSegment = "newSegment";
     onlineSegments.add(newSegment);
     setSegmentZKMetadata(newSegment, PARTITION_COLUMN_FUNC, NUM_PARTITIONS, 0, System.currentTimeMillis());
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEquals(partitionInfoMap[0]._segments, Collections.singleton(segment0));
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_0));
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
 
     // Making all of them replicated will show full list, even for the new segment
     segmentAssignment.put(segment0, ImmutableMap.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
@@ -255,13 +263,13 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
     segmentAssignment.put(segment2, ImmutableMap.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
     segmentAssignment.put(newSegment, ImmutableMap.of(SERVER_0, ONLINE, SERVER_1, ONLINE));
     segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
-    tablePartitionInfo = partitionMetadataManager.getTablePartitionInfo();
-    partitionInfoMap = tablePartitionInfo.getPartitionInfoMap();
+    tablePartitionReplicatedServersInfo = partitionMetadataManager.getTablePartitionReplicatedServersInfo();
+    partitionInfoMap = tablePartitionReplicatedServersInfo.getPartitionInfoMap();
     assertEquals(partitionInfoMap[0]._fullyReplicatedServers, ImmutableSet.of(SERVER_0, SERVER_1));
     assertEqualsNoOrder(partitionInfoMap[0]._segments.toArray(), new String[]{segment0, newSegment});
     assertEquals(partitionInfoMap[1]._fullyReplicatedServers, ImmutableSet.of(SERVER_0, SERVER_1));
     assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{segment1, segment2});
-    assertTrue(tablePartitionInfo.getSegmentsWithInvalidPartition().isEmpty());
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
   }
 
   private void setSegmentZKMetadata(String segment, String partitionFunction, int numPartitions, int partitionId,

@@ -48,8 +48,8 @@ public class DefaultFetchPlanner implements FetchPlanner {
     extractEqInColumns(Objects.requireNonNull(queryContext.getFilter()), eqInColumns);
     Map<String, List<IndexType<?, ?, ?>>> columnToIndexList = new HashMap<>();
     for (String column : eqInColumns) {
-      DataSource dataSource = indexSegment.getDataSource(column);
-      if (dataSource.getBloomFilter() != null) {
+      DataSource dataSource = indexSegment.getDataSourceNullable(column);
+      if (dataSource != null && dataSource.getBloomFilter() != null) {
         columnToIndexList.put(column, Collections.singletonList(StandardIndexes.bloomFilter()));
       }
     }

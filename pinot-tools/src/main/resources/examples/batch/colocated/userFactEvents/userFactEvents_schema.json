@@ -1,0 +1,44 @@
+{
+  "metricFieldSpecs": [
+    {
+      "dataType": "DOUBLE",
+      "name": "tripAmount"
+    },
+    {
+      "dataType": "DOUBLE",
+      "name": "distanceMeters"
+    }
+  ],
+  "dimensionFieldSpecs": [
+    {
+      "dataType": "STRING",
+      "name": "deviceOS"
+    },
+    {
+      "dataType": "STRING",
+      "name": "userUUID"
+    },
+    {
+      "dataType": "STRING",
+      "name": "tripCurrencyCode"
+    },
+    {
+      "dataType": "STRING",
+      "name": "cityName"
+    },
+    {
+      "dataType": "STRING",
+      "name": "productCode"
+    }
+  ],
+  "schemaName": "userFactEvents",
+  "dateTimeFieldSpecs": [
+    {
+      "name": "ts",
+      "dataType": "LONG",
+      "notNull": false,
+      "format": "EPOCH|SECONDS|1",
+      "granularity": "SECONDS|1"
+    }
+  ]
+}

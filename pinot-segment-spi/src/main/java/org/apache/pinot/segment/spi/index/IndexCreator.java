@@ -21,7 +21,6 @@ package org.apache.pinot.segment.spi.index;
 
 import java.io.Closeable;
 import java.io.IOException;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 
@@ -46,7 +45,7 @@ public interface IndexCreator extends Closeable {
    * @param value The nonnull value of the cell. In case the cell was actually null, a default value is received instead
    * @param dictId An optional dictionary value of the cell. If there is no dictionary, -1 is received
    */
-  void add(@Nonnull Object value, int dictId)
+  void add(Object value, int dictId)
       throws IOException;
 
   /**
@@ -57,7 +56,7 @@ public interface IndexCreator extends Closeable {
    * @param values The nonnull value of the cell. In case the cell was actually null, an empty array is received instead
    * @param dictIds An optional array of dictionary values. If there is no dictionary, null is received.
    */
-  void add(@Nonnull Object[] values, @Nullable int[] dictIds)
+  void add(Object[] values, @Nullable int[] dictIds)
       throws IOException;
 
   void seal()

@@ -28,13 +28,14 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
+public class ImplicitHybridTableRouteInfo extends BaseTableRouteInfo {
   private String _offlineTableName = null;
   private boolean _isOfflineRouteExists;
   private TableConfig _offlineTableConfig;
@@ -112,6 +113,18 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
     return _realtimeTableConfig;
   }
 
+  @Nullable
+  @Override
+  public QueryConfig getOfflineTableQueryConfig() {
+    return _offlineTableConfig != null ? _offlineTableConfig.getQueryConfig() : null;
+  }
+
+  @Nullable
+  @Override
+  public QueryConfig getRealtimeTableQueryConfig() {
+    return _realtimeTableConfig != null ? _realtimeTableConfig.getQueryConfig() : null;
+  }
+
   public void setRealtimeTableConfig(TableConfig realtimeTableConfig) {
     _realtimeTableConfig = realtimeTableConfig;
   }
@@ -160,26 +173,6 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
     _realtimeRoutingTable = realtimeRoutingTable;
   }
 
-  @Override
-  public boolean isExists() {
-    return hasOffline() || hasRealtime();
-  }
-
-  @Override
-  public boolean isHybrid() {
-    return hasOffline() && hasRealtime();
-  }
-
-  @Override
-  public boolean isOffline() {
-    return hasOffline() && !hasRealtime();
-  }
-
-  @Override
-  public boolean isRealtime() {
-    return !hasOffline() && hasRealtime();
-  }
-
   /**
    * Offline if offline table config is present.
    * @return true if there is an OFFLINE table, false otherwise
@@ -198,21 +191,7 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
     return _realtimeTableConfig != null;
   }
 
-  /**
-   * Route exists if at least one of the physical tables has a route.
-   * @return true if a route exists, false otherwise
-   */
   @Override
-  public boolean isRouteExists() {
-    if (isOffline()) {
-      return _isOfflineRouteExists;
-    } else if (isRealtime()) {
-      return _isRealtimeRouteExists;
-    } else {
-      return _isOfflineRouteExists || _isRealtimeRouteExists;
-    }
-  }
-
   public boolean isOfflineRouteExists() {
     return _isOfflineRouteExists;
   }
@@ -221,6 +200,7 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
     _isOfflineRouteExists = offlineRouteExists;
   }
 
+  @Override
   public boolean isRealtimeRouteExists() {
     return _isRealtimeRouteExists;
   }
@@ -245,21 +225,6 @@ public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
 
   public void setRealtimeTableDisabled(boolean realtimeTableDisabled) {
     _isRealtimeTableDisabled = realtimeTableDisabled;
-  }
-
-  /**
-   * Disabled if all physical tables are disabled.
-   * @return true if the table is disabled, false
-   */
-  @Override
-  public boolean isDisabled() {
-    if (isOffline()) {
-      return _isOfflineTableDisabled;
-    } else if (isRealtime()) {
-      return _isRealtimeTableDisabled;
-    } else {
-      return _isOfflineTableDisabled && _isRealtimeTableDisabled;
-    }
   }
 
   @Nullable

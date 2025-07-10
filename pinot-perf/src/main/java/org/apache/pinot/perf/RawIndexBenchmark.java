@@ -150,15 +150,11 @@ public class RawIndexBenchmark {
 
     System.out.println("Reading data...");
     while ((value = reader.readLine()) != null) {
-      HashMap<String, Object> map = new HashMap<>();
-
+      GenericRow row = new GenericRow();
       for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        map.put(fieldSpec.getName(), value);
+        row.putValue(fieldSpec.getName(), value);
       }
-
-      GenericRow genericRow = new GenericRow();
-      genericRow.init(map);
-      rows.add(genericRow);
+      rows.add(row);
       _numRows++;
 
       if (_numRows % 1000000 == 0) {

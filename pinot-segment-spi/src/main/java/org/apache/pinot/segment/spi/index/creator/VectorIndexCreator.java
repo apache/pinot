@@ -19,20 +19,19 @@
 package org.apache.pinot.segment.spi.index.creator;
 
 import java.io.IOException;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.index.IndexCreator;
 
 
 public interface VectorIndexCreator extends IndexCreator {
   @Override
-  default void add(@Nonnull Object value, int dictId)
+  default void add(Object value, int dictId)
       throws IOException {
     throw new UnsupportedOperationException("Mutable Vector indexes are not supported for single-valued columns");
   }
 
   @Override
-  default void add(@Nonnull Object[] values, @Nullable int[] dictIds) {
+  default void add(Object[] values, @Nullable int[] dictIds) {
   }
 
   void add(float[] document);

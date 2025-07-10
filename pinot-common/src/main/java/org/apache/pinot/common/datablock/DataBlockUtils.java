@@ -28,23 +28,18 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.LongConsumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.segment.spi.memory.CompoundDataBuffer;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
 import org.apache.pinot.segment.spi.memory.PinotByteBuffer;
-import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.exception.QueryException;
 
 
 public final class DataBlockUtils {
@@ -102,19 +97,6 @@ public final class DataBlockUtils {
 
   static final int VERSION_TYPE_SHIFT = 5;
 
-  public static MetadataBlock getErrorDataBlock(Exception e) {
-    if (e instanceof ProcessingException) {
-      int errorCodeId = ((ProcessingException) e).getErrorCode();
-      return getErrorDataBlock(Collections.singletonMap(errorCodeId, extractErrorMsg(e)));
-    } else if (e instanceof QueryException) {
-      int errorCodeId = ((QueryException) e).getErrorCode().getId();
-      return getErrorDataBlock(Collections.singletonMap(errorCodeId, extractErrorMsg(e)));
-    } else {
-      // TODO: Pass in meaningful error code.
-      return getErrorDataBlock(Map.of(QueryErrorCode.UNKNOWN.getId(), extractErrorMsg(e)));
-    }
-  }
-
   public static String extractErrorMsg(Throwable t) {
     while (t.getCause() != null && t.getMessage() == null) {
       t = t.getCause();
@@ -157,10 +139,6 @@ public final class DataBlockUtils {
       }
     }
     return sb.toString();
-  }
-
-  public static MetadataBlock getErrorDataBlock(Map<Integer, String> exceptions) {
-    return MetadataBlock.newError(exceptions);
   }
 
   /**

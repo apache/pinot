@@ -156,7 +156,14 @@ public class PinotDataDistribution {
     return _collation.satisfies(relCollation);
   }
 
+  /**
+   * Applies a mapping to this distribution. This will DROP the collation however.
+   */
   public PinotDataDistribution apply(@Nullable PinotDistMapping mapping) {
+    return apply(mapping, true);
+  }
+
+  public PinotDataDistribution apply(@Nullable PinotDistMapping mapping, boolean dropCollation) {
     if (mapping == null) {
       return new PinotDataDistribution(RelDistribution.Type.ANY, _workers, _workerHash, null, null);
     }
@@ -169,8 +176,7 @@ public class PinotDataDistribution {
     if (newType == RelDistribution.Type.HASH_DISTRIBUTED && newHashDesc.isEmpty()) {
       newType = RelDistribution.Type.ANY;
     }
-    // TODO: Preserve collation too.
-    RelCollation newCollation = RelCollations.EMPTY;
+    RelCollation newCollation = dropCollation ? RelCollations.EMPTY : PinotDistMapping.apply(_collation, mapping);
     return new PinotDataDistribution(newType, _workers, _workerHash, newHashDesc, newCollation);
   }
 

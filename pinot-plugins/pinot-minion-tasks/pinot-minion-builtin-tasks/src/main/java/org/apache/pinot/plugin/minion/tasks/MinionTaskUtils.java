@@ -33,6 +33,7 @@ import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsBitmapResponse;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.config.InstanceUtils;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
 import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
@@ -236,6 +237,18 @@ public class MinionTaskUtils {
         LOGGER.warn(message);
         continue;
       }
+
+      // skipping servers which are not in READY state. The bitmaps would be inconsistent when
+      // server is NOT READY as UPDATING segments might be updating the ONLINE segments
+      if (validDocIdsBitmapResponse.getServerStatus() != null && !validDocIdsBitmapResponse.getServerStatus()
+          .equals(ServiceStatus.Status.GOOD)) {
+        String message = "Server " + validDocIdsBitmapResponse.getInstanceId() + " is in "
+            + validDocIdsBitmapResponse.getServerStatus() + " state, skipping it for execution for segment: "
+            + validDocIdsBitmapResponse.getSegmentName() + ". Will try other servers.";
+        LOGGER.warn(message);
+        continue;
+      }
+
       validDocIds = RoaringBitmapUtils.deserialize(validDocIdsBitmapResponse.getBitmap());
       break;
     }

@@ -32,7 +32,8 @@ import org.apache.pinot.tools.admin.command.QuickstartRunner;
 public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
   private static final String QUICKSTART_IDENTIFIER = "COLOCATED_JOIN";
   private static final String[] COLOCATED_JOIN_DIRECTORIES = new String[]{
-      "examples/batch/colocated/userAttributes", "examples/batch/colocated/userGroups"
+      "examples/batch/colocated/userAttributes", "examples/batch/colocated/userGroups",
+      "examples/batch/colocated/userFactEvents"
   };
 
   private static final String EXPLICIT = "SELECT COUNT(*) "
@@ -70,6 +71,13 @@ public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
       + "FROM userAttributes /*+ tableOptions(partition_size='2') */ ua "
       + "JOIN userGroups ug "
       + "ON ua.userUUID = ug.userUUID";
+
+  // Physical optimizer based queries.
+  private static final String DIFFERENT_PARTITION_BUT_COLOCATED_QUERY = "SET usePhysicalOptimizer = true; "
+      + "SELECT COUNT(*) "
+      + "  FROM userFactEvents WHERE userUUID NOT IN ("
+      + "    SELECT userUUID FROM userGroups WHERE groupUUID = 'group-1'"
+      + "  )";
 
   @Override
   public List<String> types() {
@@ -128,6 +136,12 @@ public class ColocatedJoinQuickStart extends MultistageEngineQuickStart {
     printStatus(Color.YELLOW, "***** With workers not matching (not using colocated join) *****");
     printStatus(Color.CYAN, "Query : " + WORKERS_NOT_MATCH);
     printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(WORKERS_NOT_MATCH, OPTIONS_TO_USE_MSE)));
+    printStatus(Color.GREEN, "***************************************************");
+
+    printStatus(Color.YELLOW, "***** With workers not matching (not using colocated join) *****");
+    printStatus(Color.CYAN, "Query : " + DIFFERENT_PARTITION_BUT_COLOCATED_QUERY);
+    printStatus(Color.YELLOW, prettyPrintResponse(runner.runQuery(DIFFERENT_PARTITION_BUT_COLOCATED_QUERY,
+        OPTIONS_TO_USE_MSE)));
     printStatus(Color.GREEN, "***************************************************");
 
     printStatus(Color.GREEN, "***************************************************");

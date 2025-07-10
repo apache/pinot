@@ -48,7 +48,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
-import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 
 public class PredownloadSchedulerTest {
@@ -231,9 +231,9 @@ public class PredownloadSchedulerTest {
     when(_predownloadTableInfo.loadSegmentFromLocal(eq(_predownloadSegmentInfoList.get(1)))).thenReturn(false);
 
     _predownloadScheduler.loadSegmentsFromLocal();
-    assertEquals(1, _predownloadScheduler._failedSegments.size());
-    assertEquals(_predownloadSegmentInfoList.get(0).getSegmentName(),
-        _predownloadScheduler._failedSegments.iterator().next());
+    assertEquals(_predownloadScheduler._failedSegments.size(), 1);
+    assertEquals(_predownloadScheduler._failedSegments.iterator().next(),
+        _predownloadSegmentInfoList.get(0).getSegmentName());
   }
 
   public void downloadSegments()
@@ -253,9 +253,8 @@ public class PredownloadSchedulerTest {
               () -> SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(anyString(), any(), anyString()))
           .then(invocation -> null);
       try (MockedStatic<TarCompressionUtils> tarCompressionUtilsMockedStatic = mockStatic(TarCompressionUtils.class)) {
-
         PredownloadCompletionReason reason = _predownloadScheduler.downloadSegments();
-        assertEquals(PredownloadCompletionReason.SOME_SEGMENTS_DOWNLOAD_FAILED, reason);
+        assertEquals(reason, PredownloadCompletionReason.SOME_SEGMENTS_DOWNLOAD_FAILED);
       }
     }
     // download success
@@ -284,7 +283,7 @@ public class PredownloadSchedulerTest {
             });
 
         PredownloadCompletionReason reason = _predownloadScheduler.downloadSegments();
-        assertEquals(PredownloadCompletionReason.ALL_SEGMENTS_DOWNLOADED, reason);
+        assertEquals(reason, PredownloadCompletionReason.ALL_SEGMENTS_DOWNLOADED);
       }
     }
   }

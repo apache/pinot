@@ -19,24 +19,26 @@
 package org.apache.pinot.core.routing;
 
 import java.util.List;
-import java.util.Set;
 
 
+/**
+ * Tracks segments by partition for a table. Also tracks the invalid partition segments.
+ */
 public class TablePartitionInfo {
   private final String _tableNameWithType;
   private final String _partitionColumn;
   private final String _partitionFunctionName;
   private final int _numPartitions;
-  private final PartitionInfo[] _partitionInfoMap;
+  private final List<List<String>> _segmentsByPartition;
   private final List<String> _segmentsWithInvalidPartition;
 
   public TablePartitionInfo(String tableNameWithType, String partitionColumn, String partitionFunctionName,
-      int numPartitions, PartitionInfo[] partitionInfoMap, List<String> segmentsWithInvalidPartition) {
+      int numPartitions, List<List<String>> segmentsByPartition, List<String> segmentsWithInvalidPartition) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
-    _partitionInfoMap = partitionInfoMap;
+    _segmentsByPartition = segmentsByPartition;
     _segmentsWithInvalidPartition = segmentsWithInvalidPartition;
   }
 
@@ -56,21 +58,11 @@ public class TablePartitionInfo {
     return _numPartitions;
   }
 
-  public PartitionInfo[] getPartitionInfoMap() {
-    return _partitionInfoMap;
+  public List<List<String>> getSegmentsByPartition() {
+    return _segmentsByPartition;
   }
 
   public List<String> getSegmentsWithInvalidPartition() {
     return _segmentsWithInvalidPartition;
-  }
-
-  public static class PartitionInfo {
-    public final Set<String> _fullyReplicatedServers;
-    public final List<String> _segments;
-
-    public PartitionInfo(Set<String> fullyReplicatedServers, List<String> segments) {
-      _fullyReplicatedServers = fullyReplicatedServers;
-      _segments = segments;
-    }
   }
 }

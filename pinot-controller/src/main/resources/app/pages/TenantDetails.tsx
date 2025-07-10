@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { makeStyles } from '@material-ui/core/styles';
 import { Box, Button, Checkbox, FormControlLabel, Grid, Switch, Tooltip, Typography, CircularProgress, Menu, MenuItem, Chip } from '@material-ui/core';
 import ArrowDropDownIcon from '@material-ui/icons/ArrowDropDown';
@@ -50,6 +50,7 @@ import {
   RebalanceServerStatusOp
 } from "../components/Homepage/Operations/RebalanceServerStatusOp";
 import ConsumingSegmentsTable from '../components/ConsumingSegmentsTable';
+import StatusFilter from '../components/StatusFilter';
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -157,6 +158,30 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
   const segmentListColumns = ['Segment Name', 'Status'];
   const loadingSegmentList = Utils.getLoadingTableData(segmentListColumns);
   const [segmentList, setSegmentList] = useState<TableData>(loadingSegmentList);
+  const [segmentStatusFilter, setSegmentStatusFilter] = useState<'ALL' | DISPLAY_SEGMENT_STATUS | 'BAD_OR_UPDATING'>('ALL');
+  const displaySegmentList = useMemo(() => {
+    const filtered = segmentList.records.filter(([_, status]) => {
+      const value = typeof status === 'object' && status !== null && 'value' in status ? status.value as DISPLAY_SEGMENT_STATUS : status as DISPLAY_SEGMENT_STATUS;
+      if (segmentStatusFilter === 'ALL') return true;
+      if (segmentStatusFilter === 'BAD_OR_UPDATING') return value !== DISPLAY_SEGMENT_STATUS.GOOD;
+      return value === segmentStatusFilter;
+    });
+    return { ...segmentList, records: filtered };
+  }, [segmentList, segmentStatusFilter]);
+
+  const segmentStatusFilterElement = (
+    <StatusFilter
+      value={segmentStatusFilter}
+      onChange={setSegmentStatusFilter}
+      options={[
+        { label: 'All', value: 'ALL' },
+        { label: 'Bad or Updating', value: 'BAD_OR_UPDATING' },
+        { label: 'Bad', value: DISPLAY_SEGMENT_STATUS.BAD },
+        { label: 'Updating', value: DISPLAY_SEGMENT_STATUS.UPDATING },
+        { label: 'Good', value: DISPLAY_SEGMENT_STATUS.GOOD },
+      ]}
+    />
+  );
 
   const [tableSchema, setTableSchema] = useState<TableData>({
     columns: [],
@@ -248,6 +273,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
       segmentTableRows.push([
         name,
         {
+          value: status,
           customRenderer: (
             <SegmentStatusRenderer
               segmentName={name}
@@ -869,7 +895,7 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               </div>
             <CustomizedTables
               title={"Segments - " + segmentList.records.length}
-              data={segmentList}
+              data={displaySegmentList}
               baseURL={
                 tenantName && `/tenants/${tenantName}/table/${tableName}/` ||
                 instanceName && `/instance/${instanceName}/table/${tableName}/` ||
@@ -878,6 +904,19 @@ const TenantPageDetails = ({ match }: RouteComponentProps<Props>) => {
               addLinks
               showSearchBox={true}
               inAccordionFormat={true}
+              additionalControls={
+                <StatusFilter
+                  value={segmentStatusFilter}
+                  onChange={setSegmentStatusFilter}
+                  options={[
+                    { label: 'All', value: 'ALL' },
+                    { label: 'Bad or Updating', value: 'BAD_OR_UPDATING' },
+                    { label: 'Bad', value: DISPLAY_SEGMENT_STATUS.BAD },
+                    { label: 'Updating', value: DISPLAY_SEGMENT_STATUS.UPDATING },
+                    { label: 'Good', value: DISPLAY_SEGMENT_STATUS.GOOD },
+                  ]}
+                />
+              }
             />
           </Grid>
           <Grid item xs={6}>

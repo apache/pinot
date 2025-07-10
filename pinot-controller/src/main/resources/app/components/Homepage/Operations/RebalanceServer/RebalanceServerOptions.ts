@@ -19,7 +19,7 @@
 export type RebalanceServerOption = {
     name: string;
     label: string;
-    type: "BOOL" | "INTEGER" | "SELECT";
+    type: "BOOL" | "INTEGER" | "SELECT" | "DOUBLE";
     description: string;
     defaultValue: string | boolean | number;
     isAdvancedConfig: boolean;
@@ -27,6 +27,9 @@ export type RebalanceServerOption = {
     markWithWarningIcon: boolean;
     allowedValues?: string[];
     toolTip?: string;
+    valueStep?: number;
+    valueMin?: number;
+    valueMax?: number;
 }
 
 export const rebalanceServerOptions: RebalanceServerOption[] = [
@@ -119,7 +122,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "defaultValue": -1,
         "type": "INTEGER",
         "label": "Batch Size Per Server",
-        "description": "Batch size of segments to add per server in each rebalance step. For non-strict replica group this serves as the maximum per server, for strict replica group since a partition is moved as a whole, this serves as best efforts. Defaults to -1 to disable batching.",
+        "description": "Batch size of segments to add per server in each rebalance step. For non-strict replica group this serves as the maximum per server, for strict replica group since a partition is moved as a whole, this serves as best efforts. Defaults to -1 to disable batching. Recommendation: Run Dry Run and check how many segments are to be moved per server, if this number is > 200, enable batching by setting this option to about 100 to 200, otherwise leave it at the default",
         "isAdvancedConfig": false,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false
@@ -149,7 +152,7 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "name": "externalViewStabilizationTimeoutInMs",
         "defaultValue": 3600000,
         "type": "INTEGER",
-        "label": "External View Stabilization Timeout In Milliseconds",
+        "label": "External View Stabilization Timeout (ms)",
         "description": "Maximum time (in milliseconds) to wait for external view to converge with ideal states. It automatically extends the time if progress has been made",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
@@ -171,6 +174,49 @@ export const rebalanceServerOptions: RebalanceServerOption[] = [
         "type": "BOOL",
         "label": "Update Target Tier",
         "description": "If enabled, update segment target tier as part of the rebalance",
+        "isAdvancedConfig": true,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
+        "name": "diskUtilizationThreshold",
+        "defaultValue": -1.0,
+        "type": "DOUBLE",
+        "label": "Disk Utilization Threshold",
+        "description": "Override disk utilization threshold used in pre-check (0.0 to 1.0, e.g., 0.85 for 85%). If not provided (or any negative value), uses the controller's default threshold",
+        "isAdvancedConfig": true,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false,
+        "valueStep": 0.05,
+        "valueMin": -1.0,
+        "valueMax": 1.0
+    },
+    {
+        "name": "forceCommit",
+        "defaultValue": false,
+        "type": "BOOL",
+        "label": "Force Commit",
+        "description": "Do force commit on consuming segments before they are rebalanced",
+        "isAdvancedConfig": false,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
+        "name": "forceCommitBatchSize",
+        "defaultValue": 2147483647,
+        "type": "INTEGER",
+        "label": "Force Commit Batch Size",
+        "description": "If forceCommit is set, this is the batch size for force commit operations. Controls how many segments are force committed in each batch. (Default to Integer.MAX to disable batching)",
+        "isAdvancedConfig": true,
+        "isStatsGatheringConfig": false,
+        "markWithWarningIcon": false
+    },
+    {
+        "name": "forceCommitBatchStatusCheckTimeoutMs",
+        "defaultValue": 180000,
+        "type": "INTEGER",
+        "label": "Force Commit Status Check Timeout (ms)",
+        "description": "If forceCommit is set, this is the timeout in milliseconds for force commit batch status checks. Maximum time to wait for force commit operations to complete",
         "isAdvancedConfig": true,
         "isStatsGatheringConfig": false,
         "markWithWarningIcon": false

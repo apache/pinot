@@ -2,7 +2,6 @@
   "tableName": "tpch_lineitem",
   "segmentsConfig" : {
     "replication" : "1",
-    "schemaName" : "tpch_lineitem",
     "segmentAssignmentStrategy" : "BalanceNumSegmentAssignmentStrategy"
   },
   "tenants" : {

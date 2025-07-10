@@ -64,7 +64,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     _dataSourceMap = new HashMap<>(mapCapacity);
     Map<String, ColumnContext> columnContextMap = new HashMap<>(mapCapacity);
     columns.forEach(column -> {
-      DataSource dataSource = segment.getDataSource(column);
+      DataSource dataSource = segment.getDataSource(column, queryContext.getSchema());
       _dataSourceMap.put(column, dataSource);
       columnContextMap.put(column, ColumnContext.fromDataSource(dataSource));
     });

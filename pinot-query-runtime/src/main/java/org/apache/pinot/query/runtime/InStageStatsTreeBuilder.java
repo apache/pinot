@@ -21,10 +21,10 @@ package org.apache.pinot.query.runtime;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.IntFunction;
+import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.BasePlanNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
@@ -41,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
+import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -48,7 +49,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void> {
+public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InStageStatsTreeBuilder.Context> {
   private static final Logger LOGGER = LoggerFactory.getLogger(InStageStatsTreeBuilder.class);
 
   private final MultiStageQueryStats.StageStats _stageStats;
@@ -62,18 +63,25 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
     _jsonStatsByStage = jsonStatsByStage;
   }
 
-  private ObjectNode selfNode(MultiStageOperator.Type type) {
+  private ObjectNode selfNode(MultiStageOperator.Type type, Context context) {
     ObjectNode json = JsonUtils.newObjectNode();
     json.put("type", type.toString());
-    Iterator<Map.Entry<String, JsonNode>> statsIt = _stageStats.getOperatorStats(_index).asJson().fields();
-    while (statsIt.hasNext()) {
-      Map.Entry<String, JsonNode> entry = statsIt.next();
+    for (Map.Entry<String, JsonNode> entry : _stageStats.getOperatorStats(_index).asJson().properties()) {
       json.set(entry.getKey(), entry.getValue());
     }
+
+    if (json.get("parallelism") == null) {
+      json.put("parallelism", context._parallelism);
+    }
+
+    JsonNode executionTimeMs = json.get("executionTimeMs");
+    long cpuTimeMs = executionTimeMs == null ? 0 : executionTimeMs.asLong(0);
+    json.put("clockTimeMs", cpuTimeMs / context._parallelism);
+
     return json;
   }
 
-  private ObjectNode recursiveCase(BasePlanNode node, MultiStageOperator.Type expectedType) {
+  private ObjectNode recursiveCase(BasePlanNode node, MultiStageOperator.Type expectedType, Context context) {
     MultiStageOperator.Type type = _stageStats.getOperatorType(_index);
     /*
      Sometimes the operator type is not what we expect, but we can still build the tree
@@ -84,7 +92,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
     */
     if (type != expectedType) {
       if (type == MultiStageOperator.Type.LEAF) {
-        return selfNode(MultiStageOperator.Type.LEAF);
+        return selfNode(MultiStageOperator.Type.LEAF, context);
       }
       List<PlanNode> inputs = node.getInputs();
       int childrenSize = inputs.size();
@@ -92,21 +100,21 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
         case 0:
           return JsonUtils.newObjectNode();
         case 1:
-          return inputs.get(0).visit(this, null);
+          return inputs.get(0).visit(this, context);
         default:
           ObjectNode json = JsonUtils.newObjectNode();
           ArrayNode children = JsonUtils.newArrayNode();
           for (int i = 0; i < childrenSize; i++) {
             _index--;
             if (inputs.size() > i) {
-              children.add(inputs.get(i).visit(this, null));
+              children.add(inputs.get(i).visit(this, context));
             }
           }
           json.set(CHILDREN_KEY, children);
           return json;
       }
     }
-    ObjectNode json = selfNode(type);
+    ObjectNode json = selfNode(type, context);
     List<PlanNode> inputs = node.getInputs();
     int size = inputs.size();
     JsonNode[] childrenArr = new JsonNode[size];
@@ -118,7 +126,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
     for (int i = size - 1; i >= 0; i--) {
       PlanNode planNode = inputs.get(i);
       _index--;
-      JsonNode child = planNode.visit(this, null);
+      JsonNode child = planNode.visit(this, context);
 
       childrenArr[i] = child;
     }
@@ -127,28 +135,28 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
   }
 
   @Override
-  public ObjectNode visitAggregate(AggregateNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.AGGREGATE);
+  public ObjectNode visitAggregate(AggregateNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.AGGREGATE, context);
   }
 
   @Override
-  public ObjectNode visitFilter(FilterNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.FILTER);
+  public ObjectNode visitFilter(FilterNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.FILTER, context);
   }
 
   @Override
-  public ObjectNode visitJoin(JoinNode node, Void context) {
+  public ObjectNode visitJoin(JoinNode node, Context context) {
     if (node.getJoinStrategy() == JoinNode.JoinStrategy.HASH) {
-      return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN);
+      return recursiveCase(node, MultiStageOperator.Type.HASH_JOIN, context);
     } else {
       assert node.getJoinStrategy() == JoinNode.JoinStrategy.LOOKUP;
-      return recursiveCase(node, MultiStageOperator.Type.LOOKUP_JOIN);
+      return recursiveCase(node, MultiStageOperator.Type.LOOKUP_JOIN, context);
     }
   }
 
   @Override
-  public ObjectNode visitMailboxReceive(MailboxReceiveNode node, Void context) {
-    ObjectNode json = selfNode(MultiStageOperator.Type.MAILBOX_RECEIVE);
+  public ObjectNode visitMailboxReceive(MailboxReceiveNode node, Context context) {
+    ObjectNode json = selfNode(MultiStageOperator.Type.MAILBOX_RECEIVE, context);
 
     ArrayNode children = JsonUtils.newArrayNode();
     int senderStageId = node.getSenderStageId();
@@ -158,37 +166,42 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
   }
 
   @Override
-  public ObjectNode visitMailboxSend(MailboxSendNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.MAILBOX_SEND);
+  public ObjectNode visitMailboxSend(MailboxSendNode node, Context context) {
+    @SuppressWarnings("unchecked")
+    StatMap<MailboxSendOperator.StatKey> operatorStats =
+        (StatMap<MailboxSendOperator.StatKey>) _stageStats.getOperatorStats(_index);
+    long parallelism = operatorStats.getLong(MailboxSendOperator.StatKey.PARALLELISM);
+    Context myContext = new Context((int) parallelism);
+    return recursiveCase(node, MultiStageOperator.Type.MAILBOX_SEND, myContext);
   }
 
   @Override
-  public ObjectNode visitProject(ProjectNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.TRANSFORM);
+  public ObjectNode visitProject(ProjectNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.TRANSFORM, context);
   }
 
   @Override
-  public ObjectNode visitSort(SortNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.SORT_OR_LIMIT);
+  public ObjectNode visitSort(SortNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.SORT_OR_LIMIT, context);
   }
 
   @Override
-  public ObjectNode visitTableScan(TableScanNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.LEAF);
+  public ObjectNode visitTableScan(TableScanNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.LEAF, context);
   }
 
   @Override
-  public ObjectNode visitValue(ValueNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.LITERAL);
+  public ObjectNode visitValue(ValueNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.LITERAL, context);
   }
 
   @Override
-  public ObjectNode visitWindow(WindowNode node, Void context) {
-    return recursiveCase(node, MultiStageOperator.Type.WINDOW);
+  public ObjectNode visitWindow(WindowNode node, Context context) {
+    return recursiveCase(node, MultiStageOperator.Type.WINDOW, context);
   }
 
   @Override
-  public ObjectNode visitSetOp(SetOpNode node, Void context) {
+  public ObjectNode visitSetOp(SetOpNode node, Context context) {
     MultiStageOperator.Type type;
     switch (node.getSetOpType()) {
       case UNION:
@@ -203,16 +216,24 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, Void
       default:
         throw new IllegalStateException("Unexpected set op type: " + node.getSetOpType());
     }
-    return recursiveCase(node, type);
+    return recursiveCase(node, type, context);
   }
 
   @Override
-  public ObjectNode visitExchange(ExchangeNode node, Void context) {
+  public ObjectNode visitExchange(ExchangeNode node, Context context) {
     throw new UnsupportedOperationException("ExchangeNode should not be visited");
   }
 
   @Override
-  public ObjectNode visitExplained(ExplainedNode node, Void context) {
+  public ObjectNode visitExplained(ExplainedNode node, Context context) {
     throw new UnsupportedOperationException("ExplainedNode should not be visited");
+  }
+
+  public static class Context {
+    private final int _parallelism;
+
+    public Context(int parallelism) {
+      _parallelism = parallelism;
+    }
   }
 }

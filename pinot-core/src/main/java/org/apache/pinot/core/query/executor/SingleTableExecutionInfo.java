@@ -45,6 +45,7 @@ import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.UpsertConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -151,18 +152,18 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     _notAcquiredSegments = notAcquiredSegments;
   }
 
-  @Override
-  public boolean hasRealtime() {
-    return _tableDataManager instanceof RealtimeTableDataManager;
-  }
-
-
   public TableDataManager getTableDataManager() {
     return _tableDataManager;
   }
 
-  public List<SegmentDataManager> getSegmentDataManagers() {
-    return _segmentDataManagers;
+  @Override
+  public Schema getSchema() {
+    return _tableDataManager.getCachedTableConfigAndSchema().getRight();
+  }
+
+  @Override
+  public boolean hasRealtime() {
+    return _tableDataManager instanceof RealtimeTableDataManager;
   }
 
   @Override
@@ -189,12 +190,19 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     return _providedSegmentContexts;
   }
 
+  @Override
   public List<String> getSegmentsToQuery() {
     return _segmentsToQuery;
   }
 
+  @Override
   public List<String> getOptionalSegments() {
     return _optionalSegments;
+  }
+
+  @Override
+  public List<SegmentDataManager> getSegmentDataManagers() {
+    return _segmentDataManagers;
   }
 
   @Override

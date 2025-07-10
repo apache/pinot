@@ -6,7 +6,6 @@
     "timeType": "MILLISECONDS",
     "segmentPushType": "APPEND",
     "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy",
-    "schemaName": "upsertMeetupRsvp",
     "replicasPerPartition": "1",
     "replicaGroupStrategyConfig": {
       "partitionColumn": "event_id",

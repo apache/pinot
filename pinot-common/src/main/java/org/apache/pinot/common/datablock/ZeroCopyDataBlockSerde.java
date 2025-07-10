@@ -46,6 +46,13 @@ import org.apache.pinot.segment.spi.memory.PinotOutputStream;
  */
 public class ZeroCopyDataBlockSerde implements DataBlockSerde {
 
+  /// The error metadata version is used to identify the format of the error metadata.
+  /// The single version so far is 1, which includes stageId and workerId as ints and serverId as a string after the
+  /// exceptions.
+  /// Although this is not strictly necessary, it is useful to have a version to allow for future
+  /// changes in the error metadata format (adding new metadata fields, changing the format to key-value pairs, etc.).
+  private static final int ERROR_METADATA_VERSION = 1;
+
   private final PagedPinotOutputStream.PageAllocator _allocator;
 
   public ZeroCopyDataBlockSerde() {
@@ -118,6 +125,14 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     for (Map.Entry<Integer, String> entry : errCodeToExceptionMap.entrySet()) {
       into.writeInt(entry.getKey());
       into.writeInt4String(entry.getValue());
+    }
+    // this should always be the case, but we apply defensive programming here to avoid issues in the future
+    if (dataBlock instanceof MetadataBlock) {
+      MetadataBlock metablock = (MetadataBlock) dataBlock;
+      into.writeInt(ERROR_METADATA_VERSION);
+      into.writeInt(metablock.getStageId());
+      into.writeInt(metablock.getWorkerId());
+      into.writeInt4String(metablock.getServerId() != null ? metablock.getServerId() : "");
     }
   }
 
@@ -200,13 +215,9 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
               bufferView(buffer, header._fixedSizeDataStart + offset, header._fixedSizeDataLength),
               bufferView(buffer, header._variableSizeDataStart + offset, header._variableSizeDataLength));
         case METADATA: {
-          Map<Integer, String> exceptions = deserializeExceptions(stream, header);
-          if (!exceptions.isEmpty()) {
-            return MetadataBlock.newError(exceptions);
-          } else {
-            List<DataBuffer> metadata = deserializeMetadata(buffer, header);
-            return new MetadataBlock(metadata);
-          }
+          ErrorsAndMetadata exceptions = deserializeExceptions(stream, header);
+          List<DataBuffer> metadata = deserializeMetadata(buffer, header);
+          return exceptions.asBlock(metadata);
         }
         default:
           throw new UnsupportedOperationException("Unsupported data table version: " + getVersion() + " with type: "
@@ -254,21 +265,37 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
     return currentOffset;
   }
 
+  /// Deserializes the exceptions and metadata from the stream.
   @VisibleForTesting
-  static Map<Integer, String> deserializeExceptions(PinotInputStream stream, Header header)
+  static ErrorsAndMetadata deserializeExceptions(PinotInputStream stream, Header header)
       throws IOException {
     if (header._exceptionsLength == 0) {
-      return new HashMap<>();
+      return ErrorsAndMetadata.EMPTY;
     }
+    long currentOffset = header.getExceptionsStart();
+
     stream.seek(header.getExceptionsStart());
     int numExceptions = stream.readInt();
-    Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions));
+    // We reserve extra space for the fake error codes storing stageId, workerId and serverId
+    Map<Integer, String> exceptions = new HashMap<>(HashUtil.getHashMapCapacity(numExceptions + 3));
     for (int i = 0; i < numExceptions; i++) {
       int errCode = stream.readInt();
       String errMessage = stream.readInt4UTF();
       exceptions.put(errCode, errMessage);
     }
-    return exceptions;
+
+    long readOffset = stream.getCurrentOffset() - currentOffset;
+    if (readOffset >= header._exceptionsLength) {
+      return new ErrorsAndMetadata(exceptions, -1, -1, "");
+    }
+    int errorMetadataVersion = stream.readInt();
+    if (errorMetadataVersion != ERROR_METADATA_VERSION) {
+      return new ErrorsAndMetadata(exceptions, -1, -1, "");
+    }
+    int stageId = stream.readInt();
+    int workerId = stream.readInt();
+    String serverId = stream.readInt4UTF();
+    return new ErrorsAndMetadata(exceptions, stageId, workerId, serverId);
   }
 
   private DataBuffer bufferView(DataBuffer buffer, long offset, int length) {
@@ -409,60 +436,33 @@ public class ZeroCopyDataBlockSerde implements DataBlockSerde {
       _metadataStart = _variableSizeDataStart + _variableSizeDataLength;
     }
 
-    public int getFirstInt() {
-      return _firstInt;
-    }
-
-    public int getNumRows() {
-      return _numRows;
-    }
-
-    public int getNumColumns() {
-      return _numColumns;
-    }
-
     public int getExceptionsStart() {
       return Header.BYTES; // exceptions are always codified after the end of the header
     }
+  }
 
-    public int getExceptionsLength() {
-      return _exceptionsLength;
+  private static class ErrorsAndMetadata {
+    public static final ErrorsAndMetadata EMPTY =
+        new ErrorsAndMetadata(new HashMap<>(), -1, -1, "");
+
+    private final Map<Integer, String> _exceptions;
+    private final int _stageId;
+    private final int _workerId;
+    private final String _serverId;
+
+    public ErrorsAndMetadata(Map<Integer, String> exceptions, int stageId, int workerId, String serverId) {
+      _exceptions = exceptions;
+      _stageId = stageId;
+      _workerId = workerId;
+      _serverId = serverId;
     }
 
-    public int getDictionaryStart() {
-      return _dictionaryStart;
-    }
-
-    public int getDictionaryLength() {
-      return _dictionaryLength;
-    }
-
-    public int getDataSchemaStart() {
-      return _dataSchemaStart;
-    }
-
-    public int getDataSchemaLength() {
-      return _dataSchemaLength;
-    }
-
-    public int getFixedSizeDataStart() {
-      return _fixedSizeDataStart;
-    }
-
-    public int getFixedSizeDataLength() {
-      return _fixedSizeDataLength;
-    }
-
-    public int getVariableSizeDataStart() {
-      return _variableSizeDataStart;
-    }
-
-    public int getVariableSizeDataLength() {
-      return _variableSizeDataLength;
-    }
-
-    public int getMetadataStart() {
-      return _metadataStart;
+    public MetadataBlock asBlock(List<DataBuffer> statsByStage) {
+      if (_exceptions.isEmpty()) {
+        return new MetadataBlock(statsByStage);
+      } else {
+        return MetadataBlock.newErrorWithStats(_stageId, _workerId, _serverId, _exceptions, statsByStage);
+      }
     }
   }
 }

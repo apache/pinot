@@ -19,8 +19,6 @@
 package org.apache.pinot.common.tier;
 
 import com.google.common.base.Preconditions;
-import org.apache.helix.HelixManager;
-import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.spi.utils.TimeUtils;
 
@@ -30,11 +28,9 @@ import org.apache.pinot.spi.utils.TimeUtils;
  */
 public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
   private final long _segmentAgeMillis;
-  private final HelixManager _helixManager;
 
-  public TimeBasedTierSegmentSelector(HelixManager helixManager, String segmentAge) {
+  public TimeBasedTierSegmentSelector(String segmentAge) {
     _segmentAgeMillis = TimeUtils.convertPeriodToMillis(segmentAge);
-    _helixManager = helixManager;
   }
 
   @Override
@@ -42,34 +38,18 @@ public class TimeBasedTierSegmentSelector implements TierSegmentSelector {
     return TierFactory.TIME_SEGMENT_SELECTOR_TYPE;
   }
 
-  /**
-   * Checks if a segment is eligible for the tier based on the segment age i.e. the end time of the segment from zk
-   * metadata
-   * @param tableNameWithType Name of the table
-   * @param segmentName Name of the segment
-   * @return true if eligible
-   */
   @Override
-  public boolean selectSegment(String tableNameWithType, String segmentName) {
-    SegmentZKMetadata segmentZKMetadata =
-        ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segmentName);
-    Preconditions
-        .checkNotNull(segmentZKMetadata, "Could not find zk metadata for segment: {} of table: {}", segmentName,
-            tableNameWithType);
-
+  public boolean selectSegment(String tableNameWithType, SegmentZKMetadata segmentZKMetadata) {
     // don't try to move consuming segments
     if (!segmentZKMetadata.getStatus().isCompleted()) {
       return false;
     }
 
-
     // get segment end time to decide if segment gets selected
     long endTimeMs = segmentZKMetadata.getEndTimeMs();
-    Preconditions
-        .checkState(endTimeMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", endTimeMs, segmentName,
-            tableNameWithType);
-    long now = System.currentTimeMillis();
-    return (now - endTimeMs) > _segmentAgeMillis;
+    Preconditions.checkState(endTimeMs > 0, "Invalid endTimeMs: %s for segment: %s of table: %s", endTimeMs,
+        segmentZKMetadata.getSegmentName(), tableNameWithType);
+    return (System.currentTimeMillis() - endTimeMs) > _segmentAgeMillis;
   }
 
   /**

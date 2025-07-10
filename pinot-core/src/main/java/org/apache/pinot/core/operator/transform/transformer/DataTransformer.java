@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.operator.transform.transformer;
 
-import javax.annotation.Nonnull;
-
-
 /**
  * Interface for data transformer to batch transform array of input values and store the results into the output array.
  *
@@ -36,5 +33,5 @@ public interface DataTransformer<I, O> {
    * @param output Output array
    * @param length Number of values to transform
    */
-  void transform(@Nonnull I input, @Nonnull O output, int length);
+  void transform(I input, O output, int length);
 }
