@@ -35,7 +35,7 @@ public interface JsonIndexCreator extends IndexCreator {
   default void add(Object value, int dictId)
       throws IOException {
     if (value instanceof Map) {
-      add(value);
+      add((Map) value);
     } else {
       add((String) value);
     }
@@ -54,7 +54,7 @@ public interface JsonIndexCreator extends IndexCreator {
   /**
    * Adds the next json value for Map type
    */
-  void add(Object jsonMap)
+  void add(Map jsonMap)
     throws IOException;
 
   /**

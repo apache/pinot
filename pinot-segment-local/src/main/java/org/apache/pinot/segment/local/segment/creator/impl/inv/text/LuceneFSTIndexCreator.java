@@ -78,7 +78,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
         try {
           _fstBuilder.addEntry(sortedEntries[_dictId], _dictId);
-        } catch (IOException ex) {
+        } catch (Exception ex) {
           // Caught exception while trying to add, update metric and skip the document
           String metricKeyName =
               _tableNameWithType + "-" + FstIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
@@ -99,7 +99,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   public void add(String document) {
     try {
       _fstBuilder.addEntry(document, _dictId);
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       // Caught exception while trying to add, update metric and skip the document
       String metricKeyName =
           _tableNameWithType + "-" + FstIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";

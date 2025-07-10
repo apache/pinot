@@ -102,7 +102,7 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   }
 
   @Override
-  public void add(Object value)
+  public void add(Map value)
       throws IOException {
     String valueToAdd;
     try {

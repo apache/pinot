@@ -734,19 +734,16 @@ public class JsonUtils {
   public static List<Map<String, String>> flatten(String jsonString, JsonIndexConfig jsonIndexConfig)
       throws IOException {
     JsonNode jsonNode;
-    List<Map<String, String>> flattenedJson;
     try {
       jsonNode = JsonUtils.stringToJsonNode(jsonString);
-      flattenedJson = JsonUtils.flatten(jsonNode, jsonIndexConfig);
-    } catch (JsonProcessingException | IllegalArgumentException e) {
-      // IllegalArgumentException is a catch-all Exception from 'JsonUtils.flatten()' for scenarios other than OOM
+      return JsonUtils.flatten(jsonNode, jsonIndexConfig);
+    } catch (Exception e) {
       if (jsonIndexConfig.getSkipInvalidJson()) {
         return SKIPPED_FLATTENED_RECORD;
       } else {
         throw e;
       }
     }
-    return flattenedJson;
   }
 
   /**
