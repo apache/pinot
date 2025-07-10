@@ -379,9 +379,10 @@ public class PinotQueryResource {
 
   private StreamingOutput sendRequestToBroker(String query, String instanceId, String traceEnabled, String queryOptions,
       HttpHeaders httpHeaders) {
-    String hostName = getHost(instanceId);
+    InstanceConfig instanceConfig = getInstanceConfig(instanceId);
+    String hostName = getHost(instanceConfig);
     String protocol = _controllerConf.getControllerBrokerProtocol();
-    int port = getPort(instanceId);
+    int port = getPort(instanceConfig);
     String url = getQueryURL(protocol, hostName, port);
     ObjectNode requestJson = getRequestJson(query, traceEnabled, queryOptions);
 
@@ -411,7 +412,7 @@ public class PinotQueryResource {
     OutputStream outputStream) {
     HttpURLConnection conn = null;
     try {
-      LOGGER.debug("Sending {} request to: {}", method, urlStr);
+      LOGGER.info("Sending {} request to: {}", method, urlStr);
       final URL url = new URL(urlStr);
       conn = (HttpURLConnection) url.openConnection();
       conn.setRequestMethod(method);
@@ -510,9 +511,10 @@ public class PinotQueryResource {
 
   private StreamingOutput sendTimeSeriesRequestToBroker(String language, String query, String start, String end,
     String step, String instanceId, HttpHeaders httpHeaders) {
-    String hostName = getHost(instanceId);
+    InstanceConfig instanceConfig = getInstanceConfig(instanceId);
+    String hostName = getHost(instanceConfig);
     String protocol = _controllerConf.getControllerBrokerProtocol();
-    int port = getPort(instanceId);
+    int port = getPort(instanceConfig);
     String url = getTimeSeriesQueryURL(protocol, hostName, port, language, query, start, end, step);
 
     // Forward client-supplied headers
@@ -524,13 +526,8 @@ public class PinotQueryResource {
   private String getTimeSeriesQueryURL(String protocol, String hostName, int port, String language, String query,
     String start, String end, String step) {
     try {
-      URIBuilder uriBuilder = new URIBuilder()
-        .setScheme(protocol)
-        .setHost(hostName)
-        .setPort(port)
-        .setPath("/timeseries/api/v1/query_range")
-        .addParameter("language", language);
-
+      URIBuilder uriBuilder = new URIBuilder().setScheme(protocol).setHost(hostName).setPort(port)
+        .setPath("/timeseries/api/v1/query_range").addParameter("language", language);
       // Add optional parameters
       if (query != null && !query.isEmpty()) {
         uriBuilder.addParameter("query", query);
@@ -544,7 +541,6 @@ public class PinotQueryResource {
       if (step != null && !step.isEmpty()) {
         uriBuilder.addParameter("step", step);
       }
-
       return uriBuilder.build().toString();
     } catch (Exception e) {
       throw new RuntimeException("Failed to build timeseries query URL", e);
@@ -566,8 +562,7 @@ public class PinotQueryResource {
     return instanceConfig;
   }
 
-  private String getHost(String instanceId) {
-    InstanceConfig instanceConfig = getInstanceConfig(instanceId);
+  private String getHost(InstanceConfig instanceConfig) {
     String hostName = instanceConfig.getHostName();
     // Backward-compatible with legacy hostname of format 'Broker_<hostname>'
     if (hostName.startsWith(CommonConstants.Helix.PREFIX_OF_BROKER_INSTANCE)) {
@@ -576,8 +571,7 @@ public class PinotQueryResource {
     return hostName;
   }
 
-  private int getPort(String instanceId) {
-    InstanceConfig instanceConfig = getInstanceConfig(instanceId);
+  private int getPort(InstanceConfig instanceConfig) {
     return _controllerConf.getControllerBrokerPortOverride() > 0 ? _controllerConf.getControllerBrokerPortOverride()
       : Integer.parseInt(instanceConfig.getPort());
   }
