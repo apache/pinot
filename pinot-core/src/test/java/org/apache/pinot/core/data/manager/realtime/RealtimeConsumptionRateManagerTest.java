@@ -169,43 +169,43 @@ public class RealtimeConsumptionRateManagerTest {
     // 1st minute: no metrics should be emitted in the first minute
     int[] numMsgs = {10, 20, 5, 25};
     Instant now = Clock.fixed(Instant.parse("2022-08-10T12:00:02Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[0], rateLimit, now), 0);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[0], rateLimit, now), 0);
     now = Clock.fixed(Instant.parse("2022-08-10T12:00:10Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[1], rateLimit, now), 0);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[1], rateLimit, now), 0);
     now = Clock.fixed(Instant.parse("2022-08-10T12:00:30Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[2], rateLimit, now), 0);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[2], rateLimit, now), 0);
     now = Clock.fixed(Instant.parse("2022-08-10T12:00:55Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[3], rateLimit, now), 0);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[3], rateLimit, now), 0);
 
     // 2nd minute: metric should be emitted
     now = Clock.fixed(Instant.parse("2022-08-10T12:01:05Z"), ZoneOffset.UTC).instant();
     int sumOfMsgsInPrevMinute = sum(numMsgs);
     int expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
     numMsgs = new int[]{35};
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[0], rateLimit, now), expectedRatio);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[0], rateLimit, now), expectedRatio);
 
     // 3rd minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:02:25Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
     numMsgs = new int[]{0};
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[0], rateLimit, now), expectedRatio);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[0], rateLimit, now), expectedRatio);
 
     // 4th minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:03:15Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
     numMsgs = new int[]{10, 20};
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[0], rateLimit, now), expectedRatio);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[0], rateLimit, now), expectedRatio);
     now = Clock.fixed(Instant.parse("2022-08-10T12:03:20Z"), ZoneOffset.UTC).instant();
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[1], rateLimit, now), expectedRatio);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[1], rateLimit, now), expectedRatio);
 
     // 5th minute
     now = Clock.fixed(Instant.parse("2022-08-10T12:04:30Z"), ZoneOffset.UTC).instant();
     sumOfMsgsInPrevMinute = sum(numMsgs);
     expectedRatio = calcExpectedRatio(rateLimitInMinutes, sumOfMsgsInPrevMinute);
     numMsgs = new int[]{5};
-    assertEquals(metricEmitter.updateRatioPercentage(numMsgs[0], rateLimit, now), expectedRatio);
+    assertEquals(metricEmitter.updateConsumptionQuota(numMsgs[0], rateLimit, now), expectedRatio);
   }
 
   private int calcExpectedRatio(double rateLimitInMinutes, int sumOfMsgsInPrevMinute) {
