@@ -278,7 +278,7 @@ public class RealtimeConsumptionRateManager {
       _rateLimit = new AtomicReference<>(initialRateLimit);
 
       _executor = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "server-rate-metric-emitter");
+        Thread t = new Thread(r, "server-rate-limit-metric-emitter");
         t.setDaemon(true);
         return t;
       });
