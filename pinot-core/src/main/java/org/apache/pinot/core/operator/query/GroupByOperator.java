@@ -141,12 +141,10 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     //       columns if no ordering is specified.
     int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
     int trimSize = -1;
-    boolean isSafe = false;
     List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     if (!_queryContext.isUnsafeTrim()) {
       // if orderby key is groupby key, and there's no having clause, keep at most `limit` rows only
       trimSize = _queryContext.getLimit();
-      isSafe = true;
     } else if (orderByExpressions != null && minGroupTrimSize > 0) {
       // max(minSegmentGroupTrimSize, 5 * LIMIT)
       trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
@@ -154,6 +152,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     if (trimSize > 0) {
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+        // intermediateRecords is always sorted after trim
         List<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
 
         ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
@@ -164,9 +163,10 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
-      if (isSafe) {
-        // if orderBy groupBy key, sort the array even if it's smaller than trimSize
-        // to benefit combining
+      if (_queryContext.shouldSortAggregate()) {
+        // if sort-aggregate, sort the array even if it's smaller than trimSize
+        // to benefit combining. This is not very large overhead since the
+        // limit threshold of sort-aggregate is small
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         List<IntermediateRecord> intermediateRecords =
             tableResizer.sortInSegmentResults(groupByExecutor.getGroupKeyGenerator(),

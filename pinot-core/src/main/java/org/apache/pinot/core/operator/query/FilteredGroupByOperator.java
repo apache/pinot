@@ -189,10 +189,8 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     //       columns if no ordering is specified.
     int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
     int trimSize = -1;
-    boolean isSafe = false;
     if (!_queryContext.isUnsafeTrim()) {
       trimSize = _queryContext.getLimit();
-      isSafe = true;
     } else if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
       trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
     }
@@ -210,7 +208,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
-      if (isSafe) {
+      if (_queryContext.shouldSortAggregate()) {
         // if orderBy groupBy key, sort the array even if it's smaller than trimSize
         // to benefit combining
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);

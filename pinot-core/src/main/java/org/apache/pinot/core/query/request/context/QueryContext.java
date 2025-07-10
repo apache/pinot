@@ -545,6 +545,10 @@ public class QueryContext {
     return _isUnsafeTrim;
   }
 
+  public boolean shouldSortAggregate() {
+    return !isUnsafeTrim() && _limit < Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
+  }
+
   public Comparator<Key> getGroupKeyComparator() {
     if (_groupKeyComparator != null) {
       return _groupKeyComparator;
