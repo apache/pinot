@@ -144,17 +144,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             return;
           }
           if (table.isSatisfied()) {
-            boolean success = _satisfiedTable.compareAndSet(null, table);
-            assert (success);
+            _satisfiedTable.compareAndSet(null, table);
             return;
           }
           LinkedHashMapIndexedTable finalTable = table;
           LinkedHashMapIndexedTable waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
           if (waitingTable == null) {
-            // successfully put table in, process next block
-            if (_operatorLatch.getCount() == 1) {
-              assert (table.isSatisfied());
-            }
             break;
           }
           // if found waiting block, merge and loop

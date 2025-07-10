@@ -71,8 +71,6 @@ public class LinkedHashMapIndexedTable extends IndexedTable {
       _numMergedBlocks += other._numMergedBlocks;
       return this;
     }
-    assert (_numMergedBlocks >= 1);
-    assert (other._numMergedBlocks >= 1);
     LinkedHashMapIndexedTable newTable =
         new LinkedHashMapIndexedTable(getDataSchema(), _hasFinalInput, queryContext, _resultSize, _trimSize,
             _trimThreshold, executorService, _numMergedBlocks + other._numMergedBlocks, _desiredNumMergedBlocks);
