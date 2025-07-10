@@ -28,7 +28,12 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -59,6 +64,7 @@ public class RealtimeConsumptionRateManager {
 
   private static final String SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME =
       ServerMeter.REALTIME_ROWS_CONSUMED.getMeterName();
+  private static final AtomicReference<AsyncMetricEmitter> ASYNC_METRIC_EMITTER_REF = new AtomicReference<>();
   private volatile ConsumptionRateLimiter _serverRateLimiter = NOOP_RATE_LIMITER;
 
   // stream config object is required for fetching the partition count from the stream
@@ -93,11 +99,35 @@ public class RealtimeConsumptionRateManager {
 
   private ConsumptionRateLimiter createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
     if (serverRateLimit > 0) {
-      LOGGER.info("Set up ConsumptionRateLimiter with rate limit: {}", serverRateLimit);
-      MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
-      return new RateLimiterImpl(serverRateLimit, metricEmitter);
+      LOGGER.info("Set up Server ConsumptionRateLimiter with rate limit: {}", serverRateLimit);
+
+      AsyncMetricEmitter emitter = ASYNC_METRIC_EMITTER_REF.get();
+      if (emitter == null) {
+        // If emitter is null either this is the first time it's being created or it was closed before when server
+        // rate limiter was disabled.
+        AsyncMetricEmitter newEmitter =
+            new AsyncMetricEmitter(serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME, serverRateLimit);
+        if (ASYNC_METRIC_EMITTER_REF.compareAndSet(null, newEmitter)) {
+          newEmitter.start();
+          emitter = newEmitter;
+        } else {
+          emitter = ASYNC_METRIC_EMITTER_REF.get();
+        }
+      } else {
+        // In-case server rate limit config is being updated during runtime
+        emitter.setRateLimit(serverRateLimit);
+      }
+
+      return new RateLimiterImpl(serverRateLimit, emitter);
     } else {
-      LOGGER.info("ConsumptionRateLimiter is disabled");
+      // Note there is race condition when Server Rate Limiter is removed/stopped and other thread is trying to
+      // create it. It's ignored because this scenario can only happen when server rate limit config is removed and
+      // updated at the same time.
+      AsyncMetricEmitter existing = ASYNC_METRIC_EMITTER_REF.getAndSet(null);
+      if (existing != null) {
+        existing.close();
+      }
+      LOGGER.info("Server ConsumptionRateLimiter is disabled");
       return NOOP_RATE_LIMITER;
     }
   }
@@ -128,7 +158,7 @@ public class RealtimeConsumptionRateManager {
     LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with rate limit: {} "
             + "(topic rate limit: {}, partition count: {})", streamConfig.getTopicName(), tableName, partitionRateLimit,
         topicRateLimit, partitionCount);
-    MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, metricKeyName);
+    MetricEmitter metricEmitter = new MetricEmitterImpl(serverMetrics, metricKeyName);
     return new RateLimiterImpl(partitionRateLimit, metricEmitter);
   }
 
@@ -230,13 +260,68 @@ public class RealtimeConsumptionRateManager {
     }
   };
 
+  interface MetricEmitter {
+    int emitMetric(int numMsgsConsumed, double rateLimit, Instant now);
+  }
+
+  static class AsyncMetricEmitter implements MetricEmitter {
+    private final ServerMetrics _serverMetrics;
+    private final String _metricKeyName;
+    private final AtomicReference<Double> _rateLimit;
+    private final LongAdder _messageCount = new LongAdder();
+    private final ScheduledExecutorService _executor;
+    private final AtomicBoolean _running = new AtomicBoolean(false);
+
+    public AsyncMetricEmitter(ServerMetrics serverMetrics, String metricKeyName, double initialRateLimit) {
+      _serverMetrics = serverMetrics;
+      _metricKeyName = metricKeyName;
+      _rateLimit = new AtomicReference<>(initialRateLimit);
+
+      _executor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "server-rate-metric-emitter");
+        t.setDaemon(true);
+        return t;
+      });
+    }
+
+    public void start() {
+      if (_running.compareAndSet(false, true)) {
+        _executor.scheduleAtFixedRate(this::emit, 1, 1, TimeUnit.SECONDS);
+      }
+    }
+
+    public void setRateLimit(double newRateLimit) {
+      _rateLimit.set(newRateLimit);
+    }
+
+    @Override
+    public int emitMetric(int numMsgsConsumed, double ignoredRate, Instant ignoredNow) {
+      _messageCount.add(numMsgsConsumed);
+      return 0;
+    }
+
+    private void emit() {
+      double messageCount = _messageCount.sumThenReset();
+      double rateLimit = _rateLimit.get();
+      if (rateLimit > 0) {
+        int ratio = (int) Math.round(messageCount / rateLimit * 100);
+        _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION, ratio);
+      }
+    }
+
+    public void close() {
+      _executor.shutdownNow();
+      _running.set(false);
+    }
+  }
+
   /**
    * This class is responsible to emit a gauge metric for the ratio of the actual consumption rate to the rate limit.
    * Number of messages consumed are aggregated over one minute. Each minute the ratio percentage is calculated and
    * emitted.
    */
   @VisibleForTesting
-  static class MetricEmitter {
+  static class MetricEmitterImpl implements MetricEmitter {
 
     private final ServerMetrics _serverMetrics;
     private final String _metricKeyName;
@@ -245,12 +330,12 @@ public class RealtimeConsumptionRateManager {
     private long _previousMinute = -1;
     private int _aggregateNumMessages = 0;
 
-    public MetricEmitter(ServerMetrics serverMetrics, String metricKeyName) {
+    public MetricEmitterImpl(ServerMetrics serverMetrics, String metricKeyName) {
       _serverMetrics = serverMetrics;
       _metricKeyName = metricKeyName;
     }
 
-    int emitMetric(int numMsgsConsumed, double rateLimit, Instant now) {
+    public int emitMetric(int numMsgsConsumed, double rateLimit, Instant now) {
       int ratioPercentage = 0;
       long nowInMinutes = now.getEpochSecond() / 60;
       if (nowInMinutes == _previousMinute) {

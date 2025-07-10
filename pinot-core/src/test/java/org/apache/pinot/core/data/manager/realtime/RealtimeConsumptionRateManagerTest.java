@@ -164,7 +164,7 @@ public class RealtimeConsumptionRateManagerTest {
     double rateLimit = 2; // unit: msgs/sec
     double rateLimitInMinutes = rateLimit * 60;
     ServerMetrics serverMetrics = mock(ServerMetrics.class);
-    MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, "tableA-topicB-partition5");
+    MetricEmitter metricEmitter = new MetricEmitterImpl(serverMetrics, "tableA-topicB-partition5");
 
     // 1st minute: no metrics should be emitted in the first minute
     int[] numMsgs = {10, 20, 5, 25};
