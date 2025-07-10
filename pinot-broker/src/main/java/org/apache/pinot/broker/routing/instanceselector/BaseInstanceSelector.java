@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,6 +38,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
+import org.apache.pinot.broker.routing.adaptiveserverselector.PriorityPoolInstanceSelector;
 import org.apache.pinot.broker.routing.segmentpreselector.SegmentPreSelector;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
@@ -46,10 +48,13 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static org.apache.pinot.spi.utils.CommonConstants.Broker.FALLBACK_POOL_ID;
 
 
 /**
@@ -88,6 +93,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final ZkHelixPropertyStore<ZNRecord> _propertyStore;
   final BrokerMetrics _brokerMetrics;
   final AdaptiveServerSelector _adaptiveServerSelector;
+  // Will be null if and only if adaptiveServerSelector is null
+  final PriorityPoolInstanceSelector _priorityPoolInstanceSelector;
   final Clock _clock;
   final boolean _useFixedReplica;
   final long _newSegmentExpirationTimeInSeconds;
@@ -102,6 +109,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   // _segmentStates is needed for instance selection (multi-threaded), so it is made volatile.
   private volatile SegmentStates _segmentStates;
+  private Map<String, ServerInstance> _enabledServerStore;
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
@@ -119,6 +127,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _tableNameHashForFixedReplicaRouting =
         TableNameBuilder.extractRawTableName(tableNameWithType).hashCode() & 0x7FFFFFFF;
 
+    _priorityPoolInstanceSelector =
+        _adaptiveServerSelector == null ? null : new PriorityPoolInstanceSelector(_adaptiveServerSelector);
     if (_adaptiveServerSelector != null && _useFixedReplica) {
       throw new IllegalArgumentException(
           "AdaptiveServerSelector and consistent routing cannot be enabled at the same time");
@@ -126,9 +136,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   }
 
   @Override
-  public void init(Set<String> enabledInstances, IdealState idealState, ExternalView externalView,
-      Set<String> onlineSegments) {
+  public void init(Set<String> enabledInstances, Map<String, ServerInstance> enabledServerMap, IdealState idealState,
+      ExternalView externalView, Set<String> onlineSegments) {
     _enabledInstances = enabledInstances;
+    _enabledServerStore = enabledServerMap;
     Map<String, Long> newSegmentCreationTimeMap =
         getNewSegmentCreationTimeMapFromZK(idealState, externalView, onlineSegments);
     updateSegmentMaps(idealState, externalView, onlineSegments, newSegmentCreationTimeMap);
@@ -259,7 +270,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(idealStateInstanceStateMap.size());
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
-              candidates.add(new SegmentInstanceCandidate(entry.getKey(), false));
+              String instance = entry.getKey();
+              candidates.add(new SegmentInstanceCandidate(instance, false, getPool(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -275,7 +287,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           for (Map.Entry<String, String> entry : convertToSortedMap(idealStateInstanceStateMap).entrySet()) {
             if (isOnlineForRouting(entry.getValue())) {
               String instance = entry.getKey();
-              candidates.add(new SegmentInstanceCandidate(instance, onlineInstances.contains(instance)));
+              candidates.add(
+                  new SegmentInstanceCandidate(instance, onlineInstances.contains(instance), getPool(instance)));
             }
           }
           _newSegmentStateMap.put(segment, new NewSegmentState(newSegmentCreationTimeMs, candidates));
@@ -283,7 +296,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           // Old segment
           List<SegmentInstanceCandidate> candidates = new ArrayList<>(onlineInstances.size());
           for (String instance : onlineInstances) {
-            candidates.add(new SegmentInstanceCandidate(instance, true));
+            candidates.add(new SegmentInstanceCandidate(instance, true, getPool(instance)));
           }
           _oldSegmentCandidatesMap.put(segment, candidates);
         }
@@ -456,6 +469,19 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   @Override
   public Set<String> getServingInstances() {
     return _segmentStates.getServingInstances();
+  }
+
+  @VisibleForTesting
+  int getPool(String instanceID) {
+    int pool = FALLBACK_POOL_ID;
+    ServerInstance server = _enabledServerStore.get(instanceID);
+    if (server == null) {
+      LOGGER.warn("Failed to find server {} in the enabledServerManager when update segmentsMap for table {}",
+          instanceID, _tableNameWithType);
+    } else {
+      pool = server.getPool();
+    }
+    return pool;
   }
 
   /**

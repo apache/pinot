@@ -32,6 +32,7 @@ import org.apache.pinot.segment.local.segment.index.converter.SegmentV1V2ToV3For
 import org.apache.pinot.segment.local.segment.store.SegmentLocalFSDirectory;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
+import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
 import org.apache.pinot.segment.spi.ImmutableSegment;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -77,10 +79,13 @@ public class LoaderTest {
 
   private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER =
       new SegmentOperationsThrottler(new SegmentAllIndexPreprocessThrottler(1, 2, true),
-          new SegmentStarTreePreprocessThrottler(1, 2, true), new SegmentDownloadThrottler(1, 2, true));
+          new SegmentStarTreePreprocessThrottler(1, 2, true), new SegmentDownloadThrottler(1, 2, true),
+          new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
 
   private File _avroFile;
   private File _vectorAvroFile;
+  private TableConfig _v1TableConfig;
+  private TableConfig _v3TableConfig;
   private IndexLoadingConfig _v1IndexLoadingConfig;
   private IndexLoadingConfig _v3IndexLoadingConfig;
   private File _indexDir;
@@ -97,14 +102,14 @@ public class LoaderTest {
     assertNotNull(resourceUrl);
     _vectorAvroFile = new File(resourceUrl.getFile());
 
-    TableConfig tableConfig =
+    _v1TableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSegmentVersion("v1").build();
     Schema schema = createSchema();
-    _v1IndexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    _v1IndexLoadingConfig = new IndexLoadingConfig(_v1TableConfig, schema);
 
-    tableConfig =
+    _v3TableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setSegmentVersion("v3").build();
-    _v3IndexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
+    _v3IndexLoadingConfig = new IndexLoadingConfig(_v3TableConfig, schema);
   }
 
   private Schema createSchema()
@@ -112,7 +117,7 @@ public class LoaderTest {
     return SegmentTestUtils.extractSchemaFromAvroWithoutTime(_avroFile);
   }
 
-  private Schema constructV1Segment()
+  private void constructV1Segment()
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
 
@@ -127,7 +132,6 @@ public class LoaderTest {
     driver.build();
 
     _indexDir = new File(INDEX_DIR, driver.getSegmentName());
-    return schema;
   }
 
   @Test
@@ -205,14 +209,14 @@ public class LoaderTest {
   @Test
   public void testBuiltInVirtualColumns()
       throws Exception {
-    Schema schema = constructV1Segment();
+    constructV1Segment();
 
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, schema,
-        SEGMENT_OPERATIONS_THROTTLER);
+    IndexSegment indexSegment =
+        ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, SEGMENT_OPERATIONS_THROTTLER);
     testBuiltInVirtualColumns(indexSegment);
     indexSegment.destroy();
 
-    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, SEGMENT_OPERATIONS_THROTTLER);
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, SEGMENT_OPERATIONS_THROTTLER);
     testBuiltInVirtualColumns(indexSegment);
     indexSegment.destroy();
   }
@@ -231,17 +235,20 @@ public class LoaderTest {
   @Test
   public void testDefaultEmptyValueStringColumn()
       throws Exception {
-    Schema schema = constructV1Segment();
-    schema.addField(new DimensionFieldSpec("SVString", FieldSpec.DataType.STRING, true, ""));
-    schema.addField(new DimensionFieldSpec("MVString", FieldSpec.DataType.STRING, false, ""));
+    Schema schema = createSchema();
+    schema.addField(new DimensionFieldSpec("SVString", DataType.STRING, true, ""));
+    schema.addField(new DimensionFieldSpec("MVString", DataType.STRING, false, ""));
 
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v1IndexLoadingConfig, schema,
+    constructV1Segment();
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(_v1TableConfig, schema),
         SEGMENT_OPERATIONS_THROTTLER);
     assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
     indexSegment.destroy();
 
-    indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema, SEGMENT_OPERATIONS_THROTTLER);
+    constructV1Segment();
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(_v3TableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER);
     assertEquals(indexSegment.getDataSource("SVString").getDictionary().get(0), "");
     assertEquals(indexSegment.getDataSource("MVString").getDictionary().get(0), "");
     indexSegment.destroy();
@@ -250,13 +257,21 @@ public class LoaderTest {
   @Test
   public void testDefaultBytesColumn()
       throws Exception {
-    Schema schema = constructV1Segment();
+    Schema schema = createSchema();
     String newColumnName = "byteMetric";
     String defaultValue = "0000ac0000";
-
-    FieldSpec byteMetric = new MetricFieldSpec(newColumnName, FieldSpec.DataType.BYTES, defaultValue);
+    FieldSpec byteMetric = new MetricFieldSpec(newColumnName, DataType.BYTES, defaultValue);
     schema.addField(byteMetric);
-    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, _v3IndexLoadingConfig, schema,
+
+    constructV1Segment();
+    IndexSegment indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(_v1TableConfig, schema),
+        SEGMENT_OPERATIONS_THROTTLER);
+    assertEquals(BytesUtils.toHexString((byte[]) indexSegment.getDataSource(newColumnName).getDictionary().get(0)),
+        defaultValue);
+    indexSegment.destroy();
+
+    constructV1Segment();
+    indexSegment = ImmutableSegmentLoader.load(_indexDir, new IndexLoadingConfig(_v3TableConfig, schema),
         SEGMENT_OPERATIONS_THROTTLER);
     assertEquals(BytesUtils.toHexString((byte[]) indexSegment.getDataSource(newColumnName).getDictionary().get(0)),
         defaultValue);

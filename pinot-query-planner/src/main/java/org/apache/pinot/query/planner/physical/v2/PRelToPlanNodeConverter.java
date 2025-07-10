@@ -50,6 +50,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAsOfJoin;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalJoin;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -96,6 +97,8 @@ public class PRelToPlanNodeConverter {
       result = convertPhysicalExchange((PhysicalExchange) node);
     } else if (node instanceof PhysicalJoin) {
       result = convertJoin((PhysicalJoin) node);
+    } else if (node instanceof PhysicalAsOfJoin) {
+      result = convertAsOfJoin((PhysicalAsOfJoin) node);
     } else if (node instanceof Window) {
       result = convertWindow((Window) node);
     } else if (node instanceof Values) {
@@ -114,7 +117,8 @@ public class PRelToPlanNodeConverter {
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()),
         new ArrayList<>(), node.getRelExchangeType(), RelDistribution.Type.ANY, node.getDistributionKeys(),
         false, node.getRelCollation().getFieldCollations(), false,
-        !node.getRelCollation().getKeys().isEmpty(), Set.of() /* table names */, node.getExchangeStrategy());
+        !node.getRelCollation().getKeys().isEmpty(), Set.of() /* table names */, node.getExchangeStrategy(),
+        node.getHashFunction().name());
   }
 
   public static SetOpNode convertSetOp(SetOp node) {
@@ -243,6 +247,33 @@ public class PRelToPlanNodeConverter {
     return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
         joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
         joinStrategy);
+  }
+
+  public static JoinNode convertAsOfJoin(PhysicalAsOfJoin join) {
+    JoinInfo joinInfo = join.analyzeCondition();
+    DataSchema dataSchema = toDataSchema(join.getRowType());
+    List<PlanNode> inputs = new ArrayList<>();
+    JoinRelType joinType = join.getJoinType();
+    // Basic validations
+    Preconditions.checkState(joinInfo.nonEquiConditions.isEmpty(),
+        "Non-equi conditions are not supported for ASOF join, got: %s", joinInfo.nonEquiConditions);
+    Preconditions.checkState(joinType == JoinRelType.ASOF || joinType == JoinRelType.LEFT_ASOF,
+        "Join type should be ASOF or LEFT_ASOF, got: %s", joinType);
+    RexExpression matchCondition = RexExpressionUtils.fromRexNode(join.getMatchCondition());
+    Preconditions.checkState(matchCondition != null, "ASOF_JOIN must have a match condition");
+    Preconditions.checkState(matchCondition instanceof RexExpression.FunctionCall,
+        "ASOF JOIN only supports function call match condition, got: %s", matchCondition);
+    List<RexExpression> matchKeys = ((RexExpression.FunctionCall) matchCondition).getFunctionOperands();
+    // TODO: Add support for MATCH_CONDITION containing two columns of different types. In that case, there would be
+    //       a CAST RexExpression.FunctionCall on top of the RexExpression.InputRef, and the physical ASOF join operator
+    //       can't currently handle that.
+    Preconditions.checkState(
+        matchKeys.size() == 2 && matchKeys.get(0) instanceof RexExpression.InputRef
+            && matchKeys.get(1) instanceof RexExpression.InputRef,
+        "ASOF_JOIN only supports match conditions with a comparison between two columns of the same type");
+    return new JoinNode(DEFAULT_STAGE_ID, dataSchema, NodeHint.fromRelHints(join.getHints()), inputs, joinType,
+        joinInfo.leftKeys, joinInfo.rightKeys, RexExpressionUtils.fromRexNodes(joinInfo.nonEquiConditions),
+        JoinNode.JoinStrategy.ASOF, RexExpressionUtils.fromRexNode(join.getMatchCondition()));
   }
 
   public static DataSchema toDataSchema(RelDataType rowType) {

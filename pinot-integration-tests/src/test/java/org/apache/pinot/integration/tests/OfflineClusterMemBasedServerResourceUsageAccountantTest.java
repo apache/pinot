@@ -49,7 +49,7 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.junit.Assert;
+import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -230,9 +230,8 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY);
     String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("\"errorCode\":"
-        + QueryErrorCode.QUERY_CANCELLATION.getId()));
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("got killed because"));
+    Assert.assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()));
+    Assert.assertTrue(exceptionsNode.contains("got killed because"));
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -243,9 +242,8 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
     JsonNode queryResponse = postQuery(OOM_QUERY_SELECTION_ONLY);
 
     String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("\"errorCode\":"
-        + QueryErrorCode.QUERY_CANCELLATION.getId()));
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("got killed because"));
+    Assert.assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()));
+    Assert.assertTrue(exceptionsNode.contains("got killed because"));
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -255,7 +253,7 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
     String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("got killed because"));
+    Assert.assertTrue(exceptionsNode.contains("got killed because"));
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -298,10 +296,10 @@ public class OfflineClusterMemBasedServerResourceUsageAccountantTest extends Bas
     );
     countDownLatch.await();
     String exceptionsNode = queryResponse1.get().get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("\"errorCode\":503"));
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("got killed because"));
-    Assert.assertFalse(exceptionsNode, StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
-    Assert.assertFalse(exceptionsNode, StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
+    Assert.assertTrue(exceptionsNode.contains("\"errorCode\":503"));
+    Assert.assertTrue(exceptionsNode.contains("got killed because"));
+    Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
+    Assert.assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
   }
 
   // TODO: Add integation test after workload configs PR is merged.

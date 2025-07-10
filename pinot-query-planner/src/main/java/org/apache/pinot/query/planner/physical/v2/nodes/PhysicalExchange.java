@@ -26,13 +26,14 @@ import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rel.RelDistribution;
-import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.Exchange;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
+import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
@@ -76,18 +77,20 @@ public class PhysicalExchange extends Exchange implements PRelNode {
    * When not empty, records in each output stream will be sorted by the ordering defined by this collation.
    */
   private final RelCollation _relCollation;
+  private final DistHashFunction _hashFunction;
 
   public PhysicalExchange(int nodeId, PRelNode input, @Nullable PinotDataDistribution pinotDataDistribution,
       List<Integer> distributionKeys, ExchangeStrategy exchangeStrategy, @Nullable RelCollation relCollation,
-      PinotExecStrategyTrait execStrategyTrait) {
+      PinotExecStrategyTrait execStrategyTrait, DistHashFunction hashFunction) {
     super(input.unwrap().getCluster(), EMPTY_TRAIT_SET.plus(execStrategyTrait), input.unwrap(),
-        getRelDistribution(exchangeStrategy, distributionKeys));
+        ExchangeStrategy.getRelDistribution(exchangeStrategy, distributionKeys));
     _nodeId = nodeId;
     _pRelInputs = Collections.singletonList(input);
     _pinotDataDistribution = pinotDataDistribution;
     _distributionKeys = distributionKeys;
     _exchangeStrategy = exchangeStrategy;
     _relCollation = relCollation == null ? RelCollations.EMPTY : relCollation;
+    _hashFunction = hashFunction;
   }
 
   @Override
@@ -95,7 +98,7 @@ public class PhysicalExchange extends Exchange implements PRelNode {
     Preconditions.checkState(newInput instanceof PRelNode, "Expected input of PhysicalExchange to be a PRelNode");
     // TODO(mse-physical): this always uses streaming exec strategy at the moment.
     return new PhysicalExchange(_nodeId, (PRelNode) newInput, _pinotDataDistribution, _distributionKeys,
-        _exchangeStrategy, _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy());
+        _exchangeStrategy, _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy(), _hashFunction);
   }
 
   @Override
@@ -152,35 +155,22 @@ public class PhysicalExchange extends Exchange implements PRelNode {
     return trait.getType();
   }
 
+  public DistHashFunction getHashFunction() {
+    return _hashFunction;
+  }
+
   @Override
   public PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
     return new PhysicalExchange(newNodeId, newInputs.get(0), newDistribution, _distributionKeys, _exchangeStrategy,
-        _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy());
+        _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy(), _hashFunction);
   }
 
   @Override public RelWriter explainTerms(RelWriter pw) {
     return pw.item("input", input)
         .item("exchangeStrategy", _exchangeStrategy)
-        .item("distKeys", _distributionKeys)
-        .item("execStrategy", getRelExchangeType())
-        .item("collation", _relCollation);
-  }
-
-  private static RelDistribution getRelDistribution(ExchangeStrategy exchangeStrategy, List<Integer> keys) {
-    switch (exchangeStrategy) {
-      case IDENTITY_EXCHANGE:
-      case PARTITIONING_EXCHANGE:
-      case SUB_PARTITIONING_HASH_EXCHANGE:
-      case COALESCING_PARTITIONING_EXCHANGE:
-        return RelDistributions.hash(keys);
-      case BROADCAST_EXCHANGE:
-        return RelDistributions.BROADCAST_DISTRIBUTED;
-      case SINGLETON_EXCHANGE:
-        return RelDistributions.SINGLETON;
-      case SUB_PARTITIONING_RR_EXCHANGE:
-        return RelDistributions.ROUND_ROBIN_DISTRIBUTED;
-      default:
-        throw new IllegalStateException(String.format("Unexpected exchange strategy: %s", exchangeStrategy));
-    }
+        .itemIf("distKeys", _distributionKeys, CollectionUtils.isNotEmpty(_distributionKeys))
+        .itemIf("execStrategy", getRelExchangeType(),
+            getRelExchangeType() != PinotRelExchangeType.getDefaultExchangeType())
+        .itemIf("collation", _relCollation, CollectionUtils.isNotEmpty(_relCollation.getFieldCollations()));
   }
 }

@@ -161,7 +161,7 @@ public class QueryAggregator implements ResourceAggregator {
         CommonConstants.Accounting.DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO));
     _panicLevel =
         (long) (_maxHeapSize * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DEFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
+            CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
     _criticalLevel =
         (long) (_maxHeapSize * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO,
             CommonConstants.Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO));
@@ -446,30 +446,25 @@ public class QueryAggregator implements ResourceAggregator {
             String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                 maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
         interruptRunnerThread(maxUsageTuple.getAnchorThread());
-        LOGGER.error("Query {} got picked because using {} bytes of memory, actual kill committed true}",
-            maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
+        logTerminatedQuery(maxUsageTuple, _usedBytes);
       } else if (!_oomKillQueryEnabled) {
         LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
             + "because oomKillQueryEnabled is false", maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
       } else {
         LOGGER.warn("But all queries are below quota, no query killed");
       }
-    } else {
-      maxUsageTuple =
-          Collections.max(_aggregatedUsagePerActiveQuery.values(), Comparator.comparing(AggregatedStats::getCpuTimeNs));
-      if (_oomKillQueryEnabled) {
-        maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
-            String.format(" Query %s got killed because memory pressure, using %d ns of CPU time on %s: %s",
-                maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
-        interruptRunnerThread(maxUsageTuple.getAnchorThread());
-        LOGGER.error("Query {} got picked because using {} ns of cpu time, actual kill committed true",
-            maxUsageTuple._allocatedBytes, maxUsageTuple._queryId);
-      } else {
-        LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
-            + "because oomKillQueryEnabled is false", maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
-      }
     }
-    LOGGER.warn("Query aggregation results {} for the previous kill.", _aggregatedUsagePerActiveQuery.toString());
+    logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
+  }
+
+  protected void logQueryResourceUsage(Map<String, ? extends QueryResourceTracker> aggregatedUsagePerActiveQuery) {
+    LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
+  }
+
+  protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {
+    LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}",
+        queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
+        queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage);
   }
 
   private void killCPUTimeExceedQueries() {
@@ -482,8 +477,10 @@ public class QueryAggregator implements ResourceAggregator {
             "Query %s got killed on %s: %s because using %d " + "CPU time exceeding limit of %d ns CPU time",
             value._queryId, _instanceType, _instanceId, value.getCpuTimeNs(), _cpuTimeBasedKillingThresholdNS)));
         interruptRunnerThread(value.getAnchorThread());
+        logTerminatedQuery(value, _usedBytes);
       }
     }
+    logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
   }
 
   private void interruptRunnerThread(Thread thread) {

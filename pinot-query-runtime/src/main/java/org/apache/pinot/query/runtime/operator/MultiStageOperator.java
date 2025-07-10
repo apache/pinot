@@ -41,6 +41,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -72,12 +73,35 @@ public abstract class MultiStageOperator
 
   public abstract void registerExecution(long time, int numRows);
 
-  // Samples resource usage of the operator. The operator should call this function for every block of data or
-  // assuming the block holds 10000 rows or more.
+  /// This method should be called periodically by the operator to check whether the execution should be interrupted.
+  ///
+  /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
+  /// due to resource constraints.
+  ///
+  /// Normally, callers should call [#sampleAndCheckInterruption(long deadlineMs)] passing the correct deadline, but
+  /// given most operators use either the active or the passive deadline, this method is provided as a convenience
+  /// method. By default, it uses the active deadline, which is the one that should be used for most operators, but
+  /// if the operator does not actively process data (ie both mailbox operators), it should override this method to
+  /// use the passive deadline instead.
+  /// See for example [MailboxSendOperator][org.apache.pinot.query.runtime.operator.MailboxSendOperator]).
   protected void sampleAndCheckInterruption() {
+    sampleAndCheckInterruption(_context.getActiveDeadlineMs());
+  }
+
+  /// This method should be called periodically by the operator to check whether the execution should be interrupted.
+  ///
+  /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
+  /// due to resource constraints.
+  protected void sampleAndCheckInterruption(long deadlineMs) {
+    if (System.currentTimeMillis() >= deadlineMs) {
+      earlyTerminate();
+      throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on " + getExplainName());
+    }
     Tracing.ThreadAccountantOps.sampleMSE();
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       earlyTerminate();
+      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "
+          + getExplainName());
     }
   }
 
@@ -212,6 +236,7 @@ public abstract class MultiStageOperator
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
         StatMap<AggregateOperator.StatKey> stats = (StatMap<AggregateOperator.StatKey>) map;
+        response.mergeGroupsTrimmed(stats.getBoolean(AggregateOperator.StatKey.GROUPS_TRIMMED));
         response.mergeNumGroupsLimitReached(stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_LIMIT_REACHED));
         response.mergeNumGroupsWarningLimitReached(
             stats.getBoolean(AggregateOperator.StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED));
@@ -261,15 +286,15 @@ public abstract class MultiStageOperator
         response.mergeMaxRowsInOperator(stats.getLong(SetOperator.StatKey.EMITTED_ROWS));
       }
     },
-    LEAF(LeafStageOperator.StatKey.class) {
+    LEAF(LeafOperator.StatKey.class) {
       @Override
       public void mergeInto(BrokerResponseNativeV2 response, StatMap<?> map) {
         @SuppressWarnings("unchecked")
-        StatMap<LeafStageOperator.StatKey> stats = (StatMap<LeafStageOperator.StatKey>) map;
-        response.mergeMaxRowsInOperator(stats.getLong(LeafStageOperator.StatKey.EMITTED_ROWS));
+        StatMap<LeafOperator.StatKey> stats = (StatMap<LeafOperator.StatKey>) map;
+        response.mergeMaxRowsInOperator(stats.getLong(LeafOperator.StatKey.EMITTED_ROWS));
 
         StatMap<BrokerResponseNativeV2.StatKey> brokerStats = new StatMap<>(BrokerResponseNativeV2.StatKey.class);
-        for (LeafStageOperator.StatKey statKey : stats.keySet()) {
+        for (LeafOperator.StatKey statKey : stats.keySet()) {
           statKey.updateBrokerMetadata(brokerStats, stats);
         }
         response.addBrokerStats(brokerStats);

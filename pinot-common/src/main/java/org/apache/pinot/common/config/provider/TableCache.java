@@ -39,8 +39,8 @@ import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
@@ -52,6 +52,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -70,8 +71,6 @@ public class TableCache implements PinotConfigProvider {
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
   private static final String SCHEMA_PARENT_PATH = "/SCHEMAS";
   private static final String SCHEMA_PATH_PREFIX = "/SCHEMAS/";
-  private static final String LOGICAL_TABLE_PARENT_PATH = "/LOGICAL/TABLE";
-  private static final String LOGICAL_TABLE_PATH_PREFIX = "/LOGICAL/TABLE/";
   private static final String OFFLINE_TABLE_SUFFIX = "_OFFLINE";
   private static final String REALTIME_TABLE_SUFFIX = "_REALTIME";
   private static final String LOWER_CASE_OFFLINE_TABLE_SUFFIX = OFFLINE_TABLE_SUFFIX.toLowerCase();
@@ -138,12 +137,12 @@ public class TableCache implements PinotConfigProvider {
 
     synchronized (_zkLogicalTableConfigChangeListener) {
       // Subscribe child changes before reading the data to avoid missing changes
-      _propertyStore.subscribeChildChanges(LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
+      _propertyStore.subscribeChildChanges(ZkPaths.LOGICAL_TABLE_PARENT_PATH, _zkLogicalTableConfigChangeListener);
 
-      List<String> tables = _propertyStore.getChildNames(LOGICAL_TABLE_PARENT_PATH, AccessOption.PERSISTENT);
+      List<String> tables = _propertyStore.getChildNames(ZkPaths.LOGICAL_TABLE_PARENT_PATH, AccessOption.PERSISTENT);
       if (CollectionUtils.isNotEmpty(tables)) {
         List<String> pathsToAdd = tables.stream()
-            .map(rawTableName -> LOGICAL_TABLE_PATH_PREFIX + rawTableName)
+            .map(rawTableName -> ZkPaths.LOGICAL_TABLE_PATH_PREFIX + rawTableName)
             .collect(Collectors.toList());
         addLogicalTableConfigs(pathsToAdd);
       }
@@ -333,7 +332,7 @@ public class TableCache implements PinotConfigProvider {
 
   private void putTableConfig(ZNRecord znRecord)
       throws IOException {
-    TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
+    TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
     String tableNameWithType = tableConfig.getTableName();
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
@@ -391,7 +390,7 @@ public class TableCache implements PinotConfigProvider {
 
   private void removeLogicalTableConfig(String path) {
     _propertyStore.unsubscribeDataChanges(path, _zkLogicalTableConfigChangeListener);
-    String logicalTableName = path.substring(LOGICAL_TABLE_PATH_PREFIX.length());
+    String logicalTableName = path.substring(ZkPaths.LOGICAL_TABLE_PATH_PREFIX.length());
     _logicalTableConfigInfoMap.remove(logicalTableName);
     logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     _logicalTableNameMap.remove(logicalTableName);
@@ -416,7 +415,7 @@ public class TableCache implements PinotConfigProvider {
 
   private void putSchema(ZNRecord znRecord)
       throws IOException {
-    Schema schema = SchemaUtils.fromZNRecord(znRecord);
+    Schema schema = SchemaSerDeUtils.fromZNRecord(znRecord);
     addBuiltInVirtualColumns(schema);
     String schemaName = schema.getSchemaName();
     Map<String, String> columnNameMap = new HashMap<>();
@@ -616,7 +615,7 @@ public class TableCache implements PinotConfigProvider {
       List<String> pathsToAdd = new ArrayList<>();
       for (String logicalTableName : logicalTableNames) {
         if (!_logicalTableConfigInfoMap.containsKey(logicalTableName)) {
-          pathsToAdd.add(LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
+          pathsToAdd.add(ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
         }
       }
       if (!pathsToAdd.isEmpty()) {
@@ -642,7 +641,7 @@ public class TableCache implements PinotConfigProvider {
     public synchronized void handleDataDeleted(String path) {
       // NOTE: The path here is the absolute ZK path instead of the relative path to the property store.
       String logicalTableName = path.substring(path.lastIndexOf('/') + 1);
-      removeLogicalTableConfig(LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
+      removeLogicalTableConfig(ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
       notifyLogicalTableConfigChangeListeners();
     }
   }

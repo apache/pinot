@@ -160,7 +160,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
     }
     // exception will be propagated through for assert purpose on runtime error
-    return QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
+    long now = System.currentTimeMillis();
+    long extraPassiveTimeout = 1000;
+    return QueryDispatcher.runReducer(requestId, dispatchableSubPlan,
+        timeoutMs + now,
+        timeoutMs + now + extraPassiveTimeout,
+        Collections.emptyMap(),
         _mailboxService);
   }
 

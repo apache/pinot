@@ -54,8 +54,15 @@ public class DefaultRequestContext implements RequestScope {
   private long _realtimeResponseSerializationCpuTimeNs;
   private long _offlineTotalCpuTimeNs;
   private long _realtimeTotalCpuTimeNs;
+  private long _offlineThreadMemAllocatedBytes;
+  private long _realtimeThreadMemAllocatedBytes;
+  private long _offlineResponseSerMemAllocatedBytes;
+  private long _realtimeResponseSerMemAllocatedBytes;
+  private long _offlineTotalMemAllocatedBytes;
+  private long _realtimeTotalMemAllocatedBytes;
   private int _numServersQueried;
   private int _numServersResponded;
+  private boolean _groupsTrimmed;
   private boolean _isNumGroupsLimitReached;
   private int _numExceptions;
   private String _brokerId;
@@ -335,6 +342,11 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public boolean isGroupsTrimmed() {
+    return _groupsTrimmed;
+  }
+
+  @Override
   public boolean isNumGroupsLimitReached() {
     return _isNumGroupsLimitReached;
   }
@@ -405,6 +417,66 @@ public class DefaultRequestContext implements RequestScope {
   }
 
   @Override
+  public long getOfflineThreadMemAllocatedBytes() {
+    return _offlineThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public void setOfflineThreadMemAllocatedBytes(long offlineThreadMemAllocatedBytes) {
+    _offlineThreadMemAllocatedBytes = offlineThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeThreadMemAllocatedBytes() {
+    return _realtimeThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public void setRealtimeThreadMemAllocatedBytes(long realtimeThreadMemAllocatedBytes) {
+    _realtimeThreadMemAllocatedBytes = realtimeThreadMemAllocatedBytes;
+  }
+
+  @Override
+  public long getOfflineResponseSerMemAllocatedBytes() {
+    return _offlineResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public void setOfflineResponseSerMemAllocatedBytes(long offlineResponseSerMemAllocatedBytes) {
+    _offlineResponseSerMemAllocatedBytes = offlineResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeResponseSerMemAllocatedBytes() {
+    return _realtimeResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public void setRealtimeResponseSerMemAllocatedBytes(long realtimeResponseSerMemAllocatedBytes) {
+    _realtimeResponseSerMemAllocatedBytes = realtimeResponseSerMemAllocatedBytes;
+  }
+
+  @Override
+  public long getOfflineTotalMemAllocatedBytes() {
+    return _offlineTotalMemAllocatedBytes;
+  }
+
+  @Override
+  public void setOfflineTotalMemAllocatedBytes(long offlineTotalMemAllocatedBytes) {
+    _offlineTotalMemAllocatedBytes = offlineTotalMemAllocatedBytes;
+  }
+
+  @Override
+  public long getRealtimeTotalMemAllocatedBytes() {
+    return _realtimeTotalMemAllocatedBytes;
+  }
+
+  @Override
+  public void setRealtimeTotalMemAllocatedBytes(long realtimeTotalMemAllocatedBytes) {
+    _realtimeTotalMemAllocatedBytes = realtimeTotalMemAllocatedBytes;
+  }
+
+  @Override
   public void setNumServersQueried(int numServersQueried) {
     _numServersQueried = numServersQueried;
   }
@@ -412,6 +484,11 @@ public class DefaultRequestContext implements RequestScope {
   @Override
   public void setNumServersResponded(int numServersResponded) {
     _numServersResponded = numServersResponded;
+  }
+
+  @Override
+  public void setGroupsTrimmed(boolean groupsTrimmed) {
+    _groupsTrimmed = groupsTrimmed;
   }
 
   @Override

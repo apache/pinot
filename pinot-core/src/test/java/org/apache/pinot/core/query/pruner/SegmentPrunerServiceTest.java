@@ -87,26 +87,6 @@ public class SegmentPrunerServiceTest {
     Assert.assertEquals(stats.getInvalidSegments(), 0);
   }
 
-  @Test
-  public void segmentsWithoutColumnAreInvalid() {
-    SegmentPrunerService service = new SegmentPrunerService(_emptyPrunerConf);
-    IndexSegment indexSegment = mockIndexSegment(10, "col1", "col2");
-
-    SegmentPrunerStatistics stats = new SegmentPrunerStatistics();
-
-    List<IndexSegment> indexes = new ArrayList<>();
-    indexes.add(indexSegment);
-
-    String query = "select not_present from t1";
-
-    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
-
-    List<IndexSegment> actual = service.prune(indexes, queryContext, stats);
-
-    Assert.assertEquals(actual, Collections.emptyList());
-    Assert.assertEquals(1, stats.getInvalidSegments());
-  }
-
   private IndexSegment mockIndexSegment(int totalDocs, String... columns) {
     IndexSegment indexSegment = mock(IndexSegment.class);
     when(indexSegment.getColumnNames()).thenReturn(new HashSet<>(Arrays.asList(columns)));

@@ -69,13 +69,13 @@ public class RebalanceSummaryResult {
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class ServerSegmentChangeInfo {
-    private final ServerStatus _serverStatus;
-    private final int _totalSegmentsAfterRebalance;
-    private final int _totalSegmentsBeforeRebalance;
-    private final int _segmentsAdded;
-    private final int _segmentsDeleted;
-    private final int _segmentsUnchanged;
-    private final List<String> _tagList;
+    protected ServerStatus _serverStatus;
+    protected int _totalSegmentsAfterRebalance;
+    protected int _totalSegmentsBeforeRebalance;
+    protected int _segmentsAdded;
+    protected int _segmentsDeleted;
+    protected int _segmentsUnchanged;
+    protected List<String> _tagList;
 
     /**
      * Constructor for ServerSegmentChangeInfo
@@ -137,6 +137,19 @@ public class RebalanceSummaryResult {
     public List<String> getTagList() {
       return _tagList;
     }
+
+    @Override
+    public String toString() {
+      return "ServerSegmentChangeInfo{"
+          + "_serverStatus=" + _serverStatus
+          + ", _totalSegmentsAfterRebalance=" + _totalSegmentsAfterRebalance
+          + ", _totalSegmentsBeforeRebalance=" + _totalSegmentsBeforeRebalance
+          + ", _segmentsAdded=" + _segmentsAdded
+          + ", _segmentsDeleted=" + _segmentsDeleted
+          + ", _segmentsUnchanged=" + _segmentsUnchanged
+          + ", _tagList=" + _tagList
+          + '}';
+    }
   }
 
   public static class RebalanceChangeInfo {
@@ -164,14 +177,22 @@ public class RebalanceSummaryResult {
     public int getExpectedValueAfterRebalance() {
       return _expectedValueAfterRebalance;
     }
+
+    @Override
+    public String toString() {
+      return "RebalanceChangeInfo{"
+          + "_valueBeforeRebalance=" + _valueBeforeRebalance
+          + ", _expectedValueAfterRebalance=" + _expectedValueAfterRebalance
+          + '}';
+    }
   }
 
   public static class TagInfo {
     public static final String TAG_FOR_OUTDATED_SERVERS = "OUTDATED_SERVERS";
-    private final String _tagName;
-    private int _numSegmentsUnchanged;
-    private int _numSegmentsToDownload;
-    private int _numServerParticipants;
+    protected final String _tagName;
+    protected int _numSegmentsUnchanged;
+    protected int _numSegmentsToDownload;
+    protected int _numServerParticipants;
 
     @JsonCreator
     public TagInfo(
@@ -221,17 +242,27 @@ public class RebalanceSummaryResult {
     public void increaseNumServerParticipants(int numServers) {
       _numServerParticipants += numServers;
     }
+
+    @Override
+    public String toString() {
+      return "TagInfo{"
+          + "_tagName='" + _tagName + '\''
+          + ", _numSegmentsUnchanged=" + _numSegmentsUnchanged
+          + ", _numSegmentsToDownload=" + _numSegmentsToDownload
+          + ", _numServerParticipants=" + _numServerParticipants
+          + '}';
+    }
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class ServerInfo {
-    private final int _numServersGettingNewSegments;
-    private final RebalanceChangeInfo _numServers;
-    private final Set<String> _serversAdded;
-    private final Set<String> _serversRemoved;
-    private final Set<String> _serversUnchanged;
-    private final Set<String> _serversGettingNewSegments;
-    private final Map<String, ServerSegmentChangeInfo> _serverSegmentChangeInfo;
+    protected int _numServersGettingNewSegments;
+    protected RebalanceChangeInfo _numServers;
+    protected Set<String> _serversAdded;
+    protected Set<String> _serversRemoved;
+    protected Set<String> _serversUnchanged;
+    protected Set<String> _serversGettingNewSegments;
+    protected Map<String, ServerSegmentChangeInfo> _serverSegmentChangeInfo;
 
     /**
      * Constructor for ServerInfo
@@ -294,6 +325,19 @@ public class RebalanceSummaryResult {
     @JsonProperty
     public Map<String, ServerSegmentChangeInfo> getServerSegmentChangeInfo() {
       return _serverSegmentChangeInfo;
+    }
+
+    @Override
+    public String toString() {
+      return "ServerInfo{"
+          + "_numServersGettingNewSegments=" + _numServersGettingNewSegments
+          + ", _numServers=" + _numServers
+          + ", _serversAdded=" + _serversAdded
+          + ", _serversRemoved=" + _serversRemoved
+          + ", _serversUnchanged=" + _serversUnchanged
+          + ", _serversGettingNewSegments=" + _serversGettingNewSegments
+          + ", _serverSegmentChangeInfo=" + _serverSegmentChangeInfo
+          + '}';
     }
   }
 
@@ -375,8 +419,8 @@ public class RebalanceSummaryResult {
     }
 
     public static class ConsumingSegmentSummaryPerServer {
-      private final int _numConsumingSegmentsToBeAdded;
-      private final int _totalOffsetsToCatchUpAcrossAllConsumingSegments;
+      protected int _numConsumingSegmentsToBeAdded;
+      protected int _totalOffsetsToCatchUpAcrossAllConsumingSegments;
 
       /**
        * Constructor for ConsumingSegmentSummaryPerServer
@@ -407,21 +451,41 @@ public class RebalanceSummaryResult {
       public int getTotalOffsetsToCatchUpAcrossAllConsumingSegments() {
         return _totalOffsetsToCatchUpAcrossAllConsumingSegments;
       }
+
+      @Override
+      public String toString() {
+        return "ConsumingSegmentSummaryPerServer{"
+            + "_numConsumingSegmentsToBeAdded=" + _numConsumingSegmentsToBeAdded
+            + ", _totalOffsetsToCatchUpAcrossAllConsumingSegments=" + _totalOffsetsToCatchUpAcrossAllConsumingSegments
+            + '}';
+      }
+    }
+
+    @Override
+    public String toString() {
+      return "ConsumingSegmentToBeMovedSummary{"
+          + "_numConsumingSegmentsToBeMoved=" + _numConsumingSegmentsToBeMoved
+          + ", _numServersGettingConsumingSegmentsAdded=" + _numServersGettingConsumingSegmentsAdded
+          + ", _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp="
+          + _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp
+          + ", _consumingSegmentsToBeMovedWithOldestAgeInMinutes=" + _consumingSegmentsToBeMovedWithOldestAgeInMinutes
+          + ", _serverConsumingSegmentSummary=" + _serverConsumingSegmentSummary
+          + '}';
     }
   }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class SegmentInfo {
     // TODO: Add a metric to estimate the total time it will take to rebalance
-    private final int _totalSegmentsToBeMoved;
-    private final int _totalSegmentsToBeDeleted;
-    private final int _maxSegmentsAddedToASingleServer;
-    private final long _estimatedAverageSegmentSizeInBytes;
-    private final long _totalEstimatedDataToBeMovedInBytes;
-    private final RebalanceChangeInfo _replicationFactor;
-    private final RebalanceChangeInfo _numSegmentsInSingleReplica;
-    private final RebalanceChangeInfo _numSegmentsAcrossAllReplicas;
-    private final ConsumingSegmentToBeMovedSummary _consumingSegmentToBeMovedSummary;
+    protected int _totalSegmentsToBeMoved;
+    protected int _totalSegmentsToBeDeleted;
+    protected int _maxSegmentsAddedToASingleServer;
+    protected long _estimatedAverageSegmentSizeInBytes;
+    protected long _totalEstimatedDataToBeMovedInBytes;
+    protected RebalanceChangeInfo _replicationFactor;
+    protected RebalanceChangeInfo _numSegmentsInSingleReplica;
+    protected RebalanceChangeInfo _numSegmentsAcrossAllReplicas;
+    protected ConsumingSegmentToBeMovedSummary _consumingSegmentToBeMovedSummary;
 
     /**
      * Constructor for SegmentInfo
@@ -501,6 +565,21 @@ public class RebalanceSummaryResult {
     public ConsumingSegmentToBeMovedSummary getConsumingSegmentToBeMovedSummary() {
       return _consumingSegmentToBeMovedSummary;
     }
+
+    @Override
+    public String toString() {
+      return "SegmentInfo{"
+          + "_totalSegmentsToBeMoved=" + _totalSegmentsToBeMoved
+          + ", _totalSegmentsToBeDeleted=" + _totalSegmentsToBeDeleted
+          + ", _maxSegmentsAddedToASingleServer=" + _maxSegmentsAddedToASingleServer
+          + ", _estimatedAverageSegmentSizeInBytes=" + _estimatedAverageSegmentSizeInBytes
+          + ", _totalEstimatedDataToBeMovedInBytes=" + _totalEstimatedDataToBeMovedInBytes
+          + ", _replicationFactor=" + _replicationFactor
+          + ", _numSegmentsInSingleReplica=" + _numSegmentsInSingleReplica
+          + ", _numSegmentsAcrossAllReplicas=" + _numSegmentsAcrossAllReplicas
+          + ", _consumingSegmentToBeMovedSummary=" + _consumingSegmentToBeMovedSummary
+          + '}';
+    }
   }
 
   public enum ServerStatus {
@@ -508,5 +587,14 @@ public class RebalanceSummaryResult {
     // REMOVED if the server is removed as part of rebalance;
     // UNCHANGED if the server status is unchanged as part of rebalance;
     ADDED, REMOVED, UNCHANGED
+  }
+
+  @Override
+  public String toString() {
+    return "RebalanceSummaryResult{"
+        + "_serverInfo=" + _serverInfo
+        + ", _segmentInfo=" + _segmentInfo
+        + ", _tagsInfo=" + _tagsInfo
+        + '}';
   }
 }

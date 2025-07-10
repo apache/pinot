@@ -20,11 +20,14 @@ package org.apache.pinot.segment.local.dedup;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
+import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.spi.config.table.DedupConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -40,11 +43,13 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
   protected final Map<Integer, PartitionDedupMetadataManager> _partitionMetadataManagerMap = new ConcurrentHashMap<>();
   protected String _tableNameWithType;
   protected DedupContext _context;
+  protected SegmentOperationsThrottler _segmentOperationsThrottler;
 
   @Override
   public void init(PinotConfiguration instanceDedupConfig, TableConfig tableConfig, Schema schema,
-      TableDataManager tableDataManager) {
+      TableDataManager tableDataManager, @Nullable SegmentOperationsThrottler segmentOperationsThrottler) {
     _tableNameWithType = tableConfig.getTableName();
+    _segmentOperationsThrottler = segmentOperationsThrottler;
 
     Preconditions.checkArgument(tableConfig.isDedupEnabled(), "Dedup must be enabled for table: %s",
         _tableNameWithType);
@@ -118,6 +123,15 @@ public abstract class BaseTableDedupMetadataManager implements TableDedupMetadat
    * Create PartitionDedupMetadataManager for given partition id.
    */
   protected abstract PartitionDedupMetadataManager createPartitionDedupMetadataManager(Integer partitionId);
+
+  @Override
+  public Map<Integer, Long> getPartitionToPrimaryKeyCount() {
+    Map<Integer, Long> partitionToPrimaryKeyCount = new HashMap<>();
+    _partitionMetadataManagerMap.forEach(
+        (partitionID, dedupMetadataManager) -> partitionToPrimaryKeyCount.put(partitionID,
+            dedupMetadataManager.getNumPrimaryKeys()));
+    return partitionToPrimaryKeyCount;
+  }
 
   @Override
   public DedupContext getContext() {

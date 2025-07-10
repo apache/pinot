@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Properties;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest;
@@ -35,10 +36,12 @@ import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -76,6 +79,12 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     TableConfig tableConfig = createOfflineTableConfig();
     addTableConfig(tableConfig);
 
+    // Create and upload schema and logical table
+    schema.setSchemaName(getLogicalTableName());
+    addSchema(schema);
+    LogicalTableConfig logicalTableConfig = getLogicalTableConfig();
+    addLogicalTableConfig(logicalTableConfig);
+
     Properties properties = new Properties();
     properties.put(FAIL_ON_EXCEPTIONS, "FALSE");
     _pinotClientTransport = new JsonAsyncHttpPinotClientTransportFactory()
@@ -96,9 +105,11 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     setQueryQuotaForApplication(null);
     addQueryQuotaToDatabaseConfig(null);
     addQueryQuotaToTableConfig(null);
+    addQueryQuotaToLogicalTableConfig(null);
 
     _brokerHostPort = LOCAL_HOST + ":" + _brokerPorts.get(0);
     verifyQuotaUpdate(0);
+    verifyQuotaUpdateWithTableName(0, getLogicalTableName());
   }
 
   @Test
@@ -258,6 +269,48 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     }
   }
 
+  @Test
+  public void testLogicalTableQueryQuota()
+      throws Exception {
+    int maxQps = 10;
+    addQueryQuotaToLogicalTableConfig(maxQps);
+    verifyQuotaUpdateWithTableName(maxQps, getLogicalTableName());
+    runQueries(maxQps, false, "default", getLogicalTableName());
+    //increase the qps and some of the queries should be throttled.
+    runQueries(maxQps * 2, true, "default", getLogicalTableName());
+
+    // queries on broker
+    runQueriesOnBroker(maxQps, false, getLogicalTableName());
+    //increase the qps and some of the queries should be throttled.
+    runQueriesOnBroker(maxQps * 2, true, getLogicalTableName());
+  }
+
+  @Test
+  public void testLogicalTableWithDatabaseQueryQuota()
+      throws Exception {
+    int databaseMaxQps = 25;
+    int logicalTableMaxQps = 10;
+    addQueryQuotaToDatabaseConfig(databaseMaxQps);
+    addQueryQuotaToLogicalTableConfig(logicalTableMaxQps);
+    // table quota within database quota. Queries should fail upon table quota (10 qps) breach
+    verifyQuotaUpdateWithTableName(logicalTableMaxQps, getLogicalTableName());
+    runQueries(logicalTableMaxQps, false, "default", getLogicalTableName());
+    // queries on broker
+    runQueriesOnBroker(logicalTableMaxQps, false, getLogicalTableName());
+
+    //increase the logical table qps.
+    logicalTableMaxQps = 50;
+    addQueryQuotaToLogicalTableConfig(logicalTableMaxQps);
+    verifyQuotaUpdateWithTableName(databaseMaxQps, getLogicalTableName());
+    runQueries(databaseMaxQps, false, "default", getLogicalTableName());
+    // broker queries
+    runQueriesOnBroker(databaseMaxQps, false, getLogicalTableName());
+
+    //increase the qps and some of the queries should be throttled.
+    runQueries(databaseMaxQps * 2, true, "default", getLogicalTableName());
+    runQueriesOnBroker(databaseMaxQps * 2, true, getLogicalTableName());
+  }
+
   /**
    * Runs the query load with the max rate that the quota can allow and ensures queries are not failing.
    * Then runs the query load with double the max rate and expects queries to fail due to quota breach.
@@ -295,15 +348,18 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   private void runQueries(int qps, boolean shouldFail) {
     runQueries(qps, shouldFail, "default");
   }
+  private void runQueries(int qps, boolean shouldFail, String applicationName) {
+    runQueries(qps, shouldFail, applicationName, getTableName());
+  }
 
   // try to keep the qps below 50 to ensure that the time lost between 2 query runs on top of the sleepMillis
   // is not comparable to sleepMillis, else the actual qps would end up being much lower than required qps
-  private void runQueries(int qps, boolean shouldFail, String applicationName) {
+  private void runQueries(int qps, boolean shouldFail, String applicationName, String tableName) {
     int failCount = 0;
     boolean isLastFail = false;
     long deadline = System.currentTimeMillis() + 1000;
 
-    String query = "SET applicationName='" + applicationName + "'; SELECT COUNT(*) FROM " + getTableName();
+    String query = "SET applicationName='" + applicationName + "'; SELECT COUNT(*) FROM " + tableName;
 
     for (int i = 0; i < qps; i++) {
       sleep(deadline, qps - i);
@@ -333,11 +389,15 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   private static volatile String _quotaSource;
 
   private void verifyQuotaUpdate(double quotaQps) {
+    verifyQuotaUpdateWithTableName(quotaQps, getTableName() + "_OFFLINE");
+  }
+
+  private void verifyQuotaUpdateWithTableName(double quotaQps, String tableName) {
     try {
       TestUtils.waitForCondition(aVoid -> {
         try {
           double tableQuota = Double.parseDouble(sendGetRequest(
-              "http://" + _brokerHostPort + "/debug/tables/queryQuota/" + getTableName() + "_OFFLINE"));
+              "http://" + _brokerHostPort + "/debug/tables/queryQuota/" + tableName));
           double dbQuota = Double.parseDouble(
               sendGetRequest("http://" + _brokerHostPort + "/debug/databases/queryQuota/default"));
           double appQuota = Double.parseDouble(
@@ -363,7 +423,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
-      }, 10000, "Failed to reflect query quota on rate limiter in 5s.");
+      }, 10000, "Failed to reflect query quota on rate limiter in 10s.");
     } catch (AssertionError ae) {
       throw new AssertionError(
           ae.getMessage() + " Expected quota:" + quotaQps + " but is: " + _quota + " set on: " + _quotaSource, ae);
@@ -375,13 +435,17 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   }
 
   private void runQueriesOnBroker(float qps, boolean shouldFail) {
+    runQueriesOnBroker(qps, shouldFail, getTableName());
+  }
+
+  private void runQueriesOnBroker(float qps, boolean shouldFail, String tableName) {
     int failCount = 0;
     long deadline = System.currentTimeMillis() + 1000;
 
     for (int i = 0; i < qps; i++) {
       sleep(deadline, qps - i);
       BrokerResponse resultSetGroup =
-          executeQueryOnBroker("SET applicationName='default'; SELECT COUNT(*) FROM " + getTableName());
+          executeQueryOnBroker("SET applicationName='default'; SELECT COUNT(*) FROM " + tableName);
       for (Iterator<JsonNode> it = resultSetGroup.getExceptions().elements(); it.hasNext(); ) {
         JsonNode exception = it.next();
         if (exception.get("errorCode").asInt() == QueryErrorCode.TOO_MANY_REQUESTS.getId()) {
@@ -403,6 +467,14 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
     TableConfig tableConfig = getOfflineTableConfig();
     tableConfig.setQuotaConfig(new QuotaConfig(null, maxQps == null ? null : maxQps.toString()));
     updateTableConfig(tableConfig);
+    // to allow change propagation to QueryQuotaManager
+  }
+
+  public void addQueryQuotaToLogicalTableConfig(Integer maxQps)
+      throws Exception {
+    LogicalTableConfig logicalTableConfig = getLogicalTableConfig();
+    logicalTableConfig.setQuotaConfig(new QuotaConfig(null, maxQps == null ? null : maxQps.toString()));
+    updateLogicalTableConfig(logicalTableConfig);
     // to allow change propagation to QueryQuotaManager
   }
 
@@ -452,5 +524,17 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
           _httpClient.sendJsonPostRequest(new URI(_controllerRequestURLBuilder.forClusterConfigs()), payload));
     }
     // to allow change propagation to QueryQuotaManager
+  }
+
+  private static String getLogicalTableName() {
+    return "logical_table";
+  }
+
+  private LogicalTableConfig getLogicalTableConfig() {
+    List<String> physicalTableNames = List.of(TableNameBuilder.OFFLINE.tableNameWithType(getTableName()));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(getLogicalTableName(), physicalTableNames, "DefaultTenant");
+    logicalTableConfig.setQuotaConfig(new QuotaConfig(null, null));
+    return logicalTableConfig;
   }
 }

@@ -76,7 +76,6 @@ import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
-import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.core.query.utils.rewriter.ResultRewriterFactory;
 import org.apache.pinot.core.transport.ListenerConfig;
@@ -370,7 +369,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     QueryDispatcher queryDispatcher = null;
     if (_brokerConf.getProperty(Helix.CONFIG_OF_MULTI_STAGE_ENGINE_ENABLED, Helix.DEFAULT_MULTI_STAGE_ENGINE_ENABLED)) {
-      _multiStageQueryThrottler = new MultiStageQueryThrottler();
+      _multiStageQueryThrottler = new MultiStageQueryThrottler(_brokerConf);
       _multiStageQueryThrottler.init(_spectatorHelixManager);
       // multi-stage request handler uses both Netty and GRPC ports.
       // worker requires both the "Netty port" for protocol transport; and "GRPC port" for mailbox transport.
@@ -407,9 +406,6 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         new BrokerRequestHandlerDelegate(singleStageBrokerRequestHandler, multiStageBrokerRequestHandler,
             timeSeriesRequestHandler, _responseStore);
     _brokerRequestHandler.start();
-
-    // Initialize WorkloadBudgetManager for Query Workload Isolation.
-    WorkloadBudgetManager.init(_brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX));
 
     // Enable/disable thread CPU time measurement through instance config.
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(

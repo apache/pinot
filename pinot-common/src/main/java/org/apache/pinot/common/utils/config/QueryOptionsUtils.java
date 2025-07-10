@@ -21,8 +21,11 @@ package org.apache.pinot.common.utils.config;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -110,6 +113,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Long getPassiveTimeoutMs(Map<String, String> queryOptions) {
+    String passiveTimeoutMsString = queryOptions.get(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS);
+    return checkedParseLong(QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS, passiveTimeoutMsString, 0);
+  }
+
+  @Nullable
   public static Long getMaxServerResponseSizeBytes(Map<String, String> queryOptions) {
     String responseSize = queryOptions.get(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES);
     return checkedParseLongPositive(QueryOptionKey.MAX_SERVER_RESPONSE_SIZE_BYTES, responseSize);
@@ -178,6 +187,30 @@ public class QueryOptionsUtils {
     return skipIndexes;
   }
 
+  public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
+    // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
+    String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
+    if (skipIndexesStr == null) {
+      return Set.of();
+    }
+
+    String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
+
+    return new HashSet<>(List.of(skippedRules));
+  }
+
+  public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
+    // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
+    String usedIndexesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
+    if (usedIndexesStr == null) {
+      return Set.of();
+    }
+
+    String[] usedRules = StringUtils.split(usedIndexesStr, ',');
+
+    return new HashSet<>(List.of(usedRules));
+  }
+
   @Nullable
   public static Boolean isUseFixedReplica(Map<String, String> queryOptions) {
     String useFixedReplica = queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.USE_FIXED_REPLICA);
@@ -188,6 +221,25 @@ public class QueryOptionsUtils {
   public static Integer getNumReplicaGroupsToQuery(Map<String, String> queryOptions) {
     String numReplicaGroupsToQuery = queryOptions.get(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY);
     return checkedParseIntPositive(QueryOptionKey.NUM_REPLICA_GROUPS_TO_QUERY, numReplicaGroupsToQuery);
+  }
+
+  public static List<Integer> getOrderedPreferredPools(Map<String, String> queryOptions) {
+    String orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_POOLS);
+    if (StringUtils.isEmpty(orderedPreferredPools)) {
+      // backward compatibility
+      orderedPreferredPools = queryOptions.get(QueryOptionKey.ORDERED_PREFERRED_REPLICAS);
+    }
+    if (StringUtils.isEmpty(orderedPreferredPools)) {
+      return Collections.emptyList();
+    }
+    // cannot use comma as the delimiter of pool list
+    // because query option use comma as the delimiter of different options
+    String[] pools = orderedPreferredPools.split("\\|");
+    List<Integer> preferredPools = new ArrayList<>(pools.length);
+    for (String pool : pools) {
+      preferredPools.add(Integer.parseInt(pool.trim()));
+    }
+    return preferredPools;
   }
 
   public static boolean isExplainPlanVerbose(Map<String, String> queryOptions) {
@@ -310,6 +362,7 @@ public class QueryOptionsUtils {
     String numGroupsWarningLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT);
     return checkedParseIntPositive(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, numGroupsWarningLimit);
   }
+
   @Nullable
   public static Integer getMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
     String maxInitialResultHolderCapacity = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);
@@ -374,13 +427,51 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IS_SECONDARY_WORKLOAD));
   }
 
-  public static Boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
+  public static boolean isAccurateGroupByWithoutOrderBy(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.ACCURATE_GROUP_BY_WITHOUT_ORDER_BY));
+  }
+
+  public static boolean isUseMSEToFillEmptySchema(Map<String, String> queryOptions, boolean defaultValue) {
     String useMSEToFillEmptySchema = queryOptions.get(QueryOptionKey.USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA);
     return useMSEToFillEmptySchema != null ? Boolean.parseBoolean(useMSEToFillEmptySchema) : defaultValue;
   }
 
   public static boolean isInferInvalidSegmentPartition(Map<String, String> queryOptions) {
-    return Boolean.parseBoolean(queryOptions.getOrDefault(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION, "false"));
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_INVALID_SEGMENT_PARTITION));
+  }
+
+  public static boolean isInferRealtimeSegmentPartition(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.INFER_REALTIME_SEGMENT_PARTITION));
+  }
+
+  public static boolean isUseLeafServerForIntermediateStage(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static boolean isUsePhysicalOptimizer(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_PHYSICAL_OPTIMIZER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static boolean isUseLiteMode(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_LITE_MODE);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static boolean isUseBrokerPruning(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.USE_BROKER_PRUNING);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static boolean isRunInBroker(Map<String, String> queryOptions, boolean defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.RUN_IN_BROKER);
+    return option != null ? Boolean.parseBoolean(option) : defaultValue;
+  }
+
+  public static int getLiteModeServerStageLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT, option) : defaultValue;
   }
 
   @Nullable
@@ -455,7 +546,6 @@ public class QueryOptionsUtils {
         String.format("%s must be a number between %d and 2^63-1, got: %s", optionName, minValue, optionValue));
   }
 
-  @Nullable
   public static String getWorkloadName(Map<String, String> queryOptions) {
     return queryOptions.get(QueryOptionKey.WORKLOAD_NAME) != null ? queryOptions.get(QueryOptionKey.WORKLOAD_NAME)
         : CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;

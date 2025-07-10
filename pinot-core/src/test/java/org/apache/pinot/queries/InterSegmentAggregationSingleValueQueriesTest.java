@@ -775,6 +775,36 @@ public class InterSegmentAggregationSingleValueQueriesTest extends BaseSingleVal
   }
 
   @Test
+  public void testGroupsTrimmedAtSegmentLevel() {
+    String query = "SELECT COUNT(*) FROM testTable GROUP BY column1, column3 ORDER BY column1";
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    assertFalse(brokerResponse.isGroupsTrimmed());
+
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+    planMaker.setMinSegmentGroupTrimSize(5);
+    brokerResponse = getBrokerResponse(query, planMaker);
+
+    assertTrue(brokerResponse.isGroupsTrimmed());
+  }
+
+  @Test
+  public void testGroupsTrimmedAtServerLevel() {
+    String query = "SELECT COUNT(*) FROM testTable GROUP BY column1, column3 ORDER BY column1";
+
+    BrokerResponseNative brokerResponse = getBrokerResponse(query);
+    assertFalse(brokerResponse.isGroupsTrimmed());
+
+    InstancePlanMakerImplV2 planMaker = new InstancePlanMakerImplV2();
+    planMaker.setMinServerGroupTrimSize(5);
+    // on server level, trimming occurs only when threshold is reached
+    planMaker.setGroupByTrimThreshold(100);
+    brokerResponse = getBrokerResponse(query, planMaker);
+
+    assertTrue(brokerResponse.isGroupsTrimmed());
+  }
+
+  @Test
   public void testDistinctSum() {
     String query = "select DISTINCTSUM(column1) as v1, DISTINCTSUM(column3) as v2 from testTable";
 

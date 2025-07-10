@@ -34,8 +34,8 @@ import org.apache.helix.AccessOption;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.core.data.manager.offline.DimensionTableDataManager;
 import org.apache.pinot.queries.BaseQueriesTest;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
@@ -44,6 +44,7 @@ import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentLocks;
+import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentOperationsThrottler;
 import org.apache.pinot.segment.local.utils.SegmentReloadSemaphore;
 import org.apache.pinot.segment.local.utils.SegmentStarTreePreprocessThrottler;
@@ -125,7 +126,8 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
   private static final SegmentOperationsThrottler SEGMENT_OPERATIONS_THROTTLER = new SegmentOperationsThrottler(
       new SegmentAllIndexPreprocessThrottler(1, 2, true),
       new SegmentStarTreePreprocessThrottler(1, 2, true),
-      new SegmentDownloadThrottler(1, 2, true));
+      new SegmentDownloadThrottler(1, 2, true),
+      new SegmentMultiColTextIndexPreprocessThrottler(1, 2, true));
 
   @Param({"1"})
   private int _numSegments;
@@ -171,10 +173,10 @@ public class BenchmarkDimensionTableOverhead extends BaseQueriesTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = Mockito.mock(ZkHelixPropertyStore.class);
 
     Mockito.when(propertyStore.get("/SCHEMAS/" + TABLE_NAME, null, AccessOption.PERSISTENT))
-        .thenReturn(SchemaUtils.toZNRecord(SCHEMA));
+        .thenReturn(SchemaSerDeUtils.toZNRecord(SCHEMA));
 
     Mockito.when(propertyStore.get("/CONFIGS/TABLE/MyTable_OFFLINE", null, AccessOption.PERSISTENT))
-        .thenReturn(TableConfigUtils.toZNRecord(tableConfig));
+        .thenReturn(TableConfigSerDeUtils.toZNRecord(tableConfig));
 
     Mockito.when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 

@@ -120,7 +120,7 @@ public class CalciteSqlParser {
       sqlNodeAndOptions.setParseTimeNs(System.nanoTime() - parseStartTimeNs);
       return sqlNodeAndOptions;
     } catch (Throwable e) {
-      throw new SqlCompilationException("Caught exception while parsing query: " + sql, e);
+      throw new SqlCompilationException("Caught exception while parsing query: " + sql + ": " + e.getMessage(), e);
     }
   }
 
@@ -558,13 +558,31 @@ public class CalciteSqlParser {
     return join;
   }
 
-  private static void queryRewrite(PinotQuery pinotQuery) {
+  public static void queryRewrite(PinotQuery pinotQuery) {
     for (QueryRewriter queryRewriter : QUERY_REWRITERS) {
       pinotQuery = queryRewriter.rewrite(pinotQuery);
     }
     // Validate
     validate(pinotQuery);
   }
+
+  /**
+   * Applies a specific query rewriter to the given PinotQuery and validates the result.
+   * This method searches for a rewriter by class name and applies it to transform the query.
+   *
+   * @param pinotQuery the query to be rewritten
+   * @param rewriterClass the class name of the query rewriter to apply
+   * @throws IllegalArgumentException if no rewriter with the specified class name is found
+   */
+  public static void queryRewrite(PinotQuery pinotQuery, Class<? extends QueryRewriter> rewriterClass) {
+    QueryRewriter queryRewriter = QUERY_REWRITERS.stream()
+        .filter(rewriter -> rewriter.getClass().equals(rewriterClass))
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("Query rewriter not found: " + rewriterClass.getName()));
+    queryRewriter.rewrite(pinotQuery);
+    validate(pinotQuery);
+  }
+
 
   @Deprecated
   private static List<String> extractOptionsFromSql(String sql) {

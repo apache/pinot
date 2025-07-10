@@ -49,8 +49,10 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.junit.Assert;
 import org.testng.annotations.BeforeClass;
+
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -240,13 +242,13 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         }
     );
     countDownLatch.await();
-    Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains(
+    assertTrue(queryResponse1.get().get("exceptions").toString().contains(
         "Interrupted in broker reduce phase"));
-    Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("\"errorCode\":"
+    assertTrue(queryResponse1.get().get("exceptions").toString().contains("\"errorCode\":"
         + QueryErrorCode.QUERY_CANCELLATION.getId()));
-    Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
-    Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
-    Assert.assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
+    assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
+    assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
+    assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
   }
 
   private List<File> createAvroFile()

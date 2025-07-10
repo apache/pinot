@@ -58,12 +58,19 @@ public class ExecutionStatsAggregator {
   private long _realtimeResponseSerializationCpuTimeNs = 0L;
   private long _offlineTotalCpuTimeNs = 0L;
   private long _realtimeTotalCpuTimeNs = 0L;
+  private long _offlineThreadMemAllocatedBytes = 0L;
+  private long _realtimeThreadMemAllocatedBytes = 0L;
+  private long _offlineResponseSerMemAllocatedBytes = 0L;
+  private long _realtimeResponseSerMemAllocatedBytes = 0L;
+  private long _offlineTotalMemAllocatedBytes = 0L;
+  private long _realtimeTotalMemAllocatedBytes = 0L;
   private long _numSegmentsPrunedByServer = 0L;
   private long _numSegmentsPrunedInvalid = 0L;
   private long _numSegmentsPrunedByLimit = 0L;
   private long _numSegmentsPrunedByValue = 0L;
   private long _explainPlanNumEmptyFilterSegments = 0L;
   private long _explainPlanNumMatchAllFilterSegments = 0L;
+  private boolean _groupsTrimmed = false;
   private boolean _numGroupsLimitReached = false;
   private boolean _numGroupsWarningLimitReached = false;
 
@@ -173,6 +180,29 @@ public class ExecutionStatsAggregator {
     _realtimeTotalCpuTimeNs =
         _realtimeThreadCpuTimeNs + _realtimeSystemActivitiesCpuTimeNs + _realtimeResponseSerializationCpuTimeNs;
 
+    // Stats for memory allocated.
+    String threadMemAllocatedBytesStr = metadata.get(DataTable.MetadataKey.THREAD_MEM_ALLOCATED_BYTES.getName());
+    if (tableType != null && threadMemAllocatedBytesStr != null) {
+      if (tableType == TableType.OFFLINE) {
+        _offlineThreadMemAllocatedBytes += Long.parseLong(threadMemAllocatedBytesStr);
+      } else {
+        _realtimeThreadMemAllocatedBytes += Long.parseLong(threadMemAllocatedBytesStr);
+      }
+    }
+    String responseSerMemAlocatedBytesStr =
+        metadata.get(DataTable.MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName());
+    if (tableType != null && responseSerMemAlocatedBytesStr != null) {
+      if (tableType == TableType.OFFLINE) {
+        _offlineResponseSerMemAllocatedBytes += Long.parseLong(responseSerMemAlocatedBytesStr);
+      } else {
+         _realtimeResponseSerMemAllocatedBytes += Long.parseLong(responseSerMemAlocatedBytesStr);
+      }
+    }
+    _offlineTotalMemAllocatedBytes =
+        _offlineThreadMemAllocatedBytes + _offlineResponseSerMemAllocatedBytes;
+    _realtimeTotalMemAllocatedBytes =
+        _realtimeThreadMemAllocatedBytes + _realtimeResponseSerMemAllocatedBytes;
+
     withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_BY_SERVER,
         l -> _numSegmentsPrunedByServer += l);
     withNotNullLongMetadata(metadata, DataTable.MetadataKey.NUM_SEGMENTS_PRUNED_INVALID,
@@ -199,6 +229,7 @@ public class ExecutionStatsAggregator {
       _numTotalDocs += Long.parseLong(numTotalDocsString);
     }
 
+    _groupsTrimmed |= Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.GROUPS_TRIMMED.getName()));
     _numGroupsLimitReached |=
         Boolean.parseBoolean(metadata.get(DataTable.MetadataKey.NUM_GROUPS_LIMIT_REACHED.getName()));
     _numGroupsWarningLimitReached |=
@@ -223,6 +254,7 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setNumSegmentsProcessed(_numSegmentsProcessed);
     brokerResponseNative.setNumSegmentsMatched(_numSegmentsMatched);
     brokerResponseNative.setTotalDocs(_numTotalDocs);
+    brokerResponseNative.setGroupsTrimmed(_groupsTrimmed);
     brokerResponseNative.setNumGroupsLimitReached(_numGroupsLimitReached);
     brokerResponseNative.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
     brokerResponseNative.setOfflineThreadCpuTimeNs(_offlineThreadCpuTimeNs);
@@ -231,6 +263,10 @@ public class ExecutionStatsAggregator {
     brokerResponseNative.setRealtimeSystemActivitiesCpuTimeNs(_realtimeSystemActivitiesCpuTimeNs);
     brokerResponseNative.setOfflineResponseSerializationCpuTimeNs(_offlineResponseSerializationCpuTimeNs);
     brokerResponseNative.setRealtimeResponseSerializationCpuTimeNs(_realtimeResponseSerializationCpuTimeNs);
+    brokerResponseNative.setOfflineThreadMemAllocatedBytes(_offlineThreadMemAllocatedBytes);
+    brokerResponseNative.setRealtimeThreadMemAllocatedBytes(_realtimeThreadMemAllocatedBytes);
+    brokerResponseNative.setOfflineResponseSerMemAllocatedBytes(_offlineResponseSerMemAllocatedBytes);
+    brokerResponseNative.setRealtimeResponseSerMemAllocatedBytes(_realtimeResponseSerMemAllocatedBytes);
     brokerResponseNative.setNumSegmentsPrunedByServer(_numSegmentsPrunedByServer);
     brokerResponseNative.setNumSegmentsPrunedInvalid(_numSegmentsPrunedInvalid);
     brokerResponseNative.setNumSegmentsPrunedByLimit(_numSegmentsPrunedByLimit);

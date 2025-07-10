@@ -582,6 +582,17 @@ public class RealtimeSegmentDataManagerTest {
       Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
       Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
     }
+
+    // Test downloadAndReplace is called after buildAndReplace fails.
+    try (FakeRealtimeSegmentDataManager segmentDataManager = createFakeSegmentManager()) {
+      segmentDataManager._failSegmentBuildAndReplace = true;
+      segmentDataManager._stopWaitTimeMs = 0;
+      segmentDataManager._state.set(segmentDataManager, RealtimeSegmentDataManager.State.HOLDING);
+      segmentDataManager.setCurrentOffset(finalOffsetValue);
+      segmentDataManager.goOnlineFromConsuming(metadata);
+      Assert.assertTrue(segmentDataManager._downloadAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+    }
   }
 
   @Test
@@ -874,6 +885,7 @@ public class RealtimeSegmentDataManagerTest {
     public Field _shouldStop;
     public Field _stopReason;
     public Field _segmentBuildFailedWithDeterministicError;
+    public boolean _failSegmentBuildAndReplace = false;
     private Field _streamMsgOffsetFactory;
     public LinkedList<LongMsgOffset> _consumeOffsets = new LinkedList<>();
     public LinkedList<SegmentCompletionProtocol.Response> _responses = new LinkedList<>();
@@ -939,7 +951,8 @@ public class RealtimeSegmentDataManagerTest {
       return new PartitionConsumer();
     }
 
-    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime) {
+    public SegmentBuildDescriptor invokeBuildForCommit(long leaseTime)
+        throws SegmentBuildFailureException {
       super.buildSegmentForCommit(leaseTime);
       return getSegmentBuildDescriptor();
     }
@@ -951,11 +964,15 @@ public class RealtimeSegmentDataManagerTest {
 
     private void terminateLoopIfNecessary() {
       if (_consumeOffsets.isEmpty() && _responses.isEmpty()) {
-        try {
-          _shouldStop.set(this, true);
-        } catch (Exception e) {
-          Assert.fail();
-        }
+        setShouldStop();
+      }
+    }
+
+    private void setShouldStop() {
+      try {
+        _shouldStop.set(this, true);
+      } catch (Exception e) {
+        Assert.fail();
       }
     }
 
@@ -980,9 +997,7 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected SegmentCompletionProtocol.Response postSegmentConsumedMsg() {
-      SegmentCompletionProtocol.Response response = _responses.remove();
-      terminateLoopIfNecessary();
-      return response;
+      return _responses.remove();
     }
 
     @Override
@@ -1017,17 +1032,20 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected void hold() {
+      terminateLoopIfNecessary();
       _timeSupplier.add(5000L);
     }
 
     @Override
     protected boolean buildSegmentAndReplace() {
+      terminateLoopIfNecessary();
       _buildAndReplaceCalled = true;
-      return true;
+      return !_failSegmentBuildAndReplace;
     }
 
     @Override
     protected SegmentBuildDescriptor buildSegmentInternal(boolean forCommit) {
+      terminateLoopIfNecessary();
       _buildSegmentCalled = true;
       if (_failSegmentBuild) {
         try {
@@ -1051,17 +1069,20 @@ public class RealtimeSegmentDataManagerTest {
 
     @Override
     protected boolean commitSegment(String controllerVipUrl) {
+      terminateLoopIfNecessary();
       _commitSegmentCalled = true;
       return true;
     }
 
     @Override
     protected void downloadSegmentAndReplace(SegmentZKMetadata metadata) {
+      terminateLoopIfNecessary();
       _downloadAndReplaceCalled = true;
     }
 
     @Override
     public void stop() {
+      setShouldStop();
       _timeSupplier.add(_stopWaitTimeMs);
     }
 

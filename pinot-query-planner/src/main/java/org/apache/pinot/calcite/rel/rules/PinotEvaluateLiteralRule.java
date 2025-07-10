@@ -59,10 +59,14 @@ import org.apache.pinot.sql.parsers.SqlCompilationException;
 public class PinotEvaluateLiteralRule {
 
   public static class Project extends RelOptRule {
-    public static final Project INSTANCE = new Project(PinotRuleUtils.PINOT_REL_FACTORY);
+    public static final Project INSTANCE = new Project(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-    private Project(RelBuilderFactory factory) {
-      super(operand(LogicalProject.class, any()), factory, null);
+    public static Project instanceWithDescription(String description) {
+      return new Project(PinotRuleUtils.PINOT_REL_FACTORY, description);
+    }
+
+    private Project(RelBuilderFactory factory, @Nullable String description) {
+      super(operand(LogicalProject.class, any()), factory, description);
     }
 
     @Override
@@ -103,10 +107,14 @@ public class PinotEvaluateLiteralRule {
   }
 
   public static class Filter extends RelOptRule {
-    public static final Filter INSTANCE = new Filter(PinotRuleUtils.PINOT_REL_FACTORY);
+    public static final Filter INSTANCE = new Filter(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-    private Filter(RelBuilderFactory factory) {
-      super(operand(LogicalFilter.class, any()), factory, null);
+    public static Filter instanceWithDescription(String description) {
+      return new Filter(PinotRuleUtils.PINOT_REL_FACTORY, description);
+    }
+
+    private Filter(RelBuilderFactory factory, @Nullable String description) {
+      super(operand(LogicalFilter.class, any()), factory, description);
     }
 
     @Override

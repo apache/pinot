@@ -31,7 +31,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertSame;
 
 
 public class IndexServiceTest {
@@ -122,7 +122,7 @@ public class IndexServiceTest {
 
     @Override
     public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory,
-        Map<String, FieldIndexConfigs> configsByCol, @Nullable Schema schema, @Nullable TableConfig tableConfig) {
+        Map<String, FieldIndexConfigs> configsByCol, Schema schema, TableConfig tableConfig) {
       throw new UnsupportedOperationException(IndexType.class.getName() + " should not be created");
     }
 

@@ -26,8 +26,8 @@ import org.apache.helix.PropertyPathBuilder;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.tools.AbstractBaseCommand;
@@ -117,7 +117,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
       LOGGER.info("  Validating table config for table: \"{}\"", tableName);
       try {
         ZNRecord record = _helixPropertyStore.get(TABLE_CONFIG_PATH + "/" + tableName, null, 0);
-        TableConfig tableConfig = TableConfigUtils.fromZNRecord(record);
+        TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(record);
         if (!TableConfigValidator.validate(tableConfig)) {
           LOGGER.error("    Table config validation failed for table: \"{}\"", tableName);
         }
@@ -135,7 +135,7 @@ public class ValidateConfigCommand extends AbstractBaseCommand implements Comman
       LOGGER.info("  Validating schema: \"{}\"", schemaName);
       try {
         ZNRecord record = _helixPropertyStore.get(SCHEMA_PATH + "/" + schemaName, null, 0);
-        Schema schema = SchemaUtils.fromZNRecord(record);
+        Schema schema = SchemaSerDeUtils.fromZNRecord(record);
         SchemaValidator.validate(schema);
       } catch (Exception e) {
         LOGGER.error("    Caught exception while validating schema: \"{}\"", schemaName, e);

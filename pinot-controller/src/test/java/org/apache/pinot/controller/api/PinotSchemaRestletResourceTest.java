@@ -19,17 +19,23 @@
 package org.apache.pinot.controller.api;
 
 import java.io.IOException;
+import java.util.List;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.controller.helix.ControllerTest;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.expectThrows;
 import static org.testng.Assert.fail;
 
 
@@ -136,7 +142,7 @@ public class PinotSchemaRestletResourceTest {
 
     // Get the schema and verify the default null value and max length have been changed
     remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getMaxLength(), 2000);
+    assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getEffectiveMaxLength(), 2000);
     assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDefaultNullValue(), "0");
 
     // Change another column max length from 1000
@@ -150,7 +156,7 @@ public class PinotSchemaRestletResourceTest {
 
     // Get the schema and verify the default null value and max length have been changed
     remoteSchema = Schema.fromString(ControllerTest.sendGetRequest(getSchemaUrl));
-    assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getMaxLength(), 1000);
+    assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getEffectiveMaxLength(), 1000);
     assertEquals(remoteSchema.getFieldSpecFor(newColumnFieldSpec2.getName()).getDefaultNullValue(), "1");
 
     // Add a new BOOLEAN column
@@ -245,6 +251,40 @@ public class PinotSchemaRestletResourceTest {
         TEST_INSTANCE.getControllerRequestURLBuilder().forSchemaUpdate("transcript2"), schemaStringWithExtraProps);
     assertEquals(response.getResponse(),
         "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"transcript2 successfully added\"}");
+  }
+
+  @Test
+  public void testSchemaDeletionWithLogicalTable()
+      throws IOException {
+    String logicalTableName = "logical_table";
+    String physicalTable = "physical_table";
+    ControllerRequestURLBuilder urlBuilder = TEST_INSTANCE.getControllerRequestURLBuilder();
+    TEST_INSTANCE.addDummySchema(physicalTable);
+    TEST_INSTANCE.addTableConfig(ControllerTest.createDummyTableConfig(physicalTable, TableType.OFFLINE));
+    TEST_INSTANCE.addDummySchema(logicalTableName);
+
+    // Create a logical table
+    String logicalTableUrl = urlBuilder.forLogicalTableCreate();
+    LogicalTableConfig logicalTableConfig =
+        ControllerTest.getDummyLogicalTableConfig(logicalTableName,
+            List.of(TableNameBuilder.OFFLINE.tableNameWithType(physicalTable)), "DefaultTenant");
+    String response = ControllerTest.sendPostRequest(logicalTableUrl, logicalTableConfig.toSingleLineJsonString());
+    assertEquals(response,
+        "{\"unrecognizedProperties\":{},\"status\":\"logical_table logical table successfully added.\"}");
+
+    // Delete schema should fail because logical table exists
+    String deleteSchemaUrl = urlBuilder.forSchemaDelete(logicalTableName);
+    String msg = expectThrows(IOException.class, () -> ControllerTest.sendDeleteRequest(deleteSchemaUrl)).getMessage();
+    assertTrue(msg.contains("Cannot delete schema logical_table, as it is associated with logical table"), msg);
+
+    // Delete logical table
+    String logicalTableDeleteUrl = urlBuilder.forLogicalTableDelete(logicalTableName);
+    response = ControllerTest.sendDeleteRequest(logicalTableDeleteUrl);
+    assertEquals(response, "{\"status\":\"logical_table logical table successfully deleted.\"}");
+
+    // Delete schema should succeed now
+    response = ControllerTest.sendDeleteRequest(deleteSchemaUrl);
+    assertEquals(response, "{\"status\":\"Schema logical_table deleted\"}");
   }
 
   @AfterClass

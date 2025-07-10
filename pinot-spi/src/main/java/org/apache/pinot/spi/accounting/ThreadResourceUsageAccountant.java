@@ -21,6 +21,7 @@ package org.apache.pinot.spi.accounting;
 import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 
 
 public interface ThreadResourceUsageAccountant {
@@ -37,23 +38,50 @@ public interface ThreadResourceUsageAccountant {
   boolean isAnchorThreadInterrupted();
 
   /**
-   * Task tracking info
+   * This method has been deprecated and replaced by {@link setupRunner(String, int, ThreadExecutionContext.TaskType)}
+   * and {@link setupWorker(int, ThreadExecutionContext.TaskType, ThreadExecutionContext)}.
+   */
+  @Deprecated
+  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+      @Nullable ThreadExecutionContext parentContext);
+
+  /**
+   * Set up the thread execution context for an anchor a.k.a runner thread.
    * @param queryId query id string
    * @param taskId a unique task id
-   * @param parentContext the parent execution context, null for root(runner) thread
-   * @param workloadName Name of the workload corresponding to the query.
+   * @param taskType the type of the task - SSE or MSE
    */
-  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-      @Nullable ThreadExecutionContext parentContext, @Nullable String workloadName);
+  @Deprecated
+  void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType);
+
+  /**
+   * Set up the thread execution context for an anchor a.k.a runner thread.
+   * @param queryId query id string
+   * @param taskId a unique task id
+   * @param taskType the type of the task - SSE or MSE
+   * @param workloadName the name of the workload, can be null
+   */
+  void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, String workloadName);
+
+  /**
+   * Set up the thread execution context for a worker thread.
+   * @param taskId a unique task id
+   * @param taskType the type of the task - SSE or MSE
+   * @param parentContext the parent execution context
+   */
+  void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+                   @Nullable ThreadExecutionContext parentContext);
 
   /**
    * get the executon context of current thread
    */
+  @Nullable
   ThreadExecutionContext getThreadExecutionContext();
 
   /**
    * set resource usage provider
    */
+  @Deprecated
   void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider);
 
   /**
@@ -66,17 +94,38 @@ public interface ThreadResourceUsageAccountant {
    */
   void sampleUsageMSE();
 
+  default boolean throttleQuerySubmission() {
+    return false;
+  }
+
+  /**
+   * special interface to aggregate usage to the stats store only once, it is used for response
+   * ser/de threads where the thread execution context cannot be setup before hands as
+   * queryId/taskId is unknown and the execution process is hard to instrument
+   */
+  @Deprecated
+  void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes);
+
   /**
    * special interface to aggregate usage to the stats store only once, it is used for response
    * ser/de threads where the thread execution context cannot be setup before hands as
    * queryId/taskId/workloadName is unknown and the execution process is hard to instrument
    */
-  void updateResourceUsageConcurrently(String resourceName, TrackingScope resourceType);
+  void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long allocatedBytes,
+                                    TrackingScope trackingScope);
+
+  @Deprecated
+  void updateQueryUsageConcurrently(String queryId);
 
   /**
    * start the periodical task
    */
   void startWatcherTask();
+
+  @Nullable
+  default PinotClusterConfigChangeListener getClusterConfigChangeListener() {
+    return null;
+  }
 
   /**
    * get error status if the query is preempted

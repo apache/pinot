@@ -225,6 +225,10 @@ public class ControllerRequestURLBuilder {
         + "&minAvailableReplicas=" + minAvailableReplicas;
   }
 
+  public String forTableConsumingSegmentsInfo(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "consumingSegmentsInfo");
+  }
+
   public String forTableForceCommit(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "forceCommit");
   }
@@ -277,7 +281,15 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableGet(String tableName) {
-    return StringUtil.join("/", _baseUrl, "tables", tableName);
+    return forTableGet(tableName, null);
+  }
+
+  public String forTableGet(String tableName, TableType tableType) {
+    String url = StringUtil.join("/", _baseUrl, "tables", tableName);
+    if (tableType != null) {
+      url += "?type=" + tableType.name();
+    }
+    return url;
   }
 
   public String forTableDelete(String tableName) {
@@ -422,6 +434,10 @@ public class ControllerRequestURLBuilder {
 
   public String forSegmentMetadata(String tableName, String segmentName) {
     return StringUtil.join("/", _baseUrl, "segments", tableName, encode(segmentName), "metadata");
+  }
+
+  public String forSegmentMetadata(String tableName, TableType tableType) {
+    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata") + "?type=" + tableType.name();
   }
 
   public String forListAllSegmentLineages(String tableName, String tableType) {
@@ -610,6 +626,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
   }
 
+  public String forValidDocIdsMetadata(String tableName, String validDocIdsType) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName,
+        "validDocIdsMetadata?validDocIdsType=" + validDocIdsType);
+  }
+
   public String forUpdateTagsValidation() {
     return _baseUrl + "/instances/updateTags/validate";
   }
@@ -652,5 +673,9 @@ public class ControllerRequestURLBuilder {
 
   public String forLogicalTableDelete(String logicalTableName) {
     return StringUtil.join("/", _baseUrl, "logicalTables", logicalTableName);
+  }
+
+  public String forTableTimeBoundary(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "timeBoundary");
   }
 }

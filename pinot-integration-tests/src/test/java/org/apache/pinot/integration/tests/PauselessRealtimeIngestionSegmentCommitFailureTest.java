@@ -140,7 +140,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
         "Segments still not in error state");
   }
 
-  private void setMaxSegmentCompletionTimeMillis() {
+  protected void setMaxSegmentCompletionTimeMillis() {
     PinotLLCRealtimeSegmentManager realtimeSegmentManager = _helixResourceManager.getRealtimeSegmentManager();
     if (realtimeSegmentManager instanceof FailureInjectingPinotLLCRealtimeSegmentManager) {
       ((FailureInjectingPinotLLCRealtimeSegmentManager) realtimeSegmentManager).setMaxSegmentCompletionTimeoutMs(
@@ -148,7 +148,7 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
     }
   }
 
-  private int getNumErrorSegmentsInEV(String realtimeTableName) {
+  protected int getNumErrorSegmentsInEV(String realtimeTableName) {
     ExternalView externalView = _helixResourceManager.getHelixAdmin()
         .getResourceExternalView(_helixResourceManager.getHelixClusterName(), realtimeTableName);
     if (externalView == null) {
@@ -236,6 +236,14 @@ public class PauselessRealtimeIngestionSegmentCommitFailureTest extends BaseClus
       segmentZKMetadataMap.put(segmentKey, segmentZKMetadata);
     }
     return segmentZKMetadataMap;
+  }
+
+  protected String getNonPauselessTableName() {
+    return DEFAULT_TABLE_NAME_2;
+  }
+
+  protected String getPauselessTableName() {
+    return DEFAULT_TABLE_NAME;
   }
 
   @AfterClass

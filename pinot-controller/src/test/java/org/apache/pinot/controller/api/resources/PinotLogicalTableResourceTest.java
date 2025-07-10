@@ -20,10 +20,12 @@ package org.apache.pinot.controller.api.resources;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -31,6 +33,8 @@ import org.apache.pinot.spi.config.table.QuotaConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
@@ -82,23 +86,23 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   @DataProvider
   public Object[][] tableNamesProvider() {
     return new Object[][]{
-        {"test_logical_table", List.of("test_table_1", "test_table_2"), List.of("test_table_3")},
-        {"test_logical_table", List.of("test_table_1", "db.test_table_2"), List.of("test_table_3")},
-        {"test_logical_table", List.of("test_table_1", "test_table_2"), List.of("db.test_table_3")},
-        {"test_logical_table", List.of("db.test_table_1", "db.test_table_2"), List.of("db.test_table_3")},
-        {"test_table", List.of("db1.test_table", "db2.test_table"), List.of("db3.test_table")},
-        {"db0.test_table", List.of("db1.test_table", "db2.test_table"), List.of("db3.test_table")},
-        {"db.test_logical_table", List.of("test_table_1", "test_table_2"), List.of("test_table_3")},
-        {"db.test_logical_table", List.of("test_table_1", "db.test_table_2"), List.of("test_table_3")},
-        {"db.test_logical_table", List.of("test_table_1", "test_table_2"), List.of("db.test_table_3")},
-        {"db.test_logical_table", List.of("db.test_table_1", "db.test_table_2"), List.of("db.test_table_3")},
+        {"test_logical_table", List.of("test_table_1", "test_table_2"), List.of("test_table_3"), Map.of()},
+        {"db.test_logical_table", List.of("db.test_table_1", "db.test_table_2"), List.of("db.test_table_3"), Map.of()},
+        {
+            "test_logical_table", List.of("db1.test_table_1", "db1.test_table_2"), List.of("db1.test_table_3"), Map.of(
+            CommonConstants.DATABASE, "db1")
+        },
     };
   }
 
   @Test(dataProvider = "tableNamesProvider")
   public void testCreateUpdateDeleteLogicalTables(String logicalTableName, List<String> physicalTableNames,
-      List<String> physicalTablesToUpdate)
+      List<String> physicalTablesToUpdate, Map<String, String> dbHeaders)
       throws IOException {
+    Map<String, String> headers = new HashMap<>(getHeaders());
+    headers.putAll(dbHeaders);
+    logicalTableName = DatabaseUtils.translateTableName(logicalTableName, headers.get(CommonConstants.DATABASE));
+
     addDummySchema(logicalTableName);
     // verify logical table does not exist
     String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
@@ -115,7 +119,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
 
     // create logical table
     String resp =
-        ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+        ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), headers);
     assertEquals(resp,
         "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName + " logical table successfully added.\"}");
 
@@ -128,7 +132,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     logicalTableConfig = getDummyLogicalTableConfig(logicalTableName, tableNameToUpdateWithType, BROKER_TENANT);
 
     String response =
-        ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+        ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), headers);
     assertEquals(response,
         "{\"unrecognizedProperties\":{},\"status\":\"" + logicalTableName + " logical table successfully updated.\"}");
 
@@ -136,7 +140,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     verifyLogicalTableExists(getLogicalTableUrl, logicalTableConfig);
 
     // delete logical table
-    String deleteResponse = ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, getHeaders());
+    String deleteResponse = ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, headers);
     assertEquals(deleteResponse, "{\"status\":\"" + logicalTableName + " logical table successfully deleted.\"}");
 
     // verify logical table is deleted
@@ -214,6 +218,109 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     assertTrue(aThrows.getMessage()
             .contains("Reason: 'refRealtimeTableName' should be one of the provided realtime tables"),
         aThrows.getMessage());
+
+    // Test ref offline table is not null but offline table does not exist
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of("test_table_7_REALTIME"), BROKER_TENANT);
+          logicalTableConfig.setRefOfflineTableName("test_table_7_OFFLINE");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage()
+            .contains("Reason: 'refOfflineTableName' should be null or empty when offline tables do not exist"),
+        aThrows.getMessage());
+
+    // Test ref realtime table is not null but realtime table does not exist
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, List.of("test_table_7_OFFLINE"), BROKER_TENANT);
+          logicalTableConfig.setRefRealtimeTableName("test_table_7_REALTIME");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage()
+            .contains("Reason: 'refRealtimeTableName' should be null or empty when realtime tables do not exist"),
+        aThrows.getMessage());
+
+    // Test ref offline table name is realtime table name
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefOfflineTableName("test_table_7_REALTIME");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage().contains("Reason: 'refOfflineTableName' should be an offline table type"),
+        aThrows.getMessage());
+
+    // Test ref realtime table name is offline table name
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefRealtimeTableName("test_table_7_OFFLINE");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(aThrows.getMessage().contains("Reason: 'refRealtimeTableName' should be a realtime table type"),
+        aThrows.getMessage());
+
+    // Test ref offline table is specified with a database prefix
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefOfflineTableName("db.test_table_7_OFFLINE");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(
+        aThrows.getMessage().contains("Reason: 'refOfflineTableName' should be one of the provided offline tables"),
+        aThrows.getMessage());
+
+    // Test ref realtime table is specified with a database prefix
+    aThrows = expectThrows(
+        IOException.class, () -> {
+          LogicalTableConfig logicalTableConfig =
+              getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          logicalTableConfig.setRefRealtimeTableName("db.test_table_7_REALTIME");
+          ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+              getHeaders());
+        }
+    );
+    assertTrue(
+        aThrows.getMessage().contains("Reason: 'refRealtimeTableName' should be one of the provided realtime tables"),
+        aThrows.getMessage());
+  }
+
+  @Test
+  public void testLogicalTableDatabaseValidation() {
+    String logicalTableName = "db1.test_logical_table";
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(logicalTableName, List.of("test_table_1_OFFLINE", "test_table_2_REALTIME"),
+            BROKER_TENANT);
+    // Test add logical table with different database prefix
+    String msg = expectThrows(IOException.class, () -> {
+      addLogicalTableConfig(logicalTableConfig);
+    }).getMessage();
+    assertTrue(msg.contains(
+        "Reason: 'test_table_1_OFFLINE' should have the same database name as logical table: db1 != default"), msg);
+
+    // Test update logical table with different database prefix
+    msg = expectThrows(IOException.class, () -> updateLogicalTableConfig(logicalTableConfig)).getMessage();
+    assertTrue(
+        msg.contains(
+            "Reason: 'test_table_1_OFFLINE' should have the same database name as logical table: db1 != default"),
+        msg);
   }
 
   @Test(expectedExceptions = IOException.class,
@@ -283,14 +390,6 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
         throwable.getMessage());
   }
 
-  @DataProvider
-  public Object[][] tableTypeProvider() {
-    return new Object[][]{
-        {TableType.OFFLINE},
-        {TableType.REALTIME}
-    };
-  }
-
   @Test(dataProvider = "tableTypeProvider")
   public void testCreateLogicalTable(TableType tableType)
       throws IOException {
@@ -325,11 +424,67 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     throwable = expectThrows(IOException.class, () -> {
       addDummySchema(LOGICAL_TABLE_NAME);
       LogicalTableConfig logicalTableConfig =
-          getDummyLogicalTableConfig("db." + LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+          getDummyLogicalTableConfig("db." + LOGICAL_TABLE_NAME, createHybridTables(List.of("db.test_table_6")),
+              BROKER_TENANT);
       ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
     });
     assertTrue(throwable.getMessage()
             .contains("Reason: Schema with same name as logical table 'db." + LOGICAL_TABLE_NAME + "' does not exist"),
+        throwable.getMessage());
+  }
+
+  @Test
+  public void testLogicalTableTimeBoundaryConfigValidation()
+      throws IOException {
+    // Test logical table time boundary strategy validation
+    addDummySchema(LOGICAL_TABLE_NAME);
+    List<String> physicalTableNamesWithType = createHybridTables(List.of("test_table_8"));
+    LogicalTableConfig logicalTableConfig =
+        getDummyLogicalTableConfig(LOGICAL_TABLE_NAME, physicalTableNamesWithType, BROKER_TENANT);
+
+    // Test logical table with no time boundary config
+    logicalTableConfig.setTimeBoundaryConfig(null);
+    Throwable throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig' should not be null for hybrid logical tables"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but null strategy
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig(null, null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.boundaryStrategy' should not be null or empty"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but empty strategy
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("", null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.boundaryStrategy' should not be null or empty"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but null parameters
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("min", null));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.parameters' should not be null or empty"),
+        throwable.getMessage());
+
+    // Test logical table with time boundary config but empty parameters
+    logicalTableConfig.setTimeBoundaryConfig(new TimeBoundaryConfig("min", Map.of()));
+    throwable = expectThrows(IOException.class, () -> {
+      ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
+    });
+    assertTrue(throwable.getMessage()
+            .contains("Reason: 'timeBoundaryConfig.parameters' should not be null or empty"),
         throwable.getMessage());
   }
 
@@ -359,8 +514,8 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     return new Object[][]{
         {LOGICAL_TABLE_NAME, List.of("test_table_1"), "unknown_table_OFFLINE"},
         {LOGICAL_TABLE_NAME, List.of("test_table_2"), "unknown_table_REALTIME"},
-        {LOGICAL_TABLE_NAME, List.of("test_table_1"), "db.test_table_1_OFFLINE"},
-        {LOGICAL_TABLE_NAME, List.of("test_table_2"), "db.test_table_2_REALTIME"},
+        {"db." + LOGICAL_TABLE_NAME, List.of("db.test_table_1"), "db.unknown_table_OFFLINE"},
+        {"db." + LOGICAL_TABLE_NAME, List.of("db.test_table_2"), "db.unknown_table_REALTIME"},
     };
   }
 
@@ -368,6 +523,7 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
   public void testPhysicalTableShouldExist(String logicalTableName, List<String> physicalTableNames,
       String unknownTableName)
       throws IOException {
+    addDummySchema(logicalTableName);
     // setup physical tables
     List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
     physicalTableNamesWithType.add(unknownTableName);
@@ -393,21 +549,69 @@ public class PinotLogicalTableResourceTest extends ControllerTest {
     assertEquals(response, objectMapper.writeValueAsString(List.of()));
 
     // setup physical tables and logical tables
-    List<String> logicalTableNames = List.of("db.test_logical_table_1", "test_logical_table_2", "test_logical_table_3");
-    List<String> physicalTableNames = List.of("test_table_1", "test_table_2", "db.test_table_3");
-    List<String> physicalTableNamesWithType = createHybridTables(physicalTableNames);
+    List<String> logicalTableNames =
+        List.of("db.test_logical_table_1", "default.test_logical_table_2", "test_logical_table_3");
 
     for (int i = 0; i < logicalTableNames.size(); i++) {
-      addDummySchema(logicalTableNames.get(i));
-      LogicalTableConfig logicalTableConfig = getDummyLogicalTableConfig(logicalTableNames.get(i), List.of(
-          physicalTableNamesWithType.get(2 * i), physicalTableNamesWithType.get(2 * i + 1)), BROKER_TENANT);
+      String logicalTableName = logicalTableNames.get(i);
+      String databaseName = DatabaseUtils.extractDatabaseFromFullyQualifiedTableName(logicalTableName);
+      List<String> physicalTableNamesWithType = createHybridTables(List.of(databaseName + ".test_table_" + i));
+      addDummySchema(logicalTableName);
+      LogicalTableConfig logicalTableConfig =
+          getDummyLogicalTableConfig(logicalTableName, physicalTableNamesWithType, BROKER_TENANT);
 
       ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(), getHeaders());
     }
 
-    // verify logical table names
+    // verify logical table names without headers, should return tables without database prefix (or default database)
     String getLogicalTableNamesResponse = ControllerTest.sendGetRequest(getLogicalTableNamesUrl, getHeaders());
-    assertEquals(getLogicalTableNamesResponse, objectMapper.writeValueAsString(logicalTableNames));
+    assertEquals(getLogicalTableNamesResponse,
+        objectMapper.writeValueAsString(List.of("test_logical_table_2", "test_logical_table_3")));
+
+    // verify logical table names with headers, should return tables with database prefix
+    Map<String, String> headers = new HashMap<>(getHeaders());
+    headers.put(CommonConstants.DATABASE, "db");
+    getLogicalTableNamesResponse = ControllerTest.sendGetRequest(getLogicalTableNamesUrl, headers);
+    assertEquals(getLogicalTableNamesResponse,
+        objectMapper.writeValueAsString(List.of("db.test_logical_table_1")));
+  }
+
+  @Test
+  public void testLogicalTableDatabaseHeaderMismatchValidation() {
+    Map<String, String> headers = new HashMap<>(getHeaders());
+    headers.put(CommonConstants.DATABASE, "db1");
+    String logicalTableName = "db2.test_logical_table";
+    LogicalTableConfig logicalTableConfig = getDummyLogicalTableConfig(logicalTableName,
+        List.of("test_table_1_OFFLINE", "test_table_2_REALTIME"), BROKER_TENANT);
+
+    // Test add logical table with database header mismatch
+    String msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendPostRequest(_addLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+            headers)).getMessage();
+    assertTrue(msg.contains("Database name 'db2' from table prefix does not match database name 'db1' from header"),
+        msg);
+
+    // Test get logical table with database header mismatch
+    String getLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableGet(logicalTableName);
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendGetRequest(getLogicalTableUrl, headers)).getMessage();
+    assertTrue(msg.contains("Database name 'db2' from table prefix does not match database name 'db1' from header"),
+        msg);
+
+    // Test update logical table with database header mismatch
+    String updateLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableUpdate(logicalTableName);
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendPutRequest(updateLogicalTableUrl, logicalTableConfig.toSingleLineJsonString(),
+            headers)).getMessage();
+    assertTrue(msg.contains("Database name 'db2' from table prefix does not match database name 'db1' from header"),
+        msg);
+
+    // Test delete logical table with database header mismatch
+    String deleteLogicalTableUrl = _controllerRequestURLBuilder.forLogicalTableDelete(logicalTableName);
+    msg = expectThrows(IOException.class,
+        () -> ControllerTest.sendDeleteRequest(deleteLogicalTableUrl, headers)).getMessage();
+    assertTrue(msg.contains("Database name 'db2' from table prefix does not match database name 'db1' from header"),
+        msg);
   }
 
   @Test

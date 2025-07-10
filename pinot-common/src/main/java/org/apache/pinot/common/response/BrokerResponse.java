@@ -127,6 +127,11 @@ public interface BrokerResponse {
   }
 
   /**
+   * Returns whether groups were trimmed (reduced in size after sorting).
+   */
+  boolean isGroupsTrimmed();
+
+  /**
    * Returns whether the number of groups limit has been reached.
    */
   boolean isNumGroupsLimitReached();
@@ -334,6 +339,41 @@ public interface BrokerResponse {
   }
 
   /**
+   * Returns the thread memory bytes allocated for query execution against offline table.
+   */
+  long getOfflineThreadMemAllocatedBytes();
+
+  /**
+   * Returns the thread memory bytes allocated for query execution against realtime table.
+   */
+  long getRealtimeThreadMemAllocatedBytes();
+
+  /**
+   * Returns the memory bytes allocated  for response serialization against offline table.
+   */
+  long getOfflineResponseSerMemAllocatedBytes();
+
+  /**
+   * Returns the memory bytes allocated  for response serialization against realtime table.
+   */
+  long getRealtimeResponseSerMemAllocatedBytes();
+
+  /**
+   * Returns the total memory bytes allocated for query execution and response serialization against offline table.
+   */
+  default long getOfflineTotalMemAllocatedBytes() {
+    return getOfflineThreadMemAllocatedBytes() + getOfflineResponseSerMemAllocatedBytes();
+  }
+
+  /**
+   * Returns the total memory bytes allocated for query execution and response serialization against offline table.
+   */
+  default long getRealtimeTotalMemAllocatedBytes() {
+    return getRealtimeThreadMemAllocatedBytes() + getRealtimeResponseSerMemAllocatedBytes();
+  }
+
+
+  /**
    * Returns the total number of segments with an EmptyFilterOperator when Explain Plan is called.
    */
   long getExplainPlanNumEmptyFilterSegments();
@@ -359,4 +399,28 @@ public interface BrokerResponse {
    * @return Set of tables queried
    */
   Set<String> getTablesQueried();
+
+  /**
+   * Set the pools queried in the request
+   * @param pools
+   */
+  void setPools(Set<Integer> pools);
+
+  /**
+   * Get the pools queried in the request
+   * @return
+   */
+  Set<Integer> getPools();
+
+  /**
+   * Set whether RLS (row level security) filters were applied to the query.
+   * @param rlsFiltersApplied true if RLS filters were applied, false otherwise
+   */
+  void setRLSFiltersApplied(boolean rlsFiltersApplied);
+
+  /**
+   * Get whether RLS (row level security) filters were applied to the query.
+   * @return true if RLS filters were applied, false otherwise
+   */
+  boolean getRLSFiltersApplied();
 }

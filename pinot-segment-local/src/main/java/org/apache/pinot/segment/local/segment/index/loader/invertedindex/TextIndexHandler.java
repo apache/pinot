@@ -16,24 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
 
 import java.io.File;
@@ -41,7 +23,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
@@ -58,15 +39,17 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
 import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
  * Helper class for text indexes used by {@link SegmentPreProcessor}.
- * to create text index for column during segment load time. Currently text index is always
+ * to create text index for column during segment load time. Currently, text index is always
  * created (if enabled on a column) during segment generation
  *
  * (1) A new segment with text index is created/refreshed. Server loads the segment. The handler
@@ -89,8 +72,8 @@ public class TextIndexHandler extends BaseIndexHandler {
   private final Set<String> _columnsToAddIdx;
 
   public TextIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      @Nullable TableConfig tableConfig) {
-    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+      TableConfig tableConfig, Schema schema) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig, schema);
     _columnsToAddIdx = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.text(), _fieldIndexConfigs);
   }
 
@@ -158,6 +141,12 @@ public class TextIndexHandler extends BaseIndexHandler {
     if (columnMetadata.getDataType() != DataType.STRING) {
       throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
     }
+
+    MultiColumnTextIndexConfig config = _tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig();
+    if (config != null && config.getColumns().contains(column)) {
+      throw new UnsupportedOperationException(
+          "Cannot create both single and multi-column TEXT index on column: " + column);
+    }
   }
 
   private void createTextIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
@@ -185,6 +174,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .withIndexDir(segmentDirectory)
         .withTextCommitOnClose(true)
+        .withTableNameWithType(_tableConfig.getTableName())
         .build();
     TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
 

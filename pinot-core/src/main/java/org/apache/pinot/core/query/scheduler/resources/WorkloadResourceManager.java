@@ -2,6 +2,7 @@ package org.apache.pinot.core.query.scheduler.resources;
 
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 public class WorkloadResourceManager extends ResourceManager {
@@ -10,8 +11,8 @@ public class WorkloadResourceManager extends ResourceManager {
   /**
    * @param config configuration for initializing resource manager
    */
-  public WorkloadResourceManager(PinotConfiguration config) {
-    super(config);
+  public WorkloadResourceManager(PinotConfiguration config, ThreadResourceUsageAccountant resourceUsageAccountant) {
+    super(config, resourceUsageAccountant);
     _resourcePolicy = new ResourceLimitPolicy(config, _numQueryWorkerThreads);
   }
 
@@ -34,5 +35,4 @@ public class WorkloadResourceManager extends ResourceManager {
   public int getTableThreadsSoftLimit() {
     return _resourcePolicy.getTableThreadsSoftLimit();
   }
-
 }

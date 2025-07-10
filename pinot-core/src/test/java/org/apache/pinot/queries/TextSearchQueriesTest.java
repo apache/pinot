@@ -33,7 +33,7 @@ import java.util.Objects;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.TextField;
@@ -48,6 +48,8 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SearcherManager;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.pinot.common.response.broker.BrokerResponseNative;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -58,6 +60,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoa
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndex;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -74,10 +77,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 /**
@@ -90,23 +90,23 @@ import static org.testng.Assert.assertTrue;
  */
 public class TextSearchQueriesTest extends BaseQueriesTest {
   private static final File INDEX_DIR = new File(FileUtils.getTempDirectory(), "TextSearchQueriesTest");
-  private static final String TABLE_NAME = "MyTable";
+  protected static final String TABLE_NAME = "MyTable";
   private static final String SEGMENT_NAME = "testSegment";
 
-  private static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
-  private static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
-  private static final String SKILLS_TEXT_COL_DICT_NAME = "SKILLS_TEXT_COL_DICT";
-  private static final String SKILLS_TEXT_COL_MULTI_TERM_NAME = "SKILLS_TEXT_COL_1";
-  private static final String SKILLS_TEXT_NO_RAW_NAME = "SKILLS_TEXT_COL_2";
-  private static final String SKILLS_TEXT_MV_COL_NAME = "SKILLS_TEXT_MV_COL";
-  private static final String SKILLS_TEXT_MV_COL_DICT_NAME = "SKILLS_TEXT_MV_COL_DICT";
-  private static final String INT_COL_NAME = "INT_COL";
+  protected static final String QUERY_LOG_TEXT_COL_NAME = "QUERY_LOG_TEXT_COL";
+  protected static final String SKILLS_TEXT_COL_NAME = "SKILLS_TEXT_COL";
+  protected static final String SKILLS_TEXT_COL_DICT_NAME = "SKILLS_TEXT_COL_DICT";
+  protected static final String SKILLS_TEXT_COL_MULTI_TERM_NAME = "SKILLS_TEXT_COL_1";
+  protected static final String SKILLS_TEXT_NO_RAW_NAME = "SKILLS_TEXT_COL_2";
+  protected static final String SKILLS_TEXT_MV_COL_NAME = "SKILLS_TEXT_MV_COL";
+  protected static final String SKILLS_TEXT_MV_COL_DICT_NAME = "SKILLS_TEXT_MV_COL_DICT";
+  protected static final String INT_COL_NAME = "INT_COL";
 
-  private static final List<String> RAW_TEXT_INDEX_COLUMNS =
+  protected static final List<String> RAW_TEXT_INDEX_COLUMNS =
       Arrays.asList(QUERY_LOG_TEXT_COL_NAME, SKILLS_TEXT_COL_NAME, SKILLS_TEXT_COL_MULTI_TERM_NAME,
           SKILLS_TEXT_NO_RAW_NAME, SKILLS_TEXT_MV_COL_NAME);
 
-  private static final List<String> DICT_TEXT_INDEX_COLUMNS =
+  protected static final List<String> DICT_TEXT_INDEX_COLUMNS =
       Arrays.asList(SKILLS_TEXT_COL_DICT_NAME, SKILLS_TEXT_MV_COL_DICT_NAME);
 
   private static final int INT_BASE_VALUE = 1000;
@@ -123,16 +123,27 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       .addMetric(INT_COL_NAME, FieldSpec.DataType.INT)
       .build();
 
-  private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE)
-      .setTableName(TABLE_NAME)
-      .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS)
-      .setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
-      .setFieldConfigList(createFieldConfigs())
-      .build();
+  private TableConfig _tableConfig;
 
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
-  private TableConfig _tableConfig;
+
+  private TableConfig getTableConfig() {
+    if (_tableConfig == null) {
+      _tableConfig = initTableConfig();
+    }
+
+    return _tableConfig;
+  }
+
+  protected TableConfig initTableConfig() {
+    return new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName(TABLE_NAME)
+        .setNoDictionaryColumns(RAW_TEXT_INDEX_COLUMNS)
+        .setInvertedIndexColumns(DICT_TEXT_INDEX_COLUMNS)
+        .setFieldConfigList(createFieldConfigs())
+        .build();
+  }
 
   @Override
   protected String getFilter() {
@@ -154,14 +165,14 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     FileUtils.deleteQuietly(INDEX_DIR);
     buildSegment();
-    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(TABLE_CONFIG, SCHEMA);
+    IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(getTableConfig(), SCHEMA);
     ImmutableSegment immutableSegment =
         ImmutableSegmentLoader.load(new File(INDEX_DIR, SEGMENT_NAME), indexLoadingConfig);
     _indexSegment = immutableSegment;
     _indexSegments = Arrays.asList(immutableSegment, immutableSegment);
   }
 
-  private static List<FieldConfig> createFieldConfigs() {
+  protected List<FieldConfig> createFieldConfigs() {
     List<FieldConfig> fieldConfigs = new ArrayList<>();
     fieldConfigs.add(new FieldConfig(QUERY_LOG_TEXT_COL_NAME, FieldConfig.EncodingType.DICTIONARY,
         List.of(FieldConfig.IndexType.TEXT), null, null));
@@ -177,7 +188,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         Map.of(FieldConfig.TEXT_INDEX_USE_AND_FOR_MULTI_TERM_QUERIES, "true")));
     fieldConfigs.add(new FieldConfig(SKILLS_TEXT_NO_RAW_NAME, FieldConfig.EncodingType.DICTIONARY,
         List.of(FieldConfig.IndexType.TEXT), null,
-        Map.of(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true", FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding")));
+        Map.of(FieldConfig.TEXT_INDEX_NO_RAW_DATA, "true",
+            FieldConfig.TEXT_INDEX_RAW_VALUE, "ILoveCoding")));
     fieldConfigs.add(new FieldConfig(SKILLS_TEXT_MV_COL_NAME, FieldConfig.EncodingType.DICTIONARY,
         List.of(FieldConfig.IndexType.TEXT), null, null));
     fieldConfigs.add(new FieldConfig(SKILLS_TEXT_MV_COL_DICT_NAME, FieldConfig.EncodingType.DICTIONARY,
@@ -194,7 +206,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   private void buildSegment()
       throws Exception {
     List<GenericRow> rows = createTestData();
-    SegmentGeneratorConfig config = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    SegmentGeneratorConfig config = new SegmentGeneratorConfig(getTableConfig(), SCHEMA);
     config.setOutDir(INDEX_DIR.getPath());
     config.setSegmentName(SEGMENT_NAME);
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
@@ -830,13 +842,15 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             + " LIMIT 50000";
     testTextSearchAggregationQueryHelper(query, expected.size());
     // configurable default value is used
-    query =
-        "SELECT INT_COL, SKILLS_TEXT_COL_2 FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_2, '\"distributed systems\" "
-            + "AND Java AND C++') LIMIT 50000";
-    expected = new ArrayList<>();
-    expected.add(new Object[]{1005, "ILoveCoding"});
-    expected.add(new Object[]{1017, "ILoveCoding"});
-    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    if (queryDefault()) {
+      query =
+          "SELECT INT_COL, SKILLS_TEXT_COL_2 FROM MyTable WHERE TEXT_MATCH(SKILLS_TEXT_COL_2, '\"distributed systems\" "
+              + "AND Java AND C++') LIMIT 50000";
+      expected = new ArrayList<>();
+      expected.add(new Object[]{1005, "ILoveCoding"});
+      expected.add(new Object[]{1017, "ILoveCoding"});
+      testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+    }
 
     // TEST 22: composite phrase and term query using boolean operator OR
     // Search in SKILLS_TEXT_COL column to look for documents where each document MUST contain ANY of the following
@@ -1372,15 +1386,15 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // create and open an index writer
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test1.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    Analyzer analyzer = new CaseAwareStandardAnalyzer();
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(500);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
     // create an NRT index reader
     SearcherManager searcherManager = new SearcherManager(indexWriter, false, false, null);
 
-    QueryParser queryParser = new QueryParser("skill", standardAnalyzer);
+    QueryParser queryParser = new QueryParser("skill", analyzer);
     Query query = queryParser.parse("\"machine learning\"");
 
     // acquire a searcher
@@ -1542,8 +1556,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // create and open an index writer
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test2.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    CaseAwareStandardAnalyzer analyzer = new CaseAwareStandardAnalyzer();
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(50);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
@@ -1553,7 +1567,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     indexWriter.addDocument(docToIndex);
 
     // create an NRT index reader from the writer -- should see one uncommitted document
-    QueryParser queryParser = new QueryParser("skill", standardAnalyzer);
+    QueryParser queryParser = new QueryParser("skill", analyzer);
     Query query = queryParser.parse("\"distributed systems\" AND (Java C++)");
     IndexReader indexReader1 = DirectoryReader.open(indexWriter);
     IndexSearcher searcher1 = new IndexSearcher(indexReader1);
@@ -1592,9 +1606,9 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
       throws Exception {
     File indexFile = new File(INDEX_DIR.getPath() + "/realtime-test3.index");
     Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-    StandardAnalyzer standardAnalyzer = new StandardAnalyzer();
+    Analyzer analyzer = new CaseAwareStandardAnalyzer();
     // create and open a writer
-    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(standardAnalyzer);
+    IndexWriterConfig indexWriterConfig = new IndexWriterConfig(analyzer);
     indexWriterConfig.setRAMBufferSizeMB(500);
     IndexWriter indexWriter = new IndexWriter(indexDirectory, indexWriterConfig);
 
@@ -1608,7 +1622,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     // start writer and reader
     Thread writer = new Thread(new RealtimeWriter(indexWriter));
-    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, standardAnalyzer));
+    Thread realtimeReader = new Thread(new RealtimeReader(searcherManager, analyzer));
 
     writer.start();
     realtimeReader.start();
@@ -1674,8 +1688,8 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     private final QueryParser _queryParser;
     private final SearcherManager _searcherManager;
 
-    RealtimeReader(SearcherManager searcherManager, StandardAnalyzer standardAnalyzer) {
-      _queryParser = new QueryParser("skill", standardAnalyzer);
+    RealtimeReader(SearcherManager searcherManager, Analyzer analyzer) {
+      _queryParser = new QueryParser("skill", analyzer);
       _searcherManager = searcherManager;
     }
 
@@ -1991,5 +2005,287 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.STRING});
     QueriesTestUtils.testInterSegmentsResult(getBrokerResponse(query),
         new ResultTable(expectedDataSchema, expectedRows));
+  }
+
+  protected boolean queryDefault() {
+    return true;
+  }
+
+  // tests to test text search with options
+  @Test
+  public void testTextSearchWithOptions()
+      throws Exception {
+    // Test regex pattern with CLASSIC parser
+    List<Object[]> expected = new ArrayList<>();
+    expected.add(new Object[]{
+        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+        + "storage, concurrency, multi-threading"
+    });
+    expected.add(new Object[]{
+        1019,
+        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
+            + "distributed storage, concurrency, multi-threading, apache airflow"
+    });
+
+    String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
+
+    List<Object[]> expected1 = new ArrayList<>();
+    expected1.add(new Object[]{
+        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+        + "storage, concurrency, multi-threading"
+    });
+    String query1 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ava realtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
+        + "50000";
+    testTextSearchSelectQueryHelper(query1, expected.size(), false, expected);
+
+    // Test regex pattern with AND operator
+    String query2 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ava realtime streaming system* AND *chine learn*', 'parser=CLASSIC,allowLeadingWildcard=true,"
+        + "defaultOperator=AND') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query2, expected.size(), false, expected);
+
+    // Test regex pattern with AND operator (no match)
+    String query3 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '\"*ava realtime streaming system*\" AND \"*chine learner*\"', 'parser=CLASSIC,"
+        + "allowLeadingWildcard=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query3, 0, false, new ArrayList<>());
+
+    // Test regex pattern with OR operator
+    String query4 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '\"*ava realtime streaming system*\" OR \"*chine learner*\"', 'parser=COMPLEX,"
+        + "allowLeadingWildcard=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query4, expected1.size(), false, expected1);
+
+    // Test regex pattern with multiple wildcards
+    String query5 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ava* AND *stream* AND *learn*', 'parser=CLASSIC,allowLeadingWildcard=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query5, expected.size(), false, expected);
+
+    // Test regex pattern with invalid parser type (should fall back to default)
+    String query6 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ealtime streaming system*', 'parser=INVALID,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query6, expected.size(), false, expected);
+
+    // Test regex pattern with multiple options (should merge options)
+    String query7 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND,"
+        + "allowLeadingWildcard=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query7, expected.size(), false, expected);
+
+    // Test regex pattern with STANDARD parser
+    String query8 = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '*ealtime streaming system*', 'parser=STANDARD,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
+        + "50000";
+    testTextSearchSelectQueryHelper(query8, expected.size(), false, expected);
+  }
+
+  // ===== TEST CASES FOR AND/OR FILTER OPERATORS =====
+  @Test
+  public void testTextSearchWithOptionsAndOrOperators()
+      throws Exception {
+    // Test 1: Single filter operator with AND - exactly 2 documents
+    List<Object[]> expectedSingleAnd = new ArrayList<>();
+    expectedSingleAnd.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedSingleAnd.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String querySingleAnd =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\" AND Java AND C++', 'parser=CLASSIC,defaultOperator=AND') LIMIT "
+            + "50000";
+    testTextSearchSelectQueryHelper(querySingleAnd, expectedSingleAnd.size(), false, expectedSingleAnd);
+
+    // Test 2: Single filter operator with OR - exactly 2 documents
+    List<Object[]> expectedSingleOr = new ArrayList<>();
+    expectedSingleOr.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedSingleOr.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String querySingleOr =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\" AND (Java AND C++)', 'parser=CLASSIC,defaultOperator=AND') LIMIT "
+            + "50000";
+    testTextSearchSelectQueryHelper(querySingleOr, expectedSingleOr.size(), false, expectedSingleOr);
+
+    // Test 3: Aggregation queries with options
+    String queryAggAnd = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '\"distributed systems\" AND Java AND C++', 'parser=CLASSIC,defaultOperator=AND')";
+    testTextSearchAggregationQueryHelper(queryAggAnd, expectedSingleAnd.size());
+  }
+
+  @Test
+  public void testTextSearchWithOptionsWildcardOperators()
+      throws Exception {
+    // Test with wildcard support - exactly 3 documents (not 2 as originally expected)
+    List<Object[]> expectedWildcardAnd = new ArrayList<>();
+    expectedWildcardAnd.add(new Object[]{
+        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+        + "storage, concurrency, multi-threading"
+    });
+    expectedWildcardAnd.add(new Object[]{
+        1018,
+        "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
+            + "multi-threading, C++,"
+    });
+    expectedWildcardAnd.add(new Object[]{
+        1019,
+        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
+            + "distributed storage, concurrency, multi-threading, apache airflow"
+    });
+
+    String queryWildcardAnd =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*ava* AND *stream*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') "
+            + "LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryWildcardAnd, expectedWildcardAnd.size(), false, expectedWildcardAnd);
+
+    // Test with different parser types
+    String queryStandardParser =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*ava* AND *stream*', 'parser=STANDARD,allowLeadingWildcard=true,defaultOperator=AND') "
+            + "LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryStandardParser, expectedWildcardAnd.size(), false, expectedWildcardAnd);
+  }
+
+  // ===== TEST CASES FOR MULTIPLE TEXT_MATCH WITH AND/OR FILTER OPERATORS =====
+  @Test
+  public void testMultipleTextMatchWithOptionsAndOrOperators()
+      throws Exception {
+    // Test 1: Multiple TEXT_MATCH with AND operator - exactly 2 documents
+    List<Object[]> expectedMultipleAnd = new ArrayList<>();
+    expectedMultipleAnd.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedMultipleAnd.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String queryMultipleAnd =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'C++', 'parser=CLASSIC') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMultipleAnd, expectedMultipleAnd.size(), false, expectedMultipleAnd);
+
+    // Test 2: Multiple TEXT_MATCH with OR operator - exactly 2 documents
+    List<Object[]> expectedMultipleOr = new ArrayList<>();
+    expectedMultipleOr.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedMultipleOr.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String queryMultipleOr =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "(TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'C++', 'parser=CLASSIC')) LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMultipleOr, expectedMultipleOr.size(), false, expectedMultipleOr);
+
+    // Test 3: Aggregation queries with multiple TEXT_MATCH
+    String queryAggMultipleAnd = "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", 'Java', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME + ", 'C++', 'parser=CLASSIC')";
+    testTextSearchAggregationQueryHelper(queryAggMultipleAnd, expectedMultipleAnd.size());
+  }
+
+  @Test
+  public void testMultipleTextMatchDifferentColumns()
+      throws Exception {
+    // Test Multiple TEXT_MATCH on different columns with AND - exactly 2 documents
+    List<Object[]> expectedDifferentColumnsAnd = new ArrayList<>();
+    expectedDifferentColumnsAnd.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedDifferentColumnsAnd.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String queryDifferentColumnsAnd =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'C++', 'parser=CLASSIC') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryDifferentColumnsAnd, expectedDifferentColumnsAnd.size(), false,
+        expectedDifferentColumnsAnd);
+
+    // Test Multiple TEXT_MATCH with different parser options
+    String queryDifferentParsers =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '\"distributed systems\"', 'parser=CLASSIC') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=STANDARD') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'C++', 'parser=COMPLEX') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryDifferentParsers, expectedDifferentColumnsAnd.size(), false,
+        expectedDifferentColumnsAnd);
+  }
+
+  @Test
+  public void testTextFilterOptimizerWithWildcardsSameOptions()
+      throws Exception {
+    // Test that optimizer works when all TEXT_MATCH expressions have the same options with wildcards
+    String query =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*Python*', 'parser=CLASSIC,allowLeadingWildcard=true') LIMIT 50000";
+
+    BrokerResponseNative brokerResponse = getBrokerResponseForOptimizedQuery(query, getTableConfig(), SCHEMA);
+    assertTrue(brokerResponse.getNumDocsScanned() > 0, "Query should scan some documents");
+  }
+
+  @Test
+  public void testTextFilterOptimizerWithWildcardsDifferentOptions()
+      throws Exception {
+    // This should pass: trailing wildcard is allowed by default
+    String queryTrailing =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Python*', 'parser=STANDARD') LIMIT 50000";
+    BrokerResponseNative responseTrailing = getBrokerResponseForOptimizedQuery(queryTrailing, getTableConfig(), SCHEMA);
+    assertTrue(responseTrailing.getNumDocsScanned() > 0, "Trailing wildcard should scan some documents");
+
+    // This should fail: leading wildcard is NOT allowed with parser=STANDARD
+    // The optimizer should NOT merge these expressions because they have options
+    String queryLeading =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*CUDA*', 'parser=CLASSIC,allowLeadingWildcard=true') AND " + "TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", '*Python*', 'parser=STANDARD') LIMIT 50000";
+
+    BrokerResponseNative responseLeading = getBrokerResponseForOptimizedQuery(queryLeading, getTableConfig(), SCHEMA);
+    List<QueryProcessingException> exceptions = responseLeading.getExceptions();
+    assertFalse(exceptions.isEmpty(), "Expected error for leading wildcard with parser=STANDARD");
+    String errorMsg = exceptions.toString();
+    assertTrue(errorMsg.contains("Leading wildcard is not allowed") || errorMsg.contains(
+            "Failed while searching the text index"),
+        "Expected error related to leading wildcard or text search failure, got: " + errorMsg);
   }
 }

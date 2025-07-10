@@ -295,7 +295,8 @@ public class ClusterIntegrationTestUtils {
     if (numAvroFiles == 1) {
       buildSegmentFromAvro(avroFiles.get(0), tableConfig, schema, baseSegmentIndex, segmentDir, tarDir);
     } else {
-      ExecutorService executorService = Executors.newFixedThreadPool(numAvroFiles);
+      ExecutorService executorService =
+          Executors.newFixedThreadPool(Math.min(numAvroFiles, Runtime.getRuntime().availableProcessors()));
       List<Future<Void>> futures = new ArrayList<>(numAvroFiles);
       for (int i = 0; i < numAvroFiles; i++) {
         File avroFile = avroFiles.get(i);
@@ -878,6 +879,10 @@ public class ClusterIntegrationTestUtils {
 
   public static String getBrokerQueryApiUrl(String brokerBaseApiUrl, boolean useMultiStageQueryEngine) {
     return useMultiStageQueryEngine ? brokerBaseApiUrl + "/query" : brokerBaseApiUrl + "/query/sql";
+  }
+
+  public static String getTimeSeriesQueryApiUrl(String timeSeriesBaseApiUrl) {
+    return timeSeriesBaseApiUrl + "/timeseries/api/v1/query_range";
   }
 
   public static String getBrokerQueryCancelUrl(String brokerBaseApiUrl, String brokerId, String clientQueryId) {

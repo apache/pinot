@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
@@ -38,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -71,7 +73,6 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.lineage.SegmentLineage;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.restlet.resources.ServerSegmentsReloadCheckResponse;
 import org.apache.pinot.common.restlet.resources.TableSegmentsReloadCheckResponse;
@@ -86,6 +87,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
@@ -532,7 +534,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Reload job id", required = true) @PathParam("jobId") String reloadJobId)
       throws Exception {
     Map<String, String> controllerJobZKMetadata =
-        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobType.RELOAD_SEGMENT);
+        _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId, ControllerJobTypes.RELOAD_SEGMENT);
     if (controllerJobZKMetadata == null) {
       throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
           Status.NOT_FOUND);
@@ -558,9 +560,19 @@ public class PinotSegmentRestletResource {
           endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
               + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
       if (segmentNames != null) {
-        List<String> targetSegments = serverToSegments.get(server);
-        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + StringUtils.join(targetSegments,
-            SegmentNameUtils.SEGMENT_NAME_SEPARATOR);
+        List<String> segmentsForServer = serverToSegments.get(server);
+        StringBuilder encodedSegmentsBuilder = new StringBuilder();
+        if (!segmentsForServer.isEmpty()) {
+          Iterator<String> segmentIterator = segmentsForServer.iterator();
+          // Append first segment without a leading separator
+          encodedSegmentsBuilder.append(URIUtils.encode(segmentIterator.next()));
+          // Append remaining segments, each prefixed by the separator
+          while (segmentIterator.hasNext()) {
+            encodedSegmentsBuilder.append(SegmentNameUtils.SEGMENT_NAME_SEPARATOR)
+                                  .append(URIUtils.encode(segmentIterator.next()));
+          }
+        }
+        reloadTaskStatusEndpoint += "&segmentName=" + encodedSegmentsBuilder;
       }
       serverUrls.add(reloadTaskStatusEndpoint);
     }
@@ -620,7 +632,7 @@ public class PinotSegmentRestletResource {
       @Nullable String instanceName) {
     if (segmentNames == null) {
       // instanceName can be null or not null, and this method below can handle both cases.
-      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName);
+      return _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType, instanceName, true);
     }
     // Skip servers and segments not involved in the segment reloading job.
     List<String> segmnetNameList = new ArrayList<>();
@@ -1192,16 +1204,19 @@ public class PinotSegmentRestletResource {
           + "The retention period controls how long deleted segments are retained before permanent removal. "
           + "It follows this precedence: input parameter → table config → cluster setting → 7d default. "
           + "Use 0d or -1d for immediate deletion without retention.")
-  public SuccessResponse deleteSegmentsFromSequenceNum(
+  public String deleteSegmentsFromSequenceNum(
       @ApiParam(value = "Name of the table with type", required = true) @PathParam("tableNameWithType")
       String tableNameWithType,
       @ApiParam(value = "List of segment names. For each segment, all segments with higher sequence IDs in the same "
           + "partition will be deleted", required = true, allowMultiple = true)
       @QueryParam("segments") List<String> segments,
+      @ApiParam(value = "Dry run to list the segment names that will get deleted per partition", defaultValue = "true")
+      @QueryParam("dryRun") boolean dryRun,
       @ApiParam(value = "Force flag to bypass checks for pauseless being enabled and table being paused",
           defaultValue = "false") @QueryParam("force") boolean force,
       @Context HttpHeaders headers
-  ) {
+  )
+      throws JsonProcessingException {
 
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, headers);
 
@@ -1235,15 +1250,43 @@ public class PinotSegmentRestletResource {
     Map<Integer, Set<String>> partitionIdToSegmentsToDeleteMap =
         getPartitionIdToSegmentsToDeleteMap(partitionToOldestSegment, idealStateSegmentsSet,
             partitionIdToLatestSegment);
+
+    Map<String, Object> response = new HashMap<>();
+    Map<Integer, Object> partitionDetails = new HashMap<>();
+
     for (Integer partitionID : partitionToOldestSegment.keySet()) {
-      Set<String> segmentToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
-      LOGGER.info("Deleting : {} segments from segment: {} to segment: {} for partition: {}",
-          segmentToDeleteForPartition.size(), partitionToOldestSegment.get(partitionID),
-          partitionIdToLatestSegment.get(partitionID), partitionID);
-      deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentToDeleteForPartition), null);
+      Set<String> segmentsToDeleteForPartition = partitionIdToSegmentsToDeleteMap.get(partitionID);
+      LLCSegmentName oldestSegment = partitionToOldestSegment.get(partitionID);
+      LLCSegmentName latestSegment = partitionIdToLatestSegment.get(partitionID);
+
+      Map<String, Object> partitionInfo = new HashMap<>();
+      partitionInfo.put("segmentsToDelete", new ArrayList<>(segmentsToDeleteForPartition));
+      partitionInfo.put("oldestSegment", oldestSegment.getSegmentName());
+      partitionInfo.put("latestSegment", latestSegment.getSegmentName());
+      partitionInfo.put("segmentCount", segmentsToDeleteForPartition.size());
+
+      partitionDetails.put(partitionID, partitionInfo);
+
+      // Only perform actual deletion if dryRun is false
+      if (!dryRun) {
+        LOGGER.info(
+            "Deleting {} segments from segment: {} to segment: {} for partition: {}. Segments being deleted are: {}",
+            segmentsToDeleteForPartition.size(), oldestSegment, latestSegment, partitionID,
+            segmentsToDeleteForPartition);
+        deleteSegmentsInternal(tableNameWithType, new ArrayList<>(segmentsToDeleteForPartition), null);
+      }
     }
 
-    return new SuccessResponse("Successfully deleted segments for table: " + tableNameWithType);
+    response.put("tableName", tableNameWithType);
+    response.put("dryRun", dryRun);
+    response.put("partitions", partitionDetails);
+
+    if (dryRun) {
+      response.put("message", "Dry run completed. Segments identified for deletion but not actually deleted.");
+    } else {
+      response.put("message", "Successfully deleted segments for table: " + tableNameWithType);
+    }
+    return JsonUtils.objectToString(response);
   }
 
   /**

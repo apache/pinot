@@ -38,13 +38,19 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.*;
 
 
+// test works with all TEXT_MATCH expressions (on single or multi-column text index)
 public class QueryOptimizerTest {
   private static final QueryOptimizer OPTIMIZER = new QueryOptimizer();
   private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("int", DataType.INT)
-          .addSingleValueDimension("long", DataType.LONG).addSingleValueDimension("float", DataType.FLOAT)
-          .addSingleValueDimension("double", DataType.DOUBLE).addSingleValueDimension("string", DataType.STRING)
-          .addSingleValueDimension("bytes", DataType.BYTES).addMultiValueDimension("mvInt", DataType.INT).build();
+      new Schema.SchemaBuilder()
+          .setSchemaName("testTable")
+          .addSingleValueDimension("int", DataType.INT)
+          .addSingleValueDimension("long", DataType.LONG)
+          .addSingleValueDimension("float", DataType.FLOAT)
+          .addSingleValueDimension("double", DataType.DOUBLE)
+          .addSingleValueDimension("string", DataType.STRING)
+          .addSingleValueDimension("bytes", DataType.BYTES)
+          .addMultiValueDimension("mvInt", DataType.INT).build();
 
   @Test
   public void testNoFilter() {
@@ -304,6 +310,59 @@ public class QueryOptimizerTest {
         "select * from testTable where text_match(string, 'foo') AND text_match(string, 'bar OR baz')",
         "select * from testTable where text_match(string, '(foo) AND (bar OR baz)')"
     );
+
+    // Test cases for TEXT_MATCH with mixed options scenarios
+    // Case 1: Same column with multiple text match - some with options, some without options
+    // Text match without options should merge, text match with options should remain separate
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar') AND "
+            + "TEXT_MATCH(string, 'baz', 'parser=CLASSIC')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo) AND (bar)') AND "
+            + "TEXT_MATCH(string, 'baz', 'parser=CLASSIC')");
+
+    testCannotOptimizeQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND "
+        + "TEXT_MATCH(string, 'bar', 'parser=STANDARD') AND TEXT_MATCH(string, 'baz', 'parser=STANDARD')");
+
+    testQuery(
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo', 'parser=CLASSIC') AND TEXT_MATCH(string, 'bar') AND "
+            + "TEXT_MATCH(string, 'baz')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo', 'parser=CLASSIC') AND "
+            + "TEXT_MATCH(string, '(bar) AND (baz)')");
+
+    // Case 2: Different columns with or without text match - should not merge
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') AND TEXT_MATCH(string1, 'bar') AND "
+            + "TEXT_MATCH(string2, 'baz')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo) AND (bar)') AND TEXT_MATCH(string2, 'baz')");
+
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') AND TEXT_MATCH(string2, 'bar') AND "
+            + "TEXT_MATCH(string2, 'baz')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') AND TEXT_MATCH(string2, '(bar) AND (baz)')");
+
+    testCannotOptimizeQuery(
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo', 'parser=CLASSIC') AND TEXT_MATCH(string1, 'bar') AND "
+            + "TEXT_MATCH(string2, 'baz', 'parser=STANDARD')");
+
+    // Case 3: Complex scenarios with OR operators
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') OR TEXT_MATCH(string, 'bar') OR "
+            + "TEXT_MATCH(string, 'baz', 'parser=CLASSIC')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo) OR (bar)') OR "
+            + "TEXT_MATCH(string, 'baz', 'parser=CLASSIC')");
+
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') AND TEXT_MATCH(string1, 'bar') OR "
+            + "TEXT_MATCH(string2, 'baz') AND TEXT_MATCH(string2, 'qux')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string1, '(foo) AND (bar)') OR "
+            + "TEXT_MATCH(string2, '(baz) AND (qux)')");
+
+    // Case 4: Mixed scenarios with NOT operators
+    testQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string, 'foo') AND NOT TEXT_MATCH(string, 'bar') AND "
+            + "TEXT_MATCH(string, 'baz', 'parser=CLASSIC')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, '(foo) AND NOT (bar)') AND "
+            + "TEXT_MATCH(string, 'baz', 'parser=CLASSIC')");
+
+    testQuery("SELECT * FROM testTable WHERE NOT TEXT_MATCH(string, 'foo') AND TEXT_MATCH(string, 'bar') AND "
+            + "TEXT_MATCH(string, 'baz', 'parser=STANDARD')",
+        "SELECT * FROM testTable WHERE TEXT_MATCH(string, 'NOT (foo) AND (bar)') AND "
+            + "TEXT_MATCH(string, 'baz', 'parser=STANDARD')");
+
     testCannotOptimizeQuery("SELECT * FROM testTable WHERE TEXT_MATCH(string1, 'foo') OR TEXT_MATCH(string2, 'bar')");
     testCannotOptimizeQuery(
         "SELECT * FROM testTable WHERE int = 1 AND TEXT_MATCH(string, 'foo') OR TEXT_MATCH(string, 'bar')");
