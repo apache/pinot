@@ -120,7 +120,7 @@ public class RealtimeConsumptionRateManager {
 
       return new RateLimiterImpl(serverRateLimit, emitter);
     } else {
-      // Note there is race condition when Server Rate Limiter is removed/stopped and other thread is trying to
+      // Note: there is race condition when Server Rate Limiter is removed/stopped and other thread is trying to
       // create it. It's ignored because this scenario can only happen when server rate limit config is removed and
       // updated at the same time.
       AsyncMetricEmitter existing = ASYNC_METRIC_EMITTER_REF.getAndSet(null);
