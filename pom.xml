@@ -213,7 +213,7 @@
     <commons-codec.version>1.18.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
-    <commons-validator.version>1.9.0</commons-validator.version>
+    <commons-validator.version>1.10.0</commons-validator.version>
 
     <!-- Java EE Libraries -->
     <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
