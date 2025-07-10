@@ -45,7 +45,8 @@ class TestResourceAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPU
     CPUMemThreadLevelAccountingObjects.ThreadEntry anchorEntry = new CPUMemThreadLevelAccountingObjects.ThreadEntry();
     anchorEntry._currentThreadTaskStatus.set(
         new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID,
-            ThreadExecutionContext.TaskType.SSE, anchorThread._workerThread));
+            ThreadExecutionContext.TaskType.SSE, anchorThread._workerThread,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     anchorEntry._currentThreadMemoryAllocationSampleBytes = 1000;
     threadEntries.put(anchorThread._workerThread, anchorEntry);
 
@@ -62,7 +63,7 @@ class TestResourceAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPU
     CPUMemThreadLevelAccountingObjects.ThreadEntry worker1 = new CPUMemThreadLevelAccountingObjects.ThreadEntry();
     worker1._currentThreadTaskStatus.set(
         new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, taskId, ThreadExecutionContext.TaskType.SSE,
-            anchorThread));
+            anchorThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     Thread workerThread1 = new Thread(() -> {
       try {
         threadLatch.await();
