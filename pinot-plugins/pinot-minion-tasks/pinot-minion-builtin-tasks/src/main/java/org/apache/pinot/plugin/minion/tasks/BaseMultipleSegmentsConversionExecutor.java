@@ -200,7 +200,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     int numRecords;
     List<File> inputSegmentDirs = new ArrayList<>(downloadURLs.length);
     Map<String, SegmentMetadata> segmentMetadataMap = Collections.synchronizedMap(new HashMap<>(downloadURLs.length));
-    int nThreads = Math.min(getThreadPoolSize(taskConfigs), downloadURLs.length);
+    int nThreads = Math.min(getParallelism(taskConfigs), downloadURLs.length);
     LOGGER.info(
         "Start executing {} on table: {}, input segments: {} with downloadURLs: {}, uploadURL: {}, thread pool size:{}",
         taskType, tableNameWithType, inputSegmentNames, downloadURLString, uploadURL, nThreads);
@@ -361,10 +361,10 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
     return numRecords;
   }
 
-  private int getThreadPoolSize(Map<String, String> taskConfigs) {
-    int nThreads = _minionConf.getSegmentDownloadThreadPoolSize();
+  private int getParallelism(Map<String, String> taskConfigs) {
+    int nThreads = _minionConf.getSegmentDownloadParallelism();
     nThreads = Integer.parseInt(
-        taskConfigs.getOrDefault(MinionConstants.SEGMENT_DOWNLOAD_THREAD_POOL_SIZE, String.valueOf(nThreads)));
+        taskConfigs.getOrDefault(MinionConstants.SEGMENT_DOWNLOAD_PARALLELISM, String.valueOf(nThreads)));
     return nThreads;
   }
 

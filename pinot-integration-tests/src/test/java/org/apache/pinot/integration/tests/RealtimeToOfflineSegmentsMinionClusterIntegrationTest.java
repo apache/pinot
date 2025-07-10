@@ -125,7 +125,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
     Map<String, String> taskConfigs = new HashMap<>();
     taskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
-    taskConfigs.put(MinionConstants.SEGMENT_DOWNLOAD_THREAD_POOL_SIZE, "3");
+    taskConfigs.put(MinionConstants.SEGMENT_DOWNLOAD_PARALLELISM, "3");
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
         Collections.singletonMap(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigs)));
     addTableConfig(realtimeTableConfig);
@@ -138,7 +138,7 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     taskConfigsWithMetadata.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
     taskConfigsWithMetadata.put(BatchConfigProperties.PUSH_MODE,
         BatchConfigProperties.SegmentPushType.METADATA.toString());
-    taskConfigsWithMetadata.put(MinionConstants.SEGMENT_DOWNLOAD_THREAD_POOL_SIZE, "3");
+    taskConfigsWithMetadata.put(MinionConstants.SEGMENT_DOWNLOAD_PARALLELISM, "3");
     String tableWithMetadataPush = "myTable2";
     schema.setSchemaName(tableWithMetadataPush);
     addSchema(schema);

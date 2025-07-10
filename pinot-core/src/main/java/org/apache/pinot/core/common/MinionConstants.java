@@ -75,7 +75,7 @@ public class MinionConstants {
   /**
    * Segment download thread pool size to be set at task level.
    */
-  public static final String SEGMENT_DOWNLOAD_THREAD_POOL_SIZE = "segmentDownloadThreadPoolSize";
+  public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {
