@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.combine;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -29,7 +30,9 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -66,6 +69,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private final CountDownLatch _operatorLatch;
 
   private volatile IndexedTable _indexedTable;
+  private volatile IndexedTable[] _partitionedIndexedTables;
+  private volatile IndexedTable[] _mergedTables;
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
@@ -80,6 +85,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
+    _partitionedIndexedTables = new IndexedTable[operators.size()];
+    _mergedTables = new IndexedTable[_queryContext.getGroupByNumPartitions()];
   }
 
   /**
@@ -112,6 +119,10 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
+        // TODO: partition this into _partitionedIndexedTable[operatorId], without trimming
+        // TODO: create an indexed table class that takes map upon construction and exposes the map for merge
+        _partitionedIndexedTables[operatorId] = new PartitionedIndexedTable();
+
         if (_indexedTable == null) {
           synchronized (this) {
             if (_indexedTable == null) {
@@ -201,6 +212,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   @Override
   public BaseResultsBlock mergeResults()
       throws Exception {
+    // TODO: submit futures(partitionId) to executorService to merge a partition of all segments, write into _mergedTables[partitionId]
+    //  this doesn't start until all segment results are processed,
+    // TODO: await all futures done, logically stitch together into a single indexedTable, resize if needed. (just wrap it into a impl AbstractMap and return into GroupByResultBlock)
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {

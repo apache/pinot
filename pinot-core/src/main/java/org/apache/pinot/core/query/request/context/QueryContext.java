@@ -143,6 +143,9 @@ public class QueryContext {
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
+  private int _groupByNumPartitions = Server.DEFAULT_GROUPBY_NUM_PARTITIONS;
+  private int _groupByPartitionThreshold = Server.DEFAULT_GROUPBY_PARTITION_THRESHOLD;
+
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
@@ -478,6 +481,14 @@ public class QueryContext {
 
   public void setNullHandlingEnabled(boolean nullHandlingEnabled) {
     _nullHandlingEnabled = nullHandlingEnabled;
+  }
+
+  public int getGroupByPartitionThreshold() {
+    return _groupByPartitionThreshold;
+  }
+
+  public int getGroupByNumPartitions() {
+    return _groupByNumPartitions;
   }
 
   public boolean isServerReturnFinalResult() {
