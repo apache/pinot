@@ -187,7 +187,7 @@ public class MultiColumnLuceneTextIndexReader implements MultiColumnTextIndexRea
       _indexSearcher = new IndexSearcher(_indexReader);
 
       // Log the max clause count that was set globally
-      LOGGER.info("Using IndexSearcher maxClauseCount for column {} count {}", _column,
+      LOGGER.info("Using IndexSearcher maxClauseCount for count {}",
           IndexSearcher.getMaxClauseCount());
 
       if (!config.isEnableQueryCache()) {
