@@ -51,7 +51,17 @@ public interface ThreadResourceUsageAccountant {
    * @param taskId a unique task id
    * @param taskType the type of the task - SSE or MSE
    */
+  @Deprecated
   void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType);
+
+  /**
+   * Set up the thread execution context for an anchor a.k.a runner thread.
+   * @param queryId query id string
+   * @param taskId a unique task id
+   * @param taskType the type of the task - SSE or MSE
+   * @param workloadName the name of the workload, can be null
+   */
+  void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, String workloadName);
 
   /**
    * Set up the thread execution context for a worker thread.
@@ -60,7 +70,7 @@ public interface ThreadResourceUsageAccountant {
    * @param parentContext the parent execution context
    */
   void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-      @Nullable ThreadExecutionContext parentContext);
+                   @Nullable ThreadExecutionContext parentContext);
 
   /**
    * get the executon context of current thread
@@ -93,7 +103,16 @@ public interface ThreadResourceUsageAccountant {
    * ser/de threads where the thread execution context cannot be setup before hands as
    * queryId/taskId is unknown and the execution process is hard to instrument
    */
+  @Deprecated
   void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes);
+
+  /**
+   * special interface to aggregate usage to the stats store only once, it is used for response
+   * ser/de threads where the thread execution context cannot be setup before hands as
+   * queryId/taskId/workloadName is unknown and the execution process is hard to instrument
+   */
+  void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long allocatedBytes,
+                                    TrackingScope trackingScope);
 
   @Deprecated
   void updateQueryUsageConcurrently(String queryId);

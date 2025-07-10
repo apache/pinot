@@ -527,6 +527,7 @@ public class QueryCompilationTest extends QueryEnvironmentTestBase {
     assertTrue(e.getCause().getMessage().contains("Duplicate alias in WITH: 'tmp'"));
   }
 
+
   @Test
   public void testWindowFunctions() {
     String queryWithDefaultWindow = "SELECT col1, col2, RANK() OVER (PARTITION BY col1 ORDER BY col2) FROM a";
