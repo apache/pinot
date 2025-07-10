@@ -952,8 +952,10 @@ public class MutableSegmentImpl implements MutableSegment {
       comparable = new ByteArray((byte[]) value);
     } else if (dataType == MAP) {
       comparable = new ByteArray(MapUtils.serializeMap((Map) value));
-    } else {
+    } else if (Comparable.class.isAssignableFrom(value.getClass())) {
       comparable = (Comparable) value;
+    } else {
+      return;
     }
     if (indexContainer._minValue == null) {
       indexContainer._minValue = comparable;
