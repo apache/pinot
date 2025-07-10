@@ -70,6 +70,12 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVG);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("AvGPreCIsiON");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof AvgPrecisionAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.AVGPRECISION);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("MoDe");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
     assertTrue(aggregationFunction instanceof ModeAggregationFunction);
