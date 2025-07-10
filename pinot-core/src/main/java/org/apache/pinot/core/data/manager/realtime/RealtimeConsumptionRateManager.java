@@ -304,7 +304,7 @@ public class RealtimeConsumptionRateManager {
       double rateLimit = _rateLimit.get();
       if (rateLimit > 0) {
         double actualRate = messageCount / 60.0; // messages per second
-        int ratio = (int) Math.round(messageCount / actualRate * 100);
+        int ratio = (int) Math.round(actualRate / rateLimit * 100);
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION, ratio);
       }
     }
