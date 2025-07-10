@@ -132,10 +132,10 @@ public class TableMetadataReader {
    * This api takes in list of segments for which we need the metadata.
    * This calls the server to get the metadata for all segments instead of making a call per segment.
    */
-  public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, Set<String> segmentsToInclude,
+  public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, Set<String> segments,
       int timeoutMs)
       throws InvalidConfigException, IOException {
-    return getSegmentsMetadataInternal(tableNameWithType, columns, segmentsToInclude, timeoutMs);
+    return getSegmentsMetadataInternal(tableNameWithType, columns, segments, timeoutMs);
   }
 
   /**
@@ -204,7 +204,7 @@ public class TableMetadataReader {
   }
 
   private JsonNode getSegmentsMetadataInternal(String tableNameWithType, List<String> columns,
-      Set<String> segmentsToInclude, int timeoutMs)
+      Set<String> segments, int timeoutMs)
       throws InvalidConfigException, IOException {
     Map<String, List<String>> serverToSegs =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -216,7 +216,7 @@ public class TableMetadataReader {
     // try table level endpoint first
     try {
       List<String> tableUrls = buildTableLevelUrls(serverToSegs, endpoints,
-          tableNameWithType, columns, segmentsToInclude, reader);
+          tableNameWithType, columns, segments, reader);
       return fetchAndAggregateMetadata(tableUrls, endpoints, /*perSegmentJson=*/false,
           tableNameWithType, timeoutMs);
     } catch (InvalidConfigException ignore) {
@@ -225,7 +225,7 @@ public class TableMetadataReader {
 
     // legacy per segment endpoint
     List<String> segmentUrls = buildSegmentLevelUrls(serverToSegs, endpoints,
-        tableNameWithType, columns, segmentsToInclude, reader);
+        tableNameWithType, columns, segments, reader);
     return fetchAndAggregateMetadata(segmentUrls, endpoints.inverse(), /*perSegmentJson=*/true,
         tableNameWithType, timeoutMs);
   }

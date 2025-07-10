@@ -424,7 +424,7 @@ public class TablesResource {
   public String getSegmentsMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
       @PathParam("tableName") String tableName,
-      @ApiParam(value = "Segments to include", allowMultiple = true) @QueryParam("segments")
+      @ApiParam(value = "Segments name", allowMultiple = true) @QueryParam("segments")
       @DefaultValue("") List<String> segments,
       @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
       List<String> columns, @Context HttpHeaders headers) {
