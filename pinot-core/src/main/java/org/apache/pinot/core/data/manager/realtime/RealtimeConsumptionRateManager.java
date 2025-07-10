@@ -265,6 +265,7 @@ public class RealtimeConsumptionRateManager {
   }
 
   static class AsyncMetricEmitter implements MetricEmitter {
+    private static final int METRIC_EMIT_FREQUENCY_SEC = 60;
     private final ServerMetrics _serverMetrics;
     private final String _metricKeyName;
     private final AtomicReference<Double> _rateLimit;
@@ -286,7 +287,7 @@ public class RealtimeConsumptionRateManager {
 
     public void start() {
       if (_running.compareAndSet(false, true)) {
-        _executor.scheduleAtFixedRate(this::emit, 1, 60, TimeUnit.SECONDS);
+        _executor.scheduleAtFixedRate(this::emit, 0, METRIC_EMIT_FREQUENCY_SEC, TimeUnit.SECONDS);
       }
     }
 
@@ -303,7 +304,7 @@ public class RealtimeConsumptionRateManager {
       double messageCount = _messageCount.sumThenReset();
       double rateLimit = _rateLimit.get();
       if (rateLimit > 0) {
-        double actualRate = messageCount / 60.0; // messages per second
+        double actualRate = messageCount / METRIC_EMIT_FREQUENCY_SEC; // messages per second
         int ratio = (int) Math.round(actualRate / rateLimit * 100);
         _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION, ratio);
       }
