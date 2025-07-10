@@ -399,7 +399,7 @@ public class PinotTenantRestletResource {
   private String getTablesServedFromServerTenant(String tenantName, @Nullable String database,
       boolean withTableProperties) {
     Set<String> tables = new HashSet<>();
-    Map<String, TenantTableWithProperties> tablePropertiesMap = withTableProperties ? new HashMap<>() : null;
+    Set<TenantTableWithProperties> tablePropertiesSet = withTableProperties ? new HashSet<>() : null;
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
     for (String tableNameWithType : _pinotHelixResourceManager.getAllTables(database)) {
@@ -419,14 +419,14 @@ public class PinotTenantRestletResource {
           }
           TenantTableWithProperties tableWithProperties = new TenantTableWithProperties(tableConfig,
               idealState.getRecord().getMapFields(), _tableSizeReader);
-          tablePropertiesMap.put(tableConfig.getTableName(), tableWithProperties);
+          tablePropertiesSet.add(tableWithProperties);
         }
       }
     }
 
     resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
     if (withTableProperties) {
-      resourceGetRet.set(TABLES_WITH_PROPERTIES, JsonUtils.objectToJsonNode(tablePropertiesMap.values()));
+      resourceGetRet.set(TABLES_WITH_PROPERTIES, JsonUtils.objectToJsonNode(tablePropertiesSet));
     }
     return resourceGetRet.toString();
   }
