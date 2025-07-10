@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
@@ -35,6 +36,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.segment.local.segment.creator.impl.text.LuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.MultiColumnLuceneTextIndexReader;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
@@ -43,9 +45,11 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.V1Constants.Indexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +58,35 @@ public class TextIndexUtils {
   private static final Logger LOGGER = LoggerFactory.getLogger(TextIndexUtils.class);
 
   private TextIndexUtils() {
+  }
+
+  /**
+   * Configuration change listener for Lucene max clause count.
+   * This allows updating the max clause count dynamically without server restart.
+   */
+  public static class LuceneMaxClauseCountConfigChangeListener implements PinotClusterConfigChangeListener {
+    @Override
+    public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+      if (!changedConfigs.contains(CommonConstants.Server.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT)) {
+        return;
+      }
+      String maxClauseCountStr = clusterConfigs.get(CommonConstants.Server.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT);
+      if (maxClauseCountStr != null) {
+        try {
+          int newMaxClauseCount = Integer.parseInt(maxClauseCountStr);
+          // Update the static default for all new IndexSearcher instances
+          IndexSearcher.setMaxClauseCount(newMaxClauseCount);
+          LOGGER.info("Updated Lucene max clause count to: {} from cluster config", newMaxClauseCount);
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid max clause count value in cluster config: {}, keeping current value", maxClauseCountStr);
+        }
+      } else {
+        // Reset to default if config is removed
+        int defaultMaxClauseCount = CommonConstants.Server.DEFAULT_LUCENE_MAX_CLAUSE_COUNT;
+        IndexSearcher.setMaxClauseCount(defaultMaxClauseCount);
+        LOGGER.info("Reset Lucene max clause count to default: {} from cluster config", defaultMaxClauseCount);
+      }
+    }
   }
 
   static void cleanupTextIndex(File segDir, String column) {

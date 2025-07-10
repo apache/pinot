@@ -57,6 +57,7 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -87,6 +88,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
@@ -259,7 +261,18 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
 
+    // Set Lucene max clause count from server configuration
+    int maxClauseCount = _serverConf.getProperty(CommonConstants.Server.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT,
+        CommonConstants.Server.DEFAULT_LUCENE_MAX_CLAUSE_COUNT);
+    IndexSearcher.setMaxClauseCount(maxClauseCount);
+    LOGGER.info("Set global Lucene max clause count to: {}", maxClauseCount);
+
     _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+
+    // Register configuration change listener for dynamic max clause count updates
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new TextIndexUtils.LuceneMaxClauseCountConfigChangeListener());
+    LOGGER.info("Registered Lucene max clause count configuration change listener");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
