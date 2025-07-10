@@ -88,7 +88,6 @@ public class QueryContext {
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final ExplainMode _explain;
-  private Boolean _isUnsafeTrim = null;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -140,6 +139,7 @@ public class QueryContext {
   // Whether server returns the final result with unpartitioned group key
   private boolean _serverReturnFinalResultKeyUnpartitioned;
   private boolean _accurateGroupByWithoutOrderBy;
+  private boolean _isUnsafeTrim;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -538,10 +538,6 @@ public class QueryContext {
   }
 
   public boolean isUnsafeTrim() {
-    if (_isUnsafeTrim != null) {
-      return _isUnsafeTrim;
-    }
-    _isUnsafeTrim = !isSameOrderAndGroupByColumns(this) || getHavingFilter() != null;
     return _isUnsafeTrim;
   }
 
@@ -658,6 +654,9 @@ public class QueryContext {
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);
       extractColumns(queryContext);
+
+      queryContext._isUnsafeTrim =
+          !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
 
       return queryContext;
     }
