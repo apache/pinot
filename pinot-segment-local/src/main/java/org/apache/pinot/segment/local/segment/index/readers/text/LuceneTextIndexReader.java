@@ -83,11 +83,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
       _indexDirectory = FSDirectory.open(indexFile.toPath());
       _indexReader = DirectoryReader.open(_indexDirectory);
       _indexSearcher = new IndexSearcher(_indexReader);
-
-      // Log the max clause count that was set globally
-      LOGGER.info("Using IndexSearcher maxClauseCount for column {} count {}", _column,
-          IndexSearcher.getMaxClauseCount());
-
       if (!config.isEnableQueryCache()) {
         // Disable Lucene query result cache. While it helps a lot with performance for
         // repeated queries, on the downside it can cause heap issues.
