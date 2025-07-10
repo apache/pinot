@@ -67,10 +67,10 @@ public class TextIndexUtils {
   public static class LuceneMaxClauseCountConfigChangeListener implements PinotClusterConfigChangeListener {
     @Override
     public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-      if (!changedConfigs.contains(CommonConstants.Server.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT)) {
+      if (!changedConfigs.contains(CommonConstants.Lucene.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT)) {
         return;
       }
-      String maxClauseCountStr = clusterConfigs.get(CommonConstants.Server.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT);
+      String maxClauseCountStr = clusterConfigs.get(CommonConstants.Lucene.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT);
       if (maxClauseCountStr != null) {
         try {
           int newMaxClauseCount = Integer.parseInt(maxClauseCountStr);
@@ -82,7 +82,7 @@ public class TextIndexUtils {
         }
       } else {
         // Reset to default if config is removed
-        int defaultMaxClauseCount = CommonConstants.Server.DEFAULT_LUCENE_MAX_CLAUSE_COUNT;
+        int defaultMaxClauseCount = CommonConstants.Lucene.DEFAULT_LUCENE_MAX_CLAUSE_COUNT;
         IndexSearcher.setMaxClauseCount(defaultMaxClauseCount);
         LOGGER.info("Reset Lucene max clause count to default: {} from cluster config", defaultMaxClauseCount);
       }

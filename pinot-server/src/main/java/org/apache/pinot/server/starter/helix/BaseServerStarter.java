@@ -57,7 +57,6 @@ import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.participant.statemachine.StateModelFactory;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
-import org.apache.lucene.search.IndexSearcher;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
@@ -260,12 +259,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
           + DataTableBuilderFactory.DEFAULT_VERSION);
     }
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
-
-    // Set Lucene max clause count from server configuration
-    int maxClauseCount = _serverConf.getProperty(CommonConstants.Server.CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT,
-        CommonConstants.Server.DEFAULT_LUCENE_MAX_CLAUSE_COUNT);
-    IndexSearcher.setMaxClauseCount(maxClauseCount);
-    LOGGER.info("Set global Lucene max clause count to: {}", maxClauseCount);
 
     _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
 
