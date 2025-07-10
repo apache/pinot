@@ -261,7 +261,7 @@ public class RealtimeConsumptionRateManager {
   };
 
   interface MetricEmitter {
-    int emitMetric(int numMsgsConsumed, double rateLimit, Instant now);
+    void emitMetric(int numMsgsConsumed, double rateLimit, Instant now);
   }
 
   static class AsyncMetricEmitter implements MetricEmitter {
@@ -295,9 +295,8 @@ public class RealtimeConsumptionRateManager {
     }
 
     @Override
-    public int emitMetric(int numMsgsConsumed, double ignoredRate, Instant ignoredNow) {
+    public void emitMetric(int numMsgsConsumed, double ignoredRate, Instant ignoredNow) {
       _messageCount.add(numMsgsConsumed);
-      return 0;
     }
 
     private void emit() {
@@ -335,7 +334,12 @@ public class RealtimeConsumptionRateManager {
       _metricKeyName = metricKeyName;
     }
 
-    public int emitMetric(int numMsgsConsumed, double rateLimit, Instant now) {
+    public void emitMetric(int numMsgsConsumed, double rateLimit, Instant now) {
+      updateRatioPercentage(numMsgsConsumed, rateLimit, now);
+    }
+
+    @VisibleForTesting
+    int updateRatioPercentage(int numMsgsConsumed, double rateLimit, Instant now) {
       int ratioPercentage = 0;
       long nowInMinutes = now.getEpochSecond() / 60;
       if (nowInMinutes == _previousMinute) {
