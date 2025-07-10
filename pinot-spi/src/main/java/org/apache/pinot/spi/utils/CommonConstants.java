@@ -72,6 +72,10 @@ public class CommonConstants {
   public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
   public static final String QUERY_WORKLOAD = "queryWorkload";
 
+  public static class Lucene {
+    public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
+    public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;
+  }
   public static final String JFR = "pinot.jfr";
 
   public static final String RLS_FILTERS = "rlsFilters";
