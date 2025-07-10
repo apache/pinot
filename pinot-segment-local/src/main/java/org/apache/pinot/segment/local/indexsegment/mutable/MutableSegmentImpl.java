@@ -824,27 +824,30 @@ public class MutableSegmentImpl implements MutableSegment {
         DataType dataType = fieldSpec.getDataType();
         value = indexContainer._valueAggregator.getInitialAggregatedValue(value);
         // BIG_DECIMAL is actually stored as byte[] and hence can be supported here.
+        Object castedValue;
         switch (dataType.getStoredType()) {
           case INT:
-            forwardIndex.add(((Number) value).intValue(), -1, docId);
+            castedValue = ((Number) value).intValue();
             break;
           case LONG:
-            forwardIndex.add(((Number) value).longValue(), -1, docId);
+            castedValue = ((Number) value).longValue();
             break;
           case FLOAT:
-            forwardIndex.add(((Number) value).floatValue(), -1, docId);
+            castedValue = ((Number) value).floatValue();
             break;
           case DOUBLE:
-            forwardIndex.add(((Number) value).doubleValue(), -1, docId);
+            castedValue = ((Number) value).doubleValue();
             break;
           case BIG_DECIMAL:
           case BYTES:
-            forwardIndex.add(indexContainer._valueAggregator.serializeAggregatedValue(value), -1, docId);
+            castedValue = indexContainer._valueAggregator.serializeAggregatedValue(value);
             break;
           default:
             throw new UnsupportedOperationException(
                 "Unsupported data type: " + dataType + " for aggregation: " + column);
         }
+        forwardIndex.add(castedValue, -1, docId);
+        updateMinMax(indexContainer, dataType, castedValue);
         continue;
       }
 
@@ -901,25 +904,7 @@ public class MutableSegmentImpl implements MutableSegment {
           // Update min/max value from raw value
           // NOTE: Skip updating min/max value for aggregated metrics because the value will change over time.
           if (!isAggregateMetricsEnabled() || fieldSpec.getFieldType() != FieldSpec.FieldType.METRIC) {
-            Comparable comparable;
-            if (dataType == BYTES) {
-              comparable = new ByteArray((byte[]) value);
-            } else if (dataType == MAP) {
-              comparable = new ByteArray(MapUtils.serializeMap((Map) value));
-            } else {
-              comparable = (Comparable) value;
-            }
-            if (indexContainer._minValue == null) {
-              indexContainer._minValue = comparable;
-              indexContainer._maxValue = comparable;
-            } else {
-              if (comparable.compareTo(indexContainer._minValue) < 0) {
-                indexContainer._minValue = comparable;
-              }
-              if (comparable.compareTo(indexContainer._maxValue) > 0) {
-                indexContainer._maxValue = comparable;
-              }
-            }
+            updateMinMax(indexContainer, dataType, value);
           }
         }
 
@@ -958,6 +943,28 @@ public class MutableSegmentImpl implements MutableSegment {
     if (_multiColumnValues != null) {
       _multiColumnTextIndex.add(_multiColumnValues);
       Collections.fill(_multiColumnValues, null);
+    }
+  }
+
+  private void updateMinMax(IndexContainer indexContainer, DataType dataType, Object value) {
+    Comparable comparable;
+    if (dataType == BYTES) {
+      comparable = new ByteArray((byte[]) value);
+    } else if (dataType == MAP) {
+      comparable = new ByteArray(MapUtils.serializeMap((Map) value));
+    } else {
+      comparable = (Comparable) value;
+    }
+    if (indexContainer._minValue == null) {
+      indexContainer._minValue = comparable;
+      indexContainer._maxValue = comparable;
+    } else {
+      if (comparable.compareTo(indexContainer._minValue) < 0) {
+        indexContainer._minValue = comparable;
+      }
+      if (comparable.compareTo(indexContainer._maxValue) > 0) {
+        indexContainer._maxValue = comparable;
+      }
     }
   }
 
