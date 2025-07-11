@@ -20,7 +20,10 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -38,6 +41,7 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
+import org.apache.pinot.query.runtime.operator.ErrorOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
 import org.apache.pinot.query.runtime.operator.IntersectAllOperator;
@@ -58,6 +62,7 @@ import org.apache.pinot.query.runtime.operator.TransformOperator;
 import org.apache.pinot.query.runtime.operator.UnionOperator;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -118,10 +123,14 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitMailboxReceive(MailboxReceiveNode node, OpChainExecutionContext context) {
-      if (node.isSort()) {
-        return new SortedMailboxReceiveOperator(context, node);
-      } else {
-        return new MailboxReceiveOperator(context, node);
+      try {
+        if (node.isSort()) {
+          return new SortedMailboxReceiveOperator(context, node);
+        } else {
+          return new MailboxReceiveOperator(context, node);
+        }
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
       }
     }
 
@@ -132,96 +141,147 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitAggregate(AggregateNode node, OpChainExecutionContext context) {
-      return new AggregateOperator(context, visit(node.getInputs().get(0), context), node);
+      MultiStageOperator child = null;
+      try {
+        child = visit(node.getInputs().get(0), context);
+        return new AggregateOperator(context, child, node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
     }
 
     @Override
     public MultiStageOperator visitWindow(WindowNode node, OpChainExecutionContext context) {
-      PlanNode input = node.getInputs().get(0);
-      return new WindowAggregateOperator(context, visit(input, context), input.getDataSchema(), node);
+      MultiStageOperator child = null;
+      try {
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        return new WindowAggregateOperator(context, child, input.getDataSchema(), node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
     }
 
     @Override
     public MultiStageOperator visitSetOp(SetOpNode setOpNode, OpChainExecutionContext context) {
       List<MultiStageOperator> inputOperators = new ArrayList<>(setOpNode.getInputs().size());
-      for (PlanNode input : setOpNode.getInputs()) {
-        inputOperators.add(visit(input, context));
-      }
-      switch (setOpNode.getSetOpType()) {
-        case UNION:
-          return new UnionOperator(context, inputOperators, setOpNode.getInputs().get(0).getDataSchema());
-        case INTERSECT:
-          return setOpNode.isAll() ? new IntersectAllOperator(context, inputOperators,
-              setOpNode.getInputs().get(0).getDataSchema())
-              : new IntersectOperator(context, inputOperators, setOpNode.getInputs().get(0).getDataSchema());
-        case MINUS:
-          return setOpNode.isAll() ? new MinusAllOperator(context, inputOperators,
-              setOpNode.getInputs().get(0).getDataSchema())
-              : new MinusOperator(context, inputOperators, setOpNode.getInputs().get(0).getDataSchema());
-        default:
-          throw new IllegalStateException("Unsupported SetOpType: " + setOpNode.getSetOpType());
+      try {
+        for (PlanNode input : setOpNode.getInputs()) {
+          inputOperators.add(visit(input, context));
+        }
+        switch (setOpNode.getSetOpType()) {
+          case UNION:
+            return new UnionOperator(context, inputOperators, setOpNode.getInputs().get(0).getDataSchema());
+          case INTERSECT:
+            return setOpNode.isAll() ? new IntersectAllOperator(context, inputOperators,
+                setOpNode.getInputs().get(0).getDataSchema())
+                : new IntersectOperator(context, inputOperators, setOpNode.getInputs().get(0).getDataSchema());
+          case MINUS:
+            return setOpNode.isAll() ? new MinusAllOperator(context, inputOperators,
+                setOpNode.getInputs().get(0).getDataSchema())
+                : new MinusOperator(context, inputOperators, setOpNode.getInputs().get(0).getDataSchema());
+          default:
+            throw new IllegalStateException("Unsupported SetOpType: " + setOpNode.getSetOpType());
+        }
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), inputOperators);
       }
     }
 
     @Override
     public MultiStageOperator visitExchange(ExchangeNode exchangeNode, OpChainExecutionContext context) {
-      throw new UnsupportedOperationException("ExchangeNode should not be visited");
+      return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, "ExchangeNode should not be visited");
     }
 
     @Override
     public MultiStageOperator visitFilter(FilterNode node, OpChainExecutionContext context) {
-      return new FilterOperator(context, visit(node.getInputs().get(0), context), node);
+      MultiStageOperator child = null;
+      try {
+        child = visit(node.getInputs().get(0), context);
+        return new FilterOperator(context, child, node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
     }
 
     @Override
     public MultiStageOperator visitJoin(JoinNode node, OpChainExecutionContext context) {
-      List<PlanNode> inputs = node.getInputs();
-      PlanNode left = inputs.get(0);
-      MultiStageOperator leftOperator = visit(left, context);
-      PlanNode right = inputs.get(1);
-      MultiStageOperator rightOperator = visit(right, context);
-      JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
-      switch (joinStrategy) {
-        case HASH:
-          if (node.getLeftKeys().isEmpty()) {
-            // TODO: Consider adding non-equi as a separate join strategy.
-            return new NonEquiJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-          } else {
-            return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-          }
-        case LOOKUP:
-          return new LookupJoinOperator(context, leftOperator, rightOperator, node);
-        case ASOF:
-          return new AsofJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
-        default:
-          throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
+      MultiStageOperator leftOperator = null;
+      MultiStageOperator rightOperator = null;
+      try {
+        List<PlanNode> inputs = node.getInputs();
+        PlanNode left = inputs.get(0);
+        leftOperator = visit(left, context);
+
+        PlanNode right = inputs.get(1);
+        rightOperator = visit(right, context);
+
+        JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
+        switch (joinStrategy) {
+          case HASH:
+            if (node.getLeftKeys().isEmpty()) {
+              // TODO: Consider adding non-equi as a separate join strategy.
+              return new NonEquiJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+            } else {
+              return new HashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+            }
+          case LOOKUP:
+            return new LookupJoinOperator(context, leftOperator, rightOperator, node);
+          case ASOF:
+            return new AsofJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+          default:
+            throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
+        }
+      } catch (Exception e) {
+        List<MultiStageOperator> children = Stream.of(leftOperator, rightOperator)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), children);
       }
     }
 
     @Override
     public MultiStageOperator visitProject(ProjectNode node, OpChainExecutionContext context) {
-      PlanNode input = node.getInputs().get(0);
-      return new TransformOperator(context, visit(input, context), input.getDataSchema(), node);
+      MultiStageOperator child = null;
+      try {
+        PlanNode input = node.getInputs().get(0);
+        child = visit(input, context);
+        return new TransformOperator(context, child, input.getDataSchema(), node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
     }
 
     @Override
     public MultiStageOperator visitSort(SortNode node, OpChainExecutionContext context) {
-      return new SortOperator(context, visit(node.getInputs().get(0), context), node);
+      MultiStageOperator child = null;
+      try {
+        child = visit(node.getInputs().get(0), context);
+        return new SortOperator(context, child, node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
+      }
     }
 
     @Override
     public MultiStageOperator visitTableScan(TableScanNode node, OpChainExecutionContext context) {
-      throw new UnsupportedOperationException("Plan node of type TableScanNode is not supported!");
+      return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION,
+          "Plan node of type TableScanNode is not supported in OpChain execution.");
     }
 
     @Override
     public MultiStageOperator visitValue(ValueNode node, OpChainExecutionContext context) {
-      return new LiteralValueOperator(context, node);
+      try {
+        return new LiteralValueOperator(context, node);
+      } catch (Exception e) {
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+      }
     }
 
     @Override
     public MultiStageOperator visitExplained(ExplainedNode node, OpChainExecutionContext context) {
-      throw new UnsupportedOperationException("Plan node of type ExplainedNode is not supported!");
+      return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION,
+          "Plan node of type ExplainedNode is not supported in OpChain execution.");
     }
   }
 }

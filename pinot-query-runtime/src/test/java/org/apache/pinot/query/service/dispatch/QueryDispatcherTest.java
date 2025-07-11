@@ -164,8 +164,11 @@ public class QueryDispatcherTest extends QueryTestSet {
     DispatchableSubPlan dispatchableSubPlan = _queryEnvironment.planQuery(sql);
     try {
       // will throw b/c mailboxService is mocked
-      _queryDispatcher.submitAndReduce(context, dispatchableSubPlan, 10_000L, Collections.emptyMap());
-      Assert.fail("Method call above should have failed");
+      QueryDispatcher.QueryResult queryResult = _queryDispatcher.submitAndReduce(context, dispatchableSubPlan,
+          10_000L, Collections.emptyMap());
+      if (queryResult.getProcessingException() == null) {
+        Assert.fail("Method call above should have failed");
+      }
     } catch (NullPointerException e) {
       // Expected
     }
