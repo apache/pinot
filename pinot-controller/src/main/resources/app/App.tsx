@@ -91,10 +91,12 @@ export const App = () => {
 
   const getRouterData = () => {
     if (app_state.queryConsoleOnlyView) {
-      return RouterData.filter((routeObj) => { return routeObj.path === '/query' });
+      return RouterData.filter((routeObj) => {
+        return routeObj.path === '/query' || routeObj.path === '/query/timeseries';
+      });
     }
     if (app_state.hideQueryConsoleTab) {
-      return RouterData.filter((routeObj) => routeObj.path !== '/query');
+      return RouterData.filter((routeObj) => routeObj.path !== '/query' && routeObj.path !== '/query/timeseries');
     }
     return RouterData;
   };
