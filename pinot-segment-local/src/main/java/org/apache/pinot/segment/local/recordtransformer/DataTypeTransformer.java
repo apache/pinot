@@ -30,6 +30,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -56,11 +57,8 @@ public class DataTypeTransformer implements RecordTransformer {
         _dataTypes.put(fieldSpec.getName(), PinotDataType.getPinotDataTypeForIngestion(fieldSpec));
       }
     }
-    if (tableConfig.getIngestionConfig() != null) {
-      _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
-    } else {
-      _continueOnError = false;
-    }
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
   }
 
   @Override
@@ -69,7 +67,7 @@ public class DataTypeTransformer implements RecordTransformer {
   }
 
   @Override
-  public GenericRow transform(GenericRow record) {
+  public void transform(GenericRow record) {
     for (Map.Entry<String, PinotDataType> entry : _dataTypes.entrySet()) {
       String column = entry.getKey();
       try {
@@ -122,14 +120,12 @@ public class DataTypeTransformer implements RecordTransformer {
       } catch (Exception e) {
         if (!_continueOnError) {
           throw new RuntimeException("Caught exception while transforming data type for column: " + column, e);
-        } else {
-          LOGGER.debug("Caught exception while transforming data type for column: {}", column, e);
-          record.putValue(column, null);
-          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
         }
+        LOGGER.debug("Caught exception while transforming data type for column: {}", column, e);
+        record.putValue(column, null);
+        record.markIncomplete();
       }
     }
-    return record;
   }
 
   /**

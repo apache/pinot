@@ -402,6 +402,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     int defaultLiteModeServerStageLimit = _config.getProperty(
         CommonConstants.Broker.CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT,
         CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
+    String defaultHashFunction = _config.getProperty(
+        CommonConstants.Broker.CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION,
+        CommonConstants.Broker.DEFAULT_BROKER_DEFAULT_HASH_FUNCTION);
     boolean caseSensitive = !_config.getProperty(
         CommonConstants.Helix.ENABLE_CASE_INSENSITIVE_KEY,
         CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
@@ -422,6 +425,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)
         .defaultLiteModeServerStageLimit(defaultLiteModeServerStageLimit)
+        .defaultHashFunction(defaultHashFunction)
         .build();
   }
 
@@ -522,7 +526,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     onQueryStart(requestId, clientRequestId, query.getTextQuery());
 
     try {
-      Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE);
+      String workloadName = QueryOptionsUtils.getWorkloadName(query.getOptions());
+      Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), ThreadExecutionContext.TaskType.MSE,
+          workloadName);
 
       long executionStartTimeNs = System.nanoTime();
       QueryDispatcher.QueryResult queryResults;
@@ -592,6 +598,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       if (brokerResponse.isNumGroupsLimitReached()) {
         for (String table : tableNames) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
+        }
+      }
+
+      if (brokerResponse.isGroupsTrimmed()) {
+        for (String table : tableNames) {
+          _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
         }
       }
 

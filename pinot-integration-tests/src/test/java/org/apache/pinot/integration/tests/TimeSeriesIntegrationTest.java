@@ -37,7 +37,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
@@ -309,7 +308,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     return new org.apache.avro.Schema.Field(name, org.apache.avro.Schema.create(type), null, null);
   }
 
-  private static GenericData.@NotNull Record getRecord(org.apache.avro.Schema avroSchema, int i) {
+  private static GenericData.Record getRecord(org.apache.avro.Schema avroSchema, int i) {
     GenericData.Record record = new GenericData.Record(avroSchema);
     // Do not set DATA_START_TIME_SEC for easier assertion of values.
     record.put(TS_COLUMN, (DATA_START_TIME_SEC + 1 + i) * 1000L);

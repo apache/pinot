@@ -26,6 +26,7 @@ import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,8 +73,13 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
           (int) (System.currentTimeMillis() - deserializationStartTimeMs));
       long requestID = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
+      String workloadName = dataTable.getMetadata().get(DataTable.MetadataKey.WORKLOAD_NAME.getName());
+      // QUERY scope - keyed by requestId
       Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(String.valueOf(requestID),
-          resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes());
+          resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes(), TrackingScope.QUERY);
+      // WORKLOAD scope - keyed by workloadName
+      Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(workloadName,
+          resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes(), TrackingScope.WORKLOAD);
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);

@@ -48,9 +48,12 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
-import org.junit.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 /**
@@ -218,9 +221,8 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY);
     String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("\"errorCode\":"
-        + QueryErrorCode.QUERY_CANCELLATION.getId()));
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("got killed because"));
+    assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptionsNode);
+    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -233,10 +235,9 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     long offlineResponseSerMemAllocatedBytes = queryResponse.get("offlineResponseSerMemAllocatedBytes").asLong();
     long offlineTotalMemAllocatedBytes = queryResponse.get("offlineTotalMemAllocatedBytes").asLong();
 
-    Assert.assertTrue(offlineThreadMemAllocatedBytes > 0);
-    Assert.assertTrue(offlineResponseSerMemAllocatedBytes > 0);
-    Assert.assertEquals(offlineTotalMemAllocatedBytes,
-        offlineThreadMemAllocatedBytes + offlineResponseSerMemAllocatedBytes);
+    assertTrue(offlineThreadMemAllocatedBytes > 0);
+    assertTrue(offlineResponseSerMemAllocatedBytes > 0);
+    assertEquals(offlineThreadMemAllocatedBytes + offlineResponseSerMemAllocatedBytes, offlineTotalMemAllocatedBytes);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -247,9 +248,8 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     JsonNode queryResponse = postQuery(OOM_QUERY_SELECTION_ONLY);
 
     String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("\"errorCode\":"
-        + QueryErrorCode.QUERY_CANCELLATION.getId()));
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("got killed because"));
+    assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptionsNode);
+    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -259,7 +259,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
     String exceptionsNode = queryResponse.get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("got killed because"));
+    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -302,10 +302,10 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     );
     countDownLatch.await();
     String exceptionsNode = queryResponse1.get().get("exceptions").toString();
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("\"errorCode\":503"));
-    Assert.assertTrue(exceptionsNode, exceptionsNode.contains("got killed because"));
-    Assert.assertFalse(exceptionsNode, StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
-    Assert.assertFalse(exceptionsNode, StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
+    assertTrue(exceptionsNode.contains("\"errorCode\":503"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()), exceptionsNode);
+    assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()), exceptionsNode);
   }
 
   private List<File> createAvroFile()

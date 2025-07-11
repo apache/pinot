@@ -18,14 +18,11 @@
  */
 package org.apache.pinot.common.data;
 
-import javax.annotation.Nonnull;
-
-
 public class Segment {
   private final String _tableNameWithType;
   private final String _segmentName;
 
-  public Segment(@Nonnull String tableNameWithType, @Nonnull String segmentName) {
+  public Segment(String tableNameWithType, String segmentName) {
     _tableNameWithType = tableNameWithType;
     _segmentName = segmentName;
   }

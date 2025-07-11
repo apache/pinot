@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executor;
 import javax.annotation.Nonnegative;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -81,7 +80,7 @@ public class TableSizeReader {
    * @return
    */
   @Nullable
-  public TableSizeDetails getTableSizeDetails(@Nonnull String tableName, @Nonnegative int timeoutMsec,
+  public TableSizeDetails getTableSizeDetails(String tableName, @Nonnegative int timeoutMsec,
       boolean includeReplacedSegments)
       throws InvalidConfigException {
     Preconditions.checkNotNull(tableName, "Table name should not be null");

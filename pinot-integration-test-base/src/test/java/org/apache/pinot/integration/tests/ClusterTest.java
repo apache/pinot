@@ -786,6 +786,15 @@ public abstract class ClusterTest extends ControllerTest {
     return null; // TODO
   }
 
+  /**
+   * Execute a query and extract the count result
+   */
+  protected int getQueryNumResultRows(String query) throws Exception {
+    JsonNode response = postQuery(query);
+    JsonNode resTbl = response.get("resultTable");
+    return (resTbl == null || resTbl.get("rows").isEmpty()) ? 0 : resTbl.get("rows").get(0).get(0).asInt();
+  }
+
   private Map<String, String> getExtraQueryPropertiesForController() {
     if (!useMultiStageQueryEngine()) {
       return Map.of();

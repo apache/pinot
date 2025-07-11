@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -162,6 +163,48 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _expressionOverrideHints = expressionOverrideHints;
     _explain = explain;
+  }
+
+  private boolean isSameOrderAndGroupByColumns(QueryContext context) {
+    List<ExpressionContext> groupByKeys = context.getGroupByExpressions();
+    List<OrderByExpressionContext> orderByKeys = context.getOrderByExpressions();
+
+    if (groupByKeys == null || groupByKeys.isEmpty()) {
+      return orderByKeys == null || orderByKeys.isEmpty();
+    } else if (orderByKeys == null || orderByKeys.isEmpty()) {
+      return false;
+    }
+
+    BitSet orderByKeysMatched = new BitSet(orderByKeys.size());
+
+    OUTER_GROUP:
+    for (ExpressionContext groupExp : groupByKeys) {
+      for (int i = 0; i < orderByKeys.size(); i++) {
+        OrderByExpressionContext orderExp = orderByKeys.get(i);
+        if (groupExp.equals(orderExp.getExpression())) {
+          orderByKeysMatched.set(i);
+          continue OUTER_GROUP;
+        }
+      }
+
+      return false;
+    }
+
+    OUTER_ORDER:
+    for (int i = 0, n = orderByKeys.size(); i < n; i++) {
+      if (orderByKeysMatched.get(i)) {
+        continue;
+      }
+
+      for (ExpressionContext groupExp : groupByKeys) {
+        if (groupExp.equals(orderByKeys.get(i).getExpression())) {
+          continue OUTER_ORDER;
+        }
+      }
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -518,6 +561,10 @@ public class QueryContext {
 
   public boolean isIndexUseAllowed(DataSource dataSource, FieldConfig.IndexType indexType) {
     return isIndexUseAllowed(dataSource.getColumnName(), indexType);
+  }
+
+  public boolean isUnsafeTrim() {
+    return !isSameOrderAndGroupByColumns(this) || getHavingFilter() != null;
   }
 
   public static class Builder {

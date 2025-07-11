@@ -28,7 +28,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.StandardOpenOption;
-import javax.validation.constraints.NotNull;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.segment.local.io.util.VarLengthValueWriter;
@@ -292,7 +291,7 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     _dictVarDictFile = new File(_intermediateFilesDir, _column + ".var.dict");
     _dictVarDict = new VarLengthValueWriter(_dictVarDictFile, dictVarDictSize);
     _dictVarDictSize = dictVarDictSize;
-    _dictVarIdFwdIndexFile = new File(_dictVarIdFwdIndexFile, _column + ".dictVars");
+    _dictVarIdFwdIndexFile = new File(_intermediateFilesDir, _column + ".dictVars");
     _dictVarIdFwdIndex =
         new VarByteChunkForwardIndexWriterV5(_dictVarIdFwdIndexFile, chunkCompressionType, _targetChunkSize);
 
@@ -341,7 +340,7 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
    *
    * @param clpEncodedMessage The encoded message to append, must not be null.
    */
-  public void appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage) {
+  public void appendEncodedMessage(EncodedMessage clpEncodedMessage) {
     if (_isClpEncoded) {
       // Logtype
       _logtypeIdFwdIndex.putInt(_mutableLogtypeDict.index(clpEncodedMessage.getLogtype()));
@@ -398,8 +397,6 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
 
       // Write intermediate files to memory mapped buffer
       long totalSize = 0;
-      _fileBuffer.putInt(MAGIC_BYTES.length);
-      totalSize += Integer.BYTES;
       _fileBuffer.put(MAGIC_BYTES);
       totalSize += MAGIC_BYTES.length;
 

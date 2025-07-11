@@ -28,6 +28,8 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -66,6 +68,7 @@ public class PhysicalPlannerContext {
   private final boolean _runInBroker;
   private final boolean _useBrokerPruning;
   private final int _liteModeServerStageLimit;
+  private final DistHashFunction _defaultHashFunction;
 
   /**
    * Used by controller when it needs to extract table names from the query.
@@ -82,18 +85,20 @@ public class PhysicalPlannerContext {
     _runInBroker = CommonConstants.Broker.DEFAULT_RUN_IN_BROKER;
     _useBrokerPruning = CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING;
     _liteModeServerStageLimit = CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT;
+    _defaultHashFunction = DistHashFunction.valueOf(KeySelector.DEFAULT_HASH_ALGORITHM.toUpperCase());
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
       String instanceId, Map<String, String> queryOptions) {
     this(routingManager, hostName, port, requestId, instanceId, queryOptions,
         CommonConstants.Broker.DEFAULT_USE_LITE_MODE, CommonConstants.Broker.DEFAULT_RUN_IN_BROKER,
-        CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING, CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT);
+        CommonConstants.Broker.DEFAULT_USE_BROKER_PRUNING, CommonConstants.Broker.DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT,
+        KeySelector.DEFAULT_HASH_ALGORITHM);
   }
 
   public PhysicalPlannerContext(RoutingManager routingManager, String hostName, int port, long requestId,
       String instanceId, Map<String, String> queryOptions, boolean defaultUseLiteMode, boolean defaultRunInBroker,
-      boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit) {
+      boolean defaultUseBrokerPruning, int defaultLiteModeLeafStageLimit, String defaultHashFunction) {
     _routingManager = routingManager;
     _hostName = hostName;
     _port = port;
@@ -105,6 +110,7 @@ public class PhysicalPlannerContext {
     _useBrokerPruning = QueryOptionsUtils.isUseBrokerPruning(_queryOptions, defaultUseBrokerPruning);
     _liteModeServerStageLimit = QueryOptionsUtils.getLiteModeServerStageLimit(_queryOptions,
         defaultLiteModeLeafStageLimit);
+    _defaultHashFunction = DistHashFunction.valueOf(defaultHashFunction.toUpperCase());
     _instanceIdToQueryServerInstance.put(instanceId, getBrokerQueryServerInstance());
   }
 
@@ -173,6 +179,10 @@ public class PhysicalPlannerContext {
     Random random = ThreadLocalRandom.current();
     return _instanceIdToQueryServerInstance.keySet().stream().filter(instanceId -> !_instanceId.equals(instanceId))
         .collect(Collectors.toList()).get(numCandidates == 1 ? 0 : random.nextInt(numCandidates - 1));
+  }
+
+  public DistHashFunction getDefaultHashFunction() {
+    return _defaultHashFunction;
   }
 
   private QueryServerInstance getBrokerQueryServerInstance() {

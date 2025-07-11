@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.transform.transformer.datetime;
 
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.operator.transform.transformer.DataTransformer;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
@@ -216,7 +215,7 @@ public abstract class BaseDateTimeTransformer<I, O> implements DataTransformer<I
     return _dateTime;
   }
 
-  protected long transformSDFToMillis(@Nonnull String sdfTime) {
+  protected long transformSDFToMillis(String sdfTime) {
     return _inputDateTimeFormatter.parseMillis(sdfTime);
   }
 

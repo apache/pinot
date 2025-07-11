@@ -87,6 +87,7 @@ import org.apache.pinot.core.util.ListenerConfigUtil;
 import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneIndexRefreshManager;
 import org.apache.pinot.segment.local.realtime.impl.invertedindex.RealtimeLuceneTextIndexSearcherPool;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.local.utils.SegmentAllIndexPreprocessThrottler;
 import org.apache.pinot.segment.local.utils.SegmentDownloadThrottler;
 import org.apache.pinot.segment.local.utils.SegmentMultiColTextIndexPreprocessThrottler;
@@ -260,6 +261,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     DataTableBuilderFactory.setDataTableVersion(dataTableVersion);
 
     _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+
+    // Register configuration change listener for dynamic max clause count updates
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(
+        new TextIndexUtils.LuceneMaxClauseCountConfigChangeListener());
+    LOGGER.info("Registered Lucene max clause count configuration change listener");
 
     LOGGER.info("Initializing Helix manager with zkAddress: {}, clusterName: {}, instanceId: {}", _zkAddress,
         _helixClusterName, _instanceId);
@@ -663,14 +669,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
               segmentDownloadThrottler, segmentMultiColTextIndexPreprocessThrottler);
     }
 
-    SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
-    ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-        sendStatsPredicate);
-    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
-
-    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
-    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
     // initialize the thread accountant for query killing
     Tracing.ThreadAccountantOps.initializeThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
@@ -679,6 +677,15 @@ public abstract class BaseServerStarter implements ServiceStartable {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
           Tracing.getThreadAccountant().getClusterConfigChangeListener());
     }
+
+    SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
+    ServerConf serverConf = new ServerConf(_serverConf);
+    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
+        sendStatsPredicate, Tracing.getThreadAccountant());
+    ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
+
+    InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
+    instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =

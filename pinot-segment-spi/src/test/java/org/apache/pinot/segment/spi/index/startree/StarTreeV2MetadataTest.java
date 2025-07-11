@@ -27,8 +27,8 @@ import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.testng.annotations.Test;
 
-import static org.testng.AssertJUnit.assertEquals;
-import static org.testng.AssertJUnit.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class StarTreeV2MetadataTest {
@@ -42,7 +42,7 @@ public class StarTreeV2MetadataTest {
     Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
-    assertEquals(expected, actual);
+    assertEquals(actual, expected);
   }
 
   @Test
@@ -60,7 +60,7 @@ public class StarTreeV2MetadataTest {
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     TreeMap<AggregationFunctionColumnPair, AggregationSpec> actual = starTreeV2Metadata.getAggregationSpecs();
     expected.remove(rawThetaColumnPair);
-    assertEquals(expected, actual);
+    assertEquals(actual, expected);
     assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
   }
 
@@ -73,7 +73,7 @@ public class StarTreeV2MetadataTest {
     Configuration metadataProperties = createMetadata(List.of("dimX"), expected);
     StarTreeV2Metadata starTreeV2Metadata = new StarTreeV2Metadata(metadataProperties);
     Set<AggregationFunctionColumnPair> actual = starTreeV2Metadata.getFunctionColumnPairs();
-    assertEquals(expected, actual);
+    assertEquals(actual, expected);
   }
 
   @Test
@@ -92,7 +92,7 @@ public class StarTreeV2MetadataTest {
     Set<AggregationFunctionColumnPair> actual = starTreeV2Metadata.getFunctionColumnPairs();
 
     expected.remove(rawThetaColumnPair);
-    assertEquals(expected, actual);
+    assertEquals(actual, expected);
     assertTrue(starTreeV2Metadata.containsFunctionColumnPair(thetaColumnPair));
   }
 

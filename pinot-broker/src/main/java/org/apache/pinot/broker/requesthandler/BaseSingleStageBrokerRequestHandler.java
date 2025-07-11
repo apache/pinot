@@ -322,7 +322,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     _queryLogger.log(requestId, query);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
-    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
+    String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
+    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId), workloadName);
 
     try {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
@@ -810,6 +811,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     if (brokerResponse.isNumGroupsLimitReached()) {
       _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED,
           1);
+    }
+    if (brokerResponse.isGroupsTrimmed()) {
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
     }
 
     // server returns STRING as default dataType for all columns in (some) scenarios where no rows are returned
@@ -1904,7 +1908,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
    * TODO: come up with other criteria for forcing a log and come up with better numbers
    */
   private boolean forceLog(BrokerResponse brokerResponse, long totalTimeMs) {
-    if (brokerResponse.isNumGroupsLimitReached()) {
+    if (brokerResponse.isNumGroupsLimitReached() || brokerResponse.isGroupsTrimmed()) {
       return true;
     }
 
