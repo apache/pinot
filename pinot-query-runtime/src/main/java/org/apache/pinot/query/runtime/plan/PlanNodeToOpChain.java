@@ -20,7 +20,10 @@ package org.apache.pinot.query.runtime.plan;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -138,27 +141,31 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitAggregate(AggregateNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
       try {
-        return new AggregateOperator(context, visit(node.getInputs().get(0), context), node);
+        child = visit(node.getInputs().get(0), context);
+        return new AggregateOperator(context, child, node);
       } catch (Exception e) {
-        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
     }
 
     @Override
     public MultiStageOperator visitWindow(WindowNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
       try {
         PlanNode input = node.getInputs().get(0);
-        return new WindowAggregateOperator(context, visit(input, context), input.getDataSchema(), node);
+        child = visit(input, context);
+        return new WindowAggregateOperator(context, child, input.getDataSchema(), node);
       } catch (Exception e) {
-        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
     }
 
     @Override
     public MultiStageOperator visitSetOp(SetOpNode setOpNode, OpChainExecutionContext context) {
+      List<MultiStageOperator> inputOperators = new ArrayList<>(setOpNode.getInputs().size());
       try {
-        List<MultiStageOperator> inputOperators = new ArrayList<>(setOpNode.getInputs().size());
         for (PlanNode input : setOpNode.getInputs()) {
           inputOperators.add(visit(input, context));
         }
@@ -177,7 +184,7 @@ public class PlanNodeToOpChain {
             throw new IllegalStateException("Unsupported SetOpType: " + setOpNode.getSetOpType());
         }
       } catch (Exception e) {
-        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), inputOperators);
       }
     }
 
@@ -188,21 +195,27 @@ public class PlanNodeToOpChain {
 
     @Override
     public MultiStageOperator visitFilter(FilterNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
       try {
-        return new FilterOperator(context, visit(node.getInputs().get(0), context), node);
+        child = visit(node.getInputs().get(0), context);
+        return new FilterOperator(context, child, node);
       } catch (Exception e) {
-        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
     }
 
     @Override
     public MultiStageOperator visitJoin(JoinNode node, OpChainExecutionContext context) {
+      MultiStageOperator leftOperator = null;
+      MultiStageOperator rightOperator = null;
       try {
         List<PlanNode> inputs = node.getInputs();
         PlanNode left = inputs.get(0);
-        MultiStageOperator leftOperator = visit(left, context);
+        leftOperator = visit(left, context);
+
         PlanNode right = inputs.get(1);
-        MultiStageOperator rightOperator = visit(right, context);
+        rightOperator = visit(right, context);
+
         JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
         switch (joinStrategy) {
           case HASH:
@@ -220,26 +233,33 @@ public class PlanNodeToOpChain {
             throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
         }
       } catch (Exception e) {
-        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+        List<MultiStageOperator> children = Stream.of(leftOperator, rightOperator)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), children);
       }
     }
 
     @Override
     public MultiStageOperator visitProject(ProjectNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
       try {
         PlanNode input = node.getInputs().get(0);
-        return new TransformOperator(context, visit(input, context), input.getDataSchema(), node);
+        child = visit(input, context);
+        return new TransformOperator(context, child, input.getDataSchema(), node);
       } catch (Exception e) {
-        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
     }
 
     @Override
     public MultiStageOperator visitSort(SortNode node, OpChainExecutionContext context) {
+      MultiStageOperator child = null;
       try {
-        return new SortOperator(context, visit(node.getInputs().get(0), context), node);
+        child = visit(node.getInputs().get(0), context);
+        return new SortOperator(context, child, node);
       } catch (Exception e) {
-        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), child);
       }
     }
 

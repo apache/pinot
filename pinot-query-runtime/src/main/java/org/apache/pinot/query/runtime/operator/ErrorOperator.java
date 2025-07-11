@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
@@ -35,12 +36,25 @@ public class ErrorOperator extends MultiStageOperator {
   private final QueryErrorCode _errorCode;
   private final String _errorMessage;
   private final StatMap<LiteralValueOperator.StatKey> _statMap = new StatMap<>(LiteralValueOperator.StatKey.class);
+  private final List<MultiStageOperator> _childOperators;
+
 
   public ErrorOperator(OpChainExecutionContext context, QueryErrorCode errorCode,
       String errorMessage) {
+    this(context, errorCode, errorMessage, List.of());
+  }
+
+  public ErrorOperator(OpChainExecutionContext context, QueryErrorCode errorCode,
+      String errorMessage, @Nullable MultiStageOperator childOperator) {
+    this(context, errorCode, errorMessage, childOperator == null ? List.of() : List.of(childOperator));
+  }
+
+  public ErrorOperator(OpChainExecutionContext context, QueryErrorCode errorCode,
+      String errorMessage, List<MultiStageOperator> childOperators) {
     super(context);
     _errorCode = errorCode;
     _errorMessage = errorMessage;
+    _childOperators = childOperators;
   }
 
   @Override
@@ -71,7 +85,7 @@ public class ErrorOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return List.of();
+    return _childOperators;
   }
 
   protected StatMap<?> copyStatMaps() {
