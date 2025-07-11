@@ -521,7 +521,7 @@ public class ResourceManagerAccountingTest {
     FileUtils.forceMkdir(indexDir);
     String colName = "col";
     try (JsonIndexCreator offHeapIndexCreator = new OffHeapJsonIndexCreator(indexDir, colName, "myTable_OFFLINE",
-        new JsonIndexConfig());
+        false, new JsonIndexConfig());
         MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(new JsonIndexConfig(), "table__0__1", "col")) {
       // build json indexes
       for (int i = 0; i < 1000000; i++) {

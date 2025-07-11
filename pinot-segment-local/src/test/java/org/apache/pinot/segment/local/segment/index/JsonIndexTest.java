@@ -397,9 +397,24 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
    */
   private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records)
       throws IOException {
+    createIndex(createOnHeap, jsonIndexConfig, records, false);
+  }
+
+  /**
+   * Creates a JSON index with the given config and adds the given records
+   * @param createOnHeap Whether to create an on-heap index
+   * @param jsonIndexConfig the JSON index config
+   * @param records the records to be added to the index
+   * @param continueOnError whether continueOnError should be enabled or disabled
+   * @throws IOException on error
+   */
+  private void createIndex(boolean createOnHeap, JsonIndexConfig jsonIndexConfig, String[] records, boolean continueOnError)
+      throws IOException {
     try (JsonIndexCreator indexCreator = createOnHeap
-        ? new OnHeapJsonIndexCreator(INDEX_DIR, ON_HEAP_COLUMN_NAME, "myTable_OFFLINE", jsonIndexConfig)
-        : new OffHeapJsonIndexCreator(INDEX_DIR, OFF_HEAP_COLUMN_NAME, "myTable_OFFLINE", jsonIndexConfig)) {
+        ? new OnHeapJsonIndexCreator(INDEX_DIR, ON_HEAP_COLUMN_NAME, "myTable_OFFLINE", continueOnError,
+        jsonIndexConfig)
+        : new OffHeapJsonIndexCreator(INDEX_DIR, OFF_HEAP_COLUMN_NAME, "myTable_OFFLINE", continueOnError,
+            jsonIndexConfig)) {
       for (String record : records) {
         indexCreator.add(record);
       }
@@ -454,7 +469,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
 
     String colName = "col";
     try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, "myTable_OFFLINE",
-        getIndexConfig());
+        false, getIndexConfig());
         MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col")) {
       for (String record : records) {
         offHeapCreator.add(record);
@@ -524,7 +539,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
 
     String colName = "col";
     try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, "myTable_OFFLINE",
-        getIndexConfig());
+        false, getIndexConfig());
         MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col")) {
       for (String record : records) {
         offHeapCreator.add(record);
@@ -819,7 +834,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
   }
 
   @Test
-  public void testSkipInvalidJsonEnable() throws Exception {
+  public void testSkipInvalidJsonEnableContinueOnErrorFalse() throws Exception {
     JsonIndexConfig jsonIndexConfig = getIndexConfig();
     jsonIndexConfig.setSkipInvalidJson(true);
     // the braces don't match and cannot be parsed
@@ -851,8 +866,68 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     }
   }
 
+  @Test
+  public void testSkipInvalidJsonEnableContinueOnErrorTrue() throws Exception {
+    JsonIndexConfig jsonIndexConfig = getIndexConfig();
+    jsonIndexConfig.setSkipInvalidJson(true);
+    // the braces don't match and cannot be parsed
+    String[] records = {"{\"key1\":\"va\""};
+
+    createIndex(true, jsonIndexConfig, records, true);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records, true);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
+        JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+      for (String record : records) {
+        mutableJsonIndex.add(record);
+      }
+      Map<String, RoaringBitmap> onHeapRes = getMatchingDocsMap(onHeapReader, "$");
+      Map<String, RoaringBitmap> offHeapRes = getMatchingDocsMap(offHeapReader, "$");
+      Map<String, RoaringBitmap> mutableRes = mutableJsonIndex.getMatchingFlattenedDocsMap("$", null);
+      Object expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
+      assertEquals(onHeapRes, expectedRes);
+      assertEquals(offHeapRes, expectedRes);
+      assertEquals(mutableRes, expectedRes);
+    }
+  }
+
+  @Test
+  public void testSkipInvalidJsonDisabledContinueOnErrorTrue() throws Exception {
+    // by default, skipInvalidJson is disabled
+    JsonIndexConfig jsonIndexConfig = getIndexConfig();
+    // the braces don't match and cannot be parsed
+    String[] records = {"{\"key1\":\"va\""};
+
+    createIndex(true, jsonIndexConfig, records, true);
+    File onHeapIndexFile = new File(INDEX_DIR, ON_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(onHeapIndexFile.exists());
+
+    createIndex(false, jsonIndexConfig, records, true);
+    File offHeapIndexFile = new File(INDEX_DIR, OFF_HEAP_COLUMN_NAME + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
+    assertTrue(offHeapIndexFile.exists());
+
+    try (PinotDataBuffer onHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
+        PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
+        JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
+        JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length)) {
+      Map<String, RoaringBitmap> onHeapRes = getMatchingDocsMap(onHeapReader, "$");
+      Map<String, RoaringBitmap> offHeapRes = getMatchingDocsMap(offHeapReader, "$");
+      Object expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
+      assertEquals(onHeapRes, expectedRes);
+      assertEquals(offHeapRes, expectedRes);
+    }
+  }
+
   @Test(expectedExceptions = JsonProcessingException.class)
-  public void testSkipInvalidJsonDisabled() throws Exception {
+  public void testSkipInvalidJsonDisabledContinueOnErrorFalse() throws Exception {
     // by default, skipInvalidJson is disabled
     JsonIndexConfig jsonIndexConfig = getIndexConfig();
     // the braces don't match and cannot be parsed
