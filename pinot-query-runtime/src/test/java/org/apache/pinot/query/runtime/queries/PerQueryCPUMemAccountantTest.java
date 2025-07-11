@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
+import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
@@ -71,7 +72,7 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
     }
   }
 
-  CountDownLatch submitLatch = new CountDownLatch(1);
+  CountDownLatch _submitLatch = new CountDownLatch(1);
 
   @Override
   protected ThreadResourceUsageAccountant getThreadResourceUsageAccountant() {
@@ -102,12 +103,38 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
     HashMap<String, Object> configs = getAccountingConfig();
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE, false);
 
-      try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
-      tracing.when(Tracing::getThreadAccountant).thenReturn(_accountant);
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
+        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
+            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
+
+    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
+      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
       ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
       Assert.assertEquals(resultTable.getRows().size(), 2);
 
-      Map<String, ? extends QueryResourceTracker> resources = _accountant.getQueryResources();
+      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
+      Assert.assertEquals(resources.size(), 1);
+      Assert.assertEquals(resources.entrySet().iterator().next().getValue().getAllocatedBytes(), 0);
+    }
+  }
+
+  @Test
+  void testDisableSamplingWithResourceUsageAccountantForMSE() {
+    HashMap<String, Object> configs = getAccountingConfig();
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE, false);
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    ResourceUsageAccountantFactory.ResourceUsageAccountant accountant =
+        new ResourceUsageAccountantFactory.ResourceUsageAccountant(new PinotConfiguration(configs),
+            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
+
+    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
+      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
+      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+      Assert.assertEquals(resultTable.getRows().size(), 2);
+
+      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
       Assert.assertEquals(resources.size(), 1);
       Assert.assertEquals(resources.entrySet().iterator().next().getValue().getAllocatedBytes(), 0);
     }
@@ -146,7 +173,7 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
       long requestId, int stageId, Map<String, String> requestMetadataMap) {
     List<CompletableFuture<?>> futures = super.processDistributedStagePlans(dispatchableSubPlan, requestId, stageId,
         requestMetadataMap);
-    submitLatch.countDown();
+    _submitLatch.countDown();
     return futures;
   }
 
@@ -165,7 +192,7 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
         Assert.assertEquals(resultTable.getRows().size(), 2);
       });
 
-      submitLatch.await();
+      _submitLatch.await();
       // TODO: How to programmatically get the request id ?
       final String queryId = "0";
       PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant perQueryAccountant =
