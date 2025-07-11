@@ -87,5 +87,5 @@ public interface InstanceDataManagerConfig {
 
   boolean isUploadSegmentToDeepStore();
 
-  boolean isSkipOriginalFieldInUnnest();
+  boolean isRemoveUnnestedFields();
 }

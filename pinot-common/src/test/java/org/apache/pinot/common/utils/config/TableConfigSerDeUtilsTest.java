@@ -497,7 +497,7 @@ public class TableConfigSerDeUtilsTest {
     assertEquals(ingestionConfig.getComplexTypeConfig().getCollectionNotUnnestedToJson(),
             ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     assertEquals(ingestionConfig.getComplexTypeConfig().getPrefixesToRename(), Collections.emptyMap());
-    assertFalse(ingestionConfig.getComplexTypeConfig().isSkipOriginalFieldInUnnest());
+    assertFalse(ingestionConfig.getComplexTypeConfig().isRemoveUnnestedFields());
   }
 
   private void checkTierConfigList(TableConfig tableConfig) {

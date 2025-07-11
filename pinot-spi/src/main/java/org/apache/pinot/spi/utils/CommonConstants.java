@@ -1008,11 +1008,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_RELOAD_CONSUMING_SEGMENT =
         INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + RELOAD_CONSUMING_SEGMENT;
     public static final boolean DEFAULT_RELOAD_CONSUMING_SEGMENT = true;
-    public static final String REALTIME_COMPLEX_CONFIG_SKIP_ORIGINAL_FIELD_IN_UNNEST =
-            "realtime.complex.config.skipOriginalFieldInUnnest";
-    public static final String CONFIG_OF_REALTIME_COMPLEX_CONFIG_SKIP_ORIGINAL_FIELD_IN_UNNEST =
-        INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + REALTIME_OFFHEAP_ALLOCATION;
-    public static final boolean DEFAULT_REALTIME_COMPLEX_CONFIG_SKIP_ORIGINAL_FIELD_IN_UNNEST = false;
 
     // Query logger related configs
     public static final String CONFIG_OF_QUERY_LOG_MAX_RATE = "pinot.server.query.log.maxRatePerSecond";
@@ -1292,6 +1287,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS =
         "pinot.server.messagesCount.refreshIntervalSeconds";
     public static final int DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS = 30;
+
+    public static final String COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS =
+            "complex.type.transformation.remove.unnestedFields";
+    public static final String CONFIG_OF_COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS =
+            INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS;
+    public static final boolean DEFAULT_COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS = false;
 
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";

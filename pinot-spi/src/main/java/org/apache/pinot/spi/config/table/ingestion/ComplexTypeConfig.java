@@ -48,20 +48,20 @@ public class ComplexTypeConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Map of <prefix, replacement> so matching fields are renamed to start with the replacement")
   private final Map<String, String> _prefixesToRename;
 
-  @JsonPropertyDescription("Skip original fields in unnest")
-  private boolean _skipOriginalFieldInUnnest;
+  @JsonPropertyDescription("Whether to remove unnested fields")
+  private boolean _removeUnnestedFields;
 
   @JsonCreator
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
       @JsonProperty("delimiter") @Nullable String delimiter,
       @JsonProperty("collectionNotUnnestedToJson") @Nullable CollectionNotUnnestedToJson collectionNotUnnestedToJson,
       @JsonProperty("prefixesToRename") @Nullable Map<String, String> prefixesToRename,
-      @JsonProperty("skipOriginalFieldInUnnest") boolean skipOriginalFieldInUnnest) {
+      @JsonProperty("removeUnnestedFields") boolean removeUnnestedFields) {
     _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
-    _skipOriginalFieldInUnnest = skipOriginalFieldInUnnest;
+    _removeUnnestedFields = removeUnnestedFields;
   }
 
   public ComplexTypeConfig(@JsonProperty("fieldsToUnnest") @Nullable List<String> fieldsToUnnest,
@@ -91,11 +91,11 @@ public class ComplexTypeConfig extends BaseJsonConfig {
     return _prefixesToRename;
   }
 
-  public void setSkipOriginalFieldInUnnest(boolean skipOriginalFieldInUnnest) {
-    _skipOriginalFieldInUnnest = skipOriginalFieldInUnnest;
+  public void setRemoveUnnestedFields(boolean removeUnnestedFields) {
+    _removeUnnestedFields = removeUnnestedFields;
   }
 
-  public boolean isSkipOriginalFieldInUnnest() {
-    return _skipOriginalFieldInUnnest;
+  public boolean isRemoveUnnestedFields() {
+    return _removeUnnestedFields;
   }
 }

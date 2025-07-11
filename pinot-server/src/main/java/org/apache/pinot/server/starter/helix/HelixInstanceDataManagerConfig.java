@@ -333,8 +333,8 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   }
 
   @Override
-  public boolean isSkipOriginalFieldInUnnest() {
-    return _serverConfig.getProperty(REALTIME_COMPLEX_CONFIG_SKIP_ORIGINAL_FIELD_IN_UNNEST,
-            DEFAULT_REALTIME_COMPLEX_CONFIG_SKIP_ORIGINAL_FIELD_IN_UNNEST);
+  public boolean isRemoveUnnestedFields() {
+    return _serverConfig.getProperty(CONFIG_OF_COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS,
+            DEFAULT_COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS);
   }
 }
