@@ -292,7 +292,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void registerQueryCancelCallback(String queryId, MseCancelCallback callback) {
+    public void registerMseCancelCallback(String queryId, MseCancelCallback callback) {
       _queryCancelCallbacks.put(queryId, callback);
     }
 
@@ -953,7 +953,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
                   String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                       maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
-              interruptRunnerThread(maxUsageTuple);
+              terminateQuery(maxUsageTuple);
               logTerminatedQuery(maxUsageTuple, _usedBytes);
             } else if (!config.isOomKillQueryEnabled()) {
               LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
@@ -981,14 +981,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                 String.format("Query %s got killed on %s: %s because using %d "
                         + "CPU time exceeding limit of %d ns CPU time", value._queryId, _instanceType, _instanceId,
                     value.getCpuTimeNs(), config.getCpuTimeBasedKillingThresholdNS())));
-            interruptRunnerThread(value);
+            terminateQuery(value);
             logTerminatedQuery(value, _usedBytes);
           }
         }
         logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
       }
 
-      private void interruptRunnerThread(AggregatedStats queryResourceTracker) {
+      private void terminateQuery(AggregatedStats queryResourceTracker) {
         cancelQuery(queryResourceTracker.getQueryId(), queryResourceTracker.getAnchorThread());
         if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
           _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);

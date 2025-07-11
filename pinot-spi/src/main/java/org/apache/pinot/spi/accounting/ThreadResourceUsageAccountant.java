@@ -104,7 +104,7 @@ public interface ThreadResourceUsageAccountant {
    *
    * @param mseCancelCallback the callback to register
    */
-  default void registerQueryCancelCallback(String queryId, MseCancelCallback mseCancelCallback) {
+  default void registerMseCancelCallback(String queryId, MseCancelCallback mseCancelCallback) {
     // Default implementation does nothing. Subclasses can override to register a cancel callback.
   }
 

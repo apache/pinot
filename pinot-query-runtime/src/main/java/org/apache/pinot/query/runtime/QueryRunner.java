@@ -274,7 +274,7 @@ public class QueryRunner {
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
     String requestIdStr = Long.toString(QueryThreadContext.getRequestId());
-    _resourceUsageAccountant.registerQueryCancelCallback(requestIdStr, _mseCancelCallback);
+    _resourceUsageAccountant.registerMseCancelCallback(requestIdStr, _mseCancelCallback);
 
     Runnable runnable = () -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata, parentContext);
     return CompletableFuture.runAsync(runnable, _executorService);
