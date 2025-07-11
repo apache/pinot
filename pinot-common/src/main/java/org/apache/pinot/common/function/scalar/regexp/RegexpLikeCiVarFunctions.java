@@ -16,38 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql;
+package org.apache.pinot.common.function.scalar.regexp;
 
-public enum FilterKind {
-  AND,
-  OR,
-  NOT,
-  EQUALS,
-  NOT_EQUALS,
-  GREATER_THAN,
-  GREATER_THAN_OR_EQUAL,
-  LESS_THAN,
-  LESS_THAN_OR_EQUAL,
-  BETWEEN,
-  RANGE,
-  IN,
-  NOT_IN,
-  LIKE,
-  REGEXP_LIKE, REGEXP_LIKE_CI,
-  TEXT_CONTAINS,
-  TEXT_MATCH,
-  JSON_MATCH,
-  IS_NULL,
-  IS_NOT_NULL,
-  VECTOR_SIMILARITY;
+import java.util.regex.Pattern;
+import org.apache.pinot.spi.annotations.ScalarFunction;
+
+
+/**
+ * Case-insensitive regexp_like implementation for variable pattern.
+ */
+public class RegexpLikeCiVarFunctions {
+  private RegexpLikeCiVarFunctions() {
+  }
 
   /**
-   * Helper method that returns true if the enum maps to a Range.
-   *
-   * @return True if the enum is of Range type, false otherwise.
+   * Returns true if the input string matches the given regular expression (case-insensitive, variable pattern).
    */
-  public boolean isRange() {
-    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
-        || this == BETWEEN || this == RANGE;
+  @ScalarFunction
+  public static boolean regexpLikeCiVar(String inputStr, String regexPatternStr) {
+    Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+    return pattern.matcher(inputStr).find();
   }
 }

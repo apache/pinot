@@ -16,38 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql;
-
-public enum FilterKind {
-  AND,
-  OR,
-  NOT,
-  EQUALS,
-  NOT_EQUALS,
-  GREATER_THAN,
-  GREATER_THAN_OR_EQUAL,
-  LESS_THAN,
-  LESS_THAN_OR_EQUAL,
-  BETWEEN,
-  RANGE,
-  IN,
-  NOT_IN,
-  LIKE,
-  REGEXP_LIKE, REGEXP_LIKE_CI,
-  TEXT_CONTAINS,
-  TEXT_MATCH,
-  JSON_MATCH,
-  IS_NULL,
-  IS_NOT_NULL,
-  VECTOR_SIMILARITY;
-
-  /**
-   * Helper method that returns true if the enum maps to a Range.
-   *
-   * @return True if the enum is of Range type, false otherwise.
-   */
-  public boolean isRange() {
-    return this == GREATER_THAN || this == GREATER_THAN_OR_EQUAL || this == LESS_THAN || this == LESS_THAN_OR_EQUAL
-        || this == BETWEEN || this == RANGE;
+package org.apache.pinot.segment.local.segment.index.fst;
+import com.google.auto.service.AutoService;
+import org.apache.pinot.segment.spi.index.IndexPlugin;
+@AutoService(IndexPlugin.class)
+public class IFSTIndexPlugin implements IndexPlugin<IFSTIndexType> {
+  private static final IFSTIndexType INSTANCE = new IFSTIndexType();
+  @Override
+  public IFSTIndexType getIndexType() {
+    return INSTANCE;
   }
 }

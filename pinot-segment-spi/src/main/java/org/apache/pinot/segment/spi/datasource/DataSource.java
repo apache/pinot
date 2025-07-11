@@ -104,6 +104,12 @@ public interface DataSource {
   TextIndexReader getFSTIndex();
 
   /**
+   * Returns the IFST index for the column if exists, or {@code null} if not.
+   */
+  @Nullable
+  TextIndexReader getIFSTIndex();
+
+  /**
    * Returns the json index for the column if exists, or {@code null} if not.
    */
   @Nullable

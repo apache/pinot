@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv.text;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -26,23 +25,22 @@ import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-
 /**
- * This index works only for dictionary enabled columns. It requires entries be added into this index in sorted
- * order and it creates a mapping from sorted entry to the index underneath. This index stores key (column value)
- * to dictionary id as an entry.
+ * Case-insensitive FST index creator that works only for dictionary enabled columns.
+ * It requires entries be added into this index in sorted order and it creates a mapping
+ * from sorted entry to the index underneath. This index stores key (column value)
+ * to dictionary id as an entry, with case-insensitive handling.
  *
  */
-public class LuceneFSTIndexCreator implements FSTIndexCreator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexCreator.class);
+public class LuceneIFSTIndexCreator implements FSTIndexCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneIFSTIndexCreator.class);
   private final File _fstIndexFile;
   private final FSTBuilder _fstBuilder;
   Integer _dictId;
-
   /**
    * This index requires values of the column be added in sorted order. Sorted entries could be passed in through
    * constructor or added through addSortedDictIds function. Index of the sorted entry should correspond to the
@@ -53,11 +51,11 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    * @param sortedEntries Sorted entries of the unique values of the column.
    * @throws IOException
    */
-  public LuceneFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
+  public LuceneIFSTIndexCreator(File indexDir, String columnName, String[] sortedEntries)
       throws IOException {
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
-
-    _fstBuilder = new FSTBuilder(true);
+    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION);
+    // Always create case-insensitive FST for IFST
+    _fstBuilder = new FSTBuilder(false); // false = case-insensitive
     _dictId = 0;
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
@@ -65,12 +63,10 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       }
     }
   }
-
-  public LuceneFSTIndexCreator(IndexCreationContext context)
+  public LuceneIFSTIndexCreator(IndexCreationContext context, FstIndexConfig fstIndexConfig)
       throws IOException {
     this(context.getIndexDir(), context.getFieldSpec().getName(), (String[]) context.getSortedUniqueElementsArray());
   }
-
   // Expects dictionary entries in sorted order.
   @Override
   public void add(String document) {
@@ -78,24 +74,21 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       _fstBuilder.addEntry(document, _dictId);
       _dictId++;
     } catch (IOException ex) {
-      throw new RuntimeException("Unable to load the schema file", ex);
+      throw new RuntimeException("Unable to add entry to IFST index", ex);
     }
   }
-
   @Override
   public void add(String[] documents, int length) {
     throw new UnsupportedOperationException("Multiple values not supported");
   }
-
   @Override
   public void seal()
       throws IOException {
-    LOGGER.info("Sealing FST index: {}", _fstIndexFile.getAbsolutePath());
+    LOGGER.info("Sealing IFST index: {}", _fstIndexFile.getAbsolutePath());
     FileOutputStream fileOutputStream = null;
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
       FST<?> fst = _fstBuilder.done();
-
       OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
       fst.save(d, d);
     } finally {
@@ -104,7 +97,6 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       }
     }
   }
-
   @Override
   public void close()
       throws IOException {

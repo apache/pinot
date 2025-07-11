@@ -115,6 +115,16 @@ public class FilterOperatorUtils {
           return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+      } else if (predicateType == Predicate.Type.REGEXP_LIKE_CI) {
+        if (dataSource.getIFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        }
+        if (dataSource.getIFSTIndex() != null && dataSource.getInvertedIndex() != null
+            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
+          return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        }
+        return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
