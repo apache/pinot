@@ -98,7 +98,15 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   @Override
   public void add(String jsonString)
       throws IOException {
-    addFlattenedRecords(JsonUtils.flatten(jsonString, _jsonIndexConfig));
+    List<Map<String, String>> flattenedRecord = JsonUtils.flatten(jsonString, _jsonIndexConfig);
+    if (flattenedRecord.equals(JsonUtils.SKIPPED_FLATTENED_RECORD)) {
+      // The default SKIPPED_FLATTENED_RECORD was returned, this can only happen if the original record could not be
+      // flattened, so update a metric
+      String metricKeyName =
+          _tableNameWithType + "-" + JsonIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+      ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+    }
+    addFlattenedRecords(flattenedRecord);
   }
 
   @Override
