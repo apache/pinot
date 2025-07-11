@@ -421,6 +421,56 @@
         </plugins>
       </build>
     </profile>
+    <!-- Apple Silicon Mac with Homebrew for protoc -->
+    <profile>
+      <id>macos-arm64-protobuf-homebrew</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+        <file>
+          <exists>/opt/homebrew/bin/protoc-gen-grpc-java</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.xolstice.maven.plugins</groupId>
+            <artifactId>protobuf-maven-plugin</artifactId>
+            <configuration>
+              <pluginExecutable>/opt/homebrew/bin/protoc-gen-grpc-java</pluginExecutable>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Apple Silicon Mac with Homebrew (fallback path) -->
+    <profile>
+      <id>macos-arm64-protobuf-homebrew-fallback</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+        <file>
+          <exists>/usr/local/bin/protoc-gen-grpc-java</exists>
+          <missing>/opt/homebrew/bin/protoc-gen-grpc-java</missing>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.xolstice.maven.plugins</groupId>
+            <artifactId>protobuf-maven-plugin</artifactId>
+            <configuration>
+              <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>github-actions</id>
       <activation>
@@ -2323,14 +2373,6 @@
             <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
             <pluginId>grpc-java</pluginId>
             <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
-            <!-- For macOS users: If you encounter gRPC Java plugin issues during build, install protobuf and gRPC Java plugin globally, then uncomment the line below:
-              ```bash
-              brew install protobuf
-              brew install protoc-gen-grpc-java
-              sudo cp /opt/homebrew/bin/protoc-gen-grpc-java /usr/local/bin/protoc-gen-grpc-java
-              ```
-            -->
-            <!-- <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable> -->
           </configuration>
           <executions>
             <execution>
