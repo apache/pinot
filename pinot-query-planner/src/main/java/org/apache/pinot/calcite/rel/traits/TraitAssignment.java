@@ -34,6 +34,7 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
 import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Window;
 import org.apache.calcite.util.ImmutableIntList;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
@@ -92,6 +93,13 @@ public class TraitAssignment {
   }
 
   RelNode assignSetOp(SetOp setOp) {
+    if (setOp instanceof Union) {
+      Union union = (Union) setOp;
+      if (union.all) {
+        // UNION ALL means we can return duplicates, so no trait required.
+        return setOp;
+      }
+    }
     RelDistribution pushedDownDistTrait = RelDistributions.hash(ImmutableIntList.range(0,
         setOp.getRowType().getFieldCount()));
     List<RelNode> newInputs = new ArrayList<>();
