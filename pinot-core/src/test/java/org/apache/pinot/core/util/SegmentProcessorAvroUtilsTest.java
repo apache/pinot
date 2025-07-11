@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Locale;
+import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
@@ -40,16 +41,16 @@ public class SegmentProcessorAvroUtilsTest {
   @DataProvider
   public static Object[][] getTypeConversion() {
     return new Object[][] {
-        new Object[] {FieldSpec.DataType.INT, org.apache.avro.Schema.Type.INT},
-        new Object[] {FieldSpec.DataType.LONG, org.apache.avro.Schema.Type.LONG},
-        new Object[] {FieldSpec.DataType.FLOAT, org.apache.avro.Schema.Type.FLOAT},
-        new Object[] {FieldSpec.DataType.DOUBLE, org.apache.avro.Schema.Type.DOUBLE},
-        new Object[] {FieldSpec.DataType.STRING, org.apache.avro.Schema.Type.STRING},
-        new Object[] {FieldSpec.DataType.BIG_DECIMAL, org.apache.avro.Schema.Type.STRING},
-        new Object[] {FieldSpec.DataType.BYTES, org.apache.avro.Schema.Type.BYTES},
-        new Object[] {FieldSpec.DataType.BOOLEAN, org.apache.avro.Schema.Type.INT},
-        new Object[] {FieldSpec.DataType.JSON, org.apache.avro.Schema.Type.STRING},
-        new Object[] {FieldSpec.DataType.TIMESTAMP, org.apache.avro.Schema.Type.LONG}
+        new Object[] {FieldSpec.DataType.INT, org.apache.avro.Schema.Type.INT, null},
+        new Object[] {FieldSpec.DataType.LONG, org.apache.avro.Schema.Type.LONG, null},
+        new Object[] {FieldSpec.DataType.FLOAT, org.apache.avro.Schema.Type.FLOAT, null},
+        new Object[] {FieldSpec.DataType.DOUBLE, org.apache.avro.Schema.Type.DOUBLE, null},
+        new Object[] {FieldSpec.DataType.STRING, org.apache.avro.Schema.Type.STRING, null},
+        new Object[] {FieldSpec.DataType.BIG_DECIMAL, org.apache.avro.Schema.Type.STRING, "pinot.big_decimal"},
+        new Object[] {FieldSpec.DataType.BYTES, org.apache.avro.Schema.Type.BYTES, null},
+        new Object[] {FieldSpec.DataType.BOOLEAN, org.apache.avro.Schema.Type.INT, null},
+        new Object[] {FieldSpec.DataType.JSON, org.apache.avro.Schema.Type.STRING, null},
+        new Object[] {FieldSpec.DataType.TIMESTAMP, org.apache.avro.Schema.Type.LONG, null}
     };
   }
 
@@ -99,7 +100,8 @@ public class SegmentProcessorAvroUtilsTest {
   @Test(dataProvider = "getTypeConversion")
   public void convertNullableSchema(
       FieldSpec.DataType dataType,
-      org.apache.avro.Schema.Type expectedType
+      org.apache.avro.Schema.Type expectedType,
+      @Nullable String expectedLogicalType
   ) {
     Schema.SchemaBuilder pinotSchemaBuilder = new Schema.SchemaBuilder();
     pinotSchemaBuilder.setSchemaName("testSchema");
@@ -108,8 +110,6 @@ public class SegmentProcessorAvroUtilsTest {
     org.apache.avro.Schema avroSchema =
         SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(pinotSchemaBuilder.build());
     assertNotNull(avroSchema);
-
-    String expectedLogicalType = "pinot." + dataType.toString().toLowerCase(Locale.US);
 
     org.apache.avro.Schema.Field avroField = avroSchema.getField("testField");
     assertTrue(avroField.schema().isNullable(), "Field should be nullable");
@@ -127,17 +127,16 @@ public class SegmentProcessorAvroUtilsTest {
   @Test(dataProvider = "getTypeConversion")
   public void convertNonNullableSchema(
       FieldSpec.DataType dataType,
-      org.apache.avro.Schema.Type exepctedType
+      org.apache.avro.Schema.Type exepctedType,
+      @Nullable String expectedLogicalType
   ) {
-    Schema.SchemaBuilder pinotSchemaBuilder = new Schema.SchemaBuilder();
-    pinotSchemaBuilder.setSchemaName("testSchema");
-    pinotSchemaBuilder.addDimensionField("testField", dataType, field -> field.setNullable(false));
+    Schema.SchemaBuilder pinotSchemaBuilder = new Schema.SchemaBuilder()
+        .setSchemaName("testSchema")
+        .addDimensionField("testField", dataType, field -> field.setNullable(false));
 
     org.apache.avro.Schema avroSchema =
         SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(pinotSchemaBuilder.build());
     assertNotNull(avroSchema);
-
-    String expectedLogicalType = "pinot." + dataType.toString().toLowerCase(Locale.US);
 
     org.apache.avro.Schema.Field avroField = avroSchema.getField("testField");
     assertEquals(avroField.schema().getProp("logicalType"), expectedLogicalType,
@@ -149,7 +148,8 @@ public class SegmentProcessorAvroUtilsTest {
   @Test(dataProvider = "getTypeConversion")
   public void convertNullableArraySchema(
       FieldSpec.DataType dataType,
-      org.apache.avro.Schema.Type expectedType
+      org.apache.avro.Schema.Type expectedType,
+      @Nullable String expectedLogicalType
   ) {
     if (dataType == FieldSpec.DataType.BOOLEAN || dataType == FieldSpec.DataType.BYTES) {
       // Pinot does not support boolean arrays in Avro representation yet
@@ -170,8 +170,6 @@ public class SegmentProcessorAvroUtilsTest {
         SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(pinotSchemaBuilder.build());
     assertNotNull(avroSchema);
 
-    String expectedLogicalType = "pinot." + dataType.toString().toLowerCase(Locale.US);
-
     org.apache.avro.Schema.Field avroField = avroSchema.getField("testField");
 
     org.apache.avro.Schema firstType = avroField.schema().getTypes().get(0);
@@ -188,7 +186,8 @@ public class SegmentProcessorAvroUtilsTest {
   @Test(dataProvider = "getTypeConversion")
   public void convertNotNullArraySchema(
       FieldSpec.DataType dataType,
-      org.apache.avro.Schema.Type expectedType
+      org.apache.avro.Schema.Type expectedType,
+      @Nullable String expectedLogicalType
   ) {
     if (dataType == FieldSpec.DataType.BOOLEAN || dataType == FieldSpec.DataType.BYTES) {
       // Pinot does not support boolean arrays in Avro representation yet
@@ -208,8 +207,6 @@ public class SegmentProcessorAvroUtilsTest {
     org.apache.avro.Schema avroSchema =
         SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(pinotSchemaBuilder.build());
     assertNotNull(avroSchema);
-
-    String expectedLogicalType = "pinot." + dataType.toString().toLowerCase(Locale.US);
 
     org.apache.avro.Schema.Field avroField = avroSchema.getField("testField");
     assertNotNull(avroField.schema().getElementType(), "Field should be an array");

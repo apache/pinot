@@ -100,30 +100,20 @@ public final class SegmentProcessorAvroUtils {
       if (fieldSpec.isSingleValueField()) {
         switch (storedType) {
           case INT:
-            fieldAssembler = type.intBuilder()
-                .prop("logicalType", logicalType)
-                .endInt()
-                .noDefault();
+            fieldAssembler = type.intType().noDefault();
             break;
           case LONG:
-            fieldAssembler = type.longBuilder()
-                .prop("logicalType", logicalType)
-                .endLong()
-                .noDefault();
+            fieldAssembler = type.longType().noDefault();
             break;
           case FLOAT:
-            fieldAssembler = type.floatBuilder()
-                .prop("logicalType", logicalType)
-                .endFloat()
-                .noDefault();
+            fieldAssembler = type.floatType().noDefault();
             break;
           case DOUBLE:
-            fieldAssembler = type.doubleBuilder()
-                .prop("logicalType", logicalType)
-                .endDouble()
-                .noDefault();
+            fieldAssembler = type.doubleType().noDefault();
             break;
           case STRING:
+            fieldAssembler = type.stringType().noDefault();
+            break;
           case BIG_DECIMAL:
             fieldAssembler = type.stringBuilder()
                 .prop("logicalType", logicalType)
@@ -131,10 +121,7 @@ public final class SegmentProcessorAvroUtils {
                 .noDefault();
             break;
           case BYTES:
-            fieldAssembler = type.bytesBuilder()
-                .prop("logicalType", logicalType)
-                .endBytes()
-                .noDefault();
+            fieldAssembler = type.bytesType().noDefault();
             break;
           default:
             throw new RuntimeException("Unsupported data type: " + storedType);
@@ -143,30 +130,20 @@ public final class SegmentProcessorAvroUtils {
         SchemaBuilder.TypeBuilder<SchemaBuilder.ArrayDefault<Schema>> arrayBuilder = type.array().items();
         switch (storedType) {
           case INT:
-            fieldAssembler = arrayBuilder.intBuilder()
-                .prop("logicalType", logicalType)
-                .endInt()
-                .noDefault();
+            fieldAssembler = arrayBuilder.intType().noDefault();
             break;
           case LONG:
-            fieldAssembler = arrayBuilder.longBuilder()
-                .prop("logicalType", logicalType)
-                .endLong()
-                .noDefault();
+            fieldAssembler = arrayBuilder.longType().noDefault();
             break;
           case FLOAT:
-            fieldAssembler = arrayBuilder.floatBuilder()
-                .prop("logicalType", logicalType)
-                .endFloat()
-                .noDefault();
+            fieldAssembler = arrayBuilder.floatType().noDefault();
             break;
           case DOUBLE:
-            fieldAssembler = arrayBuilder.doubleBuilder()
-                .prop("logicalType", logicalType)
-                .endDouble()
-                .noDefault();
+            fieldAssembler = arrayBuilder.doubleType().noDefault();
             break;
           case STRING:
+            fieldAssembler = arrayBuilder.stringType().noDefault();
+            break;
           case BIG_DECIMAL:
             fieldAssembler = arrayBuilder.stringBuilder()
                 .prop("logicalType", logicalType)
