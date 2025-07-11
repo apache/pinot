@@ -892,7 +892,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
        */
       private void killMostExpensiveQuery() {
         if (!_isThreadMemorySamplingEnabled) {
-          LOGGER.warn("But unable to kill query memory tracking is enabled");
+          LOGGER.warn("Unable to terminate queries as  memory tracking is not enabled");
           return;
         }
         QueryMonitorConfig config = _queryMonitorConfig.get();
@@ -932,8 +932,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             } else {
               LOGGER.warn("But all queries are below quota, no query killed");
             }
-          } else {
-            LOGGER.warn("No query found to kill based on memory usage");
           }
           logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
         } else {

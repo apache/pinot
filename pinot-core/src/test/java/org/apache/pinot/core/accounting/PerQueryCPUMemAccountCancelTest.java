@@ -178,7 +178,6 @@ public class PerQueryCPUMemAccountCancelTest {
     accountant.getWatcherTask().runOnce();
     assertEquals(accountant.getCancelLog().size(), 1);
 
-    // Try once more. There should still be only one cancel.
     accountant.getWatcherTask().runOnce();
     assertEquals(accountant.getCancelLog().size(), 2);
     threadLatch.countDown();
