@@ -28,7 +28,15 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
+/// An operator that emits an error block with a specific error code and message.
+///
+/// This operator is not produced by any planner rule but instead when we find an error and it is too late to throw an
+/// exception. This for example happens when servers receive a query in
+/// [org.apache.pinot.query.planner.plannode.PlanNode] and for whatever reason (ie uses a function that is unknown for
+/// the server) it cannot be transformed into an actual operator. At that time it is too late to throw an exception
+/// because the server dispatcher is async and the only way to communicate the error is through the mailbox mechanism.
+/// Therefore we create an `ErrorOperator` that emits an error block with the error code and message, aborting the query
+/// execution in a controlled way.
 public class ErrorOperator extends MultiStageOperator {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ErrorOperator.class);
