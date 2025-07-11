@@ -380,7 +380,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testUnsupportedUdfOnIntermediateStage()
       throws Exception {
     String sqlQuery = ""
-        + "SET timeoutMs=1000;\n"
+        + "SET timeoutMs=10000;\n" // In older versions we timeout in this case, but we should fail fast now
         + "WITH fakeTable AS (\n" // this table is used to make sure the call is made on an intermediate stage
         + "  SELECT \n"
         + "    t1.DaysSinceEpoch + t2.DaysSinceEpoch as DaysSinceEpoch"
