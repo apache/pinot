@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl.inv.json;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
@@ -28,9 +29,13 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
@@ -62,6 +67,8 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   static final String DICTIONARY_FILE_NAME = "dictionary.buf";
   static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
 
+  final String _tableNameWithType;
+  final boolean _continueOnError;
   final JsonIndexConfig _jsonIndexConfig;
   final File _indexFile;
   final File _tempDir;
@@ -74,8 +81,11 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   int _nextFlattenedDocId;
   int _maxValueLength;
 
-  BaseJsonIndexCreator(File indexDir, String columnName, JsonIndexConfig jsonIndexConfig)
+  BaseJsonIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+      JsonIndexConfig jsonIndexConfig)
       throws IOException {
+    _tableNameWithType = tableNameWithType;
+    _continueOnError = continueOnError;
     _jsonIndexConfig = jsonIndexConfig;
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.JSON_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
@@ -91,7 +101,51 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
   @Override
   public void add(String jsonString)
       throws IOException {
-    addFlattenedRecords(JsonUtils.flatten(jsonString, _jsonIndexConfig));
+    List<Map<String, String>> flattenedRecord;
+    try {
+      flattenedRecord = JsonUtils.flatten(jsonString, _jsonIndexConfig);
+      if (flattenedRecord.equals(JsonUtils.SKIPPED_FLATTENED_RECORD)) {
+        // The default SKIPPED_FLATTENED_RECORD was returned, this can only happen if the original record could not be
+        // flattened, update the metric
+        String metricKeyName =
+            _tableNameWithType + "-" + JsonIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      }
+    } catch (Exception e) {
+      if (_continueOnError) {
+        // Caught exception while trying to add, update metric and add a default SKIPPED_FLATTENED_RECORD
+        // This check is needed in the case where `_jsonIndexConfig.getSkipInvalidJson()` is false,
+        // but _continueOnError is true
+        String metricKeyName =
+            _tableNameWithType + "-" + JsonIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+        flattenedRecord = JsonUtils.SKIPPED_FLATTENED_RECORD;
+      } else {
+        throw e;
+      }
+    }
+    addFlattenedRecords(flattenedRecord);
+  }
+
+  @Override
+  public void add(Map value)
+      throws IOException {
+    String valueToAdd;
+    try {
+      valueToAdd = JsonUtils.objectToString(value);
+    } catch (JsonProcessingException e) {
+      if (_jsonIndexConfig.getSkipInvalidJson() || _continueOnError) {
+        // Caught exception while trying to add, update metric and add a default SKIPPED_FLATTENED_RECORD
+        String metricKeyName =
+            _tableNameWithType + "-" + JsonIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+        addFlattenedRecords(JsonUtils.SKIPPED_FLATTENED_RECORD);
+        return;
+      } else {
+        throw e;
+      }
+    }
+    add(valueToAdd);
   }
 
   /**

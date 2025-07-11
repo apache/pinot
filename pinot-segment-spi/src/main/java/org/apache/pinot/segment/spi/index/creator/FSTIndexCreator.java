@@ -40,7 +40,8 @@ public interface FSTIndexCreator extends IndexCreator {
   /**
    * Adds the next document.
    */
-  void add(String document);
+  void add(String document)
+      throws IOException;
 
   /**
    * Adds a set of documents to the index

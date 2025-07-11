@@ -26,15 +26,19 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
+import org.apache.pinot.segment.local.segment.index.text.TextIndexType;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
@@ -42,11 +46,14 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class NativeTextIndexCreator extends AbstractTextIndexCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(NativeTextIndexCreator.class);
   private static final String TEMP_DIR_SUFFIX = ".nativetext.idx.tmp";
   private static final String FST_FILE_NAME = "native.fst";
   private static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
@@ -62,6 +69,8 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   public static final int VERSION = 1;
 
   private final String _columnName;
+  private final String _tableNameWithType;
+  private final boolean _continueOnError;
   private final FSTBuilder _fstBuilder;
   private final File _indexFile;
   private final File _tempDir;
@@ -74,9 +83,11 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private int _fstDataSize;
   private int _numBitMaps;
 
-  public NativeTextIndexCreator(String column, File indexDir)
+  public NativeTextIndexCreator(String column, String tableNameWithType, boolean continueOnError, File indexDir)
       throws IOException {
     _columnName = column;
+    _tableNameWithType = tableNameWithType;
+    _continueOnError = continueOnError;
     _fstBuilder = new FSTBuilder();
     _indexFile = new File(indexDir, column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, column + TEMP_DIR_SUFFIX);
@@ -92,14 +103,40 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
 
   @Override
   public void add(String document) {
-    addHelper(document);
+    try {
+      addHelper(document);
+    } catch (RuntimeException e) {
+      if (_continueOnError) {
+        // Caught exception while trying to add, update metric and skip the document
+        String metricKeyName =
+            _tableNameWithType + "-" + TextIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      } else {
+        LOGGER.error("Caught exception while trying to add to native text index for table: {}, column: {}",
+            _tableNameWithType, _columnName, e);
+        throw e;
+      }
+    }
     _nextDocId++;
   }
 
   @Override
   public void add(String[] documents, int length) {
-    for (int i = 0; i < length; i++) {
-      addHelper(documents[i]);
+    try {
+      for (int i = 0; i < length; i++) {
+        addHelper(documents[i]);
+      }
+    } catch (RuntimeException e) {
+      if (_continueOnError) {
+        // Caught exception while trying to add, update metric and skip the document
+        String metricKeyName =
+            _tableNameWithType + "-" + TextIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      } else {
+        LOGGER.error("Caught exception while trying to add to native text index for table: {}, column: {}",
+            _tableNameWithType, _columnName, e);
+        throw e;
+      }
     }
     _nextDocId++;
   }

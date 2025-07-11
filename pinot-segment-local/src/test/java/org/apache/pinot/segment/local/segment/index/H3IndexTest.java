@@ -92,9 +92,9 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
 
     try (MutableH3Index mutableH3Index = new MutableH3Index(h3IndexResolution)) {
       try (GeoSpatialIndexCreator onHeapCreator = new OnHeapH3IndexCreator(TEMP_DIR, onHeapColumnName,
-          "myTable_OFFLINE", h3IndexResolution);
+          "myTable_OFFLINE", false, h3IndexResolution);
           GeoSpatialIndexCreator offHeapCreator = new OffHeapH3IndexCreator(TEMP_DIR, offHeapColumnName,
-              "myTable_OFFLINE", h3IndexResolution)) {
+              "myTable_OFFLINE", false, h3IndexResolution)) {
         int docId = 0;
         while (expectedCardinalities.size() < numUniqueH3Ids) {
           double longitude = RANDOM.nextDouble() * 360 - 180;
@@ -134,7 +134,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
     int res = 5;
     H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
 
-    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE",
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
         resolution)) {
       Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
       creator.add(point);
@@ -160,7 +160,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
     int res = 5;
     H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
 
-    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE",
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
         resolution)) {
       Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
       creator.add(point);
@@ -186,7 +186,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
     int res = 5;
     H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
 
-    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE",
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", true,
         resolution)) {
       Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 42));
       creator.add(point);
@@ -205,6 +205,60 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
         H3IndexReader reader = new ImmutableH3IndexReader(buffer)) {
       long h3Id = H3Utils.H3_CORE.latLngToCell(42, 10, res);
       Assert.assertEquals(reader.getDocIds(h3Id).getCardinality(), 1);
+    }
+  }
+
+  @Test
+  public void testSkipInvalidGeometryContinueOnErrorFalse()
+      throws Exception {
+    String columnName = "skipInvalid";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", false,
+        resolution)) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
+      creator.add(point);
+
+      // Invalid serialized bytes should be skipped without throwing exception
+      Assert.assertThrows(IllegalStateException.class, () -> creator.add(new byte[]{1, 2, 3}, -1));
+    }
+  }
+
+  @Test
+  public void testSkipNullGeometryContinueOnErrorFalse()
+      throws Exception {
+    String columnName = "skipNull";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", false,
+        resolution)) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 20));
+      creator.add(point);
+
+      // Explicit null geometry should also be skipped
+      Assert.assertThrows(IllegalStateException.class, () -> creator.add(null));
+    }
+  }
+
+  @Test
+  public void testSkipNonPointGeometryContinueOnErrorFalse()
+      throws Exception {
+    String columnName = "skipInvalidGeometryType";
+    int res = 5;
+    H3IndexResolution resolution = new H3IndexResolution(Collections.singletonList(res));
+
+    try (GeoSpatialIndexCreator creator = new OnHeapH3IndexCreator(TEMP_DIR, columnName, "myTable_OFFLINE", false,
+        resolution)) {
+      Point point = GeometryUtils.GEOMETRY_FACTORY.createPoint(new Coordinate(10, 42));
+      creator.add(point);
+
+      // Explicit non-point geometry should also be skipped
+      Point[] points = new Point[1];
+      points[0] = point;
+      MultiPoint multiPoint = GeometryUtils.GEOMETRY_FACTORY.createMultiPoint(points);
+      Assert.assertThrows(IllegalStateException.class, () -> creator.add(multiPoint));
     }
   }
 
