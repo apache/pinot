@@ -260,8 +260,17 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+    int count = 0;
+    Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
+      pools.clear();
+      for (String instance : idealStateInstanceStateMap.keySet()) {
+        pools.add(getPool(instance));
+      }
+      if (pools.size() < 2) {
+        count++;
+      }
       Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
       Map<String, String> externalViewInstanceStateMap = externalViewAssignment.get(segment);
       if (externalViewInstanceStateMap == null) {
@@ -302,6 +311,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
         }
       }
     }
+    _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.SINGLE_POOL_SEGMENTS, count);
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
           _oldSegmentCandidatesMap.keySet());
