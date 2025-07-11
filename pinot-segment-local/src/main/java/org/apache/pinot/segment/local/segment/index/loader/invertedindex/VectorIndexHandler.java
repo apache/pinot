@@ -168,6 +168,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
         .withIndexDir(segmentDirectory)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     VectorIndexConfig config = colIndexConf.getConfig(StandardIndexes.vector());
 
@@ -202,6 +204,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
         .withIndexDir(segmentDirectory)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);

@@ -83,6 +83,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
   private final SegmentDirectory.Writer _segmentWriter;
   private final boolean _isTemporaryForwardIndex;
   private final String _tableNameWithType;
+  private final boolean _continueOnError;
 
   // Metadata
   private final SegmentDirectory _segmentDirectory;
@@ -115,7 +116,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
 
   public InvertedIndexAndDictionaryBasedForwardIndexCreator(String columnName, SegmentDirectory segmentDirectory,
       boolean dictionaryEnabled, ForwardIndexConfig fwdConf, SegmentDirectory.Writer segmentWriter,
-      boolean isTemporaryForwardIndex, String tableNameWithType)
+      boolean isTemporaryForwardIndex, String tableNameWithType, boolean continueOnError)
       throws IOException {
     _columnName = columnName;
     _segmentDirectory = segmentDirectory;
@@ -123,6 +124,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
     _segmentWriter = segmentWriter;
     _isTemporaryForwardIndex = isTemporaryForwardIndex;
     _tableNameWithType = tableNameWithType;
+    _continueOnError = continueOnError;
 
     _columnMetadata = _segmentMetadata.getColumnMetadataFor(columnName);
     _singleValue = _columnMetadata.isSingleValue();
@@ -271,6 +273,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withDictionary(_dictionaryEnabled)
           .withLengthOfLongestEntry(lengthOfLongestEntry)
           .withTableNameWithType(_tableNameWithType)
+          .withContinueOnError(_continueOnError)
           .build();
 
       // note: this method closes buffers and removes files
@@ -358,6 +361,7 @@ public class InvertedIndexAndDictionaryBasedForwardIndexCreator implements AutoC
           .withMaxRowLengthInBytes(maxRowLengthInBytes[0])
           .withLengthOfLongestEntry(lengthOfLongestEntry)
           .withTableNameWithType(_tableNameWithType)
+          .withContinueOnError(_continueOnError)
           .build();
 
       writeToForwardIndex(dictionary, context);
