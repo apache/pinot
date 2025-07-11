@@ -63,7 +63,7 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     uniqueValues[2] = "still";
 
     LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE",
-        uniqueValues);
+        false, uniqueValues);
     creator.seal();
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer pinotDataBuffer =
@@ -85,7 +85,7 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
   }
 
   @Test
-  public void testIndexWriterReaderWithAddExceptions()
+  public void testIndexWriterReaderWithAddExceptionsContinueOnErrorTrue()
       throws IOException {
     String[] uniqueValues = new String[3];
     uniqueValues[0] = "hello-world";
@@ -96,7 +96,7 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     // For the word "still" throw an exception so it is not indexed
     doThrow(IOException.class).when(fstBuilder).addEntry(eq("still"), anyInt());
     LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE",
-        uniqueValues, fstBuilder);
+        true, uniqueValues, fstBuilder);
     creator.seal();
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer pinotDataBuffer =
@@ -115,5 +115,20 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
       matchedDictIds = reader.getDictIds("st.*").toArray();
       Assert.assertEquals(matchedDictIds.length, 0);
     }
+  }
+
+  @Test
+  public void testIndexWriterReaderWithAddExceptionsContinueOnErrorFalse()
+      throws IOException {
+    String[] uniqueValues = new String[3];
+    uniqueValues[0] = "hello-world";
+    uniqueValues[1] = "hello-world123";
+    uniqueValues[2] = "still";
+
+    FSTBuilder fstBuilder = Mockito.spy(new FSTBuilder());
+    // For the word "still" throw an exception so it is not indexed
+    doThrow(IOException.class).when(fstBuilder).addEntry(eq("still"), anyInt());
+    Assert.assertThrows(IOException.class, () -> new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE",
+        false, uniqueValues, fstBuilder));
   }
 }

@@ -24,6 +24,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.text.NativeTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.text.NativeTextIndexReader;
+import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -59,7 +60,8 @@ public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckR
     uniqueValues[2] = "still";
     uniqueValues[3] = "zoobar";
 
-    try (NativeTextIndexCreator creator = new NativeTextIndexCreator("testFSTColumn", "myTable_OFFLINE", INDEX_DIR)) {
+    try (NativeTextIndexCreator creator = new NativeTextIndexCreator("testFSTColumn", "myTable_OFFLINE", false,
+        INDEX_DIR)) {
       for (int i = 0; i < 4; i++) {
         creator.add(uniqueValues[i]);
       }
@@ -95,7 +97,7 @@ public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckR
   }
 
   @Test
-  public void testIndexWriterReaderWithAddExceptions()
+  public void testIndexWriterReaderWithAddExceptionsWithContinueOnErrorTrue()
       throws IOException {
     String[] uniqueValues = new String[4];
     uniqueValues[0] = "still";
@@ -104,7 +106,7 @@ public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckR
     uniqueValues[3] = "hello-world123";
 
     try (NativeTextIndexCreator creator = spy(new NativeTextIndexCreator("testFSTColumn", "myTable_OFFLINE",
-        INDEX_DIR))) {
+        true, INDEX_DIR))) {
       // Add a couple of words so they show up in the index
       for (int i = 0; i < 2; i++) {
         creator.add(uniqueValues[i]);
@@ -146,6 +148,28 @@ public class NativeTextIndexCreatorTest implements PinotBuffersAfterMethodCheckR
       } finally {
         reader.closeInTest();
       }
+    }
+  }
+
+  @Test
+  public void testIndexWriterReaderWithAddExceptionsWithContinueOnErrorFalse()
+      throws IOException {
+    String[] uniqueValues = new String[4];
+    uniqueValues[0] = "still";
+    uniqueValues[1] = "zoobar";
+    uniqueValues[2] = "hello-world";
+    uniqueValues[3] = "hello-world123";
+
+    try (NativeTextIndexCreator creator = spy(new NativeTextIndexCreator("testFSTColumn", "myTable_OFFLINE",
+        false, INDEX_DIR))) {
+      // Add a couple of words so they show up in the index
+      for (int i = 0; i < 2; i++) {
+        creator.add(uniqueValues[i]);
+      }
+
+      // Throw exception for the remaining words
+      doThrow(RuntimeException.class).when(creator).analyze(anyString());
+      Assert.assertThrows(RuntimeException.class, () -> creator.add(uniqueValues[2]));
     }
   }
 }

@@ -46,11 +46,14 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.roaringbitmap.Container;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 
 public class NativeTextIndexCreator extends AbstractTextIndexCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(NativeTextIndexCreator.class);
   private static final String TEMP_DIR_SUFFIX = ".nativetext.idx.tmp";
   private static final String FST_FILE_NAME = "native.fst";
   private static final String INVERTED_INDEX_FILE_NAME = "inverted.index.buf";
@@ -67,6 +70,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
 
   private final String _columnName;
   private final String _tableNameWithType;
+  private final boolean _continueOnError;
   private final FSTBuilder _fstBuilder;
   private final File _indexFile;
   private final File _tempDir;
@@ -79,10 +83,11 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
   private int _fstDataSize;
   private int _numBitMaps;
 
-  public NativeTextIndexCreator(String column, String tableNameWithType, File indexDir)
+  public NativeTextIndexCreator(String column, String tableNameWithType, boolean continueOnError, File indexDir)
       throws IOException {
     _columnName = column;
     _tableNameWithType = tableNameWithType;
+    _continueOnError = continueOnError;
     _fstBuilder = new FSTBuilder();
     _indexFile = new File(indexDir, column + V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, column + TEMP_DIR_SUFFIX);
@@ -101,10 +106,16 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     try {
       addHelper(document);
     } catch (RuntimeException e) {
-      // Caught exception while trying to add, update metric and skip the document
-      String metricKeyName =
-          _tableNameWithType + "-" + TextIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-      ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      if (_continueOnError) {
+        // Caught exception while trying to add, update metric and skip the document
+        String metricKeyName =
+            _tableNameWithType + "-" + TextIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      } else {
+        LOGGER.error("Caught exception while trying to add to native text index for table: {}, column: {}",
+            _tableNameWithType, _columnName, e);
+        throw e;
+      }
     }
     _nextDocId++;
   }
@@ -116,10 +127,16 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
         addHelper(documents[i]);
       }
     } catch (RuntimeException e) {
-      // Caught exception while trying to add, update metric and skip the document
-      String metricKeyName =
-          _tableNameWithType + "-" + TextIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-      ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      if (_continueOnError) {
+        // Caught exception while trying to add, update metric and skip the document
+        String metricKeyName =
+            _tableNameWithType + "-" + TextIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
+        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+      } else {
+        LOGGER.error("Caught exception while trying to add to native text index for table: {}, column: {}",
+            _tableNameWithType, _columnName, e);
+        throw e;
+      }
     }
     _nextDocId++;
   }

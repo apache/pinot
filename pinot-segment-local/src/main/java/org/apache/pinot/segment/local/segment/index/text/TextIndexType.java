@@ -117,7 +117,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
         "Text index is currently only supported on STRING type columns");
     if (indexConfig.getFstType() == FSTType.NATIVE) {
       return new NativeTextIndexCreator(context.getFieldSpec().getName(), context.getTableNameWithType(),
-          context.getIndexDir());
+          context.isContinueOnError(), context.getIndexDir());
     } else {
       return new LuceneTextIndexCreator(context, indexConfig);
     }
