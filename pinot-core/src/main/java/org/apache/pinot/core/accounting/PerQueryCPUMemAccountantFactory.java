@@ -296,6 +296,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _queryCancelCallbacks.put(queryId, callback);
     }
 
+    @Nullable
     public MseCancelCallback getQueryCancelCallback(String queryId) {
       return _queryCancelCallbacks.getIfPresent(queryId);
     }
