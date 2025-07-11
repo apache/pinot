@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
@@ -78,7 +77,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private AtomicReference<LinkedHashMapIndexedTable> _waitingTable;
   private AtomicReference<LinkedHashMapIndexedTable> _satisfiedTable;
   private Comparator<Key> _comparator;
-  private AtomicInteger _numTablesCreated = new AtomicInteger(0);
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -135,10 +133,26 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (resultsBlock.isNumGroupsWarningLimitReached()) {
           _numGroupsWarningLimitReached = true;
         }
-        LinkedHashMapIndexedTable table =
+        // short-circuit one segment case
+        if (_numOperators == 1) {
+          _satisfiedTable.set(
             GroupByUtils.getAndPopulateLinkedHashMapIndexedTable(resultsBlock, false, _queryContext,
-                _queryContext.getLimit(), _queryContext.getLimit(), Integer.MAX_VALUE, _executorService, _numOperators);
-        _numTablesCreated.getAndAdd(1);
+                _queryContext.getLimit(), _queryContext.getLimit(), Integer.MAX_VALUE, _executorService, _numOperators)
+          );
+          break;
+        }
+        // save one call to getAndPopulateLinkedHashMapIndexedTable
+        //  by merging the current block in if there is a waitingTable
+        LinkedHashMapIndexedTable waitingTable = _waitingTable.getAndUpdate(v -> v == null
+            ? GroupByUtils.getAndPopulateLinkedHashMapIndexedTable(resultsBlock, false, _queryContext,
+            _queryContext.getLimit(), _queryContext.getLimit(), Integer.MAX_VALUE, _executorService, _numOperators)
+            : null);
+        if (waitingTable == null) {
+          continue;
+        }
+        LinkedHashMapIndexedTable table = mergeBlocks(waitingTable, resultsBlock, _comparator, _queryContext);
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+
         while (true) {
           if (_satisfiedTable.get() != null) {
             return;
@@ -148,7 +162,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             return;
           }
           LinkedHashMapIndexedTable finalTable = table;
-          LinkedHashMapIndexedTable waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
+          waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
           if (waitingTable == null) {
             break;
           }
@@ -326,6 +340,11 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   }
 
   private LinkedHashMapIndexedTable mergeBlocks(LinkedHashMapIndexedTable block1, LinkedHashMapIndexedTable block2,
+      Comparator<Key> comparator, QueryContext queryContext) {
+    return block1.merge(block2, comparator, queryContext, _executorService);
+  }
+
+  private LinkedHashMapIndexedTable mergeBlocks(LinkedHashMapIndexedTable block1, GroupByResultsBlock block2,
       Comparator<Key> comparator, QueryContext queryContext) {
     return block1.merge(block2, comparator, queryContext, _executorService);
   }

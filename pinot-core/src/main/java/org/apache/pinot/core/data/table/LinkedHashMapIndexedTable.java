@@ -21,10 +21,13 @@ package org.apache.pinot.core.data.table;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.util.GroupByUtils;
 
 
 public class LinkedHashMapIndexedTable extends IndexedTable {
@@ -120,6 +123,81 @@ public class LinkedHashMapIndexedTable extends IndexedTable {
 
     while (entry2 != null) {
       newTable.upsert(entry2.getKey(), entry2.getValue());
+      entry2 = iter2.hasNext() ? iter2.next() : null;
+      if (newTable.size() == limit) {
+        return newTable;
+      }
+    }
+
+    return newTable;
+  }
+
+  ///  merge a single block of segment result into this
+  public LinkedHashMapIndexedTable merge(GroupByResultsBlock other, Comparator<Key> comparator,
+      QueryContext queryContext, ExecutorService executorService) {
+    int limit = _resultSize;
+    LinkedHashMap<Key, Record> thisMap = (LinkedHashMap<Key, Record>) _lookupMap;
+    List<IntermediateRecord> otherRecord = other.getIntermediateRecords();
+    if (thisMap.isEmpty()) {
+      LinkedHashMapIndexedTable newTable = GroupByUtils.getAndPopulateLinkedHashMapIndexedTable(
+          other, false, queryContext, _resultSize, _resultSize, Integer.MAX_VALUE,
+          executorService, _desiredNumMergedBlocks);
+      newTable._numMergedBlocks += _numMergedBlocks;
+      return newTable;
+    }
+    if (otherRecord.isEmpty()) {
+      _numMergedBlocks += 1;
+      return this;
+    }
+    LinkedHashMapIndexedTable newTable =
+        new LinkedHashMapIndexedTable(getDataSchema(), _hasFinalInput, queryContext, _resultSize, _trimSize,
+            _trimThreshold, executorService, _numMergedBlocks + 1, _desiredNumMergedBlocks);
+    newTable = mergeSortedRecords(thisMap, otherRecord, comparator, limit, newTable);
+    // TODO: add stats?
+    return newTable;
+  }
+
+  public LinkedHashMapIndexedTable mergeSortedRecords(
+      LinkedHashMap<Key, Record> map1, List<IntermediateRecord> records,
+      Comparator<Key> comparator, int limit, LinkedHashMapIndexedTable newTable) {
+    assert (comparator != null);
+
+    Iterator<Map.Entry<Key, Record>> iter1 = map1.entrySet().iterator();
+    Iterator<IntermediateRecord> iter2 = records.iterator();
+
+    Map.Entry<Key, Record> entry1 = iter1.hasNext() ? iter1.next() : null;
+    IntermediateRecord entry2 = iter2.hasNext() ? iter2.next() : null;
+
+    while (entry1 != null && entry2 != null) {
+      int cmp = comparator.compare(entry1.getKey(), entry2._key);
+      if (cmp < 0) {
+        newTable.upsert(entry1.getKey(), entry1.getValue());
+        entry1 = iter1.hasNext() ? iter1.next() : null;
+      } else if (cmp == 0) {
+        // merge results using aggregation function, this might update entry1.value in place
+        newTable.upsert(entry1.getKey(), entry1.getValue());
+        newTable.upsert(entry2._key, entry2._record);
+        entry1 = iter1.hasNext() ? iter1.next() : null;
+        entry2 = iter2.hasNext() ? iter2.next() : null;
+      } else {
+        newTable.upsert(entry2._key, entry2._record);
+        entry2 = iter2.hasNext() ? iter2.next() : null;
+      }
+      if (newTable.size() == limit) {
+        return newTable;
+      }
+    }
+
+    while (entry1 != null) {
+      newTable.upsert(entry1.getKey(), entry1.getValue());
+      entry1 = iter1.hasNext() ? iter1.next() : null;
+      if (newTable.size() == limit) {
+        return newTable;
+      }
+    }
+
+    while (entry2 != null) {
+      newTable.upsert(entry2._key, entry2._record);
       entry2 = iter2.hasNext() ? iter2.next() : null;
       if (newTable.size() == limit) {
         return newTable;
