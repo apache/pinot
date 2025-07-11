@@ -263,17 +263,17 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _recordReader.rewind();
       LOGGER.info("Start building IndexCreator!");
       GenericRow reuse = new GenericRow();
-      TransformPipeline.Result reusedResult = new TransformPipeline.Result();
       while (_recordReader.hasNext()) {
         long recordReadStopTimeNs;
         reuse.clear();
 
+        TransformPipeline.Result result;
         try {
-          GenericRow decodedRow = _recordReader.next(reuse);
           long recordReadStartTimeNs = System.nanoTime();
-          _transformPipeline.processRow(decodedRow, reusedResult);
+          GenericRow decodedRow = _recordReader.next(reuse);
+          result = _transformPipeline.processRow(decodedRow);
           recordReadStopTimeNs = System.nanoTime();
-          _totalRecordReadTimeNs += (recordReadStopTimeNs - recordReadStartTimeNs);
+          _totalRecordReadTimeNs += recordReadStopTimeNs - recordReadStartTimeNs;
         } catch (Exception e) {
           if (!_continueOnError) {
             throw new RuntimeException("Error occurred while reading row during indexing", e);
@@ -284,13 +284,13 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
           }
         }
 
-        for (GenericRow row : reusedResult.getTransformedRows()) {
+        for (GenericRow row : result.getTransformedRows()) {
           _indexCreator.indexRow(row);
         }
-        _totalIndexTimeNs += (System.nanoTime() - recordReadStopTimeNs);
-        _incompleteRowsFound += reusedResult.getIncompleteRowCount();
-        _skippedRowsFound += reusedResult.getSkippedRowCount();
-        _sanitizedRowsFound += reusedResult.getSanitizedRowCount();
+        _totalIndexTimeNs += System.nanoTime() - recordReadStopTimeNs;
+        _incompleteRowsFound += result.getIncompleteRowCount();
+        _skippedRowsFound += result.getSkippedRowCount();
+        _sanitizedRowsFound += result.getSanitizedRowCount();
       }
     } catch (Exception e) {
       _indexCreator.close();
