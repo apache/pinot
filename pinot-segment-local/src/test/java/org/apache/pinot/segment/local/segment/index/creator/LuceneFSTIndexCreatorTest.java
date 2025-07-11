@@ -128,7 +128,7 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     FSTBuilder fstBuilder = Mockito.spy(new FSTBuilder());
     // For the word "still" throw an exception so it is not indexed
     doThrow(IOException.class).when(fstBuilder).addEntry(eq("still"), anyInt());
-    Assert.assertThrows(IOException.class, () -> new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE",
-        false, uniqueValues, fstBuilder));
+    Assert.assertThrows(IOException.class, () -> new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn",
+        "myTable_OFFLINE", false, uniqueValues, fstBuilder));
   }
 }
