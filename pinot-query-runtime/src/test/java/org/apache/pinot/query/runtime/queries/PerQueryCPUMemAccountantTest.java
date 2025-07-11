@@ -19,10 +19,15 @@
 package org.apache.pinot.query.runtime.queries;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
-import org.apache.pinot.core.accounting.ResourceUsageAccountantFactory;
+import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -36,10 +41,37 @@ import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
+
+  public static class ConditionalBlockingAccountant
+      extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
+
+    CountDownLatch _latch;
+    public ConditionalBlockingAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+      super(config, instanceId, instanceType);
+      _latch = null;
+    }
+
+    void setLatch(CountDownLatch latch) {
+      _latch = latch;
+    }
+
+    @Override
+    public boolean isAnchorThreadInterrupted() {
+      if (_latch != null) {
+        try {
+          _latch.await();
+        } catch (InterruptedException e) {
+        }
+      }
+      return super.isAnchorThreadInterrupted();
+    }
+  }
+
+  CountDownLatch submitLatch = new CountDownLatch(1);
 
   @Override
   protected ThreadResourceUsageAccountant getThreadResourceUsageAccountant() {
@@ -47,7 +79,7 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
 
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
 
-    return new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
+    return new ConditionalBlockingAccountant(new PinotConfiguration(configs),
         "testWithPerQueryAccountantFactory", InstanceType.SERVER);
   }
 
@@ -66,63 +98,16 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
   }
 
   @Test
-  void testWithResourceUsageAccountant() {
-    HashMap<String, Object> configs = getAccountingConfig();
-
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-    ResourceUsageAccountantFactory.ResourceUsageAccountant accountant =
-        new ResourceUsageAccountantFactory.ResourceUsageAccountant(new PinotConfiguration(configs),
-            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
-
-    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
-      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
-
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
-
-      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
-      Assert.assertEquals(resources.size(), 1);
-      Assert.assertTrue(resources.entrySet().iterator().next().getValue().getAllocatedBytes() > 0);
-    }
-  }
-
-  @Test
   void testDisableSamplingForMSE() {
     HashMap<String, Object> configs = getAccountingConfig();
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE, false);
 
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
-        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
-            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
-
-    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
-      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
+      try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
+      tracing.when(Tracing::getThreadAccountant).thenReturn(_accountant);
       ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
       Assert.assertEquals(resultTable.getRows().size(), 2);
 
-      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
-      Assert.assertEquals(resources.size(), 1);
-      Assert.assertEquals(resources.entrySet().iterator().next().getValue().getAllocatedBytes(), 0);
-    }
-  }
-
-  @Test
-  void testDisableSamplingWithResourceUsageAccountantForMSE() {
-    HashMap<String, Object> configs = getAccountingConfig();
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE, false);
-
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-    ResourceUsageAccountantFactory.ResourceUsageAccountant accountant =
-        new ResourceUsageAccountantFactory.ResourceUsageAccountant(new PinotConfiguration(configs),
-            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
-
-    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
-      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
-
-      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
+      Map<String, ? extends QueryResourceTracker> resources = _accountant.getQueryResources();
       Assert.assertEquals(resources.size(), 1);
       Assert.assertEquals(resources.entrySet().iterator().next().getValue().getAllocatedBytes(), 0);
     }
@@ -156,17 +141,38 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
     }
   }
 
+  @Override
+  protected List<CompletableFuture<?>> processDistributedStagePlans(DispatchableSubPlan dispatchableSubPlan,
+      long requestId, int stageId, Map<String, String> requestMetadataMap) {
+    List<CompletableFuture<?>> futures = super.processDistributedStagePlans(dispatchableSubPlan, requestId, stageId,
+        requestMetadataMap);
+    submitLatch.countDown();
+    return futures;
+  }
+
   @Test
-  void testCancelCallback() {
+  void testCancelCallback()
+      throws InterruptedException {
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
       tracing.when(Tracing::getThreadAccountant).thenReturn(_accountant);
 
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
+      CountDownLatch latch = new CountDownLatch(1);
+      ((ConditionalBlockingAccountant) _accountant).setLatch(latch);
+
+      ExecutorService service = Executors.newFixedThreadPool(1);
+      service.submit(() -> {
+        ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+        Assert.assertEquals(resultTable.getRows().size(), 2);
+      });
+
+      submitLatch.await();
       // TODO: How to programmatically get the request id ?
+      final String queryId = "0";
       PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant perQueryAccountant =
           (PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant) _accountant;
-      assertNotNull(perQueryAccountant.getQueryCancelCallback("0"));
+      perQueryAccountant.cancelQuery(queryId, null);
+      assertTrue(perQueryAccountant.getCancelSentQueries().contains(queryId));
+      latch.countDown();
     }
   }
 

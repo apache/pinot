@@ -553,7 +553,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
     }
 
-    protected void cancelQuery(String queryId, Thread anchorThread) {
+    public void cancelQuery(String queryId, Thread anchorThread) {
       MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(queryId);
       if (callback != null) {
         callback.cancelQuery(Long.parseLong(queryId));
