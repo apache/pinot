@@ -117,8 +117,8 @@ public class BloomIndexType extends AbstractIndexType<BloomFilterConfig, BloomFi
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new BloomFilterHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new BloomFilterHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
   @Override

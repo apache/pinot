@@ -16,7 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.pinot.spi.query;
+
 /**
- * Package with the virtual column API.
+ * Defines the behavior when query thread limits are exceeded in multistage engine
  */
-package org.apache.pinot.segment.local.segment.virtualcolumn;
+public enum QueryThreadExceedStrategy {
+  /**
+   * Wait for resources to become available
+   * @implNote Not supported by server
+   */
+  WAIT,
+
+  /**
+   * Throw an error immediately
+   * @implNote Not supported by broker
+   */
+  ERROR,
+
+  /**
+   * Logs warning when limits exceeded but allows operations to proceed
+   *
+   */
+  LOG
+}

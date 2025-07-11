@@ -140,7 +140,7 @@
     <arrow.version>18.3.0</arrow.version>
     <avro.version>1.11.4</avro.version>
     <parquet.version>1.15.2</parquet.version>
-    <orc.version>1.9.6</orc.version>
+    <orc.version>1.9.7</orc.version>
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.2</helix.version>
     <zkclient.version>0.11</zkclient.version>
@@ -159,12 +159,12 @@
     <immutables.version>2.11.0</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.23.0</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.23.1</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.33</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.7</snappy-java.version>
-    <zstd-jni.version>1.5.7-3</zstd-jni.version>
+    <zstd-jni.version>1.5.7-4</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.22.0</libthrift.verion>
     <log4j.version>2.25.0</log4j.version>
@@ -177,7 +177,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.74</aws.sdk.version>
+    <aws.sdk.version>2.31.78</aws.sdk.version>
     <azure.sdk.version>1.2.36</azure.sdk.version>
     <azure.msal4j.version>1.21.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -190,7 +190,7 @@
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
-    <enforcer-api.version>3.5.0</enforcer-api.version>
+    <enforcer-api.version>3.6.0</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.6</spark3.version>
@@ -198,10 +198,10 @@
     <kafka3.version>3.9.1</kafka3.version>
     <confluent.version>7.7.0</confluent.version>
     <pulsar.version>4.0.5</pulsar.version>
-    <flink.version>1.20.1</flink.version>
+    <flink.version>1.20.2</flink.version>
 
     <!-- Apache Commons Libraries -->
-    <commons-lang3.version>3.17.0</commons-lang3.version>
+    <commons-lang3.version>3.18.0</commons-lang3.version>
     <commons-collections4.version>4.5.0</commons-collections4.version>
     <commons-text.version>1.13.1</commons-text.version>
     <commons-compress.version>1.27.1</commons-compress.version>
@@ -213,7 +213,7 @@
     <commons-codec.version>1.18.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
-    <commons-validator.version>1.9.0</commons-validator.version>
+    <commons-validator.version>1.10.0</commons-validator.version>
 
     <!-- Java EE Libraries -->
     <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
@@ -239,10 +239,10 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.8</protobuf.version>
     <grpc.version>1.73.0</grpc.version>
-    <google.cloud.libraries.version>26.62.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.63.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
-    <google.errorprone.version>2.39.0</google.errorprone.version>
+    <google.errorprone.version>2.40.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -271,7 +271,7 @@
     <paranamer.version>2.8.3</paranamer.version>
     <kotlin.stdlib.version>2.2.0</kotlin.stdlib.version>
     <jetbrains.annotations.version>26.0.2</jetbrains.annotations.version>
-    <okio.version>3.14.0</okio.version>
+    <okio.version>3.15.0</okio.version>
     <kryo.version>2.24.0</kryo.version>
     <objenesis.version>3.4</objenesis.version>
     <chill.version>0.10.0</chill.version>
@@ -295,7 +295,7 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea47</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea53</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.10</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
@@ -2106,7 +2106,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.44.5</version>
+          <version>2.45.0</version>
           <executions>
             <execution>
               <goals>
@@ -2323,6 +2323,14 @@
             <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
             <pluginId>grpc-java</pluginId>
             <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+            <!-- For macOS users: If you encounter gRPC Java plugin issues during build, install protobuf and gRPC Java plugin globally, then uncomment the line below:
+              ```bash
+              brew install protobuf
+              brew install protoc-gen-grpc-java
+              sudo cp /opt/homebrew/bin/protoc-gen-grpc-java /usr/local/bin/protoc-gen-grpc-java
+              ```
+            -->
+            <!-- <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable> -->
           </configuration>
           <executions>
             <execution>

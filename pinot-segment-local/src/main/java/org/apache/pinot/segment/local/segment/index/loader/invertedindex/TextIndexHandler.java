@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
@@ -43,6 +42,7 @@ import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,8 +72,8 @@ public class TextIndexHandler extends BaseIndexHandler {
   private final Set<String> _columnsToAddIdx;
 
   public TextIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
-      @Nullable TableConfig tableConfig) {
-    super(segmentDirectory, fieldIndexConfigs, tableConfig);
+      TableConfig tableConfig, Schema schema) {
+    super(segmentDirectory, fieldIndexConfigs, tableConfig, schema);
     _columnsToAddIdx = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.text(), _fieldIndexConfigs);
   }
 
@@ -142,12 +142,10 @@ public class TextIndexHandler extends BaseIndexHandler {
       throw new UnsupportedOperationException("Text index is currently only supported on STRING columns: " + column);
     }
 
-    if (_tableConfig != null && _tableConfig.getIndexingConfig() != null) {
-      MultiColumnTextIndexConfig config = _tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig();
-      if (config != null && config.getColumns().contains(column)) {
-        throw new UnsupportedOperationException(
-            "Cannot create both single and multi-column TEXT index on column: " + column);
-      }
+    MultiColumnTextIndexConfig config = _tableConfig.getIndexingConfig().getMultiColumnTextIndexConfig();
+    if (config != null && config.getColumns().contains(column)) {
+      throw new UnsupportedOperationException(
+          "Cannot create both single and multi-column TEXT index on column: " + column);
     }
   }
 
@@ -176,6 +174,9 @@ public class TextIndexHandler extends BaseIndexHandler {
         .withColumnMetadata(columnMetadata)
         .withIndexDir(segmentDirectory)
         .withTextCommitOnClose(true)
+        .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
 

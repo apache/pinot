@@ -141,6 +141,32 @@ For faster builds it is recommended to use `./mvnw verify -Ppinot-fastdev`, whic
 
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
 
+### macOS Build Requirements
+
+If you're building Pinot on macOS and encounter issues with the gRPC Java plugin during the build process, you may need to configure the protobuf Maven plugin to use a specific executable path. This is a known issue on macOS ARM (Apple Silicon) systems.
+
+To resolve this, you can install the protobuf compiler and gRPC Java plugin globally:
+
+```bash
+# Install protobuf compiler
+brew install protobuf
+brew install protoc-gen-grpc-java
+sudo cp /opt/homebrew/bin/protoc-gen-grpc-java /usr/local/bin/protoc-gen-grpc-java
+```
+
+Then add the following configuration to the `protobuf-maven-plugin` in the `pom.xml` file:
+
+```xml
+<plugin>
+  <groupId>org.xolstice.maven.plugins</groupId>
+  <artifactId>protobuf-maven-plugin</artifactId>
+  <configuration>
+    ...
+    <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable>
+  </configuration>
+</plugin>
+```
+
 ## Deploying Pinot to Kubernetes
 Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](helm/superset.yaml).
 

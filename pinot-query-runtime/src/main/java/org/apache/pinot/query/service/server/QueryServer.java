@@ -209,7 +209,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     }
 
     long timeoutMs = Long.parseLong(reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS));
-
     CompletableFuture.runAsync(() -> submitInternal(request, reqMetadata), _submissionExecutorService)
         .orTimeout(timeoutMs, TimeUnit.MILLISECONDS)
         .whenComplete((result, error) -> {
@@ -286,10 +285,10 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private CompletableFuture<Void> submitWorker(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> reqMetadata) {
     String requestIdStr = Long.toString(QueryThreadContext.getRequestId());
-
+    String workloadName = reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.WORKLOAD_NAME);
     //TODO: Verify if this matches with what OOM protection expects. This method will not block for the query to
     // finish, so it may be breaking some of the OOM protection assumptions.
-    Tracing.ThreadAccountantOps.setupRunner(requestIdStr, ThreadExecutionContext.TaskType.MSE);
+    Tracing.ThreadAccountantOps.setupRunner(requestIdStr, ThreadExecutionContext.TaskType.MSE, workloadName);
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
 
     try {

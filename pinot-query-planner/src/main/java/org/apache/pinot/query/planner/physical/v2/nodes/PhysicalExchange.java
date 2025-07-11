@@ -33,6 +33,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTraitDef;
+import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
@@ -76,10 +77,11 @@ public class PhysicalExchange extends Exchange implements PRelNode {
    * When not empty, records in each output stream will be sorted by the ordering defined by this collation.
    */
   private final RelCollation _relCollation;
+  private final DistHashFunction _hashFunction;
 
   public PhysicalExchange(int nodeId, PRelNode input, @Nullable PinotDataDistribution pinotDataDistribution,
       List<Integer> distributionKeys, ExchangeStrategy exchangeStrategy, @Nullable RelCollation relCollation,
-      PinotExecStrategyTrait execStrategyTrait) {
+      PinotExecStrategyTrait execStrategyTrait, DistHashFunction hashFunction) {
     super(input.unwrap().getCluster(), EMPTY_TRAIT_SET.plus(execStrategyTrait), input.unwrap(),
         ExchangeStrategy.getRelDistribution(exchangeStrategy, distributionKeys));
     _nodeId = nodeId;
@@ -88,6 +90,7 @@ public class PhysicalExchange extends Exchange implements PRelNode {
     _distributionKeys = distributionKeys;
     _exchangeStrategy = exchangeStrategy;
     _relCollation = relCollation == null ? RelCollations.EMPTY : relCollation;
+    _hashFunction = hashFunction;
   }
 
   @Override
@@ -95,7 +98,7 @@ public class PhysicalExchange extends Exchange implements PRelNode {
     Preconditions.checkState(newInput instanceof PRelNode, "Expected input of PhysicalExchange to be a PRelNode");
     // TODO(mse-physical): this always uses streaming exec strategy at the moment.
     return new PhysicalExchange(_nodeId, (PRelNode) newInput, _pinotDataDistribution, _distributionKeys,
-        _exchangeStrategy, _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy());
+        _exchangeStrategy, _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy(), _hashFunction);
   }
 
   @Override
@@ -152,10 +155,14 @@ public class PhysicalExchange extends Exchange implements PRelNode {
     return trait.getType();
   }
 
+  public DistHashFunction getHashFunction() {
+    return _hashFunction;
+  }
+
   @Override
   public PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
     return new PhysicalExchange(newNodeId, newInputs.get(0), newDistribution, _distributionKeys, _exchangeStrategy,
-        _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy());
+        _relCollation, PinotExecStrategyTrait.getDefaultExecStrategy(), _hashFunction);
   }
 
   @Override public RelWriter explainTerms(RelWriter pw) {
