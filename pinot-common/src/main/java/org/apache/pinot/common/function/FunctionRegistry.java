@@ -20,11 +20,9 @@ package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
@@ -37,7 +35,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
-import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,84 +73,50 @@ public class FunctionRegistry {
   // Key is canonical name
   public static final Map<String, PinotScalarFunction> FUNCTION_MAP;
 
-  private static final int VAR_ARG_KEY = -1;
+  public static final int VAR_ARG_KEY = -1;
 
   static {
     long startTimeMs = System.currentTimeMillis();
 
-    // Register ScalarFunction classes
-    Map<String, PinotScalarFunction> functionMap = new HashMap<>();
-    Set<Class<?>> classes =
-        PinotReflectionUtils.getClassesThroughReflection(".*\\.function\\..*", ScalarFunction.class);
-    for (Class<?> clazz : classes) {
-      if (!Modifier.isPublic(clazz.getModifiers())) {
-        continue;
-      }
-      ScalarFunction scalarFunction = clazz.getAnnotation(ScalarFunction.class);
-      if (scalarFunction.enabled()) {
-        PinotScalarFunction function;
-        try {
-          function = (PinotScalarFunction) clazz.getConstructor().newInstance();
-        } catch (Exception e) {
-          throw new IllegalStateException("Failed to instantiate PinotScalarFunction with class: " + clazz);
-        }
-        String[] names = scalarFunction.names();
-        if (names.length == 0) {
-          register(canonicalize(function.getName()), function, functionMap);
-        } else {
-          Set<String> canonicalNames = new HashSet<>();
-          for (String name : names) {
-            if (!canonicalNames.add(canonicalize(name))) {
-              LOGGER.warn("Duplicate names: {} in class: {}", Arrays.toString(names), clazz);
-            }
-          }
-          for (String canonicalName : canonicalNames) {
-            register(canonicalName, function, functionMap);
-          }
-        }
-      }
-    }
+    FUNCTION_MAP = fromServiceLoader();
 
-    // Register ScalarFunction methods
-    Map<String, Map<Integer, FunctionInfo>> functionInfoMap = new HashMap<>();
-    Set<Method> methods = PinotReflectionUtils.getMethodsThroughReflection(".*\\.function\\..*", ScalarFunction.class);
-    for (Method method : methods) {
-      if (!Modifier.isPublic(method.getModifiers())) {
-        continue;
-      }
-      ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
-      if (scalarFunction.enabled()) {
-        FunctionInfo functionInfo =
-            new FunctionInfo(method, method.getDeclaringClass(), scalarFunction.nullableParameters());
-        int numArguments = scalarFunction.isVarArg() ? VAR_ARG_KEY : method.getParameterCount();
-        String[] names = scalarFunction.names();
-        if (names.length == 0) {
-          register(canonicalize(method.getName()), functionInfo, numArguments, functionInfoMap);
-        } else {
-          Set<String> canonicalNames = new HashSet<>();
-          for (String name : names) {
-            if (!canonicalNames.add(canonicalize(name))) {
-              LOGGER.warn("Duplicate names: {} in method: {}", Arrays.toString(names), method);
-            }
-          }
-          for (String canonicalName : canonicalNames) {
-            register(canonicalName, functionInfo, numArguments, functionInfoMap);
-          }
-        }
-      }
-    }
-
-    // Create PinotScalarFunction for registered methods
-    for (Map.Entry<String, Map<Integer, FunctionInfo>> entry : functionInfoMap.entrySet()) {
-      String canonicalName = entry.getKey();
-      Preconditions.checkState(
-          functionMap.put(canonicalName, new ArgumentCountBasedScalarFunction(canonicalName, entry.getValue())) == null,
-          "Function: %s is already registered", canonicalName);
-    }
-
-    FUNCTION_MAP = Map.copyOf(functionMap);
     LOGGER.info("Initialized FunctionRegistry with {} functions: {} in {}ms", FUNCTION_MAP.size(),
         FUNCTION_MAP.keySet(), System.currentTimeMillis() - startTimeMs);
+  }
+
+  private static Map<String, PinotScalarFunction> fromServiceLoader() {
+    Map<String, ScalarFunctionLookupMechanism.ScalarFunctionProvider> providerByFunName = new HashMap<>();
+
+    Map<String, PinotScalarFunction> functionMap = new HashMap<>();
+    for (ScalarFunctionLookupMechanism mechanism : ServiceLoader.load(ScalarFunctionLookupMechanism.class)) {
+      for (ScalarFunctionLookupMechanism.ScalarFunctionProvider provider : mechanism.getProviders()) {
+        int priority = provider.priority();
+
+        for (PinotScalarFunction function : provider.getFunctions()) {
+          for (String name : function.getNames()) {
+            String canonicalName = canonicalize(name);
+            ScalarFunctionLookupMechanism.ScalarFunctionProvider oldValue = providerByFunName.get(canonicalName);
+            if (oldValue == null) {
+              providerByFunName.put(canonicalName, provider);
+              functionMap.put(canonicalName, function);
+              LOGGER.debug("Registered function: {} using {} provider", canonicalName, provider.name());
+            } else {
+              if (oldValue.priority() < priority) {
+                providerByFunName.put(canonicalName, provider);
+                functionMap.put(canonicalName, function);
+                LOGGER.info("Function: {} already registered with a lower priority provider {}, replacing it with {}",
+                    canonicalName, oldValue.name(), provider.name());
+              } else {
+                LOGGER.info("Function: {} already registered with a higher or equal priority using {}, skipping "
+                        + "definitions from  {}",
+                    canonicalName, oldValue.name(), provider.name());
+              }
+            }
+          }
+        }
+      }
+    }
+    return functionMap;
   }
 
   /**
@@ -173,15 +136,8 @@ public class FunctionRegistry {
         canonicalName);
   }
 
-  /**
-   * Registers a {@link FunctionInfo} under the given canonical name.
-   */
-  private static void register(String canonicalName, FunctionInfo functionInfo, int numArguments,
-      Map<String, Map<Integer, FunctionInfo>> functionInfoMap) {
-    Preconditions.checkState(
-        functionInfoMap.computeIfAbsent(canonicalName, k -> new HashMap<>()).put(numArguments, functionInfo) == null,
-        "Function: %s with %s arguments is already registered", canonicalName,
-        numArguments == VAR_ARG_KEY ? "variable" : numArguments);
+  public static Set<String> getFunctionNames() {
+    return FUNCTION_MAP.keySet();
   }
 
   /**
@@ -244,7 +200,7 @@ public class FunctionRegistry {
     private final String _name;
     private final Map<Integer, FunctionInfo> _functionInfoMap;
 
-    private ArgumentCountBasedScalarFunction(String name, Map<Integer, FunctionInfo> functionInfoMap) {
+    public ArgumentCountBasedScalarFunction(String name, Map<Integer, FunctionInfo> functionInfoMap) {
       _name = name;
       _functionInfoMap = functionInfoMap;
     }
@@ -324,6 +280,48 @@ public class FunctionRegistry {
     public FunctionInfo getFunctionInfo(int numArguments) {
       FunctionInfo functionInfo = _functionInfoMap.get(numArguments);
       return functionInfo != null ? functionInfo : _functionInfoMap.get(VAR_ARG_KEY);
+    }
+  }
+
+  /**
+   * Interface for looking up scalar functions.
+   *
+   * Each instance of this interface represents a mechanism to look up scalar functions. They should be registered
+   * as a service provider in the META-INF/services directory to be discovered by the ServiceLoader.
+   * Alternatively, they can be registered using the {@link com.google.auto.service.AutoService} annotation.
+   *
+   * @see AnnotatedClassLookupMechanism
+   * @see AnnotatedMethodLookupMechanism
+   */
+  public interface ScalarFunctionLookupMechanism {
+
+    /**
+     * Returns the set of {@link ScalarFunctionProvider} instances that can be used to look up scalar functions.
+     */
+    Set<ScalarFunctionProvider> getProviders();
+
+    /**
+     * Interface for providing scalar functions.
+     * <p>Each provider can provide multiple scalar functions, and they can have different priorities.
+     * <p>If two functions have the same canonical name, the one with higher priority will be used.
+     */
+    interface ScalarFunctionProvider {
+      /**
+       * Returns the name of the provider.
+       * <p>This is used for logging and debugging purposes when there are multiple providers for the same function.
+       */
+      String name();
+
+      /**
+       * Returns the priority of the provider. Higher priority providers are loaded first.
+       * <p>Default priority is 0.
+       */
+      int priority();
+
+      /**
+       * Returns a set of {@link PinotScalarFunction} instances.
+       */
+      Set<PinotScalarFunction> getFunctions();
     }
   }
 }

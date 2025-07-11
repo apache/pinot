@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.common.function;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -34,6 +40,16 @@ public interface PinotScalarFunction {
    * Returns the name of the function.
    */
   String getName();
+
+  /**
+   * Returns the set of names of the function, including the primary name returned by {@link #getName()}.
+   *
+   * The value of this function may be used to register the function in the OperatorTable, although the names included
+   * an optional {@link ScalarFunction}} annotation higher priority.
+   */
+  default Set<String> getNames() {
+    return Set.of(getName());
+  }
 
   /**
    * Returns the corresponding {@link PinotSqlFunction} to be registered into the OperatorTable, or {@code null} if it
@@ -57,4 +73,30 @@ public interface PinotScalarFunction {
    */
   @Nullable
   FunctionInfo getFunctionInfo(int numArguments);
+
+  static Set<PinotScalarFunction> fromAnnotatedMethod(Method method) {
+    ScalarFunction annotation = method.getAnnotation(ScalarFunction.class);
+    if (annotation == null) {
+      throw new IllegalArgumentException("Method " + method + " is not annotated with @ScalarFunction");
+    }
+    return fromMethod(method, annotation.isVarArg(), annotation.nullableParameters(), annotation.names());
+  }
+
+  static Set<PinotScalarFunction> fromMethod(Method method, boolean isVarArg, boolean supportNullArgs,
+      @Nullable String... names) {
+    int numArguments = isVarArg ? FunctionRegistry.VAR_ARG_KEY : method.getParameterCount();
+    FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), supportNullArgs);
+    Map<Integer, FunctionInfo> functionInfoMap = Map.of(numArguments, functionInfo);
+
+    List<String> nameList = names != null && names.length > 0
+        ? Arrays.asList(names)
+        : List.of(method.getName());
+
+
+    return nameList.stream()
+        .map(FunctionRegistry::canonicalize)
+        .distinct()
+        .map(name -> new FunctionRegistry.ArgumentCountBasedScalarFunction(name, functionInfoMap))
+        .collect(Collectors.toSet());
+  }
 }

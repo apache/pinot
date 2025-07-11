@@ -222,6 +222,11 @@
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-udf-test</artifactId>
+      <scope>test</scope>
+    </dependency>
 
     <dependency>
       <groupId>org.testng</groupId>
