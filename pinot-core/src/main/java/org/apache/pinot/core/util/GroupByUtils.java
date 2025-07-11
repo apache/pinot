@@ -26,6 +26,8 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
+import org.apache.pinot.core.data.table.LinkedHashMapIndexedTable;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
@@ -41,17 +43,17 @@ public final class GroupByUtils {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns {@code max(limit * 5, 5000)} to
+   * ensure the result accuracy.
    */
   public static int getTableCapacity(int limit) {
     return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and
-   * result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns
+   * {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and result
+   * accuracy.
    */
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
@@ -211,5 +213,16 @@ public final class GroupByUtils {
       return new ConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
           initialCapacity, executorService);
     }
+  }
+
+  public static IndexedTable getAndPopulateLinkedHashMapIndexedTable(GroupByResultsBlock block, boolean hasFinalInput,
+      QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, ExecutorService executorService) {
+    LinkedHashMapIndexedTable indexedTable =
+        new LinkedHashMapIndexedTable(block.getDataSchema(), hasFinalInput, queryContext, resultSize, trimSize,
+            trimThreshold, executorService);
+    for (IntermediateRecord intermediateRecord : block.getIntermediateRecords()) {
+      indexedTable.upsert(intermediateRecord._key, intermediateRecord._record);
+    }
+    return indexedTable;
   }
 }

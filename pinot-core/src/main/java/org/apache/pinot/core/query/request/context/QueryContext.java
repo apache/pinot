@@ -20,8 +20,8 @@ package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,9 +37,11 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
+import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -89,6 +91,7 @@ public class QueryContext {
   private final Map<String, String> _queryOptions;
   private final Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
   private final ExplainMode _explain;
+  private Boolean _isUnsafeTrim = null;
 
   private final Function<Class<?>, Map<?, ?>> _sharedValues = MemoizedClassAssociation.of(ConcurrentHashMap::new);
 
@@ -98,6 +101,8 @@ public class QueryContext {
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private boolean _hasFilteredAggregations;
   private Set<String> _columns;
+  // comparator used when group-by order-by key case
+  private Comparator<Key> _groupKeyComparator;
 
   // Other properties to be shared across all the segments
   // Latest table schema at query time
@@ -175,41 +180,14 @@ public class QueryContext {
       return false;
     }
 
-    BitSet orderByKeysMatched = new BitSet(orderByKeys.size());
-
-    OUTER_GROUP:
-    for (ExpressionContext groupExp : groupByKeys) {
-      for (int i = 0; i < orderByKeys.size(); i++) {
-        OrderByExpressionContext orderExp = orderByKeys.get(i);
-        if (groupExp.equals(orderExp.getExpression())) {
-          orderByKeysMatched.set(i);
-          continue OUTER_GROUP;
-        }
-      }
-
-      return false;
-    }
-
-    OUTER_ORDER:
-    for (int i = 0, n = orderByKeys.size(); i < n; i++) {
-      if (orderByKeysMatched.get(i)) {
-        continue;
-      }
-
-      for (ExpressionContext groupExp : groupByKeys) {
-        if (groupExp.equals(orderByKeys.get(i).getExpression())) {
-          continue OUTER_ORDER;
-        }
-      }
-      return false;
-    }
-
-    return true;
+    Set<ExpressionContext> groupByKeyIdentSet = new HashSet<>(groupByKeys);
+    Set<ExpressionContext> orderByKeyIdentSet = new HashSet<>();
+    orderByKeys.forEach(key -> orderByKeyIdentSet.add(key.getExpression()));
+    return groupByKeyIdentSet.equals(orderByKeyIdentSet);
   }
 
   /**
-   * Returns the table name.
-   * NOTE: on the broker side, table name might be {@code null} when subquery is available.
+   * Returns the table name. NOTE: on the broker side, table name might be {@code null} when subquery is available.
    */
   public String getTableName() {
     return _tableName;
@@ -309,12 +287,10 @@ public class QueryContext {
    * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
    * <p>
    * This is just an alias on top of {@link #getExplain() != ExplainMode.NONE}
-   *
    */
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
   }
-
 
   public boolean isAccurateGroupByWithoutOrderBy() {
     return _accurateGroupByWithoutOrderBy;
@@ -340,7 +316,8 @@ public class QueryContext {
   }
 
   /**
-   * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any aggregation.
+   * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any
+   * aggregation.
    */
   @Nullable
   public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
@@ -523,13 +500,14 @@ public class QueryContext {
   }
 
   /**
-   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
-   * within the scope of a query.
-   * @param type the type of the value produced, guarantees type pollution is impossible.
-   * @param key the key used to determine if the value has already been computed.
+   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared within
+   * the scope of a query.
+   *
+   * @param type   the type of the value produced, guarantees type pollution is impossible.
+   * @param key    the key used to determine if the value has already been computed.
    * @param mapper A function to apply the first time a key is encountered to construct the value.
-   * @param <K> the key type
-   * @param <V> the value type
+   * @param <K>    the key type
+   * @param <V>    the value type
    * @return the shared value
    */
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
@@ -564,7 +542,26 @@ public class QueryContext {
   }
 
   public boolean isUnsafeTrim() {
-    return !isSameOrderAndGroupByColumns(this) || getHavingFilter() != null;
+    if (_isUnsafeTrim != null) {
+      return _isUnsafeTrim;
+    }
+    _isUnsafeTrim = !isSameOrderAndGroupByColumns(this) || getHavingFilter() != null;
+    return _isUnsafeTrim;
+  }
+
+  public boolean shouldSortAggregate() {
+    // TODO: expose this as a queryOption
+    return !isUnsafeTrim() && _limit < 100000;
+  }
+
+  public Comparator<Key> getGroupKeyComparator() {
+    if (_groupKeyComparator != null) {
+      return _groupKeyComparator;
+    }
+    _groupKeyComparator =
+        OrderByComparatorFactory.getGroupKeyComparator(getOrderByExpressions(), getGroupByExpressions(),
+            isNullHandlingEnabled());
+    return _groupKeyComparator;
   }
 
   public static class Builder {
