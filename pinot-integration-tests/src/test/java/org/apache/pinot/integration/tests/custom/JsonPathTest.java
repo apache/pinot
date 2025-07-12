@@ -212,7 +212,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + i);
       Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + i);
       Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + i);
-      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), (double) i);
+      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), i);
     }
 
     //Filter Query
@@ -367,5 +367,45 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Cache cache = CacheProvider.getCache();
     Assert.assertTrue(cache instanceof JsonPathCache);
     Assert.assertTrue(((JsonPathCache) cache).size() > 0);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonKeysQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    // Test flat map keys
+    String query = "SELECT jsonKeys(myMapStr, 1) FROM " + getTableName() + " LIMIT 1";
+    JsonNode pinotResponse = postQuery(query);
+    ArrayNode rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    Assert.assertNotNull(rows);
+    Assert.assertFalse(rows.isEmpty());
+    ArrayNode keys = (ArrayNode) rows.get(0).get(0);
+    Assert.assertTrue(keys.size() >= 2);
+    Assert.assertTrue(keys.toString().contains("k1"));
+    Assert.assertTrue(keys.toString().contains("k2"));
+
+    // Test nested map keys (depth 2)
+    query = "SELECT jsonKeys(complexMapStr, 2) FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    Assert.assertNotNull(rows);
+    Assert.assertFalse(rows.isEmpty());
+    keys = (ArrayNode) rows.get(0).get(0);
+    Assert.assertTrue(keys.toString().contains("k1"));
+    Assert.assertTrue(keys.toString().contains("k2"));
+    Assert.assertTrue(keys.toString().contains("k3"));
+    Assert.assertTrue(keys.toString().contains("k4"));
+    Assert.assertTrue(keys.toString().contains("k4.k4-k1"));
+    Assert.assertTrue(keys.toString().contains("k4.k4-k2"));
+
+    // Test nested map keys (depth 3)
+    query = "SELECT jsonKeys(complexMapStr, 3) FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    rows = (ArrayNode) pinotResponse.get("resultTable").get("rows");
+    Assert.assertNotNull(rows);
+    Assert.assertFalse(rows.isEmpty());
+    keys = (ArrayNode) rows.get(0).get(0);
+    Assert.assertTrue(keys.toString().contains("k4.k4-k3"));
+    Assert.assertTrue(keys.toString().contains("k4.met"));
   }
 }
