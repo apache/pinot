@@ -1105,9 +1105,9 @@ public class CommonConstants {
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
     // threshold for number of rows per segment result for doing partitioned group-by
     public static final int DEFAULT_GROUPBY_NUM_PARTITIONS = 4;
+    public static final int DEFAULT_GROUPBY_RADIX_BITS = 2;
     // number of partitions when doing partitioned group-by
     public static final int DEFAULT_GROUPBY_PARTITION_THRESHOLD = 10_000;
-
 
     // TODO: Merge this with "mse"
     /**
@@ -1615,7 +1615,7 @@ public class CommonConstants {
       public enum Status {
         IN_PROGRESS, // The segment is still consuming data
         COMMITTING, // This state will only be utilised by pauseless ingestion when the segment has been consumed but
-                    // is yet to be build and uploaded by the server.
+        // is yet to be build and uploaded by the server.
         DONE, // The segment has finished consumption and has been committed to the segment store
         UPLOADED; // The segment is uploaded by an external party
 

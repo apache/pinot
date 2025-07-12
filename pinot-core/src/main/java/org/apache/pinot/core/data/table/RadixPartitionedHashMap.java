@@ -1,3 +1,21 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
 package org.apache.pinot.core.data.table;
 
 import java.util.ArrayList;
@@ -11,6 +29,9 @@ import javax.annotation.Nullable;
 import javax.ws.rs.NotSupportedException;
 
 
+/**
+ * Radix partitioned hashtable that provides a single view for multiple hashtable that could be indexed
+ */
 public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   private final int _numRadixBits;
   private final int _numPartitions;
@@ -24,7 +45,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
     _mask = _numPartitions - 1;
     _maps = new ArrayList<>();
     _size = 0;
-    for (int i=0; i<_numPartitions; i++) {
+    for (int i = 0; i < _numPartitions; i++) {
       _maps.add(new HashMap<>());
     }
   }
@@ -32,13 +53,21 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   public RadixPartitionedHashMap(List<HashMap<K, V>> maps, int numRadixBits) {
     _numRadixBits = numRadixBits;
     _numPartitions = 1 << numRadixBits;
-    assert(maps.size() == _numPartitions);
+    assert (maps.size() == _numPartitions);
     _mask = _numPartitions - 1;
     _maps = maps;
     _size = 0;
-    for (HashMap<K, V> map: maps) {
+    for (HashMap<K, V> map : maps) {
       _size += map.size();
     }
+  }
+
+  public Map<K, V> getPartition(int i) {
+    return _maps.get(i);
+  }
+
+  public int getNumPartitions() {
+    return _numPartitions;
   }
 
   private int partition(K key) {
@@ -84,7 +113,11 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public V remove(Object o) {
-    throw new NotSupportedException("partitioned map does not support removing by value");
+    HashMap<K, V> map = _maps.get(partition((K) o));
+    if (map.containsKey((K) o)) {
+      _size--;
+    }
+    return map.remove(o);
   }
 
   @Override
@@ -94,7 +127,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public void clear() {
-    for (HashMap<K, V> map: _maps) {
+    for (HashMap<K, V> map : _maps) {
       map.clear();
     }
     _size = 0;
