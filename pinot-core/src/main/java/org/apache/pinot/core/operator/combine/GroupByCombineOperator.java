@@ -199,9 +199,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         int partitionId = i;
         futures.add(_executorService.submit(() -> {
           HashMap<Key, Record> map = new HashMap<>();
+          AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+          int numKeyColumns = _queryContext.getGroupByExpressions().size();
           for (RadixPartitionedHashMap<Key, Record> partitionedHashMap : _partitionedHashMaps) {
             Map<Key, Record> partition = partitionedHashMap.getPartition(partitionId);
-            map.putAll(partition);
+            for (Map.Entry<Key, Record> entry : partition.entrySet()) {
+              GroupByUtils.addOrUpdateRecord(map, entry.getKey(), entry.getValue(), aggregationFunctions,
+                  numKeyColumns);
+            }
           }
           _mergedHashMaps[partitionId] = map;
         }));
