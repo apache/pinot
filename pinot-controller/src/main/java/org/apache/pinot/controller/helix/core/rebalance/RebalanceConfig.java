@@ -65,6 +65,13 @@ public class RebalanceConfig {
   @ApiModelProperty(example = "false")
   private boolean _downtime = false;
 
+  // Whether to force allow downtime for the rebalance when peer-download enabled tables need to undergo rebalance
+  // For peer-download enabled tables, If downtime=true or minAvailableReplicas=0 and forceDowntime=true, then these
+  // configs will be allowed, otherwise the rebalance will be failed.
+  @JsonProperty("forceDowntime")
+  @ApiModelProperty(example = "false")
+  private boolean _forceDowntime = false;
+
   // For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or maximum number of replicas
   // allowed to be unavailable if value is negative
   @JsonProperty("minAvailableReplicas")
@@ -209,6 +216,14 @@ public class RebalanceConfig {
     _downtime = downtime;
   }
 
+  public boolean isForceDowntime() {
+    return _forceDowntime;
+  }
+
+  public void setForceDowntime(boolean forceDowntime) {
+    _forceDowntime = forceDowntime;
+  }
+
   public int getMinAvailableReplicas() {
     return _minAvailableReplicas;
   }
@@ -351,23 +366,25 @@ public class RebalanceConfig {
   public String toString() {
     return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
         + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _minimizeDataMovement="
-        + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime + ", _minAvailableReplicas="
-        + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", batchSizePerServer=" + _batchSizePerServer
-        + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
-        + ", _externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
-        + ", _updateTargetTier=" + _updateTargetTier + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs
-        + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs + ", _maxAttempts=" + _maxAttempts
-        + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs + ", _diskUtilizationThreshold="
-        + _diskUtilizationThreshold + ", _forceCommit=" + _forceCommit + ", _forceCommitBatchSize="
-        + _forceCommitBatchSize + ", _forceCommitBatchStatusCheckIntervalMs=" + _forceCommitBatchStatusCheckIntervalMs
-        + ", _forceCommitBatchStatusCheckTimeoutMs=" + _forceCommitBatchStatusCheckTimeoutMs + '}';
+        + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime + ", _forceDowntime="
+        + _forceDowntime + ", _minAvailableReplicas=" + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts
+        + ", batchSizePerServer=" + _batchSizePerServer + ", _externalViewCheckIntervalInMs="
+        + _externalViewCheckIntervalInMs + ", _externalViewStabilizationTimeoutInMs="
+        + _externalViewStabilizationTimeoutInMs + ", _updateTargetTier=" + _updateTargetTier
+        + ", _heartbeatIntervalInMs=" + _heartbeatIntervalInMs + ", _heartbeatTimeoutInMs=" + _heartbeatTimeoutInMs
+        + ", _maxAttempts=" + _maxAttempts + ", _retryInitialDelayInMs=" + _retryInitialDelayInMs
+        + ", _diskUtilizationThreshold=" + _diskUtilizationThreshold + ", _forceCommit=" + _forceCommit
+        + ", _forceCommitBatchSize=" + _forceCommitBatchSize + ", _forceCommitBatchStatusCheckIntervalMs="
+        + _forceCommitBatchStatusCheckIntervalMs + ", _forceCommitBatchStatusCheckTimeoutMs="
+        + _forceCommitBatchStatusCheckTimeoutMs + '}';
   }
 
   public String toQueryString() {
     return "dryRun=" + _dryRun + "&preChecks=" + _preChecks + "&reassignInstances=" + _reassignInstances
         + "&includeConsuming=" + _includeConsuming + "&bootstrap=" + _bootstrap + "&downtime=" + _downtime
-        + "&minAvailableReplicas=" + _minAvailableReplicas + "&bestEfforts=" + _bestEfforts
-        + "&minimizeDataMovement=" + _minimizeDataMovement.name() + "&batchSizePerServer=" + _batchSizePerServer
+        + "&forceDowntime=" + _forceDowntime + "&minAvailableReplicas=" + _minAvailableReplicas
+        + "&bestEfforts=" + _bestEfforts + "&minimizeDataMovement=" + _minimizeDataMovement.name()
+        + "&batchSizePerServer=" + _batchSizePerServer
         + "&externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
         + "&externalViewStabilizationTimeoutInMs=" + _externalViewStabilizationTimeoutInMs
         + "&updateTargetTier=" + _updateTargetTier + "&heartbeatIntervalInMs=" + _heartbeatIntervalInMs
@@ -387,6 +404,7 @@ public class RebalanceConfig {
     rc._includeConsuming = cfg._includeConsuming;
     rc._bootstrap = cfg._bootstrap;
     rc._downtime = cfg._downtime;
+    rc._forceDowntime = cfg._forceDowntime;
     rc._minAvailableReplicas = cfg._minAvailableReplicas;
     rc._bestEfforts = cfg._bestEfforts;
     rc._minimizeDataMovement = cfg._minimizeDataMovement;
