@@ -226,6 +226,7 @@ public class TableRebalancer {
     boolean includeConsuming = rebalanceConfig.isIncludeConsuming();
     boolean bootstrap = rebalanceConfig.isBootstrap();
     boolean downtime = rebalanceConfig.isDowntime();
+    boolean forceDowntime = rebalanceConfig.isForceDowntime();
     int minReplicasToKeepUpForNoDowntime = rebalanceConfig.getMinAvailableReplicas();
     boolean lowDiskMode = rebalanceConfig.isLowDiskMode();
     boolean bestEfforts = rebalanceConfig.isBestEfforts();
@@ -245,12 +246,12 @@ public class TableRebalancer {
     }
     tableRebalanceLogger.info(
         "Start rebalancing with dryRun: {}, preChecks: {}, reassignInstances: {}, "
-            + "includeConsuming: {}, bootstrap: {}, downtime: {}, minReplicasToKeepUpForNoDowntime: {}, "
-            + "enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, batchSizePerServer: {}, "
-            + "externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, minimizeDataMovement: {}, "
-            + "forceCommit: {}, forceCommitBatchSize: {}, forceCommitBatchStatusCheckIntervalMs: {}, "
-            + "forceCommitBatchStatusCheckTimeoutMs: {}",
-        dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime,
+            + "includeConsuming: {}, bootstrap: {}, downtime: {}, forceDowntime: {}, "
+            + "minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, "
+            + "batchSizePerServer: {}, externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, "
+            + "minimizeDataMovement: {}, forceCommit: {}, forceCommitBatchSize: {}, "
+            + "forceCommitBatchStatusCheckIntervalMs: {}, forceCommitBatchStatusCheckTimeoutMs: {}",
+        dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime, forceDowntime,
         minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
         externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
         forceCommit, rebalanceConfig.getForceCommitBatchSize(),
@@ -391,13 +392,21 @@ public class TableRebalancer {
     }
 
     if (downtime && !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())) {
-      // Don't allow downtime rebalance if peer-download is enabled as it can result in data loss. If RF=1, set
-      // minAvailableReplicas=0 instead
-      String errorMsg = "Peer-download enabled tables cannot undergo downtime rebalance due to the potential for "
-          + "data loss, if RF=1 use minAvailableReplicas=0 instead";
-      tableRebalanceLogger.error(errorMsg);
-      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
-          tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+      if (!forceDowntime) {
+        // Don't allow downtime rebalance if peer-download is enabled as it can result in data loss
+        // The best way to rebalance peer-download enabled tables is to:
+        // - Ensure that all segments have their deep-store copy available
+        // - Pause ingestion to prevent the creation of new segments during rebalance
+        // - set forceDowntime=true and re-try running the rebalance
+        String errorMsg = "Peer-download enabled tables cannot undergo downtime rebalance due to the potential for "
+            + "data loss, validate all segments exist in deep store and pause ingestion prior to setting "
+            + "forceDowntime=true to override the downtime flag";
+        tableRebalanceLogger.error(errorMsg);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+            tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+      }
+      tableRebalanceLogger.warn("Continuing with downtime rebalance for peer-download enabled table as "
+          + "forceDowntime=true");
     }
 
     if (downtime) {
@@ -502,17 +511,25 @@ public class TableRebalancer {
       minAvailableReplicas = numCurrentAssignmentReplicas;
     }
 
-    // Don't allow rebalance if peer-download is enabled where numReplicas > 1 but minAvailableReplicas = 0 (which is
-    // similar to downtime rebalance where we can drop to 0 replicas during rebalance)
-    if (numReplicas > 1 && minAvailableReplicas == 0
+    // Don't allow rebalance if peer-download is enabled but minAvailableReplicas = 0 (which is similar to downtime
+    // rebalance where we can drop to 0 replicas during rebalance)
+    if (minAvailableReplicas == 0
         && !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())) {
-      // Don't allow minAvailableReplicas=0 rebalance if peer-download is enabled and numReplicas > 1, as it can result
-      // in data loss. If RF=1, it is okay to set minAvailableReplicas=0 instead as this scenario is handled
-      String errorMsg = "Peer-download enabled tables with RF>1 cannot set minAvailableReplicas=0 for rebalance due to "
-          + "the potential for data loss";
-      tableRebalanceLogger.error(errorMsg);
-      return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
-          tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+      if (!forceDowntime) {
+        // Don't allow minAvailableReplicas=0 rebalance if peer-download is enabled, as it can result in data loss.
+        // The best way to rebalance peer-download enabled tables is to:
+        // - Ensure that all segments have their deep-store copy available
+        // - Pause ingestion to prevent the creation of new segments during rebalance
+        // - set forceDowntime=true and re-try running the rebalance
+        String errorMsg = "Peer-download enabled tables with cannot set minAvailableReplicas=0 for rebalance due to "
+            + "the potential for data loss, validate all segments exist in deep store and pause ingestion prior to "
+            + "setting forceDowntime=true to override the downtime flag";
+        tableRebalanceLogger.error(errorMsg);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+            tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+      }
+      tableRebalanceLogger.warn("Continuing with minAvailableReplicas=0 rebalance for peer-download enabled table as "
+          + "forceDowntime=true");
     }
 
     tableRebalanceLogger.info("Rebalancing with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, "
