@@ -196,8 +196,9 @@ public class TableConfigsRestletResource {
   public ConfigSuccessResponse addConfig(
       String tableConfigsStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
-      @Context Request request) {
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
+      @ApiParam(defaultValue = "false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
+      @Context HttpHeaders httpHeaders, @Context Request request) {
     Pair<TableConfigs, Map<String, Object>> tableConfigsAndUnrecognizedProps;
     try {
       tableConfigsAndUnrecognizedProps =
@@ -235,11 +236,15 @@ public class TableConfigsRestletResource {
 
       if (offlineTableConfig != null) {
         tuneConfig(offlineTableConfig, schema);
-        PinotTableRestletResource.tableTasksValidation(offlineTableConfig, _pinotHelixTaskResourceManager);
+        if (!ignoreActiveTasks) {
+          PinotTableRestletResource.tableTasksValidation(offlineTableConfig, _pinotHelixTaskResourceManager);
+        }
       }
       if (realtimeTableConfig != null) {
         tuneConfig(realtimeTableConfig, schema);
-        PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
+        if (!ignoreActiveTasks) {
+          PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
+        }
       }
       try {
         _pinotHelixResourceManager.addSchema(schema, false, false);
@@ -290,7 +295,7 @@ public class TableConfigsRestletResource {
   public SuccessResponse deleteConfig(
       @ApiParam(value = "TableConfigs name i.e. raw table name", required = true) @PathParam("tableName")
       String tableName,
-      @ApiParam(defaultValue = "false") @QueryParam("skipTasksValidation") boolean skipTasksValidation,
+      @ApiParam(defaultValue = "false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders headers) {
     try {
       if (TableNameBuilder.isOfflineTableResource(tableName) || TableNameBuilder.isRealtimeTableResource(tableName)) {
@@ -315,12 +320,12 @@ public class TableConfigsRestletResource {
           _pinotHelixResourceManager.hasRealtimeTable(tableName) || _pinotHelixResourceManager.hasOfflineTable(
               tableName);
       PinotTableRestletResource.tableTasksCleanup(TableNameBuilder.REALTIME.tableNameWithType(tableName),
-          skipTasksValidation, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
+          ignoreActiveTasks, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
       // Delete whether tables exist or not
       _pinotHelixResourceManager.deleteRealtimeTable(tableName);
       LOGGER.info("Deleted realtime table: {}", tableName);
       PinotTableRestletResource.tableTasksCleanup(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
-          skipTasksValidation, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
+          ignoreActiveTasks, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
       _pinotHelixResourceManager.deleteOfflineTable(tableName);
       LOGGER.info("Deleted offline table: {}", tableName);
       boolean schemaExists = _pinotHelixResourceManager.deleteSchema(tableName);

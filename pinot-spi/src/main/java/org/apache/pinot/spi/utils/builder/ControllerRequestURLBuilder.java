@@ -118,6 +118,18 @@ public class ControllerRequestURLBuilder {
         + "&type=" + tableType);
   }
 
+  public String forMinionTaskState(String taskName) {
+    return StringUtil.join("/", _baseUrl, "tasks", "task", taskName, "state");
+  }
+
+  public String forStopMinionTaskQueue(String taskType) {
+    return StringUtil.join("/", _baseUrl, "tasks", taskType, "stop");
+  }
+
+  public String forResumeMinionTaskQueue(String taskType) {
+    return StringUtil.join("/", _baseUrl, "tasks", taskType, "resume");
+  }
+
   public String forUpdateUserConfig(String username, String componentTypeStr, boolean passwordChanged) {
     StringBuilder params = new StringBuilder();
     if (StringUtils.isNotBlank(username)) {
