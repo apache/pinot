@@ -26,19 +26,17 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.BitmapInvertedIndexWriter;
 import org.apache.pinot.segment.local.segment.index.text.AbstractTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.text.CaseAwareStandardAnalyzer;
 import org.apache.pinot.segment.local.segment.index.text.TextIndexType;
+import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.local.utils.nativefst.FST;
 import org.apache.pinot.segment.local.utils.nativefst.FSTHeader;
 import org.apache.pinot.segment.local.utils.nativefst.builder.FSTBuilder;
@@ -108,9 +106,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     } catch (RuntimeException e) {
       if (_continueOnError) {
         // Caught exception while trying to add, update metric and skip the document
-        String metricKeyName =
-            _tableNameWithType + "-" + TextIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, TextIndexType.INDEX_DISPLAY_NAME);
       } else {
         LOGGER.error("Caught exception while trying to add to native text index for table: {}, column: {}",
             _tableNameWithType, _columnName, e);
@@ -129,9 +125,7 @@ public class NativeTextIndexCreator extends AbstractTextIndexCreator {
     } catch (RuntimeException e) {
       if (_continueOnError) {
         // Caught exception while trying to add, update metric and skip the document
-        String metricKeyName =
-            _tableNameWithType + "-" + TextIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, TextIndexType.INDEX_DISPLAY_NAME);
       } else {
         LOGGER.error("Caught exception while trying to add to native text index for table: {}, column: {}",
             _tableNameWithType, _columnName, e);

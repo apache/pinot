@@ -27,16 +27,14 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.h3.H3IndexType;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
+import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
@@ -120,10 +118,8 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   @Override
   public void add(@Nullable Geometry geometry)
       throws IOException {
-    if (_continueOnError && (geometry == null || !(geometry instanceof Point))) {
-      String metricKeyName =
-          _tableNameWithType + "-" + H3IndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-      ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+    if (_continueOnError && !(geometry instanceof Point)) {
+      MetricUtils.updateIndexingErrorMetric(_tableNameWithType, H3IndexType.INDEX_DISPLAY_NAME);
       _nextDocId++;
       return;
     }

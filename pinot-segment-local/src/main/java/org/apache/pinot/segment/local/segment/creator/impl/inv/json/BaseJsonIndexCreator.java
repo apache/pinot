@@ -29,13 +29,11 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.json.JsonIndexType;
+import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.CleanerUtil;
@@ -104,21 +102,17 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
     List<Map<String, String>> flattenedRecord;
     try {
       flattenedRecord = JsonUtils.flatten(jsonString, _jsonIndexConfig);
-      if (flattenedRecord.equals(JsonUtils.SKIPPED_FLATTENED_RECORD)) {
+      if (flattenedRecord == JsonUtils.SKIPPED_FLATTENED_RECORD) {
         // The default SKIPPED_FLATTENED_RECORD was returned, this can only happen if the original record could not be
         // flattened, update the metric
-        String metricKeyName =
-            _tableNameWithType + "-" + JsonIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, JsonIndexType.INDEX_DISPLAY_NAME);
       }
     } catch (Exception e) {
       if (_continueOnError) {
         // Caught exception while trying to add, update metric and add a default SKIPPED_FLATTENED_RECORD
         // This check is needed in the case where `_jsonIndexConfig.getSkipInvalidJson()` is false,
         // but _continueOnError is true
-        String metricKeyName =
-            _tableNameWithType + "-" + JsonIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, JsonIndexType.INDEX_DISPLAY_NAME);
         flattenedRecord = JsonUtils.SKIPPED_FLATTENED_RECORD;
       } else {
         throw e;
@@ -132,13 +126,12 @@ public abstract class BaseJsonIndexCreator implements JsonIndexCreator {
       throws IOException {
     String valueToAdd;
     try {
+      // TODO: Avoid this ser/de from map -> string -> json node
       valueToAdd = JsonUtils.objectToString(value);
     } catch (JsonProcessingException e) {
       if (_jsonIndexConfig.getSkipInvalidJson() || _continueOnError) {
         // Caught exception while trying to add, update metric and add a default SKIPPED_FLATTENED_RECORD
-        String metricKeyName =
-            _tableNameWithType + "-" + JsonIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, JsonIndexType.INDEX_DISPLAY_NAME);
         addFlattenedRecords(JsonUtils.SKIPPED_FLATTENED_RECORD);
         return;
       } else {

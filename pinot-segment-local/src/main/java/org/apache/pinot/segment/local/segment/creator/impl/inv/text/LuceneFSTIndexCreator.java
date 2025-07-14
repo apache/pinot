@@ -22,12 +22,10 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Locale;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
-import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
+import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
@@ -87,9 +85,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
         } catch (Exception ex) {
           if (_continueOnError) {
             // Caught exception while trying to add, update metric and skip the document
-            String metricKeyName =
-                _tableNameWithType + "-" + FstIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-            ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+            MetricUtils.updateIndexingErrorMetric(_tableNameWithType, FstIndexType.INDEX_DISPLAY_NAME);
           } else {
             LOGGER.error("Caught exception while trying to add to FST index for table: {}, column: {}",
                 tableNameWithType, columnName, ex);
@@ -115,9 +111,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
     } catch (Exception ex) {
       if (_continueOnError) {
         // Caught exception while trying to add, update metric and skip the document
-        String metricKeyName =
-            _tableNameWithType + "-" + FstIndexType.INDEX_DISPLAY_NAME.toUpperCase(Locale.US) + "-indexingError";
-        ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
+        MetricUtils.updateIndexingErrorMetric(_tableNameWithType, FstIndexType.INDEX_DISPLAY_NAME);
       } else {
         LOGGER.error("Caught exception while trying to add to FST index for table: {}, column: {}",
             _tableNameWithType, _columnName, ex);
