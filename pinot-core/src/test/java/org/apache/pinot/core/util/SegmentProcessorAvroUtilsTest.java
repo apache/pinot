@@ -46,7 +46,7 @@ public class SegmentProcessorAvroUtilsTest {
         new Object[] {FieldSpec.DataType.FLOAT, org.apache.avro.Schema.Type.FLOAT, null},
         new Object[] {FieldSpec.DataType.DOUBLE, org.apache.avro.Schema.Type.DOUBLE, null},
         new Object[] {FieldSpec.DataType.STRING, org.apache.avro.Schema.Type.STRING, null},
-        new Object[] {FieldSpec.DataType.BIG_DECIMAL, org.apache.avro.Schema.Type.STRING, "pinot.big_decimal"},
+        new Object[] {FieldSpec.DataType.BIG_DECIMAL, org.apache.avro.Schema.Type.BYTES, "big-decimal"},
         new Object[] {FieldSpec.DataType.BYTES, org.apache.avro.Schema.Type.BYTES, null},
         new Object[] {FieldSpec.DataType.BOOLEAN, org.apache.avro.Schema.Type.INT, null},
         new Object[] {FieldSpec.DataType.JSON, org.apache.avro.Schema.Type.STRING, null},
