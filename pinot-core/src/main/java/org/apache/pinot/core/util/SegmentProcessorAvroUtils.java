@@ -23,12 +23,14 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.avro.Conversion;
+import org.apache.avro.Conversions;
 import org.apache.avro.LogicalType;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
@@ -45,6 +47,56 @@ import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
  * {@link SegmentWriter}
  */
 public final class SegmentProcessorAvroUtils {
+
+  private static final EnumMap<FieldSpec.DataType, Schema> _notNullScalarMap;
+  private static final EnumMap<FieldSpec.DataType, Schema> _nullScalarMap;
+  private static final EnumMap<FieldSpec.DataType, Schema> _notNullMultiValueMap;
+  private static final EnumMap<FieldSpec.DataType, Schema> _nullMultiValueMap;
+
+  static {
+    GenericData.get().addLogicalTypeConversion(new Conversions.BigDecimalConversion());
+
+    _notNullScalarMap = new EnumMap<>(FieldSpec.DataType.class);
+    _nullScalarMap = new EnumMap<>(FieldSpec.DataType.class);
+    _notNullMultiValueMap = new EnumMap<>(FieldSpec.DataType.class);
+    _nullMultiValueMap = new EnumMap<>(FieldSpec.DataType.class);
+
+    Schema nullSchema = Schema.create(Schema.Type.NULL);
+    for (DataType value : DataType.values()) {
+      switch (value) {
+        case INT:
+          addType(value, Schema.create(Schema.Type.INT), nullSchema);
+          break;
+        case LONG:
+          addType(value, Schema.create(Schema.Type.LONG), nullSchema);
+          break;
+        case FLOAT:
+          addType(value, Schema.create(Schema.Type.FLOAT), nullSchema);
+          break;
+        case DOUBLE:
+          addType(value, Schema.create(Schema.Type.DOUBLE), nullSchema);
+          break;
+        case STRING:
+          addType(value, Schema.create(Schema.Type.STRING), nullSchema);
+          break;
+        case BIG_DECIMAL:
+          Schema bigDecimal = LogicalTypes.bigDecimal().addToSchema(SchemaBuilder.builder().bytesType());
+          addType(value, bigDecimal, nullSchema);
+          break;
+        case BYTES:
+          addType(value, Schema.create(Schema.Type.BYTES), nullSchema);
+          break;
+      }
+    }
+  }
+
+  private static void addType(DataType dataType, Schema scalarSchema, Schema nullSchema) {
+    _notNullScalarMap.put(dataType, scalarSchema);
+    _nullScalarMap.put(dataType, Schema.createUnion(scalarSchema, nullSchema));
+    Schema multiValueSchema = Schema.createArray(scalarSchema);
+    _notNullMultiValueMap.put(dataType, multiValueSchema);
+    _nullMultiValueMap.put(dataType, Schema.createUnion(multiValueSchema, nullSchema));
+  }
 
   private SegmentProcessorAvroUtils() {
   }
@@ -87,75 +139,34 @@ public final class SegmentProcessorAvroUtils {
         .collect(Collectors.toList());
     for (FieldSpec fieldSpec : orderedFieldSpecs) {
       String name = fieldSpec.getName();
+      // TODO: Probably we shoudn't use stored type but define a correct avro conversion.
+      //   See https://avro.apache.org/docs/1.11.0/spec.html#Logical+Types
       DataType storedType = fieldSpec.getDataType().getStoredType();
 
-      SchemaBuilder.BaseFieldTypeBuilder<Schema> type;
-      if (fieldSpec.isNullable()) {
-        type = fieldAssembler.name(name).type().nullable();
+      Schema fieldType;
+      if (fieldSpec.isSingleValueField()) {
+        if (fieldSpec.isNullable()) {
+          fieldType = _nullScalarMap.get(storedType);
+        } else {
+          fieldType = _notNullScalarMap.get(storedType);
+        }
       } else {
-        type = fieldAssembler.name(name).type();
+        if (fieldSpec.isNullable()) {
+          fieldType = _nullMultiValueMap.get(storedType);
+        } else {
+          fieldType = _notNullMultiValueMap.get(storedType);
+        }
+      }
+      if (fieldType == null) {
+        throw new RuntimeException("Unsupported data type: " + storedType);
       }
 
-      String logicalType = "pinot." + fieldSpec.getDataType().toString().toLowerCase(Locale.US);
-      if (fieldSpec.isSingleValueField()) {
-        switch (storedType) {
-          case INT:
-            fieldAssembler = type.intType().noDefault();
-            break;
-          case LONG:
-            fieldAssembler = type.longType().noDefault();
-            break;
-          case FLOAT:
-            fieldAssembler = type.floatType().noDefault();
-            break;
-          case DOUBLE:
-            fieldAssembler = type.doubleType().noDefault();
-            break;
-          case STRING:
-            fieldAssembler = type.stringType().noDefault();
-            break;
-          case BIG_DECIMAL:
-            fieldAssembler = type.stringBuilder()
-                .prop("logicalType", logicalType)
-                .endString()
-                .noDefault();
-            break;
-          case BYTES:
-            fieldAssembler = type.bytesType().noDefault();
-            break;
-          default:
-            throw new RuntimeException("Unsupported data type: " + storedType);
-        }
-      } else {
-        SchemaBuilder.TypeBuilder<SchemaBuilder.ArrayDefault<Schema>> arrayBuilder = type.array().items();
-        switch (storedType) {
-          case INT:
-            fieldAssembler = arrayBuilder.intType().noDefault();
-            break;
-          case LONG:
-            fieldAssembler = arrayBuilder.longType().noDefault();
-            break;
-          case FLOAT:
-            fieldAssembler = arrayBuilder.floatType().noDefault();
-            break;
-          case DOUBLE:
-            fieldAssembler = arrayBuilder.doubleType().noDefault();
-            break;
-          case STRING:
-            fieldAssembler = arrayBuilder.stringType().noDefault();
-            break;
-          case BIG_DECIMAL:
-            fieldAssembler = arrayBuilder.stringBuilder()
-                .prop("logicalType", logicalType)
-                .endString()
-                .noDefault();
-            break;
-          default:
-            throw new RuntimeException("Unsupported data type: " + storedType);
-        }
-      }
+      fieldAssembler.name(name)
+          .type(fieldType)
+          .noDefault();
     }
-    return fieldAssembler.endRecord();
+    Schema schema = fieldAssembler.endRecord();
+    return schema;
   }
 
   public static class BigDecimalPinotLogicalType extends LogicalType {
