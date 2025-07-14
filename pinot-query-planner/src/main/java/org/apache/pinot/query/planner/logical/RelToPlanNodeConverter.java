@@ -94,9 +94,12 @@ public final class RelToPlanNodeConverter {
   private boolean _windowFunctionFound;
   @Nullable
   private final TransformationTracker.Builder<PlanNode, RelNode> _tracker;
+  private final String _hashFunction;
 
-  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
+  public RelToPlanNodeConverter(@Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker,
+      String hashFunction) {
     _tracker = tracker;
+    _hashFunction = hashFunction;
   }
 
   /**
@@ -190,7 +193,8 @@ public final class RelToPlanNodeConverter {
       }
     }
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()), convertInputs(node.getInputs()),
-        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null);
+        exchangeType, distributionType, keys, prePartitioned, collations, sortOnSender, sortOnReceiver, null, null,
+        _hashFunction);
   }
 
   private SetOpNode convertLogicalSetOp(SetOp node) {

@@ -39,10 +39,10 @@ import org.apache.pinot.query.planner.physical.v2.mapping.PinotDistMapping;
 public class HashDistributionDesc {
   private final int _cachedHashCode;
   private final List<Integer> _keys;
-  private final String _hashFunction;
+  private final DistHashFunction _hashFunction;
   private final int _numPartitions;
 
-  public HashDistributionDesc(List<Integer> keys, String hashFunction, int numPartitions) {
+  public HashDistributionDesc(List<Integer> keys, DistHashFunction hashFunction, int numPartitions) {
     _cachedHashCode = Objects.hash(keys, hashFunction, numPartitions);
     _keys = keys;
     _hashFunction = hashFunction;
@@ -53,7 +53,7 @@ public class HashDistributionDesc {
     return _keys;
   }
 
-  public String getHashFunction() {
+  public DistHashFunction getHashFunction() {
     return _hashFunction;
   }
 

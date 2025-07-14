@@ -19,6 +19,8 @@
 package org.apache.pinot.core.accounting;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.util.Collection;
@@ -31,7 +33,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.common.metrics.BrokerGauge;
@@ -40,13 +44,16 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.accounting.MseCancelCallback;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -58,6 +65,10 @@ import org.slf4j.LoggerFactory;
  * Accounting mechanism for thread task execution status and thread resource usage sampling
  * Design and algorithm see
  * https://docs.google.com/document/d/1Z9DYAfKznHQI9Wn8BjTWZYTcNRVGiPP0B8aEP3w_1jQ
+ *
+ * TODO: Functionalities in this Accountant are now supported in a more generic ResourceUsageAccountantFactory. Keeping
+ * this around for backward compatibility. Will slowly phase this out in favor of ResourceUsageAccountantFactory after
+ * achieving stability.
  */
 public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory {
 
@@ -87,51 +98,69 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return thread;
     });
 
-    private final PinotConfiguration _config;
+    protected final PinotConfiguration _config;
 
     // the map to track stats entry for each thread, the entry will automatically be added when one calls
     // setThreadResourceUsageProvider on the thread, including but not limited to
     // server worker thread, runner thread, broker jetty thread, or broker netty thread
-    private final ConcurrentHashMap<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadEntriesMap
+    protected final ConcurrentHashMap<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadEntriesMap
         = new ConcurrentHashMap<>();
 
     // For one time concurrent update of stats. This is to provide stats collection for parts that are not
     // performance sensitive and query_id is not known beforehand (e.g. broker inbound netty thread)
-    private final ConcurrentHashMap<String, Long> _concurrentTaskCPUStatsAggregator = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Long> _concurrentTaskMemStatsAggregator = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<String, Long> _concurrentTaskCPUStatsAggregator = new ConcurrentHashMap<>();
+    protected final ConcurrentHashMap<String, Long> _concurrentTaskMemStatsAggregator = new ConcurrentHashMap<>();
 
     // for stats aggregation of finished (worker) threads when the runner is still running
-    private final HashMap<String, Long> _finishedTaskCPUStatsAggregator = new HashMap<>();
-    private final HashMap<String, Long> _finishedTaskMemStatsAggregator = new HashMap<>();
+    protected final HashMap<String, Long> _finishedTaskCPUStatsAggregator = new HashMap<>();
+    protected final HashMap<String, Long> _finishedTaskMemStatsAggregator = new HashMap<>();
 
-    private final ThreadLocal<CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadLocalEntry
+    Cache<String, MseCancelCallback> _queryCancelCallbacks;
+
+    protected final ThreadLocal<CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadLocalEntry
         = ThreadLocal.withInitial(() -> {
           CPUMemThreadLevelAccountingObjects.ThreadEntry ret =
               new CPUMemThreadLevelAccountingObjects.ThreadEntry();
-          _threadEntriesMap.put(Thread.currentThread(), ret);
+          addThreadEntry(Thread.currentThread(), ret);
           LOGGER.debug("Adding thread to _threadLocalEntry: {}", Thread.currentThread().getName());
           return ret;
         }
     );
 
     // track thread cpu time
-    private final boolean _isThreadCPUSamplingEnabled;
+    protected final boolean _isThreadCPUSamplingEnabled;
 
     // track memory usage
-    private final boolean _isThreadMemorySamplingEnabled;
+    protected final boolean _isThreadMemorySamplingEnabled;
 
     // is sampling allowed for MSE queries
-    private final boolean _isThreadSamplingEnabledForMSE;
+    protected final boolean _isThreadSamplingEnabledForMSE;
 
-    private final Set<String> _inactiveQuery;
+    protected final Set<String> _inactiveQuery;
+
+    protected Set<String> _cancelSentQueries;
 
     // the periodical task that aggregates and preempts queries
-    private final WatcherTask _watcherTask;
+    protected final WatcherTask _watcherTask;
 
     // instance id of the current instance, for logging purpose
-    private final String _instanceId;
+    protected final String _instanceId;
 
-    private final InstanceType _instanceType;
+    protected final InstanceType _instanceType;
+
+    protected PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, boolean isThreadCPUSamplingEnabled,
+        boolean isThreadMemorySamplingEnabled, boolean isThreadSamplingEnabledForMSE, Set<String> inactiveQuery,
+        String instanceId, InstanceType instanceType) {
+      _config = config;
+      _isThreadCPUSamplingEnabled = isThreadCPUSamplingEnabled;
+      _isThreadMemorySamplingEnabled = isThreadMemorySamplingEnabled;
+      _isThreadSamplingEnabledForMSE = isThreadSamplingEnabledForMSE;
+      _inactiveQuery = inactiveQuery;
+      _instanceId = instanceId;
+      _instanceType = instanceType;
+      _cancelSentQueries = new HashSet<>();
+      _watcherTask = createWatcherTask();
+    }
 
     public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
@@ -165,10 +194,22 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
       LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
 
+      _queryCancelCallbacks = CacheBuilder.newBuilder().maximumSize(
+              config.getProperty(CommonConstants.Accounting.CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE,
+                  CommonConstants.Accounting.DEFAULT_CANCEL_CALLBACK_CACHE_MAX_SIZE)).expireAfterWrite(
+              config.getProperty(CommonConstants.Accounting.CONFIG_OF_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS,
+                  CommonConstants.Accounting.DEFAULT_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS),
+              TimeUnit.SECONDS)  // backstop for stuck entries
+          .build();
+
       // task/query tracking
       _inactiveQuery = new HashSet<>();
+      _cancelSentQueries = new HashSet<>();
+      _watcherTask = createWatcherTask();
+    }
 
-      _watcherTask = new WatcherTask();
+    protected WatcherTask createWatcherTask() {
+      return new WatcherTask();
     }
 
     @Override
@@ -178,25 +219,19 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     /**
      * This function aggregates resource usage from all active threads and groups by queryId.
-     * It is inspired by {@link PerQueryCPUMemResourceUsageAccountant::aggregate}. The major difference is that
-     * it only reads from thread entries and does not update them.
      * @return A map of query id, QueryResourceTracker.
      */
     @Override
     public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+      return getQueryResourcesImpl();
+    }
+
+    protected Map<String, AggregatedStats> getQueryResourcesImpl() {
       HashMap<String, AggregatedStats> ret = new HashMap<>();
 
       // for each {pqr, pqw}
-      for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
-        // sample current usage
-        CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-        long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
-        long currentMemSample =
-            _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
-        // sample current running task status
+      for (CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry : _threadEntriesMap.values()) {
         CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
-        Thread thread = entry.getKey();
-        LOGGER.trace("tid: {}, task: {}", thread.getId(), currentTaskStatus);
 
         // if current thread is not idle
         if (currentTaskStatus != null) {
@@ -205,10 +240,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           if (queryId != null) {
             Thread anchorThread = currentTaskStatus.getAnchorThread();
             boolean isAnchorThread = currentTaskStatus.isAnchorThread();
+            long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
+            long currentMemSample =
+                _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
             ret.compute(queryId,
                 (k, v) -> v == null ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
                     isAnchorThread, threadEntry._errorStatus, queryId)
-                    : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
+                    : v.merge(currentCPUSample, currentMemSample, isAnchorThread,
+                        threadEntry._errorStatus));
           }
         }
       }
@@ -248,6 +287,21 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
+    public boolean throttleQuerySubmission() {
+      return getWatcherTask().getHeapUsageBytes() > getWatcherTask().getQueryMonitorConfig().getAlarmingLevel();
+    }
+
+    @Override
+    public void registerMseCancelCallback(String queryId, MseCancelCallback callback) {
+      _queryCancelCallbacks.put(queryId, callback);
+    }
+
+    @Nullable
+    public MseCancelCallback getQueryCancelCallback(String queryId) {
+      return _queryCancelCallbacks.getIfPresent(queryId);
+    }
+
+    @Override
     public boolean isAnchorThreadInterrupted() {
       ThreadExecutionContext context = _threadLocalEntry.get().getCurrentThreadTaskStatus();
       if (context != null && context.getAnchorThread() != null) {
@@ -263,20 +317,23 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         @Nullable ThreadExecutionContext parentContext) {
     }
 
-    /**
-     * for testing only
-     */
-    public int getEntryCount() {
-      return _threadEntriesMap.size();
-    }
-
     @Override
     @Deprecated
     public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
     }
 
     @Override
+    @Deprecated
     public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes) {
+    }
+
+    @Override
+    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes,
+                                             TrackingScope trackingScope) {
+      if (trackingScope != TrackingScope.QUERY) {
+        // only update for QUERY scope
+        return;
+      }
       if (_isThreadCPUSamplingEnabled) {
         _concurrentTaskCPUStatsAggregator.compute(queryId,
             (key, value) -> (value == null) ? cpuTimeNs : (value + cpuTimeNs));
@@ -314,12 +371,21 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
     }
 
+    @Deprecated
     @Override
-    public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+      setupRunner(queryId, taskId, taskType, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
+    }
+
+
+    @Override
+    public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+        String workloadName) {
       _threadLocalEntry.get()._errorStatus.set(null);
       if (queryId != null) {
         _threadLocalEntry.get()
-            .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread());
+            .setThreadTaskStatus(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, Thread.currentThread(),
+                workloadName);
       }
     }
 
@@ -329,7 +395,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _threadLocalEntry.get()._errorStatus.set(null);
       if (parentContext != null && parentContext.getQueryId() != null && parentContext.getAnchorThread() != null) {
         _threadLocalEntry.get().setThreadTaskStatus(parentContext.getQueryId(), taskId, parentContext.getTaskType(),
-            parentContext.getAnchorThread());
+            parentContext.getAnchorThread(), parentContext.getWorkloadName());
       }
     }
 
@@ -343,6 +409,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return _threadLocalEntry.get();
     }
 
+    public void addThreadEntry(Thread thread, CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry) {
+      _threadEntriesMap.put(thread, threadEntry);
+    }
+
     /**
      * clears thread accounting info once a runner/worker thread has finished a particular run
      */
@@ -354,9 +424,18 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       threadEntry.setToIdle();
     }
 
+    public WatcherTask getWatcherTask() {
+      return _watcherTask;
+    }
+
     @Override
     public void startWatcherTask() {
       EXECUTOR_SERVICE.submit(_watcherTask);
+    }
+
+    @Override
+    public PinotClusterConfigChangeListener getClusterConfigChangeListener() {
+      return _watcherTask;
     }
 
     /**
@@ -372,6 +451,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           _finishedTaskMemStatsAggregator.remove(inactiveQueryId);
           _concurrentTaskMemStatsAggregator.remove(inactiveQueryId);
         }
+        _cancelSentQueries.remove(inactiveQueryId);
+        _queryCancelCallbacks.invalidate(inactiveQueryId);
       }
       _inactiveQuery.clear();
       if (_isThreadCPUSamplingEnabled) {
@@ -384,29 +465,36 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
     }
 
+    public Set<String> getInactiveQueries() {
+      return Collections.unmodifiableSet(_inactiveQuery);
+    }
+
+    public Set<String> getCancelSentQueries() {
+      return Collections.unmodifiableSet(_cancelSentQueries);
+    }
+
     /**
-     * aggregated the stats if the query killing process is triggered
-     * @param isTriggered if the query killing process is triggered
-     * @return aggregated stats of active queries if triggered
+     * This function moves finished tasks through 2 stages.
+     * Initially, task metadata is stored in threadEntry._currentThreadTaskStatus etc.
+     * In the first step, it moves this metadata to threadEntry._previousThreadTaskStatus etc.
+     *
+     * At the same time, the function moves the information in _threadEntry._previousThreadTaskStatus into the second
+     * state. It is aggregated into _finishedTaskCPUStatsAggregator and _finishedTaskMemStatsAggregator.
+     *
+     * Finally it cleans up _inactiveQueries AND _threadEntriesMap.
      */
-    public Map<String, AggregatedStats> aggregate(boolean isTriggered) {
-      HashMap<String, AggregatedStats> ret = null;
-      if (isTriggered) {
-        ret = new HashMap<>();
-      }
+    public void reapFinishedTasks() {
+      Set<String> cancellingQueries = new HashSet<>();
 
       // for each {pqr, pqw}
       for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
         // sample current usage
         CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-        long currentCPUSample = _isThreadCPUSamplingEnabled
-            ? threadEntry._currentThreadCPUTimeSampleMS : 0;
-        long currentMemSample = _isThreadMemorySamplingEnabled
-            ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
+        long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
+        long currentMemSample =
+            _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
         // sample current running task status
         CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
-        Thread thread = entry.getKey();
-        LOGGER.trace("tid: {}, task: {}", thread.getId(), currentTaskStatus);
 
         // get last task on the thread
         CPUMemThreadLevelAccountingObjects.TaskEntry lastQueryTask = threadEntry._previousThreadTaskStatus;
@@ -443,47 +531,37 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           String queryId = currentTaskStatus.getQueryId();
           // update inactive queries for cleanInactive()
           _inactiveQuery.remove(queryId);
-          // if triggered, accumulate active query task stats
-          if (isTriggered) {
-            Thread anchorThread = currentTaskStatus.getAnchorThread();
-            boolean isAnchorThread = currentTaskStatus.isAnchorThread();
-            ret.compute(queryId, (k, v) -> v == null
-                ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
-                isAnchorThread, threadEntry._errorStatus, queryId)
-                : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
+          // If query is in cancelling set, retain it.
+          if (_cancelSentQueries.contains(queryId)) {
+            cancellingQueries.add(queryId);
           }
         }
 
+        Thread thread = entry.getKey();
         if (!thread.isAlive()) {
           _threadEntriesMap.remove(thread);
           LOGGER.debug("Removing thread from _threadLocalEntry: {}", thread.getName());
         }
       }
-
-      // if triggered, accumulate stats of finished tasks of each active query
-      if (isTriggered) {
-        for (Map.Entry<String, AggregatedStats> queryIdResult : ret.entrySet()) {
-          String activeQueryId = queryIdResult.getKey();
-          long accumulatedCPUValue = _isThreadCPUSamplingEnabled
-              ? _finishedTaskCPUStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-          long concurrentCPUValue = _isThreadCPUSamplingEnabled
-              ? _concurrentTaskCPUStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-          long accumulatedMemValue = _isThreadMemorySamplingEnabled
-              ? _finishedTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-          long concurrentMemValue = _isThreadMemorySamplingEnabled
-              ? _concurrentTaskMemStatsAggregator.getOrDefault(activeQueryId, 0L) : 0;
-          queryIdResult.getValue().merge(accumulatedCPUValue + concurrentCPUValue,
-              accumulatedMemValue + concurrentMemValue, false, null);
-        }
-      }
-      return ret;
+      _cancelSentQueries = cancellingQueries;
     }
 
-    public void postAggregation(Map<String, AggregatedStats> aggregatedUsagePerActiveQuery) {
+    protected void postAggregation(Map<String, AggregatedStats> aggregatedUsagePerActiveQuery) {
     }
 
     protected void logQueryResourceUsage(Map<String, ? extends QueryResourceTracker> aggregatedUsagePerActiveQuery) {
       LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
+    }
+
+    public void cancelQuery(String queryId, Thread anchorThread) {
+      MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(queryId);
+      if (callback != null) {
+        callback.cancelQuery(Long.parseLong(queryId));
+        _queryCancelCallbacks.invalidate(queryId);
+      } else {
+        anchorThread.interrupt();
+      }
+      _cancelSentQueries.add(queryId);
     }
 
     protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {
@@ -577,97 +655,15 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     /**
      * A watcher task to perform usage sampling, aggregation, and query preemption
      */
-    class WatcherTask implements Runnable {
+    public class WatcherTask implements Runnable, PinotClusterConfigChangeListener {
 
-      // max heap usage, Xmx
-      private final long _maxHeapSize = MEMORY_MX_BEAN.getHeapMemoryUsage().getMax();
+      protected AtomicReference<QueryMonitorConfig> _queryMonitorConfig = new AtomicReference<>();
 
-      // don't kill a query if its memory footprint is below some ratio of _maxHeapSize
-      private final long _minMemoryFootprintForKill = (long) (_maxHeapSize
-          * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO,
-          CommonConstants.Accounting.DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO));
-
-      // kill all queries if heap usage exceeds this
-      private final long _panicLevel = (long) (_maxHeapSize
-          * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-          CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
-
-      // kill the most expensive query if heap usage exceeds this
-      private final long _criticalLevel = (long) (_maxHeapSize
-          * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO,
-          CommonConstants.Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO));
-
-      // if after gc the heap usage is still above this, kill the most expensive query
-      // use this to prevent heap size oscillation and repeatedly triggering gc
-      private final long _criticalLevelAfterGC = _criticalLevel - (long) (_maxHeapSize
-          * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC,
-          CommonConstants.Accounting.DEFAULT_CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC));
-
-      // trigger gc if consecutively kill more than some number of queries
-      // set this to 0 to always trigger gc before killing a query to give gc a second chance
-      // as would minimize the chance of false positive killing in some usecases
-      // should consider use -XX:+ExplicitGCInvokesConcurrent to avoid STW for some gc algorithms
-      private final int _gcBackoffCount =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_GC_BACKOFF_COUNT,
-              CommonConstants.Accounting.DEFAULT_GC_BACKOFF_COUNT);
-
-      // start to sample more frequently if heap usage exceeds this
-      private final long _alarmingLevel =
-          (long) (_maxHeapSize
-              * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO,
-              CommonConstants.Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO));
-
-      // normal sleep time
-      private final int _normalSleepTime =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS,
-              CommonConstants.Accounting.DEFAULT_SLEEP_TIME_MS);
-
-      // wait for gc to complete, according to system.gc() javadoc, when control returns from the method call,
-      // the Java Virtual Machine has made a best effort to reclaim space from all discarded objects.
-      // Therefore, we default this to 0.
-      // Tested with Shenandoah GC and G1GC, with -XX:+ExplicitGCInvokesConcurrent
-      private final int _gcWaitTime =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_GC_WAIT_TIME_MS,
-              CommonConstants.Accounting.DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS);
-
-      // alarming sleep time denominator, should be > 1 to sample more frequent at alarming level
-      private final int _alarmingSleepTimeDenominator =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR,
-              CommonConstants.Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR);
-
-      // alarming sleep time
-      private final int _alarmingSleepTime = _normalSleepTime / _alarmingSleepTimeDenominator;
-
-      // the framework would not commit to kill any query if this is disabled
-      private final boolean _oomKillQueryEnabled =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY,
-              CommonConstants.Accounting.DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY);
-
-      // if we want to publish the heap usage
-      private final boolean _publishHeapUsageMetric =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE,
-              CommonConstants.Accounting.DEFAULT_PUBLISHING_JVM_USAGE);
-
-      // if we want kill query based on CPU time
-      private final boolean _isCPUTimeBasedKillingEnabled =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED,
-              CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED) && _isThreadCPUSamplingEnabled;
-
-      // CPU time based killing threshold
-      private final long _cpuTimeBasedKillingThresholdNS =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS,
-              CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS) * 1000_000L;
-
-      //
-      private final boolean _isQueryKilledMetricEnabled =
-          _config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
-              CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
-
-      private long _usedBytes;
-      private int _sleepTime;
-      private int _numQueriesKilledConsecutively = 0;
+      protected long _usedBytes;
+      protected int _sleepTime;
+      protected int _numQueriesKilledConsecutively = 0;
       protected Map<String, AggregatedStats> _aggregatedUsagePerActiveQuery;
-      private TriggeringLevel _triggeringLevel;
+      protected TriggeringLevel _triggeringLevel;
 
       // metrics class
       private final AbstractMetrics _metrics;
@@ -677,6 +673,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       private final AbstractMetrics.Gauge _memoryUsageGauge;
 
       WatcherTask() {
+        _queryMonitorConfig.set(new QueryMonitorConfig(_config, MEMORY_MX_BEAN.getHeapMemoryUsage().getMax()));
+        logQueryMonitorConfig();
+
         switch (_instanceType) {
           case SERVER:
             _metrics = ServerMetrics.get();
@@ -703,61 +702,110 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
       }
 
+      public QueryMonitorConfig getQueryMonitorConfig() {
+        return _queryMonitorConfig.get();
+      }
+
+      public long getHeapUsageBytes() {
+        return _usedBytes;
+      }
+
+      @Override
+      public synchronized void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+        // Filter configs that have CommonConstants.PREFIX_SCHEDULER_PREFIX
+        Set<String> filteredChangedConfigs =
+            changedConfigs.stream().filter(config -> config.startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX))
+                .map(config -> config.replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""))
+                .collect(Collectors.toSet());
+
+        if (filteredChangedConfigs.isEmpty()) {
+          LOGGER.debug("No relevant configs changed, skipping update for QueryMonitorConfig.");
+          return;
+        }
+
+        Map<String, String> filteredClusterConfigs = clusterConfigs.entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX)).collect(
+                Collectors.toMap(
+                    entry -> entry.getKey().replace(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".", ""),
+                    Map.Entry::getValue));
+
+        QueryMonitorConfig oldConfig = _queryMonitorConfig.get();
+        QueryMonitorConfig newConfig =
+            new QueryMonitorConfig(oldConfig, filteredChangedConfigs, filteredClusterConfigs);
+        _queryMonitorConfig.set(newConfig);
+        logQueryMonitorConfig();
+      }
+
+      private void logQueryMonitorConfig() {
+        QueryMonitorConfig queryMonitorConfig = _queryMonitorConfig.get();
+        // Log info for the accountant configs
+        LOGGER.info("Updated Configuration for Query Monitor");
+        LOGGER.info("Xmx is {}", queryMonitorConfig.getMaxHeapSize());
+        LOGGER.info("_instanceType is {}", _instanceType);
+        LOGGER.info("_alarmingLevel of on heap memory is {}", queryMonitorConfig.getAlarmingLevel());
+        LOGGER.info("_criticalLevel of on heap memory is {}", queryMonitorConfig.getCriticalLevel());
+        LOGGER.info("_criticalLevelAfterGC of on heap memory is {}", queryMonitorConfig.getCriticalLevelAfterGC());
+        LOGGER.info("_panicLevel of on heap memory is {}", queryMonitorConfig.getPanicLevel());
+        LOGGER.info("_gcBackoffCount is {}", queryMonitorConfig.getGcBackoffCount());
+        LOGGER.info("_gcWaitTime is {}", queryMonitorConfig.getGcWaitTime());
+        LOGGER.info("_normalSleepTime is {}", queryMonitorConfig.getNormalSleepTime());
+        LOGGER.info("_alarmingSleepTime is {}", queryMonitorConfig.getAlarmingSleepTime());
+        LOGGER.info("_oomKillQueryEnabled: {}", queryMonitorConfig.isOomKillQueryEnabled());
+        LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
+        LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}",
+            queryMonitorConfig.isCpuTimeBasedKillingEnabled(), queryMonitorConfig.getCpuTimeBasedKillingThresholdNS());
+      }
+
       @Override
       public void run() {
-        // Log info for the accountant configs
-        LOGGER.info("Starting accountant task for PerQueryCPUMemAccountant.");
-        LOGGER.info("Xmx is {}", _maxHeapSize);
-        LOGGER.info("_instanceType is {}", _instanceType);
-        LOGGER.info("_alarmingLevel of on heap memory is {}", _alarmingLevel);
-        LOGGER.info("_criticalLevel of on heap memory is {}", _criticalLevel);
-        LOGGER.info("_criticalLevelAfterGC of on heap memory is {}", _criticalLevelAfterGC);
-        LOGGER.info("_panicLevel of on heap memory is {}", _panicLevel);
-        LOGGER.info("_gcBackoffCount is {}", _gcBackoffCount);
-        LOGGER.info("_gcWaitTime is {}", _gcWaitTime);
-        LOGGER.info("_normalSleepTime is {}", _normalSleepTime);
-        LOGGER.info("_alarmingSleepTime is {}", _alarmingSleepTime);
-        LOGGER.info("_oomKillQueryEnabled: {}", _oomKillQueryEnabled);
-        LOGGER.info("_minMemoryFootprintForKill: {}", _minMemoryFootprintForKill);
-        LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}",
-            _isCPUTimeBasedKillingEnabled, _cpuTimeBasedKillingThresholdNS);
-
         while (true) {
-          LOGGER.debug("Running timed task for PerQueryCPUMemAccountant.");
-          _triggeringLevel = TriggeringLevel.Normal;
-          _sleepTime = _normalSleepTime;
-          _aggregatedUsagePerActiveQuery = null;
           try {
-            // Get the metrics used for triggering the kill
-            collectTriggerMetrics();
-            // Prioritize the panic check, kill ALL QUERIES immediately if triggered
-            if (outOfMemoryPanicTrigger()) {
-              continue;
-            }
-            // Check for other triggers
-            evalTriggers();
-            // Refresh thread usage and aggregate to per query usage if triggered
-            _aggregatedUsagePerActiveQuery = aggregate(_triggeringLevel.ordinal() > TriggeringLevel.Normal.ordinal());
-            // post aggregation function
-            postAggregation(_aggregatedUsagePerActiveQuery);
-            // Act on one triggered actions
-            triggeredActions();
-          } catch (Exception e) {
-            LOGGER.error("Caught exception while executing stats aggregation and query kill", e);
+            runOnce();
           } finally {
-            LOGGER.debug(_aggregatedUsagePerActiveQuery == null ? "_aggregatedUsagePerActiveQuery : null"
-                : _aggregatedUsagePerActiveQuery.toString());
-            LOGGER.debug("_threadEntriesMap size: {}", _threadEntriesMap.size());
-
-            // Publish server heap usage metrics
-            if (_publishHeapUsageMetric) {
-              _metrics.setValueOfGlobalGauge(_memoryUsageGauge, _usedBytes);
-            }
-            // Clean inactive query stats
-            cleanInactive();
             // Sleep for sometime
             reschedule();
           }
+        }
+      }
+
+      public void runOnce() {
+        QueryMonitorConfig config = _queryMonitorConfig.get();
+
+        LOGGER.debug("Running timed task for PerQueryCPUMemAccountant.");
+        _triggeringLevel = TriggeringLevel.Normal;
+        _sleepTime = config.getNormalSleepTime();
+        _aggregatedUsagePerActiveQuery = null;
+        try {
+          // Get the metrics used for triggering the kill
+          collectTriggerMetrics();
+          // Prioritize the panic check, kill ALL QUERIES immediately if triggered
+          if (outOfMemoryPanicTrigger()) {
+            return;
+          }
+          // Check for other triggers
+          evalTriggers();
+          // Refresh thread usage and aggregate to per query usage if triggered
+          reapFinishedTasks();
+          if (_triggeringLevel.ordinal() > TriggeringLevel.Normal.ordinal()) {
+            _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
+          }
+          // post aggregation function
+          postAggregation(_aggregatedUsagePerActiveQuery);
+          // Act on one triggered actions
+          triggeredActions();
+        } catch (Exception e) {
+          LOGGER.error("Caught exception while executing stats aggregation and query kill", e);
+        } finally {
+          LOGGER.debug(_aggregatedUsagePerActiveQuery == null ? "_aggregatedUsagePerActiveQuery : null"
+              : _aggregatedUsagePerActiveQuery.toString());
+          LOGGER.debug("_threadEntriesMap size: {}", _threadEntriesMap.size());
+
+          // Publish server heap usage metrics
+          if (config.isPublishHeapUsageMetric()) {
+            _metrics.setValueOfGlobalGauge(_memoryUsageGauge, _usedBytes);
+          }
+          // Clean inactive query stats
+          cleanInactive();
         }
       }
 
@@ -771,16 +819,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
        * @return if panic mode is triggered
        */
       private boolean outOfMemoryPanicTrigger() {
+        long panicLevel = _queryMonitorConfig.get().getPanicLevel();
         // at this point we assume we have tried to kill some queries and the gc kicked in
         // we have no choice but to kill all queries
-        if (_usedBytes >= _panicLevel) {
+        if (_usedBytes >= panicLevel) {
           killAllQueries();
           _triggeringLevel = TriggeringLevel.HeapMemoryPanic;
           _metrics.addMeteredGlobalValue(_heapMemoryPanicExceededMeter, 1);
           LOGGER.error("Heap used bytes {}, greater than _panicLevel {}, Killed all queries and triggered gc!",
-              _usedBytes, _panicLevel);
-          // call aggregate here as will throw exception and
-          aggregate(false);
+              _usedBytes, panicLevel);
+          // read finished tasks here as will throw exception and
+          reapFinishedTasks();
           return true;
         }
         return false;
@@ -790,16 +839,18 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
        * Evaluate triggering levels of query preemption
        * Triggers should be mutually exclusive and evaluated following level high -> low
        */
-      private void evalTriggers() {
-        if (_isCPUTimeBasedKillingEnabled) {
+      protected void evalTriggers() {
+        QueryMonitorConfig config = _queryMonitorConfig.get();
+
+        if (config.isCpuTimeBasedKillingEnabled()) {
           _triggeringLevel = TriggeringLevel.CPUTimeBasedKilling;
         }
 
-        if (_usedBytes > _criticalLevel) {
+        if (_usedBytes > config.getCriticalLevel()) {
           _triggeringLevel = TriggeringLevel.HeapMemoryCritical;
           _metrics.addMeteredGlobalValue(_heapMemoryCriticalExceededMeter, 1);
-        } else if (_usedBytes > _alarmingLevel) {
-          _sleepTime = _alarmingSleepTime;
+        } else if (_usedBytes > config.getAlarmingLevel()) {
+          _sleepTime = config.getAlarmingSleepTime();
           // For debugging
           _triggeringLevel = (IS_DEBUG_MODE_ENABLED && _triggeringLevel == TriggeringLevel.Normal)
               ? TriggeringLevel.HeapMemoryAlarmingVerbose : _triggeringLevel;
@@ -809,10 +860,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       /**
        * Perform actions at specific triggering levels
        */
-      private void triggeredActions() {
+      protected void triggeredActions() {
         switch (_triggeringLevel) {
           case HeapMemoryCritical:
-            LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
+            LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes,
+                _queryMonitorConfig.get().getCriticalLevel());
             killMostExpensiveQuery();
             break;
           case CPUTimeBasedKilling:
@@ -837,23 +889,23 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
 
       void killAllQueries() {
-        if (_oomKillQueryEnabled) {
+        QueryMonitorConfig config = _queryMonitorConfig.get();
+
+        if (config.isOomKillQueryEnabled()) {
           int killedCount = 0;
           for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
             CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
             CPUMemThreadLevelAccountingObjects.TaskEntry taskEntry = threadEntry.getCurrentThreadTaskStatus();
-            if (taskEntry != null && taskEntry.isAnchorThread()) {
-              threadEntry._errorStatus
-                  .set(new RuntimeException(String.format("Query killed due to %s out of memory!", _instanceType)));
-              taskEntry.getAnchorThread().interrupt();
+            if (taskEntry != null && !_cancelSentQueries.contains(taskEntry.getQueryId())) {
+              cancelQuery(taskEntry.getQueryId(), taskEntry.getAnchorThread());
               killedCount += 1;
             }
           }
-          if (_isQueryKilledMetricEnabled) {
+          if (config.isQueryKilledMetricEnabled()) {
             _metrics.addMeteredGlobalValue(_queryKilledMeter, killedCount);
           }
           try {
-            Thread.sleep(_normalSleepTime);
+            Thread.sleep(config.getNormalSleepTime());
           } catch (InterruptedException ignored) {
           }
           // In this extreme case we directly trigger system.gc
@@ -868,73 +920,77 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
        * use XX:+ExplicitGCInvokesConcurrent to avoid a full gc when system.gc is triggered
        */
       private void killMostExpensiveQuery() {
-        if (!_aggregatedUsagePerActiveQuery.isEmpty() && _numQueriesKilledConsecutively >= _gcBackoffCount) {
+        if (!_isThreadMemorySamplingEnabled) {
+          LOGGER.warn("Unable to terminate queries as  memory tracking is not enabled");
+          return;
+        }
+        QueryMonitorConfig config = _queryMonitorConfig.get();
+        if (_aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()
+            && _numQueriesKilledConsecutively >= config.getGcBackoffCount()) {
           _numQueriesKilledConsecutively = 0;
           System.gc();
           try {
-            Thread.sleep(_gcWaitTime);
+            Thread.sleep(config.getGcWaitTime());
           } catch (InterruptedException ignored) {
           }
           _usedBytes = MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
-          if (_usedBytes < _criticalLevelAfterGC) {
+          if (_usedBytes < config.getCriticalLevelAfterGC()) {
             return;
           }
-          LOGGER.error("After GC, heap used bytes {} still exceeds _criticalLevelAfterGC level {}",
-              _usedBytes, _criticalLevelAfterGC);
-        }
-        if (!(_isThreadMemorySamplingEnabled || _isThreadCPUSamplingEnabled)) {
-          LOGGER.warn("But unable to kill query because neither memory nor cpu tracking is enabled");
-          return;
+          LOGGER.error("After GC, heap used bytes {} still exceeds _criticalLevelAfterGC level {}", _usedBytes,
+              config.getCriticalLevelAfterGC());
         }
         // Critical heap memory usage while no queries running
-        if (_aggregatedUsagePerActiveQuery.isEmpty()) {
-          LOGGER.debug("No active queries to kill");
-          return;
-        }
-        AggregatedStats maxUsageTuple;
-        if (_isThreadMemorySamplingEnabled) {
-          maxUsageTuple = Collections.max(_aggregatedUsagePerActiveQuery.values(),
-              Comparator.comparing(AggregatedStats::getAllocatedBytes));
-          boolean shouldKill = _oomKillQueryEnabled && maxUsageTuple._allocatedBytes > _minMemoryFootprintForKill;
-          if (shouldKill) {
-            maxUsageTuple._exceptionAtomicReference
-                .set(new RuntimeException(String.format(
-                    " Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
-                    maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
-            interruptRunnerThread(maxUsageTuple.getAnchorThread());
-            logTerminatedQuery(maxUsageTuple, _usedBytes);
-          } else if (!_oomKillQueryEnabled) {
-            LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
-                    + "because oomKillQueryEnabled is false",
-                maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
-          } else {
-            LOGGER.warn("But all queries are below quota, no query killed");
+        if (_aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()) {
+          AggregatedStats maxUsageTuple;
+          maxUsageTuple = _aggregatedUsagePerActiveQuery.values().stream()
+              .filter(stats -> !_cancelSentQueries.contains(stats.getQueryId()))
+              .max(Comparator.comparing(AggregatedStats::getAllocatedBytes)).orElse(null);
+          if (maxUsageTuple != null) {
+            boolean shouldKill =
+                config.isOomKillQueryEnabled() && maxUsageTuple._allocatedBytes > config.getMinMemoryFootprintForKill();
+            if (shouldKill) {
+              maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
+                  String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
+                      maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
+              terminateQuery(maxUsageTuple);
+              logTerminatedQuery(maxUsageTuple, _usedBytes);
+            } else if (!config.isOomKillQueryEnabled()) {
+              LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
+                  + "because oomKillQueryEnabled is false", maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
+            } else {
+              LOGGER.warn("But all queries are below quota, no query killed");
+            }
           }
+          logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
+        } else {
+          LOGGER.debug("No active queries to kill");
         }
-        logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
       }
 
       private void killCPUTimeExceedQueries() {
+        QueryMonitorConfig config = _queryMonitorConfig.get();
+
         for (Map.Entry<String, AggregatedStats> entry : _aggregatedUsagePerActiveQuery.entrySet()) {
           AggregatedStats value = entry.getValue();
-          if (value._cpuNS > _cpuTimeBasedKillingThresholdNS) {
+          if (value._cpuNS > config.getCpuTimeBasedKillingThresholdNS()) {
             LOGGER.error("Current task status recorded is {}. Query {} got picked because using {} ns of cpu time,"
                     + " greater than threshold {}", _threadEntriesMap, value._queryId, value.getCpuTimeNs(),
-                _cpuTimeBasedKillingThresholdNS);
+                config.getCpuTimeBasedKillingThresholdNS());
             value._exceptionAtomicReference.set(new RuntimeException(
                 String.format("Query %s got killed on %s: %s because using %d "
                         + "CPU time exceeding limit of %d ns CPU time", value._queryId, _instanceType, _instanceId,
-                    value.getCpuTimeNs(), _cpuTimeBasedKillingThresholdNS)));
-            interruptRunnerThread(value.getAnchorThread());
+                    value.getCpuTimeNs(), config.getCpuTimeBasedKillingThresholdNS())));
+            terminateQuery(value);
             logTerminatedQuery(value, _usedBytes);
           }
         }
         logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
       }
 
-      private void interruptRunnerThread(Thread thread) {
-        thread.interrupt();
-        if (_isQueryKilledMetricEnabled) {
+      private void terminateQuery(AggregatedStats queryResourceTracker) {
+        cancelQuery(queryResourceTracker.getQueryId(), queryResourceTracker.getAnchorThread());
+        if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
           _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
         }
         _numQueriesKilledConsecutively += 1;

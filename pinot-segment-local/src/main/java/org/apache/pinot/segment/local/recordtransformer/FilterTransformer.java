@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.recordtransformer.RecordTransformer;
 import org.slf4j.Logger;
@@ -35,18 +37,21 @@ import org.slf4j.LoggerFactory;
 public class FilterTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(FilterTransformer.class);
 
-  private String _filterFunction;
+  private final String _filterFunction;
   private final FunctionEvaluator _evaluator;
   private final boolean _continueOnError;
 
-  public FilterTransformer(TableConfig tableConfig) {
-    _filterFunction = null;
-    _continueOnError = tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().isContinueOnError();
+  private long _numRecordsFiltered;
 
-    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getFilterConfig() != null) {
-      _filterFunction = tableConfig.getIngestionConfig().getFilterConfig().getFilterFunction();
+  public FilterTransformer(TableConfig tableConfig) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getFilterConfig() != null) {
+      _filterFunction = ingestionConfig.getFilterConfig().getFilterFunction();
+    } else {
+      _filterFunction = null;
     }
-    _evaluator = (_filterFunction != null) ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction) : null;
+    _evaluator = _filterFunction != null ? FunctionEvaluatorFactory.getExpressionEvaluator(_filterFunction) : null;
+    _continueOnError = ingestionConfig != null && ingestionConfig.isContinueOnError();
   }
 
   @Override
@@ -56,16 +61,20 @@ public class FilterTransformer implements RecordTransformer {
 
   @Override
   public List<String> getInputColumns() {
-    return _evaluator != null ? _evaluator.getArguments() : List.of();
+    assert _evaluator != null;
+    return _evaluator.getArguments();
   }
 
   @Override
-  public GenericRow transform(GenericRow record) {
-    if (_evaluator != null) {
+  public List<GenericRow> transform(List<GenericRow> records) {
+    assert _evaluator != null;
+    List<GenericRow> filteredRecords = new ArrayList<>();
+    for (GenericRow record : records) {
       try {
-        Object result = _evaluator.evaluate(record);
-        if (Boolean.TRUE.equals(result)) {
-          record.putValue(GenericRow.SKIP_RECORD_KEY, true);
+        if (!Boolean.TRUE.equals(_evaluator.evaluate(record))) {
+          filteredRecords.add(record);
+        } else {
+          _numRecordsFiltered++;
         }
       } catch (Exception e) {
         if (!_continueOnError) {
@@ -75,10 +84,14 @@ public class FilterTransformer implements RecordTransformer {
         } else {
           LOGGER.debug("Caught exception while executing filter function: {} for record: {}", _filterFunction,
               record.toString(), e);
-          record.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+          record.markIncomplete();
         }
       }
     }
-    return record;
+    return filteredRecords;
+  }
+
+  public long getNumRecordsFiltered() {
+    return _numRecordsFiltered;
   }
 }

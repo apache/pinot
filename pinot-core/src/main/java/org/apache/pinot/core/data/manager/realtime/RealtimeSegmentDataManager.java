@@ -238,6 +238,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private static final int BUILD_TIME_LEASE_SECONDS = 30;
   private static final int MAX_CONSECUTIVE_ERROR_COUNT = 5;
 
+  // Interrupt consumer thread every 10 seconds in case it doesn't stop, e.g. interrupt flag getting cleared somehow
+  private static final int CONSUMER_THREAD_INTERRUPT_INTERVAL_MS = 10000;
+
   private final SegmentZKMetadata _segmentZKMetadata;
   private final TableConfig _tableConfig;
   private final RealtimeTableDataManager _realtimeTableDataManager;
@@ -584,8 +587,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
     boolean canTakeMore = true;
-
-    TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean prematureExit = false;
 
     for (int index = 0; index < messageCount; index++) {
@@ -642,61 +643,63 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _numRowsErrored++;
         _numBytesDropped += rowSizeInBytes;
       } else {
+        TransformPipeline.Result result = null;
         try {
-          _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
+          result = _transformPipeline.processRow(decodedRow.getResult());
         } catch (Exception e) {
           _numRowsErrored++;
           _numBytesDropped += rowSizeInBytes;
-          // when exception happens we prefer abandoning the whole batch and not partially indexing some rows
-          reusedResult.getTransformedRows().clear();
           String errorMessage = "Caught exception while transforming the record at offset: " + offset + " , row: "
               + decodedRow.getResult();
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         }
-        if (reusedResult.getSkippedRowCount() > 0) {
-          realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
-              reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
-          if (_trackFilteredMessageOffsets) {
-            _filteredMessageOffsets.add(offset.toString());
-          }
-        }
-        if (reusedResult.getIncompleteRowCount() > 0) {
-          realtimeIncompleteRowsConsumedMeter =
-              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
-                  reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
-        }
-        if (reusedResult.getSanitizedRowCount() > 0) {
-          realtimeRowsSanitizedMeter =
-              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_SANITIZED,
-                  reusedResult.getSanitizedRowCount(), realtimeRowsSanitizedMeter);
-        }
-        List<GenericRow> transformedRows = reusedResult.getTransformedRows();
-        for (GenericRow transformedRow : transformedRows) {
-          try {
-            canTakeMore = _realtimeSegment.index(transformedRow, metadata);
-            indexedMessageCount++;
-            _lastRowMetadata = metadata;
-            _lastConsumedTimestampMs = System.currentTimeMillis();
-            realtimeRowsConsumedMeter =
-                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
-                    realtimeRowsConsumedMeter);
-            _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
-
-            int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
-            if (recordSerializedValueLength > 0) {
-              realtimeBytesIngestedMeter =
-                  _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
-                      recordSerializedValueLength, realtimeBytesIngestedMeter);
-              _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
+        if (result != null) {
+          if (result.getSkippedRowCount() > 0) {
+            realtimeRowsDroppedMeter =
+                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
+                    result.getSkippedRowCount(), realtimeRowsDroppedMeter);
+            if (_trackFilteredMessageOffsets) {
+              _filteredMessageOffsets.add(offset.toString());
             }
-          } catch (Exception e) {
-            _numRowsErrored++;
-            _numBytesDropped += rowSizeInBytes;
-            String errorMessage = "Caught exception while indexing the record at offset: " + offset + " , row: "
-                + transformedRow;
-            _segmentLogger.error(errorMessage, e);
-            _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+          }
+          if (result.getIncompleteRowCount() > 0) {
+            realtimeIncompleteRowsConsumedMeter =
+                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
+                    result.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
+          }
+          if (result.getSanitizedRowCount() > 0) {
+            realtimeRowsSanitizedMeter =
+                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_SANITIZED,
+                    result.getSanitizedRowCount(), realtimeRowsSanitizedMeter);
+          }
+          List<GenericRow> transformedRows = result.getTransformedRows();
+          for (GenericRow transformedRow : transformedRows) {
+            try {
+              canTakeMore = _realtimeSegment.index(transformedRow, metadata);
+              indexedMessageCount++;
+              _lastRowMetadata = metadata;
+              _lastConsumedTimestampMs = System.currentTimeMillis();
+              realtimeRowsConsumedMeter =
+                  _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
+                      realtimeRowsConsumedMeter);
+              _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
+
+              int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
+              if (recordSerializedValueLength > 0) {
+                realtimeBytesIngestedMeter =
+                    _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
+                        recordSerializedValueLength, realtimeBytesIngestedMeter);
+                _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
+              }
+            } catch (Exception e) {
+              _numRowsErrored++;
+              _numBytesDropped += rowSizeInBytes;
+              String errorMessage =
+                  "Caught exception while indexing the record at offset: " + offset + " , row: " + transformedRow;
+              _segmentLogger.error(errorMessage, e);
+              _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+            }
           }
         }
       }
@@ -795,7 +798,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           _partitionDedupMetadataManager.removeExpiredPrimaryKeys();
         }
 
-        while (!_state.isFinal()) {
+        // NOTE: _shouldStop is set to true when stop() is called to terminate the consumer thread. We check this flag
+        //       after every operation that can take a long time, such as consuming messages, communicating with
+        //       controller, holding, etc. so that we can stop the thread as soon as possible.
+        while (!_shouldStop && !_state.isFinal()) {
           if (_state.shouldConsume()) {
             consumeLoop();  // Consume until we reached the end criteria, or we are stopped.
           }
@@ -819,6 +825,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           // If we are sending segmentConsumed() to the controller, we are in HOLDING state.
           _state = State.HOLDING;
           SegmentCompletionProtocol.Response response = postSegmentConsumedMsg();
+          if (_shouldStop) {
+            break;
+          }
           SegmentCompletionProtocol.ControllerResponseStatus status = response.getStatus();
           switch (status) {
             case NOT_LEADER:
@@ -1306,7 +1315,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     SegmentBuildDescriptor descriptor;
     try {
       descriptor = buildSegmentInternal(false);
-    } catch (SegmentBuildFailureException e) {
+    } catch (Exception e) {
       return false;
     }
     if (descriptor == null) {
@@ -1321,6 +1330,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       closePartitionGroupConsumer();
       closePartitionMetadataProvider();
       releaseConsumerSemaphore();
+      _transformPipeline.reportStats();
     }
   }
 
@@ -1475,9 +1485,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
               } else if (_currentOffset.compareTo(endOffset) == 0) {
                 _segmentLogger
                     .info("Current offset {} matches offset in zk {}. Replacing segment", _currentOffset, endOffset);
-                boolean replaced = buildSegmentAndReplace();
-                if (!replaced) {
-                  throw new RuntimeException("Failed to build the segment: " + _segmentNameStr);
+                if (!buildSegmentAndReplace()) {
+                  _segmentLogger.warn("Failed to build the segment: {} and replace. Downloading to replace",
+                      _segmentNameStr);
+                  downloadSegmentAndReplace(segmentZKMetadata);
                 }
               } else {
                 boolean success = false;
@@ -1495,9 +1506,10 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
 
                 if (success) {
                   _segmentLogger.info("Caught up to offset {}", _currentOffset);
-                  boolean replaced = buildSegmentAndReplace();
-                  if (!replaced) {
-                    throw new RuntimeException("Failed to build the segment: " + _segmentNameStr);
+                  if (!buildSegmentAndReplace()) {
+                    _segmentLogger.warn("Failed to build the segment: {} after catchup. Downloading to replace",
+                        _segmentNameStr);
+                    downloadSegmentAndReplace(segmentZKMetadata);
                   }
                 } else {
                   _segmentLogger
@@ -1597,9 +1609,17 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       throws InterruptedException {
     _shouldStop = true;
     if (Thread.currentThread() != _consumerThread && _consumerThread.isAlive()) {
-      // Interrupt the consumer thread and wait for it to join.
+      _segmentLogger.info("Interrupting the consumer thread and waiting for it to join");
+      long startTimeMs = System.currentTimeMillis();
       _consumerThread.interrupt();
-      _consumerThread.join();
+      _consumerThread.join(CONSUMER_THREAD_INTERRUPT_INTERVAL_MS);
+      while (_consumerThread.isAlive()) {
+        _segmentLogger.warn("Consumer thread is still alive after {}ms, interrupting again",
+            System.currentTimeMillis() - startTimeMs);
+        _consumerThread.interrupt();
+        _consumerThread.join(CONSUMER_THREAD_INTERRUPT_INTERVAL_MS);
+      }
+      _segmentLogger.info("Consumer thread has been terminated after {}ms", System.currentTimeMillis() - startTimeMs);
     }
   }
 

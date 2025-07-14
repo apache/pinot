@@ -33,6 +33,7 @@ import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.trace.Tracing;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
@@ -81,7 +82,8 @@ public class MultiLevelPriorityQueueTest {
 
     PinotConfiguration configuration = new PinotConfiguration(properties);
 
-    ResourceManager rm = new UnboundedResourceManager(configuration);
+    ResourceManager rm =
+        new UnboundedResourceManager(configuration, new Tracing.DefaultThreadResourceUsageAccountant());
     MultiLevelPriorityQueue queue = createQueue(configuration, rm);
     queue.put(createQueryRequest(GROUP_ONE, METRICS));
     GROUP_FACTORY._groupMap.get(GROUP_ONE).addReservedThreads(rm.getTableThreadsHardLimit());
@@ -129,7 +131,8 @@ public class MultiLevelPriorityQueueTest {
 
     PinotConfiguration configuration = new PinotConfiguration(properties);
 
-    PolicyBasedResourceManager rm = new PolicyBasedResourceManager(configuration);
+    PolicyBasedResourceManager rm =
+        new PolicyBasedResourceManager(configuration, new Tracing.DefaultThreadResourceUsageAccountant());
     MultiLevelPriorityQueue queue = createQueue(configuration, rm);
 
     queue.put(createQueryRequest(GROUP_ONE, METRICS));
@@ -214,7 +217,7 @@ public class MultiLevelPriorityQueueTest {
 
   private MultiLevelPriorityQueue createQueue() {
     PinotConfiguration conf = new PinotConfiguration();
-    return createQueue(conf, new UnboundedResourceManager(conf));
+    return createQueue(conf, new UnboundedResourceManager(conf, new Tracing.DefaultThreadResourceUsageAccountant()));
   }
 
   private MultiLevelPriorityQueue createQueue(PinotConfiguration config, ResourceManager rm) {

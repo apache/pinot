@@ -97,7 +97,8 @@ public class PinotDataDistributionTest {
       final int numPartitions = 8;
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
           ImmutableList.of("0@0", "1@0"), 0L, Collections.singleton(
-              new HashDistributionDesc(keys, MURMUR_HASH_FUNCTION, numPartitions)), null);
+              new HashDistributionDesc(keys,
+                  DistHashFunction.valueOf(MURMUR_HASH_FUNCTION.toUpperCase()), numPartitions)), null);
       assertTrue(distribution.satisfies(RelDistributions.hash(keys)));
     }
     {
@@ -120,7 +121,8 @@ public class PinotDataDistributionTest {
   public void testSatisfiesHashDistributionDesc() {
     PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
         ImmutableList.of("0@0", "1@0"), 0L, Collections.singleton(
-            new HashDistributionDesc(ImmutableList.of(1, 3), MURMUR_HASH_FUNCTION, 8)), null);
+            new HashDistributionDesc(ImmutableList.of(1, 3),
+                DistHashFunction.valueOf(MURMUR_HASH_FUNCTION.toUpperCase()), 8)), null);
     {
       // Case-1: Hash distribution desc with different keys.
       assertNull(distribution.satisfiesHashDistributionDesc(ImmutableList.of(1, 2)));

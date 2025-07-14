@@ -626,6 +626,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
   }
 
+  public String forValidDocIdsMetadata(String tableName, String validDocIdsType) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName,
+        "validDocIdsMetadata?validDocIdsType=" + validDocIdsType);
+  }
+
   public String forUpdateTagsValidation() {
     return _baseUrl + "/instances/updateTags/validate";
   }

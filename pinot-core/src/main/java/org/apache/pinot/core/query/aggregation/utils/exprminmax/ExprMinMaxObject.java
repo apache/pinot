@@ -26,7 +26,6 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nonnull;
 import org.apache.pinot.common.datablock.DataBlock;
 import org.apache.pinot.common.datablock.DataBlockEquals;
 import org.apache.pinot.common.datablock.DataBlockUtils;
@@ -122,7 +121,6 @@ public class ExprMinMaxObject implements ParentAggregationFunctionResultObject {
   }
 
   // used for result serialization
-  @Nonnull
   public byte[] toBytes()
       throws IOException {
     int header;

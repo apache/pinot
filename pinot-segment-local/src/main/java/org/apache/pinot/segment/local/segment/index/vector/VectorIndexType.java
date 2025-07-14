@@ -117,8 +117,8 @@ public class VectorIndexType extends AbstractIndexType<VectorIndexConfig, Vector
 
   @Override
   public IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig) {
-    return new VectorIndexHandler(segmentDirectory, configsByCol, tableConfig);
+      Schema schema, TableConfig tableConfig) {
+    return new VectorIndexHandler(segmentDirectory, configsByCol, tableConfig, schema);
   }
 
   @Override

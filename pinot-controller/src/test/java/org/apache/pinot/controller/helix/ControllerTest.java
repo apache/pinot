@@ -70,6 +70,8 @@ import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -933,6 +935,28 @@ public class ControllerTest {
   public void runPeriodicTask(String taskName, String tableName, TableType tableType)
       throws IOException {
     sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
+  }
+
+  /**
+   * Trigger a task on a table and wait for completion
+   */
+  protected String triggerMinionTask(String taskType, String tableNameWithType) {
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTasksToSchedule(Set.of(taskType))
+        .setTablesToSchedule(Set.of(tableNameWithType));
+
+    List<String> taskIds = taskManager.scheduleTasks(context)
+        .get(taskType)
+        .getScheduledTaskNames();
+
+    assert taskIds != null;
+    LOGGER.info("Scheduled {} for table {} with id: {}", taskType, tableNameWithType, taskIds);
+    assertEquals(taskIds.size(), 1,
+        String.format("Task %s not scheduled as expected for table %s. Expected 1 task, but got: %s",
+        taskType, tableNameWithType, taskIds.size()));
+    return taskIds.get(0);
   }
 
   public void pauseTable(String tableName)

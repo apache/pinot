@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import javax.validation.constraints.NotNull;
 import org.apache.pinot.segment.local.realtime.impl.dictionary.BytesOffHeapMutableDictionary;
 import org.apache.pinot.segment.local.segment.creator.impl.stats.CLPStatsProvider;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
@@ -70,9 +69,9 @@ import org.slf4j.LoggerFactory;
  * <p><b>Note on Write and Read Operations:</b> Writes are strictly sequential, while reads can be performed
  * randomly. The supported append operations are:</p>
  * <ul>
- *   <li>{@code setString(int docId, String value)} - Encodes the log message using CLP and invokes
- *   {@code appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage)}.</li>
- *   <li>{@code appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage)}</li>
+ *   <li>{@link #setString(int docId, String value)} - Encodes the log message using CLP and invokes
+ *   {@link #appendEncodedMessage(EncodedMessage clpEncodedMessage)}.</li>
+ *   <li>{@link #appendEncodedMessage(EncodedMessage clpEncodedMessage)}</li>
  * </ul>
  *
  * <p><b>Limitations:</b> The current CLP mutable forward index does not achieve the same compression ratio as the
@@ -238,7 +237,7 @@ public class CLPMutableForwardIndexV2 implements MutableForwardIndex {
    *
    * @param clpEncodedMessage The {@link EncodedMessage} to append.
    */
-  public void appendEncodedMessage(@NotNull EncodedMessage clpEncodedMessage) {
+  public void appendEncodedMessage(EncodedMessage clpEncodedMessage) {
     if (_isClpEncoded || _forceEnableClpEncoding) {
       _logtypeId.setInt(_nextDocId, _logtypeDict.index(clpEncodedMessage.getLogtype()));
 

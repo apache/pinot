@@ -21,6 +21,7 @@ package org.apache.pinot.spi.accounting;
 import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 
 
 public interface ThreadResourceUsageAccountant {
@@ -50,7 +51,17 @@ public interface ThreadResourceUsageAccountant {
    * @param taskId a unique task id
    * @param taskType the type of the task - SSE or MSE
    */
+  @Deprecated
   void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType);
+
+  /**
+   * Set up the thread execution context for an anchor a.k.a runner thread.
+   * @param queryId query id string
+   * @param taskId a unique task id
+   * @param taskType the type of the task - SSE or MSE
+   * @param workloadName the name of the workload, can be null
+   */
+  void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, String workloadName);
 
   /**
    * Set up the thread execution context for a worker thread.
@@ -59,7 +70,7 @@ public interface ThreadResourceUsageAccountant {
    * @param parentContext the parent execution context
    */
   void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-      @Nullable ThreadExecutionContext parentContext);
+                   @Nullable ThreadExecutionContext parentContext);
 
   /**
    * get the executon context of current thread
@@ -83,12 +94,35 @@ public interface ThreadResourceUsageAccountant {
    */
   void sampleUsageMSE();
 
+  default boolean throttleQuerySubmission() {
+    return false;
+  }
+
+  /**
+   * Register a callback to be invoked when a query is cancelled.
+   * This is useful for cleaning up resources or notifying other components.
+   *
+   * @param mseCancelCallback the callback to register
+   */
+  default void registerMseCancelCallback(String queryId, MseCancelCallback mseCancelCallback) {
+    // Default implementation does nothing. Subclasses can override to register a cancel callback.
+  }
+
   /**
    * special interface to aggregate usage to the stats store only once, it is used for response
    * ser/de threads where the thread execution context cannot be setup before hands as
    * queryId/taskId is unknown and the execution process is hard to instrument
    */
+  @Deprecated
   void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes);
+
+  /**
+   * special interface to aggregate usage to the stats store only once, it is used for response
+   * ser/de threads where the thread execution context cannot be setup before hands as
+   * queryId/taskId/workloadName is unknown and the execution process is hard to instrument
+   */
+  void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long allocatedBytes,
+                                    TrackingScope trackingScope);
 
   @Deprecated
   void updateQueryUsageConcurrently(String queryId);
@@ -97,6 +131,11 @@ public interface ThreadResourceUsageAccountant {
    * start the periodical task
    */
   void startWatcherTask();
+
+  @Nullable
+  default PinotClusterConfigChangeListener getClusterConfigChangeListener() {
+    return null;
+  }
 
   /**
    * get error status if the query is preempted
