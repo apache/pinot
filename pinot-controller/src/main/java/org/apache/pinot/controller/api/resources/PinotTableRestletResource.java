@@ -716,6 +716,11 @@ public class PinotTableRestletResource {
       @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
       boolean downtime,
+      @ApiParam(value = "Whether to force allow downtime=true or minAvailableReplicas=0 rebalance for peer-download "
+          + "enabled tables. Such tables have a risk of data loss if the segment is not available in deep-store. "
+          + "It is recommended to ensure all segments are in deep-store and to pause ingestion before setting "
+          + "forceDowntime=true") @DefaultValue("false") @QueryParam("forceDowntime")
+      boolean forceDowntime,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
           + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("-1")
       @QueryParam("minAvailableReplicas") int minAvailableReplicas,
@@ -779,6 +784,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);
     rebalanceConfig.setBootstrap(bootstrap);
     rebalanceConfig.setDowntime(downtime);
+    rebalanceConfig.setForceDowntime(forceDowntime);
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
