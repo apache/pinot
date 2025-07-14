@@ -161,6 +161,8 @@ public class JsonIndexHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
@@ -184,6 +186,8 @@ public class JsonIndexHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     JsonIndexConfig config = _jsonIndexConfigs.get(columnName);
     try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);

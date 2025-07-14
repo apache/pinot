@@ -118,6 +118,8 @@ public class BloomFilterHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     try (BloomFilterCreator bloomFilterCreator =
         StandardIndexes.bloomFilter().createIndexCreator(context, bloomFilterConfig);
@@ -138,6 +140,8 @@ public class BloomFilterHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     try (BloomFilterCreator bloomFilterCreator = StandardIndexes.bloomFilter()
         .createIndexCreator(context, bloomFilterConfig);

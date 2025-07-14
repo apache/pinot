@@ -50,7 +50,6 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordReaderFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -353,13 +352,6 @@ public final class IngestionUtils {
       result.add(StringUtils.splitByWholeSeparator(field, delimiter)[0]);
     }
     return result;
-  }
-
-  /**
-   * Returns false if the record contains key {@link GenericRow#SKIP_RECORD_KEY} with value true
-   */
-  public static boolean shouldIngestRow(GenericRow genericRow) {
-    return !Boolean.TRUE.equals(genericRow.getValue(GenericRow.SKIP_RECORD_KEY));
   }
 
   public static Long extractTimeValue(Comparable time) {

@@ -1200,6 +1200,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         .withTotalDocs(numDocs)
         .withDictionary(hasDictionary)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
 
     ForwardIndexConfig forwardIndexConfig = null;

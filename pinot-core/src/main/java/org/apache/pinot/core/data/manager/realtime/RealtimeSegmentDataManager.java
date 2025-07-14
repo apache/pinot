@@ -587,8 +587,6 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     int indexedMessageCount = 0;
     int streamMessageCount = 0;
     boolean canTakeMore = true;
-
-    TransformPipeline.Result reusedResult = new TransformPipeline.Result();
     boolean prematureExit = false;
 
     for (int index = 0; index < messageCount; index++) {
@@ -645,61 +643,63 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _numRowsErrored++;
         _numBytesDropped += rowSizeInBytes;
       } else {
+        TransformPipeline.Result result = null;
         try {
-          _transformPipeline.processRow(decodedRow.getResult(), reusedResult);
+          result = _transformPipeline.processRow(decodedRow.getResult());
         } catch (Exception e) {
           _numRowsErrored++;
           _numBytesDropped += rowSizeInBytes;
-          // when exception happens we prefer abandoning the whole batch and not partially indexing some rows
-          reusedResult.getTransformedRows().clear();
           String errorMessage = "Caught exception while transforming the record at offset: " + offset + " , row: "
               + decodedRow.getResult();
           _segmentLogger.error(errorMessage, e);
           _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
         }
-        if (reusedResult.getSkippedRowCount() > 0) {
-          realtimeRowsDroppedMeter = _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
-              reusedResult.getSkippedRowCount(), realtimeRowsDroppedMeter);
-          if (_trackFilteredMessageOffsets) {
-            _filteredMessageOffsets.add(offset.toString());
-          }
-        }
-        if (reusedResult.getIncompleteRowCount() > 0) {
-          realtimeIncompleteRowsConsumedMeter =
-              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
-                  reusedResult.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
-        }
-        if (reusedResult.getSanitizedRowCount() > 0) {
-          realtimeRowsSanitizedMeter =
-              _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_SANITIZED,
-                  reusedResult.getSanitizedRowCount(), realtimeRowsSanitizedMeter);
-        }
-        List<GenericRow> transformedRows = reusedResult.getTransformedRows();
-        for (GenericRow transformedRow : transformedRows) {
-          try {
-            canTakeMore = _realtimeSegment.index(transformedRow, metadata);
-            indexedMessageCount++;
-            _lastRowMetadata = metadata;
-            _lastConsumedTimestampMs = System.currentTimeMillis();
-            realtimeRowsConsumedMeter =
-                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
-                    realtimeRowsConsumedMeter);
-            _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
-
-            int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
-            if (recordSerializedValueLength > 0) {
-              realtimeBytesIngestedMeter =
-                  _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
-                      recordSerializedValueLength, realtimeBytesIngestedMeter);
-              _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
+        if (result != null) {
+          if (result.getSkippedRowCount() > 0) {
+            realtimeRowsDroppedMeter =
+                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_FILTERED,
+                    result.getSkippedRowCount(), realtimeRowsDroppedMeter);
+            if (_trackFilteredMessageOffsets) {
+              _filteredMessageOffsets.add(offset.toString());
             }
-          } catch (Exception e) {
-            _numRowsErrored++;
-            _numBytesDropped += rowSizeInBytes;
-            String errorMessage = "Caught exception while indexing the record at offset: " + offset + " , row: "
-                + transformedRow;
-            _segmentLogger.error(errorMessage, e);
-            _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+          }
+          if (result.getIncompleteRowCount() > 0) {
+            realtimeIncompleteRowsConsumedMeter =
+                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED,
+                    result.getIncompleteRowCount(), realtimeIncompleteRowsConsumedMeter);
+          }
+          if (result.getSanitizedRowCount() > 0) {
+            realtimeRowsSanitizedMeter =
+                _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_SANITIZED,
+                    result.getSanitizedRowCount(), realtimeRowsSanitizedMeter);
+          }
+          List<GenericRow> transformedRows = result.getTransformedRows();
+          for (GenericRow transformedRow : transformedRows) {
+            try {
+              canTakeMore = _realtimeSegment.index(transformedRow, metadata);
+              indexedMessageCount++;
+              _lastRowMetadata = metadata;
+              _lastConsumedTimestampMs = System.currentTimeMillis();
+              realtimeRowsConsumedMeter =
+                  _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_ROWS_CONSUMED, 1,
+                      realtimeRowsConsumedMeter);
+              _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_ROWS_CONSUMED, 1L);
+
+              int recordSerializedValueLength = _lastRowMetadata.getRecordSerializedSize();
+              if (recordSerializedValueLength > 0) {
+                realtimeBytesIngestedMeter =
+                    _serverMetrics.addMeteredTableValue(_clientId, ServerMeter.REALTIME_BYTES_CONSUMED,
+                        recordSerializedValueLength, realtimeBytesIngestedMeter);
+                _serverMetrics.addMeteredGlobalValue(ServerMeter.REALTIME_BYTES_CONSUMED, recordSerializedValueLength);
+              }
+            } catch (Exception e) {
+              _numRowsErrored++;
+              _numBytesDropped += rowSizeInBytes;
+              String errorMessage =
+                  "Caught exception while indexing the record at offset: " + offset + " , row: " + transformedRow;
+              _segmentLogger.error(errorMessage, e);
+              _realtimeTableDataManager.addSegmentError(_segmentNameStr, new SegmentErrorInfo(now(), errorMessage, e));
+            }
           }
         }
       }
@@ -1330,6 +1330,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       closePartitionGroupConsumer();
       closePartitionMetadataProvider();
       releaseConsumerSemaphore();
+      _transformPipeline.reportStats();
     }
   }
 

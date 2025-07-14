@@ -168,6 +168,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           .withRealtimeConversion(segmentCreationSpec.isRealtimeConversion())
           .withConsumerDir(segmentCreationSpec.getConsumerDir())
           .withTableNameWithType(_config.getTableConfig().getTableName())
+          .withContinueOnError(_config.isContinueOnError())
           .build();
       //@formatter:on
 

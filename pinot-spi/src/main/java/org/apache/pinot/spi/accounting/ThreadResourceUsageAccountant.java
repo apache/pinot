@@ -99,6 +99,16 @@ public interface ThreadResourceUsageAccountant {
   }
 
   /**
+   * Register a callback to be invoked when a query is cancelled.
+   * This is useful for cleaning up resources or notifying other components.
+   *
+   * @param mseCancelCallback the callback to register
+   */
+  default void registerMseCancelCallback(String queryId, MseCancelCallback mseCancelCallback) {
+    // Default implementation does nothing. Subclasses can override to register a cancel callback.
+  }
+
+  /**
    * special interface to aggregate usage to the stats store only once, it is used for response
    * ser/de threads where the thread execution context cannot be setup before hands as
    * queryId/taskId is unknown and the execution process is hard to instrument

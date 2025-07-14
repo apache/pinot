@@ -295,7 +295,7 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea53</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea57</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.10</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
@@ -416,6 +416,56 @@
               <systemPropertyVariables>
                 <os.arch>aarch64</os.arch>
               </systemPropertyVariables>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!-- Apple Silicon Mac with Homebrew for protoc -->
+    <profile>
+      <id>macos-arm64-protobuf-homebrew</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+        <file>
+          <exists>/opt/homebrew/bin/protoc-gen-grpc-java</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.xolstice.maven.plugins</groupId>
+            <artifactId>protobuf-maven-plugin</artifactId>
+            <configuration>
+              <pluginExecutable>/opt/homebrew/bin/protoc-gen-grpc-java</pluginExecutable>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Apple Silicon Mac with Homebrew (fallback path) -->
+    <profile>
+      <id>macos-arm64-protobuf-homebrew-fallback</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+        <file>
+          <exists>/usr/local/bin/protoc-gen-grpc-java</exists>
+          <missing>/opt/homebrew/bin/protoc-gen-grpc-java</missing>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.xolstice.maven.plugins</groupId>
+            <artifactId>protobuf-maven-plugin</artifactId>
+            <configuration>
+              <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable>
             </configuration>
           </plugin>
         </plugins>

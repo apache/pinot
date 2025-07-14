@@ -140,6 +140,8 @@ public class InvertedIndexHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
 
     try (DictionaryBasedInvertedIndexCreator creator = StandardIndexes.inverted()

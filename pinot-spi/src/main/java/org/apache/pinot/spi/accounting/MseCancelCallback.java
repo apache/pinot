@@ -16,24 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.recordtransformer.enricher;
+package org.apache.pinot.spi.accounting;
 
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.recordtransformer.RecordTransformer;
-
-
-/// Record enricher is a special [RecordTransformer] which is applied before other transformers to enrich the columns.
-/// If a column with the same name as the input column already exists in the record, it will be overwritten.
-/// TODO: Clean up this interface as it is the same as [RecordTransformer].
-public interface RecordEnricher extends RecordTransformer {
-
+public interface MseCancelCallback {
   /**
-   * Enriches the given record, by adding new columns to the same record.
+   * Cancels the query with the given queryId.
+   * The call is asynchronous.
    */
-  void enrich(GenericRow record);
-
-  @Override
-  default void transform(GenericRow record) {
-    enrich(record);
-  }
+  void cancelQuery(long queryId);
 }

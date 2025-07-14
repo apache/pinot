@@ -118,24 +118,28 @@ public class WorkloadBudgetManagerTest {
 
   @Test
   void testCanAdmitQuery() {
-    WorkloadBudgetManager manager = WorkloadBudgetManager.getInstance();
+    WorkloadBudgetManager manager = new WorkloadBudgetManager(_config);
+    boolean isSecondary = false; // Not relevant for this test
     // Scenario 1: No budget configured -> should admit
-    assertTrue(manager.canAdmitQuery("unconfigured-workload"), "Workload without budget should be admitted");
+    assertTrue(manager.canAdmitQuery("unconfigured-workload", isSecondary),
+        "Workload without budget should be admitted");
 
     // Scenario 2: Budget configured with non-zero remaining -> should admit
     String activeWorkload = "active-workload";
     manager.addOrUpdateWorkload(activeWorkload, 100L, 200L);
-    assertTrue(manager.canAdmitQuery(activeWorkload), "Workload with available budget should be admitted");
+    assertTrue(manager.canAdmitQuery(activeWorkload, isSecondary), "Workload with available budget should be admitted");
 
     // Scenario 3: Budget depleted -> should reject
     String depletedWorkload = "depleted-workload";
     manager.addOrUpdateWorkload(depletedWorkload, 50L, 50L);
     manager.tryCharge(depletedWorkload, 50L, 50L); // deplete
-    assertFalse(manager.canAdmitQuery(depletedWorkload), "Workload with depleted budget should be rejected");
+    assertFalse(manager.canAdmitQuery(depletedWorkload, isSecondary),
+        "Workload with depleted budget should be rejected");
 
     // Scenario 4: Budget configured with zero cpu remaining -> should reject
     String zeroCpuWorkload = "zero-cpu-workload";
     manager.addOrUpdateWorkload(zeroCpuWorkload, 0L, 100L);
-    assertFalse(manager.canAdmitQuery(zeroCpuWorkload), "Workload with zero CPU budget should be rejected");
+    assertFalse(manager.canAdmitQuery(zeroCpuWorkload, isSecondary),
+        "Workload with zero CPU budget should be rejected");
   }
 }

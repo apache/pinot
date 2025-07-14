@@ -22,7 +22,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.LongAccumulator;
-
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
@@ -35,7 +34,7 @@ import org.apache.pinot.core.query.scheduler.resources.WorkloadResourceManager;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,33 +55,14 @@ public class WorkloadScheduler extends QueryScheduler {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadScheduler.class);
 
   private final WorkloadBudgetManager _workloadBudgetManager;
-  private String _secondaryWorkloadName;
-  private ServerMetrics _serverMetrics;
+  private final ServerMetrics _serverMetrics;
 
   public WorkloadScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ServerMetrics metrics,
                            LongAccumulator latestQueryTime, ThreadResourceUsageAccountant resourceUsageAccountant) {
     super(config, queryExecutor, new WorkloadResourceManager(config, resourceUsageAccountant), metrics,
         latestQueryTime);
-    _workloadBudgetManager = WorkloadBudgetManager.getInstance();
-    initSecondaryWorkload(config);
-  }
-
-  private void initSecondaryWorkload(PinotConfiguration config) {
-    _secondaryWorkloadName = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
-        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
-
-    double secondaryCpuPercentage = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE,
-        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
-
-    // The Secondary workload budget is common for all secondary queries. Setting the CPU budget based on the
-    // CPU percentage allocated for secondary workload and the enforcement window. The memory budget is set to
-    // Long.MAX_VALUE for now, since we do not have a specific memory budget for secondary queries.
-    long secondaryCpuBudget =
-        (long) (secondaryCpuPercentage * _workloadBudgetManager.getEnforcementWindowMs() * 100_000L);
-    // TODO: Add memory budget for secondary workload queries
-    _workloadBudgetManager.addOrUpdateWorkload(_secondaryWorkloadName, secondaryCpuBudget, Long.MAX_VALUE);
+    _serverMetrics = metrics;
+    _workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
   }
 
   @Override
@@ -97,13 +77,8 @@ public class WorkloadScheduler extends QueryScheduler {
     }
 
     boolean isSecondary = QueryOptionsUtils.isSecondaryWorkload(queryRequest.getQueryContext().getQueryOptions());
-    // If it is a secondary workload query, use the secondary workload name. Since we have a fixed budget allocated for
-    // secondary workload queries.
-    String workloadName = isSecondary
-        ? _secondaryWorkloadName
-        : QueryOptionsUtils.getWorkloadName(queryRequest.getQueryContext().getQueryOptions());
-
-    if (!_workloadBudgetManager.canAdmitQuery(workloadName)) {
+    String workloadName = QueryOptionsUtils.getWorkloadName(queryRequest.getQueryContext().getQueryOptions());
+    if (!_workloadBudgetManager.canAdmitQuery(workloadName, isSecondary)) {
       String tableName = TableNameBuilder.extractRawTableName(queryRequest.getTableNameWithType());
       LOGGER.warn("Workload budget exceeded for workload: {} query: {} table: {}", workloadName,
           queryRequest.getRequestId(), tableName);
