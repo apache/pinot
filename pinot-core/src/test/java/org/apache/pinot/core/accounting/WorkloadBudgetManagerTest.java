@@ -42,7 +42,7 @@ public class WorkloadBudgetManagerTest {
 
   @Test
   void testAddOrUpdateAndRetrieveBudget() {
-    WorkloadBudgetManager manager = new WorkloadBudgetManager(_config);
+    WorkloadBudgetManager manager = new DefaultWorkloadBudgetManager(_config);
     manager.addOrUpdateWorkload("test-workload", 1_000_000L, 1_000_000L);
 
     WorkloadBudgetManager.BudgetStats stats = manager.getRemainingBudgetForWorkload("test-workload");
@@ -52,7 +52,7 @@ public class WorkloadBudgetManagerTest {
 
   @Test
   void testTryChargeWithoutBudget() {
-    WorkloadBudgetManager mgr = new WorkloadBudgetManager(_config);
+    WorkloadBudgetManager mgr = new DefaultWorkloadBudgetManager(_config);
     WorkloadBudgetManager.BudgetStats stats = mgr.tryCharge("unknown-workload", 100L, 100L);
     assertEquals(Long.MAX_VALUE, stats._cpuRemaining);
     assertEquals(Long.MAX_VALUE, stats._memoryRemaining);
@@ -60,7 +60,7 @@ public class WorkloadBudgetManagerTest {
 
   @Test
   void testBudgetResetAfterInterval() throws InterruptedException {
-    WorkloadBudgetManager mgr = new WorkloadBudgetManager(_config);
+    WorkloadBudgetManager mgr = new DefaultWorkloadBudgetManager(_config);
     mgr.addOrUpdateWorkload("reset-test", 1_000_000L, 1_000_000L);
     mgr.tryCharge("reset-test", 500_000L, 500_000L);
 
@@ -80,7 +80,7 @@ public class WorkloadBudgetManagerTest {
 
   @Test
   void testConcurrentTryChargeSingleWorkload() throws InterruptedException {
-    WorkloadBudgetManager manager = new WorkloadBudgetManager(_config);
+    WorkloadBudgetManager manager = new DefaultWorkloadBudgetManager(_config);
     String workload = "concurrent-test";
     long initialCpuBudget = 2_000_000L;
     long initialMemBudget = 2_000_000L;

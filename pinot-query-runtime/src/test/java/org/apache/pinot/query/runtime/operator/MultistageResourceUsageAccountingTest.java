@@ -27,6 +27,8 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.accounting.DefaultWorkloadBudgetManager;
+import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -91,7 +93,9 @@ public class MultistageResourceUsageAccountingTest implements ITest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
     // init accountant and start watcher task
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
+    WorkloadBudgetManager workloadBudgetManager = new DefaultWorkloadBudgetManager(pinotCfg);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER,
+        workloadBudgetManager);
 
     // Setup Thread Context
     Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);

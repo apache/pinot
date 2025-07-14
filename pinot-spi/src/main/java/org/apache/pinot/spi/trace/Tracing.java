@@ -322,9 +322,9 @@ public class Tracing {
     }
 
     public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
-        InstanceType instanceType) {
+        InstanceType instanceType, WorkloadBudgetManager workloadBudgetManager) {
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
-      _workloadBudgetManager = new WorkloadBudgetManager(config);
+      _workloadBudgetManager = workloadBudgetManager;
       if (factoryName == null) {
         LOGGER.warn("No thread accountant factory provided, using default implementation");
       } else {
