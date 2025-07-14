@@ -191,7 +191,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
    * finally stitch them into one
    */
   private void mergePartitionedGroupBy()
-      throws InterruptedException, RuntimeException {
+      throws RuntimeException {
     List<Future> futures = new ArrayList<>();
     try {
       // now all partitionedHashMaps are ready, submit tasks that combines the partition
