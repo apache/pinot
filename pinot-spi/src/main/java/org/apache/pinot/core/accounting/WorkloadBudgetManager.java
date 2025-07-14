@@ -25,7 +25,7 @@ public interface WorkloadBudgetManager {
   void shutdown();
 
   /**
-   * Add a new workload or update an existing workload’s budgets.
+   * Adds or updates budget for a workload (Thread-Safe).
    *
    * @param workload           Logical workload identifier
    * @param cpuBudgetNs        CPU budget for the enforcement window, in ns
@@ -34,22 +34,28 @@ public interface WorkloadBudgetManager {
   void addOrUpdateWorkload(String workload, long cpuBudgetNs, long memoryBudgetBytes);
 
   /**
-   * Charge the given resource usage against the workload’s remaining budget.
-   *
-   * @return A snapshot of the remaining CPU / memory after the charge.
+   * Attempts to charge CPU and memory usage against the workload budget (Thread-Safe).
+   * @return the remaining budget for CPU and memory after charge.
    */
   WorkloadBudgetManager.BudgetStats tryCharge(String workload, long cpuUsedNs, long memoryUsedBytes);
 
   /**
-   * @return Remaining budget for the given workload.
+   * @return the remaining budget for a specific workload.
    */
   WorkloadBudgetManager.BudgetStats getRemainingBudgetForWorkload(String workload);
 
   /**
-   * @return Aggregate remaining budget across **all** workloads.
+   * @return the total remaining budget across all workloads (Thread-Safe).
    */
   WorkloadBudgetManager.BudgetStats getRemainingBudgetAcrossAllWorkloads();
 
+  /**
+   * Collects workload stats for CPU and memory usage.
+   *
+   * @param workload        Workload identifier
+   * @param cpuUsedNs       CPU used by the workload, in ns
+   * @param memoryUsedBytes Memory used by the workload, in bytes
+   */
   void collectWorkloadStats(String workload, long cpuUsedNs, long memoryUsedBytes);
 
   /**
