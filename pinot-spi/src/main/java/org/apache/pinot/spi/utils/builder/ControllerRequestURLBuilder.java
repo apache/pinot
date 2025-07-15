@@ -122,6 +122,10 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tasks", "task", taskName, "state");
   }
 
+  public String forDeleteMinionTask(String taskName) {
+    return StringUtil.join("/", _baseUrl, "tasks", "task", taskName);
+  }
+
   public String forStopMinionTaskQueue(String taskType) {
     return StringUtil.join("/", _baseUrl, "tasks", taskType, "stop");
   }

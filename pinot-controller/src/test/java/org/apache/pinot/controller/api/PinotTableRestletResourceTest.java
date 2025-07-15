@@ -1218,7 +1218,10 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String deleteResponse = sendDeleteRequest(
         DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName + "?ignoreActiveTasks=true"));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
-    // delete task queue
+
+    // delete task
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forDeleteMinionTask(taskName)
+        + "?forceDelete=true");
   }
 
   @Test
