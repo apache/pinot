@@ -27,9 +27,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
@@ -199,7 +201,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
    * finally stitch them into one
    */
   private void mergePartitionedGroupBy()
-      throws RuntimeException {
+      throws RuntimeException, InterruptedException {
     List<Future> futures = new ArrayList<>();
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     int numKeyColumns = _queryContext.getGroupByExpressions().size();
@@ -252,9 +254,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
       _indexedTable = GroupByUtils.createPartitionedIndexedTableForCombineOperator(_dataSchema, _queryContext,
           mergedMap, _executorService);
-    } catch (Exception e) {
-      // TODO: check error handling
+    } catch (TimeoutException ignored) {
+      // no-op as it is handled in mergeResults
+    } catch (ExecutionException e) {
       throw wrapOperatorException(this, new RuntimeException(e));
+    } catch (RuntimeException e) {
+      throw wrapOperatorException(this, e);
     } finally {
       for (Future future : futures) {
         if (future != null && !future.isDone()) {
