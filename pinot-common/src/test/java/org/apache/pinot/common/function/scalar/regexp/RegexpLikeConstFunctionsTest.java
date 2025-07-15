@@ -62,30 +62,37 @@ public class RegexpLikeConstFunctionsTest {
 
   @Test
   public void testRegexpLikeWithMatchParameters() {
-    RegexpLikeConstFunctions f = new RegexpLikeConstFunctions();
-
     // Test case-sensitive (default)
-    assertFalse(f.regexpLike("Hello", "hello", "c")); // Different case, should not match
-    assertTrue(f.regexpLike("hello", "hello", "c"));  // Same case, should match
-    assertTrue(f.regexpLike("HELLO", "HELLO", "c"));  // Same case, should match
+    RegexpLikeConstFunctions f1 = new RegexpLikeConstFunctions();
+    assertFalse(f1.regexpLike("Hello", "hello", "c"));
+    assertTrue(f1.regexpLike("hello", "hello", "c"));
 
     // Test case-insensitive
-    assertTrue(f.regexpLike("Hello", "hello", "i"));  // Different case, should match
-    assertTrue(f.regexpLike("HELLO", "hello", "i"));  // Different case, should match
-    assertTrue(f.regexpLike("hello", "HELLO", "i"));  // Different case, should match
-    assertTrue(f.regexpLike("hElLo", "HeLlO", "i"));  // Different case, should match
-    assertFalse(f.regexpLike("world", "hello", "i")); // Different word, should not match
+    RegexpLikeConstFunctions f2 = new RegexpLikeConstFunctions();
+    assertTrue(f2.regexpLike("Hello", "hello", "i"));
+    assertTrue(f2.regexpLike("HELLO", "hello", "i"));
+    assertTrue(f2.regexpLike("hello", "HELLO", "i"));
+    assertTrue(f2.regexpLike("hElLo", "HeLlO", "i"));
+    assertFalse(f2.regexpLike("world", "hello", "i"));
 
-    // Test with regex patterns
-    assertTrue(f.regexpLike("Hello World", "hello.*", "i"));  // Case-insensitive regex
-    assertTrue(f.regexpLike("HELLO WORLD", "hello.*", "i"));  // Case-insensitive regex
-    assertFalse(f.regexpLike("Hello World", "hello.*", "c")); // Case-sensitive regex
-    assertTrue(f.regexpLike("hello world", "hello.*", "c"));  // Case-sensitive regex
+    // Test with regex patterns - case insensitive
+    RegexpLikeConstFunctions f3 = new RegexpLikeConstFunctions();
+    assertTrue(f3.regexpLike("Hello World", "hello.*", "i"));
+    assertTrue(f3.regexpLike("HELLO WORLD", "hello.*", "i"));
 
-    // Test with special characters
-    assertTrue(f.regexpLike("Test123", "test\\d+", "i"));  // Case-insensitive with digits
-    assertFalse(f.regexpLike("Test123", "test\\d+", "c")); // Case-sensitive with digits
-    assertTrue(f.regexpLike("test123", "test\\d+", "c"));  // Case-sensitive with digits
+    // Test with regex patterns - case sensitive
+    RegexpLikeConstFunctions f4 = new RegexpLikeConstFunctions();
+    assertFalse(f4.regexpLike("Hello World", "hello.*", "c"));
+    assertTrue(f4.regexpLike("hello world", "hello.*", "c"));
+
+    // Test with special characters - case insensitive
+    RegexpLikeConstFunctions f5 = new RegexpLikeConstFunctions();
+    assertTrue(f5.regexpLike("Test123", "test\\d+", "i"));
+
+    // Test with special characters - case sensitive
+    RegexpLikeConstFunctions f6 = new RegexpLikeConstFunctions();
+    assertFalse(f6.regexpLike("Test123", "test\\d+", "c"));
+    assertTrue(f6.regexpLike("test123", "test\\d+", "c"));
   }
 
   @Test
@@ -117,15 +124,14 @@ public class RegexpLikeConstFunctionsTest {
 
   @Test
   public void testRegexpLikeCaseInsensitiveOptimization() {
-    RegexpLikeConstFunctions f = new RegexpLikeConstFunctions();
-
     // Test that case-insensitive matching works correctly
-    assertTrue(f.regexpLike("Hello World", "hello", "i"));
-    assertTrue(f.regexpLike("HELLO WORLD", "hello", "i"));
-    assertTrue(f.regexpLike("hElLo WoRlD", "hello", "i"));
+    RegexpLikeConstFunctions f1 = new RegexpLikeConstFunctions();
+    assertTrue(f1.regexpLike("Hello World", "hello", "i"));
 
-    // Test with different patterns to ensure matcher is reused correctly
-    assertTrue(f.regexpLike("Test String", "test", "i"));
-    assertTrue(f.regexpLike("TEST STRING", "test", "i"));
+    RegexpLikeConstFunctions f2 = new RegexpLikeConstFunctions();
+    assertTrue(f2.regexpLike("HELLO WORLD", "hello", "i"));
+
+    RegexpLikeConstFunctions f3 = new RegexpLikeConstFunctions();
+    assertTrue(f3.regexpLike("hElLo WoRlD", "hello", "i"));
   }
 }

@@ -60,27 +60,27 @@ public class RegexpLikeVarFunctionsTest {
   @Test
   public void testRegexpLikeWithMatchParameters() {
     // Test case-sensitive (default)
-    assertFalse(regexpLikeVar("Hello", "hello", "c")); // Different case, should not match
-    assertTrue(regexpLikeVar("hello", "hello", "c"));  // Same case, should match
-    assertTrue(regexpLikeVar("HELLO", "HELLO", "c"));  // Same case, should match
+    assertFalse(regexpLikeVar("Hello", "hello", "c"));
+    assertTrue(regexpLikeVar("hello", "hello", "c"));
+    assertTrue(regexpLikeVar("HELLO", "HELLO", "c"));
 
     // Test case-insensitive
-    assertTrue(regexpLikeVar("Hello", "hello", "i"));  // Different case, should match
-    assertTrue(regexpLikeVar("HELLO", "hello", "i"));  // Different case, should match
-    assertTrue(regexpLikeVar("hello", "HELLO", "i"));  // Different case, should match
-    assertTrue(regexpLikeVar("hElLo", "HeLlO", "i"));  // Different case, should match
-    assertFalse(regexpLikeVar("world", "hello", "i")); // Different word, should not match
+    assertTrue(regexpLikeVar("Hello", "hello", "i"));
+    assertTrue(regexpLikeVar("HELLO", "hello", "i"));
+    assertTrue(regexpLikeVar("hello", "HELLO", "i"));
+    assertTrue(regexpLikeVar("hElLo", "HeLlO", "i"));
+    assertFalse(regexpLikeVar("world", "hello", "i"));
 
     // Test with regex patterns
-    assertTrue(regexpLikeVar("Hello World", "hello.*", "i"));  // Case-insensitive regex
-    assertTrue(regexpLikeVar("HELLO WORLD", "hello.*", "i"));  // Case-insensitive regex
-    assertFalse(regexpLikeVar("Hello World", "hello.*", "c")); // Case-sensitive regex
-    assertTrue(regexpLikeVar("hello world", "hello.*", "c"));  // Case-sensitive regex
+    assertTrue(regexpLikeVar("Hello World", "hello.*", "i"));
+    assertTrue(regexpLikeVar("HELLO WORLD", "hello.*", "i"));
+    assertFalse(regexpLikeVar("Hello World", "hello.*", "c"));
+    assertTrue(regexpLikeVar("hello world", "hello.*", "c"));
 
     // Test with special characters
-    assertTrue(regexpLikeVar("Test123", "test\\d+", "i"));  // Case-insensitive with digits
-    assertFalse(regexpLikeVar("Test123", "test\\d+", "c")); // Case-sensitive with digits
-    assertTrue(regexpLikeVar("test123", "test\\d+", "c"));  // Case-sensitive with digits
+    assertTrue(regexpLikeVar("Test123", "test\\d+", "i"));
+    assertFalse(regexpLikeVar("Test123", "test\\d+", "c"));
+    assertTrue(regexpLikeVar("test123", "test\\d+", "c"));
   }
 
   @Test

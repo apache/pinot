@@ -44,11 +44,12 @@ public class RegexpLikeConstFunctions {
 
   @ScalarFunction
   public boolean regexpLike(String inputStr, String regexPatternStr, String matchParameter) {
-    // For 3-parameter version, we need to recompile the pattern each time
-    // since match parameters can change between calls
-    Pattern p = buildPattern(regexPatternStr, matchParameter);
-    Matcher matcher = p.matcher(inputStr);
-    return matcher.find();
+    if (_matcher == null) {
+      Pattern p = buildPattern(regexPatternStr, matchParameter);
+      _matcher = p.matcher("");
+    }
+
+    return _matcher.reset(inputStr).find();
   }
 
   private Pattern buildPattern(String pattern, String matchParameter) {
