@@ -955,7 +955,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
 
-
   protected File getWatermarkFile() {
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
@@ -1102,12 +1101,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     trackUpdatedSegmentsSinceLastSnapshot(segment);
   }
 
-  private void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
+  protected void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
     if (_enableSnapshot && segment instanceof ImmutableSegment) {
       _updatedSegmentsSinceLastSnapshot.add(segment);
-      if (_deleteRecordColumn != null) {
-        _updatedSegmentsSinceLastQueryableDocIdsSnapshot.add(segment);
-      }
     }
   }
 
