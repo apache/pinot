@@ -115,7 +115,10 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
     }
     if (asyncQueryResponse.getFailedServer() != null) {
-      _failureDetector.markServerUnhealthy(asyncQueryResponse.getFailedServer().getInstanceId());
+      _failureDetector.markServerUnhealthy(
+          asyncQueryResponse.getFailedServer().getInstanceId(),
+          asyncQueryResponse.getFailedServer().getHostname()
+      );
     }
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);

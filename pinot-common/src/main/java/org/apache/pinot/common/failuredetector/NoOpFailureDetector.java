@@ -51,11 +51,11 @@ public class NoOpFailureDetector implements FailureDetector {
   }
 
   @Override
-  public void markServerHealthy(String instanceId) {
+  public void markServerHealthy(String instanceId, String hostName) {
   }
 
   @Override
-  public void markServerUnhealthy(String instanceId) {
+  public void markServerUnhealthy(String instanceId, String hostName) {
   }
 
   @Override

@@ -105,7 +105,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
           if (retryInfo._numRetries == _maxRetries) {
             LOGGER.warn("Unhealthy server: {} already reaches the max retries: {}, do not retry again and treat it "
                 + "as healthy so that the listeners do not lose track of the server", instanceId, _maxRetries);
-            markServerHealthy(instanceId);
+            markServerHealthy(instanceId, retryInfo._hostName);
             continue;
           }
           LOGGER.info("Retry unhealthy server: {}", instanceId);
@@ -118,7 +118,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
             }
           }
           if (recovered) {
-            markServerHealthy(instanceId);
+            markServerHealthy(instanceId, retryInfo._hostName);
           } else {
             // Update the retry info and add it back to the delay queue
             retryInfo._retryDelayNs = (long) (retryInfo._retryDelayNs * _retryDelayFactor);
@@ -139,9 +139,9 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   }
 
   @Override
-  public void markServerHealthy(String instanceId) {
+  public void markServerHealthy(String instanceId, String hostName) {
     _unhealthyServerRetryInfoMap.computeIfPresent(instanceId, (id, retryInfo) -> {
-      LOGGER.info("Mark server: {} as healthy", instanceId);
+      LOGGER.info("Mark server: {} {} as healthy", instanceId, hostName);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() - 1);
       _healthyServerNotifier.accept(instanceId);
       return null;
@@ -149,12 +149,12 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   }
 
   @Override
-  public void markServerUnhealthy(String instanceId) {
+  public void markServerUnhealthy(String instanceId, String hostName) {
     _unhealthyServerRetryInfoMap.computeIfAbsent(instanceId, id -> {
-      LOGGER.warn("Mark server: {} as unhealthy", instanceId);
+      LOGGER.warn("Mark server: {} {} as unhealthy", instanceId, hostName);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() + 1);
       _unhealthyServerNotifier.accept(instanceId);
-      RetryInfo retryInfo = new RetryInfo(id);
+      RetryInfo retryInfo = new RetryInfo(id, hostName);
       _retryInfoDelayQueue.offer(retryInfo);
       return retryInfo;
     });
@@ -183,13 +183,15 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
    */
   protected class RetryInfo implements Delayed {
     final String _instanceId;
+    final String _hostName;
 
     long _retryTimeNs;
     long _retryDelayNs;
     int _numRetries;
 
-    RetryInfo(String instanceId) {
+    RetryInfo(String instanceId, String hostName) {
       _instanceId = instanceId;
+      _hostName = hostName;
       _retryTimeNs = System.nanoTime() + _retryInitialDelayNs;
       _retryDelayNs = _retryInitialDelayNs;
       _numRetries = 0;
