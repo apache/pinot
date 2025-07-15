@@ -32,13 +32,20 @@ public class RegexpLikePredicate extends BasePredicate {
   private Pattern _pattern = null;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
-    this(lhs, value, "c"); // Default case-sensitive
+    super(lhs);
+    _value = value;
+    _matchParameter = "c";
+    _pattern = PatternFactory.compile(value);
   }
 
   public RegexpLikePredicate(ExpressionContext lhs, String value, String matchParameter) {
     super(lhs);
     _value = value;
-    _matchParameter = matchParameter != null ? matchParameter : "c";
+    _matchParameter = matchParameter;
+
+    if (matchParameter.isEmpty() || matchParameter.equals("c")) {
+      _pattern = PatternFactory.compile(value);
+    }
   }
 
   @Override
@@ -62,22 +69,27 @@ public class RegexpLikePredicate extends BasePredicate {
   }
 
   private Pattern buildPattern(String pattern, String matchParameter) {
-    // Parse match parameters (Oracle-style)
-    if (matchParameter != null) {
-      for (char c : matchParameter.toCharArray()) {
-        switch (c) {
-          case 'i':
-            return PatternFactory.compileCaseInsensitive(pattern);
-          case 'c':
-            return PatternFactory.compile(pattern);
-          default:
-            // Invalid character - default to case-sensitive
-            return PatternFactory.compile(pattern);
-        }
+    // Validate that all characters in matchParameter are supported
+    for (char c : matchParameter.toCharArray()) {
+      if (c != 'i' && c != 'c') {
+        throw new IllegalArgumentException("Unsupported match parameter: '" + c
+            + "'. Only 'i' (case-insensitive) and 'c' (case-sensitive) are supported.");
       }
     }
 
-    // Default case-sensitive
+    // Validate that we don't have conflicting flags (both 'i' and 'c')
+    if (matchParameter.contains("i") && matchParameter.contains("c")) {
+      throw new IllegalArgumentException(
+          "Invalid match parameter: '" + matchParameter + "'. Cannot specify both 'i' (case-insensitive) and "
+              + "'c' (case-sensitive) flags.");
+    }
+
+    // Check for case-insensitive flag
+    if (matchParameter.contains("i")) {
+      return PatternFactory.compileCaseInsensitive(pattern);
+    }
+
+    // Default to case-sensitive
     return PatternFactory.compile(pattern);
   }
 
@@ -101,7 +113,7 @@ public class RegexpLikePredicate extends BasePredicate {
 
   @Override
   public String toString() {
-    if (_matchParameter != null && !_matchParameter.equals("c")) {
+    if (!_matchParameter.equals("c")) {
       return "regexp_like(" + _lhs + ",'" + _value + "','" + _matchParameter + "')";
     } else {
       return "regexp_like(" + _lhs + ",'" + _value + "')";

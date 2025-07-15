@@ -56,4 +56,67 @@ public class RegexpLikeVarFunctionsTest {
     //returns true because function matches against first pattern
     assertFalse(regexpLikeVar("aab", "abb"));
   }
+
+  @Test
+  public void testRegexpLikeWithMatchParameters() {
+    // Test case-sensitive (default)
+    assertFalse(regexpLikeVar("Hello", "hello", "c")); // Different case, should not match
+    assertTrue(regexpLikeVar("hello", "hello", "c"));  // Same case, should match
+    assertTrue(regexpLikeVar("HELLO", "HELLO", "c"));  // Same case, should match
+
+    // Test case-insensitive
+    assertTrue(regexpLikeVar("Hello", "hello", "i"));  // Different case, should match
+    assertTrue(regexpLikeVar("HELLO", "hello", "i"));  // Different case, should match
+    assertTrue(regexpLikeVar("hello", "HELLO", "i"));  // Different case, should match
+    assertTrue(regexpLikeVar("hElLo", "HeLlO", "i"));  // Different case, should match
+    assertFalse(regexpLikeVar("world", "hello", "i")); // Different word, should not match
+
+    // Test with regex patterns
+    assertTrue(regexpLikeVar("Hello World", "hello.*", "i"));  // Case-insensitive regex
+    assertTrue(regexpLikeVar("HELLO WORLD", "hello.*", "i"));  // Case-insensitive regex
+    assertFalse(regexpLikeVar("Hello World", "hello.*", "c")); // Case-sensitive regex
+    assertTrue(regexpLikeVar("hello world", "hello.*", "c"));  // Case-sensitive regex
+
+    // Test with special characters
+    assertTrue(regexpLikeVar("Test123", "test\\d+", "i"));  // Case-insensitive with digits
+    assertFalse(regexpLikeVar("Test123", "test\\d+", "c")); // Case-sensitive with digits
+    assertTrue(regexpLikeVar("test123", "test\\d+", "c"));  // Case-sensitive with digits
+  }
+
+  @Test
+  public void testRegexpLikeWithInvalidMatchParameters() {
+    // Test invalid match parameters
+    try {
+      regexpLikeVar("test", "test", "x");
+      assertFalse(true, "Should throw exception for invalid match parameter");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Unsupported match parameter"));
+    }
+
+    try {
+      regexpLikeVar("test", "test", "ix");
+      assertFalse(true, "Should throw exception for invalid match parameter");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Unsupported match parameter"));
+    }
+
+    try {
+      regexpLikeVar("test", "test", "ci");
+      assertFalse(true, "Should throw exception for invalid match parameter");
+    } catch (IllegalArgumentException e) {
+      assertTrue(e.getMessage().contains("Invalid match parameter"));
+    }
+  }
+
+  @Test
+  public void testRegexpLikeCaseInsensitiveOptimization() {
+    // Test that case-insensitive matching works correctly
+    assertTrue(regexpLikeVar("Hello World", "hello", "i"));
+    assertTrue(regexpLikeVar("HELLO WORLD", "hello", "i"));
+    assertTrue(regexpLikeVar("hElLo WoRlD", "hello", "i"));
+
+    // Test with different patterns to ensure each call compiles fresh
+    assertTrue(regexpLikeVar("Test String", "test", "i"));
+    assertTrue(regexpLikeVar("TEST STRING", "test", "i"));
+  }
 }

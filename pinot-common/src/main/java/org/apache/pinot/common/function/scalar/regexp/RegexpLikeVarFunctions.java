@@ -44,21 +44,27 @@ public class RegexpLikeVarFunctions {
   }
 
   private static Pattern buildPattern(String pattern, String matchParameter) {
-    // Parse match parameters (Oracle-style)
-    if (matchParameter != null) {
-      for (char c : matchParameter.toCharArray()) {
-        switch (c) {
-          case 'i':
-            return PatternFactory.compileCaseInsensitive(pattern);
-          case 'c':
-            return PatternFactory.compile(pattern);
-          default:
-            // Invalid character - default to case-sensitive
-            return PatternFactory.compile(pattern);
-        }
+    // Validate that all characters in matchParameter are supported
+    for (char c : matchParameter.toCharArray()) {
+      if (c != 'i' && c != 'c') {
+        throw new IllegalArgumentException("Unsupported match parameter: '" + c
+            + "'. Only 'i' (case-insensitive) and 'c' (case-sensitive) are supported.");
       }
     }
-    // Default case-sensitive
+
+    // Validate that we don't have conflicting flags (both 'i' and 'c')
+    if (matchParameter.contains("i") && matchParameter.contains("c")) {
+      throw new IllegalArgumentException(
+          "Invalid match parameter: '" + matchParameter + "'. Cannot specify both 'i' (case-insensitive) and "
+              + "'c' (case-sensitive) flags.");
+    }
+
+    // Check for case-insensitive flag
+    if (matchParameter.contains("i")) {
+      return PatternFactory.compileCaseInsensitive(pattern);
+    }
+
+    // Default to case-sensitive
     return PatternFactory.compile(pattern);
   }
 
