@@ -16,25 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.sql.parsers.dml;
+package org.apache.pinot.plugin.minion.tasks.segmentdeletion;
 
-import org.apache.calcite.sql.SqlDelete;
-import org.apache.calcite.sql.SqlNode;
-import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
-import org.apache.pinot.sql.parsers.parser.SqlInsertFromFile;
+import org.apache.pinot.core.common.MinionConstants;
+import org.apache.pinot.minion.event.BaseMinionProgressObserverFactory;
+import org.apache.pinot.spi.annotations.minion.EventObserverFactory;
 
 
-public class DataManipulationStatementParser {
-  private DataManipulationStatementParser() {
-  }
+@EventObserverFactory
+public class SegmentDeletionTaskProgressObserverFactory extends BaseMinionProgressObserverFactory {
 
-  public static DataManipulationStatement parse(SqlNodeAndOptions sqlNodeAndOptions) {
-    SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
-    if (sqlNode instanceof SqlInsertFromFile) {
-      return InsertIntoFile.parse(sqlNodeAndOptions);
-    } else if (sqlNode instanceof SqlDelete) {
-      return DeleteSegmentStatement.parse(sqlNodeAndOptions);
-    }
-    throw new UnsupportedOperationException("Unsupported DML SqlKind - " + sqlNode.getKind());
+  @Override
+  public String getTaskType() {
+    return MinionConstants.SegmentDeletionTask.TASK_TYPE;
   }
 }
