@@ -114,7 +114,7 @@ public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexRe
       throw new UnsupportedOperationException(
           "Native FST is not supported for IFST index. Only Lucene implementation is supported.");
     }
-    return new LuceneIFSTIndexCreator(context, indexConfig);
+    return new LuceneIFSTIndexCreator(context);
   }
 
   @Override

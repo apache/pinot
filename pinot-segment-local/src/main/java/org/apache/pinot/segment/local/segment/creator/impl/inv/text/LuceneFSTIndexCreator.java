@@ -29,7 +29,6 @@ import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
-import org.apache.pinot.segment.spi.index.FstIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,9 +62,9 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    * @throws IOException
    */
   public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
-      String[] sortedEntries, Boolean caseSensitive)
+      String[] sortedEntries)
       throws IOException {
-    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder(caseSensitive));
+    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder(true));
   }
 
   @VisibleForTesting
@@ -97,10 +96,10 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
     }
   }
 
-  public LuceneFSTIndexCreator(IndexCreationContext context, FstIndexConfig fstIndexConfig)
+  public LuceneFSTIndexCreator(IndexCreationContext context)
       throws IOException {
     this(context.getIndexDir(), context.getFieldSpec().getName(), context.getTableNameWithType(),
-        context.isContinueOnError(), (String[]) context.getSortedUniqueElementsArray(), new FSTBuilder(false));
+        context.isContinueOnError(), (String[]) context.getSortedUniqueElementsArray());
   }
 
   // Expects dictionary entries in sorted order.
