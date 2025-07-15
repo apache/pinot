@@ -24,15 +24,21 @@ import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 
 /**
- * Predicate for REGEXP_LIKE.
+ * Predicate for REGEXP_LIKE with optional match parameters (Oracle-style).
  */
 public class RegexpLikePredicate extends BasePredicate {
   private final String _value;
+  private final String _matchParameter;
   private Pattern _pattern = null;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
+    this(lhs, value, "c"); // Default case-sensitive
+  }
+
+  public RegexpLikePredicate(ExpressionContext lhs, String value, String matchParameter) {
     super(lhs);
     _value = value;
+    _matchParameter = matchParameter != null ? matchParameter : "c";
   }
 
   @Override
@@ -44,11 +50,35 @@ public class RegexpLikePredicate extends BasePredicate {
     return _value;
   }
 
+  public String getMatchParameter() {
+    return _matchParameter;
+  }
+
   public Pattern getPattern() {
     if (_pattern == null) {
-      _pattern = PatternFactory.compile(_value);
+      _pattern = buildPattern(_value, _matchParameter);
     }
     return _pattern;
+  }
+
+  private Pattern buildPattern(String pattern, String matchParameter) {
+    // Parse match parameters (Oracle-style)
+    if (matchParameter != null) {
+      for (char c : matchParameter.toCharArray()) {
+        switch (c) {
+          case 'i':
+            return PatternFactory.compileCaseInsensitive(pattern);
+          case 'c':
+            return PatternFactory.compile(pattern);
+          default:
+            // Invalid character - default to case-sensitive
+            return PatternFactory.compile(pattern);
+        }
+      }
+    }
+
+    // Default case-sensitive
+    return PatternFactory.compile(pattern);
   }
 
   @Override
@@ -60,16 +90,21 @@ public class RegexpLikePredicate extends BasePredicate {
       return false;
     }
     RegexpLikePredicate that = (RegexpLikePredicate) o;
-    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
+    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value) && Objects.equals(_matchParameter,
+        that._matchParameter);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_lhs, _value);
+    return Objects.hash(_lhs, _value, _matchParameter);
   }
 
   @Override
   public String toString() {
-    return "regexp_like(" + _lhs + ",'" + _value + "')";
+    if (_matchParameter != null && !_matchParameter.equals("c")) {
+      return "regexp_like(" + _lhs + ",'" + _value + "','" + _matchParameter + "')";
+    } else {
+      return "regexp_like(" + _lhs + ",'" + _value + "')";
+    }
   }
 }

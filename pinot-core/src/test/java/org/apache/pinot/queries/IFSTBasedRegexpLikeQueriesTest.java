@@ -35,35 +35,42 @@ public class IFSTBasedRegexpLikeQueriesTest extends BaseFSTBasedRegexpLikeQuerie
     return "ifst";
   }
 
+  private static final String QUERY_1 =
+      "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'WWW.DOMAIN1.*', 'i') LIMIT 50000";
+
+  private static final String QUERY_2 =
+      "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'WWW.DOMAIN1.*', 'i') LIMIT 5";
+
+  private static final String QUERY_3 =
+      "SELECT DOMAIN_NAMES, count(*) FROM MyTable WHERE REGEXP_LIKE(DOMAIN_NAMES, 'WWW.DOMAIN1.*', 'i') GROUP BY "
+          + "DOMAIN_NAMES LIMIT 5000";
+
+  private static final String QUERY_4 =
+      "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE(URL_COL, '.*/A', 'i') AND "
+          + "REGEXP_LIKE(NO_INDEX_COL, 'test1', 'i') GROUP BY URL_COL LIMIT 5000";
+
   @Test
   public void testIFSTBasedRegexpLike() {
     // Test : Basic IFST matching (case-insensitive pattern should match data)
-    String query =
-        "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE_CI(DOMAIN_NAMES, 'WWW.DOMAIN1.*') LIMIT 50000";
-    testInnerSegmentSelectionQuery(query, 256, null);
+    testInnerSegmentSelectionQuery(QUERY_1, 256, null);
 
     // Test : Selection query with case-insensitive pattern
-    query = "SELECT INT_COL, URL_COL FROM MyTable WHERE REGEXP_LIKE_CI(DOMAIN_NAMES, 'WWW.DOMAIN1.*') LIMIT 5";
     List<Object[]> expected = new ArrayList<>();
     expected.add(new Object[]{1000, "www.domain1.com/a"});
     expected.add(new Object[]{1001, "www.domain1.co.ab/b"});
     expected.add(new Object[]{1002, "www.domain1.co.bc/c"});
     expected.add(new Object[]{1003, "www.domain1.co.cd/d"});
     expected.add(new Object[]{1016, "www.domain1.com/a"});
-    testInnerSegmentSelectionQuery(query, 5, expected);
+    testInnerSegmentSelectionQuery(QUERY_2, 5, expected);
 
     // Test : GroupBy with case-insensitive pattern
-    query = "SELECT DOMAIN_NAMES, count(*) FROM MyTable WHERE REGEXP_LIKE_CI(DOMAIN_NAMES, 'WWW.DOMAIN1.*') GROUP BY "
-        + "DOMAIN_NAMES LIMIT 50000";
-    AggregationGroupByResult result = getGroupByResults(query);
+    AggregationGroupByResult result = getGroupByResults(QUERY_3);
     matchGroupResult(result, "www.domain1.com", 64);
     matchGroupResult(result, "www.domain1.co.ab", 64);
     matchGroupResult(result, "www.domain1.co.bc", 64);
     matchGroupResult(result, "www.domain1.co.cd", 64);
 
-    query = "SELECT URL_COL, count(*) FROM MyTable WHERE REGEXP_LIKE_CI(URL_COL, '.*/A') AND "
-        + "REGEXP_LIKE_CI(NO_INDEX_COL, 'test1') GROUP BY URL_COL LIMIT 5000";
-    result = getGroupByResults(query);
+    result = getGroupByResults(QUERY_4);
     matchGroupResult(result, "www.domain1.com/a", 13);
     matchGroupResult(result, "www.sd.domain1.com/a", 13);
     matchGroupResult(result, "www.domain2.com/a", 13);

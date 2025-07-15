@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import org.apache.pinot.common.request.context.predicate.RegexpLikeCiPredicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
@@ -26,36 +26,32 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
 /**
- * Factory for REGEXP_LIKE_CI predicate evaluators when IFST index is enabled.
+ * Factory for REGEXP_LIKE predicate evaluators when IFST index is enabled for case-insensitive matching.
  */
 public class IFSTBasedRegexpPredicateEvaluatorFactory {
   private IFSTBasedRegexpPredicateEvaluatorFactory() {
   }
 
   /**
-   * Creates a predicate evaluator which matches the regexp query pattern using IFST Index available.
+   * Create a new instance of IFST based REGEXP_LIKE predicate evaluator for case-insensitive matching.
    *
-   * @param regexpLikeCiPredicate REGEXP_LIKE_CI predicate to evaluate
-   * @param ifstIndexReader IFST Index reader
+   * @param regexpLikePredicate REGEXP_LIKE predicate to evaluate
+   * @param ifstIndexReader IFST index reader
    * @param dictionary Dictionary for the column
-   * @return Predicate evaluator
+   * @return IFST based REGEXP_LIKE predicate evaluator
    */
-  public static BaseDictionaryBasedPredicateEvaluator newIFSTBasedEvaluator(RegexpLikeCiPredicate regexpLikeCiPredicate,
+  public static BaseDictionaryBasedPredicateEvaluator newIFSTBasedEvaluator(RegexpLikePredicate regexpLikePredicate,
       TextIndexReader ifstIndexReader, Dictionary dictionary) {
-    return new IFSTBasedRegexpPredicateEvaluatorFactory.IFSTBasedRegexpPredicateEvaluator(regexpLikeCiPredicate,
-        ifstIndexReader, dictionary);
+    return new IFSTBasedRegexpPredicateEvaluator(regexpLikePredicate, ifstIndexReader, dictionary);
   }
 
-  /**
-   * Matches regexp query using IFSTIndexReader.
-   */
   private static class IFSTBasedRegexpPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
     final ImmutableRoaringBitmap _matchingDictIdBitmap;
 
-    public IFSTBasedRegexpPredicateEvaluator(RegexpLikeCiPredicate regexpLikeCiPredicate,
+    public IFSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate,
         TextIndexReader ifstIndexReader, Dictionary dictionary) {
-      super(regexpLikeCiPredicate, dictionary);
-      String searchQuery = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikeCiPredicate.getValue());
+      super(regexpLikePredicate, dictionary);
+      String searchQuery = RegexpPatternConverterUtils.regexpLikeToLuceneRegExp(regexpLikePredicate.getValue());
       _matchingDictIdBitmap = ifstIndexReader.getDictIds(searchQuery);
       int numMatchingDictIds = _matchingDictIdBitmap.getCardinality();
       if (numMatchingDictIds == 0) {

@@ -108,12 +108,6 @@ public class CalciteSqlCompilerTest {
     Assert.assertEquals(function.getOperands().size(), 1);
     Assert.assertEquals(function.getOperands().get(0).getIdentifier().getName(), "AbC");
 
-    expression = compileToExpression("ReGeXpLiKe_Ci(AbC)");
-    function = expression.getFunctionCall();
-    Assert.assertEquals(function.getOperator(), FilterKind.REGEXP_LIKE_CI.name());
-    Assert.assertEquals(function.getOperands().size(), 1);
-    Assert.assertEquals(function.getOperands().get(0).getIdentifier().getName(), "AbC");
-
     expression = compileToExpression("aBc > DeF");
     function = expression.getFunctionCall();
     Assert.assertEquals(function.getOperator(), FilterKind.GREATER_THAN.name());
@@ -354,11 +348,12 @@ public class CalciteSqlCompilerTest {
     }
 
     {
-      PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where regexp_like_ci(E, '^u.*')");
+      PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where regexp_like(E, '^u.*', 'i')");
       Function func = pinotQuery.getFilterExpression().getFunctionCall();
-      Assert.assertEquals(func.getOperator(), "REGEXP_LIKE_CI");
+      Assert.assertEquals(func.getOperator(), "REGEXP_LIKE");
       Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
       Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^u.*");
+      Assert.assertEquals(func.getOperands().get(2).getLiteral().getStringValue(), "i");
     }
 
     {
@@ -481,6 +476,15 @@ public class CalciteSqlCompilerTest {
       Assert.assertEquals(rhs.size(), 2);
       Assert.assertEquals(rhs.get(0).getFunctionCall().getOperator(), "issubnetof");
       Assert.assertEquals(rhs.get(1).getLiteral(), Literal.boolValue(true));
+    }
+
+    {
+      PinotQuery pinotQuery = compileToPinotQuery("select * from vegetables where regexp_like(E, '^u.*', 'i')");
+      Function func = pinotQuery.getFilterExpression().getFunctionCall();
+      Assert.assertEquals(func.getOperator(), "REGEXP_LIKE");
+      Assert.assertEquals(func.getOperands().get(0).getIdentifier().getName(), "E");
+      Assert.assertEquals(func.getOperands().get(1).getLiteral().getStringValue(), "^u.*");
+      Assert.assertEquals(func.getOperands().get(2).getLiteral().getStringValue(), "i");
     }
   }
 

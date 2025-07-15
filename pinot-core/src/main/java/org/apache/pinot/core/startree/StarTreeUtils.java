@@ -337,10 +337,8 @@ public class StarTreeUtils {
     switch (predicate.getType()) {
       // Do not use star-tree for the following predicates because:
       //   - REGEXP_LIKE: Need to scan the whole dictionary to gather the matching dictionary ids
-      //   - REGEXP_LIKE_CI: Need to scan the whole dictionary to gather the matching dictionary ids
       //   - TEXT_MATCH/IS_NULL/IS_NOT_NULL: No way to gather the matching dictionary ids
       case REGEXP_LIKE:
-      case REGEXP_LIKE_CI:
       case TEXT_MATCH:
       case IS_NULL:
       case IS_NOT_NULL:

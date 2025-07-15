@@ -636,7 +636,7 @@ public class QueryInvertedSortedIndexRecommender {
           .setIteratorEvalPriorityEnum(IteratorEvalPriorityEnum.INDEXED)
           .setRecommendationPriorityEnum(RecommendationPriorityEnum.BITMAP).setnESI(NESI_ZERO)
           .setPercentSelected(_params._percentSelectForTextMatch).setnESIWithIdx(NESI_ZERO).build();
-    } else if (type == Predicate.Type.REGEXP_LIKE || type == Predicate.Type.REGEXP_LIKE_CI) {
+    } else if (type == Predicate.Type.REGEXP_LIKE) {
       //  e.g. REGEXP_LIKE(a, "...")
       return PredicateParseResult.PredicateParseResultBuilder.aPredicateParseResult()
           .setCandidateDims(FixedLenBitset.IMMUTABLE_EMPTY_SET)

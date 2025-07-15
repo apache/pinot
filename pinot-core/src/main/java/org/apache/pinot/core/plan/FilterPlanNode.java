@@ -30,7 +30,6 @@ import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.predicate.JsonMatchPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.request.context.predicate.RegexpLikeCiPredicate;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.request.context.predicate.TextContainsPredicate;
 import org.apache.pinot.common.request.context.predicate.TextMatchPredicate;
@@ -298,39 +297,23 @@ public class FilterPlanNode implements PlanNode {
                 return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
               }
             case REGEXP_LIKE:
-              // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
-              // consuming segments.
-              //
-              // Rolled out segments (immutable): FST Index reader is available use FSTBasedEvaluator
-              // else use regular flow of getting predicate evaluator.
-              //
-              // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
-              // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
-              if (dataSource.getFSTIndex() != null) {
+              // Check if case-insensitive flag is present
+              RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
+              boolean isCaseInsensitive = regexpLikePredicate.getMatchParameter() != null
+                  && regexpLikePredicate.getMatchParameter().contains("i");
+
+              if (isCaseInsensitive && dataSource.getIFSTIndex() != null) {
+                // Use IFST Index for case-insensitive matching
                 predicateEvaluator =
-                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
+                    IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
+                        dataSource.getIFSTIndex(), dataSource.getDictionary());
+              } else if (dataSource.getFSTIndex() != null) {
+                // Use FST Index for case-sensitive matching
+                predicateEvaluator =
+                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
                         dataSource.getFSTIndex(), dataSource.getDictionary());
               } else {
-                predicateEvaluator =
-                    PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                        dataSource.getDataSourceMetadata().getDataType());
-              }
-              _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
-              return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);
-            case REGEXP_LIKE_CI:
-              // IFST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
-              // consuming segments.
-              //
-              // Rolled out segments (immutable): IFST Index reader is available use IFSTBasedEvaluator
-              // else use regular flow of getting predicate evaluator.
-              //
-              // Consuming segments: When IFST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
-              // similar to that of IFSTBasedEvaluator, else use regular flow of getting predicate evaluator.
-              if (dataSource.getIFSTIndex() != null) {
-                predicateEvaluator =
-                    IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator((RegexpLikeCiPredicate) predicate,
-                        dataSource.getIFSTIndex(), dataSource.getDictionary());
-              } else {
+                // Use regular predicate evaluator
                 predicateEvaluator =
                     PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
                         dataSource.getDataSourceMetadata().getDataType());

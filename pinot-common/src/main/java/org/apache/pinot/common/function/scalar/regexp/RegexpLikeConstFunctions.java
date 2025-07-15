@@ -18,8 +18,10 @@
  */
 package org.apache.pinot.common.function.scalar.regexp;
 
+import java.util.Objects;
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
+import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -30,14 +32,43 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 public class RegexpLikeConstFunctions {
 
   private Matcher _matcher;
+  private String _currentPattern;
+  private String _currentMatchParameter;
 
   @ScalarFunction
   public boolean regexpLike(String inputStr, String regexPatternStr) {
-    if (_matcher == null) {
-      _matcher = PatternFactory.compile(regexPatternStr).matcher("");
+    return regexpLike(inputStr, regexPatternStr, "c"); // Default case-sensitive
+  }
+
+  @ScalarFunction
+  public boolean regexpLike(String inputStr, String regexPatternStr, String matchParameter) {
+    if (_matcher == null || !_currentPattern.equals(regexPatternStr) || !Objects.equals(_currentMatchParameter,
+        matchParameter)) {
+      _matcher = buildPattern(regexPatternStr, matchParameter).matcher("");
+      _currentPattern = regexPatternStr;
+      _currentMatchParameter = matchParameter;
     }
 
     return _matcher.reset(inputStr).find();
+  }
+
+  private Pattern buildPattern(String pattern, String matchParameter) {
+    if (matchParameter != null) {
+      for (char c : matchParameter.toCharArray()) {
+        switch (c) {
+          case 'i':
+            return PatternFactory.compileCaseInsensitive(pattern);
+          case 'c':
+            return PatternFactory.compile(pattern);
+          default:
+            // Invalid character - default to case-sensitive
+            return PatternFactory.compile(pattern);
+        }
+      }
+    }
+
+    // Default case-sensitive
+    return PatternFactory.compile(pattern);
   }
 
   @ScalarFunction
