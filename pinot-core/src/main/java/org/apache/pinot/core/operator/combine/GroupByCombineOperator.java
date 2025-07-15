@@ -378,13 +378,17 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   public BaseResultsBlock mergeResults()
       throws Exception {
 
+    long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
+    boolean opCompleted;
+
     if (GroupByUtils.shouldPartitionGroupBy(_queryContext)) {
       // multithreaded merge partitioned hashtable, this creates _indexedTable
       mergePartitionedGroupBy();
+      opCompleted = System.currentTimeMillis() - _queryContext.getEndTimeMs() <= 0;
+    } else {
+      opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     }
 
-    long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
-    boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
       // If this happens, the broker side should already timed out, just log the error and return
       String userError = "Timed out while combining group-by order-by results after " + timeoutMs + "ms";
