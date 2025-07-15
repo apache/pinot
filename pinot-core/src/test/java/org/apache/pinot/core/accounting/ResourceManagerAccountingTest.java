@@ -103,8 +103,9 @@ public class ResourceManagerAccountingTest {
     Future[] futures = new Future[2000];
     AtomicInteger atomicInteger = new AtomicInteger();
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
+    WorkloadBudgetManager workloadBudgetManager = new DefaultWorkloadBudgetManager(pinotCfg);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testCPUtimeProvider",
-        InstanceType.SERVER);
+        InstanceType.SERVER, workloadBudgetManager);
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
@@ -165,8 +166,9 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
+    WorkloadBudgetManager workloadBudgetManager = new DefaultWorkloadBudgetManager(pinotCfg);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testCPUtimeProvider",
-        InstanceType.SERVER);
+        InstanceType.SERVER, workloadBudgetManager);
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
@@ -239,10 +241,9 @@ public class ResourceManagerAccountingTest {
 
     String workloadName = CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
+    WorkloadBudgetManager workloadBudgetManager = new DefaultWorkloadBudgetManager(pinotCfg);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testWorkloadMemoryAccounting",
-        InstanceType.SERVER);
-    WorkloadBudgetManager workloadBudgetManager =
-        Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
+        InstanceType.SERVER, workloadBudgetManager);
     workloadBudgetManager.addOrUpdateWorkload(workloadName, 88_000_000, 27_000_000);
     ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
 
@@ -378,7 +379,9 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration config = getConfig(20, 2, configs);
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER);
+    WorkloadBudgetManager workloadBudgetManager = new DefaultWorkloadBudgetManager(config);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER,
+        workloadBudgetManager);
 
     CountDownLatch latch = new CountDownLatch(100);
     AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
@@ -448,7 +451,9 @@ public class ResourceManagerAccountingTest {
 
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy", InstanceType.SERVER);
+    WorkloadBudgetManager workloadBudgetManager = new DefaultWorkloadBudgetManager(config);
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy", InstanceType.SERVER,
+        workloadBudgetManager);
 
     CountDownLatch latch = new CountDownLatch(100);
     AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
@@ -504,8 +509,9 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration config = getConfig(2, 2, configs);
     ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
     // init accountant and start watcher task
+    WorkloadBudgetManager workloadBudgetManager = new DefaultWorkloadBudgetManager(config);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM",
-        InstanceType.SERVER);
+        InstanceType.SERVER, workloadBudgetManager);
 
     Supplier<String> randomJsonValue = () -> {
       Random random = new Random();

@@ -77,6 +77,8 @@ import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.core.accounting.DefaultWorkloadBudgetManager;
+import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
@@ -670,9 +672,11 @@ public abstract class BaseServerStarter implements ServiceStartable {
     }
 
     // initialize the thread accountant for query killing
+    PinotConfiguration threadAccountantConfigs = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
+    WorkloadBudgetManager workloadBudgetManager = createWorkloadBudgetManager(threadAccountantConfigs);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(
-        _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+        threadAccountantConfigs, _instanceId,
+        org.apache.pinot.spi.config.instance.InstanceType.SERVER, workloadBudgetManager);
     if (Tracing.getThreadAccountant().getClusterConfigChangeListener() != null) {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(
           Tracing.getThreadAccountant().getClusterConfigChangeListener());
@@ -892,6 +896,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
    */
   protected void preServeQueries() {
     _segmentOperationsThrottler.startServingQueries();
+  }
+
+  /**
+   * Can be overridden to create a custom WorkloadBudgetManager.
+   */
+  protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration config) {
+    return new DefaultWorkloadBudgetManager(config);
   }
 
   @Override
