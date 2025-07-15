@@ -38,15 +38,18 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   private final int _mask;
   private final List<HashMap<K, V>> _maps;
   private int _size;
+  private int _segmentId = -1;
 
-  public RadixPartitionedHashMap(int numRadixBits) {
+  public RadixPartitionedHashMap(int numRadixBits, int initialCapacity, int segmentId) {
+    int partitionInitialCapacity = initialCapacity >> numRadixBits;
     _numRadixBits = numRadixBits;
     _numPartitions = 1 << numRadixBits;
     _mask = _numPartitions - 1;
+    _segmentId = segmentId;
     _maps = new ArrayList<>();
     _size = 0;
     for (int i = 0; i < _numPartitions; i++) {
-      _maps.add(new HashMap<>());
+      _maps.add(new HashMap<>(partitionInitialCapacity));
     }
   }
 
@@ -60,6 +63,10 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
     for (HashMap<K, V> map : maps) {
       _size += map.size();
     }
+  }
+
+  public int getSegmentId() {
+    return _segmentId;
   }
 
   public Map<K, V> getPartition(int i) {
@@ -105,19 +112,21 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   @Override
   public V put(K k, V v) {
     HashMap<K, V> map = _maps.get(partition(k));
-    if (!map.containsKey(k)) {
+    V prev = map.put(k, v);
+    if (prev == null) {
       _size++;
     }
-    return map.put(k, v);
+    return prev;
   }
 
   @Override
   public V remove(Object o) {
     HashMap<K, V> map = _maps.get(partition((K) o));
-    if (map.containsKey((K) o)) {
+    V prev = map.remove(o);
+    if (prev != null) {
       _size--;
     }
-    return map.remove(o);
+    return prev;
   }
 
   @Override

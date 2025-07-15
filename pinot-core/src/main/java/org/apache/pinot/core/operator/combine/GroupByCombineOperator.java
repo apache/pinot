@@ -25,6 +25,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -73,7 +74,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
   private DataSchema _dataSchema;
   private volatile IndexedTable _indexedTable;
-  private final RadixPartitionedHashMap<Key, Record>[] _partitionedHashMaps;
+  //  private final RadixPartitionedHashMap<Key, Record>[] _partitionedHashMaps;
+  private final CompletableFuture<RadixPartitionedHashMap<Key, Record>>[] _partitionedHashMapFutures;
   private volatile HashMap[] _mergedHashMaps;
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
@@ -89,7 +91,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
-    _partitionedHashMaps = new RadixPartitionedHashMap[operators.size()];
+    _partitionedHashMapFutures = new CompletableFuture[operators.size()];
+
+    for (int i = 0; i < operators.size(); i++) {
+      _partitionedHashMapFutures[i] = new CompletableFuture<>();
+    }
+
     _mergedHashMaps = new HashMap[_queryContext.getGroupByNumPartitions()];
   }
 
@@ -128,7 +135,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         }
         // partition this into _partitionedIndexedTable[operatorId], without trimming
         RadixPartitionedHashMap<Key, Record> map =
-            new RadixPartitionedHashMap<>(_queryContext.getGroupByPartitionNumRadixBits());
+            new RadixPartitionedHashMap<>(_queryContext.getGroupByPartitionNumRadixBits(), resultsBlock.getNumGroups(),
+                operatorId);
 
         if (resultsBlock.isGroupsTrimmed()) {
           _groupsTrimmed = true;
@@ -174,7 +182,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             mergedKeys++;
           }
         }
-        _partitionedHashMaps[operatorId] = map;
+        _partitionedHashMapFutures[operatorId].complete(map);
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
       } finally {
@@ -193,27 +201,49 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private void mergePartitionedGroupBy()
       throws RuntimeException {
     List<Future> futures = new ArrayList<>();
+    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
+    int numKeyColumns = _queryContext.getGroupByExpressions().size();
     try {
-      // now all partitionedHashMaps are ready, submit tasks that combines the partition
-      for (int i = 0; i < _queryContext.getGroupByNumPartitions(); i++) {
-        int partitionId = i;
+      // submit tasks that combines the partition
+      for (int partitionId = 0; partitionId < _queryContext.getGroupByNumPartitions(); partitionId++) {
+        int finalPartitionId = partitionId;
         futures.add(_executorService.submit(() -> {
-          HashMap<Key, Record> map = new HashMap<>();
-          AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-          int numKeyColumns = _queryContext.getGroupByExpressions().size();
-          for (RadixPartitionedHashMap<Key, Record> partitionedHashMap : _partitionedHashMaps) {
-            Map<Key, Record> partition = partitionedHashMap.getPartition(partitionId);
-            for (Map.Entry<Key, Record> entry : partition.entrySet()) {
-              GroupByUtils.addOrUpdateRecord(map, entry.getKey(), entry.getValue(), aggregationFunctions,
-                  numKeyColumns);
+          try {
+            HashMap<Key, Record> map = new HashMap<>();
+            Map<Integer, CompletableFuture<RadixPartitionedHashMap<Key, Record>>> pendingFutures = new HashMap<>();
+            for (int segmentId = 0; segmentId < _numOperators; segmentId++) {
+              pendingFutures.put(segmentId, _partitionedHashMapFutures[segmentId]);
             }
+
+            // merge partitions in arbitrary order as they are ready
+            while (!pendingFutures.isEmpty()) {
+              CompletableFuture fut =
+                  CompletableFuture.anyOf(pendingFutures.values().toArray(CompletableFuture[]::new));
+              RadixPartitionedHashMap<Key, Record> partition = (RadixPartitionedHashMap<Key, Record>) fut.get();
+              for (Map.Entry<Key, Record> entry : partition.getPartition(finalPartitionId).entrySet()) {
+                GroupByUtils.addOrUpdateRecord(map, entry.getKey(), entry.getValue(), aggregationFunctions,
+                    numKeyColumns);
+              }
+              int processedSegmentId = partition.getSegmentId();
+              pendingFutures.remove(processedSegmentId);
+            }
+
+            _mergedHashMaps[finalPartitionId] = map;
+          } catch (Exception e) {
+            throw wrapOperatorException(this, new RuntimeException(e));
           }
-          _mergedHashMaps[partitionId] = map;
         }));
       }
-      // wait and stitch together mergedHashMaps
-      for (Future fut : futures) {
-        fut.get();
+
+      long deadline = _queryContext.getEndTimeMs();
+
+      for (Future<?> fut : futures) {
+        long remaining = deadline - System.currentTimeMillis();
+        if (remaining <= 0) {
+          // will timeout in mergeResults()
+          return;
+        }
+        fut.get(remaining, TimeUnit.MILLISECONDS);
       }
 
       RadixPartitionedHashMap<Key, Record> mergedMap =
@@ -342,6 +372,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   @Override
   public BaseResultsBlock mergeResults()
       throws Exception {
+
+    if (GroupByUtils.shouldPartitionGroupBy(_queryContext)) {
+      // multithreaded merge partitioned hashtable, this creates _indexedTable
+      mergePartitionedGroupBy();
+    }
+
     long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
     boolean opCompleted = _operatorLatch.await(timeoutMs, TimeUnit.MILLISECONDS);
     if (!opCompleted) {
@@ -365,11 +401,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         errMsg = new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, userError, devError);
       }
       return new ExceptionResultsBlock(errMsg);
-    }
-
-    if (GroupByUtils.shouldPartitionGroupBy(_queryContext)) {
-      // multithreaded merge partitioned hashtable, this creates _indexedTable
-      mergePartitionedGroupBy();
     }
 
     if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
