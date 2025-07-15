@@ -369,9 +369,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTimeMs = System.currentTimeMillis();
     if (!_enableSnapshot) {
       segment.deleteValidDocIdsSnapshot();
-      if (_deleteRecordColumn != null) {
-        segment.deleteQueryableDocIdsSnapshot();
-      }
     }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {

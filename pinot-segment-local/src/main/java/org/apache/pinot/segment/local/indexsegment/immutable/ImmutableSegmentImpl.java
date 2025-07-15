@@ -195,77 +195,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     }
   }
 
-  @Nullable
-  public MutableRoaringBitmap loadQueryableDocIdsFromSnapshot() {
-    File queryablDocIdsSnapshotFile = getQueryableDocIdsSnapshotFile();
-    if (queryablDocIdsSnapshotFile.exists()) {
-      try {
-        byte[] bytes = FileUtils.readFileToByteArray(queryablDocIdsSnapshotFile);
-        MutableRoaringBitmap queryableDocIds =
-            new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
-        LOGGER.info("Loaded queryableDocIds for segment: {} with: {} valid docs", getSegmentName(),
-            queryableDocIds.getCardinality());
-        return queryableDocIds;
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while loading queryableDocIds from snapshot file: {}, ignoring the snapshot",
-            queryablDocIdsSnapshotFile);
-      }
-    }
-    return null;
-  }
-
-  public void persistQueryableDocIdsSnapshot() {
-    File queryableDocIdsSnapshotFile = getQueryableDocIdsSnapshotFile();
-    try {
-      File tmpFile = new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
-          V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp");
-      if (tmpFile.exists()) {
-        LOGGER.warn("Previous queryableDocIds snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
-        FileUtils.deleteQuietly(tmpFile);
-      }
-      MutableRoaringBitmap queryableDocIdsSnapshot = _queryableDocIds.getMutableRoaringBitmap();
-      try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(tmpFile))) {
-        queryableDocIdsSnapshot.serialize(dataOutputStream);
-      }
-      Preconditions.checkState(tmpFile.renameTo(queryableDocIdsSnapshotFile),
-          "Failed to rename tmp queryableDocIds snapshot file: %s to queryableDocIds snapshot file: %s", tmpFile,
-          queryableDocIdsSnapshotFile);
-      LOGGER.info("Persisted queryableDocIds for segment: {} with: {} queryable docs", getSegmentName(),
-          queryableDocIdsSnapshot.getCardinality());
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while persisting queryableDocIds to snapshot file: {}, skipping",
-          queryableDocIdsSnapshotFile, e);
-    }
-  }
 
   private File getValidDocIdsSnapshotFile() {
     return new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
         V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-  }
-
-  public boolean hasQueryableDocIdsSnapshotFile() {
-    return getQueryableDocIdsSnapshotFile().exists();
-  }
-
-  public void deleteQueryableDocIdsSnapshot() {
-    File queryableDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
-    if (queryableDocIdsSnapshotFile.exists()) {
-      try {
-        if (!FileUtils.deleteQuietly(queryableDocIdsSnapshotFile)) {
-          LOGGER.warn("Cannot delete old queryableDocIds snapshot file: {}, skipping", queryableDocIdsSnapshotFile);
-          return;
-        }
-        LOGGER.info("Deleted queryableDocIds snapshot for segment: {}", getSegmentName());
-      } catch (Exception e) {
-        LOGGER.warn("Caught exception while deleting queryableDocIds snapshot file: {}, skipping",
-            queryableDocIdsSnapshotFile);
-      }
-    }
-  }
-
-  private File getQueryableDocIdsSnapshotFile() {
-    return new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
-        V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
 
   /**
