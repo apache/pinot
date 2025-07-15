@@ -19,62 +19,43 @@
 package org.apache.pinot.query.runtime.function;
 
 import com.google.auto.service.AutoService;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.arithmetic.PlusScalarFunction;
-import org.apache.pinot.core.operator.transform.function.AdditionTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.core.operator.transform.function.AdditionTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
 
 @AutoService(Udf.class)
-public class PlusUdf extends Udf {
-  @Override
-  public String getMainFunctionName() {
-    return "plus";
-  }
+public class AbsUdf extends Udf.FromAnnotatedMethod {
 
-  @Override
-  public Set<String> getAllFunctionNames() {
-    return Set.of(getMainFunctionName(), "add");
+  public AbsUdf()
+      throws NoSuchMethodException {
+    super(ArithmeticFunctions.class, "abs", double.class);
   }
 
   @Override
   public String getDescription() {
-    return "This function adds two numeric values together. In order to concatenate two strings, use the `concat` "
-        + "function instead.";
-  }
-
-  @Override
-  public String asSqlCall(String name, List<String> sqlArgValues) {
-    if (name.equals(getMainFunctionName())) {
-      return "(" + String.join(" + ", sqlArgValues) + ")";
-    } else {
-      return super.asSqlCall(name, sqlArgValues);
-    }
+    return "Returns the absolute value of a numeric input.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return UdfExampleBuilder.forEndomorphismNumeric(2)
-        .addExample("1 + 2", 1, 2, 3)
-        .addExample(UdfExample.create("1 + null", 1, null, null).withoutNull(1))
+    return UdfExampleBuilder.forEndomorphismNumeric(1)
+        .addExample("positive value", 5, 5)
+        .addExample("negative value", -3, 3)
+        .addExample("zero", 0, 0)
+        .addExample(UdfExample.create("null input", null, null).withoutNull(0))
         .build()
         .generateExamples();
   }
 
   @Override
   public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ADD, AdditionTransformFunction.class);
-  }
-
-  @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of(new PlusScalarFunction());
+    return Map.of(TransformFunctionType.ABS, AdditionTransformFunction.class);
   }
 }

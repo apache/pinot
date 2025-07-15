@@ -24,8 +24,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.arithmetic.PlusScalarFunction;
-import org.apache.pinot.core.operator.transform.function.AdditionTransformFunction;
+import org.apache.pinot.common.function.scalar.arithmetic.MultScalarFunction;
+import org.apache.pinot.core.operator.transform.function.MultiplicationTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
@@ -33,27 +33,26 @@ import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfSignature;
 
 @AutoService(Udf.class)
-public class PlusUdf extends Udf {
+public class MultUdf extends Udf {
   @Override
   public String getMainFunctionName() {
-    return "plus";
+    return "mult";
   }
 
   @Override
   public Set<String> getAllFunctionNames() {
-    return Set.of(getMainFunctionName(), "add");
+    return Set.of(getMainFunctionName(), "times");
   }
 
   @Override
   public String getDescription() {
-    return "This function adds two numeric values together. In order to concatenate two strings, use the `concat` "
-        + "function instead.";
+    return "This function multiplies two numeric values together.";
   }
 
   @Override
   public String asSqlCall(String name, List<String> sqlArgValues) {
     if (name.equals(getMainFunctionName())) {
-      return "(" + String.join(" + ", sqlArgValues) + ")";
+      return "(" + String.join(" * ", sqlArgValues) + ")";
     } else {
       return super.asSqlCall(name, sqlArgValues);
     }
@@ -62,19 +61,19 @@ public class PlusUdf extends Udf {
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forEndomorphismNumeric(2)
-        .addExample("1 + 2", 1, 2, 3)
-        .addExample(UdfExample.create("1 + null", 1, null, null).withoutNull(1))
+        .addExample("2 * 3", 2, 3, 6)
+        .addExample(UdfExample.create("2 * null", 2, null, null).withoutNull(0))
         .build()
         .generateExamples();
   }
 
   @Override
   public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ADD, AdditionTransformFunction.class);
+    return Map.of(TransformFunctionType.MULT, MultiplicationTransformFunction.class);
   }
 
   @Override
   public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of(new PlusScalarFunction());
+    return Set.of(new MultScalarFunction());
   }
 }
