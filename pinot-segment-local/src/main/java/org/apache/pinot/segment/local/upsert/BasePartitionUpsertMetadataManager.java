@@ -104,13 +104,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   // Skip mutableSegments as only immutable segments are for taking snapshots.
   protected final Set<IndexSegment> _updatedSegmentsSinceLastSnapshot = ConcurrentHashMap.newKeySet();
 
-  // Track all the immutable segments where changes took place since last snapshot was taken.
-  // Note: we need take to take _snapshotLock RLock while updating this set as it may be updated by the multiple
-  // Helix threads. Otherwise, segments might be missed by the consuming thread when taking snapshots, which takes
-  // snapshotLock WLock and clear the tracking set to avoid keeping segment object references around.
-  // Skip mutableSegments as only immutable segments are for taking snapshots.
-  protected final Set<IndexSegment> _updatedSegmentsSinceLastQueryableDocIdsSnapshot = ConcurrentHashMap.newKeySet();
-
   // NOTE: We do not persist snapshot on the first consuming segment because most segments might not be loaded yet
   // We only do this for Full-Upsert tables, for partial-upsert tables, we have a check allSegmentsLoaded
   protected volatile boolean _gotFirstConsumingSegment = false;
@@ -299,9 +292,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _trackedSegments.add(segment);
       if (_enableSnapshot) {
         _updatedSegmentsSinceLastSnapshot.add(segment);
-        if (_deleteRecordColumn != null) {
-          _updatedSegmentsSinceLastQueryableDocIdsSnapshot.add(segment);
-        }
       }
     } finally {
       finishOperation();
@@ -415,9 +405,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       doPreloadSegment((ImmutableSegmentImpl) segment);
       _trackedSegments.add(segment);
       _updatedSegmentsSinceLastSnapshot.add(segment);
-      if (_deleteRecordColumn != null) {
-        _updatedSegmentsSinceLastQueryableDocIdsSnapshot.add(segment);
-      }
     } finally {
       finishOperation();
     }
@@ -587,9 +574,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         _trackedSegments.add(segment);
         if (_enableSnapshot) {
           _updatedSegmentsSinceLastSnapshot.add(segment);
-          if (_deleteRecordColumn != null) {
-            _updatedSegmentsSinceLastQueryableDocIdsSnapshot.add(segment);
-          }
         }
       }
       _trackedSegments.remove(oldSegment);
