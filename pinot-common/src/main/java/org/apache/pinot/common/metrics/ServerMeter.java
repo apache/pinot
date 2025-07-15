@@ -208,7 +208,6 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   // reingestion metrics
   SEGMENT_REINGESTION_FAILURE("segments", false),
-  UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
 
   /**
    * Approximate heap bytes used by the mutable JSON index at the time of index close.
