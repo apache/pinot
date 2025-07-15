@@ -16,35 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.creator;
+package org.apache.pinot.spi.accounting;
 
-import java.io.IOException;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.index.IndexCreator;
-
-
-public interface FSTIndexCreator extends IndexCreator {
-
-  @Override
-  default void add(Object value, int dictId)
-      throws IOException {
-    // FST indexes should do nothing when called for each row
-  }
-
-  @Override
-  default void add(Object[] values, @Nullable int[] dictIds)
-      throws IOException {
-    // FST indexes should do nothing when called for each row
-  }
-
+public interface MseCancelCallback {
   /**
-   * Adds the next document.
+   * Cancels the query with the given queryId.
+   * The call is asynchronous.
    */
-  void add(String document)
-      throws IOException;
-
-  /**
-   * Adds a set of documents to the index
-   */
-  void add(String[] document, int length);
+  void cancelQuery(long queryId);
 }
