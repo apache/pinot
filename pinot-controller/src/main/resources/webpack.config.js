@@ -27,9 +27,6 @@ module.exports = (env, argv) => {
 
   return {
     mode: !devMode ? 'production' : 'development',
-    // node: {
-    //   fs: 'empty'
-    // }, // Removed for Webpack 5
     devtool: 'source-map',
     resolve: {
       // Add '.ts' and '.tsx' as resolvable extensions.
