@@ -46,6 +46,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
@@ -71,18 +72,17 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
 
   @Test
   public void testDataLossRiskAssessorPeerDownloadDisabled() {
-    String segmentName = "randomSegmentName";
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
-    TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-        new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 2, _helixManager,
-            _helixResourceManager.getRealtimeSegmentManager());
-    assertFalse(dataLossRiskAssessor.hasDataLossRisk("randomSegmentName"));
+    assertThrows(IllegalStateException.class, () -> new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME,
+        tableConfig, 2, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
 
-    dataLossRiskAssessor =
-        new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, _helixManager,
-            _helixResourceManager.getRealtimeSegmentManager());
-    assertFalse(dataLossRiskAssessor.hasDataLossRisk("randomSegmentName"));
+    assertThrows(IllegalStateException.class, () -> new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME,
+        tableConfig, 0, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
+
+    TableRebalancer.NoOpRiskAssessorImpl noOpRiskAssessor =
+        new TableRebalancer.NoOpRiskAssessorImpl();
+    assertFalse(noOpRiskAssessor.hasDataLossRisk("randomSegmentName"));
   }
 
   @Test
@@ -91,13 +91,11 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
-    TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-        new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 2, _helixManager,
-            _helixResourceManager.getRealtimeSegmentManager());
-    assertFalse(dataLossRiskAssessor.hasDataLossRisk("randomSegmentName"));
+    assertThrows(IllegalStateException.class, () -> new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME,
+        tableConfig, 2, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
 
     // This will also return false since SegmentZkMetadata will be null
-    dataLossRiskAssessor =
+    TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
         new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, _helixManager,
             _helixResourceManager.getRealtimeSegmentManager());
     assertFalse(dataLossRiskAssessor.hasDataLossRisk("randomSegmentName"));

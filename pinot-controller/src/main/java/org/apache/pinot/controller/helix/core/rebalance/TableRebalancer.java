@@ -43,7 +43,6 @@ import java.util.function.ToIntFunction;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.commons.lang3.tuple.Triple;
 import org.apache.helix.AccessOption;
@@ -391,7 +390,8 @@ public class TableRebalancer {
           tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
     }
 
-    if (downtime && !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())) {
+    String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
+    if (downtime && peerSegmentDownloadScheme != null) {
       if (!forceDowntime) {
         // Don't allow downtime rebalance if peer-download is enabled as it can result in data loss
         // The best way to rebalance peer-download enabled tables is to:
@@ -401,7 +401,8 @@ public class TableRebalancer {
         String errorMsg = "Peer-download enabled tables cannot undergo downtime rebalance due to the potential for "
             + "data loss, validate all segments exist in deep store and pause ingestion prior to setting "
             + "forceDowntime=true to override the downtime flag";
-        tableRebalanceLogger.error(errorMsg);
+        onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
+
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
@@ -437,7 +438,7 @@ public class TableRebalancer {
       // If peer-download is enabled, verify that for all segments with changes in assignment, it is safe to rebalance
       // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
       // for a table
-      if (!StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())) {
+      if (peerSegmentDownloadScheme != null) {
         // Setting minAvailableReplicas to 0 since that is what's equivalent to downtime=true
         DataLossRiskAssessor dataLossRiskAssessor = new DataLossRiskAssessorImpl(tableNameWithType, tableConfig,
             0, _helixManager, _pinotLLCRealtimeSegmentManager);
@@ -537,8 +538,8 @@ public class TableRebalancer {
 
     // Don't allow rebalance if peer-download is enabled but minAvailableReplicas = 0 (which is similar to downtime
     // rebalance where we can drop to 0 replicas during rebalance)
-    if (minAvailableReplicas == 0
-        && !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())) {
+    DataLossRiskAssessor dataLossRiskAssessor;
+    if (minAvailableReplicas == 0 && peerSegmentDownloadScheme != null) {
       if (!forceDowntime) {
         // Don't allow minAvailableReplicas=0 rebalance if peer-download is enabled, as it can result in data loss.
         // The best way to rebalance peer-download enabled tables is to:
@@ -548,12 +549,20 @@ public class TableRebalancer {
         String errorMsg = "Peer-download enabled tables with cannot set minAvailableReplicas=0 for rebalance due to "
             + "the potential for data loss, validate all segments exist in deep store and pause ingestion prior to "
             + "setting forceDowntime=true to override the downtime flag";
-        tableRebalanceLogger.error(errorMsg);
+        onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
         return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
       tableRebalanceLogger.warn("Continuing with minAvailableReplicas=0 rebalance for peer-download enabled table as "
           + "forceDowntime=true");
+      // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
+      // for a table
+      dataLossRiskAssessor = new DataLossRiskAssessorImpl(tableNameWithType, tableConfig, minAvailableReplicas,
+          _helixManager, _pinotLLCRealtimeSegmentManager);
+    } else {
+      // If peer-download is disabled or minAvailableReplicas > 0, there is no data loss risk so create a no-op
+      // assessor
+      dataLossRiskAssessor = new NoOpRiskAssessorImpl();
     }
 
     tableRebalanceLogger.info("Rebalancing with minAvailableReplicas: {}, enableStrictReplicaGroup: {}, "
@@ -570,11 +579,6 @@ public class TableRebalancer {
     PartitionIdFetcher partitionIdFetcher =
         new PartitionIdFetcherImpl(tableNameWithType, TableConfigUtils.getPartitionColumn(tableConfig), _helixManager,
             isStrictRealtimeSegmentAssignment);
-
-    // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
-    // for a table
-    DataLossRiskAssessor dataLossRiskAssessor = new DataLossRiskAssessorImpl(tableNameWithType, tableConfig,
-        minAvailableReplicas, _helixManager, _pinotLLCRealtimeSegmentManager);
 
     // We repeat the following steps until the target assignment is reached:
     // 1. Wait for ExternalView to converge with the IdealState. Fail the rebalance if it doesn't make progress within
@@ -1895,35 +1899,46 @@ public class TableRebalancer {
     boolean hasDataLossRisk(String segmentName);
   }
 
+  /**
+   * NoOpRiskAssessorImpl - to be used for non-peer download enabled tables or rebalance with minAvailableReplicas > 0
+   */
+  @VisibleForTesting
+  static class NoOpRiskAssessorImpl implements DataLossRiskAssessor {
+    NoOpRiskAssessorImpl() {
+    }
+
+    @Override
+    public boolean hasDataLossRisk(String segmentName) {
+      return false;
+    }
+  }
+
+  /**
+   * To be used for peer-download enabled tables with downtime=true or minAvailableReplicas=0
+   */
   @VisibleForTesting
   static class DataLossRiskAssessorImpl implements DataLossRiskAssessor {
     private final String _tableNameWithType;
     private final TableConfig _tableConfig;
-    private final int _minAvailableReplicas;
     private final HelixManager _helixManager;
     private final PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
-    private final boolean _isPeerDownloadEnabled;
     private final boolean _isPauselessEnabled;
 
     @VisibleForTesting
     DataLossRiskAssessorImpl(String tableNameWithType, TableConfig tableConfig, int minAvailableReplicas,
         HelixManager helixManager, PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
+      // Should only be created for peer-download enabled tables with minAvailableReplicas = 0
+      Preconditions.checkState(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null
+          && minAvailableReplicas == 0);
       _tableNameWithType = tableNameWithType;
       _tableConfig = tableConfig;
-      _minAvailableReplicas = minAvailableReplicas;
       _helixManager = helixManager;
       _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
-      _isPeerDownloadEnabled = !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
       _isPauselessEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     }
 
     @Override
     public boolean hasDataLossRisk(String segmentName) {
-      // If peer-download is disabled, or minAvailableReplicas > 0 no data loss risk exists
-      if (!_isPeerDownloadEnabled || _minAvailableReplicas > 0) {
-        return false;
-      }
-
       SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
           .getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _tableNameWithType, segmentName);
       if (segmentZKMetadata == null) {
