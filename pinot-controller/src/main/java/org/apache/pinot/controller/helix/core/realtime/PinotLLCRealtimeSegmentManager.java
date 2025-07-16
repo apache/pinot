@@ -2552,7 +2552,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private boolean allowRepairOfErrorSegments(boolean repairErrorSegmentsForPartialUpsertOrDedup,
+  public boolean allowRepairOfErrorSegments(boolean repairErrorSegmentsForPartialUpsertOrDedup,
       TableConfig tableConfig) {
     if (repairErrorSegmentsForPartialUpsertOrDedup) {
       // If API context has repairErrorSegmentsForPartialUpsertOrDedup=true, allow repair.
