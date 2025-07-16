@@ -206,12 +206,16 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
     int numKeyColumns = _queryContext.getGroupByExpressions().size();
     try {
+      // TODO: fix problem that likely merge tasks blocked on .get() with the workerThread?
+      //    consider submitting task after most partition processing are done?
+      //    maybe moving this logic into processSegments will work, the closure process segments until there's none left,
+      //    and then picks a partition number to merge
       // submit tasks that combines the partition
       for (int partitionId = 0; partitionId < _queryContext.getGroupByNumPartitions(); partitionId++) {
         int finalPartitionId = partitionId;
         futures.add(_executorService.submit(() -> {
           try {
-            HashMap<Key, Record> map = new HashMap<>();
+            HashMap<Key, Record> map = new HashMap<>(1024);
             Map<Integer, CompletableFuture<RadixPartitionedHashMap<Key, Record>>> pendingFutures = new HashMap<>();
             for (int segmentId = 0; segmentId < _numOperators; segmentId++) {
               pendingFutures.put(segmentId, _partitionedHashMapFutures[segmentId]);
@@ -221,6 +225,19 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             while (!pendingFutures.isEmpty()) {
               CompletableFuture fut =
                   CompletableFuture.anyOf(pendingFutures.values().toArray(CompletableFuture[]::new));
+              // TODO: .get() on this newFut somewhere
+              CompletableFuture<Void> newFut = fut.thenApplyAsync(f -> {
+                RadixPartitionedHashMap<Key, Record> partition = (RadixPartitionedHashMap<Key, Record>) f;
+                for (Map.Entry<Key, Record> entry : partition.getPartition(finalPartitionId).entrySet()) {
+                  GroupByUtils.addOrUpdateRecord(map, entry.getKey(), entry.getValue(), aggregationFunctions,
+                      numKeyColumns);
+                }
+                int processedSegmentId = partition.getSegmentId();
+                pendingFutures.remove(processedSegmentId);
+
+                return null;
+              }, _executorService);
+
               RadixPartitionedHashMap<Key, Record> partition = (RadixPartitionedHashMap<Key, Record>) fut.get();
               for (Map.Entry<Key, Record> entry : partition.getPartition(finalPartitionId).entrySet()) {
                 GroupByUtils.addOrUpdateRecord(map, entry.getKey(), entry.getValue(), aggregationFunctions,
