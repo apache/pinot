@@ -97,14 +97,14 @@ public class RegexpLikeVarFunctionsTest {
       regexpLikeVar("test", "test", "ix");
       assertFalse(true, "Should throw exception for invalid match parameter");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Unsupported match parameter"));
+      assertTrue(e.getMessage().contains("Match parameter must be exactly one character"));
     }
 
     try {
       regexpLikeVar("test", "test", "ci");
       assertFalse(true, "Should throw exception for invalid match parameter");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Invalid match parameter"));
+      assertTrue(e.getMessage().contains("Match parameter must be exactly one character"));
     }
   }
 
@@ -118,5 +118,18 @@ public class RegexpLikeVarFunctionsTest {
     // Test with different patterns to ensure each call compiles fresh
     assertTrue(regexpLikeVar("Test String", "test", "i"));
     assertTrue(regexpLikeVar("TEST STRING", "test", "i"));
+  }
+
+  @Test
+  public void testRegexpLikeWithUppercaseMatchParameters() {
+    // Test uppercase 'I' for case-insensitive
+    assertTrue(regexpLikeVar("Hello", "hello", "I"));
+    assertTrue(regexpLikeVar("HELLO", "hello", "I"));
+    assertTrue(regexpLikeVar("hello", "HELLO", "I"));
+
+    // Test uppercase 'C' for case-sensitive
+    assertFalse(regexpLikeVar("Hello", "hello", "C"));
+    assertTrue(regexpLikeVar("hello", "hello", "C"));
+    assertTrue(regexpLikeVar("HELLO", "HELLO", "C"));
   }
 }

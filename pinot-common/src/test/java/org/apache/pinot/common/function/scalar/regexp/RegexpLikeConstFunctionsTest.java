@@ -111,14 +111,14 @@ public class RegexpLikeConstFunctionsTest {
       f.regexpLike("test", "test", "ix");
       assertFalse(true, "Should throw exception for invalid match parameter");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Unsupported match parameter"));
+      assertTrue(e.getMessage().contains("Match parameter must be exactly one character"));
     }
 
     try {
       f.regexpLike("test", "test", "ci");
       assertFalse(true, "Should throw exception for invalid match parameter");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Invalid match parameter"));
+      assertTrue(e.getMessage().contains("Match parameter must be exactly one character"));
     }
   }
 
@@ -133,5 +133,28 @@ public class RegexpLikeConstFunctionsTest {
 
     RegexpLikeConstFunctions f3 = new RegexpLikeConstFunctions();
     assertTrue(f3.regexpLike("hElLo WoRlD", "hello", "i"));
+  }
+
+  @Test
+  public void testRegexpLikeWithUppercaseMatchParameters() {
+    // Test uppercase 'I' for case-insensitive
+    RegexpLikeConstFunctions f1 = new RegexpLikeConstFunctions();
+    assertTrue(f1.regexpLike("Hello", "hello", "I"));
+
+    RegexpLikeConstFunctions f2 = new RegexpLikeConstFunctions();
+    assertTrue(f2.regexpLike("HELLO", "hello", "I"));
+
+    RegexpLikeConstFunctions f3 = new RegexpLikeConstFunctions();
+    assertTrue(f3.regexpLike("hello", "HELLO", "I"));
+
+    // Test uppercase 'C' for case-sensitive
+    RegexpLikeConstFunctions f4 = new RegexpLikeConstFunctions();
+    assertFalse(f4.regexpLike("Hello", "hello", "C"));
+
+    RegexpLikeConstFunctions f5 = new RegexpLikeConstFunctions();
+    assertTrue(f5.regexpLike("hello", "hello", "C"));
+
+    RegexpLikeConstFunctions f6 = new RegexpLikeConstFunctions();
+    assertTrue(f6.regexpLike("HELLO", "HELLO", "C"));
   }
 }
