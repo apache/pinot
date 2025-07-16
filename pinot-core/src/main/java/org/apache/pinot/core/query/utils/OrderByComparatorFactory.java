@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
@@ -66,9 +66,8 @@ public class OrderByComparatorFactory {
   /**
    * get orderBy expressions on the groupBy keys when orderBy keys match groupBy keys
    */
-  public static Comparator<Key> getGroupKeyComparator(List<OrderByExpressionContext> orderByExpressions,
-      List<ExpressionContext> groupByExpressions,
-      boolean nullHandlingEnabled) {
+  public static Comparator<Record> getRecordKeyComparator(List<OrderByExpressionContext> orderByExpressions,
+      List<ExpressionContext> groupByExpressions, boolean nullHandlingEnabled) {
     List<OrderByExpressionWithIndex> groupKeyOrderByExpressions =
         getGroupKeyOrderByExpressionFromRowOrderByExpressions(orderByExpressions, groupByExpressions);
     Comparator<Object[]> valueComparator = getComparatorWithIndex(groupKeyOrderByExpressions, nullHandlingEnabled);
@@ -84,6 +83,9 @@ public class OrderByComparatorFactory {
     return groupByExpressionIndexMap;
   }
 
+  /**
+   * orderby expression with an index with respect to its position in the group keys
+   */
   public static class OrderByExpressionWithIndex {
     OrderByExpressionContext _orderByExpressionContext;
     Integer _index;

@@ -41,7 +41,6 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
-import org.apache.pinot.core.query.utils.OrderByComparatorFactory;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -547,16 +546,6 @@ public class QueryContext {
 
   public boolean shouldSortAggregate() {
     return !isUnsafeTrim() && _limit < Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
-  }
-
-  public Comparator<Key> getGroupKeyComparator() {
-    if (_groupKeyComparator != null) {
-      return _groupKeyComparator;
-    }
-    _groupKeyComparator =
-        OrderByComparatorFactory.getGroupKeyComparator(getOrderByExpressions(), getGroupByExpressions(),
-            isNullHandlingEnabled());
-    return _groupKeyComparator;
   }
 
   public static class Builder {

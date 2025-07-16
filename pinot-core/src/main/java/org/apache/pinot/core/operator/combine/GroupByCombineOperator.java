@@ -31,8 +31,8 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
-import org.apache.pinot.core.data.table.LinkedHashMapIndexedTable;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.SortedRecordTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -74,9 +74,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
 
-  private AtomicReference<LinkedHashMapIndexedTable> _waitingTable;
-  private AtomicReference<LinkedHashMapIndexedTable> _satisfiedTable;
-  private Comparator<Key> _comparator;
+  private AtomicReference<SortedRecordTable> _waitingTable;
+  private AtomicReference<SortedRecordTable> _satisfiedTable;
+  private Comparator<Record> _recordKeyComparator;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -91,7 +91,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     if (_queryContext.shouldSortAggregate()) {
       _waitingTable = new AtomicReference<>();
       _satisfiedTable = new AtomicReference<>();
-      _comparator = OrderByComparatorFactory.getGroupKeyComparator(queryContext.getOrderByExpressions(),
+      _recordKeyComparator = OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
           queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
     }
   }
@@ -136,21 +136,21 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         // short-circuit one segment case
         if (_numOperators == 1) {
           _satisfiedTable.set(
-            GroupByUtils.getAndPopulateLinkedHashMapIndexedTable(resultsBlock, false, _queryContext,
-                _queryContext.getLimit(), _queryContext.getLimit(), Integer.MAX_VALUE, _executorService, _numOperators)
+              GroupByUtils.getAndPopulateSortedRecordTable(resultsBlock, _queryContext,
+                  _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator)
           );
           break;
         }
         // save one call to getAndPopulateLinkedHashMapIndexedTable
         //  by merging the current block in if there is a waitingTable
-        LinkedHashMapIndexedTable waitingTable = _waitingTable.getAndUpdate(v -> v == null
-            ? GroupByUtils.getAndPopulateLinkedHashMapIndexedTable(resultsBlock, false, _queryContext,
-            _queryContext.getLimit(), _queryContext.getLimit(), Integer.MAX_VALUE, _executorService, _numOperators)
+        SortedRecordTable waitingTable = _waitingTable.getAndUpdate(v -> v == null
+            ? GroupByUtils.getAndPopulateSortedRecordTable(resultsBlock, _queryContext,
+            _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator)
             : null);
         if (waitingTable == null) {
           continue;
         }
-        LinkedHashMapIndexedTable table = mergeBlocks(waitingTable, resultsBlock, _comparator, _queryContext);
+        SortedRecordTable table = mergeBlocks(waitingTable, resultsBlock);
         Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
 
         while (true) {
@@ -161,13 +161,13 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             _satisfiedTable.compareAndSet(null, table);
             return;
           }
-          LinkedHashMapIndexedTable finalTable = table;
+          SortedRecordTable finalTable = table;
           waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
           if (waitingTable == null) {
             break;
           }
           // if found waiting block, merge and loop
-          table = mergeBlocks(table, waitingTable, _comparator, _queryContext);
+          table = mergeBlocks(table, waitingTable);
           Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
         }
       } catch (RuntimeException e) {
@@ -313,8 +313,20 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
 
     if (_queryContext.shouldSortAggregate()) {
-      _indexedTable = _satisfiedTable.get();
-      assert (_indexedTable != null);
+      SortedRecordTable table = _satisfiedTable.get();
+      assert (table != null);
+      if (_queryContext.isServerReturnFinalResult()) {
+        table.finish(true, true);
+      } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
+        table.finish(false, true);
+      } else {
+        table.finish(false);
+      }
+      GroupByResultsBlock mergedBlock = new GroupByResultsBlock(table, _queryContext);
+      mergedBlock.setGroupsTrimmed(_groupsTrimmed);
+      mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+      mergedBlock.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
+      return mergedBlock;
     }
 
     if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {
@@ -339,13 +351,11 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     return mergedBlock;
   }
 
-  private LinkedHashMapIndexedTable mergeBlocks(LinkedHashMapIndexedTable block1, LinkedHashMapIndexedTable block2,
-      Comparator<Key> comparator, QueryContext queryContext) {
-    return block1.merge(block2, comparator, queryContext, _executorService);
+  private SortedRecordTable mergeBlocks(SortedRecordTable block1, SortedRecordTable block2) {
+    return block1.mergeSortedRecordTable(block2);
   }
 
-  private LinkedHashMapIndexedTable mergeBlocks(LinkedHashMapIndexedTable block1, GroupByResultsBlock block2,
-      Comparator<Key> comparator, QueryContext queryContext) {
-    return block1.merge(block2, comparator, queryContext, _executorService);
+  private SortedRecordTable mergeBlocks(SortedRecordTable block1, GroupByResultsBlock block2) {
+    return block1.mergeSortedGroupByResultBlock(block2);
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Comparator;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -27,8 +28,9 @@ import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
-import org.apache.pinot.core.data.table.LinkedHashMapIndexedTable;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.data.table.SortedRecordTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
@@ -216,18 +218,16 @@ public final class GroupByUtils {
     }
   }
 
-  public static LinkedHashMapIndexedTable getAndPopulateLinkedHashMapIndexedTable(GroupByResultsBlock block,
-      boolean hasFinalInput,
-      QueryContext queryContext, int resultSize, int trimSize, int trimThreshold, ExecutorService executorService,
-      int desiredNumMergedBlocks) {
-    LinkedHashMapIndexedTable indexedTable =
-        new LinkedHashMapIndexedTable(block.getDataSchema(), hasFinalInput, queryContext, resultSize, trimSize,
-            trimThreshold, executorService, 1, desiredNumMergedBlocks);
+  public static SortedRecordTable getAndPopulateSortedRecordTable(GroupByResultsBlock block,
+      QueryContext queryContext, int resultSize,
+      ExecutorService executorService, int desiredNumMergedBlocks, Comparator<Record> recordKeyComaparator) {
+    SortedRecordTable table = new SortedRecordTable(block.getDataSchema(), queryContext, resultSize, executorService,
+        1, desiredNumMergedBlocks, recordKeyComaparator);
     int mergedKeys = 0;
     for (IntermediateRecord intermediateRecord : block.getIntermediateRecords()) {
-      indexedTable.upsert(intermediateRecord._key, intermediateRecord._record);
+      table.upsert(intermediateRecord._record);
       Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
     }
-    return indexedTable;
+    return table;
   }
 }
