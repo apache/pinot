@@ -32,7 +32,7 @@ import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 
-public class PerQueryCPUMemAccountantFactoryTest {
+public class QueryMonitorConfigTest {
   private static final double EXPECTED_MIN_MEMORY_FOOTPRINT_FOR_KILL = 0.05;
   private static final double EXPECTED_PANIC_LEVEL = 0.9f;
   private static final double EXPECTED_CRITICAL_LEVEL = 0.95f;

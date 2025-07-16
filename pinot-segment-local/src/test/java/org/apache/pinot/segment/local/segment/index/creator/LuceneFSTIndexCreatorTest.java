@@ -25,15 +25,18 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
 import org.apache.pinot.segment.local.segment.creator.impl.inv.text.LuceneFSTIndexCreator;
 import org.apache.pinot.segment.local.segment.index.readers.LuceneFSTIndexReader;
+import org.apache.pinot.segment.local.utils.fst.FSTBuilder;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
+import org.mockito.Mockito;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 
 
 public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRule {
@@ -59,9 +62,8 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
     uniqueValues[1] = "hello-world123";
     uniqueValues[2] = "still";
 
-    FieldSpec fieldSpec = new DimensionFieldSpec("testFSTColumn", FieldSpec.DataType.STRING, true);
-    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(
-        INDEX_DIR, "testFSTColumn", uniqueValues);
+    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE",
+        false, uniqueValues);
     creator.seal();
     File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     try (PinotDataBuffer pinotDataBuffer =
@@ -69,12 +71,64 @@ public class LuceneFSTIndexCreatorTest implements PinotBuffersAfterMethodCheckRu
         LuceneFSTIndexReader reader = new LuceneFSTIndexReader(pinotDataBuffer)) {
 
       int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
-      Assert.assertEquals(2, matchedDictIds.length);
-      Assert.assertEquals(0, matchedDictIds[0]);
-      Assert.assertEquals(1, matchedDictIds[1]);
+      Assert.assertEquals(matchedDictIds.length, 2);
+      Assert.assertEquals(matchedDictIds[0], 0);
+      Assert.assertEquals(matchedDictIds[1], 1);
 
       matchedDictIds = reader.getDictIds(".*llo").toArray();
-      Assert.assertEquals(0, matchedDictIds.length);
+      Assert.assertEquals(matchedDictIds.length, 0);
+
+      matchedDictIds = reader.getDictIds("st.*").toArray();
+      Assert.assertEquals(matchedDictIds.length, 1);
+      Assert.assertEquals(matchedDictIds[0], 2);
     }
+  }
+
+  @Test
+  public void testIndexWriterReaderWithAddExceptionsContinueOnErrorTrue()
+      throws IOException {
+    String[] uniqueValues = new String[3];
+    uniqueValues[0] = "hello-world";
+    uniqueValues[1] = "hello-world123";
+    uniqueValues[2] = "still";
+
+    FSTBuilder fstBuilder = Mockito.spy(new FSTBuilder());
+    // For the word "still" throw an exception so it is not indexed
+    doThrow(IOException.class).when(fstBuilder).addEntry(eq("still"), anyInt());
+    LuceneFSTIndexCreator creator = new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn", "myTable_OFFLINE",
+        true, uniqueValues, fstBuilder);
+    creator.seal();
+    File fstFile = new File(INDEX_DIR, "testFSTColumn" + LUCENE_V912_FST_INDEX_FILE_EXTENSION);
+    try (PinotDataBuffer pinotDataBuffer =
+        PinotDataBuffer.mapFile(fstFile, true, 0, fstFile.length(), ByteOrder.BIG_ENDIAN, "fstIndexFile");
+        LuceneFSTIndexReader reader = new LuceneFSTIndexReader(pinotDataBuffer)) {
+
+      int[] matchedDictIds = reader.getDictIds("hello.*").toArray();
+      Assert.assertEquals(matchedDictIds.length, 2);
+      Assert.assertEquals(matchedDictIds[0], 0);
+      Assert.assertEquals(matchedDictIds[1], 1);
+
+      matchedDictIds = reader.getDictIds(".*llo").toArray();
+      Assert.assertEquals(matchedDictIds.length, 0);
+
+      // Validate that nothing matches st.*
+      matchedDictIds = reader.getDictIds("st.*").toArray();
+      Assert.assertEquals(matchedDictIds.length, 0);
+    }
+  }
+
+  @Test
+  public void testIndexWriterReaderWithAddExceptionsContinueOnErrorFalse()
+      throws IOException {
+    String[] uniqueValues = new String[3];
+    uniqueValues[0] = "hello-world";
+    uniqueValues[1] = "hello-world123";
+    uniqueValues[2] = "still";
+
+    FSTBuilder fstBuilder = Mockito.spy(new FSTBuilder());
+    // For the word "still" throw an exception so it is not indexed
+    doThrow(IOException.class).when(fstBuilder).addEntry(eq("still"), anyInt());
+    Assert.assertThrows(IOException.class, () -> new LuceneFSTIndexCreator(INDEX_DIR, "testFSTColumn",
+        "myTable_OFFLINE", false, uniqueValues, fstBuilder));
   }
 }

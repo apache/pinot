@@ -31,6 +31,7 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.TrackingScope;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -58,6 +59,11 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
 
       @Override
       public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+      }
+
+      @Override
+      public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+          String workloadName) {
       }
 
       @Override
@@ -94,6 +100,11 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
 
       @Override
       public void updateQueryUsageConcurrently(String queryId) {
+      }
+
+      @Override
+      public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes,
+          TrackingScope trackingScope) {
       }
 
       @Override

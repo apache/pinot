@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.AsofJoin;
 import org.apache.calcite.rel.core.Filter;
+import org.apache.calcite.rel.core.Intersect;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Minus;
 import org.apache.calcite.rel.core.Project;
@@ -41,7 +42,9 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAsOfJoin;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalFilter;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalIntersect;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalJoin;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalMinus;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalProject;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalTableScan;
@@ -119,8 +122,12 @@ public class RelToPRelConverter {
           nodeIdGenerator.get(), null);
     } else if (relNode instanceof Minus) {
       Minus minus = (Minus) relNode;
-      return new PhysicalUnion(minus.getCluster(), minus.getTraitSet(), minus.getHints(), minus.all, inputs,
+      return new PhysicalMinus(minus.getCluster(), minus.getTraitSet(), minus.getHints(), inputs, minus.all,
           nodeIdGenerator.get(), null);
+    } else if (relNode instanceof Intersect) {
+      Intersect intersect = (Intersect) relNode;
+      return new PhysicalIntersect(intersect.getCluster(), intersect.getTraitSet(), intersect.getHints(), inputs,
+          intersect.all, nodeIdGenerator.get(), null);
     } else if (relNode instanceof Sort) {
       Preconditions.checkState(inputs.size() == 1, "Expected exactly 1 input of sort. Found: %s", inputs);
       Sort sort = (Sort) relNode;

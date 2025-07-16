@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.request.context;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -140,6 +139,7 @@ public class QueryContext {
   // Whether server returns the final result with unpartitioned group key
   private boolean _serverReturnFinalResultKeyUnpartitioned;
   private boolean _accurateGroupByWithoutOrderBy;
+  private boolean _isUnsafeTrim;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -175,36 +175,10 @@ public class QueryContext {
       return false;
     }
 
-    BitSet orderByKeysMatched = new BitSet(orderByKeys.size());
-
-    OUTER_GROUP:
-    for (ExpressionContext groupExp : groupByKeys) {
-      for (int i = 0; i < orderByKeys.size(); i++) {
-        OrderByExpressionContext orderExp = orderByKeys.get(i);
-        if (groupExp.equals(orderExp.getExpression())) {
-          orderByKeysMatched.set(i);
-          continue OUTER_GROUP;
-        }
-      }
-
-      return false;
-    }
-
-    OUTER_ORDER:
-    for (int i = 0, n = orderByKeys.size(); i < n; i++) {
-      if (orderByKeysMatched.get(i)) {
-        continue;
-      }
-
-      for (ExpressionContext groupExp : groupByKeys) {
-        if (groupExp.equals(orderByKeys.get(i).getExpression())) {
-          continue OUTER_ORDER;
-        }
-      }
-      return false;
-    }
-
-    return true;
+    Set<ExpressionContext> groupByKeyIdentSet = new HashSet<>(groupByKeys);
+    Set<ExpressionContext> orderByKeyIdentSet = new HashSet<>();
+    orderByKeys.forEach(key -> orderByKeyIdentSet.add(key.getExpression()));
+    return groupByKeyIdentSet.equals(orderByKeyIdentSet);
   }
 
   /**
@@ -564,7 +538,7 @@ public class QueryContext {
   }
 
   public boolean isUnsafeTrim() {
-    return !isSameOrderAndGroupByColumns(this) || getHavingFilter() != null;
+    return _isUnsafeTrim;
   }
 
   public static class Builder {
@@ -680,6 +654,9 @@ public class QueryContext {
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);
       extractColumns(queryContext);
+
+      queryContext._isUnsafeTrim =
+          !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
 
       return queryContext;
     }

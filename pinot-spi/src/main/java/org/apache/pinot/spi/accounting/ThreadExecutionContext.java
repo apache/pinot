@@ -47,4 +47,6 @@ public interface ThreadExecutionContext {
    Thread getAnchorThread();
 
    TaskType getTaskType();
+
+   String getWorkloadName();
 }

@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.recordtransformer;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,6 +36,7 @@ import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.utils.Base64Utils;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.SchemaConformingTransformerConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -100,55 +102,58 @@ import org.slf4j.LoggerFactory;
 public class SchemaConformingTransformer implements RecordTransformer {
   private static final Logger _logger = LoggerFactory.getLogger(SchemaConformingTransformer.class);
   private static final int MAXIMUM_LUCENE_DOCUMENT_SIZE = 32766;
-  private static final List<String> MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE = Arrays.asList("_logtype", "_dictionaryVars",
-      "_encodedVars");
+  private static final List<String> MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE =
+      List.of("_logtype", "_dictionaryVars", "_encodedVars");
 
-  private final boolean _continueOnError;
+  private final String _tableName;
+  private final SchemaConformingTransformerConfig _transformerConfig;
   private final DataType _indexableExtrasFieldType;
   private final DataType _unindexableExtrasFieldType;
   private final DimensionFieldSpec _mergedTextIndexFieldSpec;
-  private final SchemaConformingTransformerConfig _transformerConfig;
-  @Nullable
-  ServerMetrics _serverMetrics = null;
-  private SchemaTreeNode _schemaTree;
-  @Nullable
-  private PinotMeter _realtimeMergedTextIndexTruncatedDocumentSizeMeter = null;
-  private String _tableName;
-  private int _jsonKeyValueSeparatorByteCount;
-  private long _mergedTextIndexDocumentBytesCount = 0L;
-  private long _mergedTextIndexDocumentCount = 0L;
-  private GenericRow _reusedOutputRecord = new GenericRow();
-  private Map<String, Object> _reusedMergedTextIndexMap = new HashMap<>();
-  private Map<String, Object> _reusedIndexableExtras = new HashMap<>();
-  private Map<String, Object> _reusedUnindexableExtras = new HashMap<>();
+  private final SchemaTreeNode _schemaTree;
+  private final int _jsonKeyValueSeparatorByteCount;
+  private final boolean _continueOnError;
+  private final ServerMetrics _serverMetrics;
 
-  public SchemaConformingTransformer(TableConfig tableConfig, Schema schema) {
-    if (null == tableConfig.getIngestionConfig() || null == tableConfig.getIngestionConfig()
-        .getSchemaConformingTransformerConfig()) {
-      _continueOnError = false;
-      _transformerConfig = null;
-      _indexableExtrasFieldType = null;
-      _unindexableExtrasFieldType = null;
-      _mergedTextIndexFieldSpec = null;
-      return;
-    }
+  private final GenericRow _reusedOutputRecord = new GenericRow();
+  private final Map<String, Object> _reusedMergedTextIndexMap = new HashMap<>();
+  private final Map<String, Object> _reusedIndexableExtras = new HashMap<>();
+  private final Map<String, Object> _reusedUnindexableExtras = new HashMap<>();
 
-    _continueOnError = tableConfig.getIngestionConfig().isContinueOnError();
-    _transformerConfig = tableConfig.getIngestionConfig().getSchemaConformingTransformerConfig();
+  @Nullable
+  private PinotMeter _realtimeMergedTextIndexTruncatedDocumentSizeMeter;
+  private long _mergedTextIndexDocumentBytesCount;
+  private long _mergedTextIndexDocumentCount;
+
+  private SchemaConformingTransformer(TableConfig tableConfig, Schema schema) {
+    _tableName = tableConfig.getTableName();
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    assert ingestionConfig != null;
+    _transformerConfig = ingestionConfig.getSchemaConformingTransformerConfig();
+    assert _transformerConfig != null;
     String indexableExtrasFieldName = _transformerConfig.getIndexableExtrasField();
     _indexableExtrasFieldType =
-        indexableExtrasFieldName == null ? null : getAndValidateExtrasFieldType(schema,
-            indexableExtrasFieldName);
+        indexableExtrasFieldName != null ? getAndValidateExtrasFieldType(schema, indexableExtrasFieldName) : null;
     String unindexableExtrasFieldName = _transformerConfig.getUnindexableExtrasField();
     _unindexableExtrasFieldType =
-        unindexableExtrasFieldName == null ? null : getAndValidateExtrasFieldType(schema,
-            unindexableExtrasFieldName);
+        unindexableExtrasFieldName != null ? getAndValidateExtrasFieldType(schema, unindexableExtrasFieldName) : null;
     _mergedTextIndexFieldSpec = schema.getDimensionSpec(_transformerConfig.getMergedTextIndexField());
-    _tableName = tableConfig.getTableName();
     _schemaTree = validateSchemaAndCreateTree(schema, _transformerConfig);
+    _jsonKeyValueSeparatorByteCount =
+        _transformerConfig.getJsonKeyValueSeparator().getBytes(StandardCharsets.UTF_8).length;
+    _continueOnError = ingestionConfig.isContinueOnError();
     _serverMetrics = ServerMetrics.get();
-    _jsonKeyValueSeparatorByteCount = _transformerConfig.getJsonKeyValueSeparator()
-        .getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+  }
+
+  /// Returns a [ComplexTypeTransformer] if it is defined in the table config, `null` otherwise.
+  @Nullable
+  public static SchemaConformingTransformer create(TableConfig tableConfig, Schema schema) {
+    IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+    if (ingestionConfig != null && ingestionConfig.getSchemaConformingTransformerConfig() != null) {
+      return new SchemaConformingTransformer(tableConfig, schema);
+    } else {
+      return null;
+    }
   }
 
   /**
@@ -174,8 +179,7 @@ public class SchemaConformingTransformer implements RecordTransformer {
     }
     Set<String> preserveFieldNames = transformerConfig.getFieldPathsToPreserveInput();
     for (String preserveFieldName : preserveFieldNames) {
-      Preconditions.checkState(
-          columnNameToJsonKeyPathMap.containsValue(preserveFieldName)
+      Preconditions.checkState(columnNameToJsonKeyPathMap.containsValue(preserveFieldName)
               || schema.getFieldSpecFor(preserveFieldName) != null,
           "Preserved path '%s' doesn't exist in columnNameToJsonKeyPathMap or schema", preserveFieldName);
     }
@@ -310,53 +314,72 @@ public class SchemaConformingTransformer implements RecordTransformer {
   }
 
   @Override
-  public boolean isNoOp() {
-    return null == _transformerConfig;
+  public List<GenericRow> transform(List<GenericRow> records) {
+    int numRecords = records.size();
+    if (numRecords == 0) {
+      return records;
+    }
+    // Reuse fields for single record transformation
+    if (numRecords == 1) {
+      _reusedOutputRecord.clear();
+      _reusedMergedTextIndexMap.clear();
+      _reusedIndexableExtras.clear();
+      _reusedUnindexableExtras.clear();
+      processRecord(records.get(0), _reusedOutputRecord, _reusedMergedTextIndexMap, _reusedIndexableExtras,
+          _reusedUnindexableExtras);
+      return List.of(_reusedOutputRecord);
+    }
+    List<GenericRow> outputRecords = new ArrayList<>(numRecords);
+    for (int i = 0; i < numRecords; i++) {
+      GenericRow outputRecord = new GenericRow();
+      Map<String, Object> mergedTextIndexMap = new HashMap<>();
+      Map<String, Object> indexableExtras = new HashMap<>();
+      Map<String, Object> unindexableExtras = new HashMap<>();
+      processRecord(records.get(i), outputRecord, mergedTextIndexMap, indexableExtras, unindexableExtras);
+      outputRecords.add(outputRecord);
+    }
+    return outputRecords;
   }
 
-  @Nullable
-  @Override
-  public GenericRow transform(GenericRow record) {
-    _reusedOutputRecord.clear();
-    _reusedMergedTextIndexMap.clear();
-    _reusedIndexableExtras.clear();
-    _reusedUnindexableExtras.clear();
-
+  private void processRecord(GenericRow record, GenericRow outputRecord, Map<String, Object> mergedTextIndexMap,
+      Map<String, Object> indexableExtras, Map<String, Object> unindexableExtras) {
     try {
+      if (record.isIncomplete()) {
+        outputRecord.markIncomplete();
+      }
+
       List<String> jsonPath = new ArrayList<>();
       for (Map.Entry<String, Object> recordEntry : record.getFieldToValueMap().entrySet()) {
         String recordKey = recordEntry.getKey();
         Object recordValue = recordEntry.getValue();
         jsonPath.add(recordKey);
-        processField(_schemaTree, jsonPath, recordValue, true, _reusedOutputRecord,
-            _reusedMergedTextIndexMap, _reusedIndexableExtras, _reusedUnindexableExtras);
+        processField(_schemaTree, jsonPath, recordValue, true, outputRecord, mergedTextIndexMap, indexableExtras,
+            unindexableExtras);
         jsonPath.remove(jsonPath.size() - 1);
       }
 
-      putExtrasField(_transformerConfig.getIndexableExtrasField(), _indexableExtrasFieldType,
-          _reusedIndexableExtras, _reusedOutputRecord);
-      putExtrasField(_transformerConfig.getUnindexableExtrasField(), _unindexableExtrasFieldType,
-          _reusedUnindexableExtras, _reusedOutputRecord);
+      putExtrasField(_transformerConfig.getIndexableExtrasField(), _indexableExtrasFieldType, indexableExtras,
+          outputRecord);
+      putExtrasField(_transformerConfig.getUnindexableExtrasField(), _unindexableExtrasFieldType, unindexableExtras,
+          outputRecord);
 
       // Generate merged text index. This optional step puts all field + value pairs in the input record in a special
       // column "_mergedTextIndex" to perform full text indexing and search.
-      if (null != _mergedTextIndexFieldSpec && !_reusedMergedTextIndexMap.isEmpty()) {
-        List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(_reusedMergedTextIndexMap);
+      if (_mergedTextIndexFieldSpec != null && !mergedTextIndexMap.isEmpty()) {
+        List<String> luceneDocuments = getLuceneDocumentsFromMergedTextIndexMap(mergedTextIndexMap);
         if (_mergedTextIndexFieldSpec.isSingleValueField()) {
-          _reusedOutputRecord.putValue(_mergedTextIndexFieldSpec.getName(), String.join(" ", luceneDocuments));
+          outputRecord.putValue(_mergedTextIndexFieldSpec.getName(), String.join(" ", luceneDocuments));
         } else {
-          _reusedOutputRecord.putValue(_mergedTextIndexFieldSpec.getName(), luceneDocuments);
+          outputRecord.putValue(_mergedTextIndexFieldSpec.getName(), luceneDocuments);
         }
       }
     } catch (Exception e) {
       if (!_continueOnError) {
         throw e;
       }
-      _logger.error("Couldn't transform record: {}", record.toString(), e);
-      _reusedOutputRecord.putValue(GenericRow.INCOMPLETE_RECORD_KEY, true);
+      _logger.debug("Couldn't transform record: {}", record.toString(), e);
+      outputRecord.markIncomplete();
     }
-
-    return _reusedOutputRecord;
   }
 
   /**
@@ -406,16 +429,16 @@ public class SchemaConformingTransformer implements RecordTransformer {
    * @return ExtraFieldsContainer carries the indexable and unindexable fields of the current node as well as its
    * subtree
    */
-  private void processField(SchemaTreeNode parentNode, List<String> jsonPath, Object value,
-      boolean isIndexable, GenericRow outputRecord, Map<String, Object> mergedTextIndexMap,
-      Map<String, Object> indexableExtras, Map<String, Object> unindexableExtras) {
+  private void processField(SchemaTreeNode parentNode, List<String> jsonPath, Object value, boolean isIndexable,
+      GenericRow outputRecord, Map<String, Object> mergedTextIndexMap, Map<String, Object> indexableExtras,
+      Map<String, Object> unindexableExtras) {
     // Common variables
     boolean storeIndexableExtras = _transformerConfig.getIndexableExtrasField() != null;
     boolean storeUnindexableExtras = _transformerConfig.getUnindexableExtrasField() != null;
     String key = jsonPath.get(jsonPath.size() - 1);
 
     // Base case
-    if (StreamDataDecoderImpl.isSpecialKeyType(key) || GenericRow.isSpecialKeyType(key)) {
+    if (StreamDataDecoderImpl.isSpecialKeyType(key)) {
       outputRecord.putValue(key, value);
       return;
     }
@@ -544,8 +567,8 @@ public class SchemaConformingTransformer implements RecordTransformer {
     // of ":" or the specified Json key value separator character
     int valueTruncationLength = mergedTextIndexDocumentMaxLength - _jsonKeyValueSeparatorByteCount - key.length();
     if (val.length() > valueTruncationLength) {
-      _realtimeMergedTextIndexTruncatedDocumentSizeMeter = _serverMetrics
-          .addMeteredTableValue(_tableName, ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE,
+      _realtimeMergedTextIndexTruncatedDocumentSizeMeter =
+          _serverMetrics.addMeteredTableValue(_tableName, ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE,
               key.length() + _jsonKeyValueSeparatorByteCount + val.length(),
               _realtimeMergedTextIndexTruncatedDocumentSizeMeter);
       val = val.substring(0, valueTruncationLength);
@@ -601,20 +624,20 @@ public class SchemaConformingTransformer implements RecordTransformer {
   }
 
   private List<String> getLuceneDocumentsFromMergedTextIndexMap(Map<String, Object> mergedTextIndexMap) {
-    final Integer mergedTextIndexDocumentMaxLength = _transformerConfig.getMergedTextIndexDocumentMaxLength();
-    final @Nullable
+    Integer mergedTextIndexDocumentMaxLength = _transformerConfig.getMergedTextIndexDocumentMaxLength();
     List<String> luceneDocuments = new ArrayList<>();
-    mergedTextIndexMap.entrySet().stream()
+    mergedTextIndexMap.entrySet()
+        .stream()
         .filter(kv -> null != kv.getKey() && null != kv.getValue())
         .filter(kv -> !_transformerConfig.getMergedTextIndexPathToExclude().contains(kv.getKey()))
         .filter(kv -> !base64ValueFilter(kv.getValue().toString().getBytes(),
             _transformerConfig.getMergedTextIndexBinaryDocumentDetectionMinLength()))
         .filter(kv -> _transformerConfig.getMergedTextIndexPrefixToExclude().stream()
             .noneMatch(prefix -> kv.getKey().startsWith(prefix)))
-        .filter(kv -> !MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE.stream()
-            .anyMatch(suffix -> kv.getKey().endsWith(suffix))).forEach(kv -> {
-      generateTextIndexLuceneDocument(kv, luceneDocuments, mergedTextIndexDocumentMaxLength);
-    });
+        .filter(kv -> !MERGED_TEXT_INDEX_SUFFIX_TO_EXCLUDE.stream().anyMatch(suffix -> kv.getKey().endsWith(suffix)))
+        .forEach(kv -> {
+          generateTextIndexLuceneDocument(kv, luceneDocuments, mergedTextIndexDocumentMaxLength);
+        });
     return luceneDocuments;
   }
 
@@ -637,9 +660,9 @@ public class SchemaConformingTransformer implements RecordTransformer {
           + _transformerConfig.getJsonKeyValueSeparator() + key
           + _transformerConfig.getMergedTextIndexEndOfDocAnchor());
     } else {
-      documents.add(_transformerConfig.getMergedTextIndexBeginOfDocAnchor() + key
-          + _transformerConfig.getJsonKeyValueSeparator() + value
-          + _transformerConfig.getMergedTextIndexEndOfDocAnchor());
+      documents.add(
+          _transformerConfig.getMergedTextIndexBeginOfDocAnchor() + key + _transformerConfig.getJsonKeyValueSeparator()
+              + value + _transformerConfig.getMergedTextIndexEndOfDocAnchor());
     }
   }
 }

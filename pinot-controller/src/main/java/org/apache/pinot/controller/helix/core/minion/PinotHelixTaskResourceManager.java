@@ -524,8 +524,11 @@ public class PinotHelixTaskResourceManager {
    * @return List of child task configs
    */
   public synchronized List<PinotTaskConfig> getSubtaskConfigs(String taskName) {
-    Collection<TaskConfig> helixTaskConfigs =
-        _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfigMap().values();
+    JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
+    if (jobConfig == null) {
+      return List.of();
+    }
+    Collection<TaskConfig> helixTaskConfigs = jobConfig.getTaskConfigMap().values();
     List<PinotTaskConfig> taskConfigs = new ArrayList<>(helixTaskConfigs.size());
     for (TaskConfig helixTaskConfig : helixTaskConfigs) {
       taskConfigs.add(PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig));
