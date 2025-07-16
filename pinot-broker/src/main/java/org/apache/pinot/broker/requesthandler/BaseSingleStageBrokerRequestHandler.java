@@ -371,7 +371,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     CompileResult compileResult =
         compileRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
             accessControl);
-    // Accounts for resource usage of the compilation phase
+    // Accounts for resource usage of the compilation phase, since compilation for some queries can be expensive.
     Tracing.ThreadAccountantOps.sample();
 
     if (compileResult._errorOrLiteralOnlyBrokerResponse != null) {
@@ -654,7 +654,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     long routingEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING,
         routingEndTimeNs - routingStartTimeNs);
-    // Account the resource used for routing phase
+    // Account the resource used for routing phase, since for single stage queries with multiple segments, routing
+    // can be expensive.
     Tracing.ThreadAccountantOps.sample();
 
     // Set timeout in the requests

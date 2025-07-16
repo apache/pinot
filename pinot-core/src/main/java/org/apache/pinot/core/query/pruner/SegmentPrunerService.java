@@ -117,6 +117,7 @@ public class SegmentPrunerService {
             _prunerStatsUpdaters.get(segmentPruner).accept(stats, originalSegmentsSize - segments.size());
           }
         }
+        Tracing.ThreadAccountantOps.sample();
       }
       scope.setNumChildren(invokedPrunersCount);
     }
