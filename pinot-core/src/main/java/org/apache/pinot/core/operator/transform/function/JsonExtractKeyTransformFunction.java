@@ -24,9 +24,10 @@ import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.ParseContext;
 import com.jayway.jsonpath.spi.json.JacksonJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.function.JsonPathCache;
+import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.core.operator.ColumnContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.operator.transform.TransformResultMetadata;
@@ -40,8 +41,12 @@ import org.apache.pinot.core.operator.transform.TransformResultMetadata;
  *
  * Usage:
  * jsonExtractKey(jsonFieldName, 'jsonPath')
+ * jsonExtractKey(jsonFieldName, 'jsonPath', maxDepth)
+ * jsonExtractKey(jsonFieldName, 'jsonPath', maxDepth, dotNotation)
  * <code>jsonFieldName</code> is the Json String field/expression.
  * <code>jsonPath</code> is a JsonPath expression which used to read from JSON document
+ * <code>maxDepth</code> is an optional integer specifying the maximum depth to recurse
+ * <code>dotNotation</code> is an optional boolean specifying output format (true=dot notation, false=JsonPath format)
  *
  */
 public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
@@ -53,7 +58,9 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
           .build());
 
   private TransformFunction _jsonFieldTransformFunction;
-  private JsonPath _jsonPath;
+  private String _jsonPath;
+  private int _maxDepth = Integer.MAX_VALUE;
+  private boolean _dotNotation = false;
 
   @Override
   public String getName() {
@@ -63,10 +70,11 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
   @Override
   public void init(List<TransformFunction> arguments, Map<String, ColumnContext> columnContextMap) {
     super.init(arguments, columnContextMap);
-    // Check that there are exactly 2 arguments
-    if (arguments.size() != 2) {
+    // Check that there are 2, 3, or 4 arguments
+    if (arguments.size() < 2 || arguments.size() > 4) {
       throw new IllegalArgumentException(
-          "Exactly 2 arguments are required for transform function: jsonExtractKey(jsonFieldName, 'jsonPath')");
+          "2, 3, or 4 arguments are required for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation])");
     }
 
     TransformFunction firstArgument = arguments.get(0);
@@ -76,7 +84,41 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
+    _jsonPath = ((LiteralTransformFunction) arguments.get(1)).getStringLiteral();
+
+    // Handle optional third argument (maxDepth)
+    if (arguments.size() >= 3) {
+      TransformFunction depthArgument = arguments.get(2);
+      if (!(depthArgument instanceof LiteralTransformFunction)) {
+        throw new IllegalArgumentException("The third argument (maxDepth) must be a literal integer");
+      }
+      try {
+        _maxDepth = Integer.parseInt(((LiteralTransformFunction) depthArgument).getStringLiteral());
+        if (_maxDepth <= 0) {
+          throw new IllegalArgumentException("maxDepth must be a positive integer");
+        }
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("The third argument (maxDepth) must be a valid integer");
+      }
+    }
+
+    // Handle optional fourth argument (dotNotation)
+    if (arguments.size() == 4) {
+      TransformFunction dotNotationArgument = arguments.get(3);
+      if (!(dotNotationArgument instanceof LiteralTransformFunction)) {
+        throw new IllegalArgumentException("The fourth argument (dotNotation) must be a literal boolean");
+      }
+      try {
+        String dotNotationStr = ((LiteralTransformFunction) dotNotationArgument).getStringLiteral();
+        if (!"true".equalsIgnoreCase(dotNotationStr) && !"false".equalsIgnoreCase(dotNotationStr)) {
+          throw new IllegalArgumentException(
+              "The fourth argument (dotNotation) must be a valid boolean ('true' or 'false')");
+        }
+        _dotNotation = Boolean.parseBoolean(dotNotationStr);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("The fourth argument (dotNotation) must be a valid boolean");
+      }
+    }
   }
 
   @Override
@@ -90,8 +132,27 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
     initStringValuesMV(length);
     String[] jsonStrings = _jsonFieldTransformFunction.transformToStringValuesSV(valueBlock);
     for (int i = 0; i < length; i++) {
-      List<String> values = JSON_PARSER_CONTEXT.parse(jsonStrings[i]).read(_jsonPath);
-      _stringValuesMV[i] = values.toArray(new String[0]);
+      // Call the appropriate JsonFunctions method based on available parameters
+      List values;
+      try {
+        if (_maxDepth != Integer.MAX_VALUE && _dotNotation) {
+          // Call 4-parameter method
+          values = JsonFunctions.jsonExtractKey((Object) jsonStrings[i], _jsonPath, _maxDepth, _dotNotation);
+        } else if (_maxDepth != Integer.MAX_VALUE) {
+          // Call 3-parameter method
+          values = JsonFunctions.jsonExtractKey((Object) jsonStrings[i], _jsonPath, _maxDepth);
+        } else {
+          // Call 2-parameter method
+          values = JsonFunctions.jsonExtractKey((Object) jsonStrings[i], _jsonPath);
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      // Convert list to String array
+      _stringValuesMV[i] = new String[values.size()];
+      for (int j = 0; j < values.size(); j++) {
+        _stringValuesMV[i][j] = String.valueOf(values.get(j));
+      }
     }
     return _stringValuesMV;
   }

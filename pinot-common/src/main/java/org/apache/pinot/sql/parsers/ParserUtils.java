@@ -77,15 +77,32 @@ public class ParserUtils {
   }
 
   private static void validateJsonExtractKeyFunction(List<Expression> operands) {
-    // Check that there are exactly 2 arguments
-    if (operands.size() != 2) {
+    // Check that there are 2, 3, or 4 arguments
+    if (operands.size() < 2 || operands.size() > 4) {
       throw new SqlCompilationException(
-          "Expect 2 arguments are required for transform function: jsonExtractKey(jsonFieldName, 'jsonPath')");
+          "2, 3, or 4 arguments are required for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation])");
     }
     if (!operands.get(1).isSetLiteral()) {
       throw new SqlCompilationException(
-          "Expect the 2nd argument for transform function: jsonExtractKey(jsonFieldName, 'jsonPath') to be a "
-              + "single-quoted literal value.");
+          "Expect the 2nd argument for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation]) "
+              + "to be a single-quoted literal value.");
     }
+    // Note: 3rd argument (maxDepth) should be an integer literal
+    if (operands.size() > 2 && !operands.get(2).isSetLiteral()) {
+      throw new SqlCompilationException(
+          "Expect the 3rd argument for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation]) "
+              + "to be an integer literal value.");
+    }
+    // Note: 4th argument (dotNotation) should be a boolean literal
+    if (operands.size() > 3 && !operands.get(3).isSetLiteral()) {
+      throw new SqlCompilationException(
+          "Expect the 4th argument for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation]) "
+              + "to be a boolean literal value.");
+    }
+    // Runtime validation will ensure correct types
   }
 }

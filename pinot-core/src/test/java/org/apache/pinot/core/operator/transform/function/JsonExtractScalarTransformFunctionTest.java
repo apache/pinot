@@ -438,6 +438,65 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     RequestContextUtils.getExpression(expressionStr);
   }
 
+  @Test
+  public void testJsonExtractKeyWithDepthTransformFunction() {
+    ExpressionContext expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2)");
+    TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
+    Assert.assertEquals(transformFunction.getName(), JsonExtractKeyTransformFunction.FUNCTION_NAME);
+    Assert.assertEquals(transformFunction.getResultMetadata().getDataType(), DataType.STRING);
+    Assert.assertFalse(transformFunction.getResultMetadata().isSingleValue());
+
+    // Test with different depth values
+    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 1)");
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
+
+    // Test with 4 parameters (depth and dotNotation)
+    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2, true)");
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
+
+    // Test with 4 parameters (depth and dotNotation = false)
+    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2, false)");
+    transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
+    Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
+
+    // Test with invalid number of arguments (should fail)
+    try {
+      RequestContextUtils.getExpression("jsonExtractKey(json)");
+      Assert.fail("Should have thrown SqlCompilationException");
+    } catch (SqlCompilationException e) {
+      // Expected
+    }
+
+    // Test with too many arguments (should fail)
+    try {
+      RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2, true, 'extra')");
+      Assert.fail("Should have thrown SqlCompilationException");
+    } catch (SqlCompilationException e) {
+      // Expected
+    }
+
+    // Test with invalid depth argument that should fail during initialization
+    try {
+      expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 'invalid')");
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+      Assert.fail("Should have thrown BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      // Expected
+    }
+
+    // Test with invalid dotNotation argument that should fail during initialization
+    try {
+      expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2, 'invalid')");
+      TransformFunctionFactory.get(expression, _dataSourceMap);
+      Assert.fail("Should have thrown BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      // Expected
+    }
+  }
+
   @DataProvider(name = "testIllegalArguments")
   public Object[][] testIllegalArguments() {
     //@formatter:off
