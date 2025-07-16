@@ -225,7 +225,9 @@ public final class GroupByUtils {
         1, desiredNumMergedBlocks, recordKeyComaparator);
     int mergedKeys = 0;
     for (IntermediateRecord intermediateRecord : block.getIntermediateRecords()) {
-      table.upsert(intermediateRecord._record);
+      if (!table.upsert(intermediateRecord._record)) {
+        break;
+      }
       Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
     }
     return table;

@@ -75,27 +75,17 @@ public class SortedRecordTable extends BaseTable {
   ///  only used when creating SortedRecordTable from unique, sorted segment groupby results
   @Override
   public boolean upsert(Record record) {
+    if (_nextIdx == _resultSize) {
+      // enough records
+      return false;
+    }
     _records[_nextIdx++] = record;
     return true;
   }
 
   @Override
   public boolean upsert(Key key, Record record) {
-    if (_nextIdx == _resultSize) {
-      // enough records
-      return false;
-    }
-    if (_nextIdx == 0) {
-      _records[_nextIdx++] = record;
-      return true;
-    }
-    Record existingRecord = _records[_nextIdx - 1];
-    if (compareKeyEquals(existingRecord, key)) {
-      _records[_nextIdx - 1] = updateRecord(existingRecord, record);
-      return true;
-    }
-    _records[_nextIdx++] = record;
-    return true;
+    throw new UnsupportedOperationException("method unused for SortedRecordTable");
   }
 
   public boolean isSatisfied() {
@@ -228,17 +218,6 @@ public class SortedRecordTable extends BaseTable {
     finalizeRecordMerge(newRecords, newNextIdx);
   }
 
-  private boolean compareKeyEquals(Record existingRecord, Key newKey) {
-    Object[] existingValues = existingRecord.getValues();
-    Object[] newValues = newKey.getValues();
-    for (int i = 0; i < _numKeyColumns; i++) {
-      if (existingValues[i] != newValues[i]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   protected Record updateRecord(Record existingRecord, Record newRecord) {
     Object[] existingValues = existingRecord.getValues();
     Object[] newValues = newRecord.getValues();
@@ -257,7 +236,7 @@ public class SortedRecordTable extends BaseTable {
 
   @Override
   public Iterator<Record> iterator() {
-    return Arrays.stream(_topRecords, 0, _nextIdx).iterator();
+    return Arrays.stream(_topRecords, 0, size()).iterator();
   }
 
   @Override
@@ -314,7 +293,8 @@ public class SortedRecordTable extends BaseTable {
           throw new RuntimeException("Error during multi-threaded final reduce", e);
         }
       } else {
-        for (Record record : _topRecords) {
+        for (int idx = 0; idx < size(); idx++) {
+          Record record = _topRecords[idx];
           Object[] values = record.getValues();
           for (int i = 0; i < numAggregationFunctions; i++) {
             int colId = i + _numKeyColumns;
