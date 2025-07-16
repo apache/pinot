@@ -134,7 +134,8 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-        ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.STRING, false);
+        ForwardIndexReader reader = ForwardIndexReaderFactory.getInstance()
+            .createRawIndexReader(buffer, DataType.STRING, false);
         ForwardIndexReaderContext context = reader.createContext()) {
       String[] values = new String[maxElements];
       for (int i = 0; i < numDocs; i++) {
@@ -186,7 +187,8 @@ public class MultiValueVarByteRawIndexCreatorTest implements PinotBuffersAfterMe
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-        ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, DataType.BYTES, false);
+        ForwardIndexReader reader = ForwardIndexReaderFactory.getInstance()
+            .createRawIndexReader(buffer, DataType.BYTES, false);
         ForwardIndexReaderContext context = reader.createContext()) {
       byte[][] values = new byte[maxElements][];
       for (int i = 0; i < numDocs; i++) {
