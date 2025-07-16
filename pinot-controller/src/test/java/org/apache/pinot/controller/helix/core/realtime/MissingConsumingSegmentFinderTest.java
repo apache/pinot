@@ -91,11 +91,11 @@ public class MissingConsumingSegmentFinderTest {
     idealStateMap.put("tableA__3__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     idealStateMap.put("tableA__3__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
 
-    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = ImmutableMap.of(
-        0, new LongMsgOffset(1000),
-        1, new LongMsgOffset(1001),
-        2, new LongMsgOffset(1002),
-        3, new LongMsgOffset(1003)
+    Map<String, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = ImmutableMap.of(
+        "0", new LongMsgOffset(1000),
+        "1", new LongMsgOffset(1001),
+        "2", new LongMsgOffset(1002),
+        "3", new LongMsgOffset(1003)
     );
 
     Instant now = Instant.parse("2022-06-01T18:00:00.00Z");
@@ -128,11 +128,11 @@ public class MissingConsumingSegmentFinderTest {
     idealStateMap.put("tableA__3__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     idealStateMap.put("tableA__3__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
 
-    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = ImmutableMap.of(
-        0, new LongMsgOffset(1000),
-        1, new LongMsgOffset(701),
-        2, new LongMsgOffset(1002),
-        3, new LongMsgOffset(703)
+    Map<String, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = ImmutableMap.of(
+        "0", new LongMsgOffset(1000),
+        "1", new LongMsgOffset(701),
+        "2", new LongMsgOffset(1002),
+        "3", new LongMsgOffset(703)
     );
 
     // setup segment metadata fetcher
@@ -229,14 +229,14 @@ public class MissingConsumingSegmentFinderTest {
     idealStateMap.put("tableA__5__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 6 is a new partition and there's no consuming segment in ideal states for it
 
-    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = new HashMap<>();
-    partitionGroupIdToLargestStreamOffsetMap.put(0, new LongMsgOffset(1000));
-    partitionGroupIdToLargestStreamOffsetMap.put(1, new LongMsgOffset(1001));
-    partitionGroupIdToLargestStreamOffsetMap.put(2, new LongMsgOffset(1002));
-    partitionGroupIdToLargestStreamOffsetMap.put(3, new LongMsgOffset(1003));
-    partitionGroupIdToLargestStreamOffsetMap.put(4, new LongMsgOffset(1004));
-    partitionGroupIdToLargestStreamOffsetMap.put(5, new LongMsgOffset(1005));
-    partitionGroupIdToLargestStreamOffsetMap.put(6, new LongMsgOffset(16));
+    Map<String, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = new HashMap<>();
+    partitionGroupIdToLargestStreamOffsetMap.put("0", new LongMsgOffset(1000));
+    partitionGroupIdToLargestStreamOffsetMap.put("1", new LongMsgOffset(1001));
+    partitionGroupIdToLargestStreamOffsetMap.put("2", new LongMsgOffset(1002));
+    partitionGroupIdToLargestStreamOffsetMap.put("3", new LongMsgOffset(1003));
+    partitionGroupIdToLargestStreamOffsetMap.put("4", new LongMsgOffset(1004));
+    partitionGroupIdToLargestStreamOffsetMap.put("5", new LongMsgOffset(1005));
+    partitionGroupIdToLargestStreamOffsetMap.put("6", new LongMsgOffset(16));
 
     // setup segment metadata fetcher
     SegmentZKMetadata m1 = mock(SegmentZKMetadata.class);

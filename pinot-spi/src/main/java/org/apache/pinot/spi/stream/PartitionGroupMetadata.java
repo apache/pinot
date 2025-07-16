@@ -28,16 +28,35 @@ package org.apache.pinot.spi.stream;
  */
 public class PartitionGroupMetadata {
 
+  private static final String SEPARATOR = "__";
   private final int _partitionGroupId;
+  private final String _topicName;
   private final StreamPartitionMsgOffset _startOffset;
 
   public PartitionGroupMetadata(int partitionGroupId, StreamPartitionMsgOffset startOffset) {
+    this("", partitionGroupId, startOffset);
+  }
+
+  public PartitionGroupMetadata(String topicName, int partitionGroupId, StreamPartitionMsgOffset startOffset) {
+    _topicName = topicName;
     _partitionGroupId = partitionGroupId;
     _startOffset = startOffset;
   }
 
   public int getPartitionGroupId() {
     return _partitionGroupId;
+  }
+
+  public String getTopicName() {
+    return _topicName;
+  }
+
+  public String getPartitionGroupInfo() {
+    if (_topicName.isEmpty()) {
+      return String.valueOf(_partitionGroupId);
+    } else {
+      return _topicName + SEPARATOR + _partitionGroupId;
+    }
   }
 
   public StreamPartitionMsgOffset getStartOffset() {
