@@ -50,7 +50,7 @@ import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 
-public class DataLossRiskAssessorImplTest extends ControllerTest {
+public class DataLossRiskAssessorTest extends ControllerTest {
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String REALTIME_TABLE_NAME = TableNameBuilder.REALTIME.tableNameWithType(RAW_TABLE_NAME);
   private static final int NUM_REPLICAS = 3;
@@ -74,14 +74,14 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
   public void testDataLossRiskAssessorPeerDownloadDisabled() {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
-    assertThrows(IllegalStateException.class, () -> new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME,
-        tableConfig, 2, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
+    assertThrows(IllegalStateException.class, () -> new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(
+        REALTIME_TABLE_NAME, tableConfig, 2, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
 
-    assertThrows(IllegalStateException.class, () -> new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME,
-        tableConfig, 0, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
+    assertThrows(IllegalStateException.class, () -> new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(
+        REALTIME_TABLE_NAME, tableConfig, 0, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
 
-    TableRebalancer.NoOpRiskAssessorImpl noOpRiskAssessor =
-        new TableRebalancer.NoOpRiskAssessorImpl();
+    TableRebalancer.NoOpRiskAssessor noOpRiskAssessor =
+        new TableRebalancer.NoOpRiskAssessor();
     assertFalse(noOpRiskAssessor.hasDataLossRisk("randomSegmentName"));
   }
 
@@ -91,13 +91,13 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
     tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
-    assertThrows(IllegalStateException.class, () -> new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME,
-        tableConfig, 2, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
+    assertThrows(IllegalStateException.class, () -> new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(
+        REALTIME_TABLE_NAME, tableConfig, 2, _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
 
     // This will also return false since SegmentZkMetadata will be null
-    TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-        new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, _helixManager,
-            _helixResourceManager.getRealtimeSegmentManager());
+    TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+        new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+            _helixManager, _helixResourceManager.getRealtimeSegmentManager());
     assertFalse(dataLossRiskAssessor.hasDataLossRisk("randomSegmentName"));
   }
 
@@ -121,9 +121,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -140,9 +140,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertTrue(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -164,9 +164,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -183,9 +183,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertTrue(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -208,9 +208,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -227,9 +227,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertTrue(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -256,9 +256,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -275,9 +275,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertTrue(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
   }
@@ -303,9 +303,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -328,9 +328,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -354,9 +354,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -384,9 +384,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
   }
@@ -420,9 +420,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -444,9 +444,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertTrue(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -469,9 +469,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertTrue(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
 
@@ -493,9 +493,9 @@ public class DataLossRiskAssessorImplTest extends ControllerTest {
       HelixManager helixManager = mock(HelixManager.class);
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
-      TableRebalancer.DataLossRiskAssessorImpl dataLossRiskAssessor =
-          new TableRebalancer.DataLossRiskAssessorImpl(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
-              _helixResourceManager.getRealtimeSegmentManager());
+      TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+              helixManager, _helixResourceManager.getRealtimeSegmentManager());
       assertFalse(dataLossRiskAssessor.hasDataLossRisk(segmentName));
     }
   }
