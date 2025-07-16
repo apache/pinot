@@ -1227,7 +1227,10 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         throws IOException, IndexReaderConstraintException {
 
       IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-      _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, null, columnMetadata);
+      FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
+          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
+          .build();
+      _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, fieldIndexConfigs, columnMetadata);
       if (columnMetadata.hasDictionary()) {
         _dictionary = DictionaryIndexType.read(_segmentWriter, columnMetadata);
       } else {

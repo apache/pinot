@@ -82,6 +82,8 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 
 import static org.testng.Assert.*;
 
@@ -806,7 +808,11 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
       if (expectedCompressionType != null) {
         assertFalse(hasDictionary);
         IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
-        try (ForwardIndexReader fwdIndexReader = readerFactory.createIndexReader(reader, null, columnMetadata);) {
+        FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
+            .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
+            .build();
+        try (ForwardIndexReader fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
+            columnMetadata);) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
           assertEquals(compressionType, expectedCompressionType);
         }
