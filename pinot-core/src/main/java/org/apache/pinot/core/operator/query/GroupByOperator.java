@@ -163,7 +163,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
-      if (_queryContext.shouldSortAggregate()) {
+      if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
         // if sort-aggregate, sort the array even if it's smaller than trimSize
         // to benefit combining. This is not very large overhead since the
         // limit threshold of sort-aggregate is small

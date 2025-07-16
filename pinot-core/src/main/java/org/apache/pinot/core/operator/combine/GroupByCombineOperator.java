@@ -88,7 +88,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
-    if (_queryContext.shouldSortAggregate()) {
+    if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
       _waitingTable = new AtomicReference<>();
       _satisfiedTable = new AtomicReference<>();
       _recordKeyComparator = OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
@@ -186,7 +186,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   @Override
   protected void processSegments() {
     // sort-aggregate if groupby orderby key and no having clause and limit is smaller than threshold
-    if (_queryContext.shouldSortAggregate()) {
+    if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
       processSafeTrim();
       return;
     }
@@ -312,7 +312,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       return new ExceptionResultsBlock(errMsg);
     }
 
-    if (_queryContext.shouldSortAggregate()) {
+    if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
       SortedRecordTable table = _satisfiedTable.get();
       assert (table != null);
       if (_queryContext.isServerReturnFinalResult()) {

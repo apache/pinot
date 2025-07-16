@@ -208,7 +208,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
-      if (_queryContext.shouldSortAggregate()) {
+      if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
         // if orderBy groupBy key, sort the array even if it's smaller than trimSize
         // to benefit combining
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);

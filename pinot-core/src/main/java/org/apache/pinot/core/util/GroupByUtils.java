@@ -218,6 +218,14 @@ public final class GroupByUtils {
     }
   }
 
+  /**
+   * do sort aggregate when is safeTrim (order by group keys with no having clause)
+   * and limit is smaller than threshold
+   */
+  public static boolean shouldSortAggregateUnderSafeTrim(QueryContext queryContext) {
+    return !queryContext.isUnsafeTrim() && queryContext.getLimit() < queryContext.getSortAggregateLimitThreshold();
+  }
+
   public static SortedRecordTable getAndPopulateSortedRecordTable(GroupByResultsBlock block,
       QueryContext queryContext, int resultSize,
       ExecutorService executorService, int desiredNumMergedBlocks, Comparator<Record> recordKeyComaparator) {

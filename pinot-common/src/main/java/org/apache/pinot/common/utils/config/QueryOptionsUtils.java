@@ -390,6 +390,12 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getSortAggregateLimitThreshold(Map<String, String> queryOptions) {
+    String sortAggregateLimitThreshold = queryOptions.get(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD);
+    return checkedParseIntPositive(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD, sortAggregateLimitThreshold);
+  }
+
+  @Nullable
   public static Integer getMaxStreamingPendingBlocks(Map<String, String> queryOptions) {
     String maxStreamingPendingBlocks = queryOptions.get(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS);
     return checkedParseIntPositive(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, maxStreamingPendingBlocks);

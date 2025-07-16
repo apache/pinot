@@ -21,7 +21,6 @@ package org.apache.pinot.core.query.request.context;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,7 +36,6 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
@@ -99,8 +97,6 @@ public class QueryContext {
   private Map<Pair<FunctionContext, FilterContext>, Integer> _filteredAggregationsIndexMap;
   private boolean _hasFilteredAggregations;
   private Set<String> _columns;
-  // comparator used when group-by order-by key case
-  private Comparator<Key> _groupKeyComparator;
 
   // Other properties to be shared across all the segments
   // Latest table schema at query time
@@ -136,6 +132,8 @@ public class QueryContext {
   private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
   // Parallel chunk size for final reduce
   private int _chunkSizeExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
+  // Threshold to use sort aggregate for safeTrim case when LIMIT is below this
+  private int _sortAggregateLimitThreshold = Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -186,7 +184,8 @@ public class QueryContext {
   }
 
   /**
-   * Returns the table name. NOTE: on the broker side, table name might be {@code null} when subquery is available.
+   * Returns the table name.
+   * NOTE: on the broker side, table name might be {@code null} when subquery is available.
    */
   public String getTableName() {
     return _tableName;
@@ -498,6 +497,14 @@ public class QueryContext {
     _serverReturnFinalResultKeyUnpartitioned = serverReturnFinalResultKeyUnpartitioned;
   }
 
+  public void setSortAggregateLimitThreshold(int sortAggregateLimitThreshold) {
+    _sortAggregateLimitThreshold = sortAggregateLimitThreshold;
+  }
+
+  public int getSortAggregateLimitThreshold() {
+    return _sortAggregateLimitThreshold;
+  }
+
   /**
    * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared within
    * the scope of a query.
@@ -542,10 +549,6 @@ public class QueryContext {
 
   public boolean isUnsafeTrim() {
     return _isUnsafeTrim;
-  }
-
-  public boolean shouldSortAggregate() {
-    return !isUnsafeTrim() && _limit < Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
   }
 
   public static class Builder {
@@ -664,6 +667,11 @@ public class QueryContext {
 
       queryContext._isUnsafeTrim =
           !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+
+      Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
+      if (sortAggregateLimitThreshold != null) {
+        queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
+      }
 
       return queryContext;
     }
