@@ -50,9 +50,9 @@ public class PerQueryCPUMemAccountCancelTest {
     }
 
     @Override
-    public void cancelQuery(AggregatedStats queryResourceTracker) {
-      _cancelSentQueries.add(queryResourceTracker.getQueryId());
-      _cancelLog.add(queryResourceTracker.getQueryId());
+    public void cancelQuery(String queryId, Thread anchorThread) {
+      _cancelSentQueries.add(queryId);
+      _cancelLog.add(queryId);
     }
 
     public List<String> getCancelLog() {

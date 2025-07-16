@@ -216,18 +216,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
     int maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
+    _numSegmentsAcquiredDownloadSemaphore = new AtomicInteger(0);
+    _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT, 0);
     if (maxParallelSegmentDownloads > 0) {
       LOGGER.info(
           "Construct segment download semaphore for Table: {}. Maximum number of parallel segment downloads: {}",
           _tableNameWithType, maxParallelSegmentDownloads);
       _segmentDownloadSemaphore = new Semaphore(maxParallelSegmentDownloads, true);
-      _numSegmentsAcquiredDownloadSemaphore = new AtomicInteger(0);
       _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_THROTTLE_THRESHOLD,
           maxParallelSegmentDownloads);
-      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT, 0);
     } else {
       _segmentDownloadSemaphore = null;
-      _numSegmentsAcquiredDownloadSemaphore = null;
     }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
@@ -946,8 +945,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Acquiring table level segment download semaphore for segment: {}, queue-length: {} ", segmentName,
           _segmentDownloadSemaphore.getQueueLength());
       _segmentDownloadSemaphore.acquire();
-      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
-          _numSegmentsAcquiredDownloadSemaphore.incrementAndGet());
       _logger.info("Acquired table level segment download semaphore for segment: {} (lock-time={}ms, queue-length={}).",
           segmentName, System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
     }
@@ -962,6 +959,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
                 + "queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
             segmentDownloadThrottler.getQueueLength());
       }
+      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
+          _numSegmentsAcquiredDownloadSemaphore.incrementAndGet());
       try {
         File untarredSegmentDir;
         if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
@@ -999,9 +998,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
     } finally {
       if (_segmentDownloadSemaphore != null) {
         _segmentDownloadSemaphore.release();
-        _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
-            _numSegmentsAcquiredDownloadSemaphore.decrementAndGet());
       }
+      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
+          _numSegmentsAcquiredDownloadSemaphore.decrementAndGet());
     }
   }
 
