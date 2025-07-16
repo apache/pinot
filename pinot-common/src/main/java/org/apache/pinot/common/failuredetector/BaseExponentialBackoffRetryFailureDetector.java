@@ -27,6 +27,7 @@ import java.util.concurrent.Delayed;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -139,7 +140,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   }
 
   @Override
-  public void markServerHealthy(String instanceId, String hostName) {
+  public void markServerHealthy(String instanceId, @Nullable String hostName) {
     _unhealthyServerRetryInfoMap.computeIfPresent(instanceId, (id, retryInfo) -> {
       LOGGER.info("Mark server: {} {} as healthy", instanceId, hostName);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() - 1);
@@ -149,7 +150,7 @@ public abstract class BaseExponentialBackoffRetryFailureDetector implements Fail
   }
 
   @Override
-  public void markServerUnhealthy(String instanceId, String hostName) {
+  public void markServerUnhealthy(String instanceId, @Nullable String hostName) {
     _unhealthyServerRetryInfoMap.computeIfAbsent(instanceId, id -> {
       LOGGER.warn("Mark server: {} {} as unhealthy", instanceId, hostName);
       _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.UNHEALTHY_SERVERS, _unhealthyServerRetryInfoMap.size() + 1);
