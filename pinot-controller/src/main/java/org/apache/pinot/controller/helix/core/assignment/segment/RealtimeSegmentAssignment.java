@@ -20,17 +20,21 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.utils.PauselessConsumptionUtils;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategy;
 import org.apache.pinot.controller.helix.core.assignment.segment.strategy.SegmentAssignmentStrategyFactory;
+import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -192,8 +196,16 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
             + "includeConsuming: {}, bootstrap: {}", _tableNameWithType, completedInstancePartitions,
         consumingInstancePartitions, includeConsuming, bootstrap);
 
+    Set<String> committingSegments = null;
+    if (PauselessConsumptionUtils.isPauselessEnabled(_tableConfig)) {
+      List<String> committingSegmentList = PinotLLCRealtimeSegmentManager.getCommittingSegments(_tableNameWithType,
+          _helixManager.getHelixPropertyStore());
+      if (!committingSegmentList.isEmpty()) {
+        committingSegments = new HashSet<>(committingSegmentList);
+      }
+    }
     SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment completedConsumingOfflineSegmentAssignment =
-        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(nonTierAssignment);
+        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(nonTierAssignment, committingSegments);
     Map<String, Map<String, String>> newAssignment;
 
     // Reassign COMPLETED segments first
