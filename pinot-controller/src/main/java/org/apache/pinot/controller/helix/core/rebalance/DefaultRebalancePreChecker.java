@@ -359,6 +359,9 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
       }
     }
 
+    // For non-peer download enabled tables, warn if downtime is enabled but numReplicas > 1. Should only use
+    // downtime=true for such tables if downtime is indeed acceptable whereas for numReplicas = 1, rebalance cannot
+    // be done without downtime
     if (rebalanceConfig.isDowntime()) {
       if (!segmentsToMove.isEmpty() && numReplicas > 1) {
         pass = false;
@@ -368,7 +371,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     // Peer download enabled tables may have data loss during rebalance, when downtime=true or minAvailableReplicas=0.
     // The scenario plays out as follows:
-    // 1. If the newly built consuming segment is not able to be uploaded to deep store, it may set up the download URI
+    // 1. If the newly built consuming segment is cannot be uploaded to deep store, it may set up the download URI
     //    as an empty string: ""
     // 2. When this happens, other servers expect to download the segment from a peer server that built the segment or
     //    has a copy of the segment

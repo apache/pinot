@@ -550,7 +550,7 @@ public class TableRebalancer {
     // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
     // for a table
     DataLossRiskAssessor dataLossRiskAssessor = new DataLossRiskAssessorImpl(tableNameWithType, tableConfig,
-        _helixManager);
+        minAvailableReplicas, _helixManager, _pinotLLCRealtimeSegmentManager);
 
     // We repeat the following steps until the target assignment is reached:
     // 1. Wait for ExternalView to converge with the IdealState. Fail the rebalance if it doesn't make progress within
@@ -1873,23 +1873,28 @@ public class TableRebalancer {
 
   private static class DataLossRiskAssessorImpl implements DataLossRiskAssessor {
     private final String _tableNameWithType;
+    private final TableConfig _tableConfig;
+    private final int _minAvailableReplicas;
     private final HelixManager _helixManager;
+    private final PinotLLCRealtimeSegmentManager _pinotLLCRealtimeSegmentManager;
     private final boolean _isPeerDownloadEnabled;
-    private final boolean _isUpsertOrDedupTable;
     private final boolean _isPauselessEnabled;
 
-    private DataLossRiskAssessorImpl(String tableNameWithType, TableConfig tableConfig, HelixManager helixManager) {
+    private DataLossRiskAssessorImpl(String tableNameWithType, TableConfig tableConfig, int minAvailableReplicas,
+        HelixManager helixManager, PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
       _tableNameWithType = tableNameWithType;
+      _tableConfig = tableConfig;
+      _minAvailableReplicas = minAvailableReplicas;
       _helixManager = helixManager;
+      _pinotLLCRealtimeSegmentManager = pinotLLCRealtimeSegmentManager;
       _isPeerDownloadEnabled = !StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme());
-      _isUpsertOrDedupTable = tableConfig.isUpsertEnabled() || tableConfig.isDedupEnabled();
       _isPauselessEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     }
 
     @Override
     public boolean hasDataLossRisk(String segmentName) {
-      // If peer-download is disabled, no data loss risk exists
-      if (!_isPeerDownloadEnabled) {
+      // If peer-download is disabled, or minAvailableReplicas > 0 no data loss risk exists
+      if (!_isPeerDownloadEnabled || _minAvailableReplicas > 0) {
         return false;
       }
 
@@ -1914,7 +1919,7 @@ public class TableRebalancer {
       //   RealtimeSegmentValidationManager does not automatically try to fix up these segments. To be safe it is best
       //   to return that there is a risk of data loss in case of race conditions for pauseless enabled tables
       //   (rebalance updates IS at the same time as segment commit protocol starts and moves it to COMMITTING)
-      return _isUpsertOrDedupTable && _isPauselessEnabled;
+      return _isPauselessEnabled && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig);
     }
   }
 
