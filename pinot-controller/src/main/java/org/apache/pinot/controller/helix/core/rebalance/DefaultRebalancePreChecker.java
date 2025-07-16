@@ -29,7 +29,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -353,7 +352,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     int numReplicas = Integer.MAX_VALUE;
     String peerSegmentDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
-    if (rebalanceConfig.isDowntime() || !StringUtils.isEmpty(peerSegmentDownloadScheme)) {
+    if (rebalanceConfig.isDowntime() || peerSegmentDownloadScheme != null) {
       for (String segment : segmentsToMove) {
         numReplicas = Math.min(targetAssignment.get(segment).size(), numReplicas);
       }
@@ -382,7 +381,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     //    there is no way to recover this segment without manually re-building it
     // Thus, to avoid the above data loss scenario, it is not recommended to run downtime rebalance for peer download
     // enabled tables. This pre-check is added to warn of the potential risk.
-    if (!StringUtils.isEmpty(peerSegmentDownloadScheme)) {
+    if (peerSegmentDownloadScheme != null) {
       int minAvailableReplica = rebalanceConfig.getMinAvailableReplicas();
       if (minAvailableReplica < 0) {
         minAvailableReplica = numReplicas + minAvailableReplica;
