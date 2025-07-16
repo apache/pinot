@@ -77,31 +77,24 @@ public class ParserUtils {
   }
 
   private static void validateJsonExtractKeyFunction(List<Expression> operands) {
-    // Check that there are 2, 3, or 4 arguments
-    if (operands.size() < 2 || operands.size() > 4) {
+    // Check that there are 2 or 3 arguments
+    if (operands.size() < 2 || operands.size() > 3) {
       throw new SqlCompilationException(
-          "2, 3, or 4 arguments are required for transform function: "
-              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation])");
+          "2 or 3 arguments are required for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [optionalParameters])");
     }
     if (!operands.get(1).isSetLiteral()) {
       throw new SqlCompilationException(
           "Expect the 2nd argument for transform function: "
-              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation]) "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [optionalParameters]) "
               + "to be a single-quoted literal value.");
     }
-    // Note: 3rd argument (maxDepth) should be an integer literal
+    // Note: 3rd argument (optionalParameters) should be a string literal
     if (operands.size() > 2 && !operands.get(2).isSetLiteral()) {
       throw new SqlCompilationException(
           "Expect the 3rd argument for transform function: "
-              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation]) "
-              + "to be an integer literal value.");
-    }
-    // Note: 4th argument (dotNotation) should be a boolean literal
-    if (operands.size() > 3 && !operands.get(3).isSetLiteral()) {
-      throw new SqlCompilationException(
-          "Expect the 4th argument for transform function: "
-              + "jsonExtractKey(jsonFieldName, 'jsonPath', [maxDepth], [dotNotation]) "
-              + "to be a boolean literal value.");
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [optionalParameters]) "
+              + "to be a single-quoted literal value.");
     }
     // Runtime validation will ensure correct types
   }

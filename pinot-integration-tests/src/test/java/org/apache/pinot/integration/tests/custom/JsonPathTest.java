@@ -373,7 +373,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
   public void testJsonKeysQueries(boolean useMultiStageQueryEngine)
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
-    String query = "SELECT jsonExtractKey(myMapStr, '$.*', 1) FROM " + getTableName() + " LIMIT 1";
+    String query = "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1') FROM " + getTableName() + " LIMIT 1";
     JsonNode pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
@@ -385,7 +385,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertTrue(keys.isArray());
     Assert.assertTrue(keys.size() > 0);
 
-    query = "SELECT jsonExtractKey(complexMapStr, '$.*', 2) FROM " + getTableName() + " LIMIT 1";
+    query = "SELECT jsonExtractKey(complexMapStr, '$.*', 'maxDepth=2') FROM " + getTableName() + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -396,7 +396,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertTrue(keys.isArray());
     Assert.assertTrue(keys.size() > 0);
 
-    query = "SELECT jsonExtractKey(complexMapStr, '$.*', 3) FROM " + getTableName() + " LIMIT 1";
+    query = "SELECT jsonExtractKey(complexMapStr, '$.*', 'maxDepth=3') FROM " + getTableName() + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -413,8 +413,9 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
-    // Test 4-parameter jsonExtractKey with dotNotation=true (simple JSON)
-    String query = "SELECT jsonExtractKey(myMapStr, '$.*', 1, true) FROM " + getTableName() + " LIMIT 1";
+    // Test optional parameter jsonExtractKey with dotNotation=true (simple JSON)
+    String query =
+        "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1; dotNotation=true') FROM " + getTableName() + " LIMIT 1";
     JsonNode pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     JsonNode rows = pinotResponse.get("resultTable").get("rows");
@@ -435,8 +436,9 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertFalse(keyList.contains("$['k1']"));
     Assert.assertFalse(keyList.contains("$['k2']"));
 
-    // Test 4-parameter jsonExtractKey with dotNotation=false (JsonPath format)
-    query = "SELECT jsonExtractKey(myMapStr, '$.*', 1, false) FROM " + getTableName() + " LIMIT 1";
+    // Test optional parameter jsonExtractKey with dotNotation=false (JsonPath format)
+    query =
+        "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1; dotNotation=false') FROM " + getTableName() + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -453,7 +455,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertTrue(keyList.contains("$['k2']"));
 
     // Test recursive key extraction with dot notation on complex JSON
-    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 2, true) FROM " + getTableName() + " LIMIT 1";
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=2; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -472,7 +475,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertTrue(keyList.contains("k4"));
 
     // Test recursive key extraction with JsonPath format
-    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 2, false) FROM " + getTableName() + " LIMIT 1";
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=2; dotNotation=false') FROM " + getTableName()
+        + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -490,7 +494,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertTrue(keyList.contains("$['k4']"));
 
     // Test deeper recursive extraction with dot notation
-    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 3, true) FROM " + getTableName() + " LIMIT 1";
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=3; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -513,7 +518,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertTrue(keyList.contains("k3.2"));
 
     // Test deeper recursive extraction with JsonPath format
-    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 3, false) FROM " + getTableName() + " LIMIT 1";
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=3; dotNotation=false') FROM " + getTableName()
+        + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -535,7 +541,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertTrue(keyList.contains("$['k3'][2]"));
 
     // Test specific path extraction with dot notation
-    query = "SELECT jsonExtractKey(complexMapStr, '$.k4.*', 1, true) FROM " + getTableName() + " LIMIT 1";
+    query = "SELECT jsonExtractKey(complexMapStr, '$.k4.*', 'maxDepth=2; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");
@@ -569,8 +576,8 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Assert.assertTrue(keyList.contains("$['k1']"));
     Assert.assertTrue(keyList.contains("$['k2']"));
 
-    // Test backward compatibility - 3-parameter version should default to JsonPath format
-    query = "SELECT jsonExtractKey(myMapStr, '$.*', 1) FROM " + getTableName() + " LIMIT 1";
+    // Test backward compatibility - no dotNotation should default to JsonPath format
+    query = "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1') FROM " + getTableName() + " LIMIT 1";
     pinotResponse = postQuery(query);
     Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
     rows = pinotResponse.get("resultTable").get("rows");

@@ -440,7 +440,7 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
   @Test
   public void testJsonExtractKeyWithDepthTransformFunction() {
-    ExpressionContext expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2)");
+    ExpressionContext expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 'maxDepth=2')");
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
     Assert.assertEquals(transformFunction.getName(), JsonExtractKeyTransformFunction.FUNCTION_NAME);
@@ -448,21 +448,21 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
     Assert.assertFalse(transformFunction.getResultMetadata().isSingleValue());
 
     // Test with different depth values
-    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 1)");
+    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 'maxDepth=1')");
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
 
-    // Test with 4 parameters (depth and dotNotation)
-    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2, true)");
+    // Test with parameters (depth and dotNotation)
+    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 'maxDepth=2;dotNotation=true')");
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
 
-    // Test with 4 parameters (depth and dotNotation = false)
-    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2, false)");
+    // Test with parameters (depth and dotNotation = false)
+    expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 'maxDepth=2;dotNotation=false')");
     transformFunction = TransformFunctionFactory.get(expression, _dataSourceMap);
     Assert.assertTrue(transformFunction instanceof JsonExtractKeyTransformFunction);
 
-    // Test with invalid number of arguments (should fail)
+    // Test with an invalid number of arguments (should fail)
     try {
       RequestContextUtils.getExpression("jsonExtractKey(json)");
       Assert.fail("Should have thrown SqlCompilationException");
@@ -472,24 +472,15 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
 
     // Test with too many arguments (should fail)
     try {
-      RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2, true, 'extra')");
+      RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 'maxDepth=2;dotNotation=true', 'extra')");
       Assert.fail("Should have thrown SqlCompilationException");
     } catch (SqlCompilationException e) {
       // Expected
     }
 
-    // Test with invalid depth argument that should fail during initialization
+    // Test with invalid optional parameter argument that should fail during initialization
     try {
-      expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 'invalid')");
-      TransformFunctionFactory.get(expression, _dataSourceMap);
-      Assert.fail("Should have thrown BadQueryRequestException");
-    } catch (BadQueryRequestException e) {
-      // Expected
-    }
-
-    // Test with invalid dotNotation argument that should fail during initialization
-    try {
-      expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 2, 'invalid')");
+      expression = RequestContextUtils.getExpression("jsonExtractKey(json, '$.*', 'unknownKey=abc')");
       TransformFunctionFactory.get(expression, _dataSourceMap);
       Assert.fail("Should have thrown BadQueryRequestException");
     } catch (BadQueryRequestException e) {

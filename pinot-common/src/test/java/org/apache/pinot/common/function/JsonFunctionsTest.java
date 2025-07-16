@@ -460,11 +460,11 @@ public class JsonFunctionsTest {
     String nestedJson = "{\"a\":1,\"b\":{\"c\":2,\"d\":3},\"f\":4}";
 
     // For extracting all keys at all levels, use $..**
-    Assert.assertEqualsNoOrder(JsonFunctions.jsonExtractKey(flatJson, "$..**", 1).toArray(),
+    Assert.assertEqualsNoOrder(JsonFunctions.jsonExtractKey(flatJson, "$..**", "maxDepth=1").toArray(),
         new String[]{"$['a']", "$['b']"});
 
     // Test with nested JSON - $.** should give us all paths
-    List<String> nestedResult = JsonFunctions.jsonExtractKey(nestedJson, "$..**", 2);
+    List<String> nestedResult = JsonFunctions.jsonExtractKey(nestedJson, "$..**", "maxDepth=2");
     System.out.println("Nested result: " + nestedResult);
 
     // Just test that we get some results for now
@@ -475,50 +475,50 @@ public class JsonFunctionsTest {
   public void testJsonKeysArrayAndNull()
       throws IOException {
     String arrayJson = "[{\"a\":1},{\"b\":2}]";
-    List<String> result = JsonFunctions.jsonExtractKey(arrayJson, "$..**", 2);
+    List<String> result = JsonFunctions.jsonExtractKey(arrayJson, "$..**", "maxDepth=2");
     System.out.println("Array result: " + result);
 
     // Test null and invalid cases
-    Assert.assertEquals(JsonFunctions.jsonExtractKey(null, "$..**", 2).size(), 0);
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("not a json", "$..**", 2).size(), 0);
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", 0).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey(null, "$..**", "maxDepth=2").size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("not a json", "$..**", "maxDepth=2").size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", "maxDepth=0").size(), 0);
   }
 
   @Test
   public void testJsonKeysEdgeCases()
       throws IOException {
     // Test with negative depth
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", -1).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", "maxDepth=-1").size(), 1);
 
     // Test with empty string
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("", "$..**", 1).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("", "$..**", "maxDepth=1").size(), 0);
 
     // Test with null JSON value
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("null", "$..**", 1).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("null", "$..**", "maxDepth=1").size(), 0);
 
     // Test with empty JSON object
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("{}", "$..**", 1).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("{}", "$..**", "maxDepth=1").size(), 0);
 
     // Test with empty JSON array
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("[]", "$..**", 1).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("[]", "$..**", "maxDepth=1").size(), 0);
 
     // Test with various object types
     Map<String, Object> mapObj = new java.util.HashMap<>();
     mapObj.put("key1", "value1");
     mapObj.put("key2", 42);
-    List<String> mapResult = JsonFunctions.jsonExtractKey(mapObj, "$..**", 1);
+    List<String> mapResult = JsonFunctions.jsonExtractKey(mapObj, "$..**", "maxDepth=1");
     System.out.println("Map result: " + mapResult);
     Assert.assertTrue(mapResult.size() > 0);
 
     List<Object> listObj = new java.util.ArrayList<>();
     listObj.add(Map.of("key1", "value1"));
     listObj.add(Map.of("key2", "value2"));
-    List<String> listResult = JsonFunctions.jsonExtractKey(listObj, "$..**", 2);
+    List<String> listResult = JsonFunctions.jsonExtractKey(listObj, "$..**", "maxDepth=2");
     System.out.println("List result: " + listResult);
     Assert.assertTrue(listResult.size() > 0);
 
     String deepJson = "{\"a\":{\"b\":{\"c\":{\"d\":1}}}}";
-    List<String> deepResult = JsonFunctions.jsonExtractKey(deepJson, "$..**", 3);
+    List<String> deepResult = JsonFunctions.jsonExtractKey(deepJson, "$..**", "maxDepth=3");
     System.out.println("Deep result: " + deepResult);
     Assert.assertTrue(deepResult.size() > 0);
   }
@@ -529,18 +529,18 @@ public class JsonFunctionsTest {
     String nestedJson = "{\"a\":1,\"b\":{\"c\":2,\"d\":{\"e\":3}}}";
 
     // Test 4-parameter version with dotNotation=true
-    List<String> dotNotationResult = JsonFunctions.jsonExtractKey(nestedJson, "$..**", 3, true);
+    List<String> dotNotationResult = JsonFunctions.jsonExtractKey(nestedJson, "$..**", "maxDepth=3;dotNotation=true");
     List<String> expectedDotNotation = Arrays.asList("a", "b", "b.c", "b.d", "b.d.e");
     Assert.assertEqualsNoOrder(dotNotationResult.toArray(), expectedDotNotation.toArray());
 
     // Test 4-parameter version with dotNotation=false (JsonPath format)
-    List<String> jsonPathResult = JsonFunctions.jsonExtractKey(nestedJson, "$..**", 3, false);
+    List<String> jsonPathResult = JsonFunctions.jsonExtractKey(nestedJson, "$..**", "maxDepth=3;dotNotation=false");
     List<String> expectedJsonPath = Arrays.asList("$['a']", "$['b']", "$['b']['c']", "$['b']['d']", "$['b']['d']['e']");
     Assert.assertEqualsNoOrder(jsonPathResult.toArray(), expectedJsonPath.toArray());
 
     // Test with arrays in dot notation
     String arrayJson = "{\"users\":[{\"name\":\"Alice\"},{\"name\":\"Bob\"}]}";
-    List<String> arrayDotResult = JsonFunctions.jsonExtractKey(arrayJson, "$..**", 3, true);
+    List<String> arrayDotResult = JsonFunctions.jsonExtractKey(arrayJson, "$..**", "maxDepth=3;dotNotation=true");
     List<String> expectedArrayDot = Arrays.asList("users", "users.0", "users.0.name", "users.1", "users.1.name");
     Assert.assertEqualsNoOrder(arrayDotResult.toArray(), expectedArrayDot.toArray());
   }
@@ -551,19 +551,19 @@ public class JsonFunctionsTest {
     String deepJson = "{\"a\":{\"b\":{\"c\":{\"d\":1}}}}";
 
     // Test depth=1 (only top level)
-    List<String> depth1 = JsonFunctions.jsonExtractKey(deepJson, "$..**", 1);
+    List<String> depth1 = JsonFunctions.jsonExtractKey(deepJson, "$..**", "maxDepth=1");
     Assert.assertEquals(depth1, Arrays.asList("$['a']"));
 
     // Test depth=2
-    List<String> depth2 = JsonFunctions.jsonExtractKey(deepJson, "$..**", 2);
+    List<String> depth2 = JsonFunctions.jsonExtractKey(deepJson, "$..**", "maxDepth=2");
     Assert.assertEqualsNoOrder(depth2.toArray(), new String[]{"$['a']", "$['a']['b']"});
 
     // Test depth=3
-    List<String> depth3 = JsonFunctions.jsonExtractKey(deepJson, "$..**", 3);
+    List<String> depth3 = JsonFunctions.jsonExtractKey(deepJson, "$..**", "maxDepth=3");
     Assert.assertEqualsNoOrder(depth3.toArray(), new String[]{"$['a']", "$['a']['b']", "$['a']['b']['c']"});
 
     // Test depth=4 (includes all levels)
-    List<String> depth4 = JsonFunctions.jsonExtractKey(deepJson, "$..**", 4);
+    List<String> depth4 = JsonFunctions.jsonExtractKey(deepJson, "$..**", "maxDepth=4");
     Assert.assertEqualsNoOrder(depth4.toArray(),
         new String[]{"$['a']", "$['a']['b']", "$['a']['b']['c']", "$['a']['b']['c']['d']"});
   }
@@ -574,17 +574,17 @@ public class JsonFunctionsTest {
     String json = "{\"a\":1,\"b\":{\"c\":2,\"d\":3}}";
 
     // Test $..**
-    List<String> recursiveResult = JsonFunctions.jsonExtractKey(json, "$..**", Integer.MAX_VALUE);
+    List<String> recursiveResult = JsonFunctions.jsonExtractKey(json, "$..**", "maxDepth=-1");
     List<String> expected = Arrays.asList("$['a']", "$['b']", "$['b']['c']", "$['b']['d']");
     Assert.assertEqualsNoOrder(recursiveResult.toArray(), expected.toArray());
 
     // Test $.. (should work the same as $..**)
-    List<String> dotDotResult = JsonFunctions.jsonExtractKey(json, "$..", Integer.MAX_VALUE);
+    List<String> dotDotResult = JsonFunctions.jsonExtractKey(json, "$..", "maxDepth=-1");
     Assert.assertEqualsNoOrder(dotDotResult.toArray(), expected.toArray());
 
     // Test with mixed object and array structure
     String mixedJson = "{\"data\":[{\"id\":1,\"info\":{\"name\":\"test\"}}]}";
-    List<String> mixedResult = JsonFunctions.jsonExtractKey(mixedJson, "$..**", Integer.MAX_VALUE);
+    List<String> mixedResult = JsonFunctions.jsonExtractKey(mixedJson, "$..**", "maxDepth=2147483647");
     List<String> expectedMixed = Arrays.asList(
         "$['data']", "$['data'][0]", "$['data'][0]['id']", "$['data'][0]['info']", "$['data'][0]['info']['name']");
     Assert.assertEqualsNoOrder(mixedResult.toArray(), expectedMixed.toArray());
@@ -596,13 +596,13 @@ public class JsonFunctionsTest {
     String arrayJson = "[{\"a\":1},{\"b\":2},{\"c\":{\"d\":3}}]";
 
     // Test recursive extraction from array
-    List<String> result = JsonFunctions.jsonExtractKey(arrayJson, "$..**", 3);
+    List<String> result = JsonFunctions.jsonExtractKey(arrayJson, "$..**", "maxDepth=3");
     List<String> expected = Arrays.asList("$[0]", "$[0]['a']", "$[1]", "$[1]['b']", "$[2]", "$[2]['c']",
         "$[2]['c']['d']");
     Assert.assertEqualsNoOrder(result.toArray(), expected.toArray());
 
     // Test with dot notation
-    List<String> dotResult = JsonFunctions.jsonExtractKey(arrayJson, "$..**", 3, true);
+    List<String> dotResult = JsonFunctions.jsonExtractKey(arrayJson, "$..**", "maxDepth=3;dotNotation=true");
     List<String> expectedDot = Arrays.asList("0", "0.a", "1", "1.b", "2", "2.c", "2.c.d");
     Assert.assertEqualsNoOrder(dotResult.toArray(), expectedDot.toArray());
   }
@@ -620,7 +620,7 @@ public class JsonFunctionsTest {
         + "}";
 
     // Test with depth limiting
-    List<String> depth2Result = JsonFunctions.jsonExtractKey(complexJson, "$..**", 2, true);
+    List<String> depth2Result = JsonFunctions.jsonExtractKey(complexJson, "$..**", "maxDepth=2;dotNotation=true");
     Assert.assertTrue(depth2Result.contains("users"));
     Assert.assertTrue(depth2Result.contains("metadata"));
     Assert.assertTrue(depth2Result.contains("users.active"));
@@ -639,12 +639,12 @@ public class JsonFunctionsTest {
     String json = "{\"a\":1,\"b\":{\"c\":2,\"d\":3}}";
 
     // Test $.*  (top level only)
-    List<String> topLevelResult = JsonFunctions.jsonExtractKey(json, "$.*", Integer.MAX_VALUE);
+    List<String> topLevelResult = JsonFunctions.jsonExtractKey(json, "$.*", "maxDepth=-3");
     List<String> expectedTopLevel = Arrays.asList("$['a']", "$['b']");
     Assert.assertEqualsNoOrder(topLevelResult.toArray(), expectedTopLevel.toArray());
 
     // Test specific path $.b.*
-    List<String> specificResult = JsonFunctions.jsonExtractKey(json, "$.b.*", Integer.MAX_VALUE);
+    List<String> specificResult = JsonFunctions.jsonExtractKey(json, "$.b.*", "maxDepth=-1");
     List<String> expectedSpecific = Arrays.asList("$['b']['c']", "$['b']['d']");
     Assert.assertEqualsNoOrder(specificResult.toArray(), expectedSpecific.toArray());
   }
@@ -653,20 +653,20 @@ public class JsonFunctionsTest {
   public void testJsonExtractKeyEdgeCasesWithDotNotation()
       throws IOException {
     // Test with zero depth
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", 0, true).size(), 0);
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", 0, false).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", "maxDepth=0;dotNotation=true").size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", "maxDepth=0;dotNotation=false").size(), 0);
 
     // Test with negative depth
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", -1, true).size(), 0);
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", -1, false).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", "maxDepth=-1;dotNotation=true").size(), 1);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("{\"a\":1}", "$..**", "maxDepth=-1;dotNotation=false").size(), 1);
 
     // Test with empty objects and arrays
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("{}", "$..**", 5, true).size(), 0);
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("[]", "$..**", 5, true).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("{}", "$..**", "maxDepth=5;dotNotation=true").size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("[]", "$..**", "maxDepth=5;dotNotation=false").size(), 0);
 
     // Test with invalid JSON
-    Assert.assertEquals(JsonFunctions.jsonExtractKey("invalid json", "$..**", 5, true).size(), 0);
-    Assert.assertEquals(JsonFunctions.jsonExtractKey(null, "$..**", 5, true).size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey("invalid json", "$..**", "maxDepth=5;dotNotation=true").size(), 0);
+    Assert.assertEquals(JsonFunctions.jsonExtractKey(null, "$..**", "maxDepth=5;dotNotation=true").size(), 0);
   }
 
   @Test
@@ -676,12 +676,12 @@ public class JsonFunctionsTest {
 
     // Test 2-parameter version (should default to maxDepth=Integer.MAX_VALUE, dotNotation=false)
     List<String> twoParamResult = JsonFunctions.jsonExtractKey(json, "$..**");
-    List<String> fourParamResult = JsonFunctions.jsonExtractKey(json, "$..**", Integer.MAX_VALUE, false);
+    List<String> fourParamResult = JsonFunctions.jsonExtractKey(json, "$..**", "maxDepth=2147483647;dotNotation=false");
     Assert.assertEquals(twoParamResult, fourParamResult);
 
     // Test 3-parameter version (should default to dotNotation=false)
-    List<String> threeParamResult = JsonFunctions.jsonExtractKey(json, "$..**", 2);
-    List<String> fourParamResultWithDepth = JsonFunctions.jsonExtractKey(json, "$..**", 2, false);
+    List<String> threeParamResult = JsonFunctions.jsonExtractKey(json, "$..**", "maxDepth=2");
+    List<String> fourParamResultWithDepth = JsonFunctions.jsonExtractKey(json, "$..**", "maxDepth=2;dotNotation=false");
     Assert.assertEquals(threeParamResult, fourParamResultWithDepth);
   }
 
@@ -696,14 +696,14 @@ public class JsonFunctionsTest {
         + "}";
 
     // Test with special characters in field names
-    List<String> result = JsonFunctions.jsonExtractKey(specialJson, "$..**", 1, true);
+    List<String> result = JsonFunctions.jsonExtractKey(specialJson, "$..**", "maxDepth=1;dotNotation=true");
     Assert.assertTrue(result.contains("field-with-dash"));
     Assert.assertTrue(result.contains("field.with.dots"));
     Assert.assertTrue(result.contains("field_with_underscores"));
     Assert.assertTrue(result.contains("field with spaces"));
 
     // Test JsonPath format
-    List<String> jsonPathResult = JsonFunctions.jsonExtractKey(specialJson, "$..**", 1, false);
+    List<String> jsonPathResult = JsonFunctions.jsonExtractKey(specialJson, "$..**", "maxDepth=1;dotNotation=false");
     Assert.assertTrue(jsonPathResult.contains("$['field-with-dash']"));
     Assert.assertTrue(jsonPathResult.contains("$['field.with.dots']"));
     Assert.assertTrue(jsonPathResult.contains("$['field_with_underscores']"));
