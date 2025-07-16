@@ -223,6 +223,11 @@ public class JsonUtils {
     return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes));
   }
 
+  public static JsonNode bytesToJsonNode(byte[] jsonBytes, int offset, int length)
+      throws IOException {
+    return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes, offset, length));
+  }
+
   public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType)
       throws IOException {
     return DEFAULT_READER.forType(valueType).readValue(jsonNode);
