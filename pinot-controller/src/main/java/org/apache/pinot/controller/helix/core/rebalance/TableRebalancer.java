@@ -690,10 +690,18 @@ public class TableRebalancer {
 
         // Step 2: Handle force commit if flag is set, then recalculate if force commit occurred
         if (shouldForceCommit) {
-          nextAssignment =
-              getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-                  lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
-                  tableRebalanceLogger);
+          try {
+            nextAssignment =
+                getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+                    lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
+                    tableRebalanceLogger);
+          } catch (Exception e) {
+            String errorMsg =
+                "Caught exception while calculating the next assignment, aborting the rebalance: " + e.getMessage();
+            onReturnFailure(errorMsg, e, tableRebalanceLogger);
+            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+          }
           Set<String> consumingSegmentsToMoveNext = getMovingConsumingSegments(currentAssignment, nextAssignment);
 
           if (!consumingSegmentsToMoveNext.isEmpty()) {
@@ -747,10 +755,18 @@ public class TableRebalancer {
             tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
       }
 
-      nextAssignment =
-          getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
-              lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
-              tableRebalanceLogger);
+      try {
+        nextAssignment =
+            getNextAssignment(currentAssignment, targetAssignment, minAvailableReplicas, enableStrictReplicaGroup,
+                lowDiskMode, batchSizePerServer, segmentPartitionIdMap, partitionIdFetcher, dataLossRiskAssessor,
+                tableRebalanceLogger);
+      } catch (Exception e) {
+        String errorMsg =
+            "Caught exception while calculating the next assignment, aborting the rebalance: " + e.getMessage();
+        onReturnFailure(errorMsg, e, tableRebalanceLogger);
+        return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+            tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+      }
       tableRebalanceLogger.info(
           "Got the next assignment with number of segments to be added/removed for each instance: {}",
           SegmentAssignmentUtils.getNumSegmentsToMovePerInstance(currentAssignment, nextAssignment));
