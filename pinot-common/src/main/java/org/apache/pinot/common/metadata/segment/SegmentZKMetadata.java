@@ -50,7 +50,7 @@ public class SegmentZKMetadata implements ZKMetadata {
   private boolean _endTimeMsCached;
   private long _endTimeMs;
 
-  public SegmentZKMetadata(String segmentName) {
+  public  SegmentZKMetadata(String segmentName) {
     _znRecord = new ZNRecord(segmentName);
     _simpleFields = _znRecord.getSimpleFields();
   }
