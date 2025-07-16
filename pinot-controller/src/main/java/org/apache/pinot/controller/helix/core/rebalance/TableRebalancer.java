@@ -433,6 +433,30 @@ public class TableRebalancer {
               tierToInstancePartitionsMap, rebalanceConfig);
         }
       }
+
+      // If peer-download is enabled, verify that for all segments with changes in assignment, it is safe to rebalance
+      // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
+      // for a table
+      if (!StringUtils.isEmpty(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme())) {
+        // Setting minAvailableReplicas to 0 since that is what's equivalent to downtime=true
+        DataLossRiskAssessor dataLossRiskAssessor = new DataLossRiskAssessorImpl(tableNameWithType, tableConfig,
+            0, _helixManager, _pinotLLCRealtimeSegmentManager);
+        for (Map.Entry<String, Map<String, String>> segmentToAssignment : currentAssignment.entrySet()) {
+          String segmentName = segmentToAssignment.getKey();
+          Map<String, String> assignment = segmentToAssignment.getValue();
+          if (!assignment.equals(targetAssignment.get(segmentName))
+              && dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
+            String errorMsg = "Moving segment " + segmentName + " as part of rebalance is risky for peer-download "
+                + "enabled tables, ensure the deep store has a copy of the segment and if upsert / dedup enabled "
+                + "that it is completed and try again. It is recommended to forceCommit and pause ingestion prior to "
+                + "rebalancing";
+            onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
+            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+          }
+        }
+      }
+
       // Reuse current IdealState to update the IdealState in cluster
       ZNRecord idealStateRecord = currentIdealState.getRecord();
       idealStateRecord.setMapFields(targetAssignment);
@@ -1871,7 +1895,8 @@ public class TableRebalancer {
     boolean hasDataLossRisk(String segmentName);
   }
 
-  private static class DataLossRiskAssessorImpl implements DataLossRiskAssessor {
+  @VisibleForTesting
+  static class DataLossRiskAssessorImpl implements DataLossRiskAssessor {
     private final String _tableNameWithType;
     private final TableConfig _tableConfig;
     private final int _minAvailableReplicas;
@@ -1880,7 +1905,8 @@ public class TableRebalancer {
     private final boolean _isPeerDownloadEnabled;
     private final boolean _isPauselessEnabled;
 
-    private DataLossRiskAssessorImpl(String tableNameWithType, TableConfig tableConfig, int minAvailableReplicas,
+    @VisibleForTesting
+    DataLossRiskAssessorImpl(String tableNameWithType, TableConfig tableConfig, int minAvailableReplicas,
         HelixManager helixManager, PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
       _tableNameWithType = tableNameWithType;
       _tableConfig = tableConfig;
@@ -1905,21 +1931,23 @@ public class TableRebalancer {
       }
 
       // If the segment state is COMPLETED and the peer download URL is empty, there is a data loss risk
-      if (!segmentZKMetadata.getStatus().isCompleted()) {
+      if (segmentZKMetadata.getStatus().isCompleted()) {
         return CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl());
       }
 
       // If the segment is not yet completed, then the following scenarios are possible:
-      // - Non-upsert / non-dedup table: data loss scenarios are not possible. Either the segment will restart
-      //   consumption or the RealtimeSegmentValidationManager will kick in to fix up the segment if pauseless is
-      //   enabled
-      // - Upsert / dedup table: For non-pauseless tables, it is safe to move the segment without data loss concerns.
-      //   For pauseless tables, if the segment is still in CONSUMING state, moving it is safe, but if it is in
-      //   COMMITTING state then there is a risk of data loss on segment build failures as well since the
-      //   RealtimeSegmentValidationManager does not automatically try to fix up these segments. To be safe it is best
-      //   to return that there is a risk of data loss in case of race conditions for pauseless enabled tables
-      //   (rebalance updates IS at the same time as segment commit protocol starts and moves it to COMMITTING)
-      return _isPauselessEnabled && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig);
+      // - Non-upsert / non-dedup table:
+      //     - data loss scenarios are not possible. Either the segment will restart consumption or the
+      //       RealtimeSegmentValidationManager will kick in to fix up the segment if pauseless is enabled
+      // - Upsert / dedup table:
+      //     - For non-pauseless tables, it is safe to move the segment without data loss concerns
+      //     - For pauseless tables, if the segment is still in CONSUMING state, moving it is safe, but if it is in
+      //       COMMITTING state then there is a risk of data loss on segment build failures as well since the
+      //       RealtimeSegmentValidationManager does not automatically try to fix up these segments. To be safe it is
+      //       best to return that there is a risk of data loss for pauseless enabled tables for segments in COMMITTING
+      //       state
+      return _isPauselessEnabled && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
+          && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig);
     }
   }
 
