@@ -19,62 +19,50 @@
 package org.apache.pinot.query.runtime.function;
 
 import com.google.auto.service.AutoService;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.arithmetic.PlusScalarFunction;
-import org.apache.pinot.core.operator.transform.function.AdditionTransformFunction;
+import org.apache.pinot.common.function.scalar.TrigonometricFunctions;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AcosTransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
+import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.spi.data.FieldSpec;
+
 
 @AutoService(Udf.class)
-public class PlusUdf extends Udf {
-  @Override
-  public String getMainFunctionName() {
-    return "plus";
-  }
+public class AcosUdf extends Udf.FromAnnotatedMethod {
 
-  @Override
-  public Set<String> getAllFunctionNames() {
-    return Set.of(getMainFunctionName(), "add");
+  public AcosUdf()
+      throws NoSuchMethodException {
+    super(TrigonometricFunctions.class, "acos", double.class);
   }
 
   @Override
   public String getDescription() {
-    return "This function adds two numeric values together. In order to concatenate two strings, use the `concat` "
-        + "function instead.";
-  }
-
-  @Override
-  public String asSqlCall(String name, List<String> sqlArgValues) {
-    if (name.equals(getMainFunctionName())) {
-      return "(" + String.join(" + ", sqlArgValues) + ")";
-    } else {
-      return super.asSqlCall(name, sqlArgValues);
-    }
+    return "Returns the arc cosine of a numeric input (in radians).";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return UdfExampleBuilder.forEndomorphismNumeric(2)
-        .addExample("1 + 2", 1, 2, 3)
-        .addExample(UdfExample.create("1 + null", 1, null, null).withoutNull(1))
+    return UdfExampleBuilder.forSignature(UdfSignature.of(
+            UdfParameter.of(FieldSpec.DataType.DOUBLE, false),  // Input is a scalar DOUBLE
+            UdfParameter.of(FieldSpec.DataType.DOUBLE, false)  // Return type is single value DOUBLE
+        ))
+        .addExample("acos(1)", 1d, 0d)
+        .addExample("acos(0)", 0d, Math.PI / 2)
+        .addExample("acos(-1)", -1d, Math.PI)
+        .addExample(UdfExample.create("null input", null, null)
+            .withoutNull(Math.PI / 2))
         .build()
         .generateExamples();
   }
 
   @Override
   public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ADD, AdditionTransformFunction.class);
-  }
-
-  @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of(new PlusScalarFunction());
+    return Map.of(TransformFunctionType.ACOS, AcosTransformFunction.class);
   }
 }

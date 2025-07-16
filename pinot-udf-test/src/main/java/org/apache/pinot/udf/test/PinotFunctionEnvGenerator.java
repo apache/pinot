@@ -289,8 +289,15 @@ public class PinotFunctionEnvGenerator {
       schemaBuilder.addDimensionField(columnName, param.getDataType(),
           fieldSpec -> fieldSpec.setSingleValueField(false));
     } else {
-      schemaBuilder.addMetricField(columnName, param.getDataType(),
-          fieldSpec -> fieldSpec.setSingleValueField(true));
+      try {
+        schemaBuilder.addMetricField(columnName, param.getDataType(),
+            fieldSpec -> fieldSpec.setSingleValueField(true));
+      } catch (IllegalStateException e) {
+        schemaBuilder.addDimensionField(columnName, param.getDataType(),
+            fieldSpec -> {
+          fieldSpec.setSingleValueField(true);
+        });
+      }
     }
   }
 

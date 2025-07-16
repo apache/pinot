@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -34,6 +33,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -219,12 +219,12 @@ public class UdfTest {
 
   /// Returns a map whose keys are all the function names (including scalar and transform functions) and values are the
   /// Udf of that function, or null if the function is not UDF registered.
-  private Map<String, Class<? extends Udf>> generateUdfMapForAllFunctions() {
+  private TreeMap<String, Class<? extends Udf>> generateUdfMapForAllFunctions() {
     Set<String> scalarFunctions = FunctionRegistry.getFunctionNames();
     Set<String> transformFunctions = TransformFunctionFactory.getAllFunctionNames();
     Set<String> allFunctions = new TreeSet<>(Sets.union(scalarFunctions, transformFunctions));
 
-    Map<String, Class<? extends Udf>> udfMap = Maps.newHashMapWithExpectedSize(allFunctions.size());
+    TreeMap<String, Class<? extends Udf>> udfMap = new TreeMap<>();
     for (Udf udf : _framework.getUdfs()) {
       for (String name : udf.getAllFunctionNames()) {
         udfMap.put(name, udf.getClass());
@@ -285,7 +285,7 @@ public class UdfTest {
 
   private void generateAllFunctionsYaml(Writer writer)
       throws IOException {
-    Map<String, Class<? extends Udf>> udfMap = generateUdfMapForAllFunctions();
+    TreeMap<String, Class<? extends Udf>> udfMap = generateUdfMapForAllFunctions();
 
     // Write the license header
     writer.write(getYamlLicenseHeader());
