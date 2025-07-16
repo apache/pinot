@@ -213,6 +213,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return new WatcherTask();
     }
 
+    public QueryMonitorConfig getQueryMonitorConfig() {
+      return _watcherTask.getQueryMonitorConfig();
+    }
+
     @Override
     public Collection<? extends ThreadResourceTracker> getThreadResources() {
       return _threadEntriesMap.values();

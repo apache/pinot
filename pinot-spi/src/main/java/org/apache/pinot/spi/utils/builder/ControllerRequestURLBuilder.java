@@ -694,4 +694,12 @@ public class ControllerRequestURLBuilder {
   public String forTableTimeBoundary(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "timeBoundary");
   }
+
+  public String forClusterConfigUpdate() {
+    return StringUtil.join("/", _baseUrl, "cluster", "configs");
+  }
+
+  public String forClusterConfigDelete(String config) {
+    return StringUtil.join("/", _baseUrl, "cluster", "configs", config);
+  }
 }

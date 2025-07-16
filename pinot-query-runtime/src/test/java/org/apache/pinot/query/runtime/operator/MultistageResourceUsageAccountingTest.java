@@ -92,7 +92,7 @@ public class MultistageResourceUsageAccountingTest implements ITest {
     // init accountant and start watcher task
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
-    Tracing.ThreadAccountantOps.startThreadAccountant();
+    Tracing.getThreadAccountant().startWatcherTask();
 
     // Setup Thread Context
     Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);
