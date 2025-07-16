@@ -42,6 +42,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.Realtime.Status;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -540,17 +541,32 @@ public class RealtimeToOfflineSegmentsTaskGeneratorTest {
     // validate valid config
     taskGenerator.validateTaskConfigs(tableConfig, schema, realtimeToOfflineTaskConfig);
 
-    // invalid Upsert config with RealtimeToOfflineTask
+    // valid Upsert config with RealtimeToOfflineTask (now supported with snapshot enabled)
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setTimeColumnName(TIME_COLUMN_NAME)
-            .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL)).setTaskConfig(new TableTaskConfig(
+            .setUpsertConfig(upsertConfig).setTaskConfig(new TableTaskConfig(
                 ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig,
                     "SegmentGenerationAndPushTask", segmentGenerationAndPushTaskConfig))).build();
+    // Should pass validation with snapshot enabled
+    taskGenerator.validateTaskConfigs(tableConfig, schema, realtimeToOfflineTaskConfig);
+
+    // invalid Upsert config with snapshot disabled
+    UpsertConfig upsertConfigDisabled = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigDisabled.setSnapshot(Enablement.DISABLE);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN_NAME)
+        .setUpsertConfig(upsertConfigDisabled)
+        .setTaskConfig(
+            new TableTaskConfig(ImmutableMap.of("RealtimeToOfflineSegmentsTask", realtimeToOfflineTaskConfig)))
+        .build();
     try {
       taskGenerator.validateTaskConfigs(tableConfig, schema, realtimeToOfflineTaskConfig);
       Assert.fail();
     } catch (IllegalStateException e) {
-      Assert.assertTrue(e.getMessage().contains("RealtimeToOfflineTask doesn't support upsert table"));
+      Assert.assertTrue(e.getMessage().contains("'snapshot' from UpsertConfig must not be 'DISABLE'"));
     }
 
     // invalid period

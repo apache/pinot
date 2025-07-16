@@ -41,6 +41,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
 import org.apache.pinot.client.ConnectionFactory;
+import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
@@ -749,6 +750,15 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return 0;
   }
 
+  protected long getCurrentCountStarResultWithoutUpsert(String tableName) {
+    ResultSetGroup resultSetGroup = getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName
+        + " OPTION(skipUpsert=true)");
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getLong(0);
+    }
+    return 0;
+  }
+
   protected void waitForMinionTaskCompletion(String taskId, long timeout) {
     TestUtils.waitForCondition(aVoid ->
             _controllerStarter.getHelixTaskResourceManager().getTaskState(taskId) == TaskState.COMPLETED,
@@ -802,6 +812,22 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       }
       return true;
     }, 60_000L, "Failed to remove table data manager for table: " + tableNameWithType);
+  }
+
+  protected void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, int expectedNumSegmentsQueried) {
+    waitForNumQueriedSegmentsToConverge(tableName, timeoutMs, expectedNumSegmentsQueried, -1);
+  }
+
+  protected void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, int expectedNumSegmentsQueried,
+      int expectedNumConsumingSegmentsQueried) {
+    // Do not tolerate exception here because it is always followed by the docs check
+    TestUtils.waitForCondition(aVoid -> {
+      ExecutionStats executionStats =
+          getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getExecutionStats();
+      return executionStats.getNumSegmentsQueried() == expectedNumSegmentsQueried && (
+          expectedNumConsumingSegmentsQueried < 0
+              || executionStats.getNumConsumingSegmentsQueried() == expectedNumConsumingSegmentsQueried);
+    }, timeoutMs, "Failed to load all segments");
   }
 
   /**

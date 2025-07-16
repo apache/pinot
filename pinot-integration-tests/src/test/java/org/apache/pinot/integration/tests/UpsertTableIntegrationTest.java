@@ -28,7 +28,6 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
-import org.apache.pinot.client.ExecutionStats;
 import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -167,15 +166,6 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     return 10;
   }
 
-  private long queryCountStarWithoutUpsert(String tableName) {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)")
-        .getResultSet(0).getLong(0);
-  }
-
-  private long queryCountStar(String tableName) {
-    return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getResultSet(0).getLong(0);
-  }
-
   @Override
   protected void waitForAllDocsLoaded(long timeoutMs) {
     waitForAllDocsLoaded(getTableName(), timeoutMs, getCountStarResultWithoutUpsert());
@@ -184,27 +174,11 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
   private void waitForAllDocsLoaded(String tableName, long timeoutMs, long expectedCountStarWithoutUpsertResult) {
     TestUtils.waitForCondition(aVoid -> {
       try {
-        return queryCountStarWithoutUpsert(tableName) == expectedCountStarWithoutUpsertResult;
+        return getCurrentCountStarResultWithoutUpsert(tableName) == expectedCountStarWithoutUpsertResult;
       } catch (Exception e) {
         return null;
       }
     }, timeoutMs, "Failed to load all documents");
-  }
-
-  private void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, int expectedNumSegmentsQueried) {
-    waitForNumQueriedSegmentsToConverge(tableName, timeoutMs, expectedNumSegmentsQueried, -1);
-  }
-
-  private void waitForNumQueriedSegmentsToConverge(String tableName, long timeoutMs, int expectedNumSegmentsQueried,
-      int expectedNumConsumingSegmentsQueried) {
-    // Do not tolerate exception here because it is always followed by the docs check
-    TestUtils.waitForCondition(aVoid -> {
-      ExecutionStats executionStats =
-          getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName).getExecutionStats();
-      return executionStats.getNumSegmentsQueried() == expectedNumSegmentsQueried && (
-          expectedNumConsumingSegmentsQueried < 0
-              || executionStats.getNumConsumingSegmentsQueried() == expectedNumConsumingSegmentsQueried);
-    }, timeoutMs, "Failed to load all segments");
   }
 
   @Test
@@ -451,7 +425,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     updateTableConfig(tableConfig);
 
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
-    assertEquals(queryCountStar(tableName), 3);
+    assertEquals(getCurrentCountStarResult(tableName), 3);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3, 2);
 
@@ -474,7 +448,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForTaskToComplete();
     // 2 segments should be compacted (351 rows -> 1 row; 500 rows -> 2 rows), 1 segment (149 rows) should be deleted
     waitForAllDocsLoaded(tableName, 600_000L, 3);
-    assertEquals(queryCountStar(tableName), 3);
+    assertEquals(getCurrentCountStarResult(tableName), 3);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 4, 2);
   }
@@ -496,7 +470,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     updateTableConfig(tableConfig);
 
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
-    assertEquals(queryCountStar(tableName), 3);
+    assertEquals(getCurrentCountStarResult(tableName), 3);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
 
@@ -508,7 +482,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForTaskToComplete();
     // 1 segment should be compacted (500 rows -> 2 rows)
     waitForAllDocsLoaded(tableName, 600_000L, 502);
-    assertEquals(queryCountStar(tableName), 3);
+    assertEquals(getCurrentCountStarResult(tableName), 3);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
   }
@@ -530,7 +504,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     updateTableConfig(tableConfig);
 
     waitForAllDocsLoaded(tableName, 600_000L, 1000);
-    assertEquals(queryCountStar(tableName), 3);
+    assertEquals(getCurrentCountStarResult(tableName), 3);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3);
 
@@ -539,7 +513,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
         "100,Zook,counter-strike,2050,1681377200000,true");
     pushCsvIntoKafka(deleteRecords, kafkaTopicName, 0);
     waitForAllDocsLoaded(tableName, 600_000L, 1002);
-    assertEquals(queryCountStar(tableName), 1);
+    assertEquals(getCurrentCountStarResult(tableName), 1);
 
     // Force commit the segments to ensure the deleting rows are part of the committed segments
     sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableName));
@@ -552,7 +526,7 @@ public class UpsertTableIntegrationTest extends BaseClusterIntegrationTest {
     waitForTaskToComplete();
     // 1 segment should be compacted (351 rows -> 1 rows), 2 segments (500 rows, 151 rows) should be deleted
     waitForAllDocsLoaded(tableName, 600_000L, 1);
-    assertEquals(queryCountStar(tableName), 1);
+    assertEquals(getCurrentCountStarResult(tableName), 1);
     assertEquals(getNumDeletedRows(tableName), 0);
     assertEquals(getScore(tableName), 3692);
     waitForNumQueriedSegmentsToConverge(tableName, 10_000L, 3, 2);

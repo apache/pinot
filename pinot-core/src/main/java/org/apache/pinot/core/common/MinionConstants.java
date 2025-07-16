@@ -155,6 +155,16 @@ public class MinionConstants {
     public static final String MERGE_TYPE_KEY = "mergeType";
     public static final String AGGREGATION_TYPE_KEY_SUFFIX = ".aggregationType";
 
+    /**
+     * Number of segments to query in one batch to fetch valid doc id metadata for upsert tables, by default 500
+     */
+    public static final String NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = "numSegmentsBatchPerServerRequest";
+
+    /**
+     * Boolean config to indicate if the table is an upsert table, set by the task generator
+     */
+    public static final String IS_UPSERT_TABLE = "isUpsertTable";
+
     public final static EnumSet<AggregationFunctionType> AVAILABLE_CORE_VALUE_AGGREGATORS =
         EnumSet.of(MIN, MAX, SUM, DISTINCTCOUNTHLL, DISTINCTCOUNTRAWHLL, DISTINCTCOUNTTHETASKETCH,
             DISTINCTCOUNTRAWTHETASKETCH, DISTINCTCOUNTTUPLESKETCH, DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH,

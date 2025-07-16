@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
@@ -37,19 +38,24 @@ import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
+import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TimestampConfig;
 import org.apache.pinot.spi.config.table.TimestampIndexGranularity;
+import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -69,6 +75,15 @@ import static org.testng.Assert.assertTrue;
  * accordingly.
  */
 public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseClusterIntegrationTestSet {
+  private static final String UPSERT_INPUT_DATA_TAR_FILE = "gameScores_upsert_realtimeToOffline_csv.tar.gz";
+  private static final String UPSERT_CSV_SCHEMA_HEADER = "playerId,name,game,score,timestampInEpoch,deleted";
+  private static final String UPSERT_CSV_DELIMITER = ",";
+  private static final String UPSERT_TABLE_NAME = "myUpsertTable";
+  private static final String UPSERT_PRIMARY_KEY_COL = "playerId";
+  private static final String UPSERT_TIME_COL_NAME = "timestampInEpoch";
+  private static final String UPSERT_SCHEMA_FILE_NAME = "upsert_table_test.schema";
+  private static final String DELETE_COL = "deleted";
+
   private PinotHelixTaskResourceManager _taskResourceManager;
   private PinotTaskManager _taskManager;
   private String _realtimeTableName;
@@ -76,6 +91,8 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
 
   private String _realtimeMetadataTableName;
   private String _offlineMetadataTableName;
+  private String _realtimeUpsertTableName;
+  private String _offlineUpsertTableName;
   private long _dataSmallestTimeMs;
   private long _dataSmallestMetadataTableTimeMs;
 
@@ -158,6 +175,9 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     // Set up the H2 connection
     setUpH2Connection(avroFiles);
 
+    // Create upsert table for testing upsert support using gameScores data
+    setUpUpsertTable();
+
     // Wait for all documents loaded
     waitForAllDocsLoaded(600_000L);
 
@@ -202,6 +222,17 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
         .setSegmentPartitionConfig(partitionConfig).build();
   }
 
+  private TableConfig createOfflineUpsertTableConfig() {
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put(UPSERT_PRIMARY_KEY_COL, new ColumnPartitionConfig("Murmur", getNumKafkaPartitions()));
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(UPSERT_TABLE_NAME)
+        .setTimeColumnName(UPSERT_TIME_COL_NAME)
+        .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
+        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig()).setNullHandlingEnabled(getNullHandlingEnabled())
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap)).build();
+  }
+
   protected TableConfig createRealtimeTableConfig(File sampleAvroFile, String tableName, TableTaskConfig taskConfig) {
     AvroFileSchemaKafkaAvroMessageDecoder._avroFile = sampleAvroFile;
     return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setTimeColumnName(getTimeColumnName())
@@ -212,6 +243,64 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
         .setTaskConfig(taskConfig).setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
         .setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig()).setStreamConfigs(getStreamConfigs())
         .setNullHandlingEnabled(getNullHandlingEnabled()).build();
+  }
+
+  private TableConfig createRealtimeUpsertTableConfig(String kafkaTopicName) {
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setDeleteRecordColumn(DELETE_COL);
+    upsertConfig.setSnapshot(Enablement.ENABLE);
+
+    Map<String, String> taskConfigs = new HashMap<>();
+    taskConfigs.put(BatchConfigProperties.OVERWRITE_OUTPUT, "true");
+    // Use yearly buckets since gameScores data spans multiple years (2019-2024)
+    taskConfigs.put(MinionConstants.RealtimeToOfflineSegmentsTask.BUCKET_TIME_PERIOD_KEY, "365d");
+
+    Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
+    columnPartitionConfigMap.put(UPSERT_PRIMARY_KEY_COL, new ColumnPartitionConfig("Murmur", getNumKafkaPartitions()));
+
+    Map<String, String> streamConfigsMap = getStreamConfigMap();
+    // Set flush threshold to 500 to create multiple completed segments
+    // Actual flush threshold is going to be 500 per segment (1000 / partitionsPerInstance)
+    streamConfigsMap.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "1000");
+    streamConfigsMap.put(
+        StreamConfigProperties.constructStreamProperty("kafka", StreamConfigProperties.STREAM_TOPIC_NAME),
+        kafkaTopicName);
+    streamConfigsMap.putAll(getCSVDecoderProperties(UPSERT_CSV_DELIMITER, UPSERT_CSV_SCHEMA_HEADER));
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(UPSERT_TABLE_NAME)
+        .setTimeColumnName(UPSERT_TIME_COL_NAME)
+        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode()).setTaskConfig(new TableTaskConfig(Collections.singletonMap(
+            MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskConfigs))).setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setStreamConfigs(streamConfigsMap)
+        .setNullHandlingEnabled(UpsertConfig.Mode.PARTIAL.equals(upsertConfig.getMode()) || getNullHandlingEnabled())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
+        .setReplicaGroupStrategyConfig(new ReplicaGroupStrategyConfig(UPSERT_PRIMARY_KEY_COL, 1))
+        .setUpsertConfig(upsertConfig).build();
+  }
+
+  private void setUpUpsertTable()
+      throws Exception {
+    // Create upsert schema from schema file
+    Schema upsertSchema = createSchema(UPSERT_SCHEMA_FILE_NAME);
+    upsertSchema.setSchemaName(UPSERT_TABLE_NAME);
+    addSchema(upsertSchema);
+
+    // Set up gameScores CSV data for upsert table
+    String upsertKafkaTopicName = getKafkaTopic() + "-upsert";
+    createKafkaTopic(upsertKafkaTopicName);
+    List<File> gameScoresFiles = unpackTarData(UPSERT_INPUT_DATA_TAR_FILE, _tempDir);
+    pushCsvIntoKafka(gameScoresFiles.get(0), upsertKafkaTopicName, 0);
+
+    TableConfig realtimeUpsertTableConfig = createRealtimeUpsertTableConfig(upsertKafkaTopicName);
+    addTableConfig(realtimeUpsertTableConfig);
+
+    TableConfig offlineUpsertTableConfig = createOfflineUpsertTableConfig();
+    addTableConfig(offlineUpsertTableConfig);
+
+    _realtimeUpsertTableName = TableNameBuilder.REALTIME.tableNameWithType(UPSERT_TABLE_NAME);
+    _offlineUpsertTableName = TableNameBuilder.OFFLINE.tableNameWithType(UPSERT_TABLE_NAME);
   }
 
   @Test
@@ -321,6 +410,99 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     }
   }
 
+  private long getMinUpsertTimestamp() {
+    ResultSetGroup resultSetGroup =
+        getPinotConnection().execute("SELECT MIN(" + UPSERT_TIME_COL_NAME + ") FROM " + UPSERT_TABLE_NAME
+            + " OPTION(skipUpsert=true)");
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return (long) resultSetGroup.getResultSet(0).getDouble(0);
+    }
+    return 0L;
+  }
+
+  private long getScore() {
+    return (long) getPinotConnection().execute(
+            "SELECT score FROM " + UPSERT_TABLE_NAME + " WHERE playerId = 101")
+        .getResultSet(0).getFloat(0);
+  }
+
+  @Test
+  public void testRealtimeToOfflineSegmentsUpsertTask()
+      throws Exception {
+    // wait for documents to be loaded: 1000 (2019-2023) + 6 (2024)
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResultWithoutUpsert(UPSERT_TABLE_NAME) == 1006,
+        600_000L,
+        "Failed to load all documents for upsert");
+    assertEquals(getCurrentCountStarResult(UPSERT_TABLE_NAME), 5);
+    assertEquals(getScore(), 3692);
+
+    // wait for segments to converge first
+    waitForNumQueriedSegmentsToConverge(UPSERT_TABLE_NAME, 10_000L, 3, 2);
+
+    // Pause consumption to force segment completion, then resume to trigger snapshot
+    sendPostRequest(_controllerRequestURLBuilder.forPauseConsumption(UPSERT_TABLE_NAME));
+    waitForNumQueriedSegmentsToConverge(UPSERT_TABLE_NAME, 600_000L, 3, 0);
+    sendPostRequest(_controllerRequestURLBuilder.forResumeConsumption(UPSERT_TABLE_NAME));
+    waitForNumQueriedSegmentsToConverge(UPSERT_TABLE_NAME, 600_000L, 5, 2);
+
+    // Run a single task iteration for upsert table
+    List<SegmentZKMetadata> segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_offlineUpsertTableName);
+    assertTrue(segmentsZKMetadata.isEmpty());
+
+    // Query minimum timestamp directly from the data
+    long minDataTimeMs = getMinUpsertTimestamp();
+
+    // Round down to bucket boundary (365 days) to match task generator logic
+    long yearMs = 365 * 24 * 3600 * 1000L; // 365 days
+    long windowStartMs = (minDataTimeMs / yearMs) * yearMs;
+    long expectedWatermark = windowStartMs + yearMs;
+    _taskManager.cleanUpTask();
+
+    long totalOfflineDocuments = 0;
+    for (int i = 0; i < 5; i++) {
+      // Schedule task for upsert table
+      assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeUpsertTableName)))
+          .get(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE));
+      assertTrue(_taskResourceManager.getTaskQueues().contains(
+          PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)));
+
+      // Should not generate more tasks
+      MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+              .setTablesToSchedule(Collections.singleton(_realtimeUpsertTableName))
+              .setTasksToSchedule(Collections.singleton(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE)),
+          _taskManager);
+
+      // Wait at most 600 seconds for all tasks COMPLETED
+      waitForTaskToComplete(expectedWatermark, _realtimeUpsertTableName);
+
+      // Count documents from the offline segments created for upsert table
+      segmentsZKMetadata = _helixResourceManager.getSegmentsZKMetadata(_offlineUpsertTableName);
+      long expectedOfflineWindowStartMs = expectedWatermark - yearMs;
+      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+        assertTrue(segmentZKMetadata.getStartTimeMs() >= expectedOfflineWindowStartMs);
+        assertTrue(segmentZKMetadata.getStartTimeMs() < expectedWatermark);
+        assertTrue(segmentZKMetadata.getEndTimeMs() >= expectedOfflineWindowStartMs);
+        assertTrue(segmentZKMetadata.getEndTimeMs() < expectedWatermark);
+        totalOfflineDocuments += segmentZKMetadata.getTotalDocs();
+      }
+      expectedWatermark += yearMs;
+    }
+
+    // offline segments should contain 3 records (distinct primary keys)
+    // minus 2 primary keys from 2024 (last window cannot be processed as it could overlap with CONSUMING segments)
+    assertEquals(totalOfflineDocuments, 3);
+    // Number of segments must be increased by 2: one per partition in the offline table
+    waitForNumQueriedSegmentsToConverge(UPSERT_TABLE_NAME, 600_000L, 7, 2);
+    // 3 + 6 records from the realtime table (2024)
+    TestUtils.waitForCondition(aVoid -> getCurrentCountStarResultWithoutUpsert(UPSERT_TABLE_NAME) == 9,
+        600_000L,
+        "Failed to load all documents for upsert");
+    assertEquals(getCurrentCountStarResult(UPSERT_TABLE_NAME),
+        5); // 3 + 2 records (primary keys only) from the realtime table (2024)
+    assertEquals(getScore(), 3692);
+  }
+
   private void waitForTaskToComplete(long expectedWatermark, String realtimeTableName) {
     TestUtils.waitForCondition(input -> {
       // Check task state
@@ -349,6 +531,10 @@ public class RealtimeToOfflineSegmentsMinionClusterIntegrationTest extends BaseC
     assertNull(MinionTaskMetadataUtils.fetchTaskMetadata(_propertyStore,
         MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, _realtimeTableName));
     dropOfflineTable(_offlineTableName);
+
+    // Clean up upsert tables
+    dropRealtimeTable(_realtimeUpsertTableName);
+    dropOfflineTable(_offlineUpsertTableName);
 
     stopMinion();
     stopServer();
