@@ -80,7 +80,8 @@ public class RealtimeNgramFilteringIndexTest {
     return Arrays.asList("andrew", "drerew", "draw", "dr", "dr and rew", "ew re");
   }
 
-  private void testSelectionResults(RealtimeNgramFilteringIndex realtimeNgramFilteringIndex, String nativeQuery, List<Integer> results) {
+  private void testSelectionResults(RealtimeNgramFilteringIndex realtimeNgramFilteringIndex, String nativeQuery,
+      List<Integer> results) {
     ImmutableRoaringBitmap resultMap = realtimeNgramFilteringIndex.getDocIds(nativeQuery);
     if (resultMap == null) {
       assertNull(results);
