@@ -46,10 +46,10 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 @Warmup(iterations = 1)
 @Measurement(iterations = 2)
 @State(Scope.Benchmark)
-public class BenchmarkNgramFilteringIndex
-{
+public class BenchmarkNgramFilteringIndex {
   public static final String PREFIX = "somelonglongveryverylongword";
   RealtimeNgramFilteringIndex _realtimeNgramFilteringIndex;
+
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder().include(BenchmarkNgramFilteringIndex.class.getSimpleName());
