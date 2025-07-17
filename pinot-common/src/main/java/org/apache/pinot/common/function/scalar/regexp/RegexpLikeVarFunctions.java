@@ -33,36 +33,21 @@ public class RegexpLikeVarFunctions {
 
   @ScalarFunction
   public static boolean regexpLikeVar(String inputStr, String regexPatternStr) {
-    Pattern pattern = Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE);
-    return pattern.matcher(inputStr).find();
+    return Pattern.compile(regexPatternStr, Pattern.UNICODE_CASE).matcher(inputStr).find();
   }
 
   @ScalarFunction
   public static boolean regexpLikeVar(String inputStr, String regexPatternStr, String matchParameter) {
-    Pattern pattern = buildPattern(regexPatternStr, matchParameter);
-    return pattern.matcher(inputStr).find();
+    return buildPattern(regexPatternStr, matchParameter).matcher(inputStr).find();
   }
 
   private static Pattern buildPattern(String pattern, String matchParameter) {
-    // Only allow single character match parameter
-    if (matchParameter.length() != 1) {
-      throw new IllegalArgumentException(
-          "Match parameter must be exactly one character. Got: '" + matchParameter + "'");
-    }
-
-    char matchChar = Character.toLowerCase(matchParameter.charAt(0));
-    if (matchChar != 'i' && matchChar != 'c') {
-      throw new IllegalArgumentException("Unsupported match parameter: '" + matchParameter.charAt(0)
-          + "'. Only 'i'/'I' (case-insensitive) and 'c'/'C' (case-sensitive) are supported.");
-    }
-
-    // Check for case-insensitive flag
-    if (matchChar == 'i') {
+    boolean caseInsensitive = RegexpPatternConverterUtils.isCaseInsensitive(matchParameter);
+    if (caseInsensitive) {
       return Pattern.compile(pattern, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+    } else {
+      return Pattern.compile(pattern);
     }
-
-    // Default to case-sensitive
-    return Pattern.compile(pattern);
   }
 
   @ScalarFunction

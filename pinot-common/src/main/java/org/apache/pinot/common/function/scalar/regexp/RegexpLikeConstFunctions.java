@@ -35,8 +35,7 @@ public class RegexpLikeConstFunctions {
   @ScalarFunction
   public boolean regexpLike(String inputStr, String regexPatternStr) {
     if (_matcher == null) {
-      Pattern p = PatternFactory.compile(regexPatternStr);
-      _matcher = p.matcher("");
+      _matcher = PatternFactory.compile(regexPatternStr).matcher("");
     }
 
     return _matcher.reset(inputStr).find();
@@ -45,8 +44,7 @@ public class RegexpLikeConstFunctions {
   @ScalarFunction
   public boolean regexpLike(String inputStr, String regexPatternStr, String matchParameter) {
     if (_matcher == null) {
-      Pattern p = buildPattern(regexPatternStr, matchParameter);
-      _matcher = p.matcher("");
+      _matcher = buildPattern(regexPatternStr, matchParameter).matcher("");
     }
 
     return _matcher.reset(inputStr).find();
@@ -78,8 +76,7 @@ public class RegexpLikeConstFunctions {
   public boolean like(String inputStr, String likePatternStr) {
     if (_matcher == null) {
       String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
-      Pattern p = PatternFactory.compile(regexPatternStr);
-      _matcher = p.matcher("");
+      _matcher = PatternFactory.compile(regexPatternStr).matcher("");
     }
 
     return _matcher.reset(inputStr).find();

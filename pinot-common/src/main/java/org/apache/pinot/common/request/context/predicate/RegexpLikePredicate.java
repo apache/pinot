@@ -20,6 +20,7 @@ package org.apache.pinot.common.request.context.predicate;
 
 import java.util.Objects;
 import org.apache.pinot.common.request.context.ExpressionContext;
+import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 
@@ -28,24 +29,19 @@ import org.apache.pinot.common.utils.regex.PatternFactory;
  */
 public class RegexpLikePredicate extends BasePredicate {
   private final String _value;
-  private final String _matchParameter;
+  private final Boolean _caseInsensitive;
   private Pattern _pattern = null;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
     super(lhs);
     _value = value;
-    _matchParameter = "c";
-    _pattern = PatternFactory.compile(value);
+    _caseInsensitive = false;
   }
 
   public RegexpLikePredicate(ExpressionContext lhs, String value, String matchParameter) {
     super(lhs);
     _value = value;
-    _matchParameter = matchParameter;
-
-    if (matchParameter.isEmpty() || matchParameter.equals("c")) {
-      _pattern = PatternFactory.compile(value);
-    }
+    _caseInsensitive = RegexpPatternConverterUtils.isCaseInsensitive(matchParameter);
   }
 
   @Override
@@ -57,40 +53,23 @@ public class RegexpLikePredicate extends BasePredicate {
     return _value;
   }
 
-  public String getMatchParameter() {
-    return _matchParameter;
+  public boolean isCaseInsensitive() {
+    return _caseInsensitive;
   }
 
   public Pattern getPattern() {
     if (_pattern == null) {
-      _pattern = buildPattern(_value, _matchParameter);
+      _pattern = buildPattern(_value, _caseInsensitive);
     }
     return _pattern;
   }
 
-  private Pattern buildPattern(String pattern, String matchParameter) {
-    // Validate that all characters in matchParameter are supported
-    for (char c : matchParameter.toCharArray()) {
-      if (c != 'i' && c != 'c') {
-        throw new IllegalArgumentException("Unsupported match parameter: '" + c
-            + "'. Only 'i' (case-insensitive) and 'c' (case-sensitive) are supported.");
-      }
-    }
-
-    // Validate that we don't have conflicting flags (both 'i' and 'c')
-    if (matchParameter.contains("i") && matchParameter.contains("c")) {
-      throw new IllegalArgumentException(
-          "Invalid match parameter: '" + matchParameter + "'. Cannot specify both 'i' (case-insensitive) and "
-              + "'c' (case-sensitive) flags.");
-    }
-
-    // Check for case-insensitive flag
-    if (matchParameter.contains("i")) {
+  private Pattern buildPattern(String pattern, boolean caseInsensitive) {
+    if (caseInsensitive) {
       return PatternFactory.compileCaseInsensitive(pattern);
+    } else {
+      return PatternFactory.compile(pattern);
     }
-
-    // Default to case-sensitive
-    return PatternFactory.compile(pattern);
   }
 
   @Override
@@ -102,21 +81,20 @@ public class RegexpLikePredicate extends BasePredicate {
       return false;
     }
     RegexpLikePredicate that = (RegexpLikePredicate) o;
-    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value) && Objects.equals(_matchParameter,
-        that._matchParameter);
+    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value) && Objects.equals(_caseInsensitive, that._caseInsensitive);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_lhs, _value, _matchParameter);
+    return Objects.hash(_lhs, _value, _caseInsensitive);
   }
 
   @Override
   public String toString() {
-    if (!_matchParameter.equals("c")) {
-      return "regexp_like(" + _lhs + ",'" + _value + "','" + _matchParameter + "')";
+    if (_caseInsensitive) {
+      return "regexp_like(" + _lhs + ", '" + _value + "', 'i')";
     } else {
-      return "regexp_like(" + _lhs + ",'" + _value + "')";
+      return "regexp_like(" + _lhs + ", '" + _value + "')";
     }
   }
 }

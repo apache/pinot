@@ -299,8 +299,7 @@ public class FilterPlanNode implements PlanNode {
             case REGEXP_LIKE:
               // Check if case-insensitive flag is present
               RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
-              boolean isCaseInsensitive = regexpLikePredicate.getMatchParameter() != null
-                  && regexpLikePredicate.getMatchParameter().contains("i");
+              boolean isCaseInsensitive = regexpLikePredicate.isCaseInsensitive();
 
               if (isCaseInsensitive && dataSource.getIFSTIndex() != null) {
                 // Use IFST Index for case-insensitive matching
