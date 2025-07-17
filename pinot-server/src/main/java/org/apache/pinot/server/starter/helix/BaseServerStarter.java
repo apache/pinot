@@ -679,7 +679,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (_resourceUsageAccountant == null) {
       _resourceUsageAccountant = Tracing.getThreadAccountant();
     }
-    Tracing.ThreadAccountantOps.startThreadAccountant();
 
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
@@ -789,7 +788,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
 
     // Start the thread accountant
-    _resourceUsageAccountant.startWatcherTask();
+    Tracing.ThreadAccountantOps.startThreadAccountant();
     PinotClusterConfigChangeListener threadAccountantListener =
         _resourceUsageAccountant.getClusterConfigChangeListener();
     if (threadAccountantListener != null) {
