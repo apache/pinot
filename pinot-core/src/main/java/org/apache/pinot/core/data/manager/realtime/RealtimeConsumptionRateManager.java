@@ -28,7 +28,12 @@ import com.google.common.util.concurrent.RateLimiter;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.LongAdder;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -87,25 +92,32 @@ public class RealtimeConsumptionRateManager {
     double serverRateLimit =
         serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
             CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
-    _serverRateLimiter = createServerRateLimiter(serverRateLimit, serverMetrics);
+    createServerRateLimiter(serverRateLimit, serverMetrics);
     return _serverRateLimiter;
   }
 
-  private ConsumptionRateLimiter createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
-    if (serverRateLimit > 0) {
-      LOGGER.info("Set up ConsumptionRateLimiter with rate limit: {}", serverRateLimit);
-      MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
-      return new RateLimiterImpl(serverRateLimit, metricEmitter);
+  private void createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
+    if (_serverRateLimiter instanceof ServerRateLimiter) {
+      ServerRateLimiter existingLimiter = (ServerRateLimiter) _serverRateLimiter;
+      if (serverRateLimit > 0) {
+        existingLimiter.updateRateLimit(serverRateLimit);
+      } else {
+        existingLimiter.close();
+        _serverRateLimiter = NOOP_RATE_LIMITER;
+      }
     } else {
-      LOGGER.info("ConsumptionRateLimiter is disabled");
-      return NOOP_RATE_LIMITER;
+      if (serverRateLimit > 0) {
+        _serverRateLimiter =
+            new ServerRateLimiter(serverRateLimit, serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
+      }
     }
   }
 
-  public void updateServerRateLimiter(double newServerRateLimit, ServerMetrics serverMetrics) {
-    LOGGER.info("Updating serverRateLimiter from: {} to: {}", _serverRateLimiter, newServerRateLimit);
-    _serverRateLimiter = createServerRateLimiter(newServerRateLimit, serverMetrics);
+  public void updateServerRateLimiter(double newRateLimit, ServerMetrics serverMetrics) {
+    LOGGER.info("Updating serverRateLimiter from: {} to: {}", _serverRateLimiter, newRateLimit);
+    createServerRateLimiter(newRateLimit, serverMetrics);
   }
+
 
   public ConsumptionRateLimiter getServerRateLimiter() {
     return _serverRateLimiter;
@@ -128,8 +140,7 @@ public class RealtimeConsumptionRateManager {
     LOGGER.info("A consumption rate limiter is set up for topic {} in table {} with rate limit: {} "
             + "(topic rate limit: {}, partition count: {})", streamConfig.getTopicName(), tableName, partitionRateLimit,
         topicRateLimit, partitionCount);
-    MetricEmitter metricEmitter = new MetricEmitter(serverMetrics, metricKeyName);
-    return new RateLimiterImpl(partitionRateLimit, metricEmitter);
+    return new PartitionRateLimiter(partitionRateLimit, serverMetrics, metricKeyName);
   }
 
   @VisibleForTesting
@@ -162,6 +173,58 @@ public class RealtimeConsumptionRateManager {
         });
   }
 
+  /**
+   * Tracks quota utilization for a stream consumer by aggregating the number of messages consumed and computing
+   * the consumption rate against the configured rate limit.
+   * <p>
+   * This class maintains the message count over time and computes the quota utilization ratio once per minute.
+   * The utilization is reported as a gauge metric to {@link ServerMetrics}.
+   * <p>
+   * Note: This class is not thread-safe and is intended to be used in contexts where concurrency control is
+   * managed externally (e.g., per-partition rate limiter instances).
+   * <p>
+   * Example:
+   *   - If 3000 messages are consumed in one minute and the rate limit is 50 msg/sec,
+   *     the quota utilization = (3000 / 60) / 50 = 1.0 → 100%
+   */
+  static class QuotaUtilizationTracker {
+    private long _previousMinute = -1;
+    private int _aggregateNumMessages = 0;
+    private final ServerMetrics _serverMetrics;
+    private final String _metricKeyName;
+
+    public QuotaUtilizationTracker(ServerMetrics serverMetrics, String metricKeyName) {
+      _serverMetrics = serverMetrics;
+      _metricKeyName = metricKeyName;
+    }
+
+    /**
+     * Update count and return utilization ratio percentage (0 if not enough data yet).
+     */
+    public int update(int numMsgsConsumed, double rateLimit, Instant now) {
+      int ratioPercentage = 0;
+      long nowInMinutes = now.getEpochSecond() / 60;
+      if (nowInMinutes == _previousMinute) {
+        _aggregateNumMessages += numMsgsConsumed;
+      } else {
+        if (_previousMinute != -1) { // not first time
+          double actualRate = _aggregateNumMessages / ((nowInMinutes - _previousMinute) * 60.0); // messages per second
+          ratioPercentage = (int) Math.round(actualRate / rateLimit * 100);
+          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
+              ratioPercentage);
+        }
+        _aggregateNumMessages = numMsgsConsumed;
+        _previousMinute = nowInMinutes;
+      }
+      return ratioPercentage;
+    }
+
+    @VisibleForTesting
+    int getAggregateNumMessages() {
+      return _aggregateNumMessages;
+    }
+  }
+
   @FunctionalInterface
   public interface ConsumptionRateLimiter {
     void throttle(int numMsgs);
@@ -172,15 +235,15 @@ public class RealtimeConsumptionRateManager {
   };
 
   @VisibleForTesting
-  static class RateLimiterImpl implements ConsumptionRateLimiter {
+  static class PartitionRateLimiter implements ConsumptionRateLimiter {
     private final double _rate;
     private final RateLimiter _rateLimiter;
-    private MetricEmitter _metricEmitter;
+    private final QuotaUtilizationTracker _quotaUtilizationTracker;
 
-    private RateLimiterImpl(double rate, MetricEmitter metricEmitter) {
+    private PartitionRateLimiter(double rate, ServerMetrics serverMetrics, String metricKeyName) {
       _rate = rate;
       _rateLimiter = RateLimiter.create(rate);
-      _metricEmitter = metricEmitter;
+      _quotaUtilizationTracker = new QuotaUtilizationTracker(serverMetrics, metricKeyName);
     }
 
     @Override
@@ -189,7 +252,7 @@ public class RealtimeConsumptionRateManager {
         // Only emit metrics when throttling is allowed. Throttling is not enabled.
         // until the server has passed startup checks. Otherwise, we will see
         // consumption well over 100% during startup.
-        _metricEmitter.emitMetric(numMsgs, _rate, Clock.systemUTC().instant());
+        _quotaUtilizationTracker.update(numMsgs, _rate, Clock.systemUTC().instant());
         if (numMsgs > 0) {
           _rateLimiter.acquire(numMsgs);
         }
@@ -203,9 +266,47 @@ public class RealtimeConsumptionRateManager {
 
     @Override
     public String toString() {
-      return "RateLimiterImpl{"
+      return "PartitionRateLimiter{"
           + "_rate=" + _rate
           + ", _rateLimiter=" + _rateLimiter
+          + ", _quotaUtilizationTracker=" + _quotaUtilizationTracker
+          + '}';
+    }
+  }
+
+  static class ServerRateLimiter implements ConsumptionRateLimiter {
+    private final RateLimiter _rateLimiter;
+    private final AsyncMetricEmitter _metricEmitter;
+
+    public ServerRateLimiter(double initialRateLimit, ServerMetrics serverMetrics, String metricKeyName) {
+      _rateLimiter = RateLimiter.create(initialRateLimit);
+      _metricEmitter = new AsyncMetricEmitter(serverMetrics, metricKeyName, initialRateLimit);
+      _metricEmitter.start(); // start background emission
+    }
+
+    public void throttle(int numMsgsConsumed) {
+      _metricEmitter.record(numMsgsConsumed); // just incrementing counter (non-blocking)
+      _rateLimiter.acquire(numMsgsConsumed); // blocks if needed
+    }
+
+    public void updateRateLimit(double newRateLimit) {
+      _rateLimiter.setRate(newRateLimit);
+      _metricEmitter.setRateLimit(newRateLimit);
+    }
+
+    public void close() {
+      _metricEmitter.close();
+    }
+
+    @VisibleForTesting
+    AsyncMetricEmitter getMetricEmitter() {
+      return _metricEmitter;
+    }
+
+    @Override
+    public String toString() {
+      return "ServerBasedRateLimiter{"
+          + "_rateLimiter=" + _rateLimiter
           + ", _metricEmitter=" + _metricEmitter
           + '}';
     }
@@ -231,41 +332,81 @@ public class RealtimeConsumptionRateManager {
   };
 
   /**
-   * This class is responsible to emit a gauge metric for the ratio of the actual consumption rate to the rate limit.
-   * Number of messages consumed are aggregated over one minute. Each minute the ratio percentage is calculated and
-   * emitted.
+   * Asynchronously emits the quota utilization metric for a shared rate limiter (e.g., server-wide).
+   * <p>
+   * This class aggregates consumed message counts over a fixed time interval (default: 60 seconds) using a
+   * high-performance {@link java.util.concurrent.atomic.LongAdder}. A scheduled background task computes the
+   * actual message rate and reports the quota utilization ratio as a gauge metric.
+   * <p>
+   * This design avoids contention from multiple threads calling emit logic and ensures non-blocking accumulation
+   * of message counts. Thread-safe and suitable for shared use.
+   * <p>
+   * Usage:
+   *   - Call {@link #record(int)} to record messages consumed.
+   *   - Call {@link #start()} once to schedule metric emission.
+   *   - Optionally call {@link #close()} to stop the emitter.
+   * <p>
+   * Thread-safe.
    */
-  @VisibleForTesting
-  static class MetricEmitter {
+  static class AsyncMetricEmitter {
+    private static final int METRIC_EMIT_FREQUENCY_SEC = 60;
+    private final AtomicReference<Double> _rateLimit;
+    private final LongAdder _messageCount = new LongAdder();
+    private final ScheduledExecutorService _executor;
+    private final AtomicBoolean _running = new AtomicBoolean(false);
+    private final QuotaUtilizationTracker _tracker;
 
-    private final ServerMetrics _serverMetrics;
-    private final String _metricKeyName;
-
-    // state variables
-    private long _previousMinute = -1;
-    private int _aggregateNumMessages = 0;
-
-    public MetricEmitter(ServerMetrics serverMetrics, String metricKeyName) {
-      _serverMetrics = serverMetrics;
-      _metricKeyName = metricKeyName;
+    public AsyncMetricEmitter(ServerMetrics serverMetrics, String metricKeyName, double initialRateLimit) {
+      _rateLimit = new AtomicReference<>(initialRateLimit);
+      _tracker = new QuotaUtilizationTracker(serverMetrics, metricKeyName);
+      _executor = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "server-rate-limit-metric-emitter");
+        t.setDaemon(true);
+        return t;
+      });
     }
 
-    int emitMetric(int numMsgsConsumed, double rateLimit, Instant now) {
-      int ratioPercentage = 0;
-      long nowInMinutes = now.getEpochSecond() / 60;
-      if (nowInMinutes == _previousMinute) {
-        _aggregateNumMessages += numMsgsConsumed;
-      } else {
-        if (_previousMinute != -1) { // not first time
-          double actualRate = _aggregateNumMessages / ((nowInMinutes - _previousMinute) * 60.0); // messages per second
-          ratioPercentage = (int) Math.round(actualRate / rateLimit * 100);
-          _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
-              ratioPercentage);
-        }
-        _aggregateNumMessages = numMsgsConsumed;
-        _previousMinute = nowInMinutes;
+    public void start() {
+      if (_running.compareAndSet(false, true)) {
+        _executor.scheduleAtFixedRate(this::emit, 0, METRIC_EMIT_FREQUENCY_SEC, TimeUnit.SECONDS);
       }
-      return ratioPercentage;
+    }
+
+    @VisibleForTesting
+    void start(int initialDelayInSeconds, int emitFrequencyInSeconds) {
+      if (_running.compareAndSet(false, true)) {
+        _executor.scheduleAtFixedRate(this::emit, initialDelayInSeconds, emitFrequencyInSeconds, TimeUnit.SECONDS);
+      }
+    }
+
+    public void setRateLimit(double newRateLimit) {
+      _rateLimit.set(newRateLimit);
+    }
+
+    public void record(int numMsgsConsumed) {
+      _messageCount.add(numMsgsConsumed);
+    }
+
+    private void emit() {
+      double rateLimit = _rateLimit.get();
+      Instant now = Instant.now();
+      int count = (int) _messageCount.sumThenReset();
+      _tracker.update(count, rateLimit, now);
+    }
+
+    @VisibleForTesting
+    LongAdder getMessageCount() {
+      return _messageCount;
+    }
+
+    @VisibleForTesting
+    QuotaUtilizationTracker getTracker() {
+      return _tracker;
+    }
+
+    public void close() {
+      _executor.shutdownNow();
+      _running.set(false);
     }
   }
 }
