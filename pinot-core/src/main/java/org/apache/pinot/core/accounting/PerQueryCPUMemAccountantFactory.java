@@ -564,10 +564,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _cancelSentQueries.add(queryId);
     }
 
-    protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {
-      LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}",
+    protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage,
+        boolean hasCallback) {
+      LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}. Used Callback: {}",
           queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
-          queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage);
+          queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage, hasCallback);
     }
 
     @Override
@@ -925,8 +926,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
                   String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                       maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
+              boolean hasCallBack = _queryCancelCallbacks.getIfPresent(maxUsageTuple.getQueryId()) != null;
               terminateQuery(maxUsageTuple);
-              logTerminatedQuery(maxUsageTuple, _usedBytes);
+              logTerminatedQuery(maxUsageTuple, _usedBytes, hasCallBack);
             } else if (!config.isOomKillQueryEnabled()) {
               LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
                   + "because oomKillQueryEnabled is false", maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
@@ -953,8 +955,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                 String.format("Query %s got killed on %s: %s because using %d "
                         + "CPU time exceeding limit of %d ns CPU time", value._queryId, _instanceType, _instanceId,
                     value.getCpuTimeNs(), config.getCpuTimeBasedKillingThresholdNS())));
+            boolean hasCallBack = _queryCancelCallbacks.getIfPresent(value.getQueryId()) != null;
             terminateQuery(value);
-            logTerminatedQuery(value, _usedBytes);
+            logTerminatedQuery(value, _usedBytes, hasCallBack);
           }
         }
         logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
