@@ -153,7 +153,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
   protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
 
   protected volatile boolean _shutDown;
-  protected volatile boolean _isDeleteTable;
+  protected volatile boolean _isDeleted;
 
   @Override
   public void init(InstanceDataManagerConfig instanceDataManagerConfig, HelixManager helixManager,
@@ -693,13 +693,13 @@ public abstract class BaseTableDataManager implements TableDataManager {
   }
 
   @Override
-  public boolean isDeleteTable() {
-    return _isDeleteTable;
+  public boolean isDeleted() {
+    return _isDeleted;
   }
 
   @Override
-  public void setDeleteTable(boolean deleteTable) {
-    _isDeleteTable = deleteTable;
+  public void setDeleted(boolean deleted) {
+    _isDeleted = deleted;
   }
 
   @Override

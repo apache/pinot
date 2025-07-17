@@ -216,9 +216,9 @@ public interface TableDataManager {
    */
   boolean isSegmentDeletedRecently(String segmentName);
 
-  boolean isDeleteTable();
+  boolean isDeleted();
 
-  void setDeleteTable(boolean deleteTable);
+  void setDeleted(boolean deleted);
 
   /**
    * Acquires all segments of the table.
