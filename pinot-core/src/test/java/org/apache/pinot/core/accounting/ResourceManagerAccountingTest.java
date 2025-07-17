@@ -105,7 +105,7 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testCPUtimeProvider",
         InstanceType.SERVER);
-    Tracing.getThreadAccountant().startWatcherTask();
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
@@ -168,7 +168,7 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testCPUtimeProvider",
         InstanceType.SERVER);
-    Tracing.getThreadAccountant().startWatcherTask();
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
@@ -243,7 +243,7 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
     Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testWorkloadMemoryAccounting",
         InstanceType.SERVER);
-    Tracing.getThreadAccountant().startWatcherTask();
+    Tracing.ThreadAccountantOps.startThreadAccountant();
     WorkloadBudgetManager workloadBudgetManager =
         Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
     workloadBudgetManager.addOrUpdateWorkload(workloadName, 88_000_000, 27_000_000);
@@ -382,7 +382,7 @@ public class ResourceManagerAccountingTest {
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER);
-    Tracing.getThreadAccountant().startWatcherTask();
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     CountDownLatch latch = new CountDownLatch(100);
     AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
@@ -453,7 +453,7 @@ public class ResourceManagerAccountingTest {
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy", InstanceType.SERVER);
-    Tracing.getThreadAccountant().startWatcherTask();
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     CountDownLatch latch = new CountDownLatch(100);
     AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
@@ -511,7 +511,7 @@ public class ResourceManagerAccountingTest {
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM",
         InstanceType.SERVER);
-    Tracing.getThreadAccountant().startWatcherTask();
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     Supplier<String> randomJsonValue = () -> {
       Random random = new Random();

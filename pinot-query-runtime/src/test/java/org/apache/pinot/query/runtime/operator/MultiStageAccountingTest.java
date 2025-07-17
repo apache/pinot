@@ -93,7 +93,7 @@ public class MultiStageAccountingTest implements ITest {
     // init accountant and start watcher task
     Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(configs), "testGroupBy",
         InstanceType.SERVER);
-    Tracing.getThreadAccountant().startWatcherTask();
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     // Setup Thread Context
     Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);
