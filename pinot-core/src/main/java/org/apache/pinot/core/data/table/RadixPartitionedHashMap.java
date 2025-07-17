@@ -36,7 +36,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   private final int _numRadixBits;
   private final int _numPartitions;
   private final int _mask;
-  private final List<HashMap<K, V>> _maps;
+  private final HashMap<K, V>[] _maps;
   private int _size;
   private int _segmentId = -1;
 
@@ -46,17 +46,17 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
     _numPartitions = 1 << numRadixBits;
     _mask = _numPartitions - 1;
     _segmentId = segmentId;
-    _maps = new ArrayList<>();
+    _maps = new HashMap[_numPartitions];
     _size = 0;
     for (int i = 0; i < _numPartitions; i++) {
-      _maps.add(new HashMap<>(partitionInitialCapacity));
+      _maps[i] = new HashMap<>(partitionInitialCapacity);
     }
   }
 
-  public RadixPartitionedHashMap(List<HashMap<K, V>> maps, int numRadixBits) {
+  public RadixPartitionedHashMap(HashMap<K, V>[] maps, int numRadixBits) {
     _numRadixBits = numRadixBits;
     _numPartitions = 1 << numRadixBits;
-    assert (maps.size() == _numPartitions);
+    assert (maps.length == _numPartitions);
     _mask = _numPartitions - 1;
     _maps = maps;
     _size = 0;
@@ -70,7 +70,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   }
 
   public Map<K, V> getPartition(int i) {
-    return _maps.get(i);
+    return _maps[i];
   }
 
   public int getNumPartitions() {
@@ -93,7 +93,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public boolean containsKey(Object o) {
-    HashMap<K, V> map = _maps.get(partition((K) o));
+    HashMap<K, V> map = _maps[partition((K) o)];
     return map.containsKey(o);
   }
 
@@ -104,14 +104,14 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public V get(Object o) {
-    HashMap<K, V> map = _maps.get(partition((K) o));
+    HashMap<K, V> map = _maps[partition((K) o)];
     return map.get(o);
   }
 
   @Nullable
   @Override
   public V put(K k, V v) {
-    HashMap<K, V> map = _maps.get(partition(k));
+    HashMap<K, V> map = _maps[partition(k)];
     V prev = map.put(k, v);
     if (prev == null) {
       _size++;
@@ -121,7 +121,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public V remove(Object o) {
-    HashMap<K, V> map = _maps.get(partition((K) o));
+    HashMap<K, V> map = _maps[partition((K) o)];
     V prev = map.remove(o);
     if (prev != null) {
       _size--;
@@ -145,21 +145,27 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   @Override
   public Set<K> keySet() {
     Set<K> set = new HashSet<>();
-    _maps.forEach(m -> set.addAll(m.keySet()));
+    for (int i = 0; i < _maps.length; i++) {
+      set.addAll(_maps[i].keySet());
+    }
     return set;
   }
 
   @Override
   public Collection<V> values() {
     List<V> list = new ArrayList<>();
-    _maps.forEach(m -> list.addAll(m.values()));
+    for (int i = 0; i < _maps.length; i++) {
+      list.addAll(_maps[i].values());
+    }
     return list;
   }
 
   @Override
   public Set<Entry<K, V>> entrySet() {
     Set<Entry<K, V>> set = new HashSet<>();
-    _maps.forEach(m -> set.addAll(m.entrySet()));
+    for (int i = 0; i < _maps.length; i++) {
+      set.addAll(_maps[i].entrySet());
+    }
     return set;
   }
 }
