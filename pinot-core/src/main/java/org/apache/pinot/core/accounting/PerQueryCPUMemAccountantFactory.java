@@ -160,6 +160,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _instanceType = instanceType;
       _cancelSentQueries = new HashSet<>();
       _watcherTask = createWatcherTask();
+      _queryCancelCallbacks = CacheBuilder.newBuilder().build();
     }
 
     public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId,
