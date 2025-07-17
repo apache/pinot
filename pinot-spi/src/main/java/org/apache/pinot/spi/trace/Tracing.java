@@ -67,7 +67,7 @@ public class Tracing {
 
   private static final class Holder {
     static final Tracer TRACER = TRACER_REGISTRATION.get() == null ? createDefaultTracer() : TRACER_REGISTRATION.get();
-    static ThreadResourceUsageAccountant _accountant = createDefaultThreadAccountant();
+    static ThreadResourceUsageAccountant _accountant = null;
   }
 
   /**
@@ -87,14 +87,9 @@ public class Tracing {
    * @return true if the registration was successful.
    */
   public static boolean register(ThreadResourceUsageAccountant threadResourceUsageAccountant) {
-    return register(null, threadResourceUsageAccountant);
-  }
-
-  public static boolean register(ThreadResourceUsageAccountant current, ThreadResourceUsageAccountant newAccountant) {
     // This is used in tests to replace the accountant with a new one
-    if (ACCOUNTANT_REGISTRATION.compareAndSet(current, newAccountant)) {
-      ACCOUNTANT_REGISTRATION.set(newAccountant);
-      Holder._accountant = newAccountant;
+    if (ACCOUNTANT_REGISTRATION.compareAndSet(null, threadResourceUsageAccountant)) {
+      Holder._accountant = threadResourceUsageAccountant;
       return true;
     }
     return false;
@@ -153,7 +148,8 @@ public class Tracing {
   }
 
   public static void resetToDefaultThreadAccountant() {
-    Holder._accountant = createDefaultThreadAccountant();
+    Holder._accountant = null;
+    ACCOUNTANT_REGISTRATION.set(null);
   }
 
   /**
@@ -338,36 +334,43 @@ public class Tracing {
 
     public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
-      createThreadAccountant(config, instanceId, instanceType);
+      ThreadResourceUsageAccountant accountant = createThreadAccountant(config, instanceId, instanceType);
+      initializeThreadAccountant(accountant);
     }
+
+    public static void initializeThreadAccountant(ThreadResourceUsageAccountant accountant) {
+      if (accountant == null) {
+        LOGGER.warn("No thread accountant factory provided, using default implementation");
+        accountant = createDefaultThreadAccountant();
+      }
+      boolean registered = register(accountant);
+      if (registered) {
+        LOGGER.warn("ThreadAccountant register unsuccessful, as it is already registered.");
+      }
+    }
+
 
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
-      ThreadResourceUsageAccountant current = Tracing.getThreadAccountant();
-      String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
       _workloadBudgetManager = new WorkloadBudgetManager(config);
-      if (factoryName == null) {
-        LOGGER.warn("No thread accountant factory provided, using default implementation");
-      } else {
+      String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
+      if (factoryName != null) {
         LOGGER.info("Config-specified accountant factory name {}", factoryName);
         try {
           ThreadAccountantFactory threadAccountantFactory =
               (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
           LOGGER.info("Using accountant provided by {}", factoryName);
-          ThreadResourceUsageAccountant resourceUsageAccountant =
-              threadAccountantFactory.init(config, instanceId, instanceType);
-          boolean registered = Tracing.register(current, resourceUsageAccountant);
-          if (registered) {
-            current = resourceUsageAccountant;
-          } else {
-            LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);
-          }
+          return threadAccountantFactory.init(config, instanceId, instanceType);
         } catch (Exception exception) {
           LOGGER.warn("Using default implementation of thread accountant, "
               + "due to invalid thread accountant factory {} provided, exception:", factoryName, exception);
         }
       }
-      return current;
+      return null;
+    }
+
+    public static void startThreadAccountant() {
+      Tracing.getThreadAccountant().startWatcherTask();
     }
 
     public static boolean isInterrupted() {

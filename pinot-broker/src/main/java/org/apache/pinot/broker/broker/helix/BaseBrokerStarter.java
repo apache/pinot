@@ -420,7 +420,11 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
         _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.BROKER);
-    _resourceUsageAccountant.startWatcherTask();
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(_resourceUsageAccountant);
+    if (_resourceUsageAccountant == null) {
+      _resourceUsageAccountant = Tracing.getThreadAccountant();
+    }
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     if (controllerUrl != null) {
