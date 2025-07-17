@@ -92,9 +92,9 @@ public class RegexpLikePredicate extends BasePredicate {
   @Override
   public String toString() {
     if (_caseInsensitive) {
-      return "regexp_like(" + _lhs + ", '" + _value + "', 'i')";
+      return "regexp_like(" + _lhs + ",'" + _value + "','i')";
     } else {
-      return "regexp_like(" + _lhs + ", '" + _value + "')";
+      return "regexp_like(" + _lhs + ",'" + _value + "')";
     }
   }
 }
