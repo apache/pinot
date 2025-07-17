@@ -56,6 +56,7 @@ import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -961,6 +962,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
       }
       _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
           _numSegmentsAcquiredDownloadSemaphore.incrementAndGet());
+      long downloadStartTime = System.currentTimeMillis();
       try {
         File untarredSegmentDir;
         if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
@@ -985,6 +987,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
         }
         File indexDir = moveSegment(segmentName, untarredSegmentDir);
         _logger.info("Downloaded segment: {} from: {} to: {}", segmentName, downloadUrl, indexDir);
+
         return indexDir;
       } catch (Exception e) {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1);
@@ -993,6 +996,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
         if (_segmentOperationsThrottler != null) {
           _segmentOperationsThrottler.getSegmentDownloadThrottler().release();
         }
+        long downloadDuration = System.currentTimeMillis() - downloadStartTime;
+        _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.SEGMENT_DOWNLOAD_FROM_DEEP_STORE_TIME_MS,
+            downloadDuration, TimeUnit.MILLISECONDS);
         FileUtils.deleteQuietly(tempRootDir);
       }
     } finally {
@@ -1022,6 +1028,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
               + "(lock-time={}ms, queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
           segmentDownloadThrottler.getQueueLength());
     }
+    long downloadStartTime = System.currentTimeMillis();
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
@@ -1034,6 +1041,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentTarFile.length());
       File indexDir = untarAndMoveSegment(segmentName, segmentTarFile, tempRootDir);
       _logger.info("Downloaded segment: {} from peers to: {}", segmentName, indexDir);
+
       return indexDir;
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1);
@@ -1042,6 +1050,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       if (_segmentOperationsThrottler != null) {
         _segmentOperationsThrottler.getSegmentDownloadThrottler().release();
       }
+      long downloadDuration = System.currentTimeMillis() - downloadStartTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.SEGMENT_DOWNLOAD_FROM_PEERS_TIME_MS,
+          downloadDuration, TimeUnit.MILLISECONDS);
       FileUtils.deleteQuietly(tempRootDir);
     }
   }
