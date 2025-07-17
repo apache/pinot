@@ -98,18 +98,17 @@ public class RealtimeConsumptionRateManager {
 
   private void createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
     LOGGER.info("Setting up ConsumptionRateLimiter with rate limit: {}", serverRateLimit);
-    if (_serverRateLimiter instanceof ServerRateLimiter) {
-      ServerRateLimiter existingLimiter = (ServerRateLimiter) _serverRateLimiter;
-      if (serverRateLimit > 0) {
-        existingLimiter.updateRateLimit(serverRateLimit);
+    if (serverRateLimit > 0) {
+      if (_serverRateLimiter instanceof ServerRateLimiter) {
+        ((ServerRateLimiter) _serverRateLimiter).updateRateLimit(serverRateLimit);
       } else {
-        existingLimiter.close();
-        _serverRateLimiter = NOOP_RATE_LIMITER;
-      }
-    } else {
-      if (serverRateLimit > 0) {
         _serverRateLimiter =
             new ServerRateLimiter(serverRateLimit, serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
+      }
+    } else {
+      if (_serverRateLimiter instanceof ServerRateLimiter) {
+        ((ServerRateLimiter) _serverRateLimiter).close();
+        _serverRateLimiter = NOOP_RATE_LIMITER;
       }
     }
   }
