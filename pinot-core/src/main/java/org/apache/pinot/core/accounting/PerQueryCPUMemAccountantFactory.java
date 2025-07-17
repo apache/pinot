@@ -661,7 +661,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       protected long _usedBytes;
       protected int _sleepTime;
-      protected int _numQueriesKilledConsecutively = 0;
       protected Map<String, AggregatedStats> _aggregatedUsagePerActiveQuery;
       protected TriggeringLevel _triggeringLevel;
 
@@ -744,10 +743,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.info("_instanceType is {}", _instanceType);
         LOGGER.info("_alarmingLevel of on heap memory is {}", queryMonitorConfig.getAlarmingLevel());
         LOGGER.info("_criticalLevel of on heap memory is {}", queryMonitorConfig.getCriticalLevel());
-        LOGGER.info("_criticalLevelAfterGC of on heap memory is {}", queryMonitorConfig.getCriticalLevelAfterGC());
         LOGGER.info("_panicLevel of on heap memory is {}", queryMonitorConfig.getPanicLevel());
-        LOGGER.info("_gcBackoffCount is {}", queryMonitorConfig.getGcBackoffCount());
-        LOGGER.info("_gcWaitTime is {}", queryMonitorConfig.getGcWaitTime());
         LOGGER.info("_normalSleepTime is {}", queryMonitorConfig.getNormalSleepTime());
         LOGGER.info("_alarmingSleepTime is {}", queryMonitorConfig.getAlarmingSleepTime());
         LOGGER.info("_oomKillQueryEnabled: {}", queryMonitorConfig.isOomKillQueryEnabled());
@@ -873,10 +869,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           case HeapMemoryAlarmingVerbose:
             LOGGER.warn("Heap used bytes {} exceeds alarming level", _usedBytes);
             LOGGER.warn("Query usage aggregation results {}", _aggregatedUsagePerActiveQuery.toString());
-            _numQueriesKilledConsecutively = 0;
             break;
           default:
-            _numQueriesKilledConsecutively = 0;
             break;
         }
       }
@@ -904,13 +898,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           if (config.isQueryKilledMetricEnabled()) {
             _metrics.addMeteredGlobalValue(_queryKilledMeter, killedCount);
           }
-          try {
-            Thread.sleep(config.getNormalSleepTime());
-          } catch (InterruptedException ignored) {
-          }
-          // In this extreme case we directly trigger system.gc
-          System.gc();
-          _numQueriesKilledConsecutively = 0;
         }
       }
 
@@ -925,21 +912,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           return;
         }
         QueryMonitorConfig config = _queryMonitorConfig.get();
-        if (_aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()
-            && _numQueriesKilledConsecutively >= config.getGcBackoffCount()) {
-          _numQueriesKilledConsecutively = 0;
-          System.gc();
-          try {
-            Thread.sleep(config.getGcWaitTime());
-          } catch (InterruptedException ignored) {
-          }
-          _usedBytes = MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
-          if (_usedBytes < config.getCriticalLevelAfterGC()) {
-            return;
-          }
-          LOGGER.error("After GC, heap used bytes {} still exceeds _criticalLevelAfterGC level {}", _usedBytes,
-              config.getCriticalLevelAfterGC());
-        }
         // Critical heap memory usage while no queries running
         if (_aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()) {
           AggregatedStats maxUsageTuple;
@@ -993,7 +965,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
           _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
         }
-        _numQueriesKilledConsecutively += 1;
       }
     }
   }
