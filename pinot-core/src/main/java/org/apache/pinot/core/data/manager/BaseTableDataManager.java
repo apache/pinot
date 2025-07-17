@@ -987,7 +987,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
         }
         File indexDir = moveSegment(segmentName, untarredSegmentDir);
         _logger.info("Downloaded segment: {} from: {} to: {}", segmentName, downloadUrl, indexDir);
-
         return indexDir;
       } catch (Exception e) {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, 1);
@@ -1041,7 +1040,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
           segmentTarFile.length());
       File indexDir = untarAndMoveSegment(segmentName, segmentTarFile, tempRootDir);
       _logger.info("Downloaded segment: {} from peers to: {}", segmentName, indexDir);
-
       return indexDir;
     } catch (Exception e) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, 1);
