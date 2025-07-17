@@ -97,6 +97,7 @@ public class RealtimeConsumptionRateManager {
   }
 
   private void createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
+    LOGGER.info("Setting up ConsumptionRateLimiter with rate limit: {}", serverRateLimit);
     if (_serverRateLimiter instanceof ServerRateLimiter) {
       ServerRateLimiter existingLimiter = (ServerRateLimiter) _serverRateLimiter;
       if (serverRateLimit > 0) {
