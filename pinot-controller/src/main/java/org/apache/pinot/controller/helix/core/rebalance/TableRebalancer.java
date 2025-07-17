@@ -1743,8 +1743,7 @@ public class TableRebalancer {
         Map<String, String> firstEntryInstanceStateMap = firstEntry.getValue();
         SingleSegmentAssignment firstAssignment =
             getNextSingleSegmentAssignment(firstEntryInstanceStateMap, targetAssignment.get(firstEntry.getKey()),
-                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap, firstEntry.getKey(),
-                dataLossRiskAssessor);
+                minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
         Set<String> serversAdded = getServersAddedInSingleSegmentAssignment(firstEntryInstanceStateMap,
             firstAssignment._instanceStateMap);
         boolean anyServerExhaustedBatchSize = false;
@@ -1794,7 +1793,7 @@ public class TableRebalancer {
         Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
         SingleSegmentAssignment assignment =
             getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-                lowDiskMode, numSegmentsToOffloadMap, assignmentMap, segmentName, dataLossRiskAssessor);
+                lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
         Set<String> assignedInstances = assignment._instanceStateMap.keySet();
         Set<String> availableInstances = assignment._availableInstances;
         availableInstancesMap.compute(assignedInstances, (k, currentAvailableInstances) -> {
@@ -1824,6 +1823,13 @@ public class TableRebalancer {
           Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
               nextAssignment.get(segmentName));
           serversAddedForSegment.forEach(server -> serverToNumSegmentsAddedSoFar.merge(server, 1, Integer::sum));
+
+          // Since next assignment doesn't match current assignment, it means the segment will be moved. Check if there
+          // is a data loss risk
+          if (dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
+            throw new IllegalStateException(String.format("Found data loss risk for segment: %s while rebalancing",
+                segmentName));
+          }
         }
       }
     }
@@ -1998,7 +2004,7 @@ public class TableRebalancer {
       Map<String, String> targetInstanceStateMap = targetAssignment.get(segmentName);
       Map<String, String> nextInstanceStateMap =
           getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap, minAvailableReplicas,
-              lowDiskMode, numSegmentsToOffloadMap, assignmentMap, segmentName, dataLossRiskAssessor)._instanceStateMap;
+              lowDiskMode, numSegmentsToOffloadMap, assignmentMap)._instanceStateMap;
       Set<String> serversAddedForSegment = getServersAddedInSingleSegmentAssignment(currentInstanceStateMap,
           nextInstanceStateMap);
       boolean anyServerExhaustedBatchSize = false;
@@ -2019,6 +2025,15 @@ public class TableRebalancer {
         nextAssignment.put(segmentName, nextInstanceStateMap);
         updateNumSegmentsToOffloadMap(numSegmentsToOffloadMap, currentInstanceStateMap.keySet(),
             nextInstanceStateMap.keySet());
+
+        if (!nextAssignment.get(segmentName).equals(currentInstanceStateMap)) {
+          // Since next assignment doesn't match current assignment, it means the segment will be moved. Check if there
+          // is a data loss risk
+          if (dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
+            throw new IllegalStateException(String.format("Found data loss risk for segment: %s while rebalancing",
+                segmentName));
+          }
+        }
       }
     }
     return nextAssignment;
@@ -2071,13 +2086,7 @@ public class TableRebalancer {
   @VisibleForTesting
   static SingleSegmentAssignment getNextSingleSegmentAssignment(Map<String, String> currentInstanceStateMap,
       Map<String, String> targetInstanceStateMap, int minAvailableReplicas, boolean lowDiskMode,
-      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap,
-      String segmentName, DataLossRiskAssessor dataLossRiskAssessor) {
-    if (dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
-      throw new IllegalStateException(String.format("Found data loss risk for segment: %s while rebalancing",
-          segmentName));
-    }
-
+      Map<String, Integer> numSegmentsToOffloadMap, Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap) {
     Map<String, String> nextInstanceStateMap = new TreeMap<>();
 
     // Assign the segment the same way as other segments if the current and target instances are the same. We need this
