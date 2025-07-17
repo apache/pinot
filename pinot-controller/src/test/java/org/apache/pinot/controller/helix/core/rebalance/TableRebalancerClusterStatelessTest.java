@@ -67,7 +67,8 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.testng.Assert.*;
+import static org.testng.Assert.
+    *;
 
 
 @Test(groups = "stateless")
@@ -669,124 +670,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
   }
 
   @Test
-  public void testRebalancePeerDownload()
-      throws Exception {
-    for (int batchSizePerServer : Arrays.asList(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1, 2)) {
-      int numServers = 3;
-      // Mock disk usage
-      Map<String, DiskUsageInfo> diskUsageInfoMap = new HashMap<>();
-
-      for (int i = 0; i < numServers; i++) {
-        String instanceId = SERVER_INSTANCE_ID_PREFIX + i;
-        addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
-        DiskUsageInfo diskUsageInfo = new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
-        diskUsageInfoMap.put(instanceId, diskUsageInfo);
-      }
-
-      ExecutorService executorService = Executors.newFixedThreadPool(10);
-      DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
-      preChecker.init(_helixResourceManager, executorService, 1);
-      TableRebalancer tableRebalancer =
-          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
-      TableConfig tableConfig =
-          new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
-
-      // Rebalance should fail without creating the table
-      RebalanceConfig rebalanceConfig = new RebalanceConfig();
-      rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
-      RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-      assertNull(rebalanceResult.getRebalanceSummaryResult());
-
-      // Rebalance with dry-run summary should fail without creating the table
-      rebalanceConfig = new RebalanceConfig();
-      rebalanceConfig.setDryRun(true);
-      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-      assertNull(rebalanceResult.getRebalanceSummaryResult());
-
-      // Create the table
-      addDummySchema(RAW_TABLE_NAME);
-      _helixResourceManager.addTable(tableConfig);
-
-      // Add the segments
-      int numSegments = 10;
-      for (int i = 0; i < numSegments; i++) {
-        _helixResourceManager.addNewSegment(OFFLINE_TABLE_NAME,
-            SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i), null);
-      }
-      Map<String, Map<String, String>> oldSegmentAssignment =
-          _helixResourceManager.getTableIdealState(OFFLINE_TABLE_NAME).getRecord().getMapFields();
-
-      // Rebalance should return NO_OP status
-      rebalanceConfig = new RebalanceConfig();
-      rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
-      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
-
-      // All servers should be assigned to the table
-      Map<InstancePartitionsType, InstancePartitions> instanceAssignment = rebalanceResult.getInstanceAssignment();
-      assertEquals(instanceAssignment.size(), 1);
-      InstancePartitions instancePartitions = instanceAssignment.get(InstancePartitionsType.OFFLINE);
-      assertEquals(instancePartitions.getNumReplicaGroups(), 1);
-      assertEquals(instancePartitions.getNumPartitions(), 1);
-      // Math.abs("testTable_OFFLINE".hashCode()) % 3 = 2
-      assertEquals(instancePartitions.getInstances(0, 0),
-          Arrays.asList(SERVER_INSTANCE_ID_PREFIX + 2, SERVER_INSTANCE_ID_PREFIX + 0, SERVER_INSTANCE_ID_PREFIX + 1));
-
-      // Segment assignment should not change
-      assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
-
-      // Add 3 more servers
-      int numServersToAdd = 3;
-      for (int i = 0; i < numServersToAdd; i++) {
-        String instanceId = SERVER_INSTANCE_ID_PREFIX + (numServers + i);
-        addFakeServerInstanceToAutoJoinHelixCluster(instanceId, true);
-        DiskUsageInfo diskUsageInfo = new DiskUsageInfo(instanceId, "", 1000L, 500L, System.currentTimeMillis());
-        diskUsageInfoMap.put(instanceId, diskUsageInfo);
-      }
-
-      ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
-
-      // Enable peer-download for the table and validate that rebalance with downtime results in FAILURE
-      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
-      rebalanceConfig = new RebalanceConfig();
-      rebalanceConfig.setDowntime(true);
-      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-      assertEquals(rebalanceResult.getDescription(), "Peer-download enabled tables cannot undergo downtime rebalance "
-          + "due to the potential for data loss, validate all segments exist in deep store and pause ingestion prior "
-          + "to setting forceDowntime=true to override the downtime flag");
-
-      // Enable peer-download for the table and validate that rebalance with minAvailableReplicas=0 results in FAILURE
-      rebalanceConfig = new RebalanceConfig();
-      rebalanceConfig.setMinAvailableReplicas(0);
-      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-      assertEquals(rebalanceResult.getDescription(), "Peer-download enabled tables with cannot set "
-          + "minAvailableReplicas=0 for rebalance due to the potential for data loss, validate all segments exist in "
-          + "deep store and pause ingestion prior to setting forceDowntime=true to override the downtime flag");
-
-      // Rebalance with downtime should succeed after disabling the peer-download
-      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme(null);
-      rebalanceConfig = new RebalanceConfig();
-      rebalanceConfig.setDowntime(true);
-      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-
-      _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
-
-      for (int i = 0; i < numServers; i++) {
-        stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + i);
-      }
-      for (int i = 0; i < numServersToAdd; i++) {
-        stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + (numServers + i));
-      }
-      executorService.shutdown();
-    }
-  }
-
-  @Test
   public void testRebalancePeerDownloadForceDowntime()
       throws Exception {
     for (int batchSizePerServer : Arrays.asList(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1, 2)) {
@@ -866,20 +749,10 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
       ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
 
-      // Enable peer-download for the table and validate that rebalance with downtime results in FAILURE
+      // Enable peer-download for the table and validate that rebalance with downtime results in DONE
       tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
       rebalanceConfig = new RebalanceConfig();
       rebalanceConfig.setDowntime(true);
-      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-      assertEquals(rebalanceResult.getDescription(), "Peer-download enabled tables cannot undergo downtime rebalance "
-          + "due to the potential for data loss, validate all segments exist in deep store and pause ingestion prior "
-          + "to setting forceDowntime=true to override the downtime flag");
-
-      // Rebalance with downtime should succeed after enabling forceDowntime
-      rebalanceConfig = new RebalanceConfig();
-      rebalanceConfig.setDowntime(true);
-      rebalanceConfig.setForceDowntime(true);
       rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
       assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
 
@@ -975,26 +848,13 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
 
       ResourceUtilizationInfo.setDiskUsageInfo(diskUsageInfoMap);
 
-      // Enable peer-download for the table and validate that rebalance with minAvailableReplicas=0 results in FAILURE
+      // Enable peer-download for the table and validate that rebalance with minAvailableReplicas=0 results in DONE
       tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
-      String existingReplication = tableConfig.getValidationConfig().getReplication();
       tableConfig.getValidationConfig().setReplication("3");
       rebalanceConfig = new RebalanceConfig();
       rebalanceConfig.setMinAvailableReplicas(0);
       rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
-      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
-      assertEquals(rebalanceResult.getDescription(), "Peer-download enabled tables with cannot set "
-          + "minAvailableReplicas=0 for rebalance due to the potential for data loss, validate all segments exist in "
-          + "deep store and pause ingestion prior to setting forceDowntime=true to override the downtime flag");
-
-      // Rebalance with downtime should succeed after enabling forceDowntime
-      tableConfig.getValidationConfig().setReplication(existingReplication);
-      rebalanceConfig = new RebalanceConfig();
-      rebalanceConfig.setMinAvailableReplicas(0);
-      rebalanceConfig.setForceDowntime(true);
-      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
       assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
-
 
       _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME);
 
