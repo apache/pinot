@@ -96,6 +96,30 @@ public class SegmentProcessorAvroUtilsTest {
     assertEquals(actualValue, expected, "Unexpected value after conversion");
   }
 
+  @Test(dataProvider = "getValueConversion")
+  public void testNullConversion(
+      FieldSpec.DataType dataType,
+      Object initial,
+      Object expected
+  ) {
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("testField", null);
+
+    Schema.SchemaBuilder pinotSchemaBuilder = new Schema.SchemaBuilder();
+    pinotSchemaBuilder.setSchemaName("testSchema");
+    pinotSchemaBuilder.addDimensionField("testField", dataType, field -> field.setNullable(true));
+
+    org.apache.avro.Schema avroSchema =
+        SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(pinotSchemaBuilder.build());
+
+    GenericData.Record record = SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(
+        genericRow,
+        new GenericData.Record(avroSchema));
+
+    Object actualValue = record.get("testField");
+    assertNull(actualValue, "Unexpected value after conversion. Expected null, but got: " + actualValue);
+  }
+
   @Test(dataProvider = "getTypeConversion")
   public void convertNullableSchema(
       FieldSpec.DataType dataType,
