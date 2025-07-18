@@ -23,6 +23,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -45,10 +47,13 @@ public class ServerRateLimitConfigChangeListenerTest {
   }
 
   @Test
-  public void testRateLimitUpdate() {
+  public void testRateLimitUpdate()
+      throws InterruptedException {
+    AtomicReference<Throwable> errorRef = new AtomicReference<>();
+    simulateThrottling(errorRef);
     // Initial state
     RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(SERVER_CONFIG, null);
-    RealtimeConsumptionRateManager.RateLimiterImpl serverRateLimiter = getServerRateLimiter();
+    RealtimeConsumptionRateManager.ServerRateLimiter serverRateLimiter = getServerRateLimiter();
     double initialRate = serverRateLimiter.getRate();
     assertEquals(initialRate, 5.0, DELTA);
 
@@ -58,18 +63,67 @@ public class ServerRateLimitConfigChangeListenerTest {
     ServerRateLimitConfigChangeListener listener = new ServerRateLimitConfigChangeListener(MOCK_SERVER_METRICS);
     Set<String> changedConfigSet =
         new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    simulateThrottling(errorRef);
     listener.onChange(changedConfigSet, newConfig);
+    simulateThrottling(errorRef);
 
-    // Verify that old rate remains same and the new rate is applied
+    // Verify that rate changed
     double rate = serverRateLimiter.getRate();
-    assertEquals(rate, 5.0, DELTA);
-
+    assertEquals(rate, 300.0, DELTA);
     double updatedRate = getServerRateLimiter().getRate();
     assertEquals(updatedRate, 300.0, DELTA);
+
+    // Test removal of serverRateLimit
+    newConfig = new HashMap<>();
+    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "0");
+    changedConfigSet = new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    simulateThrottling(errorRef);
+    listener.onChange(changedConfigSet, newConfig);
+    simulateThrottling(errorRef);
+
+    // Verify that old rate remains same and the new rate is applied
+    rate = serverRateLimiter.getRate();
+    assertEquals(rate, 300.0, DELTA);
+
+    assertEquals(RealtimeConsumptionRateManager.NOOP_RATE_LIMITER,
+        RealtimeConsumptionRateManager.getInstance().getServerRateLimiter());
+
+    // Test update of serverRateLimit after it was removed
+    newConfig = new HashMap<>();
+    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "10000");
+    changedConfigSet = new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    simulateThrottling(errorRef);
+    listener.onChange(changedConfigSet, newConfig);
+    simulateThrottling(errorRef);
+
+    // Verify that old rate (one before the config change was deleted and again added) remains same.
+    rate = serverRateLimiter.getRate();
+    assertEquals(rate, 300.0, DELTA);
+
+    updatedRate = getServerRateLimiter().getRate();
+    assertEquals(updatedRate, 10000, DELTA);
+
+    Thread.sleep(1000);
+    if (errorRef.get() != null) {
+      throw new RuntimeException("Throttle call failed: " + errorRef.get().getMessage());
+    }
   }
 
-  private RealtimeConsumptionRateManager.RateLimiterImpl getServerRateLimiter() {
-    return (RealtimeConsumptionRateManager.RateLimiterImpl) (RealtimeConsumptionRateManager.getInstance()
+  private void simulateThrottling(AtomicReference<Throwable> errorRef) {
+    // A helper method to test side effects of throttling during serverRateLimit config change.
+    for (int i = 0; i < 10; i++) {
+      CompletableFuture.runAsync(() -> {
+        try {
+          RealtimeConsumptionRateManager.getInstance().getServerRateLimiter().throttle(100);
+        } catch (Throwable throwable) {
+          errorRef.set(throwable);
+        }
+      });
+    }
+  }
+
+  private RealtimeConsumptionRateManager.ServerRateLimiter getServerRateLimiter() {
+    return (RealtimeConsumptionRateManager.ServerRateLimiter) (RealtimeConsumptionRateManager.getInstance()
         .getServerRateLimiter());
   }
 }
