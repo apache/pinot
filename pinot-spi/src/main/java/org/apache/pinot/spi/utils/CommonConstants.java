@@ -1529,15 +1529,6 @@ public class CommonConstants {
         "accounting.min.memory.footprint.to.kill.ratio";
     public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
 
-    // Per-query memory threshold configurations
-    public static final String CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK = "accounting.per.query.memory.check.enabled";
-    public static final boolean DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK = false;
-
-    public static final String CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES = "accounting.per.query.memory.limit.bytes";
-    // Default to 512MB per query limit to avoid issues with Runtime.getRuntime().maxMemory() at class loading time
-    public static final long DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES = 512L * 1024 * 1024;
-    // 1/3 of heap size
-
     // Per-thread query memory threshold configurations (new naming to be more explicit)
     public static final String CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED =
         "accounting.per.thread.query.memory.check.enabled";
