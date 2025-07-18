@@ -103,7 +103,7 @@ public class FSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
     x.put("STILL", 124);  // Same key in different case
 
     // Build case-insensitive FST
-    FST<?> fst = FSTBuilder.buildFST(x, false); // caseSensitive = false
+    FST<BytesRef> fst = (FST<BytesRef>) FSTBuilder.buildFST(x, false); // caseSensitive = false
 
     // Save to file
     File outputFile = new File(TEMP_DIR, "test_case_insensitive.lucene");
@@ -119,29 +119,29 @@ public class FSTBuilderTest implements PinotBuffersAfterMethodCheckRule {
       PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, fstFile.length());
 
       // Test that case-insensitive matching works
-      List<Long> results = RegexpMatcher.regexMatch("hello.*world", fst);
+      List<Long> results = RegexpMatcherCaseInsensitive.regexMatch("hello.*world", fst);
       Assert.assertEquals(results.size(), 2); // Should match both "Hello-World" and "HELLO-WORLD"
       Assert.assertTrue(results.contains(12L));
       Assert.assertTrue(results.contains(13L));
 
-      results = RegexpMatcher.regexMatch("hello.*world123", fst);
+      results = RegexpMatcherCaseInsensitive.regexMatch("hello.*world123", fst);
       Assert.assertEquals(results.size(), 2); // Should match both "hello-world123" and "HELLO-WORLD123"
       Assert.assertTrue(results.contains(21L));
       Assert.assertTrue(results.contains(22L));
 
-      results = RegexpMatcher.regexMatch("still", fst);
+      results = RegexpMatcherCaseInsensitive.regexMatch("still", fst);
       Assert.assertEquals(results.size(), 2); // Should match both "Still" and "STILL"
       Assert.assertTrue(results.contains(123L));
       Assert.assertTrue(results.contains(124L));
 
       // Test with uppercase regex
-      results = RegexpMatcher.regexMatch("HELLO.*WORLD", fst);
+      results = RegexpMatcherCaseInsensitive.regexMatch("HELLO.*WORLD", fst);
       Assert.assertEquals(results.size(), 2); // Should still match both
       Assert.assertTrue(results.contains(12L));
       Assert.assertTrue(results.contains(13L));
 
       // Test with mixed case regex
-      results = RegexpMatcher.regexMatch("HeLLo.*WoRlD", fst);
+      results = RegexpMatcherCaseInsensitive.regexMatch("HeLLo.*WoRlD", fst);
       Assert.assertEquals(results.size(), 2); // Should still match both
       Assert.assertTrue(results.contains(12L));
       Assert.assertTrue(results.contains(13L));

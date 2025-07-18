@@ -301,21 +301,25 @@ public class FilterPlanNode implements PlanNode {
               RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
               boolean isCaseInsensitive = regexpLikePredicate.isCaseInsensitive();
 
-              if (isCaseInsensitive && dataSource.getIFSTIndex() != null) {
-                // Use IFST Index for case-insensitive matching
-                predicateEvaluator =
-                    IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
-                        dataSource.getIFSTIndex(), dataSource.getDictionary());
-              } else if (dataSource.getFSTIndex() != null) {
-                // Use FST Index for case-sensitive matching
-                predicateEvaluator =
-                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
-                        dataSource.getFSTIndex(), dataSource.getDictionary());
+              if (isCaseInsensitive) {
+                if (dataSource.getIFSTIndex() != null) {
+                  predicateEvaluator =
+                      IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
+                          dataSource.getIFSTIndex(), dataSource.getDictionary());
+                } else {
+                  predicateEvaluator =
+                      PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                          dataSource.getDataSourceMetadata().getDataType());
+                }
               } else {
-                // Use regular predicate evaluator
-                predicateEvaluator =
-                    PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                        dataSource.getDataSourceMetadata().getDataType());
+                if (dataSource.getFSTIndex() != null) {
+                  predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
+                      dataSource.getFSTIndex(), dataSource.getDictionary());
+                } else {
+                  predicateEvaluator =
+                      PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                          dataSource.getDataSourceMetadata().getDataType());
+                }
               }
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);

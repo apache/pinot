@@ -20,7 +20,6 @@ package org.apache.pinot.common.function.scalar.regexp;
 
 import org.apache.pinot.common.utils.RegexpPatternConverterUtils;
 import org.apache.pinot.common.utils.regex.Matcher;
-import org.apache.pinot.common.utils.regex.Pattern;
 import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
@@ -44,32 +43,14 @@ public class RegexpLikeConstFunctions {
   @ScalarFunction
   public boolean regexpLike(String inputStr, String regexPatternStr, String matchParameter) {
     if (_matcher == null) {
-      _matcher = buildPattern(regexPatternStr, matchParameter).matcher("");
+      if (RegexpPatternConverterUtils.isCaseInsensitive(matchParameter)) {
+        _matcher = PatternFactory.compile(regexPatternStr, true).matcher("");
+      } else {
+        _matcher = PatternFactory.compile(regexPatternStr).matcher("");
+      }
     }
 
     return _matcher.reset(inputStr).find();
-  }
-
-  private Pattern buildPattern(String pattern, String matchParameter) {
-    // Only allow single character match parameter
-    if (matchParameter.length() != 1) {
-      throw new IllegalArgumentException(
-          "Match parameter must be exactly one character. Got: '" + matchParameter + "'");
-    }
-
-    char matchChar = Character.toLowerCase(matchParameter.charAt(0));
-    if (matchChar != 'i' && matchChar != 'c') {
-      throw new IllegalArgumentException(
-          "Unsupported match parameter: '" + matchParameter.charAt(0) + "'. Only 'i'/'I' (case-insensitive) and "
-              + "'c'/'C' (case-sensitive) are supported.");
-    }
-
-    // Check for case-insensitive flag
-    if (matchChar == 'i') {
-      return PatternFactory.compileCaseInsensitive(pattern);
-    }
-    // Default to case-sensitive
-    return PatternFactory.compile(pattern);
   }
 
   @ScalarFunction
