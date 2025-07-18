@@ -419,36 +419,25 @@ public class TableRebalancer {
 
       // If peer-download is enabled, verify that for all segments with changes in assignment, it is safe to rebalance
       // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
-      // for a table
-      if (peerSegmentDownloadScheme != null) {
+      // for a table. Skip this step if allowPeerDownloadDataLoss = true
+      if (peerSegmentDownloadScheme != null && !allowPeerDownloadDataLoss) {
         // Setting minAvailableReplicas to 0 since that is what's equivalent to downtime=true
         DataLossRiskAssessor dataLossRiskAssessor = new PeerDownloadTableDataLossRiskAssessor(tableNameWithType,
             tableConfig, 0, _helixManager, _pinotLLCRealtimeSegmentManager);
-        int numSegmentsFoundWithDataLossPotential = 0;
         for (Map.Entry<String, Map<String, String>> segmentToAssignment : currentAssignment.entrySet()) {
           String segmentName = segmentToAssignment.getKey();
           Map<String, String> assignment = segmentToAssignment.getValue();
           if (!assignment.equals(targetAssignment.get(segmentName))
               && dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
-            if (!allowPeerDownloadDataLoss) {
-              // Fail the rebalance if a segment with the potential for data loss is found and allowPeerDownloadDataLoss
-              // is disabled
-              String errorMsg = "Moving segment " + segmentName + " as part of rebalance is risky for peer-download "
-                  + "enabled tables, ensure the deep store has a copy of the segment and if upsert / dedup enabled "
-                  + "that it is completed and try again. It is recommended to forceCommit and pause ingestion prior to "
-                  + "rebalancing";
-              onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
-              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
-                  tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
-            } else {
-              numSegmentsFoundWithDataLossPotential++;
-            }
+            // Fail the rebalance if a segment with the potential for data loss is found
+            String errorMsg = "Moving segment " + segmentName + " as part of rebalance is risky for peer-download "
+                + "enabled tables, ensure the deep store has a copy of the segment and if upsert / dedup enabled "
+                + "that it is completed and try again. It is recommended to forceCommit and pause ingestion prior to "
+                + "rebalancing";
+            onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
+            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
           }
-        }
-
-        if (numSegmentsFoundWithDataLossPotential > 0) {
-          LOGGER.warn("{} segments found for peer-download table with potential for data loss, continuing rebalance "
-              + "as allowPeerDownloadDataLoss = true", numSegmentsFoundWithDataLossPotential);
         }
       }
 
