@@ -21,15 +21,13 @@ package org.apache.pinot.core.util;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.avro.Conversions;
-import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
+import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -42,77 +40,6 @@ import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
  * {@link SegmentWriter}
  */
 public final class SegmentProcessorAvroUtils {
-
-  private static final EnumMap<FieldSpec.DataType, Schema> NOT_NULL_SCALAR_MAP;
-  private static final EnumMap<FieldSpec.DataType, Schema> NULL_SCALAR_MAP;
-  private static final EnumMap<FieldSpec.DataType, Schema> NOT_NULL_MULTI_VALUE_MAP;
-  private static final EnumMap<FieldSpec.DataType, Schema> NULL_MULTI_VALUE_MAP;
-
-  static {
-    NOT_NULL_SCALAR_MAP = new EnumMap<>(FieldSpec.DataType.class);
-    NULL_SCALAR_MAP = new EnumMap<>(FieldSpec.DataType.class);
-    NOT_NULL_MULTI_VALUE_MAP = new EnumMap<>(FieldSpec.DataType.class);
-    NULL_MULTI_VALUE_MAP = new EnumMap<>(FieldSpec.DataType.class);
-
-    Schema nullSchema = Schema.create(Schema.Type.NULL);
-    for (DataType value : DataType.values()) {
-      switch (value) {
-        case INT:
-          addType(value, Schema.create(Schema.Type.INT), nullSchema);
-          break;
-        case LONG:
-          addType(value, Schema.create(Schema.Type.LONG), nullSchema);
-          break;
-        case FLOAT:
-          addType(value, Schema.create(Schema.Type.FLOAT), nullSchema);
-          break;
-        case DOUBLE:
-          addType(value, Schema.create(Schema.Type.DOUBLE), nullSchema);
-          break;
-        case STRING:
-        case JSON:
-          addType(value, Schema.create(Schema.Type.STRING), nullSchema);
-          break;
-        case BIG_DECIMAL:
-          Schema bigDecimal = LogicalTypes.bigDecimal().addToSchema(SchemaBuilder.builder().bytesType());
-          addType(value, bigDecimal, nullSchema);
-          break;
-        case BYTES:
-          addType(value, Schema.create(Schema.Type.BYTES), nullSchema);
-          break;
-        case BOOLEAN:
-          addType(value, Schema.create(Schema.Type.BOOLEAN), nullSchema);
-          break;
-        case TIMESTAMP:
-          Schema timestampMillis = LogicalTypes.timestampMillis().addToSchema(SchemaBuilder.builder().longType());
-          addType(value, timestampMillis, nullSchema);
-          break;
-        case MAP:
-        case LIST:
-        case STRUCT:
-        case UNKNOWN:
-          // Types we know we don't support in AVRO
-          break;
-        default:
-          throw new RuntimeException("Unsupported data type: " + value);
-      }
-    }
-  }
-
-  /// This should be used on avro writers to automatically cast types
-  public static GenericData getGenericData() {
-    GenericData genericData = new GenericData();
-    genericData.addLogicalTypeConversion(new Conversions.BigDecimalConversion());
-    return genericData;
-  }
-
-  private static void addType(DataType dataType, Schema scalarSchema, Schema nullSchema) {
-    NOT_NULL_SCALAR_MAP.put(dataType, scalarSchema);
-    NULL_SCALAR_MAP.put(dataType, Schema.createUnion(scalarSchema, nullSchema));
-    Schema multiValueSchema = Schema.createArray(scalarSchema);
-    NOT_NULL_MULTI_VALUE_MAP.put(dataType, multiValueSchema);
-    NULL_MULTI_VALUE_MAP.put(dataType, Schema.createUnion(multiValueSchema, nullSchema));
-  }
 
   private SegmentProcessorAvroUtils() {
   }
@@ -155,31 +82,52 @@ public final class SegmentProcessorAvroUtils {
         .collect(Collectors.toList());
     for (FieldSpec fieldSpec : orderedFieldSpecs) {
       String name = fieldSpec.getName();
-      DataType dataType = fieldSpec.getDataType();
-
-      Schema fieldType;
+      DataType storedType = fieldSpec.getDataType().getStoredType();
       if (fieldSpec.isSingleValueField()) {
-        if (fieldSpec.isNullable()) {
-          fieldType = NULL_SCALAR_MAP.get(dataType);
-        } else {
-          fieldType = NOT_NULL_SCALAR_MAP.get(dataType);
+        switch (storedType) {
+          case INT:
+            fieldAssembler = fieldAssembler.name(name).type().intType().noDefault();
+            break;
+          case LONG:
+            fieldAssembler = fieldAssembler.name(name).type().longType().noDefault();
+            break;
+          case FLOAT:
+            fieldAssembler = fieldAssembler.name(name).type().floatType().noDefault();
+            break;
+          case DOUBLE:
+            fieldAssembler = fieldAssembler.name(name).type().doubleType().noDefault();
+            break;
+          case STRING:
+            fieldAssembler = fieldAssembler.name(name).type().stringType().noDefault();
+            break;
+          case BYTES:
+            fieldAssembler = fieldAssembler.name(name).type().bytesType().noDefault();
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type: " + storedType);
         }
       } else {
-        if (fieldSpec.isNullable()) {
-          fieldType = NULL_MULTI_VALUE_MAP.get(dataType);
-        } else {
-          fieldType = NOT_NULL_MULTI_VALUE_MAP.get(dataType);
+        switch (storedType) {
+          case INT:
+            fieldAssembler = fieldAssembler.name(name).type().array().items().intType().noDefault();
+            break;
+          case LONG:
+            fieldAssembler = fieldAssembler.name(name).type().array().items().longType().noDefault();
+            break;
+          case FLOAT:
+            fieldAssembler = fieldAssembler.name(name).type().array().items().floatType().noDefault();
+            break;
+          case DOUBLE:
+            fieldAssembler = fieldAssembler.name(name).type().array().items().doubleType().noDefault();
+            break;
+          case STRING:
+            fieldAssembler = fieldAssembler.name(name).type().array().items().stringType().noDefault();
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type: " + storedType);
         }
       }
-      if (fieldType == null) {
-        throw new RuntimeException("Unsupported data type: " + dataType);
-      }
-
-      fieldAssembler.name(name)
-          .type(fieldType)
-          .noDefault();
     }
-    Schema schema = fieldAssembler.endRecord();
-    return schema;
+    return fieldAssembler.endRecord();
   }
 }

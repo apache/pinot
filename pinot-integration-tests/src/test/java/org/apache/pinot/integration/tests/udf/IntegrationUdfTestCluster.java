@@ -27,17 +27,12 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Stream;
-import org.apache.avro.file.DataFileWriter;
-import org.apache.avro.generic.GenericData;
-import org.apache.avro.generic.GenericDatumWriter;
-import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.grpc.GrpcConnection;
 import org.apache.pinot.client.grpc.GrpcUtils;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
-import org.apache.pinot.core.util.SegmentProcessorAvroUtils;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -120,19 +115,13 @@ public class IntegrationUdfTestCluster extends BaseClusterIntegrationTest
 
       int numRows = 0;
       File tempFile = File.createTempFile(tableName, ".avro");
-      org.apache.avro.Schema avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(schema);
 
-      GenericData genericData = SegmentProcessorAvroUtils.getGenericData();
-      GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(avroSchema, genericData);
       try (Stream<GenericRow> closeMe = rows;
-          DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter)) {
-        dataFileWriter.create(avroSchema, tempFile);
+          AvroSink sink = new AvroSink(schema, tempFile)) {
 
         Iterator<GenericRow> it = rows.iterator();
         while (it.hasNext()) {
-          GenericData.Record record = new GenericData.Record(avroSchema);
-          SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(it.next(), record);
-          dataFileWriter.append(record);
+          sink.consume(it.next());
           numRows++;
         }
       }
@@ -178,7 +167,7 @@ public class IntegrationUdfTestCluster extends BaseClusterIntegrationTest
       }
       throw toThrow != null ? toThrow : new RuntimeException(exceptions.toString());
     }
-    // Process schemao
+    // Process schema
     if (!response.hasNext()) {
       throw new RuntimeException("No schema found in the response");
     }
