@@ -201,15 +201,14 @@ public class PinotSegmentUploadDownloadRestletResource {
       }
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       long segmentSizeInBytes = segmentFile.length();
-      long accessStartTimeMs = System.currentTimeMillis();
+      long downloadStartTimeMs = System.currentTimeMillis();
       ResourceUtils.emitPreSegmentDownloadMetrics(_controllerMetrics, rawTableName, segmentSizeInBytes);
       // Streaming the segment file directly from local FS to the output stream to ensure we can capture the metrics
       builder.entity((StreamingOutput) output -> {
         try {
           Files.copy(segmentFile.toPath(), output);
         } finally {
-          long durationMs = System.currentTimeMillis() - accessStartTimeMs;
-          ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName, durationMs,
+          ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName, downloadStartTimeMs,
               segmentSizeInBytes);
         }
       });
@@ -229,12 +228,12 @@ public class PinotSegmentUploadDownloadRestletResource {
               "Invalid segment name: %s", segmentName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       // Emit metrics related to deep-store download operation
-      long deepStoreDownloadStartTimeMs = System.currentTimeMillis();
+      long downloadStartTimeMs = System.currentTimeMillis();
       long segmentSizeInBytes = segmentFile.length();
       ResourceUtils.emitPreSegmentDownloadMetrics(_controllerMetrics, rawTableName, segmentSizeInBytes);
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
-      ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName,
-          System.currentTimeMillis() - deepStoreDownloadStartTimeMs, segmentSizeInBytes);
+      ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName, downloadStartTimeMs,
+          segmentSizeInBytes);
 
       // Streaming in the tmp file and delete it afterward.
       builder.entity((StreamingOutput) output -> {
