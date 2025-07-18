@@ -353,7 +353,7 @@ public class JsonFunctions {
    * @return List of key paths matching the JsonPath, empty list if input is null or invalid
    */
   @ScalarFunction
-  public static List jsonExtractKey(Object jsonObj, String jsonPath) {
+  public static List<String> jsonExtractKey(Object jsonObj, String jsonPath) {
     // treat empty string as extracting all
     if ("".equals(jsonPath)) {
       jsonPath = "$..**";
@@ -361,7 +361,7 @@ public class JsonFunctions {
     return jsonExtractKeyInternal(jsonObj, JsonPathCache.INSTANCE.getOrCompute(jsonPath));
   }
 
-  public static List jsonExtractKeyInternal(Object jsonObj, JsonPath jsonPath) {
+  public static List<String> jsonExtractKeyInternal(Object jsonObj, JsonPath jsonPath) {
     if (jsonObj instanceof String) {
       return KEY_PARSE_CONTEXT.parse((String) jsonObj).read(jsonPath);
     }
@@ -369,7 +369,7 @@ public class JsonFunctions {
   }
 
   @ScalarFunction
-  public static List jsonExtractKey(Object jsonObj, String jsonPath, String paramString)
+  public static List<String> jsonExtractKey(Object jsonObj, String jsonPath, String paramString)
       throws IOException {
     JsonExtractFunctionParameters params = new JsonExtractFunctionParameters(paramString);
 
@@ -378,13 +378,18 @@ public class JsonFunctions {
     }
     // Special handling for empty string, '$.**' and '$..' recursive key extraction
     if ("".equals(jsonPath) || "$..**".equals(jsonPath) || "$..".equals(jsonPath)) {
-      return extractAllKeysRecursively(jsonObj, params._maxDepth, params._dotNotation);
+      return jsonExtractAllKeysInternal(jsonObj, params._maxDepth, params._dotNotation);
     }
     return jsonExtractKeyInternal(jsonObj, JsonPathCache.INSTANCE.getOrCompute(jsonPath), params._maxDepth,
         params._dotNotation);
   }
 
-  public static List jsonExtractKeyInternal(Object jsonObj, JsonPath jsonPath, int maxDepth, boolean dotNotation)
+  public static boolean isExtractAllKeys(String jsonPath) {
+    return "".equals(jsonPath) || "$..**".equals(jsonPath) || "$..".equals(jsonPath);
+  }
+
+  public static List<String> jsonExtractKeyInternal(Object jsonObj, JsonPath jsonPath, int maxDepth,
+      boolean dotNotation)
       throws IOException {
     // For other expressions, try to get keys using AS_PATH_LIST
     List<String> keys = jsonObj instanceof String ? KEY_PARSE_CONTEXT.parse((String) jsonObj).read(jsonPath)
@@ -405,8 +410,8 @@ public class JsonFunctions {
   /**
    * Extract all keys recursively from a JSON object up to maxDepth with output format option
    */
-  private static List<String> extractAllKeysRecursively(Object jsonObj, int maxDepth, boolean dotNotation) {
-    List<String> allKeys = new java.util.ArrayList<>();
+  public static List<String> jsonExtractAllKeysInternal(Object jsonObj, int maxDepth, boolean dotNotation) {
+    List<String> allKeys = new ArrayList<>();
     try {
       JsonNode node;
       if (jsonObj instanceof String) {

@@ -50,6 +50,7 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
 
   private TransformFunction _jsonFieldTransformFunction;
   private JsonPath _jsonPath;
+  private boolean _isExtractAllKeys;
   private int _maxDepth = Integer.MAX_VALUE;
   private boolean _dotNotation = false;
 
@@ -75,7 +76,9 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
               + "function");
     }
     _jsonFieldTransformFunction = firstArgument;
-    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(((LiteralTransformFunction) arguments.get(1)).getStringLiteral());
+    String jsonPathString = ((LiteralTransformFunction) arguments.get(1)).getStringLiteral();
+    _isExtractAllKeys = JsonFunctions.isExtractAllKeys(jsonPathString);
+    _jsonPath = JsonPathCache.INSTANCE.getOrCompute(jsonPathString);
 
     // Handle the optional third argument (optionalParameters)
     if (arguments.size() == 3) {
@@ -106,9 +109,17 @@ public class JsonExtractKeyTransformFunction extends BaseTransformFunction {
       List values;
       try {
         if (_maxDepth != Integer.MAX_VALUE || _dotNotation) {
-          values = JsonFunctions.jsonExtractKeyInternal(jsonStrings[i], _jsonPath, _maxDepth, _dotNotation);
+          if (_isExtractAllKeys) {
+            values = JsonFunctions.jsonExtractAllKeysInternal(jsonStrings[i], _maxDepth, _dotNotation);
+          } else {
+            values = JsonFunctions.jsonExtractKeyInternal(jsonStrings[i], _jsonPath, _maxDepth, _dotNotation);
+          }
         } else {
-          values = JsonFunctions.jsonExtractKeyInternal(jsonStrings[i], _jsonPath);
+          if (_isExtractAllKeys) {
+            values = JsonFunctions.jsonExtractAllKeysInternal(jsonStrings[i], Integer.MAX_VALUE, false);
+          } else {
+            values = JsonFunctions.jsonExtractKeyInternal(jsonStrings[i], _jsonPath);
+          }
         }
       } catch (IOException e) {
         throw new RuntimeException(e);
