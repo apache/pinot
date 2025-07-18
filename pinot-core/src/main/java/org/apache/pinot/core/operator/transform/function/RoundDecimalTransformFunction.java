@@ -90,18 +90,31 @@ public class RoundDecimalTransformFunction extends BaseTransformFunction {
     double[] leftValues = _leftTransformFunction.transformToDoubleValuesSV(valueBlock);
     if (_fixedScale) {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        try {
+          _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+                  .setScale(_scale, RoundingMode.HALF_UP).doubleValue();
+        } catch(NumberFormatException nfe) {
+          _doubleValuesSV[i] = leftValues[i];
+        }
       }
     } else if (_rightTransformFunction != null) {
       int[] rightValues = _rightTransformFunction.transformToIntValuesSV(valueBlock);
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
-            .setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+        try {
+          _doubleValuesSV[i] = BigDecimal.valueOf(leftValues[i])
+                  .setScale(rightValues[i], RoundingMode.HALF_UP).doubleValue();
+        } catch(NumberFormatException nfe) {
+          _doubleValuesSV[i] = leftValues[i];
+        }
       }
     } else {
       for (int i = 0; i < length; i++) {
-        _doubleValuesSV[i] = (double) Math.round(leftValues[i]);
+        if (leftValues[i] == Double.NEGATIVE_INFINITY || leftValues[i] == Double.POSITIVE_INFINITY ||
+                leftValues[i] == Double.NaN) {
+          _doubleValuesSV[i] = leftValues[i];
+        } else {
+          _doubleValuesSV[i] = (double) Math.round(leftValues[i]);
+        }
       }
     }
     return _doubleValuesSV;
