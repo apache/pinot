@@ -29,7 +29,7 @@ import org.apache.pinot.common.utils.regex.PatternFactory;
  */
 public class RegexpLikePredicate extends BasePredicate {
   private final String _value;
-  private final Boolean _caseInsensitive;
+  private final boolean _caseInsensitive;
   private Pattern _pattern = null;
 
   public RegexpLikePredicate(ExpressionContext lhs, String value) {
