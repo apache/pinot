@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.combine;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -30,6 +31,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -76,10 +78,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private final CompletableFuture<RadixPartitionedHashMap<Key, Record>>[] _partitionedHashMapFutures;
 
   private AtomicInteger _nextPartitionId = new AtomicInteger(0);
-  private volatile HashMap[] _mergedHashMaps;
+  private volatile Object2ObjectOpenHashMap[] _mergedHashMaps;
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
+
+  private AtomicInteger[] _partitionSizes;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -97,7 +101,12 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       _partitionedHashMapFutures[i] = new CompletableFuture<>();
     }
 
-    _mergedHashMaps = new HashMap[_queryContext.getGroupByNumPartitions()];
+    _mergedHashMaps = new Object2ObjectOpenHashMap[_queryContext.getGroupByNumPartitions()];
+
+    _partitionSizes = new AtomicInteger[queryContext.getGroupByNumPartitions()];
+    for (int i=0; i< queryContext.getGroupByNumPartitions(); i++) {
+      _partitionSizes[i] = new AtomicInteger(0);
+    }
   }
 
   /**
@@ -186,6 +195,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             mergedKeys++;
           }
         }
+        for (int i=0; i < _queryContext.getGroupByNumPartitions(); i++) {
+          _partitionSizes[i].getAndAdd(map.getPartition(i).size());
+        }
         _partitionedHashMapFutures[operatorId].complete(map);
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
@@ -202,8 +214,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     while (_processingException.get() == null
         && (partitionId = _nextPartitionId.getAndIncrement()) < _queryContext.getGroupByNumPartitions()) {
       try {
-        HashMap<Key, Record> map = new HashMap<>(1024);
-        Map<Integer, CompletableFuture<RadixPartitionedHashMap<Key, Record>>> pendingFutures = new HashMap<>();
+        // a magical way to approximate initial size needed for each partition
+        // the larger number of segments, the more likely there are heterogeneous keys
+        // TODO: don't use hashmap to do partition, instead directly get partitions from each segment result
+        int initialSize = HashUtil.getHashMapCapacity(
+            (int) Math.round(_partitionSizes[partitionId].get() / Math.sqrt(_numOperators)));
+        Object2ObjectOpenHashMap<Key, Record> map = new Object2ObjectOpenHashMap<>(initialSize);
+
+        Map<Integer, CompletableFuture<RadixPartitionedHashMap<Key, Record>>> pendingFutures = new HashMap<>(_numOperators);
         for (int segmentId = 0; segmentId < _numOperators; segmentId++) {
           pendingFutures.put(segmentId, _partitionedHashMapFutures[segmentId]);
         }
@@ -213,12 +231,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         while (!pendingFutures.isEmpty()) {
           CompletableFuture fut =
               CompletableFuture.anyOf(pendingFutures.values().toArray(CompletableFuture[]::new));
-
           RadixPartitionedHashMap<Key, Record> partition = (RadixPartitionedHashMap<Key, Record>) fut.get();
           for (Map.Entry<Key, Record> entry : partition.getPartition(partitionId).entrySet()) {
-            // TODO: this is causing lots of GC?
-            //    what is a way to combine N hashmaps into 1, using as least allocs as possible?
-            //    currently we are having intermediate hashmaps in total as large as the final result
             GroupByUtils.addOrUpdateRecord(map, entry.getKey(), entry.getValue(), aggregationFunctions,
                 numKeyColumns);
           }

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.ws.rs.NotSupportedException;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 
 /**
@@ -36,7 +37,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   private final int _numRadixBits;
   private final int _numPartitions;
   private final int _mask;
-  private final HashMap<K, V>[] _maps;
+  private final Object2ObjectOpenHashMap<K, V>[] _maps;
   private int _size;
   private int _segmentId = -1;
 
@@ -46,21 +47,21 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
     _numPartitions = 1 << numRadixBits;
     _mask = _numPartitions - 1;
     _segmentId = segmentId;
-    _maps = new HashMap[_numPartitions];
+    _maps = new Object2ObjectOpenHashMap[_numPartitions];
     _size = 0;
     for (int i = 0; i < _numPartitions; i++) {
-      _maps[i] = new HashMap<>(partitionInitialCapacity);
+      _maps[i] = new Object2ObjectOpenHashMap<>(partitionInitialCapacity);
     }
   }
 
-  public RadixPartitionedHashMap(HashMap<K, V>[] maps, int numRadixBits) {
+  public RadixPartitionedHashMap(Object2ObjectOpenHashMap<K, V>[] maps, int numRadixBits) {
     _numRadixBits = numRadixBits;
     _numPartitions = 1 << numRadixBits;
     assert (maps.length == _numPartitions);
     _mask = _numPartitions - 1;
     _maps = maps;
     _size = 0;
-    for (HashMap<K, V> map : maps) {
+    for (Object2ObjectOpenHashMap<K, V> map : maps) {
       _size += map.size();
     }
   }
@@ -77,8 +78,12 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
     return _numPartitions;
   }
 
-  private int partition(K key) {
+  public int partition(K key) {
     return key.hashCode() & _mask;
+  }
+
+  public int partitionFromHashCode(int hash) {
+    return hash & _mask;
   }
 
   @Override
@@ -93,7 +98,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public boolean containsKey(Object o) {
-    HashMap<K, V> map = _maps[partition((K) o)];
+    Object2ObjectOpenHashMap<K, V> map = _maps[partition((K) o)];
     return map.containsKey(o);
   }
 
@@ -104,14 +109,23 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public V get(Object o) {
-    HashMap<K, V> map = _maps[partition((K) o)];
+    Object2ObjectOpenHashMap<K, V> map = _maps[partition((K) o)];
     return map.get(o);
+  }
+
+  public V putIntoPartition(K k, V v, int partition) {
+    Object2ObjectOpenHashMap<K, V> map = _maps[partition];
+    V prev = map.put(k, v);
+    if (prev == null) {
+      _size++;
+    }
+    return prev;
   }
 
   @Nullable
   @Override
   public V put(K k, V v) {
-    HashMap<K, V> map = _maps[partition(k)];
+    Object2ObjectOpenHashMap<K, V> map = _maps[partition(k)];
     V prev = map.put(k, v);
     if (prev == null) {
       _size++;
@@ -121,7 +135,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public V remove(Object o) {
-    HashMap<K, V> map = _maps[partition((K) o)];
+    Object2ObjectOpenHashMap<K, V> map = _maps[partition((K) o)];
     V prev = map.remove(o);
     if (prev != null) {
       _size--;
@@ -136,7 +150,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public void clear() {
-    for (HashMap<K, V> map : _maps) {
+    for (Object2ObjectOpenHashMap<K, V> map : _maps) {
       map.clear();
     }
     _size = 0;
