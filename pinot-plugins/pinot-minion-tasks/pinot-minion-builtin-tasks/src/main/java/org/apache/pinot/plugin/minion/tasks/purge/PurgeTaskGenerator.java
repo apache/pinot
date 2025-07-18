@@ -113,8 +113,13 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       int tableNumTasks = 0;
       Set<Segment> runningSegments =
           TaskGeneratorUtils.getRunningSegments(MinionConstants.PurgeTask.TASK_TYPE, _clusterInfoAccessor);
+      List<String> segmentsForDeletion = new ArrayList<>();
       for (SegmentZKMetadata segmentZKMetadata : notpurgedSegmentsZKMetadata) {
         String segmentName = segmentZKMetadata.getSegmentName();
+        if (segmentZKMetadata.getTotalDocs() == 0L) {
+          segmentsForDeletion.add(segmentName);
+          continue;
+        }
         Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segmentName)));
         Long tsLastPurge;
         if (segmentZKMetadata.getCustomMap() != null) {
@@ -140,6 +145,13 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
         configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
         pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
         tableNumTasks++;
+      }
+      if (!segmentsForDeletion.isEmpty()) {
+        _clusterInfoAccessor.getPinotHelixResourceManager().deleteSegments(tableName, segmentsForDeletion,
+            "0d");
+        LOGGER.info(
+            "Deleted segments containing no records for table: {}, number of segments to be deleted: {}",
+            tableName, segmentsForDeletion.size());
       }
       LOGGER.info("Finished generating {} tasks configs for table: {} " + "for task: {}", tableNumTasks, tableName,
           taskType);
