@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.udf.test.scenarios;
 
+import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
@@ -53,19 +56,28 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
       UdfSignature signature,
       boolean nullHandling,
       /* language=sql*/ String templateSql) {
-    String call = udf.asSqlCall(udf.getMainFunctionName(), PinotFunctionEnvGenerator.getArgsForCall(signature));
     return templateSql
-        .replace("@call", call)
         .replace("@table", PinotFunctionEnvGenerator.getTableName(udf))
         .replace("@udfCol", PinotFunctionEnvGenerator.getUdfColumnName())
         .replace("@udfName", udf.getMainFunctionName())
         .replace("@testCol", PinotFunctionEnvGenerator.getTestColumnName())
         .replace("@resultCol", PinotFunctionEnvGenerator.getResultColumnName(signature, nullHandling))
-        // Important, we need to replace the @testCol and @result after replacing @test and @resultCol respectively
+        // Important, we need to replace the @testCol and @resultCol before replacing @test and @result respectively
         .replace("@test", "test")
         .replace("@result", "result")
         .replace("@signatureCol", PinotFunctionEnvGenerator.getSignatureColumnName())
         .replace("@signature", signature.toString());
+  }
+
+  protected String replaceCall(
+      Udf udf,
+      UdfSignature signature,
+      UdfExample example,
+      /* language=sql*/ String templateSql) {
+    String call = udf.asSqlCall(udf.getMainFunctionName(), PinotFunctionEnvGenerator.getArgsForCall(signature, example));
+    return templateSql
+        .replace("@example", example.getId())
+        .replace("@call", call);
   }
 
   @Override
@@ -76,23 +88,38 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
   protected Map<UdfExample, UdfExampleResult> extractResultsByCase(
       Udf udf,
       UdfSignature signature,
-      Iterator<GenericRow> rows) {
-    Map<UdfExample, UdfExampleResult> result = new HashMap<>();
+      UdfTestCluster.ExecutionContext context,
+      /* language=sql*/ String sqlTemplate) {
+    Set<UdfExample> examples = udf.getExamples().get(signature);
+    Map<UdfExample, UdfExampleResult> results = Maps.newHashMapWithExpectedSize(examples.size());
 
-    Map<String, UdfExample> testById = udf.getExamples()
-        .get(signature)
-        .stream()
-        .collect(Collectors.toMap(UdfExample::getId, testCase -> testCase));
+    String sqlTemplate2 = replaceCommonVariables(udf, signature, isNullHandlingEnabled(), sqlTemplate);
 
-    while (rows.hasNext()) {
+    for (UdfExample example : examples) {
+      String sql = replaceCall(udf, signature, example, sqlTemplate2);
+      Iterator<GenericRow> rows = _cluster.query(context, sql);
+
+      if (!rows.hasNext()) {
+        String errorMessage = "No results found for example: " + example.getId();
+        results.put(example, UdfExampleResult.error(example, errorMessage));
+        continue;
+      }
       GenericRow row = rows.next();
       String testId = (String) row.getValue("test");
-      UdfExample test = testById.get(testId);
-      assert test != null : "Test case not found for id: " + testId;
+      if (testId != null && !testId.equals(example.getId())) {
+        String errorMessage = "Test ID mismatch: expected " + example.getId() + ", found " + testId;
+        results.put(example, UdfExampleResult.error(example, errorMessage));
+        continue;
+      }
+      Object expectedResult = example.getResult(isNullHandlingEnabled());
+      results.put(example, UdfExampleResult.success(example, row.getValue("result"), expectedResult));
 
-      Object expectedResult = test.getResult(isNullHandlingEnabled());
-      result.put(test, UdfExampleResult.success(test, row.getValue("result"), expectedResult));
+      if (rows.hasNext()) {
+        String errorMessage = "Multiple results found for example: " + example.getId();
+        results.put(example, UdfExampleResult.error(example, errorMessage));
+      }
     }
-    return result;
+
+    return results;
   }
 }

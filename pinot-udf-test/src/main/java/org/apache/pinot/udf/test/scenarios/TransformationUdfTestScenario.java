@@ -52,20 +52,20 @@ public class TransformationUdfTestScenario extends AbstractUdfTestScenario {
       UdfSignature signature) {
 
     // language=sql
-    String sql = replaceCommonVariables(suite, signature, isNullHandlingEnabled(),
-        ""
+    String sqlTemplate = ""
         + "SELECT \n"
         + "  @testCol as test, \n"
         + "  @call AS result\n"
         + "FROM @table \n"
         + "WHERE @signatureCol = '@signature' \n"
-        + "  AND @udfCol = '@udfName' \n");
+        + "  AND @udfCol = '@udfName' \n"
+        + "  AND @testCol = '@example' \n";
 
     UdfTestCluster.ExecutionContext context = new UdfTestCluster.ExecutionContext(
         isNullHandlingEnabled(),
         false);
 
-    return extractResultsByCase(suite, signature, _cluster.query(context, sql));
+    return extractResultsByCase(suite, signature, context, sqlTemplate);
   }
 
   /// A factory that creates an instance of this scenario with null handling enabled

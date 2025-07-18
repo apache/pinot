@@ -55,7 +55,7 @@ public abstract class UdfSignature {
   public String toString() {
     return getParameters().stream()
         .map(UdfParameter::toString)
-        .collect(Collectors.joining(", ", "(", ")")) + " -> " + getReturnType().toString();
+        .collect(Collectors.joining(", ", "(", ")")) + " -> " + getReturnType().getTypeString();
   }
 
   public static UdfSignature of(UdfParameter... parametersAndReturnType) {
@@ -70,13 +70,5 @@ public abstract class UdfSignature {
         return parametersAndReturnType[parametersAndReturnType.length - 1];
       }
     };
-  }
-
-  public static UdfSignature ofSingleValue(FieldSpec.DataType... parametersAndResultType) {
-    return UdfSignature.of(
-        Arrays.stream(parametersAndResultType)
-            .map(param -> UdfParameter.of(param, false))
-            .toArray(UdfParameter[]::new)
-    );
   }
 }

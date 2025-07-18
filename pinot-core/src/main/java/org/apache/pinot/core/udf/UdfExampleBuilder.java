@@ -171,9 +171,12 @@ public interface UdfExampleBuilder {
         );
         Map<UdfSignature, Set<UdfExample>> cases = Maps.newHashMapWithExpectedSize(numericTypes.size());
         for (FieldSpec.DataType type : numericTypes) {
-          FieldSpec.DataType[] paramsAndResult = new FieldSpec.DataType[_arity + 1];
-          Arrays.fill(paramsAndResult, type);
-          UdfSignature signature = UdfSignature.ofSingleValue(paramsAndResult);
+          UdfParameter[] paramsAndResult = new UdfParameter[_arity + 1];
+          for (int i = 0; i < _arity; i++) {
+            paramsAndResult[i] = UdfParameter.of("arg" + i, type);
+          }
+          paramsAndResult[_arity] = UdfParameter.result(type);
+          UdfSignature signature = UdfSignature.of(paramsAndResult);
           Set<UdfExample> newCases = _cases.stream()
               .map(testCase -> new EndomorphismNumericTypesBuilder.NumericPinotUdfExample(testCase, type))
               .collect(Collectors.toSet());

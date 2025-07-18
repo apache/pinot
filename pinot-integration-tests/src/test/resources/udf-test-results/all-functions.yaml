@@ -26,461 +26,1839 @@
 # 2. It is used to have a test that fails if a new function is added to the system without a UDF.
 
 ---
-abs: "org.apache.pinot.query.runtime.function.AbsUdf"
-acos: "org.apache.pinot.query.runtime.function.AcosUdf"
-add: "org.apache.pinot.query.runtime.function.PlusUdf"
-adler32: null
-ago: null
-agomv: null
-and: null
-appendtostringandreturn: null
-array: null
-arrayElementAtInt: "org.apache.pinot.query.runtime.function.ArrayElementAtIntUdf"
-arrayMax: "org.apache.pinot.query.runtime.function.ArrayMaxUdf"
-arrayaverage: null
-arrayconcatdouble: null
-arrayconcatfloat: null
-arrayconcatint: null
-arrayconcatlong: null
-arrayconcatstring: null
-arraycontainsint: null
-arraycontainsstring: null
-arraydistinctint: null
-arraydistinctstring: null
-arrayelementatdouble: null
-arrayelementatfloat: null
-arrayelementatint: null
-arrayelementatlong: null
-arrayelementatstring: null
-arrayindexesofdouble: null
-arrayindexesoffloat: null
-arrayindexesofint: null
-arrayindexesoflong: null
-arrayindexesofstring: null
-arrayindexofint: null
-arrayindexofstring: null
-arraylength: null
-arraymax: null
-arraymin: null
-arrayremoveint: null
-arrayremovestring: null
-arrayreverseint: null
-arrayreversestring: null
-arraysliceint: null
-arrayslicestring: null
-arraysortint: null
-arraysortstring: null
-arraysum: null
-arraysumint: null
-arraysumlong: null
-arraytostring: null
-arrayunionint: null
-arrayunionstring: null
-arrayvalueconstructor: null
-asin: null
-atan: null
-atan2: null
-avgreduce: null
-base64decode: null
-base64encode: null
-between: null
-bigdecimaltobytes: null
-brokerid: null
-bytestobigdecimal: null
-bytestohex: null
-byteswapint: null
-byteswaplong: null
-cardinality: null
-case: null
-casewhen: null
-cast: null
-ceil: null
-ceiling: null
-chr: null
-cid: null
-cityhash128: null
-cityhash32: null
-cityhash64: null
-clpdecode: null
-clpencodedvarsmatch: null
-coalesce: null
-codepoint: null
-concat: null
-concatws: null
-contains: null
-cos: null
-cosh: null
-cosinedistance: null
-cot: null
-cpcsketchtostring: null
-cpcsketchunion: null
-crc32: null
-crc32c: null
-cutfragment: null
-cutquerystring: null
-cutquerystringandfragment: null
-cuttofirstsignificantsubdomain: null
-cuttofirstsignificantsubdomainwithwww: null
-cuturlparameter: null
-cuturlparameters: null
-cutwww: null
-dateadd: null
-dateaddmv: null
-datebin: null
-datediff: null
-datediffmv: null
-datediffmvreverse: null
-datetimeconvert: null
-datetimeconvertwindowhop: null
-datetrunc: null
-datetruncmv: null
-day: null
-daymv: null
-dayofmonth: null
-dayofmonthmv: null
-dayofweek: null
-dayofweekmv: null
-dayofyear: null
-dayofyearmv: null
-decodegeohash: null
-decodegeohashlat: null
-decodegeohashlatitude: null
-decodegeohashlon: null
-decodegeohashlongitude: null
-decodeurl: null
-degrees: null
-div: null
-divide: null
-dotproduct: null
-dow: null
-dowmv: null
-doy: null
-doymv: null
-encodegeohash: null
-encodeurl: null
-endswith: null
-endtime: null
-equals: null
-euclideandistance: null
-exp: null
-extract: null
-extracturlparameter: null
-extracturlparameternames: null
-extracturlparameters: null
-floor: null
-fromascii: null
-frombase64: null
-frombytes: null
-fromdatetime: null
-fromdatetimemv: null
-fromepochdays: null
-fromepochdaysbucket: null
-fromepochdaysbucketmv: null
-fromepochdaysmv: null
-fromepochhours: null
-fromepochhoursbucket: null
-fromepochhoursbucketmv: null
-fromepochhoursmv: null
-fromepochminutes: null
-fromepochminutesbucket: null
-fromepochminutesbucketmv: null
-fromepochminutesmv: null
-fromepochseconds: null
-fromepochsecondsbucket: null
-fromepochsecondsbucketmv: null
-fromepochsecondsmv: null
-fromiso8601: null
-fromiso8601mv: null
-fromtimestamp: null
-fromtimestampmv: null
-fromull: null
-fromutf8: null
-fromuuidbytes: null
-gcd: null
-generatedoublearray: null
-generatefloatarray: null
-generateintarray: null
-generatelongarray: null
-geotoh3: null
-getcpcsketchestimate: null
-getinttuplesketchestimate: null
-getthetasketchestimate: null
-greaterthan: null
-greaterthanorequal: null
-greatest: null
-griddisk: null
-griddistance: null
-groovy: null
-hammingdistance: null
-hexdecimaltolong: null
-hextobytes: null
-hour: null
-hourmv: null
-hypot: null
-ifnotfinite: null
-in: null
-inidset: null
-innerproduct: null
-intdiv: null
-intdivorzero: null
-intersectindices: null
-intmaxtuplesketchintersect: null
-intmaxtuplesketchunion: null
-intmintuplesketchintersect: null
-intmintuplesketchunion: null
-intsumtuplesketchdiff: null
-intsumtuplesketchintersect: null
-intsumtuplesketchunion: null
-isdistinctfrom: null
-isfalse: null
-isfinite: null
-isinfinite: null
-isjson: null
-isnan: null
-isnotdistinctfrom: null
-isnotfalse: null
-isnotnull: null
-isnottrue: null
-isnull: null
-issubnetof: null
-istrue: null
-item: null
-jsonextractindex: null
-jsonextractkey: null
-jsonextractscalar: null
-jsonformat: null
-jsonkeyvaluearraytomap: null
-jsonpath: null
-jsonpatharray: null
-jsonpatharraydefaultempty: null
-jsonpathdouble: null
-jsonpathexists: null
-jsonpathlong: null
-jsonpathstring: null
-jsonstringtoarray: null
-jsonstringtolistormap: null
-jsonstringtomap: null
-l1distance: null
-l2distance: null
-lcm: null
-least: null
-left: null
-leftsubstr: null
-length: null
-lessthan: null
-lessthanorequal: null
-like: null
-likevar: null
-ln: null
-log: null
-log10: null
-log2: null
-longtohexdecimal: null
-lookup: null
-lower: null
-lpad: null
-ltrim: null
-mapvalue: null
-max: null
-md2: null
-md5: null
-millisecond: null
-millisecondmv: null
-min: null
-minus: null
-minute: null
-minutemv: null
-mod: null
-moduloorzero: null
-month: null
-monthmv: null
-monthofyear: null
-monthofyearmv: null
-mult: "org.apache.pinot.query.runtime.function.MultUdf"
-murmurhash2: null
-murmurhash2bit64: null
-murmurhash2utf8: null
-murmurhash3bit128: null
-murmurhash3bit32: null
-murmurhash3bit64: null
-murmurhash3x64bit128: null
-murmurhash3x64bit32: null
-murmurhash3x64bit64: null
-negate: null
-normalize: null
-not: null
-notequals: null
-notin: null
-now: null
-nullif: null
-or: null
-plus: "org.apache.pinot.query.runtime.function.PlusUdf"
-positivemodulo: null
-pow: null
-power: null
-prefixes: null
-prefixeswithprefix: null
-quarter: null
-quartermv: null
-queryengine: null
-radians: null
-regexpextract: null
-regexpextractvar: null
-regexplike: null
-regexplikevar: null
-regexpreplace: null
-regexpreplacevar: null
-remove: null
-repeat: null
-replace: null
-reqid: null
-reverse: null
-right: null
-rightsubstr: null
-round: null
-rounddecimal: null
-roundmv: null
-rpad: null
-rtrim: null
-second: null
-secondmv: null
-sha: null
-sha224: null
-sha256: null
-sha512: null
-sign: null
-sin: null
-sinh: null
-sleep: null
-split: null
-splitpart: null
-sqrt: null
-stageid: null
-starea: null
-startswith: null
-starttime: null
-stasbinary: null
-stasgeojson: null
-stastext: null
-stcontains: null
-stdistance: null
-stequals: null
-stgeogfromgeojson: null
-stgeogfromtext: null
-stgeogfromwkb: null
-stgeometrytype: null
-stgeomfromgeojson: null
-stgeomfromtext: null
-stgeomfromwkb: null
-stpoint: null
-stpolygon: null
-strcmp: null
-stringtoarray: null
-strpos: null
-strrpos: null
-stwithin: null
-sub: null
-substr: null
-substring: null
-suffixes: null
-suffixeswithsuffix: null
-tan: null
-tanh: null
-testfunc1: null
-testfunc2: null
-textmatch: null
-thetasketchdiff: null
-thetasketchintersect: null
-thetasketchtostring: null
-thetasketchunion: null
-timeconvert: null
-times: "org.apache.pinot.query.runtime.function.MultUdf"
-timeseriesbucket: null
-timestampadd: null
-timestampaddmv: null
-timestampdiff: null
-timestampdiffmv: null
-timestampdiffmvreverse: null
-timezonehour: null
-timezonehourmv: null
-timezoneminute: null
-timezoneminutemv: null
-toascii: null
-tobase64: null
-tobytes: null
-tocpcsketch: null
-todatetime: null
-todatetimemv: null
-toepochdays: null
-toepochdaysbucket: null
-toepochdaysbucketmv: null
-toepochdaysmv: null
-toepochdaysrounded: null
-toepochdaysroundedmv: null
-toepochhours: null
-toepochhoursbucket: null
-toepochhoursbucketmv: null
-toepochhoursmv: null
-toepochhoursrounded: null
-toepochhoursroundedmv: null
-toepochminutes: null
-toepochminutesbucket: null
-toepochminutesbucketmv: null
-toepochminutesmv: null
-toepochminutesrounded: null
-toepochminutesroundedmv: null
-toepochseconds: null
-toepochsecondsbucket: null
-toepochsecondsbucketmv: null
-toepochsecondsmv: null
-toepochsecondsrounded: null
-toepochsecondsroundedmv: null
-togeometry: null
-tohll: null
-tointegersumtuplesketch: null
-toiso8601: null
-toiso8601mv: null
-tojsonmapstr: null
-tosphericalgeography: null
-tothetasketch: null
-totimestamp: null
-totimestampmv: null
-toull: null
-toutf8: null
-touuidbytes: null
-trim: null
-truncate: null
-uniquengrams: null
-upper: null
-urldecode: null
-urldecodeformcomponent: null
-urldomain: null
-urldomainwithoutwww: null
-urlencode: null
-urlencodeformcomponent: null
-urlfirstsignificantsubdomain: null
-urlfragment: null
-urlhierarchy: null
-urlnetloc: null
-urlpath: null
-urlpathhierarchy: null
-urlpathwithquery: null
-urlport: null
-urlprotocol: null
-urlquerystring: null
-urlquerystringandfragment: null
-urltopleveldomain: null
-valuein: null
-vectordims: null
-vectornorm: null
-week: null
-weekmv: null
-weekofyear: null
-weekofyearmv: null
-workerid: null
-year: null
-yearmv: null
-yearofweek: null
-yearofweekmv: null
-yow: null
-yowmv: null
+abs:
+  scalar: true
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.AbsUdf"
+acos:
+  scalar: true
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.AcosUdf"
+add:
+  scalar: true
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.PlusUdf"
+adler32:
+  scalar: true
+  transform: false
+  udf: "org.apache.pinot.query.runtime.function.Adler32Udf"
+ago:
+  scalar: true
+  transform: false
+  udf: null
+agomv:
+  scalar: true
+  transform: false
+  udf: null
+and:
+  scalar: false
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.AndUdf"
+array:
+  scalar: true
+  transform: false
+  udf: null
+arrayElementAtInt:
+  scalar: false
+  transform: false
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtIntUdf"
+arrayMax:
+  scalar: false
+  transform: false
+  udf: "org.apache.pinot.query.runtime.function.ArrayMaxUdf"
+arrayaverage:
+  scalar: false
+  transform: true
+  udf: null
+arrayconcatdouble:
+  scalar: true
+  transform: false
+  udf: null
+arrayconcatfloat:
+  scalar: true
+  transform: false
+  udf: null
+arrayconcatint:
+  scalar: true
+  transform: false
+  udf: null
+arrayconcatlong:
+  scalar: true
+  transform: false
+  udf: null
+arrayconcatstring:
+  scalar: true
+  transform: false
+  udf: null
+arraycontainsint:
+  scalar: true
+  transform: false
+  udf: null
+arraycontainsstring:
+  scalar: true
+  transform: false
+  udf: null
+arraydistinctint:
+  scalar: true
+  transform: false
+  udf: null
+arraydistinctstring:
+  scalar: true
+  transform: false
+  udf: null
+arrayelementatdouble:
+  scalar: true
+  transform: false
+  udf: null
+arrayelementatfloat:
+  scalar: true
+  transform: false
+  udf: null
+arrayelementatint:
+  scalar: true
+  transform: false
+  udf: null
+arrayelementatlong:
+  scalar: true
+  transform: false
+  udf: null
+arrayelementatstring:
+  scalar: true
+  transform: false
+  udf: null
+arrayindexesofdouble:
+  scalar: true
+  transform: false
+  udf: null
+arrayindexesoffloat:
+  scalar: true
+  transform: false
+  udf: null
+arrayindexesofint:
+  scalar: true
+  transform: false
+  udf: null
+arrayindexesoflong:
+  scalar: true
+  transform: false
+  udf: null
+arrayindexesofstring:
+  scalar: true
+  transform: false
+  udf: null
+arrayindexofint:
+  scalar: true
+  transform: false
+  udf: null
+arrayindexofstring:
+  scalar: true
+  transform: false
+  udf: null
+arraylength:
+  scalar: true
+  transform: true
+  udf: null
+arraymax:
+  scalar: false
+  transform: true
+  udf: null
+arraymin:
+  scalar: false
+  transform: true
+  udf: null
+arrayremoveint:
+  scalar: true
+  transform: false
+  udf: null
+arrayremovestring:
+  scalar: true
+  transform: false
+  udf: null
+arrayreverseint:
+  scalar: true
+  transform: false
+  udf: null
+arrayreversestring:
+  scalar: true
+  transform: false
+  udf: null
+arraysliceint:
+  scalar: true
+  transform: false
+  udf: null
+arrayslicestring:
+  scalar: true
+  transform: false
+  udf: null
+arraysortint:
+  scalar: true
+  transform: false
+  udf: null
+arraysortstring:
+  scalar: true
+  transform: false
+  udf: null
+arraysum:
+  scalar: false
+  transform: true
+  udf: null
+arraysumint:
+  scalar: true
+  transform: false
+  udf: null
+arraysumlong:
+  scalar: true
+  transform: false
+  udf: null
+arraytostring:
+  scalar: true
+  transform: false
+  udf: null
+arrayunionint:
+  scalar: true
+  transform: false
+  udf: null
+arrayunionstring:
+  scalar: true
+  transform: false
+  udf: null
+arrayvalueconstructor:
+  scalar: true
+  transform: false
+  udf: null
+asin:
+  scalar: true
+  transform: true
+  udf: null
+atan:
+  scalar: true
+  transform: true
+  udf: null
+atan2:
+  scalar: true
+  transform: true
+  udf: null
+avgreduce:
+  scalar: true
+  transform: false
+  udf: null
+base64decode:
+  scalar: true
+  transform: false
+  udf: null
+base64encode:
+  scalar: true
+  transform: false
+  udf: null
+between:
+  scalar: true
+  transform: false
+  udf: null
+bigdecimaltobytes:
+  scalar: true
+  transform: false
+  udf: null
+brokerid:
+  scalar: true
+  transform: false
+  udf: null
+bytestobigdecimal:
+  scalar: true
+  transform: false
+  udf: null
+bytestohex:
+  scalar: true
+  transform: false
+  udf: null
+byteswapint:
+  scalar: true
+  transform: false
+  udf: null
+byteswaplong:
+  scalar: true
+  transform: false
+  udf: null
+cardinality:
+  scalar: true
+  transform: true
+  udf: null
+case:
+  scalar: true
+  transform: true
+  udf: null
+casewhen:
+  scalar: true
+  transform: false
+  udf: null
+cast:
+  scalar: true
+  transform: true
+  udf: null
+ceil:
+  scalar: true
+  transform: true
+  udf: null
+ceiling:
+  scalar: true
+  transform: true
+  udf: null
+chr:
+  scalar: true
+  transform: false
+  udf: null
+cid:
+  scalar: true
+  transform: false
+  udf: null
+cityhash128:
+  scalar: true
+  transform: false
+  udf: null
+cityhash32:
+  scalar: true
+  transform: false
+  udf: null
+cityhash64:
+  scalar: true
+  transform: false
+  udf: null
+clpdecode:
+  scalar: false
+  transform: true
+  udf: null
+clpencodedvarsmatch:
+  scalar: false
+  transform: true
+  udf: null
+coalesce:
+  scalar: true
+  transform: true
+  udf: null
+codepoint:
+  scalar: true
+  transform: false
+  udf: null
+concat:
+  scalar: true
+  transform: false
+  udf: null
+concatws:
+  scalar: true
+  transform: false
+  udf: null
+contains:
+  scalar: true
+  transform: false
+  udf: null
+cos:
+  scalar: true
+  transform: true
+  udf: null
+cosh:
+  scalar: true
+  transform: true
+  udf: null
+cosinedistance:
+  scalar: true
+  transform: true
+  udf: null
+cot:
+  scalar: true
+  transform: true
+  udf: null
+cpcsketchtostring:
+  scalar: true
+  transform: false
+  udf: null
+cpcsketchunion:
+  scalar: true
+  transform: false
+  udf: null
+crc32:
+  scalar: true
+  transform: false
+  udf: null
+crc32c:
+  scalar: true
+  transform: false
+  udf: null
+cutfragment:
+  scalar: true
+  transform: false
+  udf: null
+cutquerystring:
+  scalar: true
+  transform: false
+  udf: null
+cutquerystringandfragment:
+  scalar: true
+  transform: false
+  udf: null
+cuttofirstsignificantsubdomain:
+  scalar: true
+  transform: false
+  udf: null
+cuttofirstsignificantsubdomainwithwww:
+  scalar: true
+  transform: false
+  udf: null
+cuturlparameter:
+  scalar: true
+  transform: false
+  udf: null
+cuturlparameters:
+  scalar: true
+  transform: false
+  udf: null
+cutwww:
+  scalar: true
+  transform: false
+  udf: null
+dateadd:
+  scalar: true
+  transform: false
+  udf: null
+dateaddmv:
+  scalar: true
+  transform: false
+  udf: null
+datebin:
+  scalar: true
+  transform: false
+  udf: null
+datediff:
+  scalar: true
+  transform: false
+  udf: null
+datediffmv:
+  scalar: true
+  transform: false
+  udf: null
+datediffmvreverse:
+  scalar: true
+  transform: false
+  udf: null
+datetimeconvert:
+  scalar: true
+  transform: true
+  udf: null
+datetimeconvertwindowhop:
+  scalar: false
+  transform: true
+  udf: null
+datetrunc:
+  scalar: true
+  transform: true
+  udf: null
+datetruncmv:
+  scalar: true
+  transform: false
+  udf: null
+day:
+  scalar: true
+  transform: true
+  udf: null
+daymv:
+  scalar: true
+  transform: false
+  udf: null
+dayofmonth:
+  scalar: true
+  transform: true
+  udf: null
+dayofmonthmv:
+  scalar: true
+  transform: false
+  udf: null
+dayofweek:
+  scalar: true
+  transform: true
+  udf: null
+dayofweekmv:
+  scalar: true
+  transform: false
+  udf: null
+dayofyear:
+  scalar: true
+  transform: true
+  udf: null
+dayofyearmv:
+  scalar: true
+  transform: false
+  udf: null
+decodegeohash:
+  scalar: true
+  transform: false
+  udf: null
+decodegeohashlat:
+  scalar: true
+  transform: false
+  udf: null
+decodegeohashlatitude:
+  scalar: true
+  transform: false
+  udf: null
+decodegeohashlon:
+  scalar: true
+  transform: false
+  udf: null
+decodegeohashlongitude:
+  scalar: true
+  transform: false
+  udf: null
+decodeurl:
+  scalar: true
+  transform: false
+  udf: null
+degrees:
+  scalar: true
+  transform: true
+  udf: null
+div:
+  scalar: true
+  transform: true
+  udf: null
+divide:
+  scalar: true
+  transform: true
+  udf: null
+dotproduct:
+  scalar: true
+  transform: false
+  udf: null
+dow:
+  scalar: true
+  transform: true
+  udf: null
+dowmv:
+  scalar: true
+  transform: false
+  udf: null
+doy:
+  scalar: true
+  transform: true
+  udf: null
+doymv:
+  scalar: true
+  transform: false
+  udf: null
+encodegeohash:
+  scalar: true
+  transform: false
+  udf: null
+encodeurl:
+  scalar: true
+  transform: false
+  udf: null
+endswith:
+  scalar: true
+  transform: false
+  udf: null
+endtime:
+  scalar: true
+  transform: false
+  udf: null
+equals:
+  scalar: true
+  transform: true
+  udf: null
+euclideandistance:
+  scalar: true
+  transform: false
+  udf: null
+exp:
+  scalar: true
+  transform: true
+  udf: null
+extract:
+  scalar: true
+  transform: true
+  udf: null
+extracturlparameter:
+  scalar: true
+  transform: false
+  udf: null
+extracturlparameternames:
+  scalar: true
+  transform: false
+  udf: null
+extracturlparameters:
+  scalar: true
+  transform: false
+  udf: null
+floor:
+  scalar: true
+  transform: true
+  udf: null
+fromascii:
+  scalar: true
+  transform: false
+  udf: null
+frombase64:
+  scalar: true
+  transform: false
+  udf: null
+frombytes:
+  scalar: true
+  transform: false
+  udf: null
+fromdatetime:
+  scalar: true
+  transform: false
+  udf: null
+fromdatetimemv:
+  scalar: true
+  transform: false
+  udf: null
+fromepochdays:
+  scalar: true
+  transform: false
+  udf: null
+fromepochdaysbucket:
+  scalar: true
+  transform: false
+  udf: null
+fromepochdaysbucketmv:
+  scalar: true
+  transform: false
+  udf: null
+fromepochdaysmv:
+  scalar: true
+  transform: false
+  udf: null
+fromepochhours:
+  scalar: true
+  transform: false
+  udf: null
+fromepochhoursbucket:
+  scalar: true
+  transform: false
+  udf: null
+fromepochhoursbucketmv:
+  scalar: true
+  transform: false
+  udf: null
+fromepochhoursmv:
+  scalar: true
+  transform: false
+  udf: null
+fromepochminutes:
+  scalar: true
+  transform: false
+  udf: null
+fromepochminutesbucket:
+  scalar: true
+  transform: false
+  udf: null
+fromepochminutesbucketmv:
+  scalar: true
+  transform: false
+  udf: null
+fromepochminutesmv:
+  scalar: true
+  transform: false
+  udf: null
+fromepochseconds:
+  scalar: true
+  transform: false
+  udf: null
+fromepochsecondsbucket:
+  scalar: true
+  transform: false
+  udf: null
+fromepochsecondsbucketmv:
+  scalar: true
+  transform: false
+  udf: null
+fromepochsecondsmv:
+  scalar: true
+  transform: false
+  udf: null
+fromiso8601:
+  scalar: true
+  transform: false
+  udf: null
+fromiso8601mv:
+  scalar: true
+  transform: false
+  udf: null
+fromtimestamp:
+  scalar: true
+  transform: false
+  udf: null
+fromtimestampmv:
+  scalar: true
+  transform: false
+  udf: null
+fromull:
+  scalar: true
+  transform: false
+  udf: null
+fromutf8:
+  scalar: true
+  transform: false
+  udf: null
+fromuuidbytes:
+  scalar: true
+  transform: false
+  udf: null
+gcd:
+  scalar: true
+  transform: false
+  udf: null
+generatedoublearray:
+  scalar: true
+  transform: false
+  udf: null
+generatefloatarray:
+  scalar: true
+  transform: false
+  udf: null
+generateintarray:
+  scalar: true
+  transform: false
+  udf: null
+generatelongarray:
+  scalar: true
+  transform: false
+  udf: null
+geotoh3:
+  scalar: true
+  transform: true
+  udf: null
+getcpcsketchestimate:
+  scalar: true
+  transform: false
+  udf: null
+getinttuplesketchestimate:
+  scalar: true
+  transform: false
+  udf: null
+getthetasketchestimate:
+  scalar: true
+  transform: false
+  udf: null
+greaterthan:
+  scalar: true
+  transform: true
+  udf: null
+greaterthanorequal:
+  scalar: true
+  transform: true
+  udf: null
+greatest:
+  scalar: true
+  transform: true
+  udf: null
+griddisk:
+  scalar: true
+  transform: true
+  udf: null
+griddistance:
+  scalar: true
+  transform: true
+  udf: null
+groovy:
+  scalar: false
+  transform: true
+  udf: null
+hammingdistance:
+  scalar: true
+  transform: false
+  udf: null
+hexdecimaltolong:
+  scalar: true
+  transform: false
+  udf: null
+hextobytes:
+  scalar: true
+  transform: false
+  udf: null
+hour:
+  scalar: true
+  transform: true
+  udf: null
+hourmv:
+  scalar: true
+  transform: false
+  udf: null
+hypot:
+  scalar: true
+  transform: false
+  udf: null
+ifnotfinite:
+  scalar: true
+  transform: false
+  udf: null
+in:
+  scalar: false
+  transform: true
+  udf: null
+inidset:
+  scalar: false
+  transform: true
+  udf: null
+innerproduct:
+  scalar: true
+  transform: true
+  udf: null
+intdiv:
+  scalar: true
+  transform: false
+  udf: null
+intdivorzero:
+  scalar: true
+  transform: false
+  udf: null
+intersectindices:
+  scalar: true
+  transform: false
+  udf: null
+intmaxtuplesketchintersect:
+  scalar: true
+  transform: false
+  udf: null
+intmaxtuplesketchunion:
+  scalar: true
+  transform: false
+  udf: null
+intmintuplesketchintersect:
+  scalar: true
+  transform: false
+  udf: null
+intmintuplesketchunion:
+  scalar: true
+  transform: false
+  udf: null
+intsumtuplesketchdiff:
+  scalar: true
+  transform: false
+  udf: null
+intsumtuplesketchintersect:
+  scalar: true
+  transform: false
+  udf: null
+intsumtuplesketchunion:
+  scalar: true
+  transform: false
+  udf: null
+isFalse:
+  scalar: false
+  transform: false
+  udf: "org.apache.pinot.query.runtime.function.IsFalseUdf"
+isdistinctfrom:
+  scalar: true
+  transform: true
+  udf: null
+isfalse:
+  scalar: false
+  transform: true
+  udf: null
+isfinite:
+  scalar: true
+  transform: false
+  udf: null
+isinfinite:
+  scalar: true
+  transform: false
+  udf: null
+isjson:
+  scalar: true
+  transform: false
+  udf: null
+isnan:
+  scalar: true
+  transform: false
+  udf: null
+isnotdistinctfrom:
+  scalar: true
+  transform: true
+  udf: null
+isnotfalse:
+  scalar: false
+  transform: true
+  udf: null
+isnotnull:
+  scalar: true
+  transform: true
+  udf: null
+isnottrue:
+  scalar: false
+  transform: true
+  udf: null
+isnull:
+  scalar: true
+  transform: true
+  udf: null
+issubnetof:
+  scalar: true
+  transform: false
+  udf: null
+istrue:
+  scalar: false
+  transform: true
+  udf: null
+item:
+  scalar: false
+  transform: true
+  udf: null
+jsonextractindex:
+  scalar: false
+  transform: true
+  udf: null
+jsonextractkey:
+  scalar: false
+  transform: true
+  udf: null
+jsonextractscalar:
+  scalar: false
+  transform: true
+  udf: null
+jsonformat:
+  scalar: true
+  transform: false
+  udf: null
+jsonkeyvaluearraytomap:
+  scalar: true
+  transform: false
+  udf: null
+jsonpath:
+  scalar: true
+  transform: false
+  udf: null
+jsonpatharray:
+  scalar: true
+  transform: false
+  udf: null
+jsonpatharraydefaultempty:
+  scalar: true
+  transform: false
+  udf: null
+jsonpathdouble:
+  scalar: true
+  transform: false
+  udf: null
+jsonpathexists:
+  scalar: true
+  transform: false
+  udf: null
+jsonpathlong:
+  scalar: true
+  transform: false
+  udf: null
+jsonpathstring:
+  scalar: true
+  transform: false
+  udf: null
+jsonstringtoarray:
+  scalar: true
+  transform: false
+  udf: null
+jsonstringtolistormap:
+  scalar: true
+  transform: false
+  udf: null
+jsonstringtomap:
+  scalar: true
+  transform: false
+  udf: null
+l1distance:
+  scalar: true
+  transform: true
+  udf: null
+l2distance:
+  scalar: true
+  transform: true
+  udf: null
+lcm:
+  scalar: true
+  transform: false
+  udf: null
+least:
+  scalar: true
+  transform: true
+  udf: null
+left:
+  scalar: true
+  transform: false
+  udf: null
+leftsubstr:
+  scalar: true
+  transform: false
+  udf: null
+length:
+  scalar: true
+  transform: false
+  udf: null
+lessthan:
+  scalar: true
+  transform: true
+  udf: null
+lessthanorequal:
+  scalar: true
+  transform: true
+  udf: null
+like:
+  scalar: true
+  transform: false
+  udf: null
+likevar:
+  scalar: true
+  transform: false
+  udf: null
+ln:
+  scalar: true
+  transform: true
+  udf: null
+log:
+  scalar: true
+  transform: true
+  udf: null
+log10:
+  scalar: true
+  transform: true
+  udf: null
+log2:
+  scalar: true
+  transform: true
+  udf: null
+longtohexdecimal:
+  scalar: true
+  transform: false
+  udf: null
+lookup:
+  scalar: false
+  transform: true
+  udf: null
+lower:
+  scalar: true
+  transform: false
+  udf: null
+lpad:
+  scalar: true
+  transform: false
+  udf: null
+ltrim:
+  scalar: true
+  transform: false
+  udf: null
+mapvalue:
+  scalar: false
+  transform: true
+  udf: null
+max:
+  scalar: true
+  transform: false
+  udf: null
+md2:
+  scalar: true
+  transform: false
+  udf: null
+md5:
+  scalar: true
+  transform: false
+  udf: null
+millisecond:
+  scalar: true
+  transform: true
+  udf: null
+millisecondmv:
+  scalar: true
+  transform: false
+  udf: null
+min:
+  scalar: true
+  transform: false
+  udf: null
+minus:
+  scalar: true
+  transform: true
+  udf: null
+minute:
+  scalar: true
+  transform: true
+  udf: null
+minutemv:
+  scalar: true
+  transform: false
+  udf: null
+mod:
+  scalar: true
+  transform: true
+  udf: null
+moduloorzero:
+  scalar: true
+  transform: false
+  udf: null
+month:
+  scalar: true
+  transform: true
+  udf: null
+monthmv:
+  scalar: true
+  transform: false
+  udf: null
+monthofyear:
+  scalar: true
+  transform: true
+  udf: null
+monthofyearmv:
+  scalar: true
+  transform: false
+  udf: null
+mult:
+  scalar: true
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.MultUdf"
+murmurhash2:
+  scalar: true
+  transform: false
+  udf: null
+murmurhash2bit64:
+  scalar: true
+  transform: false
+  udf: null
+murmurhash2utf8:
+  scalar: true
+  transform: false
+  udf: null
+murmurhash3bit128:
+  scalar: true
+  transform: false
+  udf: null
+murmurhash3bit32:
+  scalar: true
+  transform: false
+  udf: null
+murmurhash3bit64:
+  scalar: true
+  transform: false
+  udf: null
+murmurhash3x64bit128:
+  scalar: true
+  transform: false
+  udf: null
+murmurhash3x64bit32:
+  scalar: true
+  transform: false
+  udf: null
+murmurhash3x64bit64:
+  scalar: true
+  transform: false
+  udf: null
+negate:
+  scalar: true
+  transform: false
+  udf: null
+normalize:
+  scalar: true
+  transform: false
+  udf: null
+not:
+  scalar: true
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.NotUdf"
+notequals:
+  scalar: true
+  transform: true
+  udf: null
+notin:
+  scalar: false
+  transform: true
+  udf: null
+now:
+  scalar: true
+  transform: false
+  udf: null
+nullif:
+  scalar: true
+  transform: false
+  udf: null
+or:
+  scalar: false
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.OrUdf"
+plus:
+  scalar: true
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.PlusUdf"
+positivemodulo:
+  scalar: true
+  transform: false
+  udf: null
+pow:
+  scalar: true
+  transform: true
+  udf: null
+power:
+  scalar: true
+  transform: true
+  udf: null
+prefixes:
+  scalar: true
+  transform: false
+  udf: null
+prefixeswithprefix:
+  scalar: true
+  transform: false
+  udf: null
+quarter:
+  scalar: true
+  transform: true
+  udf: null
+quartermv:
+  scalar: true
+  transform: false
+  udf: null
+queryengine:
+  scalar: true
+  transform: false
+  udf: null
+radians:
+  scalar: true
+  transform: true
+  udf: null
+regexpextract:
+  scalar: true
+  transform: true
+  udf: null
+regexpextractvar:
+  scalar: true
+  transform: false
+  udf: null
+regexplike:
+  scalar: true
+  transform: false
+  udf: null
+regexplikevar:
+  scalar: true
+  transform: false
+  udf: null
+regexpreplace:
+  scalar: true
+  transform: false
+  udf: null
+regexpreplacevar:
+  scalar: true
+  transform: false
+  udf: null
+remove:
+  scalar: true
+  transform: false
+  udf: null
+repeat:
+  scalar: true
+  transform: false
+  udf: null
+replace:
+  scalar: true
+  transform: false
+  udf: null
+reqid:
+  scalar: true
+  transform: false
+  udf: null
+reverse:
+  scalar: true
+  transform: false
+  udf: null
+right:
+  scalar: true
+  transform: false
+  udf: null
+rightsubstr:
+  scalar: true
+  transform: false
+  udf: null
+round:
+  scalar: true
+  transform: false
+  udf: null
+rounddecimal:
+  scalar: true
+  transform: true
+  udf: null
+roundmv:
+  scalar: true
+  transform: false
+  udf: null
+rpad:
+  scalar: true
+  transform: false
+  udf: null
+rtrim:
+  scalar: true
+  transform: false
+  udf: null
+second:
+  scalar: true
+  transform: true
+  udf: null
+secondmv:
+  scalar: true
+  transform: false
+  udf: null
+sha:
+  scalar: true
+  transform: false
+  udf: null
+sha224:
+  scalar: true
+  transform: false
+  udf: null
+sha256:
+  scalar: true
+  transform: false
+  udf: null
+sha512:
+  scalar: true
+  transform: false
+  udf: null
+sign:
+  scalar: true
+  transform: true
+  udf: null
+sin:
+  scalar: true
+  transform: true
+  udf: null
+sinh:
+  scalar: true
+  transform: true
+  udf: null
+sleep:
+  scalar: true
+  transform: false
+  udf: null
+split:
+  scalar: true
+  transform: false
+  udf: null
+splitpart:
+  scalar: true
+  transform: false
+  udf: null
+sqrt:
+  scalar: true
+  transform: true
+  udf: null
+stageid:
+  scalar: true
+  transform: false
+  udf: null
+starea:
+  scalar: false
+  transform: true
+  udf: null
+startswith:
+  scalar: true
+  transform: false
+  udf: null
+starttime:
+  scalar: true
+  transform: false
+  udf: null
+stasbinary:
+  scalar: true
+  transform: true
+  udf: null
+stasgeojson:
+  scalar: true
+  transform: true
+  udf: null
+stastext:
+  scalar: true
+  transform: true
+  udf: null
+stcontains:
+  scalar: true
+  transform: true
+  udf: null
+stdistance:
+  scalar: true
+  transform: true
+  udf: null
+stequals:
+  scalar: true
+  transform: true
+  udf: null
+stgeogfromgeojson:
+  scalar: true
+  transform: true
+  udf: null
+stgeogfromtext:
+  scalar: true
+  transform: true
+  udf: null
+stgeogfromwkb:
+  scalar: true
+  transform: true
+  udf: null
+stgeometrytype:
+  scalar: true
+  transform: true
+  udf: null
+stgeomfromgeojson:
+  scalar: true
+  transform: true
+  udf: null
+stgeomfromtext:
+  scalar: true
+  transform: true
+  udf: null
+stgeomfromwkb:
+  scalar: true
+  transform: true
+  udf: null
+stpoint:
+  scalar: true
+  transform: true
+  udf: null
+stpolygon:
+  scalar: false
+  transform: true
+  udf: null
+strcmp:
+  scalar: true
+  transform: false
+  udf: null
+stringtoarray:
+  scalar: true
+  transform: false
+  udf: null
+strpos:
+  scalar: true
+  transform: false
+  udf: null
+strrpos:
+  scalar: true
+  transform: false
+  udf: null
+stwithin:
+  scalar: true
+  transform: true
+  udf: null
+sub:
+  scalar: true
+  transform: true
+  udf: null
+substr:
+  scalar: true
+  transform: false
+  udf: null
+substring:
+  scalar: true
+  transform: false
+  udf: null
+suffixes:
+  scalar: true
+  transform: false
+  udf: null
+suffixeswithsuffix:
+  scalar: true
+  transform: false
+  udf: null
+tan:
+  scalar: true
+  transform: true
+  udf: null
+tanh:
+  scalar: true
+  transform: true
+  udf: null
+testfunc1:
+  scalar: true
+  transform: false
+  udf: null
+testfunc2:
+  scalar: true
+  transform: false
+  udf: null
+textmatch:
+  scalar: false
+  transform: true
+  udf: null
+thetasketchdiff:
+  scalar: true
+  transform: false
+  udf: null
+thetasketchintersect:
+  scalar: true
+  transform: false
+  udf: null
+thetasketchtostring:
+  scalar: true
+  transform: false
+  udf: null
+thetasketchunion:
+  scalar: true
+  transform: false
+  udf: null
+timeconvert:
+  scalar: false
+  transform: true
+  udf: null
+times:
+  scalar: true
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.MultUdf"
+timeseriesbucket:
+  scalar: false
+  transform: true
+  udf: null
+timestampadd:
+  scalar: true
+  transform: false
+  udf: null
+timestampaddmv:
+  scalar: true
+  transform: false
+  udf: null
+timestampdiff:
+  scalar: true
+  transform: false
+  udf: null
+timestampdiffmv:
+  scalar: true
+  transform: false
+  udf: null
+timestampdiffmvreverse:
+  scalar: true
+  transform: false
+  udf: null
+timezonehour:
+  scalar: true
+  transform: false
+  udf: null
+timezonehourmv:
+  scalar: true
+  transform: false
+  udf: null
+timezoneminute:
+  scalar: true
+  transform: false
+  udf: null
+timezoneminutemv:
+  scalar: true
+  transform: false
+  udf: null
+toDateTime:
+  scalar: false
+  transform: false
+  udf: "org.apache.pinot.query.runtime.function.ToDateTimeUdf"
+toascii:
+  scalar: true
+  transform: false
+  udf: null
+tobase64:
+  scalar: true
+  transform: false
+  udf: null
+tobytes:
+  scalar: true
+  transform: false
+  udf: null
+tocpcsketch:
+  scalar: true
+  transform: false
+  udf: null
+todatetime:
+  scalar: true
+  transform: false
+  udf: null
+todatetimemv:
+  scalar: true
+  transform: false
+  udf: null
+toepochdays:
+  scalar: true
+  transform: false
+  udf: null
+toepochdaysbucket:
+  scalar: true
+  transform: false
+  udf: null
+toepochdaysbucketmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochdaysmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochdaysrounded:
+  scalar: true
+  transform: false
+  udf: null
+toepochdaysroundedmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochhours:
+  scalar: true
+  transform: false
+  udf: null
+toepochhoursbucket:
+  scalar: true
+  transform: false
+  udf: null
+toepochhoursbucketmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochhoursmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochhoursrounded:
+  scalar: true
+  transform: false
+  udf: null
+toepochhoursroundedmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochminutes:
+  scalar: true
+  transform: false
+  udf: null
+toepochminutesbucket:
+  scalar: true
+  transform: false
+  udf: null
+toepochminutesbucketmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochminutesmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochminutesrounded:
+  scalar: true
+  transform: false
+  udf: null
+toepochminutesroundedmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochseconds:
+  scalar: true
+  transform: false
+  udf: null
+toepochsecondsbucket:
+  scalar: true
+  transform: false
+  udf: null
+toepochsecondsbucketmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochsecondsmv:
+  scalar: true
+  transform: false
+  udf: null
+toepochsecondsrounded:
+  scalar: true
+  transform: false
+  udf: null
+toepochsecondsroundedmv:
+  scalar: true
+  transform: false
+  udf: null
+togeometry:
+  scalar: true
+  transform: false
+  udf: null
+tohll:
+  scalar: true
+  transform: false
+  udf: null
+tointegersumtuplesketch:
+  scalar: true
+  transform: false
+  udf: null
+toiso8601:
+  scalar: true
+  transform: false
+  udf: null
+toiso8601mv:
+  scalar: true
+  transform: false
+  udf: null
+tojsonmapstr:
+  scalar: true
+  transform: false
+  udf: null
+tosphericalgeography:
+  scalar: true
+  transform: false
+  udf: null
+tothetasketch:
+  scalar: true
+  transform: false
+  udf: null
+totimestamp:
+  scalar: true
+  transform: false
+  udf: null
+totimestampmv:
+  scalar: true
+  transform: false
+  udf: null
+toull:
+  scalar: true
+  transform: false
+  udf: null
+toutf8:
+  scalar: true
+  transform: false
+  udf: null
+touuidbytes:
+  scalar: true
+  transform: false
+  udf: null
+trim:
+  scalar: true
+  transform: false
+  udf: null
+truncate:
+  scalar: true
+  transform: true
+  udf: null
+uniquengrams:
+  scalar: true
+  transform: false
+  udf: null
+upper:
+  scalar: true
+  transform: false
+  udf: null
+urldecode:
+  scalar: true
+  transform: false
+  udf: null
+urldecodeformcomponent:
+  scalar: true
+  transform: false
+  udf: null
+urldomain:
+  scalar: true
+  transform: false
+  udf: null
+urldomainwithoutwww:
+  scalar: true
+  transform: false
+  udf: null
+urlencode:
+  scalar: true
+  transform: false
+  udf: null
+urlencodeformcomponent:
+  scalar: true
+  transform: false
+  udf: null
+urlfirstsignificantsubdomain:
+  scalar: true
+  transform: false
+  udf: null
+urlfragment:
+  scalar: true
+  transform: false
+  udf: null
+urlhierarchy:
+  scalar: true
+  transform: false
+  udf: null
+urlnetloc:
+  scalar: true
+  transform: false
+  udf: null
+urlpath:
+  scalar: true
+  transform: false
+  udf: null
+urlpathhierarchy:
+  scalar: true
+  transform: false
+  udf: null
+urlpathwithquery:
+  scalar: true
+  transform: false
+  udf: null
+urlport:
+  scalar: true
+  transform: false
+  udf: null
+urlprotocol:
+  scalar: true
+  transform: false
+  udf: null
+urlquerystring:
+  scalar: true
+  transform: false
+  udf: null
+urlquerystringandfragment:
+  scalar: true
+  transform: false
+  udf: null
+urltopleveldomain:
+  scalar: true
+  transform: false
+  udf: null
+valuein:
+  scalar: false
+  transform: true
+  udf: null
+vectordims:
+  scalar: true
+  transform: true
+  udf: null
+vectornorm:
+  scalar: true
+  transform: true
+  udf: null
+week:
+  scalar: true
+  transform: true
+  udf: null
+weekmv:
+  scalar: true
+  transform: false
+  udf: null
+weekofyear:
+  scalar: true
+  transform: true
+  udf: null
+weekofyearmv:
+  scalar: true
+  transform: false
+  udf: null
+workerid:
+  scalar: true
+  transform: false
+  udf: null
+year:
+  scalar: true
+  transform: true
+  udf: "org.apache.pinot.query.runtime.function.YearUdf"
+yearmv:
+  scalar: true
+  transform: false
+  udf: null
+yearofweek:
+  scalar: true
+  transform: true
+  udf: null
+yearofweekmv:
+  scalar: true
+  transform: false
+  udf: null
+yow:
+  scalar: true
+  transform: true
+  udf: null
+yowmv:
+  scalar: true
+  transform: false
+  udf: null

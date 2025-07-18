@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.function.scalar.ArrayFunctions;
+import org.apache.pinot.common.function.scalar.HashFunctions;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
@@ -29,36 +29,38 @@ import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
+
+/**
+ * UDF stub for adler32 (not implemented).
+ */
 @AutoService(Udf.class)
-public class ArrayElementAtIntUdf extends Udf.FromAnnotatedMethod {
-  public ArrayElementAtIntUdf()
+public class Adler32Udf extends Udf.FromAnnotatedMethod {
+
+  public Adler32Udf()
       throws NoSuchMethodException {
-    super(ArrayFunctions.class.getMethod("arrayElementAtInt", int[].class, int.class));
+    super(HashFunctions.class, "adler32", byte[].class);
   }
 
-  // language=markdown
   @Override
   public String getDescription() {
-    return "Returns the element at the specified index in an array of integers. "
-        + "The index is 1-based, meaning that the first element is at index 1. ";
+    return "Stub for adler32 function. Not implemented.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
-    return UdfExampleBuilder.forSignature(UdfSignature.of(
-            UdfParameter.of("arr", FieldSpec.DataType.INT)
-                .withDescription("Array of integers to retrieve the element from")
-                .asMultiValued(),
-            UdfParameter.of("idx", FieldSpec.DataType.INT)
-                .withDescription("1-based index of the element to retrieve."),
+    return UdfExampleBuilder.forSignature(
+        UdfSignature.of(
+            UdfParameter.of("input", FieldSpec.DataType.BYTES)
+                .withDescription("Input byte array to compute the Adler-32 checksum"),
             UdfParameter.result(FieldSpec.DataType.INT)
+                .withDescription("The Adler-32 checksum of the input byte array")
         ))
-        .addExample("first element", new Integer[]{10, 20, 30}, 1, 10)
-        .addExample("second element", new Integer[]{10, 20, 30}, 2, 20)
-        .addExample("negative element", new Integer[]{10, 20, 30}, -1, 0) // Index < 1 returns 0
-        .addExample("zero element", new Integer[]{10, 20, 30}, 0, 0) // Index < 1 returns 0
-        .addExample("out of bounds element", new Integer[]{10, 20, 30}, 4, 0) // Index > length returns 0
+        .addExample("empty", new byte[0], 1)
+        .addExample("single byte", new byte[]{1}, 131074)
+        .addExample("multiple bytes", new byte[]{1, 2, 3, 4}, 1572875)
+        .addExample(UdfExample.create("null input", null, null).withoutNull(1))
         .build()
         .generateExamples();
   }
 }
+

@@ -20,6 +20,7 @@ package org.apache.pinot.udf.test;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -39,8 +40,10 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
+import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.glassfish.grizzly.http.util.HexUtils;
 
 
 /// Class used to generate the [TableConfig] and [Schema] for the Pinot function tests.
@@ -103,6 +106,33 @@ public class PinotFunctionEnvGenerator {
     List<String> args = new ArrayList<>(params.size());
     for (int i = 0; i < params.size(); i++) {
       args.add(getParameterColumnName(signature, i));
+    }
+    return args;
+  }
+
+  public static List<String> getArgsForCall(UdfSignature signature, UdfExample example) {
+    List<UdfParameter> params = signature.getParameters();
+    List<String> args = new ArrayList<>(params.size());
+    for (int i = 0; i < params.size(); i++) {
+      UdfParameter param = params.get(i);
+      String paramValue;
+      if (param.isLiteralOnly()) {
+        Object exampleValue = example.getInputValues().get(i);
+        if (exampleValue == null) {
+          paramValue = "NULL";
+        } else if (exampleValue.getClass().isArray()) {
+          paramValue = Arrays.toString((Object[]) exampleValue);
+        } else if (param.getDataType() == FieldSpec.DataType.STRING) {
+          paramValue = "'" + exampleValue.toString().replace("'", "''") + "'";
+        } else if (param.getDataType() == FieldSpec.DataType.BYTES) {
+          paramValue = "X('" + BytesUtils.toHexString((byte[]) exampleValue) + "')";
+        } else {
+          paramValue = exampleValue.toString();
+        }
+      } else {
+        paramValue = getParameterColumnName(signature, i);
+      }
+      args.add(paramValue);
     }
     return args;
   }
@@ -289,14 +319,31 @@ public class PinotFunctionEnvGenerator {
       schemaBuilder.addDimensionField(columnName, param.getDataType(),
           fieldSpec -> fieldSpec.setSingleValueField(false));
     } else {
-      try {
-        schemaBuilder.addMetricField(columnName, param.getDataType(),
-            fieldSpec -> fieldSpec.setSingleValueField(true));
-      } catch (IllegalStateException e) {
-        schemaBuilder.addDimensionField(columnName, param.getDataType(),
-            fieldSpec -> {
-          fieldSpec.setSingleValueField(true);
-        });
+      switch (param.getDataType()) {
+        case INT:
+        case LONG:
+        case FLOAT:
+        case DOUBLE:
+        case BIG_DECIMAL:
+        case BYTES:
+          schemaBuilder.addMetricField(columnName, param.getDataType(),
+              fieldSpec -> fieldSpec.setSingleValueField(true));
+          break;
+        case BOOLEAN:
+        case TIMESTAMP:
+        case STRING:
+        case JSON:
+          schemaBuilder.addDimensionField(columnName, param.getDataType(),
+              fieldSpec -> {
+                fieldSpec.setSingleValueField(true);
+              });
+          break;
+        case MAP:
+        case LIST:
+        case STRUCT:
+        case UNKNOWN:
+        default:
+          throw new IllegalArgumentException("Unsupported data type: " + param.getDataType());
       }
     }
   }

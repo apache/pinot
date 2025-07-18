@@ -99,6 +99,12 @@ public abstract class UdfExample {
       return false;
     }
     if (result1.getClass().isArray() && result2.getClass().isArray()) {
+      if (!result1.getClass().equals(result2.getClass())) {
+        return false;
+      }
+      if (result1.getClass().equals(byte[].class)) {
+        return Arrays.equals((byte[]) result1, (byte[]) result2);
+      }
       return Arrays.equals((Object[]) result1, (Object[]) result2);
     }
     return Objects.equals(result1, result2);

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.integration.tests.udf;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -219,23 +221,58 @@ public class UdfTest {
 
   /// Returns a map whose keys are all the function names (including scalar and transform functions) and values are the
   /// Udf of that function, or null if the function is not UDF registered.
-  private TreeMap<String, Class<? extends Udf>> generateUdfMapForAllFunctions() {
+  private TreeMap<String, AllFunctionsValue> generateUdfMapForAllFunctions() {
     Set<String> scalarFunctions = FunctionRegistry.getFunctionNames();
     Set<String> transformFunctions = TransformFunctionFactory.getAllFunctionNames();
     Set<String> allFunctions = new TreeSet<>(Sets.union(scalarFunctions, transformFunctions));
 
-    TreeMap<String, Class<? extends Udf>> udfMap = new TreeMap<>();
+    TreeMap<String, AllFunctionsValue> udfMap = new TreeMap<>();
     for (Udf udf : _framework.getUdfs()) {
       for (String name : udf.getAllFunctionNames()) {
-        udfMap.put(name, udf.getClass());
+        udfMap.put(name, new AllFunctionsValue(
+            udf.getClass(),
+            transformFunctions.contains(name),
+            scalarFunctions.contains(name))
+        );
       }
     }
     for (String function : allFunctions) {
       if (!udfMap.containsKey(function)) {
-        udfMap.put(function, null);
+        udfMap.put(function, new AllFunctionsValue(null,
+            transformFunctions.contains(function),
+            scalarFunctions.contains(function)
+        ));
       }
     }
     return udfMap;
+  }
+
+  public static class AllFunctionsValue {
+    private final Class<? extends Udf> _udf;
+    private final boolean _transform;
+    private final boolean _scalar;
+
+    @JsonCreator
+    public AllFunctionsValue(
+        @JsonProperty("udf") Class<? extends Udf> udf,
+        @JsonProperty("transform") boolean transform,
+        @JsonProperty("scalar") boolean scalar) {
+      _udf = udf;
+      _transform = transform;
+      _scalar = scalar;
+    }
+
+    public Class<? extends Udf> getUdf() {
+      return _udf;
+    }
+
+    public boolean isTransform() {
+      return _transform;
+    }
+
+    public boolean isScalar() {
+      return _scalar;
+    }
   }
 
   /// Runs the framework and creates one file for each UDF with the results of the test.
@@ -285,7 +322,7 @@ public class UdfTest {
 
   private void generateAllFunctionsYaml(Writer writer)
       throws IOException {
-    TreeMap<String, Class<? extends Udf>> udfMap = generateUdfMapForAllFunctions();
+    TreeMap<String, AllFunctionsValue> udfMap = generateUdfMapForAllFunctions();
 
     // Write the license header
     writer.write(getYamlLicenseHeader());

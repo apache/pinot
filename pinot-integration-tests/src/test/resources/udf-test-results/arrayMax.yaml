@@ -22,22 +22,22 @@
 
 ---
 Ingestion time transformer:
-  ([Lint) -> int:
+  '(arr: ARRAY(int)) -> int':
     entries: null
     error: true
     errorMessage: "Unsupported"
 MSE intermediate stage (with null handling):
-  ([Lint) -> int:
+  '(arr: ARRAY(int)) -> int':
     entries: null
     error: true
     errorMessage: "Unsupported"
 MSE intermediate stage (without null handling):
-  ([Lint) -> int:
+  '(arr: ARRAY(int)) -> int':
     entries: null
     error: true
     errorMessage: "Unsupported"
 SSE predicate (with null handling):
-  ([Lint) -> int:
+  '(arr: ARRAY(int)) -> int':
     entries:
       array with small values:
         actualResult: true
@@ -47,7 +47,7 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  ([Lint) -> int:
+  '(arr: ARRAY(int)) -> int':
     entries:
       array with small values:
         actualResult: true
@@ -57,7 +57,7 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  ([Lint) -> int:
+  '(arr: ARRAY(int)) -> int':
     entries:
       array with small values:
         actualResult: 3
@@ -67,7 +67,7 @@ SSE projection (with null handling):
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  ([Lint) -> int:
+  '(arr: ARRAY(int)) -> int':
     entries:
       array with small values:
         actualResult: 3

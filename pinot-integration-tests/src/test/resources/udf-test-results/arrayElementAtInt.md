@@ -19,22 +19,33 @@
 
 ## arrayElementAtInt
 
+### Description
+
+Returns the element at the specified index in an array of integers. The index is 1-based, meaning that the first element is at index 1. 
 ### Summary
 
 The UDF arrayElementAtInt is supported in all scenarios with at least EQUAL semantic.
 
-### Details
+### Signatures
+
+#### arrayElementAtInt(arr: ARRAY(int), idx: int) -> int
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arr | int | Array of integers to retrieve the element from |
+| idx | int | 1-based index of the element to retrieve. |
+### Scenarios
 
 #### Ingestion time transformer
 
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
 
 
 #### MSE intermediate stage (with null handling)
@@ -42,11 +53,11 @@ The UDF arrayElementAtInt is supported in all scenarios with at least EQUAL sema
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
 
 
 #### MSE intermediate stage (without null handling)
@@ -54,11 +65,11 @@ The UDF arrayElementAtInt is supported in all scenarios with at least EQUAL sema
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
 
 
 #### SSE predicate (with null handling)
@@ -66,11 +77,11 @@ The UDF arrayElementAtInt is supported in all scenarios with at least EQUAL sema
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 2) |true |true |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 0) |true |true |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 4) |true |true |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 1) |true |true |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], -1) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 2) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 0) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 4) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 1) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], -1) |true |true |EQUAL |
 
 
 #### SSE predicate (without null handling)
@@ -78,11 +89,11 @@ The UDF arrayElementAtInt is supported in all scenarios with at least EQUAL sema
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 2) |true |true |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 0) |true |true |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 4) |true |true |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 1) |true |true |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], -1) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 2) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 0) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 4) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 1) |true |true |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], -1) |true |true |EQUAL |
 
 
 #### SSE projection (with null handling)
@@ -90,11 +101,11 @@ The UDF arrayElementAtInt is supported in all scenarios with at least EQUAL sema
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
 
 
 #### SSE projection (without null handling)
@@ -102,10 +113,10 @@ The UDF arrayElementAtInt is supported in all scenarios with at least EQUAL sema
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
-| ([Lint, int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 0) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 4) |0 |0 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 2) |20 |20 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], 1) |10 |10 |EQUAL |
+| (arr: ARRAY(int), idx: int) -> int |arrayElementAtInt([10, 20, 30], -1) |0 |0 |EQUAL |
 
 

@@ -21,7 +21,10 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.function.scalar.ArrayFunctions;
+import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.core.operator.transform.function.IsFalseTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
@@ -30,35 +33,40 @@ import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
 @AutoService(Udf.class)
-public class ArrayElementAtIntUdf extends Udf.FromAnnotatedMethod {
-  public ArrayElementAtIntUdf()
-      throws NoSuchMethodException {
-    super(ArrayFunctions.class.getMethod("arrayElementAtInt", int[].class, int.class));
+public class IsFalseUdf extends Udf {
+  @Override
+  public String getMainFunctionName() {
+    return "isFalse";
   }
 
-  // language=markdown
   @Override
   public String getDescription() {
-    return "Returns the element at the specified index in an array of integers. "
-        + "The index is 1-based, meaning that the first element is at index 1. ";
+    return "Returns true if the input is false (0), otherwise false. Null inputs return false.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-            UdfParameter.of("arr", FieldSpec.DataType.INT)
-                .withDescription("Array of integers to retrieve the element from")
-                .asMultiValued(),
-            UdfParameter.of("idx", FieldSpec.DataType.INT)
-                .withDescription("1-based index of the element to retrieve."),
-            UdfParameter.result(FieldSpec.DataType.INT)
+          UdfParameter.of("input", FieldSpec.DataType.INT)
+              .withDescription("Input value to check if it is false (0)"),
+          UdfParameter.result(FieldSpec.DataType.BOOLEAN)
         ))
-        .addExample("first element", new Integer[]{10, 20, 30}, 1, 10)
-        .addExample("second element", new Integer[]{10, 20, 30}, 2, 20)
-        .addExample("negative element", new Integer[]{10, 20, 30}, -1, 0) // Index < 1 returns 0
-        .addExample("zero element", new Integer[]{10, 20, 30}, 0, 0) // Index < 1 returns 0
-        .addExample("out of bounds element", new Integer[]{10, 20, 30}, 4, 0) // Index > length returns 0
+        .addExample("input is 0 (false)", 0, true)
+        .addExample("input is 1 (true)", 1, false)
+        .addExample("input is -1 (not false)", -1, false)
+        .addExample(UdfExample.create("null input", null, false))
         .build()
         .generateExamples();
   }
+
+  @Override
+  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
+    return Map.of(TransformFunctionType.IS_FALSE, IsFalseTransformFunction.class);
+  }
+
+  @Override
+  public Set<PinotScalarFunction> getScalarFunctions() {
+    return Set.of();
+  }
 }
+

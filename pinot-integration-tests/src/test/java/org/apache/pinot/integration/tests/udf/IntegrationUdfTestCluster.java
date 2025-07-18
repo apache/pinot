@@ -27,6 +27,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Stream;
+import org.apache.avro.Conversions;
+import org.apache.avro.data.TimeConversions;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -121,8 +123,11 @@ public class IntegrationUdfTestCluster extends BaseClusterIntegrationTest
       int numRows = 0;
       File tempFile = File.createTempFile(tableName, ".avro");
       org.apache.avro.Schema avroSchema = SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(schema);
+
+      GenericData genericData = SegmentProcessorAvroUtils.getGenericData();
+      GenericDatumWriter<GenericRecord> datumWriter = new GenericDatumWriter<>(avroSchema, genericData);
       try (Stream<GenericRow> closeMe = rows;
-          DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(new GenericDatumWriter<>(avroSchema))) {
+          DataFileWriter<GenericRecord> dataFileWriter = new DataFileWriter<>(datumWriter)) {
         dataFileWriter.create(avroSchema, tempFile);
 
         Iterator<GenericRow> it = rows.iterator();

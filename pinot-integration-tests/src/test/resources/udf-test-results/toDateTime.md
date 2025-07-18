@@ -17,29 +17,23 @@
   ~ under the License.
   -->
 
-## arrayMax
+## toDateTime
 
 ### Description
 
-Given an array with numeric values, this function returns the maximum value in the array. * asdf 
+Converts epoch millis to a DateTime string represented by the given pattern. Optionally, a timezone can be provided.
 ### Summary
 
-| Scenario | Semantic |
-|----------|----------|
-| Ingestion time transformer | ❌ Unsupported |
-| MSE intermediate stage (with null handling) | ❌ Unsupported |
-| MSE intermediate stage (without null handling) | ❌ Unsupported |
-| SSE predicate (with null handling) | EQUAL |
-| SSE predicate (without null handling) | EQUAL |
-| SSE projection (with null handling) | EQUAL |
-| SSE projection (without null handling) | EQUAL |
+The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
+
 ### Signatures
 
-#### arrayMax(arr: ARRAY(int)) -> int
+#### toDateTime(mills: long, format: string) -> string
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| arr | int | Input array of integers |
+| mills | long | A long value representing epoch millis, e.g., 1577836800000L for 2020-01-01T00:00:00Z |
+| format | string | A string literal representing the date format, e.g., 'yyyy-MM-dd'T'HH:mm:ss'Z' or 'yyyy-MM-dd' |
 ### Scenarios
 
 #### Ingestion time transformer
@@ -47,7 +41,8 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
 
 
 #### MSE intermediate stage (with null handling)
@@ -55,7 +50,8 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
 
 
 #### MSE intermediate stage (without null handling)
@@ -63,7 +59,8 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
 
 
 #### SSE predicate (with null handling)
@@ -71,7 +68,8 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |true |true |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |true |true |EQUAL |
 
 
 #### SSE predicate (without null handling)
@@ -79,7 +77,8 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |true |true |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |true |true |EQUAL |
 
 
 #### SSE projection (with null handling)
@@ -87,7 +86,8 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
 
 
 #### SSE projection (without null handling)
@@ -95,6 +95,7 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
+| (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
 
 

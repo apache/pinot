@@ -21,10 +21,10 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.TrigonometricFunctions;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AcosTransformFunction;
+import org.apache.pinot.core.operator.transform.function.OrOperatorTransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
@@ -32,41 +32,49 @@ import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
-
 @AutoService(Udf.class)
-public class AcosUdf extends Udf.FromAnnotatedMethod {
-
-  public AcosUdf()
-      throws NoSuchMethodException {
-    super(TrigonometricFunctions.class, "acos", double.class);
+public class OrUdf extends Udf {
+  @Override
+  public String getMainFunctionName() {
+    return "or";
   }
 
   @Override
   public String getDescription() {
-    return "Returns the arc cosine of a numeric input (in radians).";
+    return "Logical OR function for two boolean values. Returns true if either argument is true, false if both are false, and null if both are null or one is null and the other is false.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-            UdfParameter.of("d", FieldSpec.DataType.DOUBLE)
-                .withDescription("The double value for which to compute the arc cosine."),
-            UdfParameter.result(FieldSpec.DataType.DOUBLE)
-                .withDescription("The arc cosine of the input value, in radians.")
+          UdfParameter.of("left", FieldSpec.DataType.BOOLEAN)
+              .withDescription("Left operand of the OR operation"),
+          UdfParameter.of("right", FieldSpec.DataType.BOOLEAN)
+              .withDescription("Right operand of the OR operation"),
+          UdfParameter.result(FieldSpec.DataType.BOOLEAN)
+              .withDescription("Result of the OR operation, true if either operand is true, false otherwise")
         ))
-        .addExample("acos(1)", 1d, 0d)
-        .addExample("acos(0)", 0d, Math.PI / 2)
-        .addExample("acos(-1)", -1d, Math.PI)
-        .addExample("larger than 1", 10d, Double.NaN)
-        .addExample("smaller than -1", -10d, Double.NaN)
-        .addExample(UdfExample.create("null input", null, null)
-            .withoutNull(Math.PI / 2))
+        .addExample("true or true", true, true, true)
+        .addExample("true or false", true, false, true)
+        .addExample("false or true", false, true, true)
+        .addExample("false or false", false, false, false)
+        .addExample(UdfExample.create("true or null", true, null, true).withoutNull(true))
+        .addExample(UdfExample.create("null or true", null, true, true).withoutNull(true))
+        .addExample(UdfExample.create("false or null", false, null, null).withoutNull(false))
+        .addExample(UdfExample.create("null or false", null, false, null).withoutNull(false))
+        .addExample(UdfExample.create("null or null", null, null, null).withoutNull(false))
         .build()
         .generateExamples();
   }
 
   @Override
+  public Set<PinotScalarFunction> getScalarFunctions() {
+    return Set.of();
+  }
+
+  @Override
   public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ACOS, AcosTransformFunction.class);
+    return Map.of(TransformFunctionType.OR, OrOperatorTransformFunction.class);
   }
 }
+

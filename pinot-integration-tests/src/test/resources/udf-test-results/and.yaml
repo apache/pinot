@@ -22,139 +22,159 @@
 
 ---
 Ingestion time transformer:
-  '(d: double) -> double':
+  '(left: boolean, right: boolean) -> boolean':
     entries:
-      acos(-1):
-        actualResult: 3.141592653589793
+      false and false:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 3.141592653589793
-      acos(0):
-        actualResult: 1.5707963267948966
+        expectedResult: false
+      false and true:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 1.5707963267948966
-      acos(1):
-        actualResult: 0.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0.0
-      larger than 1:
-        actualResult: NaN
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: NaN
-      null input:
+        expectedResult: false
+      null and null:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      smaller than -1:
-        actualResult: NaN
+      null and true:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: NaN
+        expectedResult: null
+      true and false:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      true and null:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      true and true:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(d: double) -> double':
+  '(left: boolean, right: boolean) -> boolean':
     entries:
-      acos(-1):
-        actualResult: 3.141592653589793
+      false and false:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 3.141592653589793
-      acos(0):
-        actualResult: 1.5707963267948966
+        expectedResult: false
+      false and true:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 1.5707963267948966
-      acos(1):
-        actualResult: 0.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0.0
-      larger than 1:
-        actualResult: NaN
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: NaN
-      null input:
+        expectedResult: false
+      null and null:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      smaller than -1:
-        actualResult: NaN
+      null and true:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: NaN
+        expectedResult: null
+      true and false:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      true and null:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      true and true:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(d: double) -> double':
+  '(left: boolean, right: boolean) -> boolean':
     entries:
-      acos(-1):
-        actualResult: 3.141592653589793
+      false and false:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 3.141592653589793
-      acos(0):
-        actualResult: 1.5707963267948966
+        expectedResult: false
+      false and true:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 1.5707963267948966
-      acos(1):
-        actualResult: 0.0
+        expectedResult: false
+      null and null:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      larger than 1:
-        actualResult: NaN
+        expectedResult: false
+      null and true:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: NaN
-      null input:
-        actualResult: 1.5707963267948966
+        expectedResult: false
+      true and false:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 1.5707963267948966
-      smaller than -1:
-        actualResult: NaN
+        expectedResult: false
+      true and null:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: NaN
+        expectedResult: false
+      true and true:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(d: double) -> double':
+  '(left: boolean, right: boolean) -> boolean':
     entries:
-      acos(-1):
+      false and false:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      acos(0):
+      false and true:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      acos(1):
+      null and null:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      larger than 1:
+      null and true:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      null input:
+      true and false:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      smaller than -1:
+      true and null:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      true and true:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -162,34 +182,39 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(d: double) -> double':
+  '(left: boolean, right: boolean) -> boolean':
     entries:
-      acos(-1):
+      false and false:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      acos(0):
+      false and true:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      acos(1):
+      null and null:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      larger than 1:
+      null and true:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      null input:
+      true and false:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      smaller than -1:
+      true and null:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      true and true:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -197,72 +222,82 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(d: double) -> double':
+  '(left: boolean, right: boolean) -> boolean':
     entries:
-      acos(-1):
-        actualResult: 3.141592653589793
+      false and false:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 3.141592653589793
-      acos(0):
-        actualResult: 1.5707963267948966
+        expectedResult: false
+      false and true:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 1.5707963267948966
-      acos(1):
-        actualResult: 0.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0.0
-      larger than 1:
-        actualResult: NaN
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: NaN
-      null input:
+        expectedResult: false
+      null and null:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      smaller than -1:
-        actualResult: NaN
+      null and true:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: NaN
+        expectedResult: null
+      true and false:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      true and null:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      true and true:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(d: double) -> double':
+  '(left: boolean, right: boolean) -> boolean':
     entries:
-      acos(-1):
-        actualResult: 3.141592653589793
+      false and false:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 3.141592653589793
-      acos(0):
-        actualResult: 1.5707963267948966
+        expectedResult: false
+      false and true:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 1.5707963267948966
-      acos(1):
-        actualResult: 0.0
+        expectedResult: false
+      null and null:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      larger than 1:
-        actualResult: NaN
+        expectedResult: false
+      null and true:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: NaN
-      null input:
-        actualResult: 1.5707963267948966
+        expectedResult: false
+      true and false:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 1.5707963267948966
-      smaller than -1:
-        actualResult: NaN
+        expectedResult: false
+      true and null:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: NaN
+        expectedResult: false
+      true and true:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null

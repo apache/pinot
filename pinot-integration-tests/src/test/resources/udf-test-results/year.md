@@ -17,29 +17,31 @@
   ~ under the License.
   -->
 
-## arrayMax
+## year
 
 ### Description
 
-Given an array with numeric values, this function returns the maximum value in the array. * asdf 
+Returns the year from the given epoch millis in UTC timezone.
 ### Summary
 
 | Scenario | Semantic |
 |----------|----------|
-| Ingestion time transformer | ❌ Unsupported |
-| MSE intermediate stage (with null handling) | ❌ Unsupported |
-| MSE intermediate stage (without null handling) | ❌ Unsupported |
+| Ingestion time transformer | EQUAL |
+| MSE intermediate stage (with null handling) | NUMBER_AS_DOUBLE |
+| MSE intermediate stage (without null handling) | NUMBER_AS_DOUBLE |
 | SSE predicate (with null handling) | EQUAL |
 | SSE predicate (without null handling) | EQUAL |
 | SSE projection (with null handling) | EQUAL |
 | SSE projection (without null handling) | EQUAL |
 ### Signatures
 
-#### arrayMax(arr: ARRAY(int)) -> int
+#### year(millis: long) -> int
+
+Returns the year as an integer
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| arr | int | Input array of integers |
+| millis | long | A long value representing epoch millise.g., 1577836800000L for 2020-01-01T00:00:00Z |
 ### Scenarios
 
 #### Ingestion time transformer
@@ -47,7 +49,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (millis: long) -> int |year(1577836800000) |2020 |2020 |EQUAL |
+| (millis: long) -> int |year(NULL) |NULL |NULL |EQUAL |
+| (millis: long) -> int |year(0) |1970 |1970 |EQUAL |
 
 
 #### MSE intermediate stage (with null handling)
@@ -55,7 +59,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (millis: long) -> int |year(1577836800000) |2020 (Integer) |2020 (Long) |NUMBER_AS_DOUBLE |
+| (millis: long) -> int |year(NULL) |NULL |NULL |EQUAL |
+| (millis: long) -> int |year(0) |1970 (Integer) |1970 (Long) |NUMBER_AS_DOUBLE |
 
 
 #### MSE intermediate stage (without null handling)
@@ -63,7 +69,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (millis: long) -> int |year(1577836800000) |2020 (Integer) |2020 (Long) |NUMBER_AS_DOUBLE |
+| (millis: long) -> int |year(NULL) |1970 (Integer) |1970 (Long) |NUMBER_AS_DOUBLE |
+| (millis: long) -> int |year(0) |1970 (Integer) |1970 (Long) |NUMBER_AS_DOUBLE |
 
 
 #### SSE predicate (with null handling)
@@ -71,7 +79,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
+| (millis: long) -> int |year(1577836800000) |true |true |EQUAL |
+| (millis: long) -> int |year(NULL) |true |true |EQUAL |
+| (millis: long) -> int |year(0) |true |true |EQUAL |
 
 
 #### SSE predicate (without null handling)
@@ -79,7 +89,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
+| (millis: long) -> int |year(1577836800000) |true |true |EQUAL |
+| (millis: long) -> int |year(NULL) |true |true |EQUAL |
+| (millis: long) -> int |year(0) |true |true |EQUAL |
 
 
 #### SSE projection (with null handling)
@@ -87,7 +99,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
+| (millis: long) -> int |year(1577836800000) |2020 |2020 |EQUAL |
+| (millis: long) -> int |year(NULL) |NULL |NULL |EQUAL |
+| (millis: long) -> int |year(0) |1970 |1970 |EQUAL |
 
 
 #### SSE projection (without null handling)
@@ -95,6 +109,8 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
+| (millis: long) -> int |year(1577836800000) |2020 |2020 |EQUAL |
+| (millis: long) -> int |year(NULL) |1970 |1970 |EQUAL |
+| (millis: long) -> int |year(0) |1970 |1970 |EQUAL |
 
 

@@ -22,119 +22,99 @@
 
 ---
 Ingestion time transformer:
-  '(arr: ARRAY(int), idx: int) -> int':
+  '(input: bytes) -> int':
     entries:
-      first element:
-        actualResult: 10
+      empty:
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 10
-      negative element:
-        actualResult: 0
+        expectedResult: 1
+      multiple bytes:
+        actualResult: 1572875
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      out of bounds element:
-        actualResult: 0
+        expectedResult: 1572875
+      null input:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      second element:
-        actualResult: 20
+        expectedResult: null
+      single byte:
+        actualResult: 131074
         equivalence: "EQUAL"
         error: null
-        expectedResult: 20
-      zero element:
-        actualResult: 0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0
+        expectedResult: 131074
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(arr: ARRAY(int), idx: int) -> int':
+  '(input: bytes) -> int':
     entries:
-      first element:
-        actualResult: 10
+      empty:
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 10
-      negative element:
-        actualResult: 0
+        expectedResult: 1
+      multiple bytes:
+        actualResult: 1572875
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      out of bounds element:
-        actualResult: 0
+        expectedResult: 1572875
+      null input:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      second element:
-        actualResult: 20
+        expectedResult: null
+      single byte:
+        actualResult: 131074
         equivalence: "EQUAL"
         error: null
-        expectedResult: 20
-      zero element:
-        actualResult: 0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0
+        expectedResult: 131074
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(arr: ARRAY(int), idx: int) -> int':
+  '(input: bytes) -> int':
     entries:
-      first element:
-        actualResult: 10
+      empty:
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 10
-      negative element:
-        actualResult: 0
+        expectedResult: 1
+      multiple bytes:
+        actualResult: 1572875
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      out of bounds element:
-        actualResult: 0
+        expectedResult: 1572875
+      null input:
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      second element:
-        actualResult: 20
+        expectedResult: 1
+      single byte:
+        actualResult: 131074
         equivalence: "EQUAL"
         error: null
-        expectedResult: 20
-      zero element:
-        actualResult: 0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0
+        expectedResult: 131074
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(arr: ARRAY(int), idx: int) -> int':
+  '(input: bytes) -> int':
     entries:
-      first element:
+      empty:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      negative element:
+      multiple bytes:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      out of bounds element:
+      null input:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      second element:
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      zero element:
+      single byte:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -142,29 +122,24 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(arr: ARRAY(int), idx: int) -> int':
+  '(input: bytes) -> int':
     entries:
-      first element:
+      empty:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      negative element:
+      multiple bytes:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      out of bounds element:
+      null input:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      second element:
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      zero element:
+      single byte:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -172,62 +147,52 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(arr: ARRAY(int), idx: int) -> int':
+  '(input: bytes) -> int':
     entries:
-      first element:
-        actualResult: 10
+      empty:
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 10
-      negative element:
-        actualResult: 0
+        expectedResult: 1
+      multiple bytes:
+        actualResult: 1572875
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      out of bounds element:
-        actualResult: 0
+        expectedResult: 1572875
+      null input:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      second element:
-        actualResult: 20
+        expectedResult: null
+      single byte:
+        actualResult: 131074
         equivalence: "EQUAL"
         error: null
-        expectedResult: 20
-      zero element:
-        actualResult: 0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0
+        expectedResult: 131074
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(arr: ARRAY(int), idx: int) -> int':
+  '(input: bytes) -> int':
     entries:
-      first element:
-        actualResult: 10
+      empty:
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 10
-      negative element:
-        actualResult: 0
+        expectedResult: 1
+      multiple bytes:
+        actualResult: 1572875
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      out of bounds element:
-        actualResult: 0
+        expectedResult: 1572875
+      null input:
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
-      second element:
-        actualResult: 20
+        expectedResult: 1
+      single byte:
+        actualResult: 131074
         equivalence: "EQUAL"
         error: null
-        expectedResult: 20
-      zero element:
-        actualResult: 0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0
+        expectedResult: 131074
     error: false
     errorMessage: null

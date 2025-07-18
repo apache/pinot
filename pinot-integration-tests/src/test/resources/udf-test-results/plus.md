@@ -19,6 +19,13 @@
 
 ## plus
 
+Other names: add
+
+### Description
+
+This function adds two numeric values together. In order to concatenate two strings, use the `concat` function instead.
+### Summary
+
 | Scenario | Semantic |
 |----------|----------|
 | Ingestion time transformer | NUMBER_AS_DOUBLE |
@@ -28,23 +35,55 @@
 | SSE predicate (without null handling) | EQUAL |
 | SSE projection (with null handling) | NUMBER_AS_DOUBLE |
 | SSE projection (without null handling) | NUMBER_AS_DOUBLE |
-### Details
+### Signatures
+
+#### plus(arg0: big_decimal, arg1: big_decimal) -> big_decimal
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | big_decimal |  |
+| arg1 | big_decimal |  |
+#### plus(arg0: float, arg1: float) -> float
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | float |  |
+| arg1 | float |  |
+#### plus(arg0: long, arg1: long) -> long
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | long |  |
+| arg1 | long |  |
+#### plus(arg0: int, arg1: int) -> int
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | int |  |
+| arg1 | int |  |
+#### plus(arg0: double, arg1: double) -> double
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | double |  |
+| arg1 | double |  |
+### Scenarios
 
 #### Ingestion time transformer
 
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (Double) |BIG_DECIMAL_AS_DOUBLE |
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (double, double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
-| (double, double) -> double |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (float, float) -> float |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (float, float) -> float |(1.0 + 2.0) |3.0 (Float) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (int, int) -> int |(1 + NULL) |NULL |NULL |EQUAL |
-| (int, int) -> int |(1 + 2) |3 (Integer) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (long, long) -> long |(1 + 2) |3 (Long) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (long, long) -> long |(1 + NULL) |NULL |NULL |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (Double) |BIG_DECIMAL_AS_DOUBLE |
+| (arg0: double, arg1: double) -> double |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + 2.0) |3.0 (Float) |3.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: float, arg1: float) -> float |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + NULL) |NULL |NULL |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + 2) |3 (Integer) |3.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: long, arg1: long) -> long |(1 + 2) |3 (Long) |3.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: long, arg1: long) -> long |(1 + NULL) |NULL |NULL |EQUAL |
 
 
 #### MSE intermediate stage (with null handling)
@@ -52,16 +91,16 @@
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (Double) |BIG_DECIMAL_AS_DOUBLE |
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (double, double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
-| (double, double) -> double |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (float, float) -> float |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (float, float) -> float |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
-| (int, int) -> int |(1 + NULL) |NULL |NULL |EQUAL |
-| (int, int) -> int |(1 + 2) |3 |3 |EQUAL |
-| (long, long) -> long |(1 + 2) |3 |3 |EQUAL |
-| (long, long) -> long |(1 + NULL) |NULL |NULL |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (Double) |BIG_DECIMAL_AS_DOUBLE |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + NULL) |NULL |NULL |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + 2) |3 |3 |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + NULL) |NULL |NULL |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + 2) |3 |3 |EQUAL |
 
 
 #### MSE intermediate stage (without null handling)
@@ -69,16 +108,16 @@
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (Double) |BIG_DECIMAL_AS_DOUBLE |
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + NULL) |1.0 (BigDecimal) |1.0 (Double) |BIG_DECIMAL_AS_DOUBLE |
-| (double, double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
-| (double, double) -> double |(1.0 + NULL) |1.0 |1.0 |EQUAL |
-| (float, float) -> float |(1.0 + NULL) |1.0 |1.0 |EQUAL |
-| (float, float) -> float |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
-| (int, int) -> int |(1 + NULL) |1 |1 |EQUAL |
-| (int, int) -> int |(1 + 2) |3 |3 |EQUAL |
-| (long, long) -> long |(1 + 2) |3 |3 |EQUAL |
-| (long, long) -> long |(1 + NULL) |1 |1 |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (Double) |BIG_DECIMAL_AS_DOUBLE |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + NULL) |1.0 (BigDecimal) |1.0 (Double) |BIG_DECIMAL_AS_DOUBLE |
+| (arg0: double, arg1: double) -> double |(1.0 + NULL) |1.0 |1.0 |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + NULL) |1.0 |1.0 |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + NULL) |1 |1 |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + 2) |3 |3 |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + NULL) |1 |1 |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + 2) |3 |3 |EQUAL |
 
 
 #### SSE predicate (with null handling)
@@ -86,16 +125,16 @@
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + 2.0) |true |true |EQUAL |
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + NULL) |true |true |EQUAL |
-| (double, double) -> double |(1.0 + 2.0) |true |true |EQUAL |
-| (double, double) -> double |(1.0 + NULL) |true |true |EQUAL |
-| (float, float) -> float |(1.0 + NULL) |true |true |EQUAL |
-| (float, float) -> float |(1.0 + 2.0) |true |true |EQUAL |
-| (int, int) -> int |(1 + NULL) |true |true |EQUAL |
-| (int, int) -> int |(1 + 2) |true |true |EQUAL |
-| (long, long) -> long |(1 + 2) |true |true |EQUAL |
-| (long, long) -> long |(1 + NULL) |true |true |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + NULL) |true |true |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + 2.0) |true |true |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + NULL) |true |true |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + 2.0) |true |true |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + 2.0) |true |true |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + NULL) |true |true |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + NULL) |true |true |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + 2) |true |true |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + 2) |true |true |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + NULL) |true |true |EQUAL |
 
 
 #### SSE predicate (without null handling)
@@ -103,16 +142,16 @@
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + 2.0) |true |true |EQUAL |
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + NULL) |true |true |EQUAL |
-| (double, double) -> double |(1.0 + 2.0) |true |true |EQUAL |
-| (double, double) -> double |(1.0 + NULL) |true |true |EQUAL |
-| (float, float) -> float |(1.0 + NULL) |true |true |EQUAL |
-| (float, float) -> float |(1.0 + 2.0) |true |true |EQUAL |
-| (int, int) -> int |(1 + NULL) |true |true |EQUAL |
-| (int, int) -> int |(1 + 2) |true |true |EQUAL |
-| (long, long) -> long |(1 + 2) |true |true |EQUAL |
-| (long, long) -> long |(1 + NULL) |true |true |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + NULL) |true |true |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + 2.0) |true |true |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + NULL) |true |true |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + 2.0) |true |true |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + 2.0) |true |true |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + NULL) |true |true |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + NULL) |true |true |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + 2) |true |true |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + 2) |true |true |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + NULL) |true |true |EQUAL |
 
 
 #### SSE projection (with null handling)
@@ -120,16 +159,16 @@
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (String) |BIG_DECIMAL_AS_DOUBLE |
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (double, double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
-| (double, double) -> double |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (float, float) -> float |(1.0 + NULL) |NULL |NULL |EQUAL |
-| (float, float) -> float |(1.0 + 2.0) |3.0 (Float) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (int, int) -> int |(1 + NULL) |NULL |NULL |EQUAL |
-| (int, int) -> int |(1 + 2) |3 (Integer) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (long, long) -> long |(1 + 2) |3 (Long) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (long, long) -> long |(1 + NULL) |NULL |NULL |EQUAL |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (String) |BIG_DECIMAL_AS_DOUBLE |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + 2.0) |3.0 (Float) |3.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: float, arg1: float) -> float |(1.0 + NULL) |NULL |NULL |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + NULL) |NULL |NULL |EQUAL |
+| (arg0: int, arg1: int) -> int |(1 + 2) |3 (Integer) |3.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: long, arg1: long) -> long |(1 + NULL) |NULL |NULL |EQUAL |
+| (arg0: long, arg1: long) -> long |(1 + 2) |3 (Long) |3.0 (Double) |NUMBER_AS_DOUBLE |
 
 
 #### SSE projection (without null handling)
@@ -137,15 +176,15 @@
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (String) |BIG_DECIMAL_AS_DOUBLE |
-| (big_decimal, big_decimal) -> big_decimal |(1.0 + NULL) |1.0 (BigDecimal) |1.0 (String) |BIG_DECIMAL_AS_DOUBLE |
-| (double, double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
-| (double, double) -> double |(1.0 + NULL) |1.0 |1.0 |EQUAL |
-| (float, float) -> float |(1.0 + NULL) |1.0 (Float) |1.0 (Double) |NUMBER_AS_DOUBLE |
-| (float, float) -> float |(1.0 + 2.0) |3.0 (Float) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (int, int) -> int |(1 + NULL) |1 (Integer) |1.0 (Double) |NUMBER_AS_DOUBLE |
-| (int, int) -> int |(1 + 2) |3 (Integer) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (long, long) -> long |(1 + 2) |3 (Long) |3.0 (Double) |NUMBER_AS_DOUBLE |
-| (long, long) -> long |(1 + NULL) |1 (Long) |1.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + 2.0) |3.0 (BigDecimal) |3.0 (String) |BIG_DECIMAL_AS_DOUBLE |
+| (arg0: big_decimal, arg1: big_decimal) -> big_decimal |(1.0 + NULL) |1.0 (BigDecimal) |1.0 (String) |BIG_DECIMAL_AS_DOUBLE |
+| (arg0: double, arg1: double) -> double |(1.0 + NULL) |1.0 |1.0 |EQUAL |
+| (arg0: double, arg1: double) -> double |(1.0 + 2.0) |3.0 |3.0 |EQUAL |
+| (arg0: float, arg1: float) -> float |(1.0 + 2.0) |3.0 (Float) |3.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: float, arg1: float) -> float |(1.0 + NULL) |1.0 (Float) |1.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: int, arg1: int) -> int |(1 + NULL) |1 (Integer) |1.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: int, arg1: int) -> int |(1 + 2) |3 (Integer) |3.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: long, arg1: long) -> long |(1 + NULL) |1 (Long) |1.0 (Double) |NUMBER_AS_DOUBLE |
+| (arg0: long, arg1: long) -> long |(1 + 2) |3 (Long) |3.0 (Double) |NUMBER_AS_DOUBLE |
 
 

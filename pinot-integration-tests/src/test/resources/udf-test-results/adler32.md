@@ -17,29 +17,24 @@
   ~ under the License.
   -->
 
-## arrayMax
+## adler32
 
 ### Description
 
-Given an array with numeric values, this function returns the maximum value in the array. * asdf 
+Stub for adler32 function. Not implemented.
 ### Summary
 
-| Scenario | Semantic |
-|----------|----------|
-| Ingestion time transformer | ❌ Unsupported |
-| MSE intermediate stage (with null handling) | ❌ Unsupported |
-| MSE intermediate stage (without null handling) | ❌ Unsupported |
-| SSE predicate (with null handling) | EQUAL |
-| SSE predicate (without null handling) | EQUAL |
-| SSE projection (with null handling) | EQUAL |
-| SSE projection (without null handling) | EQUAL |
+The UDF adler32 is supported in all scenarios with at least EQUAL semantic.
+
 ### Signatures
 
-#### arrayMax(arr: ARRAY(int)) -> int
+#### adler32(input: bytes) -> int
+
+The Adler-32 checksum of the input byte array
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| arr | int | Input array of integers |
+| input | bytes | Input byte array to compute the Adler-32 checksum |
 ### Scenarios
 
 #### Ingestion time transformer
@@ -47,7 +42,10 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (input: bytes) -> int |adler32(hexToBytes('01')) |131074 |131074 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01020304')) |1572875 |1572875 |EQUAL |
+| (input: bytes) -> int |adler32(NULL) |NULL |NULL |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
 
 
 #### MSE intermediate stage (with null handling)
@@ -55,7 +53,10 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (input: bytes) -> int |adler32(hexToBytes('01')) |131074 |131074 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01020304')) |1572875 |1572875 |EQUAL |
+| (input: bytes) -> int |adler32(NULL) |NULL |NULL |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
 
 
 #### MSE intermediate stage (without null handling)
@@ -63,7 +64,10 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (input: bytes) -> int |adler32(hexToBytes('01')) |131074 |131074 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01020304')) |1572875 |1572875 |EQUAL |
+| (input: bytes) -> int |adler32(NULL) |1 |1 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
 
 
 #### SSE predicate (with null handling)
@@ -71,7 +75,10 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01')) |true |true |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01020304')) |true |true |EQUAL |
+| (input: bytes) -> int |adler32(NULL) |true |true |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('')) |true |true |EQUAL |
 
 
 #### SSE predicate (without null handling)
@@ -79,7 +86,10 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01')) |true |true |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01020304')) |true |true |EQUAL |
+| (input: bytes) -> int |adler32(NULL) |true |true |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('')) |true |true |EQUAL |
 
 
 #### SSE projection (with null handling)
@@ -87,7 +97,10 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01')) |131074 |131074 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01020304')) |1572875 |1572875 |EQUAL |
+| (input: bytes) -> int |adler32(NULL) |NULL |NULL |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
 
 
 #### SSE projection (without null handling)
@@ -95,6 +108,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01')) |131074 |131074 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('01020304')) |1572875 |1572875 |EQUAL |
+| (input: bytes) -> int |adler32(NULL) |1 |1 |EQUAL |
+| (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
 
 

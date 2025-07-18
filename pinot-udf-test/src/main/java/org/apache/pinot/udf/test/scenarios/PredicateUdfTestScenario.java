@@ -53,21 +53,22 @@ public class PredicateUdfTestScenario extends AbstractUdfTestScenario {
   public Map<UdfExample, UdfExampleResult> execute(Udf udf, UdfSignature signature) {
 
     // language=sql
-    String sql = replaceCommonVariables(udf, signature, isNullHandlingEnabled(), ""
-            + "SELECT \n"
-            + "  @testCol as test,"
-            + "  true as result\n"
-            + "FROM @table \n"
-            + "WHERE @signatureCol = '@signature' \n"
-            + "  AND @udfCol = '@udfName' \n"
-            + "  AND ( \n"
-            + "    @call = @resultCol OR \n"
-            + "    @call IS NULL AND @resultCol IS NULL \n"
-            + "  )\n");
+    String sqlTemplate = ""
+        + "SELECT \n"
+        + "  @testCol as test,"
+        + "  true as result\n"
+        + "FROM @table \n"
+        + "WHERE @signatureCol = '@signature' \n"
+        + "  AND @udfCol = '@udfName' \n"
+        + "  AND ( \n"
+        + "    @call = @resultCol OR \n"
+        + "    @call IS NULL AND @resultCol IS NULL \n"
+        + "  )\n"
+        + "  AND @testCol = '@example' \n";
     UdfTestCluster.ExecutionContext context = new UdfTestCluster.ExecutionContext(
         isNullHandlingEnabled(),
         false);
-    Map<UdfExample, UdfExampleResult> queryResult = extractResultsByCase(udf, signature, _cluster.query(context, sql));
+    Map<UdfExample, UdfExampleResult> queryResult = extractResultsByCase(udf, signature, context, sqlTemplate);
 
     Set<UdfExample> successfulCases = queryResult.values()
         .stream()
@@ -77,8 +78,12 @@ public class PredicateUdfTestScenario extends AbstractUdfTestScenario {
     Set<UdfExample> examples = udf.getExamples().get(signature);
     Map<UdfExample, UdfExampleResult> result = new HashMap<>();
     Sets.SetView<UdfExample> expectedPositives = Sets.intersection(examples, successfulCases);
-    for (UdfExample expectedPositive : expectedPositives) {
-      result.put(expectedPositive, UdfExampleResult.success(expectedPositive, true, true));
+    try {
+      for (UdfExample expectedPositive : expectedPositives) {
+        result.put(expectedPositive, UdfExampleResult.success(expectedPositive, true, true));
+      }
+    } catch (RuntimeException e) {
+      throw e;
     }
 
     if (expectedPositives.size() != udf.getExamples().size()) {

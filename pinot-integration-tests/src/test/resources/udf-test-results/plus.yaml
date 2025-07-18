@@ -22,283 +22,283 @@
 
 ---
 Ingestion time transformer:
-  (big_decimal, big_decimal) -> big_decimal:
+  '(arg0: big_decimal, arg1: big_decimal) -> big_decimal':
     entries:
-      small values with null_big_decimal:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
-      small values_big_decimal:
+      "1 + 2_big_decimal":
         actualResult: 3.0
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (double, double) -> double:
-    entries:
-      small values with null_double:
+      "1 + null_big_decimal":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_double:
+    error: false
+    errorMessage: null
+  '(arg0: double, arg1: double) -> double':
+    entries:
+      "1 + 2_double":
         actualResult: 3.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (float, float) -> float:
-    entries:
-      small values with null_float:
+      "1 + null_double":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_float:
+    error: false
+    errorMessage: null
+  '(arg0: float, arg1: float) -> float':
+    entries:
+      "1 + 2_float":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (int, int) -> int:
-    entries:
-      small values with null_int:
+      "1 + null_float":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_int:
+    error: false
+    errorMessage: null
+  '(arg0: int, arg1: int) -> int':
+    entries:
+      "1 + 2_int":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3
-    error: false
-    errorMessage: null
-  (long, long) -> long:
-    entries:
-      small values with null_long:
+      "1 + null_int":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_long:
+    error: false
+    errorMessage: null
+  '(arg0: long, arg1: long) -> long':
+    entries:
+      "1 + 2_long":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3
+      "1 + null_long":
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  (big_decimal, big_decimal) -> big_decimal:
+  '(arg0: big_decimal, arg1: big_decimal) -> big_decimal':
     entries:
-      small values with null_big_decimal:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
-      small values_big_decimal:
+      "1 + 2_big_decimal":
         actualResult: 3.0
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (double, double) -> double:
-    entries:
-      small values with null_double:
+      "1 + null_big_decimal":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_double:
+    error: false
+    errorMessage: null
+  '(arg0: double, arg1: double) -> double':
+    entries:
+      "1 + 2_double":
         actualResult: 3.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (float, float) -> float:
-    entries:
-      small values with null_float:
+      "1 + null_double":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_float:
+    error: false
+    errorMessage: null
+  '(arg0: float, arg1: float) -> float':
+    entries:
+      "1 + 2_float":
         actualResult: 3.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (int, int) -> int:
-    entries:
-      small values with null_int:
+      "1 + null_float":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_int:
+    error: false
+    errorMessage: null
+  '(arg0: int, arg1: int) -> int':
+    entries:
+      "1 + 2_int":
         actualResult: 3
         equivalence: "EQUAL"
         error: null
         expectedResult: 3
-    error: false
-    errorMessage: null
-  (long, long) -> long:
-    entries:
-      small values with null_long:
+      "1 + null_int":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_long:
+    error: false
+    errorMessage: null
+  '(arg0: long, arg1: long) -> long':
+    entries:
+      "1 + 2_long":
         actualResult: 3
         equivalence: "EQUAL"
         error: null
         expectedResult: 3
+      "1 + null_long":
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  (big_decimal, big_decimal) -> big_decimal:
+  '(arg0: big_decimal, arg1: big_decimal) -> big_decimal':
     entries:
-      small values with null_big_decimal:
-        actualResult: 1.0
-        equivalence: "BIG_DECIMAL_AS_DOUBLE"
-        error: null
-        expectedResult: 1.0
-      small values_big_decimal:
+      "1 + 2_big_decimal":
         actualResult: 3.0
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (double, double) -> double:
-    entries:
-      small values with null_double:
+      "1 + null_big_decimal":
         actualResult: 1.0
-        equivalence: "EQUAL"
+        equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 1.0
-      small values_double:
+    error: false
+    errorMessage: null
+  '(arg0: double, arg1: double) -> double':
+    entries:
+      "1 + 2_double":
         actualResult: 3.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (float, float) -> float:
-    entries:
-      small values with null_float:
+      "1 + null_double":
         actualResult: 1.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 1.0
-      small values_float:
+    error: false
+    errorMessage: null
+  '(arg0: float, arg1: float) -> float':
+    entries:
+      "1 + 2_float":
         actualResult: 3.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (int, int) -> int:
-    entries:
-      small values with null_int:
-        actualResult: 1
+      "1 + null_float":
+        actualResult: 1.0
         equivalence: "EQUAL"
         error: null
-        expectedResult: 1
-      small values_int:
+        expectedResult: 1.0
+    error: false
+    errorMessage: null
+  '(arg0: int, arg1: int) -> int':
+    entries:
+      "1 + 2_int":
         actualResult: 3
         equivalence: "EQUAL"
         error: null
         expectedResult: 3
-    error: false
-    errorMessage: null
-  (long, long) -> long:
-    entries:
-      small values with null_long:
+      "1 + null_int":
         actualResult: 1
         equivalence: "EQUAL"
         error: null
         expectedResult: 1
-      small values_long:
+    error: false
+    errorMessage: null
+  '(arg0: long, arg1: long) -> long':
+    entries:
+      "1 + 2_long":
         actualResult: 3
         equivalence: "EQUAL"
         error: null
         expectedResult: 3
+      "1 + null_long":
+        actualResult: 1
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 1
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  (big_decimal, big_decimal) -> big_decimal:
+  '(arg0: big_decimal, arg1: big_decimal) -> big_decimal':
     entries:
-      small values with null_big_decimal:
+      "1 + 2_big_decimal":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_big_decimal:
+      "1 + null_big_decimal":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
     error: false
     errorMessage: null
-  (double, double) -> double:
+  '(arg0: double, arg1: double) -> double':
     entries:
-      small values with null_double:
+      "1 + 2_double":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_double:
+      "1 + null_double":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
     error: false
     errorMessage: null
-  (float, float) -> float:
+  '(arg0: float, arg1: float) -> float':
     entries:
-      small values with null_float:
+      "1 + 2_float":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_float:
+      "1 + null_float":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
     error: false
     errorMessage: null
-  (int, int) -> int:
+  '(arg0: int, arg1: int) -> int':
     entries:
-      small values with null_int:
+      "1 + 2_int":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_int:
+      "1 + null_int":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
     error: false
     errorMessage: null
-  (long, long) -> long:
+  '(arg0: long, arg1: long) -> long':
     entries:
-      small values with null_long:
+      "1 + 2_long":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_long:
+      "1 + null_long":
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -306,70 +306,70 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  (big_decimal, big_decimal) -> big_decimal:
+  '(arg0: big_decimal, arg1: big_decimal) -> big_decimal':
     entries:
-      small values with null_big_decimal:
+      "1 + 2_big_decimal":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_big_decimal:
+      "1 + null_big_decimal":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
     error: false
     errorMessage: null
-  (double, double) -> double:
+  '(arg0: double, arg1: double) -> double':
     entries:
-      small values with null_double:
+      "1 + 2_double":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_double:
+      "1 + null_double":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
     error: false
     errorMessage: null
-  (float, float) -> float:
+  '(arg0: float, arg1: float) -> float':
     entries:
-      small values with null_float:
+      "1 + 2_float":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_float:
+      "1 + null_float":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
     error: false
     errorMessage: null
-  (int, int) -> int:
+  '(arg0: int, arg1: int) -> int':
     entries:
-      small values with null_int:
+      "1 + 2_int":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_int:
+      "1 + null_int":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
     error: false
     errorMessage: null
-  (long, long) -> long:
+  '(arg0: long, arg1: long) -> long':
     entries:
-      small values with null_long:
+      "1 + 2_long":
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      small values_long:
+      "1 + null_long":
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -377,144 +377,144 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  (big_decimal, big_decimal) -> big_decimal:
+  '(arg0: big_decimal, arg1: big_decimal) -> big_decimal':
     entries:
-      small values with null_big_decimal:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
-      small values_big_decimal:
+      "1 + 2_big_decimal":
         actualResult: "3.0"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (double, double) -> double:
-    entries:
-      small values with null_double:
+      "1 + null_big_decimal":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_double:
+    error: false
+    errorMessage: null
+  '(arg0: double, arg1: double) -> double':
+    entries:
+      "1 + 2_double":
         actualResult: 3.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (float, float) -> float:
-    entries:
-      small values with null_float:
+      "1 + null_double":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_float:
+    error: false
+    errorMessage: null
+  '(arg0: float, arg1: float) -> float':
+    entries:
+      "1 + 2_float":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (int, int) -> int:
-    entries:
-      small values with null_int:
+      "1 + null_float":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_int:
+    error: false
+    errorMessage: null
+  '(arg0: int, arg1: int) -> int':
+    entries:
+      "1 + 2_int":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3
-    error: false
-    errorMessage: null
-  (long, long) -> long:
-    entries:
-      small values with null_long:
+      "1 + null_int":
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
-      small values_long:
+    error: false
+    errorMessage: null
+  '(arg0: long, arg1: long) -> long':
+    entries:
+      "1 + 2_long":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3
+      "1 + null_long":
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  (big_decimal, big_decimal) -> big_decimal:
+  '(arg0: big_decimal, arg1: big_decimal) -> big_decimal':
     entries:
-      small values with null_big_decimal:
+      "1 + 2_big_decimal":
+        actualResult: "3.0"
+        equivalence: "BIG_DECIMAL_AS_DOUBLE"
+        error: null
+        expectedResult: 3.0
+      "1 + null_big_decimal":
         actualResult: "1.0"
         equivalence: "BIG_DECIMAL_AS_DOUBLE"
         error: null
         expectedResult: 1.0
-      small values_big_decimal:
-        actualResult: "3.0"
-        equivalence: "BIG_DECIMAL_AS_DOUBLE"
-        error: null
-        expectedResult: 3.0
     error: false
     errorMessage: null
-  (double, double) -> double:
+  '(arg0: double, arg1: double) -> double':
     entries:
-      small values with null_double:
-        actualResult: 1.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 1.0
-      small values_double:
+      "1 + 2_double":
         actualResult: 3.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (float, float) -> float:
-    entries:
-      small values with null_float:
+      "1 + null_double":
         actualResult: 1.0
-        equivalence: "NUMBER_AS_DOUBLE"
+        equivalence: "EQUAL"
         error: null
         expectedResult: 1.0
-      small values_float:
+    error: false
+    errorMessage: null
+  '(arg0: float, arg1: float) -> float':
+    entries:
+      "1 + 2_float":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3.0
-    error: false
-    errorMessage: null
-  (int, int) -> int:
-    entries:
-      small values with null_int:
+      "1 + null_float":
         actualResult: 1.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
-        expectedResult: 1
-      small values_int:
+        expectedResult: 1.0
+    error: false
+    errorMessage: null
+  '(arg0: int, arg1: int) -> int':
+    entries:
+      "1 + 2_int":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3
-    error: false
-    errorMessage: null
-  (long, long) -> long:
-    entries:
-      small values with null_long:
+      "1 + null_int":
         actualResult: 1.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 1
-      small values_long:
+    error: false
+    errorMessage: null
+  '(arg0: long, arg1: long) -> long':
+    entries:
+      "1 + 2_long":
         actualResult: 3.0
         equivalence: "NUMBER_AS_DOUBLE"
         error: null
         expectedResult: 3
+      "1 + null_long":
+        actualResult: 1.0
+        equivalence: "NUMBER_AS_DOUBLE"
+        error: null
+        expectedResult: 1
     error: false
     errorMessage: null

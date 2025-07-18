@@ -17,29 +17,24 @@
   ~ under the License.
   -->
 
-## arrayMax
+## not
 
 ### Description
 
-Given an array with numeric values, this function returns the maximum value in the array. * asdf 
+Logical NOT function for a boolean value. Returns true if the argument is false, false if true, and null if null.
 ### Summary
 
-| Scenario | Semantic |
-|----------|----------|
-| Ingestion time transformer | ❌ Unsupported |
-| MSE intermediate stage (with null handling) | ❌ Unsupported |
-| MSE intermediate stage (without null handling) | ❌ Unsupported |
-| SSE predicate (with null handling) | EQUAL |
-| SSE predicate (without null handling) | EQUAL |
-| SSE projection (with null handling) | EQUAL |
-| SSE projection (without null handling) | EQUAL |
+The UDF not is supported in all scenarios with at least EQUAL semantic.
+
 ### Signatures
 
-#### arrayMax(arr: ARRAY(int)) -> int
+#### not(value: boolean) -> boolean
+
+Returns the logical negation of the input value.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| arr | int | Input array of integers |
+| value | boolean | A boolean value to negate. |
 ### Scenarios
 
 #### Ingestion time transformer
@@ -47,7 +42,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (value: boolean) -> boolean |not(NULL) |NULL |NULL |EQUAL |
+| (value: boolean) -> boolean |not(false) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(true) |false |false |EQUAL |
 
 
 #### MSE intermediate stage (with null handling)
@@ -55,7 +52,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (value: boolean) -> boolean |not(NULL) |NULL |NULL |EQUAL |
+| (value: boolean) -> boolean |not(false) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(true) |false |false |EQUAL |
 
 
 #### MSE intermediate stage (without null handling)
@@ -63,7 +62,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
+| (value: boolean) -> boolean |not(NULL) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(false) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(true) |false |false |EQUAL |
 
 
 #### SSE predicate (with null handling)
@@ -71,7 +72,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(NULL) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(false) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(true) |true |true |EQUAL |
 
 
 #### SSE predicate (without null handling)
@@ -79,7 +82,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(NULL) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(false) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(true) |true |true |EQUAL |
 
 
 #### SSE projection (with null handling)
@@ -87,7 +92,9 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
+| (value: boolean) -> boolean |not(NULL) |NULL |NULL |EQUAL |
+| (value: boolean) -> boolean |not(false) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(true) |false |false |EQUAL |
 
 
 #### SSE projection (without null handling)
@@ -95,6 +102,8 @@ Given an array with numeric values, this function returns the maximum value in t
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
-| (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
+| (value: boolean) -> boolean |not(NULL) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(false) |true |true |EQUAL |
+| (value: boolean) -> boolean |not(true) |false |false |EQUAL |
 
 
