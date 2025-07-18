@@ -203,7 +203,7 @@ public class PinotSegmentUploadDownloadRestletResource {
       long segmentSizeInBytes = segmentFile.length();
       long accessStartTimeMs = System.currentTimeMillis();
       ResourceUtils.emitPreSegmentDownloadMetrics(_controllerMetrics, rawTableName, segmentSizeInBytes);
-      // Streaming the segment file directly from local disk to the output stream to ensure we can capture the metrics
+      // Streaming the segment file directly from local FS to the output stream to ensure we can capture the metrics
       builder.entity((StreamingOutput) output -> {
         try {
           Files.copy(segmentFile.toPath(), output);
