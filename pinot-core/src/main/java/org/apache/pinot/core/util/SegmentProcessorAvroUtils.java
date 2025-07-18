@@ -34,7 +34,6 @@ import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.generic.GenericData;
-import org.apache.pinot.core.segment.processing.framework.SegmentProcessorFramework;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -54,8 +53,6 @@ public final class SegmentProcessorAvroUtils {
   private static final EnumMap<FieldSpec.DataType, Schema> _nullMultiValueMap;
 
   static {
-    GenericData.get().addLogicalTypeConversion(new Conversions.BigDecimalConversion());
-
     _notNullScalarMap = new EnumMap<>(FieldSpec.DataType.class);
     _nullScalarMap = new EnumMap<>(FieldSpec.DataType.class);
     _notNullMultiValueMap = new EnumMap<>(FieldSpec.DataType.class);
@@ -77,6 +74,7 @@ public final class SegmentProcessorAvroUtils {
           addType(value, Schema.create(Schema.Type.DOUBLE), nullSchema);
           break;
         case STRING:
+        case JSON:
           addType(value, Schema.create(Schema.Type.STRING), nullSchema);
           break;
         case BIG_DECIMAL:
@@ -86,8 +84,30 @@ public final class SegmentProcessorAvroUtils {
         case BYTES:
           addType(value, Schema.create(Schema.Type.BYTES), nullSchema);
           break;
+        case BOOLEAN:
+          addType(value, Schema.create(Schema.Type.BOOLEAN), nullSchema);
+          break;
+        case TIMESTAMP:
+          Schema timestampMillis = LogicalTypes.timestampMillis().addToSchema(SchemaBuilder.builder().longType());
+          addType(value, timestampMillis, nullSchema);
+          break;
+        case MAP:
+        case LIST:
+        case STRUCT:
+        case UNKNOWN:
+          // Types we know we don't support in AVRO
+          break;
+        default:
+          throw new RuntimeException("Unsupported data type: " + value);
       }
     }
+  }
+
+  /// This should be used on avro writers to automatically cast types
+  public static GenericData getGenericData() {
+    GenericData genericData = new GenericData();
+    genericData.addLogicalTypeConversion(new Conversions.BigDecimalConversion());
+    return genericData;
   }
 
   private static void addType(DataType dataType, Schema scalarSchema, Schema nullSchema) {
@@ -139,26 +159,24 @@ public final class SegmentProcessorAvroUtils {
         .collect(Collectors.toList());
     for (FieldSpec fieldSpec : orderedFieldSpecs) {
       String name = fieldSpec.getName();
-      // TODO: Probably we shoudn't use stored type but define a correct avro conversion.
-      //   See https://avro.apache.org/docs/1.11.0/spec.html#Logical+Types
-      DataType storedType = fieldSpec.getDataType().getStoredType();
+      DataType dataType = fieldSpec.getDataType();
 
       Schema fieldType;
       if (fieldSpec.isSingleValueField()) {
         if (fieldSpec.isNullable()) {
-          fieldType = _nullScalarMap.get(storedType);
+          fieldType = _nullScalarMap.get(dataType);
         } else {
-          fieldType = _notNullScalarMap.get(storedType);
+          fieldType = _notNullScalarMap.get(dataType);
         }
       } else {
         if (fieldSpec.isNullable()) {
-          fieldType = _nullMultiValueMap.get(storedType);
+          fieldType = _nullMultiValueMap.get(dataType);
         } else {
-          fieldType = _notNullMultiValueMap.get(storedType);
+          fieldType = _notNullMultiValueMap.get(dataType);
         }
       }
       if (fieldType == null) {
-        throw new RuntimeException("Unsupported data type: " + storedType);
+        throw new RuntimeException("Unsupported data type: " + dataType);
       }
 
       fieldAssembler.name(name)
@@ -167,19 +185,5 @@ public final class SegmentProcessorAvroUtils {
     }
     Schema schema = fieldAssembler.endRecord();
     return schema;
-  }
-
-  public static class BigDecimalPinotLogicalType extends LogicalType {
-    public static final String NAME = "pinot.big_decimal";
-    public BigDecimalPinotLogicalType() {
-      super(NAME);
-    }
-
-    @Override
-    public void validate(Schema schema) {
-      if (schema.getType() != Schema.Type.STRING) {
-        throw new IllegalArgumentException("BigDecimal logical type can only be applied to STRING type");
-      }
-    }
   }
 }
