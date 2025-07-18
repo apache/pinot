@@ -199,7 +199,20 @@ public class PinotSegmentUploadDownloadRestletResource {
             "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFile.getAbsolutePath(),
             Response.Status.NOT_FOUND);
       }
-      builder.entity(segmentFile);
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      long segmentSizeInBytes = segmentFile.length();
+      long accessStartTimeMs = System.currentTimeMillis();
+      ResourceUtils.emitPreSegmentDownloadMetrics(_controllerMetrics, rawTableName, segmentSizeInBytes);
+      // Streaming the segment file directly from local disk to the output stream to ensure we can capture the metrics
+      builder.entity((StreamingOutput) output -> {
+        try {
+          Files.copy(segmentFile.toPath(), output);
+        } finally {
+          long durationMs = System.currentTimeMillis() - accessStartTimeMs;
+          ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName, durationMs,
+              segmentSizeInBytes);
+        }
+      });
     } else {
       URI remoteSegmentFileURI = URIUtils.getUri(dataDirURI.toString(), tableName, URIUtils.encode(segmentName));
       PinotFS pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
