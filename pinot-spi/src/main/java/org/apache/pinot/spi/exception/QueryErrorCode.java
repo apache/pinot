@@ -52,6 +52,7 @@ public enum QueryErrorCode {
   BROKER_REQUEST_SEND(425, "BrokerRequestSend"),
   SERVER_NOT_RESPONDING(427, "ServerNotResponding"),
   TOO_MANY_REQUESTS(429, "TooManyRequests"),
+  WORKLOAD_QUOTA_EXCEEDED(429, "WorkloadQuotaExceeded"),
   INTERNAL(450, "InternalError"),
   MERGE_RESPONSE(500, "MergeResponseError"),
   QUERY_CANCELLATION(503, "QueryCancellationError"),
