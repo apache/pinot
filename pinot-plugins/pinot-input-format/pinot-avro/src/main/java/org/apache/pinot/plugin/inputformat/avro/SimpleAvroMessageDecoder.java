@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.concurrent.NotThreadSafe;
@@ -33,8 +32,6 @@ import org.apache.pinot.spi.data.readers.RecordExtractor;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,8 +40,6 @@ import org.slf4j.LoggerFactory;
  */
 @NotThreadSafe
 public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SimpleAvroMessageDecoder.class);
-
   private static final String SCHEMA = "schema";
 
   private org.apache.avro.Schema _avroSchema;
@@ -95,9 +90,8 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     _binaryDecoderToReuse = DecoderFactory.get().binaryDecoder(payload, offset, length, _binaryDecoderToReuse);
     try {
       _avroRecordToReuse = _datumReader.read(_avroRecordToReuse, _binaryDecoderToReuse);
-    } catch (IOException e) {
-      LOGGER.error("Caught exception while reading message using schema: {}", _avroSchema, e);
-      return null;
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while reading message using schema: " + _avroSchema, e);
     }
     return _avroRecordExtractor.extract(_avroRecordToReuse, destination);
   }

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.data .readers;
+package org.apache.pinot.spi.data.readers;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.io.Serializable;

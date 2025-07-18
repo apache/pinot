@@ -157,7 +157,7 @@
     <jsonsmart.version>2.5.2</jsonsmart.version>
     <quartz.version>2.5.0</quartz.version>
     <calcite.version>1.40.0</calcite.version>
-    <immutables.version>2.11.0</immutables.version>
+    <immutables.version>2.11.1</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.24.0</dynatrace.hash4j.version>
@@ -178,9 +178,9 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.78</aws.sdk.version>
+    <aws.sdk.version>2.32.2</aws.sdk.version>
     <azure.sdk.version>1.2.36</azure.sdk.version>
-    <azure.msal4j.version>1.21.0</azure.msal4j.version>
+    <azure.msal4j.version>1.22.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
@@ -191,7 +191,7 @@
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
-    <enforcer-api.version>3.6.0</enforcer-api.version>
+    <enforcer-api.version>3.6.1</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.6</spark3.version>
@@ -240,7 +240,7 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.8</protobuf.version>
     <grpc.version>1.73.0</grpc.version>
-    <google.cloud.libraries.version>26.63.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.64.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
     <google.errorprone.version>2.40.0</google.errorprone.version>
@@ -296,9 +296,9 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea57</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea58</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
-    <maven.version>3.9.10</maven.version>
+    <maven.version>3.9.11</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
     <plexus-utils.version>3.6.0</plexus-utils.version>
 
