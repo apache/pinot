@@ -19,6 +19,7 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -26,9 +27,14 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.PartitionedIndexedTable;
+import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -41,17 +47,17 @@ public final class GroupByUtils {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns {@code max(limit * 5, 5000)} to
+   * ensure the result accuracy.
    */
   public static int getTableCapacity(int limit) {
     return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and
-   * result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns
+   * {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and result
+   * accuracy.
    */
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
@@ -89,6 +95,65 @@ public final class GroupByUtils {
       return upperBound;
     }
     return Math.max(minCapacity, lowerBound);
+  }
+
+  /**
+   * whether we should do partitionedGroupBy, currently only handle no trimming, i.e. no orderBy or orderBy with
+   * infinite trimThreshold
+   */
+  public static boolean shouldPartitionGroupBy(QueryContext queryContext) {
+    // TODO: add more conditions
+    return isTrimDisabled(queryContext);
+  }
+
+  ///  whether the result table should be trimmed
+  public static boolean isTrimDisabled(QueryContext queryContext) {
+    int limit = queryContext.getLimit();
+    int minTrimSize =
+        queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
+    boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
+    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
+    int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
+    return (!hasOrderBy || trimThreshold == Integer.MAX_VALUE);
+  }
+
+  public static void addOrUpdateRecord(Map<Key, Record> map, Key key, Record newRecord,
+      AggregationFunction[] aggregationFunctions, int numKeyColumns) {
+    map.compute(key, (k, v) -> v == null
+        ? newRecord
+        : updateRecord(v, newRecord, aggregationFunctions, numKeyColumns));
+  }
+
+  private static Record updateRecord(Record existingRecord, Record newRecord,
+      AggregationFunction[] aggregationFunctions, int numKeyColumns) {
+    Object[] existingValues = existingRecord.getValues();
+    Object[] newValues = newRecord.getValues();
+    int numAggregations = aggregationFunctions.length;
+    int index = numKeyColumns;
+    for (int i = 0; i < numAggregations; i++, index++) {
+      existingValues[index] = aggregationFunctions[i].merge(existingValues[index], newValues[index]);
+    }
+    return existingRecord;
+  }
+
+  /**
+   * Creates an indexed table for partitioned group by combining
+   */
+  public static IndexedTable createPartitionedIndexedTableForCombineOperator(DataSchema dataSchema,
+      QueryContext queryContext, RadixPartitionedHashMap<Key, Record> map, ExecutorService executorService) {
+    int limit = queryContext.getLimit();
+    boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
+    boolean hasHaving = queryContext.getHavingFilter() != null;
+    int minTrimSize = queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
+
+    // Disable trim when min trim size is non-positive
+    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
+
+    // When there is no ORDER BY, trim is not required because the indexed table stops accepting new groups once the
+    // result size is reached
+    // When there is ORDER BY, currently partitionedIndexedTable only handles no resize case, i.e. resultSize = MAX_INT
+    int resultSize = hasOrderBy ? Integer.MAX_VALUE : hasHaving ? trimSize : limit;
+    return PartitionedIndexedTable.create(dataSchema, false, queryContext, resultSize, map, executorService);
   }
 
   /**
