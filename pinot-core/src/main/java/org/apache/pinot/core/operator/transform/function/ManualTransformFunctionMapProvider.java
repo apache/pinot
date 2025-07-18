@@ -68,10 +68,12 @@ public class ManualTransformFunctionMapProvider {
     typeToImplementation.put(TransformFunctionType.ABS, SingleParamMathTransformFunction.AbsTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.CEIL, SingleParamMathTransformFunction.CeilTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.EXP, SingleParamMathTransformFunction.ExpTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.FLOOR, SingleParamMathTransformFunction.FloorTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.FLOOR,
+        SingleParamMathTransformFunction.FloorTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOG, SingleParamMathTransformFunction.LnTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.LOG2, SingleParamMathTransformFunction.Log2TransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LOG10, SingleParamMathTransformFunction.Log10TransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.LOG10,
+        SingleParamMathTransformFunction.Log10TransformFunction.class);
     typeToImplementation.put(TransformFunctionType.SQRT, SingleParamMathTransformFunction.SqrtTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.SIGN, SingleParamMathTransformFunction.SignTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.POWER, PowerTransformFunction.class);
@@ -196,16 +198,24 @@ public class ManualTransformFunctionMapProvider {
     typeToImplementation.put(TransformFunctionType.SINH, TrigonometricTransformFunctions.SinhTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.COSH, TrigonometricTransformFunctions.CoshTransformFunction.class);
     typeToImplementation.put(TransformFunctionType.TANH, TrigonometricTransformFunctions.TanhTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DEGREES, TrigonometricTransformFunctions.DegreesTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.RADIANS, TrigonometricTransformFunctions.RadiansTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.DEGREES,
+        TrigonometricTransformFunctions.DegreesTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.RADIANS,
+        TrigonometricTransformFunctions.RadiansTransformFunction.class);
 
     // Vector functions
-    typeToImplementation.put(TransformFunctionType.COSINE_DISTANCE, VectorTransformFunctions.CosineDistanceTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.INNER_PRODUCT, VectorTransformFunctions.InnerProductTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.L1_DISTANCE, VectorTransformFunctions.L1DistanceTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.L2_DISTANCE, VectorTransformFunctions.L2DistanceTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorTransformFunctions.VectorDimsTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorTransformFunctions.VectorNormTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.COSINE_DISTANCE,
+        VectorTransformFunctions.CosineDistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.INNER_PRODUCT,
+        VectorTransformFunctions.InnerProductTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.L1_DISTANCE,
+        VectorTransformFunctions.L1DistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.L2_DISTANCE,
+        VectorTransformFunctions.L2DistanceTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VECTOR_DIMS,
+        VectorTransformFunctions.VectorDimsTransformFunction.class);
+    typeToImplementation.put(TransformFunctionType.VECTOR_NORM,
+        VectorTransformFunctions.VectorNormTransformFunction.class);
 
     // Item functions
     typeToImplementation.put(TransformFunctionType.ITEM, ItemTransformFunction.class);
