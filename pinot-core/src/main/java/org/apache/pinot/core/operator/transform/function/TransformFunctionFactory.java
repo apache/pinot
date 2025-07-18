@@ -230,8 +230,8 @@ public class TransformFunctionFactory {
     ServiceLoader.load(Udf.class).stream()
         .map(ServiceLoader.Provider::get)
         .forEach(udf -> {
-          for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry :
-              udf.getTransformFunctions().entrySet()) {
+          for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry
+              : udf.getTransformFunctions().entrySet()) {
             Udf oldUdf = typeToUdf.get(entry.getKey());
             if (oldUdf == null) {
               typeToUdf.put(entry.getKey(), udf);
