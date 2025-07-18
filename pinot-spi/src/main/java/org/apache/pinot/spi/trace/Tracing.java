@@ -349,7 +349,8 @@ public class Tracing {
     }
 
     public static boolean isInterrupted() {
-      return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted();
+      return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted()
+          || Tracing.getThreadAccountant().isQueryTerminated();
     }
 
     public static void sampleAndCheckInterruption() {
@@ -357,6 +358,10 @@ public class Tracing {
         throw new EarlyTerminationException("Interrupted while merging records");
       }
       sample();
+    }
+
+    public static void checkMemoryAndInterruptIfExceeded() {
+      Tracing.getThreadAccountant().checkMemoryAndInterruptIfExceeded();
     }
 
     @Deprecated
@@ -386,6 +391,13 @@ public class Tracing {
 
     public static WorkloadBudgetManager getWorkloadBudgetManager() {
       return _workloadBudgetManager;
+    }
+
+    public static void interruptAnchorThread() {
+      ThreadExecutionContext context = getThreadAccountant().getThreadExecutionContext();
+      if (context != null && context.getAnchorThread() != null) {
+        context.getAnchorThread().interrupt();
+      }
     }
   }
 }

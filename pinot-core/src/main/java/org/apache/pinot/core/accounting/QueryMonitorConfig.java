@@ -62,6 +62,10 @@ public class QueryMonitorConfig {
 
   private final boolean _isQueryKilledMetricEnabled;
 
+  // Per-thread query memory configurations for proactive OOM prevention
+  private final boolean _isPerThreadQueryMemoryCheckEnabled;
+  private final long _perThreadQueryMemoryLimitBytes;
+
   public QueryMonitorConfig(PinotConfiguration config, long maxHeapSize) {
     _maxHeapSize = maxHeapSize;
 
@@ -106,6 +110,13 @@ public class QueryMonitorConfig {
 
     _isQueryKilledMetricEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
         CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
+
+    _isPerThreadQueryMemoryCheckEnabled =
+        config.getProperty(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED,
+            CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED);
+    _perThreadQueryMemoryLimitBytes =
+        config.getProperty(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES,
+            CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES);
   }
 
   QueryMonitorConfig(QueryMonitorConfig oldConfig, Set<String> changedConfigs, Map<String, String> clusterConfigs) {
@@ -245,6 +256,30 @@ public class QueryMonitorConfig {
     } else {
       _isQueryKilledMetricEnabled = oldConfig._isQueryKilledMetricEnabled;
     }
+
+    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED)) {
+      if (clusterConfigs == null || !clusterConfigs.containsKey(
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED)) {
+        _isPerThreadQueryMemoryCheckEnabled = CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED;
+      } else {
+        _isPerThreadQueryMemoryCheckEnabled = Boolean.parseBoolean(
+            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED));
+      }
+    } else {
+      _isPerThreadQueryMemoryCheckEnabled = oldConfig._isPerThreadQueryMemoryCheckEnabled;
+    }
+
+    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES)) {
+      if (clusterConfigs == null || !clusterConfigs.containsKey(
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES)) {
+        _perThreadQueryMemoryLimitBytes = CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES;
+      } else {
+        _perThreadQueryMemoryLimitBytes = Long.parseLong(
+            clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES));
+      }
+    } else {
+      _perThreadQueryMemoryLimitBytes = oldConfig._perThreadQueryMemoryLimitBytes;
+    }
   }
 
   public long getMaxHeapSize() {
@@ -293,5 +328,13 @@ public class QueryMonitorConfig {
 
   public boolean isQueryKilledMetricEnabled() {
     return _isQueryKilledMetricEnabled;
+  }
+
+  public boolean isPerThreadQueryMemoryCheckEnabled() {
+    return _isPerThreadQueryMemoryCheckEnabled;
+  }
+
+  public long getPerThreadQueryMemoryLimitBytes() {
+    return _perThreadQueryMemoryLimitBytes;
   }
 }

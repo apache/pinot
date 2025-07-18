@@ -115,6 +115,10 @@ public abstract class MultiStageOperator
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       throw new EarlyTerminationException("Interrupted while processing next block");
     }
+
+    // Check per-thread memory usage and terminate query proactively if threshold exceeded
+    Tracing.ThreadAccountantOps.checkMemoryAndInterruptIfExceeded();
+
     if (logger().isDebugEnabled()) {
       logger().debug("Operator {}: Reading next block", _operatorId);
     }

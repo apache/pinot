@@ -136,6 +136,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     // is sampling allowed for MSE queries
     protected final boolean _isThreadSamplingEnabledForMSE;
 
+    // per-query memory checking configuration
+    protected final boolean _isPerQueryMemoryCheckEnabled;
+    protected final long _perQueryMemoryLimitBytes;
+
     protected final Set<String> _inactiveQuery;
 
     protected Set<String> _cancelSentQueries;
@@ -155,6 +159,20 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _isThreadCPUSamplingEnabled = isThreadCPUSamplingEnabled;
       _isThreadMemorySamplingEnabled = isThreadMemorySamplingEnabled;
       _isThreadSamplingEnabledForMSE = isThreadSamplingEnabledForMSE;
+      _isPerQueryMemoryCheckEnabled = config.getProperty(
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED,
+          CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED);
+      long configuredLimit = config.getProperty(
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES,
+          CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES);
+      // If using default value, dynamically calculate based on actual heap size for better defaults
+      if (configuredLimit == CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES) {
+        long maxHeapMemory = Runtime.getRuntime().maxMemory();
+        // Use 1/3 of heap size, but cap at 2GB per query
+        _perQueryMemoryLimitBytes = Math.min(maxHeapMemory / 3, 2L * 1024 * 1024 * 1024);
+      } else {
+        _perQueryMemoryLimitBytes = configuredLimit;
+      }
       _inactiveQuery = inactiveQuery;
       _instanceId = instanceId;
       _instanceType = instanceType;
@@ -194,6 +212,23 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
               CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
       LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
+
+      _isPerQueryMemoryCheckEnabled = config.getProperty(
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED,
+          CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED);
+      long configuredLimit = config.getProperty(
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES,
+          CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES);
+      // If using default value, dynamically calculate based on actual heap size for better defaults
+      if (configuredLimit == CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES) {
+        long maxHeapMemory = Runtime.getRuntime().maxMemory();
+        // Use 1/3 of heap size, but cap at 2GB per query
+        _perQueryMemoryLimitBytes = Math.min(maxHeapMemory / 3, 2L * 1024 * 1024 * 1024);
+      } else {
+        _perQueryMemoryLimitBytes = configuredLimit;
+      }
+      LOGGER.info("_isPerQueryMemoryCheckEnabled: {}, _perQueryMemoryLimitBytes: {}", _isPerQueryMemoryCheckEnabled,
+          _perQueryMemoryLimitBytes);
 
       _queryCancelCallbacks = CacheBuilder.newBuilder().maximumSize(
               config.getProperty(CommonConstants.Accounting.CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE,
@@ -292,6 +327,42 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return getWatcherTask().getHeapUsageBytes() > getWatcherTask().getQueryMonitorConfig().getAlarmingLevel();
     }
 
+    public void checkMemoryAndInterruptIfExceeded() {
+      // Use QueryMonitorConfig for runtime-changeable settings
+      QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
+      if (!config.isPerThreadQueryMemoryCheckEnabled() || !_isThreadMemorySamplingEnabled) {
+        return;
+      }
+
+      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
+      CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
+
+      if (currentTaskStatus == null) {
+        return; // No active query on this thread
+      }
+
+      long currentMemoryUsage = threadEntry._currentThreadMemoryAllocationSampleBytes;
+      long memoryLimit = config.getPerThreadQueryMemoryLimitBytes();
+      if (currentMemoryUsage > memoryLimit) {
+        String queryId = currentTaskStatus.getQueryId();
+        String errorMessage = String.format(
+            "Query %s exceeded per-thread memory limit of %d bytes (current usage: %d bytes) on %s: %s. "
+                + "Query terminated proactively to prevent OOM.",
+            queryId, memoryLimit, currentMemoryUsage, _instanceType, _instanceId);
+
+        // Set error status to terminate the query
+        threadEntry._errorStatus.set(new RuntimeException(errorMessage));
+
+        // Also interrupt the anchor thread if available
+        Thread anchorThread = currentTaskStatus.getAnchorThread();
+        if (anchorThread != null) {
+          anchorThread.interrupt();
+        }
+
+        LOGGER.warn("Per-thread memory limit exceeded: {}", errorMessage);
+      }
+    }
+
     @Override
     public void registerMseCancelCallback(String queryId, MseCancelCallback callback) {
       _queryCancelCallbacks.put(queryId, callback);
@@ -310,6 +381,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
 
       return false;
+    }
+
+    @Override
+    public boolean isQueryTerminated() {
+      // Check if the current thread has an error status set due to resource constraint violations
+      // This provides a way to check for query termination without relying on thread interruption
+      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
+      return threadEntry._errorStatus.get() != null;
     }
 
     @Override
@@ -752,6 +831,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
         LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}",
             queryMonitorConfig.isCpuTimeBasedKillingEnabled(), queryMonitorConfig.getCpuTimeBasedKillingThresholdNS());
+        LOGGER.info("_isPerThreadQueryMemoryCheckEnabled: {}, _perThreadQueryMemoryLimitBytes: {}",
+            queryMonitorConfig.isPerThreadQueryMemoryCheckEnabled(),
+            queryMonitorConfig.getPerThreadQueryMemoryLimitBytes());
       }
 
       @Override

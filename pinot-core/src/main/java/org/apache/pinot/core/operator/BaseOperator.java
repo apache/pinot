@@ -44,6 +44,10 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       throw new EarlyTerminationException("Interrupted while processing next block");
     }
+
+    // Check per-thread memory usage and terminate query proactively if threshold exceeded
+    Tracing.ThreadAccountantOps.checkMemoryAndInterruptIfExceeded();
+
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       return getNextBlock();
     }
