@@ -422,9 +422,8 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
 
   private void addTableConfig(TableConfig tableConfig, String validationTypesToSkip)
       throws IOException {
-    String createTableUriStr =
-        String.format(_controllerRequestURLBuilder.forTableCreate() + "?validationTypesToSkip=%s",
-            validationTypesToSkip);
+    String createTableUriStr = _controllerRequestURLBuilder.forTableCreate()
+        + "&validationTypesToSkip=" + validationTypesToSkip;
     try {
       HttpClient.wrapAndThrowHttpException(
           _httpClient.sendJsonPostRequest(new URI(createTableUriStr), tableConfig.toJsonString(),
