@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -219,7 +220,11 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableCreate() {
-    return StringUtil.join("/", _baseUrl, "tables");
+    return forTableCreate(true);
+  }
+
+  public String forTableCreate(boolean ignoreActiveTasks) {
+    return StringUtil.join("/", _baseUrl, "tables") + (ignoreActiveTasks ? "?ignoreActiveTasks=true" : "");
   }
 
   public String forUpdateTableConfig(String tableName) {
@@ -308,14 +313,37 @@ public class ControllerRequestURLBuilder {
     return url;
   }
 
+  public String forTablesList(List<String> queryParams) {
+    String url = StringUtil.join("/", _baseUrl, "tables");
+    if (queryParams != null && !queryParams.isEmpty()) {
+      url += "?" + String.join("&", queryParams);
+    }
+    return url;
+  }
+
   public String forTableDelete(String tableName) {
     return forTableDelete(tableName, null);
   }
 
   public String forTableDelete(String tableName, String retention) {
+    return forTableDelete(tableName, retention, true);
+  }
+
+  public String forTableDelete(String tableName, boolean ignoreActiveTasks) {
+    return forTableDelete(tableName, null, ignoreActiveTasks);
+  }
+
+  public String forTableDelete(String tableName, String retention, boolean ignoreActiveTasks) {
     String url = StringUtil.join("/", _baseUrl, "tables", tableName);
+    List<String> queryParams = new ArrayList<>();
     if (retention != null) {
-      url += "?retention=" + retention;
+      queryParams.add("retention=" + retention);
+    }
+    if (ignoreActiveTasks) {
+      queryParams.add("ignoreActiveTasks=true");
+    }
+    if (!queryParams.isEmpty()) {
+      url += "?" + String.join("&", queryParams);
     }
     return url;
   }
@@ -382,7 +410,12 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableConfigsCreate() {
-    return StringUtil.join("/", _baseUrl, "tableConfigs");
+    return forTableConfigsCreate(true);
+  }
+
+  public String forTableConfigsCreate(boolean ignoreActiveTasks) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs")
+        + (ignoreActiveTasks ? "?ignoreActiveTasks=true" : "");
   }
 
   public String forTableConfigsGet(String configName) {
@@ -398,7 +431,12 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forTableConfigsDelete(String configName) {
-    return StringUtil.join("/", _baseUrl, "tableConfigs", configName);
+    return forTableConfigsDelete(configName, true);
+  }
+
+  public String forTableConfigsDelete(String configName, boolean ignoreActiveTasks) {
+    return StringUtil.join("/", _baseUrl, "tableConfigs", configName)
+        + (ignoreActiveTasks ? "?ignoreActiveTasks=true" : "");
   }
 
   public String forTableConfigsValidate() {
