@@ -162,9 +162,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _isPerQueryMemoryCheckEnabled = config.getProperty(
           CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK,
           CommonConstants.Accounting.DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK);
-      _perQueryMemoryLimitBytes = config.getProperty(
+      long configuredLimit = config.getProperty(
           CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES,
           CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES);
+      // If using default value, dynamically calculate based on actual heap size for better defaults
+      if (configuredLimit == CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES) {
+        long maxHeapMemory = Runtime.getRuntime().maxMemory();
+        // Use 1/3 of heap size, but cap at 2GB per query
+        _perQueryMemoryLimitBytes = Math.min(maxHeapMemory / 3, 2L * 1024 * 1024 * 1024);
+      } else {
+        _perQueryMemoryLimitBytes = configuredLimit;
+      }
       _inactiveQuery = inactiveQuery;
       _instanceId = instanceId;
       _instanceType = instanceType;
@@ -208,9 +216,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _isPerQueryMemoryCheckEnabled = config.getProperty(
           CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK,
           CommonConstants.Accounting.DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK);
-      _perQueryMemoryLimitBytes = config.getProperty(
+      long configuredLimit = config.getProperty(
           CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES,
           CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES);
+      // If using default value, dynamically calculate based on actual heap size for better defaults
+      if (configuredLimit == CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES) {
+        long maxHeapMemory = Runtime.getRuntime().maxMemory();
+        // Use 1/3 of heap size, but cap at 2GB per query
+        _perQueryMemoryLimitBytes = Math.min(maxHeapMemory / 3, 2L * 1024 * 1024 * 1024);
+      } else {
+        _perQueryMemoryLimitBytes = configuredLimit;
+      }
       LOGGER.info("_isPerQueryMemoryCheckEnabled: {}, _perQueryMemoryLimitBytes: {}", _isPerQueryMemoryCheckEnabled,
           _perQueryMemoryLimitBytes);
 

@@ -423,7 +423,7 @@ public class Tracing {
       return _workloadBudgetManager;
     }
 
-    public static void interruptRunnerThread() {
+    public static void interruptAnchorThread() {
       ThreadExecutionContext context = getThreadAccountant().getThreadExecutionContext();
       if (context != null && context.getAnchorThread() != null) {
         context.getAnchorThread().interrupt();
