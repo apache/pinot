@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.util;
 
-import com.google.auto.service.AutoService;
-import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -27,9 +25,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.avro.Conversion;
 import org.apache.avro.Conversions;
-import org.apache.avro.LogicalType;
 import org.apache.avro.LogicalTypes;
 import org.apache.avro.Schema;
 import org.apache.avro.SchemaBuilder;
@@ -103,6 +99,7 @@ public final class SegmentProcessorAvroUtils {
     }
   }
 
+  /// This should be used on avro writers to automatically cast types
   public static GenericData getGenericData() {
     GenericData genericData = new GenericData();
     genericData.addLogicalTypeConversion(new Conversions.BigDecimalConversion());
@@ -184,42 +181,5 @@ public final class SegmentProcessorAvroUtils {
     }
     Schema schema = fieldAssembler.endRecord();
     return schema;
-  }
-
-  public static class BigDecimalPinotLogicalType extends LogicalType {
-    public static final String NAME = "pinot.big_decimal";
-    public BigDecimalPinotLogicalType() {
-      super(NAME);
-    }
-
-    @Override
-    public void validate(Schema schema) {
-      if (schema.getType() != Schema.Type.STRING) {
-        throw new IllegalArgumentException("BigDecimal logical type can only be applied to STRING type");
-      }
-    }
-  }
-
-  @AutoService(Conversion.class)
-  public static class BigDecimalConversion extends Conversion<BigDecimal> {
-    @Override
-    public Class<BigDecimal> getConvertedType() {
-      return BigDecimal.class;
-    }
-
-    @Override
-    public String getLogicalTypeName() {
-      return BigDecimalPinotLogicalType.NAME;
-    }
-
-    @Override
-    public BigDecimal fromCharSequence(CharSequence value, Schema schema, LogicalType type) {
-      return new BigDecimal(value.toString());
-    }
-
-    @Override
-    public CharSequence toCharSequence(BigDecimal value, Schema schema, LogicalType type) {
-      return value.toString();
-    }
   }
 }
