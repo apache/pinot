@@ -101,7 +101,12 @@ public enum ServerTimer implements AbstractMetrics.Timer {
   STARTUP_SUCCESS_DURATION_MS("millis", true),
   STARTUP_FAILURE_DURATION_MS("millis", true),
 
-  PREDOWNLOAD_TIME("millis", true);
+  PREDOWNLOAD_TIME("millis", true),
+
+  SEGMENT_DOWNLOAD_FROM_DEEP_STORE_TIME_MS("millis", false,
+      "Time taken to download a segment from deep store (including untar and move operations)"),
+  SEGMENT_DOWNLOAD_FROM_PEERS_TIME_MS("millis", false,
+      "Time taken to download a segment from peers (including untar and move operations)");
 
   private final String _timerName;
   private final boolean _global;

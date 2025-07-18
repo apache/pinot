@@ -342,6 +342,9 @@ public class Tracing {
               + "due to invalid thread accountant factory {} provided, exception:", factoryName, exception);
         }
       }
+    }
+
+    public static void startThreadAccountant() {
       Tracing.getThreadAccountant().startWatcherTask();
     }
 

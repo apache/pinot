@@ -114,8 +114,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
           ? BrokerMeter.SECONDARY_WORKLOAD_BROKER_RESPONSES_WITH_TIMEOUTS : BrokerMeter.BROKER_RESPONSES_WITH_TIMEOUTS;
       _brokerMetrics.addMeteredTableValue(rawTableName, meter, 1);
     }
-    if (asyncQueryResponse.getFailedServer() != null) {
-      _failureDetector.markServerUnhealthy(asyncQueryResponse.getFailedServer().getInstanceId());
+    ServerRoutingInstance failedServer = asyncQueryResponse.getFailedServer();
+    if (failedServer != null) {
+      _failureDetector.markServerUnhealthy(failedServer.getInstanceId(), failedServer.getHostname());
     }
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.SCATTER_GATHER,
         System.nanoTime() - scatterGatherStartTimeNs);
