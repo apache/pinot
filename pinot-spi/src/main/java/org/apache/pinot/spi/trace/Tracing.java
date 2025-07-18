@@ -87,9 +87,9 @@ public class Tracing {
    * @return true if the registration was successful.
    */
   public static boolean register(ThreadResourceUsageAccountant threadResourceUsageAccountant) {
-    // This is used in tests to replace the accountant with a new one
     if (ACCOUNTANT_REGISTRATION.compareAndSet(null, threadResourceUsageAccountant)) {
       Holder._accountant = threadResourceUsageAccountant;
+      LOGGER.info("Registered thread accountant: {}", threadResourceUsageAccountant.getClass().getName());
       return true;
     }
     return false;
@@ -147,7 +147,12 @@ public class Tracing {
     return accountant;
   }
 
-  public static void resetToDefaultThreadAccountant() {
+  /**
+   * Unregisters the thread accountant. This is only used in tests when a custom thread accountant is required.
+   * This will reset the thread accountant to null, so that the next call to initializeThreadAccountant or
+   * createThreadAccountant will register the new thread accountant.
+   */
+  public static void unregisterThreadAccountant() {
     Holder._accountant = null;
     ACCOUNTANT_REGISTRATION.set(null);
   }
@@ -335,38 +340,36 @@ public class Tracing {
     public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
       ThreadResourceUsageAccountant accountant = createThreadAccountant(config, instanceId, instanceType);
-      initializeThreadAccountant(accountant);
+      createThreadAccountant(config, instanceId, instanceType);
     }
-
-    public static void initializeThreadAccountant(ThreadResourceUsageAccountant accountant) {
-      if (accountant == null) {
-        LOGGER.warn("No thread accountant factory provided, using default implementation");
-        accountant = createDefaultThreadAccountant();
-      }
-      boolean registered = register(accountant);
-      if (registered) {
-        LOGGER.warn("ThreadAccountant register unsuccessful, as it is already registered.");
-      }
-    }
-
 
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
       _workloadBudgetManager = new WorkloadBudgetManager(config);
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
+      ThreadResourceUsageAccountant accountant = null;
       if (factoryName != null) {
         LOGGER.info("Config-specified accountant factory name {}", factoryName);
         try {
           ThreadAccountantFactory threadAccountantFactory =
               (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
           LOGGER.info("Using accountant provided by {}", factoryName);
-          return threadAccountantFactory.init(config, instanceId, instanceType);
+          accountant = threadAccountantFactory.init(config, instanceId, instanceType);
         } catch (Exception exception) {
           LOGGER.warn("Using default implementation of thread accountant, "
               + "due to invalid thread accountant factory {} provided, exception:", factoryName, exception);
         }
       }
-      return null;
+      // If no factory is specified or the factory creation failed, use the default implementation
+      LOGGER.info("Using default thread accountant implementation");
+      if (accountant == null) {
+        accountant = createDefaultThreadAccountant();
+      }
+      boolean registered = register(accountant);
+      if (!registered) {
+        LOGGER.warn("ThreadAccountant register unsuccessful, as it is already registered.");
+      }
+      return accountant;
     }
 
     public static void startThreadAccountant() {

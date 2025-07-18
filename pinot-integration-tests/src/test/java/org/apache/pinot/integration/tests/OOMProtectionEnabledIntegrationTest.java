@@ -70,6 +70,7 @@ public class OOMProtectionEnabledIntegrationTest extends BaseClusterIntegrationT
     startZk();
     startController();
     startBroker();
+    Tracing.unregisterThreadAccountant();
     startServer();
     startKafka();
 
@@ -112,10 +113,11 @@ public class OOMProtectionEnabledIntegrationTest extends BaseClusterIntegrationT
   @Test
   public void testChangeOomKillQueryEnabled()
       throws IOException {
-    assertTrue(
-        Tracing.getThreadAccountant() instanceof PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant);
+    assertTrue(_serverStarters.get(0)
+        .getResourceUsageAccountant() instanceof PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant);
     PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
-        (PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant) Tracing.getThreadAccountant();
+        (PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant) _serverStarters.get(0)
+            .getResourceUsageAccountant();
 
     QueryMonitorConfig queryMonitorConfig = accountant.getQueryMonitorConfig();
     assertFalse(queryMonitorConfig.isOomKillQueryEnabled());
@@ -133,10 +135,12 @@ public class OOMProtectionEnabledIntegrationTest extends BaseClusterIntegrationT
   @Test
   public void testChangeThresholds()
       throws IOException {
-    assertTrue(
-        Tracing.getThreadAccountant() instanceof PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant);
+    assertTrue(_serverStarters.get(0)
+        .getResourceUsageAccountant() instanceof PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant);
     PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
-        (PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant) Tracing.getThreadAccountant();
+        (PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant) _serverStarters.get(0)
+            .getResourceUsageAccountant();
+
 
     QueryMonitorConfig queryMonitorConfig = accountant.getQueryMonitorConfig();
     updateClusterConfig(Map.of("pinot.query.scheduler.accounting.oom.alarming.usage.ratio", "0.7f",
