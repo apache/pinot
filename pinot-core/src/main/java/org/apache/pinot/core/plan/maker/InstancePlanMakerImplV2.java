@@ -306,8 +306,8 @@ public class InstancePlanMakerImplV2 implements PlanMaker {
   @Override
   public PlanNode makeSegmentPlanNode(SegmentContext segmentContext, QueryContext queryContext) {
     rewriteQueryContextWithHints(queryContext, segmentContext.getIndexSegment());
-    // Sample to track usage of query planning
-    Tracing.ThreadAccountantOps.sample();
+    // Sample to track usage of query planning, since it can be expensive for large segment lists.
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
     if (QueryContextUtils.isAggregationQuery(queryContext)) {
       List<ExpressionContext> groupByExpressions = queryContext.getGroupByExpressions();
       if (groupByExpressions != null) {
