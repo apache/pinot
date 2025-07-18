@@ -143,6 +143,7 @@ public class Tracing {
   private static DefaultThreadResourceUsageAccountant createDefaultThreadAccountant() {
     LOGGER.info("Using default thread accountant");
     DefaultThreadResourceUsageAccountant accountant = new DefaultThreadResourceUsageAccountant();
+    Holder._accountant = accountant;
     ACCOUNTANT_REGISTRATION.set(accountant);
     return accountant;
   }
