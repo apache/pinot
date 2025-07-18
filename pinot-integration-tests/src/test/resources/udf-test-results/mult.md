@@ -43,30 +43,30 @@ This function multiplies two numeric values together.
 |-----------|------|-------------|
 | arg0 | big_decimal |  |
 | arg1 | big_decimal |  |
-#### mult(arg0: float, arg1: float) -> float
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| arg0 | float |  |
-| arg1 | float |  |
-#### mult(arg0: long, arg1: long) -> long
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| arg0 | long |  |
-| arg1 | long |  |
-#### mult(arg0: int, arg1: int) -> int
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| arg0 | int |  |
-| arg1 | int |  |
 #### mult(arg0: double, arg1: double) -> double
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | arg0 | double |  |
 | arg1 | double |  |
+#### mult(arg0: float, arg1: float) -> float
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | float |  |
+| arg1 | float |  |
+#### mult(arg0: int, arg1: int) -> int
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | int |  |
+| arg1 | int |  |
+#### mult(arg0: long, arg1: long) -> long
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | long |  |
+| arg1 | long |  |
 ### Scenarios
 
 #### Ingestion time transformer

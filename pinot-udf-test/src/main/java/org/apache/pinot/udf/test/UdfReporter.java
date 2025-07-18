@@ -139,7 +139,8 @@ public class UdfReporter {
   }
 
   private static void reportSignatures(Udf udf, PrintWriter report) {
-    Set<UdfSignature> signatures = udf.getExamples().keySet();
+    Set<UdfSignature> signatures = new TreeSet<>(Comparator.comparing(UdfSignature::toString));
+    signatures.addAll(udf.getExamples().keySet());
     if (!signatures.isEmpty()) {
       report.append("### Signatures\n\n");
 

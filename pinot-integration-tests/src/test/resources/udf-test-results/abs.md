@@ -35,21 +35,16 @@ Returns the absolute value of a numeric input.
 | SSE projection (without null handling) | NUMBER_AS_DOUBLE |
 ### Signatures
 
-#### abs(arg0: long) -> long
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| arg0 | long |  |
-#### abs(arg0: double) -> double
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| arg0 | double |  |
 #### abs(arg0: big_decimal) -> big_decimal
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | arg0 | big_decimal |  |
+#### abs(arg0: double) -> double
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | double |  |
 #### abs(arg0: float) -> float
 
 | Parameter | Type | Description |
@@ -60,6 +55,11 @@ Returns the absolute value of a numeric input.
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | arg0 | int |  |
+#### abs(arg0: long) -> long
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | long |  |
 ### Scenarios
 
 #### Ingestion time transformer

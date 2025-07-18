@@ -43,30 +43,30 @@ This function adds two numeric values together. In order to concatenate two stri
 |-----------|------|-------------|
 | arg0 | big_decimal |  |
 | arg1 | big_decimal |  |
-#### plus(arg0: float, arg1: float) -> float
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| arg0 | float |  |
-| arg1 | float |  |
-#### plus(arg0: long, arg1: long) -> long
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| arg0 | long |  |
-| arg1 | long |  |
-#### plus(arg0: int, arg1: int) -> int
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| arg0 | int |  |
-| arg1 | int |  |
 #### plus(arg0: double, arg1: double) -> double
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | arg0 | double |  |
 | arg1 | double |  |
+#### plus(arg0: float, arg1: float) -> float
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | float |  |
+| arg1 | float |  |
+#### plus(arg0: int, arg1: int) -> int
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | int |  |
+| arg1 | int |  |
+#### plus(arg0: long, arg1: long) -> long
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| arg0 | long |  |
+| arg1 | long |  |
 ### Scenarios
 
 #### Ingestion time transformer
