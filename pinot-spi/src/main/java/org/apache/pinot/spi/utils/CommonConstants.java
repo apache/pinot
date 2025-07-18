@@ -1529,6 +1529,13 @@ public class CommonConstants {
         "accounting.min.memory.footprint.to.kill.ratio";
     public static final double DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO = 0.025;
 
+    // Per-query memory threshold configurations
+    public static final String CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK = "accounting.per.query.memory.check.enabled";
+    public static final boolean DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK = false;
+
+    public static final String CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES = "accounting.per.query.memory.limit.bytes";
+    public static final long DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES = 1024 * 1024 * 1024L; // 1GB
+
     public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
     public static final int DEFAULT_GC_BACKOFF_COUNT = 5;
 

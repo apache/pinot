@@ -136,6 +136,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     // is sampling allowed for MSE queries
     protected final boolean _isThreadSamplingEnabledForMSE;
 
+    // per-query memory checking configuration
+    protected final boolean _isPerQueryMemoryCheckEnabled;
+    protected final long _perQueryMemoryLimitBytes;
+
     protected final Set<String> _inactiveQuery;
 
     protected Set<String> _cancelSentQueries;
@@ -155,6 +159,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _isThreadCPUSamplingEnabled = isThreadCPUSamplingEnabled;
       _isThreadMemorySamplingEnabled = isThreadMemorySamplingEnabled;
       _isThreadSamplingEnabledForMSE = isThreadSamplingEnabledForMSE;
+      _isPerQueryMemoryCheckEnabled = config.getProperty(
+          CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK,
+          CommonConstants.Accounting.DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK);
+      _perQueryMemoryLimitBytes = config.getProperty(
+          CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES,
+          CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES);
       _inactiveQuery = inactiveQuery;
       _instanceId = instanceId;
       _instanceType = instanceType;
@@ -194,6 +204,15 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
               CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
       LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
+
+      _isPerQueryMemoryCheckEnabled = config.getProperty(
+          CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK,
+          CommonConstants.Accounting.DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK);
+      _perQueryMemoryLimitBytes = config.getProperty(
+          CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES,
+          CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES);
+      LOGGER.info("_isPerQueryMemoryCheckEnabled: {}, _perQueryMemoryLimitBytes: {}", _isPerQueryMemoryCheckEnabled,
+          _perQueryMemoryLimitBytes);
 
       _queryCancelCallbacks = CacheBuilder.newBuilder().maximumSize(
               config.getProperty(CommonConstants.Accounting.CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE,
@@ -294,6 +313,39 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @Override
     public boolean throttleQuerySubmission() {
       return getWatcherTask().getHeapUsageBytes() > getWatcherTask().getQueryMonitorConfig().getAlarmingLevel();
+    }
+
+    public void checkMemoryAndInterruptIfExceeded() {
+      if (!_isPerQueryMemoryCheckEnabled || !_isThreadMemorySamplingEnabled) {
+        return;
+      }
+
+      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
+      CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
+
+      if (currentTaskStatus == null) {
+        return; // No active query on this thread
+      }
+
+      long currentMemoryUsage = threadEntry._currentThreadMemoryAllocationSampleBytes;
+      if (currentMemoryUsage > _perQueryMemoryLimitBytes) {
+        String queryId = currentTaskStatus.getQueryId();
+        String errorMessage = String.format(
+            "Query %s exceeded per-query memory limit of %d bytes (current usage: %d bytes) on %s: %s. "
+                + "Query terminated proactively to prevent OOM.",
+            queryId, _perQueryMemoryLimitBytes, currentMemoryUsage, _instanceType, _instanceId);
+
+        // Set error status to terminate the query
+        threadEntry._errorStatus.set(new RuntimeException(errorMessage));
+
+        // Also interrupt the anchor thread if available
+        Thread anchorThread = currentTaskStatus.getAnchorThread();
+        if (anchorThread != null) {
+          anchorThread.interrupt();
+        }
+
+        LOGGER.warn("Per-query memory limit exceeded: {}", errorMessage);
+      }
     }
 
     @Override

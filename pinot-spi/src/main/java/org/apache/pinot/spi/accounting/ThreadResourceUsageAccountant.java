@@ -157,6 +157,16 @@ public interface ThreadResourceUsageAccountant {
   Collection<? extends ThreadResourceTracker> getThreadResources();
 
   /**
+   * Check if the current thread's allocated memory exceeds the configured per-query threshold.
+   * If the threshold is exceeded, this method will set an error status to terminate the query proactively.
+   * This provides a way for operators to check memory usage during execution and suicide the query
+   * before it causes OOM issues.
+   */
+  default void checkMemoryAndInterruptIfExceeded() {
+    // Default implementation does nothing. Subclasses can override to implement memory checking.
+  }
+
+  /**
    * Get all the QueryResourceTrackers for all the queries executing in a broker or server.
    * @return A Map of String, QueryResourceTracker for all the queries.
    */

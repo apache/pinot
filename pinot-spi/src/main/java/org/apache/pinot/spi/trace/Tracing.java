@@ -390,6 +390,10 @@ public class Tracing {
       sample();
     }
 
+    public static void checkMemoryAndInterruptIfExceeded() {
+      Tracing.getThreadAccountant().checkMemoryAndInterruptIfExceeded();
+    }
+
     @Deprecated
     public static void updateQueryUsageConcurrently(String queryId) {
     }
@@ -417,6 +421,13 @@ public class Tracing {
 
     public static WorkloadBudgetManager getWorkloadBudgetManager() {
       return _workloadBudgetManager;
+    }
+
+    public static void interruptRunnerThread() {
+      ThreadExecutionContext context = getThreadAccountant().getThreadExecutionContext();
+      if (context != null && context.getAnchorThread() != null) {
+        context.getAnchorThread().interrupt();
+      }
     }
   }
 }
