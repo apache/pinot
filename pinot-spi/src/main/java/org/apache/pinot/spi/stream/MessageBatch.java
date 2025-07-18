@@ -47,19 +47,12 @@ public interface MessageBatch<T> {
   /**
    * Returns the stream message at the given index within the batch.
    */
-  default StreamMessage<T> getStreamMessage(int index) {
-    byte[] value = getMessageBytesAtIndex(index);
-    StreamMessageMetadata metadata = (StreamMessageMetadata) getMetadataAtIndex(index);
-    //noinspection unchecked
-    return (StreamMessage<T>) new StreamMessage<>(value, value.length, metadata);
-  }
+  StreamMessage<T> getStreamMessage(int index);
 
   /**
    * Returns the start offset of the next batch.
    */
-  default StreamPartitionMsgOffset getOffsetOfNextBatch() {
-    return getNextStreamPartitionMsgOffsetAtIndex(getMessageCount() - 1);
-  }
+  StreamPartitionMsgOffset getOffsetOfNextBatch();
 
   /**
    * Returns the offset of the first message (including tombstone) in the batch.
@@ -71,8 +64,7 @@ public interface MessageBatch<T> {
     if (numMessages == 0) {
       return null;
     }
-    StreamMessageMetadata firstMessageMetadata = getStreamMessage(0).getMetadata();
-    return firstMessageMetadata != null ? firstMessageMetadata.getOffset() : null;
+    return getStreamMessage(0).getMetadata().getOffset();
   }
 
   /**
@@ -102,40 +94,5 @@ public interface MessageBatch<T> {
    */
   default boolean hasDataLoss() {
     return false;
-  }
-
-  @Deprecated
-  default T getMessageAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default byte[] getMessageBytesAtIndex(int index) {
-    return (byte[]) getMessageAtIndex(index);
-  }
-
-  @Deprecated
-  default int getMessageLengthAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default int getMessageOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default RowMetadata getMetadataAtIndex(int index) {
-    return null;
-  }
-
-  @Deprecated
-  default long getNextStreamMessageOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
-    return new LongMsgOffset(getNextStreamMessageOffsetAtIndex(index));
   }
 }

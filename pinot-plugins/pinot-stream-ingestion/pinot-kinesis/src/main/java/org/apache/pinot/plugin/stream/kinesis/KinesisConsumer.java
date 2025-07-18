@@ -114,9 +114,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     KinesisPartitionGroupOffset offsetOfNextBatch;
     if (!records.isEmpty()) {
       messages = records.stream().map(record -> extractStreamMessage(record, shardId)).collect(Collectors.toList());
-      StreamMessageMetadata lastMessageMetadata = messages.get(messages.size() - 1).getMetadata();
-      assert lastMessageMetadata != null;
-      offsetOfNextBatch = (KinesisPartitionGroupOffset) lastMessageMetadata.getNextOffset();
+      offsetOfNextBatch = (KinesisPartitionGroupOffset) messages.get(messages.size() - 1).getMetadata().getNextOffset();
     } else {
       // TODO: Revisit whether Kinesis can return empty batch when there are available records. The consumer cna handle
       //       empty message batch, but it will treat it as fully caught up.
