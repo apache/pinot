@@ -87,6 +87,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   private final TableConfigBuilder _offlineBuilder = getOfflineTableBuilder(OFFLINE_TABLE_NAME);
   private final TableConfigBuilder _realtimeBuilder = getRealtimeTableBuilder(REALTIME_TABLE_NAME);
   private String _createTableUrl;
+  private String _createTableUrlWithValidation;
 
   @BeforeClass
   public void setUp()
@@ -94,6 +95,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.setupSharedStateAndValidate();
     registerMinionTasks();
     _createTableUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate();
+    _createTableUrlWithValidation = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableCreate(false);
   }
 
   private TableConfigBuilder getRealtimeTableBuilder(String tableName) {
@@ -430,8 +432,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
   private void deleteAllTables()
       throws IOException {
-    List<String> tables = getTableNames(_createTableUrl + "?type=offline");
-    tables.addAll(getTableNames(_createTableUrl + "?type=realtime"));
+    List<String> tables = getTableNames(List.of("type=offline"));
+    tables.addAll(getTableNames(List.of("type=realtime")));
     for (String tableName : tables) {
       sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
     }
@@ -441,7 +443,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
   public void testListTables()
       throws Exception {
     deleteAllTables();
-    List<String> tables = getTableNames(_createTableUrl);
+    List<String> tables = getTableNames(null);
     assertTrue(tables.isEmpty());
 
     // post 2 offline, 1 realtime
@@ -457,33 +459,33 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     sendPostRequest(_createTableUrl, offlineTableConfig2.toJsonString());
 
     // list
-    tables = getTableNames(_createTableUrl);
+    tables = getTableNames(null);
     assertEquals(tables, Lists.newArrayList("abc", "pqr"));
-    tables = getTableNames(_createTableUrl + "?sortAsc=false");
+    tables = getTableNames(List.of("sortAsc=false"));
     assertEquals(tables, Lists.newArrayList("pqr", "abc"));
-    tables = getTableNames(_createTableUrl + "?sortType=creationTime");
+    tables = getTableNames(List.of("sortType=creationTime"));
     assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "pqr_REALTIME", "abc_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?sortType=creationTime&sortAsc=false");
+    tables = getTableNames(List.of("sortType=creationTime", "sortAsc=false"));
     assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_REALTIME", "pqr_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime");
+    tables = getTableNames(List.of("sortType=lastModifiedTime"));
     assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "pqr_REALTIME", "abc_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime&sortAsc=false");
+    tables = getTableNames(List.of("sortType=lastModifiedTime", "sortAsc=false"));
     assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_REALTIME", "pqr_OFFLINE"));
 
     // type
-    tables = getTableNames(_createTableUrl + "?type=realtime");
+    tables = getTableNames(List.of("type=realtime"));
     assertEquals(tables, Lists.newArrayList("pqr_REALTIME"));
-    tables = getTableNames(_createTableUrl + "?type=offline");
+    tables = getTableNames(List.of("type=offline"));
     assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?type=offline&sortAsc=false");
+    tables = getTableNames(List.of("type=offline", "sortAsc=false"));
     assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?type=offline&sortType=creationTime");
+    tables = getTableNames(List.of("type=offline", "sortType=creationTime"));
     assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?type=offline&sortType=creationTime&sortAsc=false");
+    tables = getTableNames(List.of("type=offline", "sortType=creationTime", "sortAsc=false"));
     assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?type=offline&sortType=lastModifiedTime");
+    tables = getTableNames(List.of("type=offline", "sortType=lastModifiedTime"));
     assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?type=offline&sortType=lastModifiedTime&sortAsc=false");
+    tables = getTableNames(List.of("type=offline", "sortType=lastModifiedTime", "sortAsc=false"));
     assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
 
     // update taskType for abc_OFFLINE
@@ -502,15 +504,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             realtimeTableConfig1.toJsonString()));
 
     // list lastModified, taskType
-    tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime");
+    tables = getTableNames(List.of("sortType=lastModifiedTime"));
     assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE", "pqr_REALTIME"));
-    tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime&sortAsc=false");
+    tables = getTableNames(List.of("sortType=lastModifiedTime", "sortAsc=false"));
     assertEquals(tables, Lists.newArrayList("pqr_REALTIME", "abc_OFFLINE", "pqr_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask");
+    tables = getTableNames(List.of("taskType=MergeRollupTask"));
     assertEquals(tables, Lists.newArrayList("abc_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&type=realtime");
+    tables = getTableNames(List.of("taskType=MergeRollupTask", "type=realtime"));
     assertTrue(tables.isEmpty());
-    tables = getTableNames(_createTableUrl + "?taskType=RealtimeToOfflineSegmentsTask");
+    tables = getTableNames(List.of("taskType=RealtimeToOfflineSegmentsTask"));
     assertEquals(tables, Lists.newArrayList("pqr_REALTIME"));
 
     // update taskType for pqr_OFFLINE
@@ -522,16 +524,17 @@ public class PinotTableRestletResourceTest extends ControllerTest {
             offlineTableConfig1.toJsonString()));
 
     // list lastModified, taskType
-    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask");
+    tables = getTableNames(List.of("taskType=MergeRollupTask"));
     assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&sortAsc=false");
+    tables = getTableNames(List.of("taskType=MergeRollupTask", "sortAsc=false"));
     assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
-    tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&sortType=creationTime");
+    tables = getTableNames(List.of("taskType=MergeRollupTask", "sortType=creationTime"));
     assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
   }
 
-  private List<String> getTableNames(String url)
+  private List<String> getTableNames(List<String> queryParams)
       throws IOException {
+    String url = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTablesList(queryParams);
     JsonNode tablesJson = JsonUtils.stringToJsonNode(sendGetRequest(url)).get("tables");
     return JsonUtils.jsonNodeToObject(tablesJson, new TypeReference<List<String>>() {
     });
@@ -677,14 +680,14 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         "{\"unrecognizedProperties\":{},\"status\":\"logicalTable logical table successfully added.\"}");
 
     // table deletion should fail
-    String tableDeleteUrl = urlBuilder.forTableDelete(tableNameWithType);
+    String tableDeleteUrl = urlBuilder.forTableDelete(tableNameWithType) + "type=" + tableType;
     String msg = expectThrows(IOException.class, () -> ControllerTest.sendDeleteRequest(tableDeleteUrl)).getMessage();
     assertTrue(msg.contains("Cannot delete table config: " + tableNameWithType
         + " because it is referenced in logical table: logicalTable"), msg);
 
     // table delete with name and type should also fail
     msg = expectThrows(IOException.class,
-        () -> ControllerTest.sendDeleteRequest(tableDeleteUrl + "?type=" + tableType)).getMessage();
+        () -> ControllerTest.sendDeleteRequest(tableDeleteUrl)).getMessage();
     assertTrue(msg.contains("Cannot delete table config: " + tableNameWithType
         + " because it is referenced in logical table: logicalTable"), msg);
 
@@ -696,7 +699,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // table delete with raw table name and type also should fail
     msg = expectThrows(IOException.class,
-        () -> ControllerTest.sendDeleteRequest(urlBuilder.forTableDelete(tableName + "?type=" + tableType)))
+        () -> ControllerTest.sendDeleteRequest(urlBuilder.forTableDelete(tableName) + "type=" + tableType))
             .getMessage();
     assertTrue(msg.contains(
         "Cannot delete table config: " + tableName + " because it is referenced in logical table: logicalTable"), msg);
@@ -1064,12 +1067,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         .build();
 
     // Should succeed when no dangling tasks exist
-    String creationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    String creationResponse = sendPostRequest(_createTableUrlWithValidation, offlineTableConfig.toJsonString());
     assertEquals(creationResponse,
         "{\"unrecognizedProperties\":{},\"status\":\"Table testTableTasksValidation_OFFLINE successfully added\"}");
 
     // Clean up
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName, false));
   }
 
   @Test
@@ -1086,7 +1089,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         .build();
 
     // First create the table successfully
-    sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    sendPostRequest(_createTableUrlWithValidation, offlineTableConfig.toJsonString());
 
     // Create a task manually to simulate dangling task
     PinotTaskManager taskManager = DEFAULT_INSTANCE.getControllerStarter().getTaskManager();
@@ -1097,11 +1100,10 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     waitForTaskState(taskName, TaskState.IN_PROGRESS);
 
     // Now try to create another table with same name (simulating re-creation with dangling tasks)
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
-        .forTableDelete(tableName + "?ignoreActiveTasks=true"));
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
 
     try {
-      sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+      sendPostRequest(_createTableUrlWithValidation, offlineTableConfig.toJsonString());
       fail("Table creation should fail when dangling tasks exist");
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("The table has dangling task data"));
@@ -1109,8 +1111,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Clean up any remaining tasks
     try {
-      sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
-          .forTableDelete(tableName + "?ignoreActiveTasks=true"));
+      sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName, false));
     } catch (Exception ignored) {
       // Ignore if table doesn't exist
     }
@@ -1125,12 +1126,12 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName).build(); // No task config
 
     // Should succeed when task config is null
-    String creationResponse = sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    String creationResponse = sendPostRequest(_createTableUrlWithValidation, offlineTableConfig.toJsonString());
     assertEquals(creationResponse, "{\"unrecognizedProperties\":{},"
         + "\"status\":\"Table testTableTasksValidationNullConfig_OFFLINE successfully added\"}");
 
     // Clean up
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName, false));
   }
 
   @Test
@@ -1147,7 +1148,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         .build();
 
     // Create table
-    sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    sendPostRequest(_createTableUrlWithValidation, offlineTableConfig.toJsonString());
 
     // Create some completed tasks
     PinotTaskManager taskManager = DEFAULT_INSTANCE.getControllerStarter().getTaskManager();
@@ -1167,7 +1168,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Delete table - should succeed and clean up tasks
     String deleteResponse = sendDeleteRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName, false));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
   }
 
@@ -1197,7 +1198,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
         .build();
 
     // Create table
-    sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    sendPostRequest(_createTableUrlWithValidation, offlineTableConfig.toJsonString());
 
     // Create an active/in-progress task
     PinotTaskManager taskManager = DEFAULT_INSTANCE.getControllerStarter().getTaskManager();
@@ -1208,7 +1209,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     waitForTaskState(taskName, TaskState.IN_PROGRESS);
     try {
       // Try to delete table without ignoring active tasks - should fail
-      sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+      sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName, false));
       fail("Table deletion should fail when active tasks exist");
     } catch (IOException e) {
       assertTrue(e.getMessage().contains("The table has") && e.getMessage().contains("active running tasks"));
@@ -1216,7 +1217,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Delete table with ignoreActiveTasks flag - should succeed
     String deleteResponse = sendDeleteRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName + "?ignoreActiveTasks=true"));
+        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
 
     // delete task
@@ -1233,11 +1234,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName).build(); // No task config
 
     // Create table
-    sendPostRequest(_createTableUrl, offlineTableConfig.toJsonString());
+    sendPostRequest(_createTableUrlWithValidation, offlineTableConfig.toJsonString());
 
     // Delete table - should succeed even with null task config
     String deleteResponse = sendDeleteRequest(
-        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
+        DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName, false));
     assertEquals(deleteResponse, "{\"status\":\"Tables: [" + tableName + "_OFFLINE] deleted\"}");
   }
 

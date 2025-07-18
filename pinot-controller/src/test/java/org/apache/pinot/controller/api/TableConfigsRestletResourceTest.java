@@ -312,9 +312,14 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
         new TableConfigs(tableName3, createDummySchema(tableName3), null, createRealtimeTableConfig(tableName3));
     sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
 
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName1));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName2));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName3));
+    deleteTableConfig(tableName1);
+    deleteTableConfig(tableName2);
+    deleteTableConfig(tableName3);
+  }
+
+  private String deleteTableConfig(String tableName)
+      throws IOException {
+    return sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
   }
 
   /**
@@ -344,7 +349,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
       // expected
     }
 
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
 
     // replica check
     tableName = "testCreateReplicas";
@@ -362,7 +367,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
         DEFAULT_MIN_NUM_REPLICAS);
     Assert.assertEquals(tableConfigsResponse.getRealtime().getReplication(),
         DEFAULT_MIN_NUM_REPLICAS);
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
 
     // quota check
     tableName = "testCreateQuota";
@@ -375,7 +380,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(tableName, tableConfigsResponse.getTableName());
     Assert.assertEquals(tableConfigsResponse.getOffline().getQuotaConfig().getStorage(),
         DEFAULT_INSTANCE.getControllerConfig().getDimTableMaxSize());
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
 
     // tuner config
     tableName = "testTunerConfig";
@@ -395,7 +400,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
         .containsAll(schema.getDimensionNames()));
     Assert.assertTrue(tableConfigsResponse.getRealtime().getIndexingConfig().getNoDictionaryColumns()
         .containsAll(schema.getMetricNames()));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
   }
 
   @Test
@@ -443,7 +448,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName1, tableName2)));
 
     // delete 1
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName2));
+    deleteTableConfig(tableName2);
 
     // list 1
     getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
@@ -452,7 +457,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(configs.size(), 1);
     Assert.assertTrue(configs.containsAll(Sets.newHashSet(tableName1)));
 
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName1));
+    deleteTableConfig(tableName1);
   }
 
   @Test
@@ -533,7 +538,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertTrue(
         tableConfigsResponse.getRealtime().getIndexingConfig().getInvertedIndexColumns().contains("dimA"));
 
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
   }
 
   @Test
@@ -573,7 +578,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     newTableConfigUpdateUrl = tableConfigUpdateUrl + "?validationTypesToSkip=ALL&forceTableSchemaUpdate=true";
     response = sendPutRequest(newTableConfigUpdateUrl, tableConfigs.toPrettyJsonString());
     Assert.assertTrue(response.contains("TableConfigs updated for testUpdate1"));
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
   }
 
   @Test
@@ -590,7 +595,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
 
     // delete & check
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
     String getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
     List<String> configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
@@ -607,7 +612,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(tableConfigsResponse.getTableName(), tableName);
 
     // delete & check
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
     getResponse = sendGetRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsList());
     configs = JsonUtils.stringToObject(getResponse, new TypeReference<List<String>>() {
     });
@@ -636,7 +641,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
 
     // Delete table should fail because it is referenced by a logical table
     String msg = Assert.expectThrows(
-        IOException.class, () -> sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName))).getMessage();
+        IOException.class, () -> deleteTableConfig(tableName)).getMessage();
     Assert.assertTrue(msg.contains("Cannot delete table config: " + tableName
         + " because it is referenced in logical table: " + logicalTableName), msg);
 
@@ -646,7 +651,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertTrue(response.contains("testDeleteLogicalTable logical table successfully deleted"), response);
 
     // physical table should be deleted successfully
-    response = sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName));
+    response = deleteTableConfig(tableName);
     Assert.assertTrue(response.contains("Deleted TableConfigs: physicalTable"), response);
   }
 
@@ -662,13 +667,13 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // Delete table should fail because it is not a raw table name
     String msg = Assert.expectThrows(
             IOException.class,
-            () -> sendDeleteRequest(urlBuilder.forTableConfigsDelete(offlineTableConfig.getTableName())))
+            () -> deleteTableConfig(offlineTableConfig.getTableName()))
         .getMessage();
     Assert.assertTrue(msg.contains("Invalid table name: testDeleteWithTypeValidation_OFFLINE. Use raw table name."),
         msg);
 
     // Delete table with raw table name
-    String response = sendDeleteRequest(urlBuilder.forTableConfigsDelete(tableName));
+    String response = deleteTableConfig(tableName);
     Assert.assertTrue(response.contains("Deleted TableConfigs: testDeleteWithTypeValidation"), response);
   }
 
@@ -701,7 +706,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(response,
         "{\"unrecognizedProperties\":{\"/illegalKey1\":1},\"status\":\"TableConfigs updated for testUnrecognized1\"}");
     // Delete
-    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+    deleteTableConfig(tableName);
   }
 
   /**
