@@ -324,6 +324,11 @@ public class RealtimeConsumptionRateManager {
       return _metricEmitter;
     }
 
+    @VisibleForTesting
+    double getRate() {
+      return _rateLimiter.getRate();
+    }
+
     @Override
     public String toString() {
       return "ServerBasedRateLimiter{"
@@ -423,6 +428,11 @@ public class RealtimeConsumptionRateManager {
     @VisibleForTesting
     QuotaUtilizationTracker getTracker() {
       return _tracker;
+    }
+
+    @VisibleForTesting
+    double getRate() {
+      return _rateLimit.get();
     }
 
     public void close() {

@@ -33,7 +33,6 @@ import org.testng.annotations.Test;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertSame;
 
 
 public class ServerRateLimitConfigChangeListenerTest {
@@ -54,7 +53,7 @@ public class ServerRateLimitConfigChangeListenerTest {
     simulateThrottling(errorRef);
     // Initial state
     RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(SERVER_CONFIG, null);
-    RealtimeConsumptionRateManager.PartitionRateLimiter serverRateLimiter = getServerRateLimiter();
+    RealtimeConsumptionRateManager.ServerRateLimiter serverRateLimiter = getServerRateLimiter();
     double initialRate = serverRateLimiter.getRate();
     assertEquals(initialRate, 5.0, DELTA);
 
@@ -68,10 +67,9 @@ public class ServerRateLimitConfigChangeListenerTest {
     listener.onChange(changedConfigSet, newConfig);
     simulateThrottling(errorRef);
 
-    // Verify that old rate remains same and the new rate is applied
+    // Verify that rate changed
     double rate = serverRateLimiter.getRate();
-    assertEquals(rate, 5.0, DELTA);
-
+    assertEquals(rate, 300.0, DELTA);
     double updatedRate = getServerRateLimiter().getRate();
     assertEquals(updatedRate, 300.0, DELTA);
 
@@ -84,12 +82,11 @@ public class ServerRateLimitConfigChangeListenerTest {
     simulateThrottling(errorRef);
 
     // Verify that old rate remains same and the new rate is applied
-    rate = updatedRate;
+    rate = serverRateLimiter.getRate();
     assertEquals(rate, 300.0, DELTA);
 
-    assertSame(RealtimeConsumptionRateManager.NOOP_RATE_LIMITER,
+    assertEquals(RealtimeConsumptionRateManager.NOOP_RATE_LIMITER,
         RealtimeConsumptionRateManager.getInstance().getServerRateLimiter());
-    updatedRate = 0; // Since it's a NOOP_RATE_LIMITER
 
     // Test update of serverRateLimit after it was removed
     newConfig = new HashMap<>();
@@ -99,9 +96,9 @@ public class ServerRateLimitConfigChangeListenerTest {
     listener.onChange(changedConfigSet, newConfig);
     simulateThrottling(errorRef);
 
-    // Verify that old rate remains same and the new rate is applied
-    rate = updatedRate;
-    assertEquals(rate, 0, DELTA);
+    // Verify that old rate (one before the config change was deleted and again added) remains same.
+    rate = serverRateLimiter.getRate();
+    assertEquals(rate, 300.0, DELTA);
 
     updatedRate = getServerRateLimiter().getRate();
     assertEquals(updatedRate, 10000, DELTA);
@@ -125,8 +122,8 @@ public class ServerRateLimitConfigChangeListenerTest {
     }
   }
 
-  private RealtimeConsumptionRateManager.PartitionRateLimiter getServerRateLimiter() {
-    return (RealtimeConsumptionRateManager.PartitionRateLimiter) (RealtimeConsumptionRateManager.getInstance()
+  private RealtimeConsumptionRateManager.ServerRateLimiter getServerRateLimiter() {
+    return (RealtimeConsumptionRateManager.ServerRateLimiter) (RealtimeConsumptionRateManager.getInstance()
         .getServerRateLimiter());
   }
 }

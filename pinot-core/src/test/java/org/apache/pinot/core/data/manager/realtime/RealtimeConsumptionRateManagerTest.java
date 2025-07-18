@@ -99,11 +99,21 @@ public class RealtimeConsumptionRateManagerTest {
   public void testCreateServerRateLimiter() {
     // Server config 1
     ConsumptionRateLimiter rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_1, null);
-    assertEquals(5.0, ((PartitionRateLimiter) rateLimiter).getRate(), DELTA);
+    ServerRateLimiter serverRateLimiter = (ServerRateLimiter) rateLimiter;
+    try {
+      assertEquals(serverRateLimiter.getRate(), 5.0, DELTA);
+      assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 5.0, DELTA);
+    } finally {
+      serverRateLimiter.close();
+    }
 
     // Server config 2
-    rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_2, null);
-    assertEquals(2.5, ((PartitionRateLimiter) rateLimiter).getRate(), DELTA);
+    serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_2, null);
+    try {
+      assertEquals(((ServerRateLimiter) rateLimiter).getRate(), 2.5, DELTA);
+    } finally {
+      serverRateLimiter.close();
+    }
 
     // Server config 3
     rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_3, null);
@@ -112,6 +122,19 @@ public class RealtimeConsumptionRateManagerTest {
     // Server config 4
     rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_4, null);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
+
+    _consumptionRateManager.updateServerRateLimiter(1, null);
+    serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.getServerRateLimiter();
+    try {
+      assertEquals(serverRateLimiter.getRate(), 1);
+      assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 1);
+
+      serverRateLimiter.updateRateLimit(12_000);
+      assertEquals(serverRateLimiter.getRate(), 12_000);
+      assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 12_000);
+    } finally {
+      serverRateLimiter.close();
+    }
   }
 
   @Test
@@ -239,7 +262,8 @@ public class RealtimeConsumptionRateManagerTest {
       TestUtils.waitForCondition(
           aVoid -> ((emitter1.getMessageCount().intValue() > 0) && (emitter1.getTracker().getAggregateNumMessages()
               == 0)), 5000,
-          "Expected messageCount to be greater than zero because messageCount will reset post initial delay.");
+          "Expected messageCount to be greater than zero because messageCount will reset post initial delay (first "
+              + "run).");
     } finally {
       emitter.close();
     }
