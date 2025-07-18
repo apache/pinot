@@ -32,6 +32,8 @@ import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -148,8 +150,9 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
           // do nothing
         });
         fail("Should not allow more than 1 task");
-      } catch (Exception e) {
+      } catch (QueryException e) {
         // as expected
+        assertEquals(e.getErrorCode(), QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
         assertEquals(e.getMessage(), "Tasks throttled due to high heap usage.");
       }
     } catch (BrokenBarrierException | InterruptedException e) {
