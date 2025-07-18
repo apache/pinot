@@ -143,6 +143,10 @@ public class IngestionDelayTrackerTest {
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(partition1), ingestionTimeMs);
     }
 
+    ingestionDelayTracker = createTracker();
+    ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, 1, 1, null, null);
+    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 0);
+
     ingestionDelayTracker.shutdown();
     Assert.assertTrue(true);
   }
