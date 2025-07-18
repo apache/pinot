@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericData;
 import org.apache.pinot.spi.data.FieldSpec;

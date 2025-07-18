@@ -5,7 +5,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
-import org.apache.pinot.core.operator.transform.function.DateTimeTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
@@ -24,7 +23,8 @@ public class ToDateTimeUdf extends Udf.FromAnnotatedMethod {
 
   @Override
   public String getDescription() {
-    return "Converts epoch millis to a DateTime string represented by the given pattern. Optionally, a timezone can be provided.";
+    return "Converts epoch millis to a DateTime string represented by the given pattern. "
+        + "Optionally, a timezone can be provided.";
   }
 
   @Override
@@ -54,4 +54,3 @@ public class ToDateTimeUdf extends Udf.FromAnnotatedMethod {
     return Map.of();
   }
 }
-

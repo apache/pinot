@@ -19,12 +19,10 @@
 package org.apache.pinot.udf.test.scenarios;
 
 import com.google.common.collect.Maps;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
-import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfSignature;
@@ -74,7 +72,8 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
       UdfSignature signature,
       UdfExample example,
       /* language=sql*/ String templateSql) {
-    String call = udf.asSqlCall(udf.getMainFunctionName(), PinotFunctionEnvGenerator.getArgsForCall(signature, example));
+    List<String> argsForCall = PinotFunctionEnvGenerator.getArgsForCall(signature, example);
+    String call = udf.asSqlCall(udf.getMainFunctionName(), argsForCall);
     return templateSql
         .replace("@example", example.getId())
         .replace("@call", call);

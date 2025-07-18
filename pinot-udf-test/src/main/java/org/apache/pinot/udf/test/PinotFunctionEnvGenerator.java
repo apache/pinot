@@ -43,7 +43,6 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.glassfish.grizzly.http.util.HexUtils;
 
 
 /// Class used to generate the [TableConfig] and [Schema] for the Pinot function tests.

@@ -59,10 +59,10 @@ public class UdfReporter {
                 .collect(Collectors.joining(", ")))
             .append("\n\n");
       }
-      
+
       report.append("### Description\n\n")
           .append(udf.getDescription()).append("\n");
-      
+
       TreeSet<UdfTestScenario> scenarios = new TreeSet<>(Comparator.comparing(UdfTestScenario::getTitle));
       scenarios.addAll(byScenario.getMap().keySet());
 

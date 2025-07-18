@@ -27,8 +27,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.stream.Stream;
-import org.apache.avro.Conversions;
-import org.apache.avro.data.TimeConversions;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;

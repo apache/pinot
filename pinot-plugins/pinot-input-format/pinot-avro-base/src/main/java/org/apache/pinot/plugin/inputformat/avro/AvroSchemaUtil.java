@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.avro.Conversion;
 import org.apache.avro.Conversions;
 import org.apache.avro.LogicalType;

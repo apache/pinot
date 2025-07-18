@@ -152,7 +152,8 @@ public class UdfParameter {
 
   public static class LiteralConstraint implements Constraint {
     public static final LiteralConstraint INSTANCE = new LiteralConstraint();
-    private LiteralConstraint() {}
+    private LiteralConstraint() {
+    }
 
     @Override
     public void updateTableConfig(TableConfigBuilder tableConfigBuilder, String columnName) {

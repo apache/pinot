@@ -23,8 +23,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.OrOperatorTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
@@ -41,7 +41,8 @@ public class OrUdf extends Udf {
 
   @Override
   public String getDescription() {
-    return "Logical OR function for two boolean values. Returns true if either argument is true, false if both are false, and null if both are null or one is null and the other is false.";
+    return "Logical OR function for two boolean values. Returns true if either argument is true, "
+        + "false if both are false, and null if both are null or one is null and the other is false.";
   }
 
   @Override
@@ -77,4 +78,3 @@ public class OrUdf extends Udf {
     return Map.of(TransformFunctionType.OR, OrOperatorTransformFunction.class);
   }
 }
-

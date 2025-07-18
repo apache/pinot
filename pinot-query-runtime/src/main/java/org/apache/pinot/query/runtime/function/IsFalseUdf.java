@@ -69,4 +69,3 @@ public class IsFalseUdf extends Udf {
     return Set.of();
   }
 }
-

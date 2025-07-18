@@ -21,7 +21,6 @@ package org.apache.pinot.core.udf;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import org.apache.pinot.spi.data.FieldSpec;
 
 
 /// The signature of a User Defined Function ([UDF][Udf]) used to define examples.

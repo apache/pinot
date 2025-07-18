@@ -63,4 +63,3 @@ public class Adler32Udf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

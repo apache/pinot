@@ -20,8 +20,6 @@ package org.apache.pinot.udf.test.scenarios;
 
 import com.google.auto.service.AutoService;
 import com.google.common.collect.Maps;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,7 +27,6 @@ import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
-import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.udf.test.PinotFunctionEnvGenerator;
 import org.apache.pinot.udf.test.UdfExampleResult;
 import org.apache.pinot.udf.test.UdfTestCluster;

@@ -24,13 +24,12 @@ import java.util.Set;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.LogicalFunctions;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.NotOperatorTransformFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfParameter;
-
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 

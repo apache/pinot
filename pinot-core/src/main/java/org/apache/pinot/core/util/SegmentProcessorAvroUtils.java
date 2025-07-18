@@ -47,16 +47,16 @@ import org.apache.pinot.spi.ingestion.segment.writer.SegmentWriter;
  */
 public final class SegmentProcessorAvroUtils {
 
-  private static final EnumMap<FieldSpec.DataType, Schema> _notNullScalarMap;
-  private static final EnumMap<FieldSpec.DataType, Schema> _nullScalarMap;
-  private static final EnumMap<FieldSpec.DataType, Schema> _notNullMultiValueMap;
-  private static final EnumMap<FieldSpec.DataType, Schema> _nullMultiValueMap;
+  private static final EnumMap<FieldSpec.DataType, Schema> NOT_NULL_SCALAR_MAP;
+  private static final EnumMap<FieldSpec.DataType, Schema> NULL_SCALAR_MAP;
+  private static final EnumMap<FieldSpec.DataType, Schema> NOT_NULL_MULTI_VALUE_MAP;
+  private static final EnumMap<FieldSpec.DataType, Schema> NULL_MULTI_VALUE_MAP;
 
   static {
-    _notNullScalarMap = new EnumMap<>(FieldSpec.DataType.class);
-    _nullScalarMap = new EnumMap<>(FieldSpec.DataType.class);
-    _notNullMultiValueMap = new EnumMap<>(FieldSpec.DataType.class);
-    _nullMultiValueMap = new EnumMap<>(FieldSpec.DataType.class);
+    NOT_NULL_SCALAR_MAP = new EnumMap<>(FieldSpec.DataType.class);
+    NULL_SCALAR_MAP = new EnumMap<>(FieldSpec.DataType.class);
+    NOT_NULL_MULTI_VALUE_MAP = new EnumMap<>(FieldSpec.DataType.class);
+    NULL_MULTI_VALUE_MAP = new EnumMap<>(FieldSpec.DataType.class);
 
     Schema nullSchema = Schema.create(Schema.Type.NULL);
     for (DataType value : DataType.values()) {
@@ -110,11 +110,11 @@ public final class SegmentProcessorAvroUtils {
   }
 
   private static void addType(DataType dataType, Schema scalarSchema, Schema nullSchema) {
-    _notNullScalarMap.put(dataType, scalarSchema);
-    _nullScalarMap.put(dataType, Schema.createUnion(scalarSchema, nullSchema));
+    NOT_NULL_SCALAR_MAP.put(dataType, scalarSchema);
+    NULL_SCALAR_MAP.put(dataType, Schema.createUnion(scalarSchema, nullSchema));
     Schema multiValueSchema = Schema.createArray(scalarSchema);
-    _notNullMultiValueMap.put(dataType, multiValueSchema);
-    _nullMultiValueMap.put(dataType, Schema.createUnion(multiValueSchema, nullSchema));
+    NOT_NULL_MULTI_VALUE_MAP.put(dataType, multiValueSchema);
+    NULL_MULTI_VALUE_MAP.put(dataType, Schema.createUnion(multiValueSchema, nullSchema));
   }
 
   private SegmentProcessorAvroUtils() {
@@ -163,15 +163,15 @@ public final class SegmentProcessorAvroUtils {
       Schema fieldType;
       if (fieldSpec.isSingleValueField()) {
         if (fieldSpec.isNullable()) {
-          fieldType = _nullScalarMap.get(dataType);
+          fieldType = NULL_SCALAR_MAP.get(dataType);
         } else {
-          fieldType = _notNullScalarMap.get(dataType);
+          fieldType = NOT_NULL_SCALAR_MAP.get(dataType);
         }
       } else {
         if (fieldSpec.isNullable()) {
-          fieldType = _nullMultiValueMap.get(dataType);
+          fieldType = NULL_MULTI_VALUE_MAP.get(dataType);
         } else {
-          fieldType = _notNullMultiValueMap.get(dataType);
+          fieldType = NOT_NULL_MULTI_VALUE_MAP.get(dataType);
         }
       }
       if (fieldType == null) {
