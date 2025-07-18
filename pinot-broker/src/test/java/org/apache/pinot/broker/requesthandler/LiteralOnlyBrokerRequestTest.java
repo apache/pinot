@@ -29,9 +29,11 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BytesUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.BeforeClass;
@@ -169,8 +171,10 @@ public class LiteralOnlyBrokerRequestTest {
   @Test
   public void testBrokerRequestHandler()
       throws Exception {
+    String brokerId = "testBrokerId";
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(), brokerId, InstanceType.BROKER);
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), brokerId, null, ACCESS_CONTROL_FACTORY,
             null, null, null, null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class));
 
     long randNum = RANDOM.nextLong();
@@ -347,8 +351,10 @@ public class LiteralOnlyBrokerRequestTest {
   @Test
   public void testExplainPlanLiteralOnly()
       throws Exception {
+    String brokerId = "testBrokerId";
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(), brokerId, InstanceType.BROKER);
     SingleConnectionBrokerRequestHandler requestHandler =
-        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), "testBrokerId", null, ACCESS_CONTROL_FACTORY,
+        new SingleConnectionBrokerRequestHandler(new PinotConfiguration(), brokerId, null, ACCESS_CONTROL_FACTORY,
             null, null, null, null, mock(ServerRoutingStatsManager.class), mock(FailureDetector.class));
 
     // Test 1: select constant

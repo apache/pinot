@@ -937,6 +937,16 @@ public class ControllerTest {
     sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
   }
 
+  public void updateClusterConfig(Map<String, String> clusterConfig)
+      throws IOException {
+    getControllerRequestClient().updateClusterConfig(clusterConfig);
+  }
+
+  public void deleteClusterConfig(String clusterConfig)
+      throws IOException {
+    getControllerRequestClient().deleteClusterConfig(clusterConfig);
+  }
+
   /**
    * Trigger a task on a table and wait for completion
    */
