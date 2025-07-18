@@ -267,6 +267,7 @@ public abstract class ClusterTest extends ControllerTest {
     // TODO: this can be removed when we eventually enable thread time measurement by default.
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     serverConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
+    serverConf.setProperty(CommonConstants.QueryCacheConfigs.QUERY_CACHE_ENABLED, false);
     overrideServerConf(serverConf);
     return serverConf;
   }
