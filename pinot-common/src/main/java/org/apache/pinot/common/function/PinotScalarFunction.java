@@ -48,6 +48,14 @@ public interface PinotScalarFunction {
    * an optional {@link ScalarFunction}} annotation higher priority.
    */
   default Set<String> getNames() {
+    if (getClass().isAnnotationPresent(ScalarFunction.class)) {
+      ScalarFunction annotation = getClass().getAnnotation(ScalarFunction.class);
+      if (annotation.names() != null && annotation.names().length > 0) {
+        return Arrays.stream(annotation.names())
+            .map(FunctionRegistry::canonicalize)
+            .collect(Collectors.toSet());
+      }
+    }
     return Set.of(getName());
   }
 
