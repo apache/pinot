@@ -303,6 +303,8 @@ export default function CustomizedTables({
   const [finalData, setFinalData] = React.useState(Utils.tableFormat(data));
   React.useEffect( () => {
     setInitialData(data);
+    // Reset pagination when data changes
+    setPage(0);
   }, [data]);
   // We do not use data.isLoading directly in the renderer because there's a gap between data
   // changing and finalData being set. Without this, there's a flicker where we go from
@@ -368,6 +370,8 @@ export default function CustomizedTables({
       // Table.tsx currently doesn't support sorting after filtering. So for now, we just
       // remove the visual indicator of the sorted column until users sort again.
       setColumnClicked('')
+      // Reset pagination to first page when search changes
+      setPage(0);
     }, 200);
 
     return () => {
@@ -521,6 +525,8 @@ export default function CustomizedTables({
                       }
                       setOrder(!order);
                       setColumnClicked(column);
+                      // Reset pagination when sorting
+                      setPage(0);
                     }}
                   >
                     <>
