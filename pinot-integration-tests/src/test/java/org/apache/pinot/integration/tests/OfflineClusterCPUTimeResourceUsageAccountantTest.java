@@ -28,6 +28,7 @@ import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.IntStream;
 import org.apache.avro.file.DataFileWriter;
@@ -99,9 +100,9 @@ public class OfflineClusterCPUTimeResourceUsageAccountantTest extends BaseCluste
     startZk();
     startController();
     startServers();
-    while (!Tracing.isAccountantRegistered()) {
-      Thread.sleep(100L);
-    }
+    TestUtils.waitForCondition(aVoid -> Tracing.isAccountantRegistered(), 100L, 60000L,
+        "ThreadResourceUsageAccountant did not register");
+
     startBrokers();
 
 
@@ -258,7 +259,7 @@ public class OfflineClusterCPUTimeResourceUsageAccountantTest extends BaseCluste
           }
         }
     );
-    countDownLatch.await();
+    Assert.assertTrue(countDownLatch.await(1, TimeUnit.MINUTES));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed on SERVER"));
     Assert.assertTrue(queryResponse1.get().get("exceptions").toString().contains("CPU time exceeding limit of"));
     Assert.assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
