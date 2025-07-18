@@ -22,7 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 
 
 public interface MutableSegment extends IndexSegment {
@@ -31,10 +31,10 @@ public interface MutableSegment extends IndexSegment {
    * Indexes a record into the segment with optionally provided metadata.
    *
    * @param row Record represented as a {@link GenericRow}
-   * @param rowMetadata the metadata associated with the message
+   * @param metadata the metadata associated with the message
    * @return Whether the segment is full (i.e. cannot index more record into it)
    */
-  boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
+  boolean index(GenericRow row, @Nullable StreamMessageMetadata metadata)
       throws IOException;
 
   /**

@@ -95,7 +95,6 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionLagState;
 import org.apache.pinot.spi.stream.PermanentConsumerException;
-import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -318,7 +317,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private final StreamPartitionMsgOffset _startOffset;
   private final StreamConfig _streamConfig;
 
-  private RowMetadata _lastRowMetadata;
+  private StreamMessageMetadata _lastRowMetadata;
   private long _lastConsumedTimestampMs = -1;
   private long _consumeStartTime = -1;
   private long _lastLogTime = 0;
@@ -620,20 +619,12 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       }
 
       // Decode message
-      StreamMessage streamMessage = messageBatch.getStreamMessage(index);
+      StreamMessage<?> streamMessage = messageBatch.getStreamMessage(index);
       StreamDataDecoderResult decodedRow = _streamDataDecoder.decode(streamMessage);
       StreamMessageMetadata metadata = streamMessage.getMetadata();
-      StreamPartitionMsgOffset offset = null;
-      StreamPartitionMsgOffset nextOffset = null;
-      if (metadata != null) {
-        offset = metadata.getOffset();
-        nextOffset = metadata.getNextOffset();
-      }
-      // Backward compatible
-      if (nextOffset == null) {
-        nextOffset = messageBatch.getNextStreamPartitionMsgOffsetAtIndex(index);
-      }
-      int rowSizeInBytes = null == metadata ? 0 : metadata.getRecordSerializedSize();
+      StreamPartitionMsgOffset offset = metadata.getOffset();
+      StreamPartitionMsgOffset nextOffset = metadata.getNextOffset();
+      int rowSizeInBytes = metadata.getRecordSerializedSize();
       if (decodedRow.getException() != null) {
         // TODO: based on a config, decide whether the record should be silently dropped or stop further consumption on
         // decode error
@@ -2018,7 +2009,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _streamConsumerFactory.createPartitionMetadataProvider(_clientId, _streamPartitionId);
   }
 
-  private void updateIngestionMetrics(RowMetadata metadata) {
+  private void updateIngestionMetrics(StreamMessageMetadata metadata) {
     if (metadata != null) {
       try {
         StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000, true);

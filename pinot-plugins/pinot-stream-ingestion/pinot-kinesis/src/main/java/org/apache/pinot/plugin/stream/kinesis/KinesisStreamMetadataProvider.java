@@ -35,10 +35,10 @@ import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.PartitionLagState;
-import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.slf4j.Logger;
@@ -264,7 +264,7 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
       ConsumerPartitionState partitionState = entry.getValue();
       // Compute record-availability
       String recordAvailabilityLag = "UNKNOWN";
-      RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
+      StreamMessageMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
       if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
         long availabilityLag =
             partitionState.getLastProcessedTimeMs() - lastProcessedMessageMetadata.getRecordIngestionTimeMs();

@@ -113,7 +113,7 @@ import org.apache.pinot.spi.data.MetricFieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.PrimaryKey;
-import org.apache.pinot.spi.stream.RowMetadata;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
 import org.apache.pinot.spi.utils.FixedIntArray;
@@ -610,7 +610,7 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Override
-  public boolean index(GenericRow row, @Nullable RowMetadata rowMetadata)
+  public boolean index(GenericRow row, @Nullable StreamMessageMetadata metadata)
       throws IOException {
     boolean canTakeMore;
     int numDocsIndexed = _numDocsIndexed;
@@ -689,8 +689,8 @@ public class MutableSegmentImpl implements MutableSegment {
 
     // Update last indexed time and latest ingestion time
     _lastIndexedTimeMs = System.currentTimeMillis();
-    if (rowMetadata != null) {
-      _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, rowMetadata.getRecordIngestionTimeMs());
+    if (metadata != null) {
+      _latestIngestionTimeMs = Math.max(_latestIngestionTimeMs, metadata.getRecordIngestionTimeMs());
     }
 
     return canTakeMore;

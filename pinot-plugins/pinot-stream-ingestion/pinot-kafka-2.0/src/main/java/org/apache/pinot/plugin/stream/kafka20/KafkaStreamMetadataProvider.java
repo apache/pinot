@@ -41,8 +41,8 @@ import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionLagState;
-import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.TransientConsumerException;
@@ -158,7 +158,7 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
 
       // Compute record-availability
       String availabilityLagMs = "UNKNOWN";
-      RowMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
+      StreamMessageMetadata lastProcessedMessageMetadata = partitionState.getLastProcessedRowMetadata();
       if (lastProcessedMessageMetadata != null && partitionState.getLastProcessedTimeMs() > 0) {
         long availabilityLag = partitionState.getLastProcessedTimeMs()
             - lastProcessedMessageMetadata.getRecordIngestionTimeMs();
