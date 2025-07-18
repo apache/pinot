@@ -317,6 +317,13 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
+    public boolean isQueryTerminated() {
+      QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
+      return isAnchorThreadInterrupted() ||
+          (config.isThreadSelfTerminateOnPanic() && _watcherTask.getHeapUsageBytes() > config.getPanicLevel());
+    }
+
+    @Override
     @Deprecated
     public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
         @Nullable ThreadExecutionContext parentContext) {

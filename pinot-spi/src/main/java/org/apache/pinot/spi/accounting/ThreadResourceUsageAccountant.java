@@ -38,6 +38,15 @@ public interface ThreadResourceUsageAccountant {
   boolean isAnchorThreadInterrupted();
 
   /**
+   * This function is expected to be called by threads in query engine. The query id of the task will be available in
+   * the thread execution context stored in a thread local. Therefore it does not accept any parameters.
+   * @return true if the query is terminated, false otherwise
+   */
+  default boolean isQueryTerminated() {
+    return false;
+  }
+
+  /**
    * This method has been deprecated and replaced by {@link setupRunner(String, int, ThreadExecutionContext.TaskType)}
    * and {@link setupWorker(int, ThreadExecutionContext.TaskType, ThreadExecutionContext)}.
    */
