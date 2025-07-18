@@ -98,17 +98,22 @@ public class RealtimeConsumptionRateManager {
 
   private void createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
     LOGGER.info("Setting up ServerRateLimiter with rate limit: {}", serverRateLimit);
+    ConsumptionRateLimiter currentRateLimiter = _serverRateLimiter;
     if (serverRateLimit > 0) {
-      if (_serverRateLimiter instanceof ServerRateLimiter) {
-        ((ServerRateLimiter) _serverRateLimiter).updateRateLimit(serverRateLimit);
+      if (currentRateLimiter instanceof ServerRateLimiter) {
+        ((ServerRateLimiter) currentRateLimiter).updateRateLimit(serverRateLimit);
       } else {
         _serverRateLimiter =
             new ServerRateLimiter(serverRateLimit, serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
       }
     } else {
-      if (_serverRateLimiter instanceof ServerRateLimiter) {
-        ((ServerRateLimiter) _serverRateLimiter).close();
+      if (currentRateLimiter instanceof ServerRateLimiter) {
+        ((ServerRateLimiter) currentRateLimiter).close();
         _serverRateLimiter = NOOP_RATE_LIMITER;
+        // Note: The consumer threads already present before refer to the serverRateLimiter object (not
+        // NOOP_RATE_LIMITER). These threads will keep calling throttle() method and they might get blocked as a
+        // result of it, But the metric related to throttling won't be emitted since as a result of here above the
+        // AsyncMetricEmitter will be closed.
       }
     }
   }
@@ -233,6 +238,13 @@ public class RealtimeConsumptionRateManager {
   static final ConsumptionRateLimiter NOOP_RATE_LIMITER = n -> {
   };
 
+  /**
+   * {@code PartitionRateLimiter} is an implementation of {@link ConsumptionRateLimiter} that uses Guava's
+   * {@link com.google.common.util.concurrent.RateLimiter} to throttle the rate of consumption at per partition
+   * level based on a configurable rate limit (in permits per second).
+   * <p>
+   * <p>This class is NOT thread-safe
+   */
   @VisibleForTesting
   static class PartitionRateLimiter implements ConsumptionRateLimiter {
     private final double _rate;
@@ -273,6 +285,16 @@ public class RealtimeConsumptionRateManager {
     }
   }
 
+  /**
+   * {@code ServerRateLimiter} is an implementation of {@link ConsumptionRateLimiter} that uses Guava's
+   * {@link com.google.common.util.concurrent.RateLimiter} to throttle the rate of consumption at entire server
+   * level based on a configurable rate limit (in permits per second).
+   * <p>
+   * It supports dynamically updating the rate limit and emits metrics asynchronously to track quota utilization
+   * via {@link AsyncMetricEmitter}.
+   *
+   * <p>This class is thread-safe
+   */
   static class ServerRateLimiter implements ConsumptionRateLimiter {
     private final RateLimiter _rateLimiter;
     private final AsyncMetricEmitter _metricEmitter;
@@ -404,8 +426,9 @@ public class RealtimeConsumptionRateManager {
     }
 
     public void close() {
-      _executor.shutdownNow();
-      _running.set(false);
+      if (_running.compareAndSet(true, false)) {
+        _executor.shutdownNow();
+      }
     }
   }
 }
