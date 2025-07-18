@@ -675,11 +675,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(_resourceUsageAccountant);
-    if (_resourceUsageAccountant == null) {
-      _resourceUsageAccountant = Tracing.getThreadAccountant();
-    }
-
+    Preconditions.checkNotNull(_resourceUsageAccountant);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     ServerConf serverConf = new ServerConf(_serverConf);
