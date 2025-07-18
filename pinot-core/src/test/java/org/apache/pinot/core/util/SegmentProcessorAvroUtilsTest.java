@@ -45,11 +45,11 @@ public class SegmentProcessorAvroUtilsTest {
         new Object[] {FieldSpec.DataType.FLOAT, org.apache.avro.Schema.Type.FLOAT, null},
         new Object[] {FieldSpec.DataType.DOUBLE, org.apache.avro.Schema.Type.DOUBLE, null},
         new Object[] {FieldSpec.DataType.STRING, org.apache.avro.Schema.Type.STRING, null},
-        new Object[] {FieldSpec.DataType.BIG_DECIMAL, org.apache.avro.Schema.Type.STRING, "pinot.big_decimal"},
+        new Object[] {FieldSpec.DataType.BIG_DECIMAL, org.apache.avro.Schema.Type.BYTES, "big-decimal"},
         new Object[] {FieldSpec.DataType.BYTES, org.apache.avro.Schema.Type.BYTES, null},
-        new Object[] {FieldSpec.DataType.BOOLEAN, org.apache.avro.Schema.Type.INT, null},
+        new Object[] {FieldSpec.DataType.BOOLEAN, org.apache.avro.Schema.Type.BOOLEAN, null},
         new Object[] {FieldSpec.DataType.JSON, org.apache.avro.Schema.Type.STRING, null},
-        new Object[] {FieldSpec.DataType.TIMESTAMP, org.apache.avro.Schema.Type.LONG, null}
+        new Object[] {FieldSpec.DataType.TIMESTAMP, org.apache.avro.Schema.Type.LONG, "timestamp-millis"}
     };
   }
 
@@ -94,6 +94,30 @@ public class SegmentProcessorAvroUtilsTest {
 
     Object actualValue = record.get("testField");
     assertEquals(actualValue, expected, "Unexpected value after conversion");
+  }
+
+  @Test(dataProvider = "getValueConversion")
+  public void testNullConversion(
+      FieldSpec.DataType dataType,
+      Object initial,
+      Object expected
+  ) {
+    GenericRow genericRow = new GenericRow();
+    genericRow.putValue("testField", null);
+
+    Schema.SchemaBuilder pinotSchemaBuilder = new Schema.SchemaBuilder();
+    pinotSchemaBuilder.setSchemaName("testSchema");
+    pinotSchemaBuilder.addDimensionField("testField", dataType, field -> field.setNullable(true));
+
+    org.apache.avro.Schema avroSchema =
+        SegmentProcessorAvroUtils.convertPinotSchemaToAvroSchema(pinotSchemaBuilder.build());
+
+    GenericData.Record record = SegmentProcessorAvroUtils.convertGenericRowToAvroRecord(
+        genericRow,
+        new GenericData.Record(avroSchema));
+
+    Object actualValue = record.get("testField");
+    assertNull(actualValue, "Unexpected value after conversion. Expected null, but got: " + actualValue);
   }
 
   @Test(dataProvider = "getTypeConversion")
