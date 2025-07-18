@@ -131,7 +131,9 @@ public class ComplexTypeTransformerTest {
     transformedRows = transformer.transform(List.of(genericRow));
     assertEquals(transformedRows.size(), 2);
     assertEquals(transformedRows.get(0).getValue("array.a"), "v1");
+    assertEquals(transformedRows.get(0).getValue("array"), array);
     assertEquals(transformedRows.get(1).getValue("array.a"), "v2");
+    assertEquals(transformedRows.get(1).getValue("array"), array);
 
     // unnest sibling collections
     //    {
@@ -180,12 +182,20 @@ public class ComplexTypeTransformerTest {
     assertEquals(transformedRows.size(), 4);
     assertEquals(transformedRows.get(0).getValue("array.a"), "v1");
     assertEquals(transformedRows.get(0).getValue("array2.b"), "v3");
+    assertEquals(transformedRows.get(0).getValue("array"), array);
+    assertEquals(transformedRows.get(0).getValue("array2"), array2);
     assertEquals(transformedRows.get(1).getValue("array.a"), "v1");
     assertEquals(transformedRows.get(1).getValue("array2.b"), "v4");
+    assertEquals(transformedRows.get(1).getValue("array"), array);
+    assertEquals(transformedRows.get(1).getValue("array2"), array2);
     assertEquals(transformedRows.get(2).getValue("array.a"), "v2");
     assertEquals(transformedRows.get(2).getValue("array2.b"), "v3");
+    assertEquals(transformedRows.get(2).getValue("array"), array);
+    assertEquals(transformedRows.get(2).getValue("array2"), array2);
     assertEquals(transformedRows.get(3).getValue("array.a"), "v2");
     assertEquals(transformedRows.get(3).getValue("array2.b"), "v4");
+    assertEquals(transformedRows.get(3).getValue("array"), array);
+    assertEquals(transformedRows.get(3).getValue("array2"), array2);
 
     // unnest nested collection
     // {
