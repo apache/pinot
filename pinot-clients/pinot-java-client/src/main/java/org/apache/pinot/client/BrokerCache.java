@@ -215,11 +215,18 @@ public class BrokerCache {
     // If tableNames is not-null, filter out nulls
     tableNames = tableNames == null ? tableNames
         : Arrays.stream(tableNames).filter(Objects::nonNull).toArray(String[]::new);
-    if (tableNames == null || tableNames.length == 0) {
-      List<String> brokers = _brokerData.getBrokers();
+    if (tableNames != null && tableNames.length != 0) {
+      String randomBroker =
+          BrokerSelectorUtils.getRandomBroker(Arrays.asList(tableNames), _brokerData.getTableToBrokerMap());
+      if (randomBroker != null) {
+        return randomBroker;
+      }
+    }
+    List<String> brokers = _brokerData.getBrokers();
+    if (!brokers.isEmpty()) {
       return brokers.get(ThreadLocalRandom.current().nextInt(brokers.size()));
     }
-    return BrokerSelectorUtils.getRandomBroker(Arrays.asList(tableNames), _brokerData.getTableToBrokerMap());
+    return null;
   }
 
   public List<String> getBrokers() {
