@@ -16,32 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.regex;
-
-import com.google.re2j.Pattern;
-
-
-public class Re2jPattern implements org.apache.pinot.common.utils.regex.Pattern {
-  Pattern _pattern;
-
-  public Re2jPattern(String regex) {
-    this(regex, false);
-  }
-
-  public Re2jPattern(String regex, boolean caseInsensitive) {
-    if (caseInsensitive) {
-      _pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
-    } else {
-      _pattern = Pattern.compile(regex);
-    }
-  }
-
+package org.apache.pinot.segment.local.segment.index.fst;
+import com.google.auto.service.AutoService;
+import org.apache.pinot.segment.spi.index.IndexPlugin;
+@AutoService(IndexPlugin.class)
+public class IFSTIndexPlugin implements IndexPlugin<IFSTIndexType> {
+  private static final IFSTIndexType INSTANCE = new IFSTIndexType();
   @Override
-  public Matcher matcher(CharSequence input) {
-    return MatcherFactory.matcher(this, input);
-  }
-
-  protected Pattern getPattern() {
-    return _pattern;
+  public IFSTIndexType getIndexType() {
+    return INSTANCE;
   }
 }

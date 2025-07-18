@@ -41,6 +41,19 @@ public class RegexpLikeConstFunctions {
   }
 
   @ScalarFunction
+  public boolean regexpLike(String inputStr, String regexPatternStr, String matchParameter) {
+    if (_matcher == null) {
+      if (RegexpPatternConverterUtils.isCaseInsensitive(matchParameter)) {
+        _matcher = PatternFactory.compile(regexPatternStr, true).matcher("");
+      } else {
+        _matcher = PatternFactory.compile(regexPatternStr).matcher("");
+      }
+    }
+
+    return _matcher.reset(inputStr).find();
+  }
+
+  @ScalarFunction
   public boolean like(String inputStr, String likePatternStr) {
     if (_matcher == null) {
       String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);

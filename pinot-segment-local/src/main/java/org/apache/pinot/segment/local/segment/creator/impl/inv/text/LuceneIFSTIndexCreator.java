@@ -32,16 +32,15 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.creator.FSTIndexCreator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-
 /**
- * This index works only for dictionary enabled columns. It requires entries be added into this index in sorted
- * order and it creates a mapping from sorted entry to the index underneath. This index stores key (column value)
- * to dictionary id as an entry.
+ * Case-insensitive FST index creator that works only for dictionary enabled columns.
+ * It requires entries be added into this index in sorted order and it creates a mapping
+ * from sorted entry to the index underneath. This index stores key (column value)
+ * to dictionary id as an entry, with case-insensitive handling.
  *
  */
-public class LuceneFSTIndexCreator implements FSTIndexCreator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexCreator.class);
+public class LuceneIFSTIndexCreator implements FSTIndexCreator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(LuceneIFSTIndexCreator.class);
   private final File _fstIndexFile;
   private final String _columnName;
   private final String _tableNameWithType;
@@ -61,20 +60,20 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    * @param sortedEntries Sorted entries of the unique values of the column.
    * @throws IOException
    */
-  public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+  public LuceneIFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
       String[] sortedEntries)
       throws IOException {
-    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder(true));
+    this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder(false));
   }
 
   @VisibleForTesting
-  public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+  public LuceneIFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
       String[] sortedEntries, FSTBuilder fstBuilder)
       throws IOException {
     _columnName = columnName;
     _tableNameWithType = tableNameWithType;
     _continueOnError = continueOnError;
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
+    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION);
 
     _fstBuilder = fstBuilder;
     _dictId = 0;
@@ -87,7 +86,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
             // Caught exception while trying to add, update metric and skip the document
             MetricUtils.updateIndexingErrorMetric(_tableNameWithType, FstIndexType.INDEX_DISPLAY_NAME);
           } else {
-            LOGGER.error("Caught exception while trying to add to FST index for table: {}, column: {}",
+            LOGGER.error("Caught exception while trying to add to IFST index for table: {}, column: {}",
                 tableNameWithType, columnName, ex);
             throw ex;
           }
@@ -96,7 +95,7 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
     }
   }
 
-  public LuceneFSTIndexCreator(IndexCreationContext context)
+  public LuceneIFSTIndexCreator(IndexCreationContext context)
       throws IOException {
     this(context.getIndexDir(), context.getFieldSpec().getName(), context.getTableNameWithType(),
         context.isContinueOnError(), (String[]) context.getSortedUniqueElementsArray());
@@ -113,8 +112,8 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
         // Caught exception while trying to add, update metric and skip the document
         MetricUtils.updateIndexingErrorMetric(_tableNameWithType, FstIndexType.INDEX_DISPLAY_NAME);
       } else {
-        LOGGER.error("Caught exception while trying to add to FST index for table: {}, column: {}",
-            _tableNameWithType, _columnName, ex);
+        LOGGER.error("Caught exception while trying to add to IFST index for table: {}, column: {}", _tableNameWithType,
+            _columnName, ex);
         throw ex;
       }
     }
@@ -129,12 +128,11 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   @Override
   public void seal()
       throws IOException {
-    LOGGER.info("Sealing FST index: {}", _fstIndexFile.getAbsolutePath());
+    LOGGER.info("Sealing IFST index: {}", _fstIndexFile.getAbsolutePath());
     FileOutputStream fileOutputStream = null;
     try {
       fileOutputStream = new FileOutputStream(_fstIndexFile);
       FST<?> fst = _fstBuilder.done();
-
       OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
       fst.save(d, d);
     } finally {

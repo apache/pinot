@@ -72,6 +72,7 @@ public class StandardIndexes {
   public static final String NULL_VALUE_VECTOR_ID = "nullvalue_vector";
   public static final String BLOOM_FILTER_ID = "bloom_filter";
   public static final String FST_ID = "fst_index";
+  public static final String IFST_ID = "ifst_index";
   public static final String INVERTED_ID = "inverted_index";
   public static final String JSON_ID = "json_index";
   public static final String RANGE_ID = "range_index";
@@ -105,6 +106,11 @@ public class StandardIndexes {
   public static IndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator> fst() {
     return (IndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator>)
         IndexService.getInstance().get(FST_ID);
+  }
+
+  public static IndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator> ifst() {
+    return (IndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator>)
+        IndexService.getInstance().get(IFST_ID);
   }
 
   public static IndexType<IndexConfig, InvertedIndexReader, DictionaryBasedInvertedIndexCreator> inverted() {

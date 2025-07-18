@@ -20,12 +20,17 @@ package org.apache.pinot.common.utils.regex;
 
 import java.util.regex.Pattern;
 
-
 public class JavaUtilPattern implements org.apache.pinot.common.utils.regex.Pattern {
   Pattern _pattern;
 
   public JavaUtilPattern(String regex) {
-    _pattern = Pattern.compile(regex, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE);
+    _pattern = Pattern.compile(regex, 0);
+  }
+
+  public JavaUtilPattern(String regex, boolean caseInsensitive) {
+    _pattern = caseInsensitive
+        ? Pattern.compile(regex, Pattern.UNICODE_CASE | Pattern.CASE_INSENSITIVE)
+        : Pattern.compile(regex, 0);
   }
 
   @Override
