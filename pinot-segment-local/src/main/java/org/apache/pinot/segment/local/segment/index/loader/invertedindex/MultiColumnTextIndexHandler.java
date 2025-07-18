@@ -28,12 +28,13 @@ import java.util.Map;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.pinot.segment.local.segment.creator.impl.text.MultiColumnLuceneTextIndexCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.TextIndexConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -183,7 +184,7 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
 
   private void createMultiColumnTextIndex(SegmentDirectory.Writer segmentWriter,
       MultiColumnLuceneTextIndexCreator textIndexCreator)
-      throws IOException {
+      throws IOException, IndexReaderConstraintException {
     SegmentMetadataImpl segmentMetadata = _segmentDirectory.getSegmentMetadata();
     String segmentName = segmentMetadata.getName();
     int numDocs = segmentMetadata.getTotalDocs();
@@ -201,7 +202,9 @@ public class MultiColumnTextIndexHandler extends BaseIndexHandler {
     for (int i = 0, n = indexedColumns.size(); i < n; i++) {
       String columnName = indexedColumns.get(i);
       ColumnMetadata metadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
-      ForwardIndexReader fwdReader = ForwardIndexType.read(segmentWriter, metadata);
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      ForwardIndexReader fwdReader =
+          readerFactory.createIndexReader(segmentWriter, _fieldIndexConfigs.get(metadata.getColumnName()), metadata);
       fwdReaders.add(fwdReader);
       fwdReaderContexts.add(fwdReader.createContext());
 
