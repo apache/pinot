@@ -445,7 +445,7 @@ public class QueryAggregator implements ResourceAggregator {
         maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
             String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                 maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
-        interruptRunnerThread(maxUsageTuple.getAnchorThread());
+        interruptAnchorThread(maxUsageTuple.getAnchorThread());
         logTerminatedQuery(maxUsageTuple, _usedBytes);
       } else if (!_oomKillQueryEnabled) {
         LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
@@ -476,14 +476,14 @@ public class QueryAggregator implements ResourceAggregator {
         value._exceptionAtomicReference.set(new RuntimeException(String.format(
             "Query %s got killed on %s: %s because using %d " + "CPU time exceeding limit of %d ns CPU time",
             value._queryId, _instanceType, _instanceId, value.getCpuTimeNs(), _cpuTimeBasedKillingThresholdNS)));
-        interruptRunnerThread(value.getAnchorThread());
+        interruptAnchorThread(value.getAnchorThread());
         logTerminatedQuery(value, _usedBytes);
       }
     }
     logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
   }
 
-  private void interruptRunnerThread(Thread thread) {
+  private void interruptAnchorThread(Thread thread) {
     thread.interrupt();
     if (_isQueryKilledMetricEnabled) {
       _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);

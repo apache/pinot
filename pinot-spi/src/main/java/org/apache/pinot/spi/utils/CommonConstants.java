@@ -1534,7 +1534,8 @@ public class CommonConstants {
     public static final boolean DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK = false;
 
     public static final String CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES = "accounting.per.query.memory.limit.bytes";
-    public static final long DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES = Runtime.getRuntime().maxMemory() / 3;
+    // Default to 512MB per query limit to avoid issues with Runtime.getRuntime().maxMemory() at class loading time
+    public static final long DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES = 512L * 1024 * 1024;
     // 1/3 of heap size
 
     public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
