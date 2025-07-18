@@ -1538,6 +1538,16 @@ public class CommonConstants {
     public static final long DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES = 512L * 1024 * 1024;
     // 1/3 of heap size
 
+    // Per-thread query memory threshold configurations (new naming to be more explicit)
+    public static final String CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED =
+        "accounting.per.thread.query.memory.check.enabled";
+    public static final boolean DEFAULT_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED = false;
+
+    public static final String CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES =
+        "accounting.per.thread.query.memory.limit.bytes";
+    // Default to 512MB per thread limit to avoid issues with Runtime.getRuntime().maxMemory() at class loading time
+    public static final long DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES = 512L * 1024 * 1024;
+
     public static final String CONFIG_OF_GC_BACKOFF_COUNT = "accounting.gc.backoff.count";
     public static final int DEFAULT_GC_BACKOFF_COUNT = 5;
 

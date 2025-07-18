@@ -160,13 +160,13 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _isThreadMemorySamplingEnabled = isThreadMemorySamplingEnabled;
       _isThreadSamplingEnabledForMSE = isThreadSamplingEnabledForMSE;
       _isPerQueryMemoryCheckEnabled = config.getProperty(
-          CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK,
-          CommonConstants.Accounting.DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK);
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED,
+          CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED);
       long configuredLimit = config.getProperty(
-          CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES,
-          CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES);
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES,
+          CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES);
       // If using default value, dynamically calculate based on actual heap size for better defaults
-      if (configuredLimit == CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES) {
+      if (configuredLimit == CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES) {
         long maxHeapMemory = Runtime.getRuntime().maxMemory();
         // Use 1/3 of heap size, but cap at 2GB per query
         _perQueryMemoryLimitBytes = Math.min(maxHeapMemory / 3, 2L * 1024 * 1024 * 1024);
@@ -214,13 +214,13 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
 
       _isPerQueryMemoryCheckEnabled = config.getProperty(
-          CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK,
-          CommonConstants.Accounting.DEFAULT_ENABLE_PER_QUERY_MEMORY_CHECK);
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED,
+          CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED);
       long configuredLimit = config.getProperty(
-          CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES,
-          CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES);
+          CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES,
+          CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES);
       // If using default value, dynamically calculate based on actual heap size for better defaults
-      if (configuredLimit == CommonConstants.Accounting.DEFAULT_PER_QUERY_MEMORY_LIMIT_BYTES) {
+      if (configuredLimit == CommonConstants.Accounting.DEFAULT_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES) {
         long maxHeapMemory = Runtime.getRuntime().maxMemory();
         // Use 1/3 of heap size, but cap at 2GB per query
         _perQueryMemoryLimitBytes = Math.min(maxHeapMemory / 3, 2L * 1024 * 1024 * 1024);
@@ -332,7 +332,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     public void checkMemoryAndInterruptIfExceeded() {
-      if (!_isPerQueryMemoryCheckEnabled || !_isThreadMemorySamplingEnabled) {
+      // Use QueryMonitorConfig for runtime-changeable settings
+      QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
+      if (!config.isPerThreadQueryMemoryCheckEnabled() || !_isThreadMemorySamplingEnabled) {
         return;
       }
 
@@ -344,12 +346,13 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
 
       long currentMemoryUsage = threadEntry._currentThreadMemoryAllocationSampleBytes;
-      if (currentMemoryUsage > _perQueryMemoryLimitBytes) {
+      long memoryLimit = config.getPerThreadQueryMemoryLimitBytes();
+      if (currentMemoryUsage > memoryLimit) {
         String queryId = currentTaskStatus.getQueryId();
         String errorMessage = String.format(
-            "Query %s exceeded per-query memory limit of %d bytes (current usage: %d bytes) on %s: %s. "
+            "Query %s exceeded per-thread memory limit of %d bytes (current usage: %d bytes) on %s: %s. "
                 + "Query terminated proactively to prevent OOM.",
-            queryId, _perQueryMemoryLimitBytes, currentMemoryUsage, _instanceType, _instanceId);
+            queryId, memoryLimit, currentMemoryUsage, _instanceType, _instanceId);
 
         // Set error status to terminate the query
         threadEntry._errorStatus.set(new RuntimeException(errorMessage));
@@ -360,7 +363,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           anchorThread.interrupt();
         }
 
-        LOGGER.warn("Per-query memory limit exceeded: {}", errorMessage);
+        LOGGER.warn("Per-thread memory limit exceeded: {}", errorMessage);
       }
     }
 
@@ -382,6 +385,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
 
       return false;
+    }
+
+    @Override
+    public boolean isQueryTerminated() {
+      // Check if the current thread has an error status set due to resource constraint violations
+      // This provides a way to check for query termination without relying on thread interruption
+      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
+      return threadEntry._errorStatus.get() != null;
     }
 
     @Override
@@ -829,6 +840,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         LOGGER.info("_minMemoryFootprintForKill: {}", queryMonitorConfig.getMinMemoryFootprintForKill());
         LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}",
             queryMonitorConfig.isCpuTimeBasedKillingEnabled(), queryMonitorConfig.getCpuTimeBasedKillingThresholdNS());
+        LOGGER.info("_isPerThreadQueryMemoryCheckEnabled: {}, _perThreadQueryMemoryLimitBytes: {}",
+            queryMonitorConfig.isPerThreadQueryMemoryCheckEnabled(),
+            queryMonitorConfig.getPerThreadQueryMemoryLimitBytes());
       }
 
       @Override

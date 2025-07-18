@@ -273,9 +273,9 @@ public class PerQueryCPUMemAccountantTest {
   void testPerQueryMemoryCheckDisabled() {
     // Test when per-query memory check is disabled
     Map<String, Object> configs = new HashMap<>();
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK, false);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES, 1000L);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 1000L);
 
     PinotConfiguration config = new PinotConfiguration(configs);
     TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, false, 2000L);
@@ -292,9 +292,9 @@ public class PerQueryCPUMemAccountantTest {
   void testPerQueryMemoryCheckUnderLimit() {
     // Test when memory usage is under the limit
     Map<String, Object> configs = new HashMap<>();
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES, 3000L);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 3000L);
 
     PinotConfiguration config = new PinotConfiguration(configs);
     TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, true, 2000L);
@@ -311,9 +311,9 @@ public class PerQueryCPUMemAccountantTest {
   void testPerQueryMemoryCheckOverLimit() {
     // Test when memory usage exceeds the limit
     Map<String, Object> configs = new HashMap<>();
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES, 1000L);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 1000L);
 
     PinotConfiguration config = new PinotConfiguration(configs);
     TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, true, 2000L);
@@ -324,7 +324,7 @@ public class PerQueryCPUMemAccountantTest {
     // Verify error was set with appropriate message
     Exception error = accountant.getTestErrorStatus();
     assertNotNull(error);
-    assertTrue(error.getMessage().contains("exceeded per-query memory limit"));
+    assertTrue(error.getMessage().contains("exceeded per-thread memory limit"));
     assertTrue(error.getMessage().contains("testQuery"));
     assertTrue(error.getMessage().contains("2000 bytes"));
     assertTrue(error.getMessage().contains("1000 bytes"));
@@ -337,9 +337,9 @@ public class PerQueryCPUMemAccountantTest {
   void testPerQueryMemoryCheckMemorySamplingDisabled() {
     // Test when memory sampling is disabled
     Map<String, Object> configs = new HashMap<>();
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, false);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES, 1000L);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 1000L);
 
     PinotConfiguration config = new PinotConfiguration(configs);
     TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, false, 2000L);
@@ -356,9 +356,9 @@ public class PerQueryCPUMemAccountantTest {
   void testPerQueryMemoryCheckNoActiveQuery() {
     // Test when there's no active query on the thread
     Map<String, Object> configs = new HashMap<>();
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_PER_QUERY_MEMORY_CHECK, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_QUERY_MEMORY_LIMIT_BYTES, 1000L);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 1000L);
 
     PinotConfiguration config = new PinotConfiguration(configs);
     TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, true, 2000L);

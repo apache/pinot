@@ -167,6 +167,13 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     }
 
     @Override
+    public boolean isQueryTerminated() {
+      // Check if the current thread has an error status set due to resource constraint violations
+      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
+      return threadEntry._errorStatus.get() != null;
+    }
+
+    @Override
     @Deprecated
     public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
         @Nullable ThreadExecutionContext parentContext) {
