@@ -252,6 +252,41 @@ public class ComplexTypeTransformerTest {
     assertEquals(transformedRows.get(0).getValue("array.a"), "v1");
     assertEquals(transformedRows.get(0).getValue("array.array2"), "[{\"b\":\"v3\"},{\"b\":\"v4\"}]");
     assertEquals(transformedRows.get(1).getValue("array.a"), "v2");
+
+    // unnest root level collection with simple non-primitive values
+    //    {
+    //      "a": "value",
+    //      "b": "another",
+    //      "array":["x", "y"]
+    //    }
+    //  ->
+    //    [{
+    //      "a": "value",
+    //      "b": "another",
+    //      "array":"x"
+    //    },
+    //    {
+    //      "a": "value",
+    //      "b": "another",
+    //      "array":"y"
+    //    }]
+    genericRow = new GenericRow();
+    genericRow.putValue("a", "value");
+    genericRow.putValue("b", "another");
+    array = new Object[2];
+    array[0] = "x";
+    array[1] = "y";
+    genericRow.putValue("array", array);
+    transformer =
+        new ComplexTypeTransformer.Builder().setFieldsToUnnest(List.of("array")).build();
+    transformedRows = transformer.transform(List.of(genericRow));
+    assertEquals(transformedRows.size(), 2);
+    assertEquals(transformedRows.get(0).getValue("a"), "value");
+    assertEquals(transformedRows.get(0).getValue("b"), "another");
+    assertEquals(transformedRows.get(0).getValue("array"), "x");
+    assertEquals(transformedRows.get(1).getValue("a"), "value");
+    assertEquals(transformedRows.get(1).getValue("b"), "another");
+    assertEquals(transformedRows.get(1).getValue("array"), "y");
   }
 
   @Test
