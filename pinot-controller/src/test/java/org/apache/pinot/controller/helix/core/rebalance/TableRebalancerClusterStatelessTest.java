@@ -67,8 +67,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel.ONLINE;
-import static org.testng.Assert.
-    *;
+import static org.testng.Assert.*;
 
 
 @Test(groups = "stateless")
