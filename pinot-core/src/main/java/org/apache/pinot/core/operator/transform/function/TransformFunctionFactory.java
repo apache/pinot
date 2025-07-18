@@ -405,4 +405,8 @@ public class TransformFunctionFactory {
   public static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
+
+  public static Set<String> getAllFunctionNames() {
+    return TRANSFORM_FUNCTION_MAP.keySet();
+  }
 }
