@@ -113,7 +113,7 @@ public class RealtimeConsumptionRateManager {
         // Note: The consumer threads already present before refer to the serverRateLimiter object (not
         // NOOP_RATE_LIMITER). These threads will keep calling throttle() method and they might get blocked as a
         // result of it, But the metric related to throttling won't be emitted since as a result of here above the
-        // AsyncMetricEmitter will be closed.
+        // AsyncMetricEmitter will be closed. It's recommended to forceCommit segments to avoid this.
       }
     }
   }
@@ -306,8 +306,12 @@ public class RealtimeConsumptionRateManager {
     }
 
     public void throttle(int numMsgsConsumed) {
-      _metricEmitter.record(numMsgsConsumed); // just incrementing counter (non-blocking)
-      _rateLimiter.acquire(numMsgsConsumed); // blocks if needed
+      if (InstanceHolder.INSTANCE._isThrottlingAllowed) {
+        _metricEmitter.record(numMsgsConsumed); // just incrementing counter (non-blocking)
+        if (numMsgsConsumed > 0) {
+          _rateLimiter.acquire(numMsgsConsumed); // blocks if needed
+        }
+      }
     }
 
     public void updateRateLimit(double newRateLimit) {
@@ -320,18 +324,18 @@ public class RealtimeConsumptionRateManager {
     }
 
     @VisibleForTesting
-    AsyncMetricEmitter getMetricEmitter() {
-      return _metricEmitter;
-    }
-
-    @VisibleForTesting
     double getRate() {
       return _rateLimiter.getRate();
     }
 
+    @VisibleForTesting
+    AsyncMetricEmitter getMetricEmitter() {
+      return _metricEmitter;
+    }
+
     @Override
     public String toString() {
-      return "ServerBasedRateLimiter{"
+      return "ServerRateLimiter{"
           + "_rateLimiter=" + _rateLimiter
           + ", _metricEmitter=" + _metricEmitter
           + '}';
