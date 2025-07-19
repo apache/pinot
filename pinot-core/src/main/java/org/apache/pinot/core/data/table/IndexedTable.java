@@ -266,6 +266,10 @@ public abstract class IndexedTable extends BaseTable {
     return _topRecords.iterator();
   }
 
+  public Map<Key, Record> getLookupMap() {
+    return _lookupMap;
+  }
+
   public int getNumResizes() {
     return _numResizes;
   }

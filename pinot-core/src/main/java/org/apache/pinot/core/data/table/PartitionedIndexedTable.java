@@ -18,9 +18,6 @@
  */
 package org.apache.pinot.core.data.table;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import javax.ws.rs.NotSupportedException;
@@ -33,40 +30,10 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  * used for and stitching hash tables together in phase 2
  */
 public class PartitionedIndexedTable extends IndexedTable {
-  private PartitionedIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
-      int resultSize, RadixPartitionedHashMap<Key, Record> map, ExecutorService executorService) {
-    super(dataSchema, hasFinalInput, queryContext, resultSize, Integer.MAX_VALUE, Integer.MAX_VALUE, map,
+  public PartitionedIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
+      int resultSize, int trimSize, int trimThreshold, RadixPartitionedHashMap<Key, Record> map, ExecutorService executorService) {
+    super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, map,
         executorService);
-  }
-
-  public static PartitionedIndexedTable create(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
-      int resultSize, RadixPartitionedHashMap<Key, Record> map, ExecutorService executorService) {
-    // trim map to resultSize entries
-    boolean enough = false;
-    int needed = resultSize;
-    for (int i = 0; i < map.getNumPartitions(); i++) {
-      Map<Key, Record> m = map.getPartition(i);
-      int size = m.size();
-      if (enough) {
-        m.clear();
-        continue;
-      }
-      if (size >= needed) {
-        // clear maps from this on
-        enough = true;
-        Iterator<Key> it = m.keySet().iterator();
-        List<Key> keyToRemove = new ArrayList<>();
-        for (int j = 0; j < size - needed; j++) {
-          keyToRemove.add(it.next());
-        }
-        for (Key key : keyToRemove) {
-          m.remove(key);
-        }
-      } else {
-        needed -= m.size();
-      }
-    }
-    return new PartitionedIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, map, executorService);
   }
 
   public Map<Key, Record> getPartition(int i) {

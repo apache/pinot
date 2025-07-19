@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.operator.combine;
 
-import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -37,7 +37,9 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
+import org.apache.pinot.core.data.table.RadixPartitionedIntermediateRecords;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -75,15 +77,16 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
   private DataSchema _dataSchema;
   private volatile IndexedTable _indexedTable;
-  private final CompletableFuture<RadixPartitionedHashMap<Key, Record>>[] _partitionedHashMapFutures;
+  private final CompletableFuture<RadixPartitionedIntermediateRecords>[] _partitionedRecordsFutures;
 
-  private AtomicInteger _nextPartitionId = new AtomicInteger(0);
-  private volatile Object2ObjectOpenHashMap[] _mergedHashMaps;
+  private final AtomicInteger _nextPartitionId = new AtomicInteger(0);
+  private volatile SimpleIndexedTable[] _mergedIndexedTables;
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
 
-  private AtomicInteger[] _partitionSizes;
+  // CE
+  private final AtomicInteger[] _partitionSizes;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -95,13 +98,13 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
-    _partitionedHashMapFutures = new CompletableFuture[operators.size()];
+    _partitionedRecordsFutures = new CompletableFuture[operators.size()];
 
     for (int i = 0; i < operators.size(); i++) {
-      _partitionedHashMapFutures[i] = new CompletableFuture<>();
+      _partitionedRecordsFutures[i] = new CompletableFuture<>();
     }
 
-    _mergedHashMaps = new Object2ObjectOpenHashMap[_queryContext.getGroupByNumPartitions()];
+    _mergedIndexedTables = new SimpleIndexedTable[_queryContext.getGroupByNumPartitions()];
 
     _partitionSizes = new AtomicInteger[queryContext.getGroupByNumPartitions()];
     for (int i=0; i< queryContext.getGroupByNumPartitions(); i++) {
@@ -133,6 +136,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
    * phase 2:
    * each thread merge one partition of all hashTables
    * finally stitch them together into one
+   *
+   * this handles cases that ORDER BY not by group keys
    */
   protected void processPartitionedGroupBy() {
     // phase 1 partition
@@ -147,10 +152,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (_dataSchema == null) {
           _dataSchema = resultsBlock.getDataSchema();
         }
-        // partition this into _partitionedIndexedTable[operatorId], without trimming
-        RadixPartitionedHashMap<Key, Record> map =
-            new RadixPartitionedHashMap<>(_queryContext.getGroupByPartitionNumRadixBits(), resultsBlock.getNumGroups(),
-                operatorId);
+
 
         if (resultsBlock.isGroupsTrimmed()) {
           _groupsTrimmed = true;
@@ -164,7 +166,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         }
         // Merge aggregation group-by result.
         // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        Collection<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+        List<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
         // Count the number of merged keys
         int mergedKeys = 0;
         // For now, only GroupBy OrderBy query has pre-constructed intermediate records
@@ -172,8 +174,10 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           // Merge aggregation group-by result.
           AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
           if (aggregationGroupByResult != null) {
+            IntermediateRecord[] convertedRecords = new IntermediateRecord[aggregationGroupByResult.getNumGroups()];
             // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
             Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+            int idx = 0;
             while (dicGroupKeyIterator.hasNext()) {
               GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
               Object[] keys = groupKey._keys;
@@ -182,23 +186,29 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
               for (int i = 0; i < _numAggregationFunctions; i++) {
                 values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
               }
-              map.put(new Key(keys), new Record(values));
+              // TODO: into list and sort in-place
+              convertedRecords[idx++] = new IntermediateRecord(new Key(keys), new Record(values), null);
               Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
               mergedKeys++;
             }
-          }
-        } else {
-          for (IntermediateRecord intermediateResult : intermediateRecords) {
-            //TODO: change upsert api so that it accepts intermediateRecord directly
-            map.put(intermediateResult._key, intermediateResult._record);
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-            mergedKeys++;
+            intermediateRecords = Arrays.asList(convertedRecords);
+          } else {
+            // empty segment result
+            intermediateRecords = new ArrayList<>();
           }
         }
+
+        // in-place partition segment results
+        RadixPartitionedIntermediateRecords partitionedRecords =
+            new RadixPartitionedIntermediateRecords(_queryContext.getGroupByPartitionNumRadixBits(), operatorId, intermediateRecords);
+
+        // CE
         for (int i=0; i < _queryContext.getGroupByNumPartitions(); i++) {
-          _partitionSizes[i].getAndAdd(map.getPartition(i).size());
+          _partitionSizes[i].getAndAdd(partitionedRecords.getPartition(i).size());
         }
-        _partitionedHashMapFutures[operatorId].complete(map);
+
+        _partitionedRecordsFutures[operatorId].complete(partitionedRecords);
+
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
       } finally {
@@ -209,38 +219,42 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
     // phase 2 merge, only start when no more segments to be processed by this thread
     int partitionId;
-    AggregationFunction[] aggregationFunctions = _queryContext.getAggregationFunctions();
-    int numKeyColumns = _queryContext.getGroupByExpressions().size();
     while (_processingException.get() == null
         && (partitionId = _nextPartitionId.getAndIncrement()) < _queryContext.getGroupByNumPartitions()) {
       try {
+        // CE
         // a magical way to approximate initial size needed for each partition
         // the larger number of segments, the more likely there are heterogeneous keys
-        // TODO: don't use hashmap to do partition, instead directly get partitions from each segment result
         int initialSize = HashUtil.getHashMapCapacity(
             (int) Math.round(_partitionSizes[partitionId].get() / Math.sqrt(_numOperators)));
-        Object2ObjectOpenHashMap<Key, Record> map = new Object2ObjectOpenHashMap<>(initialSize);
 
-        Map<Integer, CompletableFuture<RadixPartitionedHashMap<Key, Record>>> pendingFutures = new HashMap<>(_numOperators);
+        SimpleIndexedTable table =
+            GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService, initialSize);
+
+        Map<Integer, CompletableFuture<RadixPartitionedIntermediateRecords>> pendingFutures = new HashMap<>(_numOperators);
         for (int segmentId = 0; segmentId < _numOperators; segmentId++) {
-          pendingFutures.put(segmentId, _partitionedHashMapFutures[segmentId]);
+          pendingFutures.put(segmentId, _partitionedRecordsFutures[segmentId]);
         }
 
-        // TODO: compare anyOf() to sequential approach
+        // We only handle sort and not sort by group key case, since unsorted case will be converted to safeTrim
         // merge partitions in arbitrary order as they are ready
+        // TODO: compare anyOf() to sequential approach
         while (!pendingFutures.isEmpty()) {
           CompletableFuture fut =
               CompletableFuture.anyOf(pendingFutures.values().toArray(CompletableFuture[]::new));
-          RadixPartitionedHashMap<Key, Record> partition = (RadixPartitionedHashMap<Key, Record>) fut.get();
-          for (Map.Entry<Key, Record> entry : partition.getPartition(partitionId).entrySet()) {
-            GroupByUtils.addOrUpdateRecord(map, entry.getKey(), entry.getValue(), aggregationFunctions,
-                numKeyColumns);
+          RadixPartitionedIntermediateRecords partition = (RadixPartitionedIntermediateRecords) fut.get();
+          for (IntermediateRecord record : partition.getPartition(partitionId)) {
+            // TODO: upsert like SimpleIndexedTable, sort + trim to trimSize when reaching trimThreshold if trimEnabled
+            table.upsert(record._key, record._record);
           }
           int processedSegmentId = partition.getSegmentId();
           pendingFutures.remove(processedSegmentId);
         }
 
-        _mergedHashMaps[partitionId] = map;
+        // sort and trim per-segment result if needed
+        table.finish(true, false);
+
+        _mergedIndexedTables[partitionId] = table;
       } catch (Exception e) {
         throw wrapOperatorException(this, new RuntimeException(e));
       }
@@ -383,8 +397,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
 
     if (GroupByUtils.shouldPartitionGroupBy(_queryContext)) {
-      RadixPartitionedHashMap<Key, Record> map =
-          new RadixPartitionedHashMap<>(_mergedHashMaps, _queryContext.getGroupByPartitionNumRadixBits());
+      HashMap<Key, Record>[] lookupMaps = new HashMap[_queryContext.getGroupByNumPartitions()];
+      int idx = 0;
+      for (SimpleIndexedTable table : _mergedIndexedTables) {
+        lookupMaps[idx++] = (HashMap<Key, Record>) table.getLookupMap();
+      }
+      // keep all partition records in the map, later finish will trim them if needed
+      RadixPartitionedHashMap<Key, Record> map = new RadixPartitionedHashMap<>(lookupMaps,
+          _queryContext.getGroupByPartitionNumRadixBits());
       _indexedTable = GroupByUtils.createPartitionedIndexedTableForCombineOperator(_dataSchema, _queryContext, map,
           _executorService);
     }

@@ -141,19 +141,95 @@ public final class GroupByUtils {
    */
   public static IndexedTable createPartitionedIndexedTableForCombineOperator(DataSchema dataSchema,
       QueryContext queryContext, RadixPartitionedHashMap<Key, Record> map, ExecutorService executorService) {
+    // single worker thread merges single partition number
     int limit = queryContext.getLimit();
     boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
     boolean hasHaving = queryContext.getHavingFilter() != null;
-    int minTrimSize = queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
+    int minTrimSize =
+        queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
 
     // Disable trim when min trim size is non-positive
     int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
 
     // When there is no ORDER BY, trim is not required because the indexed table stops accepting new groups once the
     // result size is reached
-    // When there is ORDER BY, currently partitionedIndexedTable only handles no resize case, i.e. resultSize = MAX_INT
-    int resultSize = hasOrderBy ? Integer.MAX_VALUE : hasHaving ? trimSize : limit;
-    return PartitionedIndexedTable.create(dataSchema, false, queryContext, resultSize, map, executorService);
+    if (!hasOrderBy) {
+      int resultSize;
+      if (hasHaving) {
+        // Keep more groups when there is HAVING clause
+        resultSize = trimSize;
+      } else {
+        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
+        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
+        resultSize = limit;
+      }
+      return new PartitionedIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, map, executorService);
+    }
+
+    int resultSize;
+    if (queryContext.isServerReturnFinalResult() && !hasHaving) {
+      // When server is asked to return final result and there is no HAVING clause, return only LIMIT groups
+      resultSize = limit;
+    } else {
+      resultSize = trimSize;
+    }
+    int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
+    if (trimThreshold == Integer.MAX_VALUE) {
+      return new PartitionedIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, map, executorService);
+    } else {
+      return new PartitionedIndexedTable(dataSchema, false, queryContext, resultSize, trimSize,
+          trimThreshold, map, executorService);
+    }
+  }
+
+  /**
+   * Creates an indexed table for the worker thread local combine of
+   * partitioned segment results
+   */
+  public static SimpleIndexedTable createIndexedTableForPartitionMerge(DataSchema dataSchema, QueryContext queryContext, ExecutorService executorService, int initialCapacity) {
+    // single worker thread merges single partition number
+    int limit = queryContext.getLimit();
+    boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
+    boolean hasHaving = queryContext.getHavingFilter() != null;
+    int minTrimSize =
+        queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
+
+    // Disable trim when min trim size is non-positive
+    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
+
+    // When there is no ORDER BY, trim is not required because the indexed table stops accepting new groups once the
+    // result size is reached
+    if (!hasOrderBy) {
+      int resultSize;
+      if (hasHaving) {
+        // Keep more groups when there is HAVING clause
+        resultSize = trimSize;
+      } else {
+        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
+        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
+        resultSize = limit;
+      }
+      return new SimpleIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, initialCapacity, executorService);
+    }
+
+    int resultSize;
+    if (queryContext.isServerReturnFinalResult() && !hasHaving) {
+      // When server is asked to return final result and there is no HAVING clause, return only LIMIT groups
+      resultSize = limit;
+    } else {
+      resultSize = trimSize;
+    }
+    int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
+    if (trimThreshold == Integer.MAX_VALUE) {
+      return new SimpleIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, initialCapacity, executorService);
+    } else {
+      return new SimpleIndexedTable(dataSchema, false, queryContext, resultSize, trimSize,
+          trimThreshold, initialCapacity, executorService);
+    }
   }
 
   /**

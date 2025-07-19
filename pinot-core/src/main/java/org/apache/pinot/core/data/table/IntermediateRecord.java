@@ -29,7 +29,7 @@ public class IntermediateRecord {
   public final Record _record;
   public final Comparable[] _values;
 
-  IntermediateRecord(Key key, Record record, Comparable[] values) {
+  public IntermediateRecord(Key key, Record record, Comparable[] values) {
     _key = key;
     _record = record;
     _values = values;
