@@ -195,13 +195,11 @@ public class ComplexTypeTransformer implements RecordTransformer {
           flattenMap(record, columns);
           transformedRecords.add(record);
         } else {
-          Map<String, Object> originalValues = record.copy(_fieldsToUnnest).getFieldToValueMap();
           flattenMap(record, columns);
           List<GenericRow> unnestedRecords = List.of(record);
           for (String field : _fieldsToUnnest) {
             unnestedRecords = unnestCollection(unnestedRecords, field);
           }
-          unnestedRecords.forEach(unnestedRecord -> unnestedRecord.getFieldToValueMap().putAll(originalValues));
           if (record.isIncomplete()) {
             unnestedRecords.forEach(GenericRow::markIncomplete);
           }
