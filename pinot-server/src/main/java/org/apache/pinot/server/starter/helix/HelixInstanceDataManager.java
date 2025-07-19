@@ -322,6 +322,15 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       tableConfig = ZKMetadataProvider.getTableConfig(_propertyStore, tableNameWithType);
       Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
     }
+    // server level config honoured only when table level config is not set to true
+    if (tableConfig.getIngestionConfig() != null && tableConfig.getIngestionConfig().getComplexTypeConfig() != null) {
+      boolean removeUnnestedFields = false;
+      removeUnnestedFields = tableConfig.getIngestionConfig().getComplexTypeConfig().isRemoveUnnestedFields();
+      if (!removeUnnestedFields) {
+        removeUnnestedFields = _instanceDataManagerConfig.isRemoveUnnestedFields();
+      }
+      tableConfig.getIngestionConfig().getComplexTypeConfig().setRemoveUnnestedFields(removeUnnestedFields);
+    }
     Schema schema = ZKMetadataProvider.getTableSchema(_propertyStore, tableNameWithType);
     Preconditions.checkState(schema != null, "Failed to find schema for table: %s", tableNameWithType);
     TimestampIndexUtils.applyTimestampIndex(tableConfig, schema);
