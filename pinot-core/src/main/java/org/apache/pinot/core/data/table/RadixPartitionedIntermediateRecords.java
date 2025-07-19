@@ -67,6 +67,7 @@ public class RadixPartitionedIntermediateRecords {
     }
   }
 
+  // TODO: make hashCode faster, and cache it
   public int partition(IntermediateRecord record) {
     return record._key.hashCode() & _mask;
   }
