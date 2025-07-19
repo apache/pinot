@@ -1548,6 +1548,10 @@ public class CommonConstants {
         "accounting.cancel.callback.cache.expiry.seconds";
     public static final int DEFAULT_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS = 1200;
 
+    public static final String CONFIG_OF_THREAD_SELF_TERMINATE_IN_PANIC_MODE =
+        "accounting.thread.self.terminate.in.panic.mode";
+    public static final boolean DEFAULT_THREAD_SELF_TERMINATE_IN_PANIC_MODE = false;
+
     /**
      * QUERY WORKLOAD ISOLATION Configs
      *
