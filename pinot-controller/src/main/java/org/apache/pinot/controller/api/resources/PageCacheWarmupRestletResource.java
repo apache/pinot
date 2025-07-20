@@ -57,16 +57,6 @@ import org.slf4j.LoggerFactory;
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
 
-@Api(tags = Constants.PAGE_CACHE_WARMUP_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
-@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
-    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
-        key = SWAGGER_AUTHORIZATION_KEY,
-        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
-    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
-        description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
-@Path("/")
 /**
  * REST endpoint that manages page‑cache warm‑up query files.
  *
@@ -82,8 +72,17 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   <tr><td>DELETE</td><td>/pagecache/queries/{tableName}</td><td>Remove stored queries</td></tr>
  * </table>
  *
- * @see ControllerConf#getPageCacheWarmupQueriesDataDir()
  */
+@Api(tags = Constants.PAGE_CACHE_WARMUP_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)})
+@SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
+    @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
+        key = SWAGGER_AUTHORIZATION_KEY,
+        description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
+    @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
+        description = "Database context passed through http header. If no context is provided 'default' database "
+            + "context will be considered.")}))
+@Path("/")
 public class PageCacheWarmupRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PageCacheWarmupRestletResource.class);
 
@@ -109,7 +108,7 @@ public class PageCacheWarmupRestletResource {
    * Response: ["SELECT COUNT(*) FROM myTable", "SELECT SUM(col) FROM myTable"]
    * }</pre>
    *
-   * @param tableName           logical Pinot table name (no type suffix)
+   * @param tableName           table name (no type suffix)
    * @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
    * @param queryFileNameParam  optional custom file name
    * @return 200 OK with a JSON array containing SQL query strings
@@ -125,18 +124,16 @@ public class PageCacheWarmupRestletResource {
       @ApiParam(value = "Custom query file name (optional)") @QueryParam("queryFileName") String queryFileNameParam) {
     try {
       String queryFileName = (queryFileNameParam == null || queryFileNameParam.isEmpty())
-          ? DEFAULT_QUERY_FILE_NAME
-          : queryFileNameParam;
+        ? DEFAULT_QUERY_FILE_NAME
+        : queryFileNameParam;
       validateInput(tableName, tableType, queryFileNameParam);
 
       LOGGER.info("Fetching warmup queries for tableName: {}, tableType: {}", tableName, tableType);
       File tableDir = new File(_pageCacheWarmupDataDir, tableName + "_" + tableType);
       File queryFile = new File(tableDir, queryFileName);
       if (!_pinotFS.exists(queryFile.toURI())) {
-        throw new ControllerApplicationException(LOGGER,
-            String.format("No queries found for table: %s of type: %s path %s",
-                tableName, tableType, queryFile.getPath()),
-            404);
+        throw new ControllerApplicationException(LOGGER, String.format("No queries found for table: %s of type: %s"
+            + " path %s", tableName, tableType, queryFile.getPath()), 404);
       }
 
       try (InputStream inputStream = _pinotFS.open(queryFile.toURI())) {
@@ -184,7 +181,7 @@ public class PageCacheWarmupRestletResource {
    * Body: ["SELECT ...", "SELECT ..."]
    * }</pre>
    *
-   * @param tableName           logical Pinot table name
+   * @param tableName           table name
    * @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
    * @param queryFileNameParam  optional custom file name
    * @param requestString       JSON array containing SQL queries
@@ -205,8 +202,8 @@ public class PageCacheWarmupRestletResource {
 
     try {
       String queryFileName = (queryFileNameParam == null || queryFileNameParam.isEmpty())
-          ? DEFAULT_QUERY_FILE_NAME
-          : queryFileNameParam;
+        ? DEFAULT_QUERY_FILE_NAME
+        : queryFileNameParam;
       validateInput(tableName, tableType, queryFileName);
 
       List<String> queries = JsonUtils.stringToObject(requestString, new TypeReference<>() { });
@@ -216,9 +213,9 @@ public class PageCacheWarmupRestletResource {
       LOGGER.info("Storing {} queries for {}_{}", queries.size(), tableName, tableType);
       storeQueriesInPageCacheWarmupDataDir(tableName + "_" + tableType, queryFileName, queries);
 
-      String resp = String.format("Successfully stored %d queries for table: %s_%s (file: %s)",
+      String responseString = String.format("Successfully stored %d queries for table: %s_%s (file: %s)",
           queries.size(), tableName, tableType, queryFileName);
-      return Response.ok(resp, MediaType.APPLICATION_JSON).build();
+      return Response.ok(responseString).build();
     } catch (ControllerApplicationException e) {
       throw e;
     } catch (IOException e) {
@@ -262,7 +259,6 @@ public class PageCacheWarmupRestletResource {
           String.format("Failed to write queries to file for table: %s, exception: %s", tableNameWithType, e), 500);
     }
   }
-
   /**
    * Deletes the warm‑up query file for the specified table and type.
    *
@@ -270,7 +266,7 @@ public class PageCacheWarmupRestletResource {
    * DELETE /pagecache/queries/myTable?tableType=OFFLINE
    * }</pre>
    *
-   * @param tableName           logical Pinot table name
+   * @param tableName           table name
    * @param tableType           table type: {@code OFFLINE} or {@code REALTIME}
    * @param queryFileNameParam  optional custom file name
    * @return 200 OK with a confirmation message (even if the file did not exist)
@@ -287,25 +283,23 @@ public class PageCacheWarmupRestletResource {
       @ApiParam(value = "Custom query file name (optional)") @QueryParam("queryFileName") String queryFileNameParam) {
     try {
       String queryFileName = (queryFileNameParam == null || queryFileNameParam.isEmpty())
-          ? DEFAULT_QUERY_FILE_NAME
-          : queryFileNameParam;
+        ? DEFAULT_QUERY_FILE_NAME
+        : queryFileNameParam;
       validateInput(tableName, tableType, queryFileName);
 
       LOGGER.info("Deleting warmup queries for tableName: {}, tableType: {}", tableName, tableType);
       File tableDir = new File(_pageCacheWarmupDataDir, tableName + "_" + tableType);
       File queryFile = new File(tableDir, queryFileName);
       if (!_pinotFS.exists(queryFile.toURI())) {
-        return Response.ok(
-            String.format("No queries found for table: %s of type: %s and file: %s", tableName, tableType,
-                queryFileName),
-            MediaType.APPLICATION_JSON
-        ).build();
+        String responseString = String.format("No queries found for table: %s of type: %s and file: %s",
+            tableName, tableType, queryFileName);
+        return Response.ok(responseString).build();
       }
       _pinotFS.delete(queryFile.toURI(), true);
       String responseString = String.format("Successfully deleted warmup queries for table: %s of type: %s"
           + " and file: %s", tableName, tableType, queryFileName);
       LOGGER.info(responseString);
-      return Response.ok(responseString, MediaType.APPLICATION_JSON).build();
+      return Response.ok(responseString).build();
     } catch (Exception e) {
       LOGGER.error("Unexpected error occurred while deleting warmup queries for tableName: {}, tableType: {}",
           tableName, tableType, e);

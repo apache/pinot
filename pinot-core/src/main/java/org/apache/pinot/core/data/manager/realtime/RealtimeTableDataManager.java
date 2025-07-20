@@ -335,18 +335,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
-  /**
-   * Method to handle CONSUMING -> ONLINE segment state transitions:
-   * We mark partitions for verification against ideal state when we do not see a consuming segment for some time
-   * for that partition. The idea is to remove the related metrics when the partition moves from the current server.
-   *
-   * @param segmentName name of segment which is transitioning state.
-   */
-  @Override
-  public void onConsumingToOnline(String segmentName) {
-    _ingestionDelayTracker.markPartitionForVerification(segmentName);
-  }
-
   @Override
   public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
       Map<String, String> queryOptions) {
@@ -470,7 +458,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     } else if (segmentDataManager instanceof RealtimeSegmentDataManager) {
       _logger.info("Changing segment: {} from CONSUMING to ONLINE", segmentName);
       ((RealtimeSegmentDataManager) segmentDataManager).goOnlineFromConsuming(zkMetadata);
-      onConsumingToOnline(segmentName);
     } else if (zkMetadata.getStatus().isCompleted()) {
       // For pauseless ingestion, the segment is marked ONLINE before it's built and before the COMMIT_END_METADATA
       // call completes.
@@ -852,6 +839,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     IndexLoadingConfig indexLoadingConfig = fetchIndexLoadingConfig();
     indexLoadingConfig.setSegmentTier(zkMetadata.getTier());
     addSegment(ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler), zkMetadata);
+    _ingestionDelayTracker.markPartitionForVerification(segmentName);
     _logger.info("Downloaded and replaced CONSUMING segment: {}", segmentName);
   }
 
@@ -878,6 +866,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
         ImmutableSegmentLoader.load(indexDir, indexLoadingConfig, _segmentOperationsThrottler);
 
     addSegment(immutableSegment, zkMetadata);
+    _ingestionDelayTracker.markPartitionForVerification(segmentName);
     _logger.info("Replaced CONSUMING segment: {}", segmentName);
   }
 
@@ -888,6 +877,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   public TableUpsertMetadataManager getTableUpsertMetadataManager() {
     return _tableUpsertMetadataManager;
+  }
+
+  @VisibleForTesting
+  public TableDedupMetadataManager getTableDedupMetadataManager() {
+    return _tableDedupMetadataManager;
   }
 
   /**

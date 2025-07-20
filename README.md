@@ -99,7 +99,7 @@ SELECT sum(clicks), sum(impressions) FROM AdAnalyticsTable
 
 ## Contributing to Pinot
 
-Want to contribute to apache/pinot? 👋🍷
+Want to contribute to Apache Pinot? 👋🍷
 
 Want to join the ranks of open source committers to Apache Pinot? Then check out the [Contribution Guide](https://docs.pinot.apache.org/developers/developers-and-contributors/contribution-guidelines) for how you can get involved in the code.
 
@@ -140,6 +140,34 @@ However this command can take a long time to run.
 For faster builds it is recommended to use `./mvnw verify -Ppinot-fastdev`, which disables some plugins that are not actually needed for development.
 
 More detailed instructions can be found at [Quick Demo](https://docs.pinot.apache.org/basics/getting-started/quick-start) section in the documentation.
+
+### macOS Build Requirements
+
+If you're building Pinot on macOS and encounter issues with the gRPC Java plugin during the build process, you may need to configure the protobuf Maven plugin to use a specific executable path. This is a known issue on macOS ARM (Apple Silicon) systems.
+
+#### Automatic Profile Activation (macOS ARM64)
+
+Pinot's Maven build now includes dedicated profiles for Apple Silicon (ARM64) Macs to ensure reliable protobuf compilation with Homebrew-installed binaries:
+
+- **Primary profile:** Activates automatically if `/opt/homebrew/bin/protoc-gen-grpc-java` exists (default for Apple Silicon Macs).
+- **Fallback profile:** Activates if `/usr/local/bin/protoc-gen-grpc-java` exists and the primary path does not (for Intel Macs or custom Homebrew setups).
+
+You do **not** need to manually edit the `pom.xml` or set the plugin executable path. The correct profile will be selected based on your system and Homebrew installation.
+
+##### To install the required tools:
+```bash
+brew install protobuf
+brew install protoc-gen-grpc-java
+```
+
+If you installed Homebrew to a non-default location, ensure the `protoc-gen-grpc-java` binary is available in either `/opt/homebrew/bin/` or `/usr/local/bin/`.
+
+To verify which profile is active, run:
+```bash
+./mvnw help:active-profiles
+```
+
+If you encounter issues, check that the `protoc-gen-grpc-java` binary is present in one of the expected locations and is executable.
 
 ## Deploying Pinot to Kubernetes
 Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](helm/superset.yaml).

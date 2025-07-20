@@ -26,9 +26,11 @@ import java.util.Objects;
 /**
  * These are rebalance progress stats to track how the rebalance is progressing over time
  */
-@JsonPropertyOrder({"status", "startTimeMs", "timeToFinishInSeconds", "completionStatusMsg",
+@JsonPropertyOrder({
+    "status", "startTimeMs", "timeToFinishInSeconds", "completionStatusMsg",
     "rebalanceProgressStatsOverall", "rebalanceProgressStatsCurrentStep", "initialToTargetStateConvergence",
-    "currentToTargetConvergence", "externalViewToIdealStateConvergence"})
+    "currentToTargetConvergence", "externalViewToIdealStateConvergence"
+})
 public class TableRebalanceProgressStats {
 
   // Done/In_progress/Failed
@@ -227,6 +229,7 @@ public class TableRebalanceProgressStats {
         + (numAdditionalSegmentsAdded * previousOverallStats._averageSegmentSizeInBytes);
 
     currentOverallStats._startTimeMs = getStartTimeMs();
+    currentOverallStats._totalSegmentsForceCommitted = previousOverallStats._totalSegmentsForceCommitted;
 
     // Update the progress stats with the current calculated stats
     setRebalanceProgressStatsOverall(currentOverallStats);
@@ -265,6 +268,7 @@ public class TableRebalanceProgressStats {
   }
 
   // TODO: Clean this up once new stats are verified
+
   /**
    * These are rebalance stats as to how the current state is, when compared to the target state.
    * Eg: If the current has 4 segments whose replicas (16) don't match the target state, _segmentsToRebalance
@@ -306,6 +310,10 @@ public class TableRebalanceProgressStats {
     // Total new segments stats (not tracked by rebalance)
     @JsonProperty("totalUniqueNewUntrackedSegmentsDuringRebalance")
     public int _totalUniqueNewUntrackedSegmentsDuringRebalance;
+    @JsonProperty("isForceCommittingConsumingSegments")
+    public boolean _isForceCommittingConsumingSegments;
+    @JsonProperty("totalSegmentsForceCommitted")
+    public int _totalSegmentsForceCommitted;
     // Derived stats
     @JsonProperty("percentageRemainingSegmentsToBeAdded")
     public double _percentageRemainingSegmentsToBeAdded;
@@ -332,6 +340,8 @@ public class TableRebalanceProgressStats {
       _totalCarryOverSegmentsToBeAdded = 0;
       _totalCarryOverSegmentsToBeDeleted = 0;
       _totalUniqueNewUntrackedSegmentsDuringRebalance = 0;
+      _isForceCommittingConsumingSegments = false;
+      _totalSegmentsForceCommitted = 0;
       _percentageRemainingSegmentsToBeAdded = 0.0;
       _percentageRemainingSegmentsToBeDeleted = 0.0;
       _estimatedTimeToCompleteAddsInSeconds = 0;
@@ -350,6 +360,8 @@ public class TableRebalanceProgressStats {
       _totalCarryOverSegmentsToBeAdded = other._totalCarryOverSegmentsToBeAdded;
       _totalCarryOverSegmentsToBeDeleted = other._totalCarryOverSegmentsToBeDeleted;
       _totalUniqueNewUntrackedSegmentsDuringRebalance = other._totalUniqueNewUntrackedSegmentsDuringRebalance;
+      _isForceCommittingConsumingSegments = other._isForceCommittingConsumingSegments;
+      _totalSegmentsForceCommitted = other._totalSegmentsForceCommitted;
       _percentageRemainingSegmentsToBeAdded = other._percentageRemainingSegmentsToBeAdded;
       _percentageRemainingSegmentsToBeDeleted = other._percentageRemainingSegmentsToBeDeleted;
       _estimatedTimeToCompleteAddsInSeconds = other._estimatedTimeToCompleteAddsInSeconds;
@@ -375,6 +387,8 @@ public class TableRebalanceProgressStats {
           && _totalCarryOverSegmentsToBeAdded == that._totalCarryOverSegmentsToBeAdded
           && _totalCarryOverSegmentsToBeDeleted == that._totalCarryOverSegmentsToBeDeleted
           && _totalUniqueNewUntrackedSegmentsDuringRebalance == that._totalUniqueNewUntrackedSegmentsDuringRebalance
+          && _isForceCommittingConsumingSegments == that._isForceCommittingConsumingSegments
+          && _totalSegmentsForceCommitted == that._totalSegmentsForceCommitted
           && Double.compare(_percentageRemainingSegmentsToBeAdded, that._percentageRemainingSegmentsToBeAdded)
           == 0
           && Double.compare(_percentageRemainingSegmentsToBeDeleted, that._percentageRemainingSegmentsToBeDeleted)
@@ -388,8 +402,9 @@ public class TableRebalanceProgressStats {
       return Objects.hash(_totalSegmentsToBeAdded, _totalSegmentsToBeDeleted, _totalRemainingSegmentsToBeAdded,
           _totalRemainingSegmentsToBeDeleted, _totalRemainingSegmentsToConverge, _totalCarryOverSegmentsToBeAdded,
           _totalCarryOverSegmentsToBeDeleted, _totalUniqueNewUntrackedSegmentsDuringRebalance,
-          _percentageRemainingSegmentsToBeAdded, _percentageRemainingSegmentsToBeDeleted, _averageSegmentSizeInBytes,
-          _totalEstimatedDataToBeMovedInBytes, _startTimeMs);
+          _isForceCommittingConsumingSegments, _totalSegmentsForceCommitted, _percentageRemainingSegmentsToBeAdded,
+          _percentageRemainingSegmentsToBeDeleted, _averageSegmentSizeInBytes, _totalEstimatedDataToBeMovedInBytes,
+          _startTimeMs);
     }
   }
 }

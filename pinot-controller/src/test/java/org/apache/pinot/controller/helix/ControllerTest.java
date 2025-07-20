@@ -70,6 +70,8 @@ import org.apache.pinot.controller.api.access.AllowAllAccessFactory;
 import org.apache.pinot.controller.api.resources.PauseStatusDetails;
 import org.apache.pinot.controller.api.resources.TableViews;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.minion.PinotTaskManager;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConfigUtils;
@@ -207,6 +209,18 @@ public class ControllerTest {
   }
 
   /**
+   * Retrieves the headers to be used for the `ControllerRequestClient`.
+   *
+   * <p>This method returns an empty map, indicating that no custom headers
+   * are set by default for the `ControllerRequestClient`.
+   *
+   * @return A map of headers (key-value pairs) to be used for the `ControllerRequestClient`.
+   */
+  protected Map<String, String> getControllerRequestClientHeaders() {
+    return Collections.emptyMap();
+  }
+
+  /**
    * ControllerRequestClient is lazy evaluated, static object, only instantiate when first use.
    *
    * <p>This is because {@code ControllerTest} has HTTP utils that depends on the TLSUtils to install the security
@@ -215,7 +229,8 @@ public class ControllerTest {
    */
   public ControllerRequestClient getControllerRequestClient() {
     if (_controllerRequestClient == null) {
-      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient());
+      _controllerRequestClient = new ControllerRequestClient(_controllerRequestURLBuilder, getHttpClient(),
+        getControllerRequestClientHeaders());
     }
     return _controllerRequestClient;
   }
@@ -260,6 +275,7 @@ public class ControllerTest {
     _nextControllerPort = controllerPort + 1;
     properties.put(ControllerConf.DATA_DIR, DEFAULT_DATA_DIR);
     properties.put(ControllerConf.LOCAL_TEMP_DIR, DEFAULT_LOCAL_TEMP_DIR);
+    properties.put(ControllerConf.CONFIG_OF_PAGE_CACHE_WARMUP_QUERIES_DATA_DIR, DEFAULT_DATA_DIR);
     // Enable groovy on the controller
     properties.put(ControllerConf.DISABLE_GROOVY, false);
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
@@ -920,6 +936,28 @@ public class ControllerTest {
   public void runPeriodicTask(String taskName, String tableName, TableType tableType)
       throws IOException {
     sendGetRequest(getControllerRequestURLBuilder().forPeriodTaskRun(taskName, tableName, tableType));
+  }
+
+  /**
+   * Trigger a task on a table and wait for completion
+   */
+  protected String triggerMinionTask(String taskType, String tableNameWithType) {
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTasksToSchedule(Set.of(taskType))
+        .setTablesToSchedule(Set.of(tableNameWithType));
+
+    List<String> taskIds = taskManager.scheduleTasks(context)
+        .get(taskType)
+        .getScheduledTaskNames();
+
+    assert taskIds != null;
+    LOGGER.info("Scheduled {} for table {} with id: {}", taskType, tableNameWithType, taskIds);
+    assertEquals(taskIds.size(), 1,
+        String.format("Task %s not scheduled as expected for table %s. Expected 1 task, but got: %s",
+        taskType, tableNameWithType, taskIds.size()));
+    return taskIds.get(0);
   }
 
   public void pauseTable(String tableName)

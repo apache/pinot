@@ -52,6 +52,7 @@ import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.starter.helix.SendStatsPredicate;
 import org.apache.pinot.server.warmup.PageCacheWarmupServerQueryExecutor;
 import org.apache.pinot.server.worker.WorkerQueryServer;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -87,7 +88,8 @@ public class ServerInstance {
   private boolean _queryServerStarted = false;
 
   public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, SendStatsPredicate sendStatsPredicate)
+      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, SendStatsPredicate sendStatsPredicate,
+      ThreadResourceUsageAccountant resourceUsageAccountant)
       throws Exception {
     LOGGER.info("Initializing server instance");
     _helixManager = helixManager;
@@ -124,7 +126,8 @@ public class ServerInstance {
     LOGGER.info("Initializing query scheduler");
     _latestQueryTime = new LongAccumulator(Long::max, 0);
     _queryScheduler =
-        QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime);
+        QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime,
+            resourceUsageAccountant);
 
     TlsConfig tlsConfig =
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
@@ -137,7 +140,7 @@ public class ServerInstance {
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
       _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager,
-          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, sendStatsPredicate);
+          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, sendStatsPredicate, resourceUsageAccountant);
     } else {
       _workerQueryServer = null;
     }

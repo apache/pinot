@@ -33,7 +33,10 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinInfo;
+import org.apache.calcite.rel.core.SetOp;
+import org.apache.calcite.rel.core.Union;
 import org.apache.calcite.rel.core.Window;
+import org.apache.calcite.util.ImmutableIntList;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
@@ -83,8 +86,29 @@ public class TraitAssignment {
       return (PRelNode) assignAggregate((PhysicalAggregate) relNode);
     } else if (relNode instanceof PhysicalWindow) {
       return (PRelNode) assignWindow((PhysicalWindow) relNode);
+    } else if (relNode instanceof SetOp) {
+      return (PRelNode) assignSetOp((SetOp) relNode);
     }
     return (PRelNode) relNode;
+  }
+
+  RelNode assignSetOp(SetOp setOp) {
+    if (setOp instanceof Union) {
+      Union union = (Union) setOp;
+      if (union.all) {
+        // UNION ALL means we can return duplicates, so no trait required.
+        return setOp;
+      }
+    }
+    RelDistribution pushedDownDistTrait = RelDistributions.hash(ImmutableIntList.range(0,
+        setOp.getRowType().getFieldCount()));
+    List<RelNode> newInputs = new ArrayList<>();
+    for (RelNode input : setOp.getInputs()) {
+      RelTraitSet newTraitSet = input.getTraitSet().plus(pushedDownDistTrait);
+      RelNode newInput = input.copy(newTraitSet, input.getInputs());
+      newInputs.add(newInput);
+    }
+    return setOp.copy(setOp.getTraitSet(), newInputs);
   }
 
   /**
@@ -185,7 +209,8 @@ public class TraitAssignment {
                 windowGroupCollation, null /* offset */, null /* fetch */, sort, _planIdGenerator.get(),
                 null /* pinot data distribution */, false /* leaf stage */);
           } else {
-            input = input.copy(input.getTraitSet().plus(RelDistributions.SINGLETON), input.getInputs());
+            input = input.copy(input.getTraitSet().plus(RelDistributions.SINGLETON).plus(windowGroupCollation),
+                input.getInputs());
           }
         } else {
           RelTraitSet newTraitSet = input.getTraitSet().plus(RelDistributions.SINGLETON)

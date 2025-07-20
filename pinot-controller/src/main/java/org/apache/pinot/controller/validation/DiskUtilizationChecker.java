@@ -36,7 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DiskUtilizationChecker {
+public class DiskUtilizationChecker implements UtilizationChecker {
   private static final Logger LOGGER = LoggerFactory.getLogger(DiskUtilizationChecker.class);
   private final int _resourceUtilizationCheckTimeoutMs;
   private final long _resourceUtilizationCheckerFrequencyMs;
@@ -54,17 +54,23 @@ public class DiskUtilizationChecker {
     _resourceUtilizationCheckerFrequencyMs = controllerConf.getResourceUtilizationCheckerFrequency() * 1000;
   }
 
+  @Override
+  public String getName() {
+    return DiskUtilizationChecker.class.getSimpleName();
+  }
+
   /**
    * Check if disk utilization for the requested table is within the configured limits.
    */
-  public boolean isDiskUtilizationWithinLimits(String tableNameWithType) {
+  @Override
+  public CheckResult isResourceUtilizationWithinLimits(String tableNameWithType, CheckPurpose purpose) {
     if (StringUtils.isEmpty(tableNameWithType)) {
       throw new IllegalArgumentException("Table name found to be null or empty while computing disk utilization.");
     }
     TableConfig tableConfig = _helixResourceManager.getTableConfig(tableNameWithType);
     if (tableConfig == null) {
       LOGGER.warn("Table config for table: {} is null", tableNameWithType);
-      return true; // table does not exist
+      return CheckResult.PASS; // table does not exist
     }
     List<String> instances;
     if (TableNameBuilder.isOfflineTableResource(tableNameWithType)) {
@@ -75,10 +81,12 @@ public class DiskUtilizationChecker {
     return isDiskUtilizationWithinLimits(instances);
   }
 
-  private boolean isDiskUtilizationWithinLimits(List<String> instances) {
+  private CheckResult isDiskUtilizationWithinLimits(List<String> instances) {
+    int numInstancesWithStaleOrNullResults = 0;
     for (String instance : instances) {
       DiskUsageInfo diskUsageInfo = ResourceUtilizationInfo.getDiskUsageInfo(instance);
       if (diskUsageInfo == null) {
+        numInstancesWithStaleOrNullResults++;
         LOGGER.warn("Disk utilization info for server: {} is null", instance);
         continue;
       }
@@ -86,6 +94,7 @@ public class DiskUtilizationChecker {
       // ResourceUtilizationChecker tasks frequency.
       if (diskUsageInfo.getLastUpdatedTimeInEpochMs()
           < System.currentTimeMillis() - _resourceUtilizationCheckerFrequencyMs) {
+        numInstancesWithStaleOrNullResults++;
         LOGGER.warn("Disk utilization info for server: {} is stale", instance);
         continue;
       }
@@ -93,16 +102,23 @@ public class DiskUtilizationChecker {
         LOGGER.warn("Disk utilization for server: {} is above threshold: {}%. UsedBytes: {}, TotalBytes: {}",
             instance, diskUsageInfo.getUsedSpaceBytes() * 100 / diskUsageInfo.getTotalSpaceBytes(), diskUsageInfo
                 .getUsedSpaceBytes(), diskUsageInfo.getTotalSpaceBytes());
-        return false;
+        return CheckResult.FAIL;
       }
     }
-    return true;
+    // If results for all servers is null or stale, return the status as STALE to indicate that the status cannot be
+    // determined.
+    // TODO: Have better handling for partial STALE results from servers. It is possible that a subset of servers are
+    //       STALE, and these are the ones that may have a resource utilization breach, but we return TRUE here.
+    //       Eventually when the status is updated, the correct value will be returned and the correct action can be
+    //       taken based on that. Temporarily the action taken may be the wrong one.
+    return numInstancesWithStaleOrNullResults == instances.size() ? CheckResult.UNDETERMINED : CheckResult.PASS;
   }
 
   /**
    * Compute disk utilization for the requested instances using the <code>CompletionServiceHelper</code>.
    */
-  public void computeDiskUtilization(BiMap<String, String> endpointsToInstances,
+  @Override
+  public void computeResourceUtilization(BiMap<String, String> endpointsToInstances,
       CompletionServiceHelper completionServiceHelper) {
     List<String> diskUtilizationUris = new ArrayList<>(endpointsToInstances.size());
     for (String endpoint : endpointsToInstances.keySet()) {

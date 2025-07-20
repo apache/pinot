@@ -194,6 +194,10 @@ public class PageCacheWarmupServerQueryExecutor {
       SegmentZKMetadata segmentZKMetadata = tableDataManager.fetchZKMetadata(segments.get(0));
       URI baseURI = FileUploadDownloadClient.extractBaseURI(new URI(segmentZKMetadata.getDownloadUrl()));
       queries = PageCacheWarmupQueryUtils.getWarmupQueries(tableNameWithType, baseURI);
+      if (queries == null || queries.isEmpty()) {
+        LOGGER.warn("No warmup queries found for table: {}", tableNameWithType);
+        return;
+      }
     }
     executeWarmupQueries(tableNameWithType, queries, segments, warmupConfig, startTimeMs, warmupQps);
   }

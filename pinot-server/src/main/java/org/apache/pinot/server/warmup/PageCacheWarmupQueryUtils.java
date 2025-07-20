@@ -76,9 +76,13 @@ public class PageCacheWarmupQueryUtils {
             LOGGER.info("Successfully got {} queries from deep store for table: {}, queries: {}",
                 resultQueries.size(), tableNameWithType, resultQueries);
             return true;
+          } else if (response.getStatusCode() == HttpStatus.SC_NOT_FOUND) {
+            LOGGER.warn("No queries found in deep store for table: {}", tableNameWithType);
+            queries.set(List.of()); // Set empty list if no queries found
+            return true;
           } else {
-            LOGGER.error("Failed to get queries from deep store for table: {}, response: {}",
-                tableNameWithType, response);
+            LOGGER.error("Failed to get queries from deep store for table: {}, response: {}", tableNameWithType,
+                response);
             return false;
           }
         } catch (Exception e) {

@@ -51,22 +51,28 @@ public class ThreadResourceUsageProvider {
   private static boolean _isThreadCpuTimeMeasurementEnabled = false;
   private static boolean _isThreadMemoryMeasurementEnabled = false;
 
-  // reference point for start time/bytes
-  private final long _startTimeNs;
-  private final long _startBytesAllocated;
+  @Deprecated
+  public long getThreadTimeNs() {
+    return 0;
+  }
 
-  public ThreadResourceUsageProvider() {
-    _startTimeNs = _isThreadCpuTimeMeasurementEnabled ? MX_BEAN.getCurrentThreadCpuTime() : -1;
+  @Deprecated
+  public long getThreadAllocatedBytes() {
+    return 0;
+  }
 
-    long startBytesAllocated1;
+  public static long getCurrentThreadCpuTime() {
+    return _isThreadCpuTimeMeasurementEnabled ? MX_BEAN.getCurrentThreadCpuTime() : 0;
+  }
+
+  public static long getCurrentThreadAllocatedBytes() {
     try {
-      startBytesAllocated1 = _isThreadMemoryMeasurementEnabled
-          ? (long) SUN_THREAD_MXBEAN_GET_BYTES_ALLOCATED_METHOD.invoke(MX_BEAN, Thread.currentThread().getId()) : -1;
+      return _isThreadMemoryMeasurementEnabled ? (long) SUN_THREAD_MXBEAN_GET_BYTES_ALLOCATED_METHOD
+          .invoke(MX_BEAN, Thread.currentThread().getId()) : 0;
     } catch (IllegalAccessException | InvocationTargetException e) {
-      startBytesAllocated1 = -1;
-      LOGGER.error("Exception happened during the invocation of getting initial bytes allocated", e);
+      LOGGER.error("Exception happened during the invocation of getting current bytes allocated", e);
+      return 0;
     }
-    _startBytesAllocated = startBytesAllocated1;
   }
 
   public static boolean isThreadCpuTimeMeasurementEnabled() {
@@ -98,20 +104,6 @@ public class ThreadResourceUsageProvider {
       }
     }
     _isThreadMemoryMeasurementEnabled = enable && IS_THREAD_ALLOCATED_MEMORY_SUPPORTED && isThreadAllocateMemoryEnabled;
-  }
-
-  public long getThreadTimeNs() {
-    return _isThreadCpuTimeMeasurementEnabled ? MX_BEAN.getCurrentThreadCpuTime() - _startTimeNs : 0;
-  }
-
-  public long getThreadAllocatedBytes() {
-    try {
-      return _isThreadMemoryMeasurementEnabled ? (long) SUN_THREAD_MXBEAN_GET_BYTES_ALLOCATED_METHOD
-          .invoke(MX_BEAN, Thread.currentThread().getId()) - _startBytesAllocated : 0;
-    } catch (IllegalAccessException | InvocationTargetException e) {
-      LOGGER.error("Exception happened during the invocation of getting initial bytes allocated", e);
-      return 0;
-    }
   }
 
   //initialize the com.sun.management.ThreadMXBean related variables using reflection

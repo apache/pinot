@@ -225,6 +225,10 @@ public class ControllerRequestURLBuilder {
         + "&minAvailableReplicas=" + minAvailableReplicas;
   }
 
+  public String forTableConsumingSegmentsInfo(String tableName) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName, "consumingSegmentsInfo");
+  }
+
   public String forTableForceCommit(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "forceCommit");
   }
@@ -622,6 +626,11 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "pauseStatus");
   }
 
+  public String forValidDocIdsMetadata(String tableName, String validDocIdsType) {
+    return StringUtil.join("/", _baseUrl, "tables", tableName,
+        "validDocIdsMetadata?validDocIdsType=" + validDocIdsType);
+  }
+
   public String forUpdateTagsValidation() {
     return _baseUrl + "/instances/updateTags/validate";
   }
@@ -668,5 +677,9 @@ public class ControllerRequestURLBuilder {
 
   public String forTableTimeBoundary(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "timeBoundary");
+  }
+
+  public String forPageCacheWarmupQueries(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "pagecache", "queries", tableName) + "?tableType=" + tableType;
   }
 }

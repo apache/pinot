@@ -68,7 +68,6 @@ const defaultTableObj = {
     "tagOverrideConfig": {}
   },
   "segmentsConfig": {
-    "schemaName": "",
     "timeColumnName": null,
     "replication": "1",
     "replicasPerPartition": "1",

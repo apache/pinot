@@ -34,6 +34,7 @@ import org.apache.pinot.common.datablock.DataBlockUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.RoaringBitmapUtils;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
@@ -415,7 +416,7 @@ public class DataTableImplV4 implements DataTable {
   @Override
   public byte[] toBytes()
       throws IOException {
-    ThreadResourceUsageProvider threadTimer = new ThreadResourceUsageProvider();
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
 
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
     DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream);
@@ -425,13 +426,12 @@ public class DataTableImplV4 implements DataTable {
     // TODO: The check on cpu time and memory measurement is not needed. We can remove it. But keeping it around for
     // backward compatibility.
     if (ThreadResourceUsageProvider.isThreadCpuTimeMeasurementEnabled()) {
-      long responseSerializationCpuTimeNs = threadTimer.getThreadTimeNs();
-      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(), String.valueOf(responseSerializationCpuTimeNs));
+      getMetadata().put(MetadataKey.RESPONSE_SER_CPU_TIME_NS.getName(),
+          String.valueOf(resourceSnapshot.getCpuTimeNs()));
     }
     if (ThreadResourceUsageProvider.isThreadMemoryMeasurementEnabled()) {
-      long responseSerializationAllocatedBytes = threadTimer.getThreadAllocatedBytes();
       getMetadata().put(MetadataKey.RESPONSE_SER_MEM_ALLOCATED_BYTES.getName(),
-          String.valueOf(responseSerializationAllocatedBytes));
+          String.valueOf(resourceSnapshot.getAllocatedBytes()));
     }
 
     // Write metadata: length followed by actual metadata bytes.
@@ -549,6 +549,8 @@ public class DataTableImplV4 implements DataTable {
         dataOutputStream.write(Ints.toByteArray(Integer.parseInt(value)));
       } else if (key.getValueType() == MetadataValueType.LONG) {
         dataOutputStream.write(Longs.toByteArray(Long.parseLong(value)));
+      } else if (key.getValueType() == MetadataValueType.BOOLEAN) {
+        dataOutputStream.write(DataTableUtils.encodeBoolean(Boolean.parseBoolean(value)));
       } else {
         byte[] valueBytes = value.getBytes(UTF_8);
         dataOutputStream.writeInt(valueBytes.length);
@@ -585,6 +587,9 @@ public class DataTableImplV4 implements DataTable {
         metadata.put(key.getName(), value);
       } else if (key.getValueType() == MetadataValueType.LONG) {
         String value = "" + buffer.getLong();
+        metadata.put(key.getName(), value);
+      } else if (key.getValueType() == MetadataValueType.BOOLEAN) {
+        String value = "" + DataTableUtils.decodeBoolean(buffer);
         metadata.put(key.getName(), value);
       } else {
         String value = DataTableUtils.decodeString(buffer);

@@ -156,6 +156,12 @@ public enum ServerMeter implements AbstractMetrics.Meter {
    */
   HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
   /**
+   * Number of times group by results were trimmed.
+   * It is increased in one by each worker that reaches the limit within the stage.
+   * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.
+   */
+  AGGREGATE_TIMES_GROUPS_TRIMMED("times", true),
+  /**
    * Number of times the max number of groups has been reached.
    * It is increased in one by each worker that reaches the limit within the stage.
    * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 10.

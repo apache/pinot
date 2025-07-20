@@ -93,7 +93,7 @@ public interface DataTable {
   DataTable toDataOnlyDataTable();
 
   enum MetadataValueType {
-    INT, LONG, STRING
+    INT, LONG, STRING, BOOLEAN
   }
 
   /* The MetadataKey is used since V3, where we present metadata as Map<MetadataKey, String>
@@ -144,11 +144,15 @@ public interface DataTable {
     MAX_ROWS_IN_JOIN_REACHED(34, "maxRowsInJoinReached", MetadataValueType.STRING),
     NUM_GROUPS_WARNING_LIMIT_REACHED(35, "numGroupsWarningLimitReached", MetadataValueType.STRING),
     THREAD_MEM_ALLOCATED_BYTES(36, "threadMemAllocatedBytes", MetadataValueType.LONG),
-    RESPONSE_SER_MEM_ALLOCATED_BYTES(37, "responseSerMemAllocatedBytes", MetadataValueType.LONG);
-
+    RESPONSE_SER_MEM_ALLOCATED_BYTES(37, "responseSerMemAllocatedBytes", MetadataValueType.LONG),
+    // NOTE: for server after release 1.3.0 this flag is always set to true since servers now perform sorting
+    SORTED(38, "sorted", MetadataValueType.BOOLEAN),
+    GROUPS_TRIMMED(39, "groupsTrimmed", MetadataValueType.STRING),
+    // Needed so that we can track workload name in Netty channel response.
+    WORKLOAD_NAME(40, "workloadName", MetadataValueType.STRING);
     // We keep this constant to track the max id added so far for backward compatibility.
     // Increase it when adding new keys, but NEVER DECREASE IT!!!
-    private static final int MAX_ID = 37;
+    private static final int MAX_ID = WORKLOAD_NAME.getId();
 
     private static final MetadataKey[] ID_TO_ENUM_KEY_MAP = new MetadataKey[MAX_ID + 1];
     private static final Map<String, MetadataKey> NAME_TO_ENUM_KEY_MAP = new HashMap<>();

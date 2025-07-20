@@ -58,11 +58,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Executes a "page‑cache warm‑up" fan‑out after new segments are pushed or refreshed.
+ * Executes a "page‑cache warm‑up" after segments are refreshed.
  *
- * <p>The executor reads the warm‑up query file located at
+ * <p>The executor reads the warm‑up query file from
  * <code>{controllerConf.pageCacheWarmupDataDir}/{tableNameWithType}/queries</code>,
- * prepends {@code SET isSecondaryWorkload=true;} so the server runs the query on
+ * prepends {@code SET isSecondaryWorkload=true;} to intend  the server to run the query on
  * its secondary workload queue, wraps the list in a
  * {@link PageCacheWarmupRequest},
  * and POSTs the request to every server that hosts the table.</p>
@@ -188,10 +188,10 @@ public class PageCacheWarmupControllerExecutor {
       });
       warmupFuture.get(maxWarmupDurationMs, TimeUnit.MILLISECONDS);
     } catch (TimeoutException e) {
-      _controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS_TIMEOUT, 1);
+      _controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
       LOGGER.error("Global warmup timed out for table: {}", rawTableName);
     } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS_ERRORS, 1);
+      _controllerMetrics.addMeteredTableValue(rawTableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
       LOGGER.error("Failed to serve queries for table: {}", tableNameWithType, e);
     }
   }
@@ -201,7 +201,7 @@ public class PageCacheWarmupControllerExecutor {
    *
    * <p>The retry policy is {@link #DEFAULT_RETRY_POLICY}. Success increments no metrics,
    * but failures and retries are logged, and a final failure increments
-   * {@link org.apache.pinot.common.metrics.ControllerMeter#PAGE_CACHE_WARMUP_REQUESTS_ERRORS}.</p>
+   * {@link org.apache.pinot.common.metrics.ControllerMeter#PAGE_CACHE_WARMUP_REQUEST_ERRORS}.</p>
    */
   private void sendWarmupRequestWithRetry(URI uri, PageCacheWarmupRequest request, String serverInstance,
                                           String tableName) {
@@ -231,7 +231,7 @@ public class PageCacheWarmupControllerExecutor {
         }
       });
     } catch (Exception e) {
-      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUESTS_ERRORS, 1);
+      _controllerMetrics.addMeteredTableValue(tableName, ControllerMeter.PAGE_CACHE_WARMUP_REQUEST_ERRORS, 1);
       LOGGER.error("Error sending warmup request to server: {} for table: {}", serverInstance, tableName, e);
     }
   }

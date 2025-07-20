@@ -104,6 +104,8 @@ import org.apache.pinot.core.util.PeerServerSegmentFinder;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.partition.metadata.ColumnPartitionMetadata;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
+import org.apache.pinot.spi.config.table.DedupConfig;
+import org.apache.pinot.spi.config.table.DisasterRecoveryMode;
 import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
@@ -801,9 +803,16 @@ public class PinotLLCRealtimeSegmentManager {
         newConsumingSegmentName = newLLCSegment.getSegmentName();
         LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
             Status.IN_PROGRESS);
+      } else {
+        LOGGER.info(
+            "Skipping creation of new segment metadata after segment: {} during commit. Reason: Partition ID: {} not "
+                + "found in upstream metadata.",
+            committingSegmentName, committingSegmentPartitionGroupId);
       }
     } else {
-      LOGGER.info("Skipped creation of new segment metadata as the table: {} is paused", realtimeTableName);
+      LOGGER.info(
+          "Skipping creation of new segment metadata after segment: {} during commit. Reason: table: {} is paused.",
+          committingSegmentName, realtimeTableName);
     }
     return newConsumingSegmentName;
   }
@@ -2167,7 +2176,7 @@ public class PinotLLCRealtimeSegmentManager {
     try {
       for (Set<String> segmentBatchToCommit : segmentBatchList) {
         if (prevBatch != null) {
-          waitUntilPrevBatchIsComplete(tableNameWithType, prevBatch, forceCommitBatchConfig);
+          waitUntilSegmentsForceCommitted(tableNameWithType, prevBatch, forceCommitBatchConfig);
         }
         sendForceCommitMessageToServers(tableNameWithType, segmentBatchToCommit);
         prevBatch = segmentBatchToCommit;
@@ -2178,7 +2187,7 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
-  private void waitUntilPrevBatchIsComplete(String tableNameWithType, Set<String> segmentBatchToCommit,
+  public void waitUntilSegmentsForceCommitted(String tableNameWithType, Set<String> segmentsToWait,
       ForceCommitBatchConfig forceCommitBatchConfig)
       throws InterruptedException {
     int batchStatusCheckIntervalMs = forceCommitBatchConfig.getBatchStatusCheckIntervalMs();
@@ -2191,17 +2200,17 @@ public class PinotLLCRealtimeSegmentManager {
     Set<?>[] segmentsYetToBeCommitted = new Set[1];
     try {
       retryPolicy.attempt(() -> {
-        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentBatchToCommit);
+        segmentsYetToBeCommitted[0] = getSegmentsYetToBeCommitted(tableNameWithType, segmentsToWait);
         return segmentsYetToBeCommitted[0].isEmpty();
       });
     } catch (AttemptFailureException e) {
       String errorMsg = String.format(
           "Exception occurred while waiting for the forceCommit of segments: %s, attempt count: %d, "
-              + "segmentsYetToBeCommitted: %s", segmentBatchToCommit, e.getAttempts(), segmentsYetToBeCommitted[0]);
+              + "segmentsYetToBeCommitted: %s", segmentsToWait, e.getAttempts(), segmentsYetToBeCommitted[0]);
       throw new RuntimeException(errorMsg, e);
     }
 
-    LOGGER.info("segmentBatch: {} successfully force committed", segmentBatchToCommit);
+    LOGGER.info("segments: {} successfully force committed", segmentsToWait);
   }
 
   @VisibleForTesting
@@ -2501,27 +2510,17 @@ public class PinotLLCRealtimeSegmentManager {
         segmentsInErrorStateInAtLeastOneReplica.size(), segmentsInErrorStateInAtLeastOneReplica,
         segmentsInErrorStateInAllReplicas.size(), segmentsInErrorStateInAllReplicas, realtimeTableName);
 
-    boolean isPartialUpsertEnabled =
-        tableConfig.getUpsertConfig() != null && tableConfig.getUpsertConfig().getMode() == UpsertConfig.Mode.PARTIAL;
-    boolean isDedupEnabled = tableConfig.getDedupConfig() != null && tableConfig.getDedupConfig().isDedupEnabled();
-    if ((isPartialUpsertEnabled || isDedupEnabled) && !repairErrorSegmentsForPartialUpsertOrDedup) {
+    if (!allowRepairOfErrorSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig)) {
       // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
       // lead to data inconsistencies
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
-      LOGGER.error("Skipping repair for errored segments in table: {} because dedup or partial upsert is enabled.",
-          realtimeTableName);
       return;
     } else {
-      if ((isPartialUpsertEnabled || isDedupEnabled)) {
-        LOGGER.info(
-            "Repairing error segments in table: {} as repairErrorSegmentForPartialUpsertOrDedup is set to true",
-            realtimeTableName);
-      }
+      LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
           ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, segmentsInErrorStateInAllReplicas.size());
     }
-
 
     for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
       SegmentZKMetadata segmentZKMetadata = getSegmentZKMetadata(realtimeTableName, segmentName);
@@ -2557,6 +2556,43 @@ public class PinotLLCRealtimeSegmentManager {
         _helixResourceManager.resetSegment(realtimeTableName, segmentName, null);
       }
     }
+  }
+
+  private boolean allowRepairOfErrorSegments(boolean repairErrorSegmentsForPartialUpsertOrDedup,
+      TableConfig tableConfig) {
+    if (repairErrorSegmentsForPartialUpsertOrDedup) {
+      // If API context has repairErrorSegmentsForPartialUpsertOrDedup=true, allow repair.
+      return true;
+    }
+
+    if ((tableConfig.getIngestionConfig() != null) && (tableConfig.getIngestionConfig().getStreamIngestionConfig()
+        != null)) {
+      DisasterRecoveryMode disasterRecoveryMode =
+          tableConfig.getIngestionConfig().getStreamIngestionConfig().getDisasterRecoveryMode();
+      if (disasterRecoveryMode == DisasterRecoveryMode.ALWAYS) {
+        return true;
+      }
+    }
+
+    boolean isPartialUpsertEnabled = (tableConfig.getUpsertConfig() != null) && (tableConfig.getUpsertConfig().getMode()
+        == UpsertConfig.Mode.PARTIAL);
+    if (isPartialUpsertEnabled) {
+      // If isPartialUpsert is enabled, do not allow repair.
+      LOGGER.warn("Skipping repair for errored segments in table: {} because partialUpsert is enabled",
+          tableConfig.getTableName());
+      return false;
+    }
+
+    DedupConfig dedupConfig = tableConfig.getDedupConfig();
+    boolean isDedupEnabled = (dedupConfig != null) && (dedupConfig.isDedupEnabled());
+    if (isDedupEnabled) {
+      // If dedup is enabled, do not allow repair of error segment.
+      LOGGER.warn("Skipping repair for errored segments in table: {} because dedup is enabled",
+          tableConfig.getTableName());
+      return false;
+    }
+
+    return true;
   }
 
   /**

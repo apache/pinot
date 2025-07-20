@@ -23,13 +23,12 @@ import java.util.List;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
-import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 import org.testng.collections.Lists;
 
 import static org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils.regexQueryNrHitsForRealTimeFST;
-import static org.testng.AssertJUnit.assertEquals;
+import static org.testng.Assert.assertEquals;
 
 
 public class MutableFSTImplTest {
@@ -54,14 +53,14 @@ public class MutableFSTImplTest {
     List<Integer> listGood = Lists.newArrayList(1, 2, 3, 4, 5, 6, 7, 8, 9);
     List<Integer> listBad = Lists.newArrayList(null, 1, 2, null, 3, 4, null, 5, 6, null, 7, 8, 9, null);
     MutableFSTImpl.compactNulls((ArrayList) listBad);
-    assertEquals(listGood, listBad);
+    assertEquals(listBad, listGood);
   }
 
   @Test
   public void shouldCompactNulls2() {
     ArrayList<Integer> listBad = (ArrayList) Lists.newArrayList(1);
     MutableFSTImpl.compactNulls(listBad);
-    assertEquals(Lists.newArrayList(1), listBad);
+    assertEquals(listBad, Lists.newArrayList(1));
   }
 
 
@@ -75,7 +74,7 @@ public class MutableFSTImplTest {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch("h.*", fst, writer::add);
 
-    Assert.assertEquals(writer.get().getCardinality(), 2);
+    assertEquals(writer.get().getCardinality(), 2);
   }
 
   @Test
@@ -88,7 +87,7 @@ public class MutableFSTImplTest {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch(".*h", fst, writer::add);
 
-    Assert.assertEquals(writer.get().getCardinality(), 2);
+    assertEquals(writer.get().getCardinality(), 2);
   }
 
   @Test
@@ -102,13 +101,13 @@ public class MutableFSTImplTest {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch(".*123", fst, writer::add);
 
-    Assert.assertEquals(writer.get().getCardinality(), 1);
+    assertEquals(writer.get().getCardinality(), 1);
 
     writer.reset();
 
     RealTimeRegexpMatcher.regexMatch(".till", fst, writer::add);
 
-    Assert.assertEquals(writer.get().getCardinality(), 1);
+    assertEquals(writer.get().getCardinality(), 1);
   }
 
   @Test
@@ -122,12 +121,12 @@ public class MutableFSTImplTest {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch("hello.*123", fst, writer::add);
 
-    Assert.assertEquals(writer.get().getCardinality(), 1);
+    assertEquals(writer.get().getCardinality(), 1);
 
     writer.reset();
     RealTimeRegexpMatcher.regexMatch("hello.*", fst, writer::add);
 
-    Assert.assertEquals(writer.get().getCardinality(), 2);
+    assertEquals(writer.get().getCardinality(), 2);
   }
 
   @Test
@@ -140,26 +139,26 @@ public class MutableFSTImplTest {
     RoaringBitmapWriter<MutableRoaringBitmap> writer = RoaringBitmapWriter.bufferWriter().get();
     RealTimeRegexpMatcher.regexMatch("cars?", fst, writer::add);
 
-    Assert.assertEquals(writer.get().getCardinality(), 2);
+    assertEquals(writer.get().getCardinality(), 2);
   }
 
   @Test
   public void testRegex1() {
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("q.[aeiou]c.*", _fst), 1);
+    assertEquals(regexQueryNrHitsForRealTimeFST("q.[aeiou]c.*", _fst), 1);
   }
 
   @Test
   public void testRegex2() {
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST(".[aeiou]c.*", _fst), 1);
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("q.[aeiou]c.", _fst), 1);
+    assertEquals(regexQueryNrHitsForRealTimeFST(".[aeiou]c.*", _fst), 1);
+    assertEquals(regexQueryNrHitsForRealTimeFST("q.[aeiou]c.", _fst), 1);
   }
 
   @Test
   public void testCharacterClasses() {
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d*", _fst), 1);
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d{6}", _fst), 1);
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("[a\\d]{6}", _fst), 1);
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d{2,7}", _fst), 1);
-    Assert.assertEquals(regexQueryNrHitsForRealTimeFST("\\d{4}", _fst), 0);
+    assertEquals(regexQueryNrHitsForRealTimeFST("\\d*", _fst), 1);
+    assertEquals(regexQueryNrHitsForRealTimeFST("\\d{6}", _fst), 1);
+    assertEquals(regexQueryNrHitsForRealTimeFST("[a\\d]{6}", _fst), 1);
+    assertEquals(regexQueryNrHitsForRealTimeFST("\\d{2,7}", _fst), 1);
+    assertEquals(regexQueryNrHitsForRealTimeFST("\\d{4}", _fst), 0);
   }
 }

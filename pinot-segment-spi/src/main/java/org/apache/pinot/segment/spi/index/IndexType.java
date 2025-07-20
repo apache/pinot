@@ -115,8 +115,9 @@ public interface IndexType<C extends IndexConfig, IR extends IndexReader, IC ext
    */
   List<String> getFileExtensions(@Nullable ColumnMetadata columnMetadata);
 
+  // TODO: Consider passing in IndexLoadingConfig
   IndexHandler createIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> configsByCol,
-      @Nullable Schema schema, @Nullable TableConfig tableConfig);
+      Schema schema, TableConfig tableConfig);
 
   /**
    * This method is used to perform in place conversion of provided {@link TableConfig} to newer format

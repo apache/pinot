@@ -139,6 +139,7 @@ public class QueryContext {
   // Whether server returns the final result with unpartitioned group key
   private boolean _serverReturnFinalResultKeyUnpartitioned;
   private boolean _accurateGroupByWithoutOrderBy;
+  private boolean _isUnsafeTrim;
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
@@ -162,6 +163,22 @@ public class QueryContext {
     _queryOptions = queryOptions;
     _expressionOverrideHints = expressionOverrideHints;
     _explain = explain;
+  }
+
+  private boolean isSameOrderAndGroupByColumns(QueryContext context) {
+    List<ExpressionContext> groupByKeys = context.getGroupByExpressions();
+    List<OrderByExpressionContext> orderByKeys = context.getOrderByExpressions();
+
+    if (groupByKeys == null || groupByKeys.isEmpty()) {
+      return orderByKeys == null || orderByKeys.isEmpty();
+    } else if (orderByKeys == null || orderByKeys.isEmpty()) {
+      return false;
+    }
+
+    Set<ExpressionContext> groupByKeyIdentSet = new HashSet<>(groupByKeys);
+    Set<ExpressionContext> orderByKeyIdentSet = new HashSet<>();
+    orderByKeys.forEach(key -> orderByKeyIdentSet.add(key.getExpression()));
+    return groupByKeyIdentSet.equals(orderByKeyIdentSet);
   }
 
   /**
@@ -520,6 +537,10 @@ public class QueryContext {
     return isIndexUseAllowed(dataSource.getColumnName(), indexType);
   }
 
+  public boolean isUnsafeTrim() {
+    return _isUnsafeTrim;
+  }
+
   public static class Builder {
     private String _tableName;
     private QueryContext _subquery;
@@ -633,6 +654,9 @@ public class QueryContext {
       // Pre-calculate the aggregation functions and columns for the query
       generateAggregationFunctions(queryContext);
       extractColumns(queryContext);
+
+      queryContext._isUnsafeTrim =
+          !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
 
       return queryContext;
     }

@@ -20,9 +20,9 @@ package org.apache.pinot.core.accounting;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.concurrent.atomic.AtomicReference;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.utils.CommonConstants;
 
@@ -42,6 +42,9 @@ public class CPUMemThreadLevelAccountingObjects {
     // current sample of thread memory usage/cputime ; this field is accessed by the thread itself and the accountant
     volatile long _currentThreadCPUTimeSampleMS = 0;
     volatile long _currentThreadMemoryAllocationSampleBytes = 0;
+
+    // reference point for start time/bytes
+    private final ThreadResourceSnapshot _threadResourceSnapshot = new ThreadResourceSnapshot();
 
     // previous query_id, task_id of the thread, this field should only be accessed by the accountant
     TaskEntry _previousThreadTaskStatus = null;
@@ -111,8 +114,22 @@ public class CPUMemThreadLevelAccountingObjects {
     }
 
     public void setThreadTaskStatus(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-        @Nonnull Thread anchorThread) {
-      _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread));
+        Thread anchorThread, String workloadName) {
+      _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread, workloadName));
+      _threadResourceSnapshot.reset();
+    }
+
+    /**
+     * Note that the precision does not match the name of the variable.
+     * _currentThreadCPUTimeSampleMS is in nanoseconds, but the variable name suggests milliseconds.
+     * This is to maintain backward compatibility. It replaces code that set the value in nanoseconds.
+     */
+    public void updateCpuSnapshot() {
+      _currentThreadCPUTimeSampleMS = _threadResourceSnapshot.getCpuTimeNs();
+    }
+
+    public void updateMemorySnapshot() {
+      _currentThreadMemoryAllocationSampleBytes = _threadResourceSnapshot.getAllocatedBytes();
     }
   }
 
@@ -127,15 +144,18 @@ public class CPUMemThreadLevelAccountingObjects {
     private final Thread _anchorThread;
     private final TaskType _taskType;
 
+    private final String _workloadName;
+
     public boolean isAnchorThread() {
       return _taskId == CommonConstants.Accounting.ANCHOR_TASK_ID;
     }
 
-    public TaskEntry(String queryId, int taskId, TaskType taskType, Thread anchorThread) {
+    public TaskEntry(String queryId, int taskId, TaskType taskType, Thread anchorThread, String workloadName) {
       _queryId = queryId;
       _taskId = taskId;
       _anchorThread = anchorThread;
       _taskType = taskType;
+      _workloadName = workloadName;
     }
 
     public String getQueryId() {
@@ -155,10 +175,15 @@ public class CPUMemThreadLevelAccountingObjects {
       return _taskType;
     }
 
+
+    public String getWorkloadName() {
+      return _workloadName;
+    }
+
     @Override
     public String toString() {
       return "TaskEntry{" + "_queryId='" + _queryId + '\'' + ", _taskId=" + _taskId + ", _rootThread=" + _anchorThread
-          + '}';
+          + ", _taskType=" + _taskType + ", _workloadName=" + _workloadName + '}';
     }
   }
 }

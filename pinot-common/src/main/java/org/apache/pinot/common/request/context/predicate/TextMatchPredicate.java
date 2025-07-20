@@ -19,6 +19,7 @@
 package org.apache.pinot.common.request.context.predicate;
 
 import java.util.Objects;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 
 
@@ -27,10 +28,16 @@ import org.apache.pinot.common.request.context.ExpressionContext;
  */
 public class TextMatchPredicate extends BasePredicate {
   private final String _value;
+  private final String _options;
 
   public TextMatchPredicate(ExpressionContext lhs, String value) {
+    this(lhs, value, null);
+  }
+
+  public TextMatchPredicate(ExpressionContext lhs, String value, @Nullable String options) {
     super(lhs);
     _value = value;
+    _options = options;
   }
 
   @Override
@@ -42,6 +49,11 @@ public class TextMatchPredicate extends BasePredicate {
     return _value;
   }
 
+  @Nullable
+  public String getOptions() {
+    return _options;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {
@@ -51,16 +63,20 @@ public class TextMatchPredicate extends BasePredicate {
       return false;
     }
     TextMatchPredicate that = (TextMatchPredicate) o;
-    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value);
+    return Objects.equals(_lhs, that._lhs) && Objects.equals(_value, that._value) && Objects.equals(_options, that._options);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(_lhs, _value);
+    return Objects.hash(_lhs, _value, _options);
   }
 
   @Override
   public String toString() {
-    return "text_match(" + _lhs + ",'" + _value + "')";
+    if (_options != null) {
+      return "text_match(" + _lhs + ",'" + _value + "','" + _options + "')";
+    } else {
+      return "text_match(" + _lhs + ",'" + _value + "')";
+    }
   }
 }

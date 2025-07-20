@@ -417,6 +417,15 @@ public abstract class ClusterTest extends ControllerTest {
   }
 
   /**
+   * Returns the headers to be sent to the controller for segment upload flow.
+   * Can be overridden to add custom headers, e.g., for authentication.
+   * By default, returns an empty list.
+   */
+  protected List<Header> getSegmentUploadAuthHeaders() {
+    return List.of();
+  }
+
+  /**
    * Upload all segments inside the given directories to the cluster.
    */
   protected void uploadSegments(String tableName, TableType tableType, List<File> tarDirs)
@@ -437,7 +446,7 @@ public abstract class ClusterTest extends ControllerTest {
         if (System.currentTimeMillis() % 2 == 0) {
           assertEquals(
               fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-                  tableName, tableType).getStatusCode(), HttpStatus.SC_OK);
+                getSegmentUploadAuthHeaders(), tableName, tableType).getStatusCode(), HttpStatus.SC_OK);
         } else {
           assertEquals(
               uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
@@ -445,13 +454,14 @@ public abstract class ClusterTest extends ControllerTest {
         }
       } else {
         // Upload all segments in parallel
-        ExecutorService executorService = Executors.newFixedThreadPool(numSegments);
+        ExecutorService executorService = Executors.newFixedThreadPool(Math.min(numSegments, Runtime.getRuntime()
+            .availableProcessors()));
         List<Future<Integer>> futures = new ArrayList<>(numSegments);
         for (File segmentTarFile : segmentTarFiles) {
           futures.add(executorService.submit(() -> {
             if (System.currentTimeMillis() % 2 == 0) {
               return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
-                  segmentTarFile, tableName, tableType).getStatusCode();
+                  segmentTarFile, getSegmentUploadAuthHeaders(), tableName, tableType).getStatusCode();
             } else {
               return uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
                   segmentTarFile);
@@ -469,11 +479,12 @@ public abstract class ClusterTest extends ControllerTest {
   private int uploadSegmentWithOnlyMetadata(String tableName, TableType tableType, URI uploadSegmentHttpURI,
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
-    List<Header> headers = List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
-                + URIUtils.encode(segmentTarFile.getName())),
-        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
-            FileUploadDownloadClient.FileUploadType.METADATA.toString()));
+    List<Header> headers = new ArrayList<>(List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
+        "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
+          + URIUtils.encode(segmentTarFile.getName())),
+      new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+        FileUploadDownloadClient.FileUploadType.METADATA.toString())));
+    headers.addAll(getSegmentUploadAuthHeaders());
     // Add table name and table type as request parameters
     NameValuePair tableNameValuePair =
         new BasicNameValuePair(FileUploadDownloadClient.QueryParameters.TABLE_NAME, tableName);
@@ -773,6 +784,15 @@ public abstract class ClusterTest extends ControllerTest {
     URI cancelURI = URI.create(getControllerRequestURLBuilder().forCancelQueryByClientId(clientQueryId));
     Object o = _httpClient.sendDeleteRequest(cancelURI);
     return null; // TODO
+  }
+
+  /**
+   * Execute a query and extract the count result
+   */
+  protected int getQueryNumResultRows(String query) throws Exception {
+    JsonNode response = postQuery(query);
+    JsonNode resTbl = response.get("resultTable");
+    return (resTbl == null || resTbl.get("rows").isEmpty()) ? 0 : resTbl.get("rows").get(0).get(0).asInt();
   }
 
   private Map<String, String> getExtraQueryPropertiesForController() {

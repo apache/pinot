@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.physical.v2;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -101,7 +102,7 @@ public class PlanFragmentAndMailboxAssignment {
       MailboxSendNode sendNode = new MailboxSendNode(senderFragmentId, inputFragmentSchema, new ArrayList<>(),
           currentFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), false, physicalExchange.getRelCollation().getFieldCollations(),
-          false /* sort on sender */);
+          false /* sort on sender */, physicalExchange.getHashFunction().name());
       MailboxReceiveNode receiveNode = new MailboxReceiveNode(currentFragmentId, inputFragmentSchema,
           senderFragmentId, PinotRelExchangeType.getDefaultExchangeType(), distributionType,
           physicalExchange.getDistributionKeys(), physicalExchange.getRelCollation().getFieldCollations(),
@@ -253,6 +254,14 @@ public class PlanFragmentAndMailboxAssignment {
     for (var entry : workersByUniqueHostPort.entrySet()) {
       result.add(new MailboxInfo(entry.getKey().getHostname(), entry.getKey().getQueryMailboxPort(), entry.getValue()));
     }
+    // IMP: Return mailbox info sorted by workerIds. This is because SendingMailbox are created in this order, and
+    // record assignment for hash exchange follows modulo arithmetic. e.g. if we have sending mailbox in order:
+    // [worker-1, worker-0], then records with modulo 0 hash would end up in worker-1.
+    // Note that the workerIds list will be >1 in length only when there's a parallelism change. It's important to
+    // also know that MailboxSendOperator will iterate over this List<MailboxInfo> in order, and within each iteration
+    // iterate over all the workerIds of that MailboxInfo. The result List<SendingMailbox> is used for modulo
+    // arithmetic for any partitioning exchange strategy.
+    result.sort(Comparator.comparingInt(info -> info.getWorkerIds().get(0)));
     return result;
   }
 

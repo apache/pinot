@@ -37,7 +37,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 import org.apache.pinot.tsdb.spi.series.SimpleTimeSeriesBuilderFactory;
 import org.apache.pinot.util.TestUtils;
-import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.annotations.AfterClass;
@@ -164,6 +163,19 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     runGroupedTimeSeriesQuery(query, 3, (ts, val, row) ->
       assertEquals(val, ts <= DATA_START_TIME_SEC ? 0L : VIEWS_MAX_VALUE)
     );
+  }
+
+  @Test
+  public void testStartTimeEqualsEndTimeQuery() {
+    String query = String.format(
+      "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+        + " | max{%s} | transformNull{0} | keepLastValue{}",
+      TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    JsonNode result = getTimeseriesQuery(query, QUERY_START_TIME_SEC, QUERY_START_TIME_SEC, getHeaders());
+    assertEquals(result.get("status").asText(), "success");
+    JsonNode series = result.get("data").get("result");
+    assertEquals(series.size(), 0);
   }
 
   protected Map<String, String> getHeaders() {
@@ -296,7 +308,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     return new org.apache.avro.Schema.Field(name, org.apache.avro.Schema.create(type), null, null);
   }
 
-  private static GenericData.@NotNull Record getRecord(org.apache.avro.Schema avroSchema, int i) {
+  private static GenericData.Record getRecord(org.apache.avro.Schema avroSchema, int i) {
     GenericData.Record record = new GenericData.Record(avroSchema);
     // Do not set DATA_START_TIME_SEC for easier assertion of values.
     record.put(TS_COLUMN, (DATA_START_TIME_SEC + 1 + i) * 1000L);
