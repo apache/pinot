@@ -79,6 +79,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.intellij.lang.annotations.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -242,6 +243,43 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected PinotConfiguration getServerConf(int serverId) {
     PinotConfiguration serverConf = new PinotConfiguration();
+    // generic for enabling read path:
+    serverConf.setProperty("pinot.server.segment.fetcher.protocols", List.of("file", "https"));
+    serverConf.setProperty("pinot.server.segment.fetcher.https.class",
+        "org.apache.pinot.common.utils.fetcher.PinotFSSegmentFetcher");
+
+    // realtime tables only
+//    serverConf.setProperty("pinot.server.storage.factory.class.https", "org.apache.pinot.plugin.filesystem.S3PinotFS");
+//    serverConf.setProperty("pinot.server.storage.factory.https.region", "us-east-1");
+//    serverConf.setProperty("pinot.server.storage.factory.https.accessKey", "...");
+//    serverConf.setProperty("pinot.server.storage.factory.https.secretKey", "...");
+//    serverConf.setProperty("pinot.server.storage.factory.https.endpoint", "https://gpfs-endpoint:6443");
+    serverConf.setProperty("pinot.server.segment.fetcher.protocols", "file,http,https,s3");
+
+    // This is for requests with https pinot-controller vip endpoints.
+    serverConf.setProperty("pinot.server.storage.factory.class.https", "org.apache.pinot.common.utils.filesystem.LiPinotFS");
+    serverConf.setProperty("pinot.server.storage.factory.https.schemes", "s3");
+    serverConf.setProperty("pinot.server.storage.factory.https.s3.class", "org.apache.pinot.plugin.filesystem.S3PinotFS");
+    serverConf.setProperty("pinot.server.storage.factory.https.s3.region", "us-east-1");
+    serverConf.setProperty("pinot.server.storage.factory.https.s3.accessKey", "...");
+    serverConf.setProperty("pinot.server.storage.factory.https.s3.secretKey", "...");
+    serverConf.setProperty("pinot.server.storage.factory.https.s3.endpoint", "https://gpfs-endpoint:6443");
+    serverConf.setProperty("pinot.server.storage.factory.https.s3.bucketName", "pinot");
+    serverConf.setProperty("pinot.server.storage.factory.https.s3.s3DataPath", "/pinot_segments/cicd");
+
+    // This is for requests with s3 paths.
+    serverConf.setProperty("pinot.server.storage.factory.class.s3", "org.apache.pinot.plugin.filesystem.S3PinotFS");
+    serverConf.setProperty("pinot.server.storage.factory.s3.region", "us-east-1");
+    serverConf.setProperty("pinot.server.storage.factory.s3.accessKey", "...");
+    serverConf.setProperty("pinot.server.storage.factory.s3.secretKey", "...");
+    serverConf.setProperty("pinot.server.storage.factory.s3.endpoint", "https://gpfs-endpoint:6443");
+
+    // needed for realtime uploads
+    serverConf.setProperty("pinot.server.instance.segment.upload.to.deep.store", true);
+    serverConf.setProperty("pinot.server.instance.segment.store.uri", "https://pinot-controller.prod.pinot-controller.ei-ltx1.atd.stg.linkedin.com:10611/segments");
+    // Change to this when data dir path gets changed from pinot-controller vip endpoint to a s3 endpoint.
+//    serverConf.setProperty("pinot.server.instance.segment.store.uri", "s3://pinot/segments/cicd");
+
     serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
@@ -458,15 +496,9 @@ public abstract class ClusterTest extends ControllerTest {
             .availableProcessors()));
         List<Future<Integer>> futures = new ArrayList<>(numSegments);
         for (File segmentTarFile : segmentTarFiles) {
-          futures.add(executorService.submit(() -> {
-            if (System.currentTimeMillis() % 2 == 0) {
-              return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
-                  segmentTarFile, getSegmentUploadAuthHeaders(), tableName, tableType).getStatusCode();
-            } else {
-              return uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
-                  segmentTarFile);
-            }
-          }));
+          futures.add(executorService.submit(
+              () -> uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
+                  segmentTarFile)));
         }
         executorService.shutdown();
         for (Future<Integer> future : futures) {
@@ -479,11 +511,22 @@ public abstract class ClusterTest extends ControllerTest {
   private int uploadSegmentWithOnlyMetadata(String tableName, TableType tableType, URI uploadSegmentHttpURI,
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
+    String fileName = URIUtils.encode(segmentTarFile.getName());
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String segmentName = fileName.substring(0, fileName.indexOf(".tar.gz"));
+    // https://pinot-controller.prod.pinot-controller.ei-ltx1.atd.stg.linkedin.com:10611/segments/rawTableName/segmentName
     List<Header> headers = new ArrayList<>(List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-        "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
-          + URIUtils.encode(segmentTarFile.getName())),
-      new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
-        FileUploadDownloadClient.FileUploadType.METADATA.toString())));
+//        "https://pinot-controller.prod.pinot-controller.ei-ltx1.atd.stg.linkedin.com:10611/segments/" + rawTableName + "/" + segmentName),
+              "s3://pinot/pinot_segments/cicd/" + rawTableName + "/" + segmentName),
+//                    String.format("file://%s/%s", segmentTarFile.getParentFile().getAbsolutePath(),
+//                URIUtils.encode(segmentTarFile.getName()))),
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+            FileUploadDownloadClient.FileUploadType.METADATA.toString())));
+//    List<Header> headers = new ArrayList<>(List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
+//            String.format("file://%s/%s", segmentTarFile.getParentFile().getAbsolutePath(),
+//                URIUtils.encode(segmentTarFile.getName()))),
+//        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+//            FileUploadDownloadClient.FileUploadType.METADATA.toString())));
     headers.addAll(getSegmentUploadAuthHeaders());
     // Add table name and table type as request parameters
     NameValuePair tableNameValuePair =

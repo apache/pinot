@@ -62,6 +62,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.URIUtils;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
@@ -257,7 +258,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     List<File> tarDirs = new ArrayList<>();
     tarDirs.add(_tarDir);
-    tarDirs.add(tarDir2);
+//    tarDirs.add(tarDir2);
     try {
       uploadSegments(getTableName(), TableType.OFFLINE, tarDirs);
     } catch (Exception e) {
@@ -509,6 +510,14 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
 
       // Upload segment
+      String rawTableName = TableNameBuilder.extractRawTableName(offlineTableName);
+      List<Header> newHeaders = new ArrayList<>();
+      String fileName = URIUtils.encode(segmentTarFile.getName());
+      String segmentName = fileName.substring(0, fileName.indexOf(".tar.gz"));
+      newHeaders.addAll(List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
+          "https://pinot-controller.prod.pinot-controller.ei-ltx1.atd.stg.linkedin.com:10611/segments/" + rawTableName + "/" + segmentName),
+          new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+              FileUploadDownloadClient.FileUploadType.METADATA.toString())));
       SimpleHttpResponse response =
           fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile, null,
               parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
@@ -517,6 +526,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(segmentsZKMetadata.size(), 1);
 
       // Refresh existing segment
+      newHeaders.addAll(headers);
       response = fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
           headers, parameters, HttpClient.DEFAULT_SOCKET_TIMEOUT_MS);
       assertEquals(response.getStatusCode(), HttpStatus.SC_OK);

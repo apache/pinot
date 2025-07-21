@@ -52,8 +52,11 @@ import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
 import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
+import software.amazon.awssdk.core.internal.http.loader.DefaultSdkHttpClientBuilder;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer;
+import software.amazon.awssdk.http.SdkHttpClient;
+import software.amazon.awssdk.http.SdkHttpConfigurationOption;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.LegacyMd5Plugin;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -92,6 +95,7 @@ import software.amazon.awssdk.services.s3.model.UploadPartResponse;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
+import software.amazon.awssdk.utils.AttributeMap;
 
 
 /**
@@ -157,15 +161,17 @@ public class S3PinotFS extends BasePinotFS {
       S3ClientBuilder s3ClientBuilder = S3Client.builder().forcePathStyle(true).region(Region.of(s3Config.getRegion()))
           .credentialsProvider(awsCredentialsProvider).crossRegionAccessEnabled(s3Config.isCrossRegionAccessEnabled());
       if (StringUtils.isNotEmpty(s3Config.getEndpoint())) {
-        try {
-          s3ClientBuilder.endpointOverride(new URI(s3Config.getEndpoint()));
-        } catch (URISyntaxException e) {
-          throw new RuntimeException(e);
-        }
+        s3ClientBuilder.endpointOverride(URI.create(s3Config.getEndpoint()));
       }
       if (s3Config.getHttpClientBuilder() != null) {
         s3ClientBuilder.httpClientBuilder(s3Config.getHttpClientBuilder());
       }
+
+      final AttributeMap attributeMap = AttributeMap.builder()
+          .put(SdkHttpConfigurationOption.TRUST_ALL_CERTIFICATES, true)
+          .build();
+      final SdkHttpClient sdkHttpClient = new DefaultSdkHttpClientBuilder().buildWithDefaults(attributeMap);
+      s3ClientBuilder.httpClient(sdkHttpClient);
 
       if (s3Config.getStorageClass() != null) {
         _storageClass = StorageClass.fromValue(s3Config.getStorageClass());
@@ -254,7 +260,7 @@ public class S3PinotFS extends BasePinotFS {
       throws IOException {
     URI base = getBase(uri);
     String path = sanitizePath(base.relativize(uri).getPath());
-    HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(uri.getHost()).key(path).build();
+    HeadObjectRequest headObjectRequest = HeadObjectRequest.builder().bucket(base.getHost()).key(path).build();
 
     return _s3Client.headObject(headObjectRequest);
   }

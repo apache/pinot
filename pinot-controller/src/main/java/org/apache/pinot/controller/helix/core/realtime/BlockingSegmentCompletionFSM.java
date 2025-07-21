@@ -826,6 +826,10 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
         committingSegmentDescriptor.setSegmentLocation(URIUtils
             .constructDownloadUrl(_controllerVipUrl, TableNameBuilder.extractRawTableName(_realtimeTableName),
                 _segmentName.getSegmentName()));
+        // TODO: consider updating the download uri to gpfs here.
+//        committingSegmentDescriptor.setSegmentLocation(URIUtils
+//            .constructDownloadUrl(_controllerVipUrl, TableNameBuilder.extractRawTableName(_realtimeTableName),
+//                _segmentName.getSegmentName()));
       }
       commitSegmentMetadata(_realtimeTableName, committingSegmentDescriptor);
     } catch (Exception e) {

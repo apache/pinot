@@ -583,7 +583,11 @@ public class PinotLLCRealtimeSegmentManager {
       return;
     }
 
-    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
+    // For testing realtime table write path.
+    URI tableDirURI = URIUtils.getUri("https://pinot-controller.prod.pinot-controller.ei-ltx1.atd.stg.linkedin.com:10611/segments", rawTableName);
+//    URI tableDirURI = URIUtils.getUri("s3://pinot/pinot_segments/cicd", rawTableName);
+//    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
+//    PinotFS pinotFS = PinotFSFactory.create("https");
     PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
     String uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
 
@@ -2415,7 +2419,9 @@ public class PinotLLCRealtimeSegmentManager {
 
   @VisibleForTesting
   URI createSegmentPath(String rawTableName, String segmentName) {
-    return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
+//    return URIUtils.getUri("s3://pinot/pinot_segments/cicd", rawTableName, URIUtils.encode(segmentName));
+    return URIUtils.getUri("https://pinot-controller.prod.pinot-controller.ei-ltx1.atd.stg.linkedin.com:10611/segments", rawTableName, URIUtils.encode(segmentName));
+//    return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
 
   /**

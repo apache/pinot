@@ -280,6 +280,26 @@ public class ControllerTest {
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, true);
+
+    // The below is needed in order to enable write path.
+//    properties.put("pinot.controller.storage.factory.class.https", "org.apache.pinot.common.utils.filesystem.LiPinotFS");
+//    properties.put("pinot.controller.storage.factory.https.schemes", "s3");
+//    properties.put("pinot.controller.storage.factory.https.s3.class", "org.apache.pinot.plugin.filesystem.S3PinotFS");
+//    properties.put("pinot.controller.storage.factory.https.s3.region", "us-east-1");
+//    properties.put("pinot.controller.storage.factory.https.s3.accessKey", "...");
+//    properties.put("pinot.controller.storage.factory.https.s3.secretKey", "...");
+//    properties.put("pinot.controller.storage.factory.https.s3.endpoint", "https://gpfs-endpoint:6443");
+
+
+//    properties.put("pinot.controller.storage.factory.class.s3", "org.apache.pinot.plugin.filesystem.S3PinotFS");
+//    properties.put("pinot.controller.storage.factory.s3.region", "us-east-1");
+//    properties.put("pinot.controller.storage.factory.s3.accessKey", "...");
+//    properties.put("pinot.controller.storage.factory.s3.secretKey", "...");
+//    properties.put("pinot.controller.segment.fetcher.protocols", "file,http,s3");
+//    properties.put("pinot.controller.segment.fetcher.s3.class", "org.apache.pinot.common.utils.fetcher.PinotFSSegmentFetcher");
+//    properties.put("pinot.controller.segment.fetcher.http.ssl.server.enable-verification", "false");
+//    properties.put("pinot.controller.storage.factory.s3.disableAcl", "false");
+
     overrideControllerConf(properties);
     return properties;
   }
