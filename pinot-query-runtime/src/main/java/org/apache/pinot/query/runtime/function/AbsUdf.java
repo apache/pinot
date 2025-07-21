@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
