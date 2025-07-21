@@ -28,7 +28,9 @@ import {
   makeStyles,
   Button,
   Input,
-  FormControlLabel
+  FormControlLabel,
+  ButtonGroup,
+  Box
 } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
@@ -41,6 +43,11 @@ import { useHistory, useLocation } from 'react-router';
 import TableToolbar from '../TableToolbar';
 import { Resizable } from 're-resizable';
 import SimpleAccordion from '../SimpleAccordion';
+import TimeseriesChart from './TimeseriesChart';
+import MetricStatsTable from './MetricStatsTable';
+import { parseTimeseriesResponse, isPrometheusFormat } from '../../utils/TimeseriesUtils';
+import { ChartSeries } from 'Models';
+import { MAX_SERIES_LIMIT } from '../../utils/ChartConstants';
 
 const useStyles = makeStyles((theme) => ({
   rightPanel: {},
@@ -106,7 +113,74 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1),
     minWidth: 0,
   },
+
 }));
+
+// Extract warning component
+const TruncationWarning: React.FC<{ totalSeries: number; truncatedSeries: number }> = ({
+  totalSeries,
+  truncatedSeries
+}) => {
+  if (totalSeries <= truncatedSeries) return null;
+
+  return (
+    <Alert severity="warning" style={{ marginBottom: '16px' }}>
+      <Typography variant="body2">
+        Large dataset detected: Showing first {truncatedSeries} of {totalSeries} series for visualization.
+        Switch to JSON view to see the complete dataset.
+      </Typography>
+    </Alert>
+  );
+};
+
+// Extract view toggle component
+const ViewToggle: React.FC<{
+  viewType: 'json' | 'chart';
+  onViewChange: (view: 'json' | 'chart') => void;
+  isChartDisabled: boolean;
+  onCopy: () => void;
+  copyMsg: boolean;
+  classes: any;
+}> = ({ viewType, onViewChange, isChartDisabled, onCopy, copyMsg, classes }) => (
+  <Grid container className={classes.actionBtns} alignItems="center" justify="space-between">
+    <Grid item>
+      <ButtonGroup color="primary" size="small">
+        <Button
+          onClick={() => onViewChange('chart')}
+          variant={viewType === 'chart' ? "contained" : "outlined"}
+          disabled={isChartDisabled}
+        >
+          Chart
+        </Button>
+        <Button
+          onClick={() => onViewChange('json')}
+          variant={viewType === 'json' ? "contained" : "outlined"}
+        >
+          JSON
+        </Button>
+      </ButtonGroup>
+    </Grid>
+    <Grid item>
+      <Button
+        variant="contained"
+        color="primary"
+        size="small"
+        className={classes.btn}
+        onClick={onCopy}
+      >
+        Copy
+      </Button>
+      {copyMsg && (
+        <Alert
+          icon={<FileCopyIcon fontSize="inherit" />}
+          severity="info"
+        >
+          Copied results to Clipboard
+        </Alert>
+      )}
+    </Grid>
+  </Grid>
+);
 
 const jsonoptions = {
   lineNumbers: true,
@@ -149,10 +223,15 @@ const TimeseriesQueryPage = () => {
 
   const [rawOutput, setRawOutput] = useState<string>('');
   const [rawData, setRawData] = useState<any>(null);
+  const [chartSeries, setChartSeries] = useState<ChartSeries[]>([]);
+  const [truncatedChartSeries, setTruncatedChartSeries] = useState<ChartSeries[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [shouldAutoExecute, setShouldAutoExecute] = useState<boolean>(false);
   const [copyMsg, showCopyMsg] = React.useState(false);
+  const [viewType, setViewType] = useState<'json' | 'chart'>('chart');
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+
 
   // Update config when URL parameters change
   useEffect(() => {
@@ -221,6 +300,25 @@ const TimeseriesQueryPage = () => {
     handleQueryInterfaceKeyDownRef.current = handleQueryInterfaceKeyDown;
   }, [handleQueryInterfaceKeyDown]);
 
+  // Extract data processing logic
+  const processQueryResponse = useCallback((parsedData: any) => {
+    setRawData(parsedData);
+    setRawOutput(JSON.stringify(parsedData, null, 2));
+
+    // Parse timeseries data for chart and stats
+    if (isPrometheusFormat(parsedData)) {
+      const series = parseTimeseriesResponse(parsedData);
+      setChartSeries(series);
+
+      // Create truncated series for visualization (limit to MAX_SERIES_LIMIT)
+      const truncatedSeries = series.slice(0, MAX_SERIES_LIMIT);
+      setTruncatedChartSeries(truncatedSeries);
+    } else {
+      setChartSeries([]);
+      setTruncatedChartSeries([]);
+    }
+  }, []);
+
   const handleExecuteQuery = useCallback(async () => {
     if (!config.query.trim()) {
       setError('Please enter a query');
@@ -250,8 +348,7 @@ const TimeseriesQueryPage = () => {
         ? JSON.parse(response.data)
         : response.data;
 
-      setRawData(parsedData);
-      setRawOutput(JSON.stringify(parsedData, null, 2));
+      processQueryResponse(parsedData);
     } catch (error) {
       console.error('Error executing timeseries query:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
@@ -259,7 +356,7 @@ const TimeseriesQueryPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [config, updateURL]);
+  }, [config, updateURL, processQueryResponse]);
 
   const copyToClipboard = () => {
     const aux = document.createElement('input');
@@ -379,36 +476,65 @@ const TimeseriesQueryPage = () => {
 
         {rawOutput && (
           <Grid item xs style={{ backgroundColor: 'white' }}>
-            <Grid container className={classes.actionBtns}>
-              <Button
-                variant="contained"
-                color="primary"
-                size="small"
-                className={classes.btn}
-                onClick={copyToClipboard}
+                         <ViewToggle
+               viewType={viewType}
+               onViewChange={setViewType}
+               isChartDisabled={truncatedChartSeries.length === 0}
+               onCopy={copyToClipboard}
+               copyMsg={copyMsg}
+               classes={classes}
+             />
+
+                                    {viewType === 'chart' && (
+              <SimpleAccordion
+                headerTitle="Timeseries Chart & Statistics"
+                showSearchBox={false}
               >
-                Copy
-              </Button>
-              {copyMsg && (
-                <Alert
-                  icon={<FileCopyIcon fontSize="inherit" />}
-                  severity="info"
-                >
-                  Copied results to Clipboard
-                </Alert>
-              )}
-            </Grid>
-            <SimpleAccordion
-              headerTitle="Query Result (JSON Format)"
-              showSearchBox={false}
-            >
-              <CodeMirror
-                options={jsonoptions}
-                value={rawOutput}
-                className={classes.queryOutput}
-                autoCursor={false}
-              />
-            </SimpleAccordion>
+                {truncatedChartSeries.length > 0 ? (
+                  <>
+                    <TruncationWarning
+                      totalSeries={chartSeries.length}
+                      truncatedSeries={truncatedChartSeries.length}
+                    />
+                    <TimeseriesChart
+                      series={truncatedChartSeries}
+                      height={500}
+                      selectedMetric={selectedMetric}
+                    />
+                    <MetricStatsTable
+                      series={truncatedChartSeries}
+                      selectedMetric={selectedMetric}
+                      onMetricSelect={setSelectedMetric}
+                    />
+                  </>
+                ) : (
+                  <Box p={3} textAlign="center">
+                    <Typography variant="h6" color="textSecondary" gutterBottom>
+                      No Chart Data Available
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      The query response is not in Prometheus-compatible format or contains no timeseries data.
+                      <br />
+                      Switch to JSON view to see the raw response.
+                    </Typography>
+                  </Box>
+                )}
+              </SimpleAccordion>
+            )}
+
+            {viewType === 'json' && (
+              <SimpleAccordion
+                headerTitle="Query Result (JSON Format)"
+                showSearchBox={false}
+              >
+                <CodeMirror
+                  options={jsonoptions}
+                  value={rawOutput}
+                  className={classes.queryOutput}
+                  autoCursor={false}
+                />
+              </SimpleAccordion>
+            )}
           </Grid>
         )}
       </Grid>
