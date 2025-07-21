@@ -58,6 +58,7 @@ import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
+import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
@@ -593,23 +594,20 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       requestContext.setNumUnavailableSegments(numUnavailableSegments);
 
       fillOldBrokerResponseStats(brokerResponse, queryResults.getQueryStats(), dispatchableSubPlan);
+      long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
+      _brokerMetrics.addTimedValue(BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
 
-      // Track number of queries with number of groups limit reached
-      if (brokerResponse.isNumGroupsLimitReached()) {
-        for (String table : tableNames) {
+      for (String table : tableNames) {
+        _brokerMetrics.addTimedTableValue(
+            table, BrokerTimer.MULTI_STAGE_QUERY_TOTAL_TIME_MS, totalTimeMs, TimeUnit.MILLISECONDS);
+        if (brokerResponse.isNumGroupsLimitReached()) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_NUM_GROUPS_LIMIT_REACHED, 1);
         }
-      }
-
-      if (brokerResponse.isGroupsTrimmed()) {
-        for (String table : tableNames) {
+        if (brokerResponse.isGroupsTrimmed()) {
           _brokerMetrics.addMeteredTableValue(table, BrokerMeter.BROKER_RESPONSES_WITH_GROUPS_TRIMMED, 1);
         }
       }
 
-      // Set total query processing time
-      // TODO: Currently we don't emit metric for QUERY_TOTAL_TIME_MS
-      long totalTimeMs = System.currentTimeMillis() - requestContext.getRequestArrivalTimeMillis();
       brokerResponse.setTimeUsedMs(totalTimeMs);
       augmentStatistics(requestContext, brokerResponse);
       if (QueryOptionsUtils.shouldDropResults(query.getOptions())) {
