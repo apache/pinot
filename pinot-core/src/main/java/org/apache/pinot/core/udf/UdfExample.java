@@ -30,6 +30,7 @@ import java.util.Objects;
 public abstract class UdfExample {
   /// A descriptive ID of what this example is showing.
   public abstract String getId();
+
   /// The input values.
   ///
   /// Notice that values should be the same used to call the function and should match the types indicated by the
@@ -37,6 +38,7 @@ public abstract class UdfExample {
   /// ints 1 and 2, but not double 1.0 and int 2. That sum is possible at SQL level, but in that case the different
   /// engines apply automatic casting to make sure the udf is called with either two ints or two doubles.
   public abstract List<Object> getInputValues();
+
   /// The result of the example. It may be different depending on whether null handling is enabled or not.
   public abstract Object getResult(boolean nullHandling);
 
@@ -56,7 +58,6 @@ public abstract class UdfExample {
     Object expectedResult = values[inputsSize];
     return new Default(name, inputs, expectedResult);
   }
-
 
   /// Returns a new UdfExample that will use the given result when null handling is disabled.
   ///
