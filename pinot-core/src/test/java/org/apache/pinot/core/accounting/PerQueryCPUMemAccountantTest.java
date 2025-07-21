@@ -324,7 +324,7 @@ public class PerQueryCPUMemAccountantTest {
     // Verify error was set with appropriate message
     Exception error = accountant.getTestErrorStatus();
     assertNotNull(error);
-    assertTrue(error.getMessage().contains("exceeded per-thread memory limit"));
+    assertTrue(error.getMessage().contains("exceeded per-query memory limit"));
     assertTrue(error.getMessage().contains("testQuery"));
     assertTrue(error.getMessage().contains("2000 bytes"));
     assertTrue(error.getMessage().contains("1000 bytes"));

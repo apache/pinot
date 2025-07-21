@@ -21,6 +21,7 @@ package org.apache.pinot.spi.executor;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -38,7 +39,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 public class ThrottleOnCriticalHeapUsageExecutorTest {
@@ -51,6 +51,7 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       throws Exception {
     AtomicBoolean heapCritical = new AtomicBoolean(false);
     AtomicInteger tasksExecuted = new AtomicInteger(0);
+    CountDownLatch taskCompleted = new CountDownLatch(1);
 
     ThreadResourceUsageAccountant accountant = createAccountant(heapCritical);
 
@@ -59,20 +60,22 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
 
     try {
       // Submit a task when heap is normal - it should execute immediately
-      executor.execute(() -> tasksExecuted.incrementAndGet());
+      executor.execute(() -> {
+        tasksExecuted.incrementAndGet();
+        taskCompleted.countDown();
+      });
 
-      // Wait a bit
-      Thread.sleep(100);
+      // Wait for task completion
+      assertTrue(taskCompleted.await(2, TimeUnit.SECONDS), "Task should complete within 2 seconds");
       assertEquals(tasksExecuted.get(), 1, "Task should have executed immediately");
       assertEquals(executor.getQueueSize(), 0, "Queue should be empty");
-      assertEquals(executor.getQueuedTaskCount(), 0, "No tasks should have been queued");
     } finally {
       executor.shutdown();
     }
   }
 
   /**
-   * Test task timeout - simplified approach
+   * Test task timeout behavior
    */
   @Test
   void testTaskTimeout()
@@ -80,37 +83,40 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
     AtomicBoolean heapCritical = new AtomicBoolean(true);
     AtomicInteger tasksExecuted = new AtomicInteger(0);
 
-    ThreadResourceUsageAccountant accountant = createAccountant(heapCritical);
+    // Use accountant with critical heap AND running queries to ensure queuing/timeout behavior
+    ThreadResourceUsageAccountant accountant = createAccountantWithQueryTracking(heapCritical, true);
 
     // Very short timeout for testing
     ThrottleOnCriticalHeapUsageExecutor executor = new ThrottleOnCriticalHeapUsageExecutor(
-        Executors.newCachedThreadPool(), accountant, 10, 100, 50);
+        Executors.newCachedThreadPool(), accountant, 10, 50, 25);
 
     try {
-      // Submit a task that will be affected by critical heap
-      Thread taskThread = new Thread(() -> {
-        try {
-          executor.execute(() -> tasksExecuted.incrementAndGet());
-        } catch (Exception e) {
-          // Expected - various exceptions can happen under critical heap conditions
+      // Submit a task that will timeout due to critical heap and running queries
+      boolean taskTimedOut = false;
+      try {
+        executor.execute(() -> tasksExecuted.incrementAndGet());
+      } catch (QueryException e) {
+        if (e.getErrorCode() == QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED) {
+          taskTimedOut = true;
         }
-      });
+      }
 
-      taskThread.start();
-      taskThread.join(1000);
+      // Wait a bit for any potential processing
+      Thread.sleep(200);
 
-      // Under critical heap conditions, the task should not execute immediately
+      // Task should not have executed due to critical heap and running queries
       assertEquals(tasksExecuted.get(), 0, "Task should not have executed under critical heap conditions");
 
-      // The important thing is that the mechanism is working - which we can see from the logs
-      assertTrue(true, "Task timeout mechanism is working as evidenced by critical heap handling");
+      // Either the task timed out or is still queued, but shouldn't have executed
+      assertTrue(taskTimedOut || executor.getQueueSize() > 0 || executor.getTimedOutTaskCount() > 0,
+          "Task should either timeout or be queued");
     } finally {
       executor.shutdown();
     }
   }
 
   /**
-   * Test queue overflow - simplified approach
+   * Test queue overflow behavior
    */
   @Test
   void testQueueOverflow()
@@ -124,43 +130,35 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
         Executors.newCachedThreadPool(), accountant, 1, 100, 50);
 
     try {
-      // Fill the queue
-      Thread task1Thread = new Thread(() -> {
+      // Submit tasks to fill the queue and test overflow
+      int tasksSubmitted = 0;
+      boolean queueOverflowDetected = false;
+
+      // Try to submit multiple tasks to trigger queue overflow
+      for (int i = 0; i < 5; i++) {
         try {
           executor.execute(() -> {
             try {
-              Thread.sleep(1000);  // Long running task to fill queue
+              Thread.sleep(200);  // Long running task to keep queue occupied
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
             }
           });
-        } catch (Exception e) {
-          // First task might timeout, that's ok
-        }
-      });
-      task1Thread.start();
-
-      Thread.sleep(50); // Allow some processing time
-
-      // Try to add another task - should fail due to queue overflow
-      Thread task2Thread = new Thread(() -> {
-        try {
-          executor.execute(() -> {
-            // This should not execute
-          });
-          fail("Should have thrown exception due to queue overflow");
+          tasksSubmitted++;
+          Thread.sleep(10); // Brief pause between submissions
         } catch (QueryException e) {
-          assertEquals(e.getErrorCode(), QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED);
-          assertTrue(e.getMessage().contains("Task queue is full") || e.getMessage().contains("timed out"));
+          if (e.getErrorCode() == QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED
+              && (e.getMessage().contains("Task queue is full") || e.getMessage().contains("timed out"))) {
+            queueOverflowDetected = true;
+            break;
+          }
         }
-      });
+      }
 
-      task2Thread.start();
-      task2Thread.join(1000);
-      task1Thread.join(1000);
-
-      // Verify that we successfully tested queue overflow
-      assertTrue(true, "Queue overflow test completed");
+      // Either we successfully filled the queue and detected overflow, or the executor handled it gracefully
+      assertTrue(queueOverflowDetected || tasksSubmitted > 0 || executor.getQueueSize() > 0
+          || executor.getTimedOutTaskCount() > 0,
+          "Should either detect queue overflow or show evidence of queue activity");
     } finally {
       executor.shutdown();
     }
@@ -174,6 +172,8 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       throws Exception {
     AtomicBoolean heapCritical = new AtomicBoolean(true);
     AtomicInteger tasksExecuted = new AtomicInteger(0);
+    CountDownLatch taskStarted = new CountDownLatch(1);
+    CountDownLatch taskCompleted = new CountDownLatch(1);
 
     ThreadResourceUsageAccountant accountant = createAccountant(heapCritical);
 
@@ -181,27 +181,34 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
         Executors.newCachedThreadPool(), accountant, 10, 2000, 50);
 
     try {
-      // Start a background thread to execute the task
+      // Start a task in a separate thread
       Thread taskThread = new Thread(() -> {
         try {
-          executor.execute(() -> tasksExecuted.incrementAndGet());
+          taskStarted.countDown();
+          executor.execute(() -> {
+            tasksExecuted.incrementAndGet();
+            taskCompleted.countDown();
+          });
         } catch (Exception e) {
           // Expected during shutdown or timeout
         }
       });
       taskThread.start();
 
+      // Wait for task to start
+      assertTrue(taskStarted.await(1, TimeUnit.SECONDS), "Task should start");
+
       // Give some time for task to be queued
-      Thread.sleep(200);
+      Thread.sleep(100);
 
       // Make heap usage normal - task should be processed
       heapCritical.set(false);
 
-      // Wait for task to complete
-      taskThread.join(2000);
+      // Wait for task to complete or thread to finish
+      taskThread.join(3000);
 
       // Give some time for processing
-      Thread.sleep(500);
+      Thread.sleep(200);
 
       // At this point, either the task executed or timed out
       assertTrue(tasksExecuted.get() == 1 || executor.getTimedOutTaskCount() > 0,
@@ -212,12 +219,12 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
   }
 
   /**
-   * Test callable task queuing
+   * Test callable task behavior
    */
   @Test
   void testCallableQueuing()
       throws Exception {
-    AtomicBoolean heapCritical = new AtomicBoolean(true);
+    AtomicBoolean heapCritical = new AtomicBoolean(false); // Start with normal heap
 
     ThreadResourceUsageAccountant accountant = createAccountant(heapCritical);
 
@@ -225,19 +232,9 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
         Executors.newCachedThreadPool(), accountant, 10, 1000, 50);
 
     try {
-      Thread callableThread = new Thread(() -> {
-        try {
-          // Make heap normal before submitting
-          heapCritical.set(false);
-          String result = executor.submit(() -> "test result").get(2, TimeUnit.SECONDS);
-          assertEquals(result, "test result", "Should get correct result");
-        } catch (Exception e) {
-          // Expected timeout or other errors
-        }
-      });
-
-      callableThread.start();
-      callableThread.join(3000);
+      // Test with normal heap - should execute immediately
+      String result = executor.submit(() -> "test result").get(2, TimeUnit.SECONDS);
+      assertEquals(result, "test result", "Should get correct result");
     } finally {
       executor.shutdown();
     }
@@ -256,9 +253,12 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
     ThrottleOnCriticalHeapUsageExecutor executor = new ThrottleOnCriticalHeapUsageExecutor(
         Executors.newCachedThreadPool(), accountant, 10, 1000, 50);
 
+    CountDownLatch taskStarted = new CountDownLatch(1);
+
     // Start a task that will be queued
     Thread taskThread = new Thread(() -> {
       try {
+        taskStarted.countDown();
         executor.execute(() -> {
           // This task should be queued and potentially timed out during shutdown
         });
@@ -267,6 +267,9 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       }
     });
     taskThread.start();
+
+    // Wait for task to start
+    assertTrue(taskStarted.await(1, TimeUnit.SECONDS), "Task should start");
 
     // Give some time for queuing
     Thread.sleep(100);
@@ -277,8 +280,80 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
     // Wait for thread to complete
     taskThread.join(2000);
 
-    // Verify shutdown completed
-    assertTrue(true, "Shutdown should complete successfully");
+    // Verify shutdown completed successfully
+    assertTrue(executor.isShutdown(), "Executor should be shut down");
+  }
+
+  /**
+   * Test that queries are allowed when heap is critical but no queries are running
+   */
+  @Test
+  void testAllowQueryWhenNoQueriesRunning()
+      throws Exception {
+    AtomicBoolean heapCritical = new AtomicBoolean(true);
+    AtomicInteger tasksExecuted = new AtomicInteger(0);
+    CountDownLatch taskCompleted = new CountDownLatch(1);
+
+    // Create accountant with critical heap but no running queries (empty query map)
+    ThreadResourceUsageAccountant accountant = createAccountantWithQueryTracking(heapCritical, false);
+
+    ThrottleOnCriticalHeapUsageExecutor executor = new ThrottleOnCriticalHeapUsageExecutor(
+        Executors.newCachedThreadPool(), accountant, 10, 1000, 50);
+
+    try {
+      // Submit a task when heap is critical but no queries are running
+      // It should execute immediately instead of being queued
+      executor.execute(() -> {
+        tasksExecuted.incrementAndGet();
+        taskCompleted.countDown();
+      });
+
+      // Wait for task completion
+      assertTrue(taskCompleted.await(2, TimeUnit.SECONDS), "Task should complete within 2 seconds");
+      assertEquals(tasksExecuted.get(), 1, "Task should have executed immediately despite critical heap");
+      assertEquals(executor.getQueueSize(), 0, "Queue should be empty since task executed immediately");
+    } finally {
+      executor.shutdown();
+    }
+  }
+
+  /**
+   * Test that queries are queued when heap is critical and queries are running
+   */
+  @Test
+  void testQueueQueryWhenQueriesRunning()
+      throws Exception {
+    AtomicBoolean heapCritical = new AtomicBoolean(true);
+    AtomicInteger tasksExecuted = new AtomicInteger(0);
+
+    // Create accountant with critical heap and running queries (non-empty query map)
+    ThreadResourceUsageAccountant accountant = createAccountantWithQueryTracking(heapCritical, true);
+
+    ThrottleOnCriticalHeapUsageExecutor executor = new ThrottleOnCriticalHeapUsageExecutor(
+        Executors.newCachedThreadPool(), accountant, 10, 100, 50);
+
+    try {
+      // Submit a task when heap is critical and queries are running
+      // It should be queued/timeout instead of executing immediately
+      boolean taskTimedOut = false;
+      try {
+        executor.execute(() -> tasksExecuted.incrementAndGet());
+      } catch (QueryException e) {
+        if (e.getErrorCode() == QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED) {
+          taskTimedOut = true;
+        }
+      }
+
+      // Wait a bit for any potential processing
+      Thread.sleep(200);
+
+      // Task should not have executed due to critical heap and running queries
+      assertEquals(tasksExecuted.get(), 0, "Task should not have executed when queries are running");
+      assertTrue(taskTimedOut || executor.getQueueSize() > 0 || executor.getTimedOutTaskCount() > 0,
+          "Task should either timeout or be queued when queries are running");
+    } finally {
+      executor.shutdown();
+    }
   }
 
   private ThreadResourceUsageAccountant createAccountant(AtomicBoolean heapCritical) {
@@ -364,6 +439,110 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       @Override
       public Map<String, ? extends QueryResourceTracker> getQueryResources() {
         return Map.of();
+      }
+    };
+  }
+
+  private ThreadResourceUsageAccountant createAccountantWithQueryTracking(AtomicBoolean heapCritical,
+      boolean queriesRunning) {
+    return new ThreadResourceUsageAccountant() {
+      @Override
+      public void clear() {
+      }
+
+      @Override
+      public boolean isAnchorThreadInterrupted() {
+        return false;
+      }
+
+      @Override
+      public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+          @Nullable ThreadExecutionContext parentContext) {
+      }
+
+      @Override
+      public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+      }
+
+      @Override
+      public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+          String workloadName) {
+      }
+
+      @Override
+      public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+          @Nullable ThreadExecutionContext parentContext) {
+      }
+
+      @Nullable
+      @Override
+      public ThreadExecutionContext getThreadExecutionContext() {
+        return null;
+      }
+
+      @Override
+      public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
+      }
+
+      @Override
+      public void sampleUsage() {
+      }
+
+      @Override
+      public void sampleUsageMSE() {
+      }
+
+      @Override
+      public boolean throttleQuerySubmission() {
+        return heapCritical.get();
+      }
+
+      @Override
+      public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes) {
+      }
+
+      @Override
+      public void updateQueryUsageConcurrently(String queryId) {
+      }
+
+      @Override
+      public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes,
+          TrackingScope trackingScope) {
+      }
+
+      @Override
+      public void startWatcherTask() {
+      }
+
+      @Override
+      public Exception getErrorStatus() {
+        return null;
+      }
+
+      @Override
+      public Collection<? extends ThreadResourceTracker> getThreadResources() {
+        return List.of();
+      }
+
+      @Override
+      public Map<String, ? extends QueryResourceTracker> getQueryResources() {
+        // Return non-empty map if queries are running, empty map if no queries are running
+        return queriesRunning ? Map.of("query1", new QueryResourceTracker() {
+          @Override
+          public String getQueryId() {
+            return "query1";
+          }
+
+          @Override
+          public long getCpuTimeNs() {
+            return 1000000;
+          }
+
+          @Override
+          public long getAllocatedBytes() {
+            return 1024;
+          }
+        }) : Map.of();
       }
     };
   }

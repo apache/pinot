@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.executor;
 
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -93,12 +94,43 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
         maxQueueSize, queueTimeoutMs, monitorIntervalMs);
   }
 
+  protected void checkTaskAllowed() {
+    // Do nothing by default
+  }
+
   /**
    * Check if a task should be queued due to critical heap usage
+   * Enhanced to allow queries when no queries are currently running, even if heap usage is critical
    * @return true if the task should be queued, false if it can be executed immediately
    */
   protected boolean shouldQueueTask() {
-    return _threadResourceUsageAccountant.throttleQuerySubmission();
+    // First check if heap usage is critical
+    boolean heapUsageCritical = _threadResourceUsageAccountant.throttleQuerySubmission();
+
+    if (!heapUsageCritical) {
+      // If heap usage is not critical, allow query execution immediately
+      return false;
+    }
+
+    // If heap usage is critical, check if there are any running queries
+    // If no queries are running, allow new queries to proceed to avoid complete starvation
+    try {
+      Map<String, ?> activeQueries = _threadResourceUsageAccountant.getQueryResources();
+      boolean hasRunningQueries = activeQueries != null && !activeQueries.isEmpty();
+
+      if (!hasRunningQueries) {
+        LOGGER.debug("Heap usage is critical but no queries are running, allowing new query to proceed");
+        return false; // Allow the query to proceed
+      }
+
+      LOGGER.debug("Heap usage is critical and {} queries are running, queueing new query",
+          activeQueries.size());
+      return true; // Queue the task since heap is critical and queries are running
+    } catch (Exception e) {
+      // If we can't determine active queries, fall back to the original behavior
+      LOGGER.warn("Failed to check active queries, falling back to heap-only throttling", e);
+      return heapUsageCritical;
+    }
   }
 
   /**
