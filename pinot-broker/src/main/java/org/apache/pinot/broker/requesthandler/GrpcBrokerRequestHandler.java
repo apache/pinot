@@ -142,7 +142,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
             streamingResponse);
       } catch (Exception e) {
         LOGGER.warn("Failed to send request {} to server: {}", requestId, serverInstance.getInstanceId(), e);
-        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId(), serverInstance.getHostname());
       }
     }
   }

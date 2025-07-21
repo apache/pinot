@@ -168,7 +168,21 @@
                 org.apache.pinot.tools.Quickstart.*"/>
     </module>
     <!-- Do not import 'sun' packages -->
-    <module name="IllegalImport"/>
+    <!-- Use javax.annotation.Nullable to annotate nullable fields, treat fields as non-null if not annotated -->
+    <module name="IllegalImport">
+      <property name="illegalClasses"
+                value="javax.annotation.Nonnull,
+                javax.validation.constraints.NotNull"/>
+    </module>
+    <!-- Use org.testng.Assert in tests -->
+    <module name="IllegalImport">
+      <property name="regexp" value="true"/>
+      <property name="illegalClasses"
+                value="org\.testng\.AssertJUnit.*,
+                org\.junit\.Assert.*,
+                org\.apache\.logging\.log4j\.core\.util\.Assert.*,
+                org\.locationtech\.jts\.util\.Assert.*"/>
+    </module>
     <!-- Do not duplicate import statements -->
     <module name="RedundantImport"/>
     <!-- Eliminate unused imports -->

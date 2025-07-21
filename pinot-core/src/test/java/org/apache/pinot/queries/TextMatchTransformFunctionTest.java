@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.spi.config.table.FieldConfig;
+import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -35,17 +36,30 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
 public class TextMatchTransformFunctionTest {
 
-  protected static final TableConfig TABLE_CONFIG =
+  protected static final TableConfig SC_TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE)
           .setTableName("testTable")
           .addFieldConfig(
-              new FieldConfig("skills", FieldConfig.EncodingType.RAW,
-                  List.of(FieldConfig.IndexType.TEXT), null, null))
+              new FieldConfig.Builder("skills")
+                  .withEncodingType(FieldConfig.EncodingType.RAW)
+                  .withIndexTypes(List.of(FieldConfig.IndexType.TEXT))
+                  .build())
+          .build();
+
+  protected static final TableConfig MC_TABLE_CONFIG =
+      new TableConfigBuilder(TableType.OFFLINE)
+          .setTableName("testTable")
+          .addFieldConfig(
+              new FieldConfig.Builder("skills")
+                  .withEncodingType(FieldConfig.EncodingType.RAW)
+                  .build())
+          .setMultiColumnTextIndexConfig(new MultiColumnTextIndexConfig(List.of("skills")))
           .build();
 
   protected File _baseDir;
@@ -67,8 +81,8 @@ public class TextMatchTransformFunctionTest {
     }
   }
 
-  @Test
-  void testTextMatchValidation() {
+  @Test(dataProvider = "isMultiColumn")
+  void testTextMatchValidation(boolean isMultiColumn) {
     try {
       FluentQueryTest.withBaseDir(_baseDir)
           .givenTable(
@@ -76,8 +90,9 @@ public class TextMatchTransformFunctionTest {
                   .setSchemaName("testTable")
                   .addMetricField("id", FieldSpec.DataType.INT)
                   .addSingleValueDimension("skills", FieldSpec.DataType.STRING)
+                  .addSingleValueDimension("skills_mc", FieldSpec.DataType.STRING)
                   .build(),
-              TABLE_CONFIG)
+              getTableConfig(isMultiColumn))
           .onFirstInstance(
               new Object[]{1, "swimming"}
           )
@@ -120,7 +135,7 @@ public class TextMatchTransformFunctionTest {
                   .addMetricField("id", FieldSpec.DataType.INT)
                   .addSingleValueDimension("skills", FieldSpec.DataType.STRING)
                   .build(),
-              TABLE_CONFIG)
+              getTableConfig(isMultiColumn))
           .onFirstInstance(
               new Object[]{1, "sewing, cooking"}
           )
@@ -139,7 +154,7 @@ public class TextMatchTransformFunctionTest {
                   .addMultiValueDimension("id", FieldSpec.DataType.STRING)
                   .addSingleValueDimension("skills", FieldSpec.DataType.STRING)
                   .build(),
-              TABLE_CONFIG)
+              getTableConfig(isMultiColumn))
           .onFirstInstance(
               new Object[]{1, "sewing, cooking"}
           )
@@ -158,7 +173,7 @@ public class TextMatchTransformFunctionTest {
                   .addMultiValueDimension("id", FieldSpec.DataType.STRING)
                   .addSingleValueDimension("skills", FieldSpec.DataType.STRING)
                   .build(),
-              TABLE_CONFIG)
+              getTableConfig(isMultiColumn))
           .onFirstInstance(
               new Object[]{1, "sewing, cooking"}
           )
@@ -170,8 +185,8 @@ public class TextMatchTransformFunctionTest {
     }
   }
 
-  @Test
-  void testTextMatchAsTransformFunction() {
+  @Test(dataProvider = "isMultiColumn")
+  void testTextMatchAsTransformFunction(boolean isMultiColumn) {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
             new Schema.SchemaBuilder()
@@ -180,7 +195,7 @@ public class TextMatchTransformFunctionTest {
                 .addMetricField("id", FieldSpec.DataType.INT)
                 .addSingleValueDimension("skills", FieldSpec.DataType.STRING)
                 .build(),
-            TABLE_CONFIG)
+            getTableConfig(isMultiColumn))
         .onFirstInstance(
             new Object[]{1, "sewing, cooking"},
             new Object[]{2, "washing, cleaning"}
@@ -222,8 +237,8 @@ public class TextMatchTransformFunctionTest {
         );
   }
 
-  @Test
-  public void testTextMatchInAggregation() {
+  @Test(dataProvider = "isMultiColumn")
+  public void testTextMatchInAggregation(boolean isMultiColumn) {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
             new Schema.SchemaBuilder()
@@ -232,7 +247,7 @@ public class TextMatchTransformFunctionTest {
                 .addMetricField("id", FieldSpec.DataType.INT)
                 .addSingleValueDimension("skills", FieldSpec.DataType.STRING)
                 .build(),
-            TABLE_CONFIG)
+            getTableConfig(isMultiColumn))
         .onFirstInstance(
             new Object[]{1, "sewing, cooking"},
             new Object[]{2, "washing, cleaning"}
@@ -260,8 +275,13 @@ public class TextMatchTransformFunctionTest {
         );
   }
 
-  @Test
-  public void testExplainTextMatch() {
+  @DataProvider(name = "isMultiColumn")
+  Boolean[] isMultiColumn() {
+    return new Boolean[]{false, true};
+  }
+
+  @Test(dataProvider = "isMultiColumn")
+  public void testExplainTextMatch(boolean isMultiColumn) {
     FluentQueryTest.withBaseDir(_baseDir)
         .givenTable(
             new Schema.SchemaBuilder()
@@ -270,7 +290,7 @@ public class TextMatchTransformFunctionTest {
                 .addMetricField("id", FieldSpec.DataType.INT)
                 .addSingleValueDimension("skills", FieldSpec.DataType.STRING)
                 .build(),
-            TABLE_CONFIG)
+            getTableConfig(isMultiColumn))
         .onFirstInstance(
             new Object[]{1, "sewing, cooking"}
         )
@@ -286,7 +306,9 @@ public class TextMatchTransformFunctionTest {
                 + "TRANSFORM(text_match(skills,'sewing')) | 4 | 3\n"
                 + "PROJECT(skills) | 5 | 4\n"
                 + "DOC_ID_SET | 6 | 5\n"
-                + "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,predicate:text_match(skills,"
+                + "FILTER_TEXT_INDEX(indexLookUp:text_index,operator:TEXT_MATCH,"
+                + (isMultiColumn ? "multiColumnIndex:true," : "")
+                + "predicate:text_match(skills,"
                 + "'swimming')) | 7 | 6"
         );
   }
@@ -367,5 +389,9 @@ public class TextMatchTransformFunctionTest {
             + "N/A\n"
             + "A1\n"
             + "A2");
+  }
+
+  private TableConfig getTableConfig(boolean isMultiColumn) {
+    return isMultiColumn ? MC_TABLE_CONFIG : SC_TABLE_CONFIG;
   }
 }

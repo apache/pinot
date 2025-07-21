@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.avro.generic.GenericData.Record;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.SslConfigs;
@@ -105,6 +106,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     _avroRecordExtractor.init(fieldsToRead, config);
   }
 
+  @Nullable
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
@@ -116,9 +118,13 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     }
   }
 
+  @Nullable
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+    if (offset != 0 || payload.length > length) {
+      payload = Arrays.copyOfRange(payload, offset, offset + length);
+    }
+    return decode(payload, destination);
   }
 
   /**

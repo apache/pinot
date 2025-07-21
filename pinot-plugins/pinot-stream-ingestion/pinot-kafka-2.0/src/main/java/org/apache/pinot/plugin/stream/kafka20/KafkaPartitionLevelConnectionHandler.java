@@ -56,7 +56,6 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   protected final Consumer<String, Bytes> _consumer;
   protected final TopicPartition _topicPartition;
   protected final Properties _consumerProp;
-  protected final AdminClient _adminClient;
 
   public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
     _config = new KafkaPartitionLevelStreamConfig(streamConfig);
@@ -68,7 +67,6 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     _consumer = createConsumer(_consumerProp);
     _topicPartition = new TopicPartition(_topic, _partition);
     _consumer.assign(Collections.singletonList(_topicPartition));
-    _adminClient = createAdminClient();
   }
 
   private Properties buildProperties(StreamConfig streamConfig) {
@@ -118,7 +116,6 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   public void close()
       throws IOException {
     _consumer.close();
-    _adminClient.close();
   }
 
   @VisibleForTesting

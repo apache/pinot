@@ -26,11 +26,9 @@ import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.Predicate;
 import com.jayway.jsonpath.spi.cache.Cache;
 import java.util.concurrent.ExecutionException;
-import javax.annotation.Nonnull;
 
 
 public class JsonPathCache implements Cache {
-
   public static final JsonPathCache INSTANCE = new JsonPathCache();
 
   private static final long DEFAULT_CACHE_MAXIMUM_SIZE = 10000;
@@ -38,9 +36,9 @@ public class JsonPathCache implements Cache {
 
   private final LoadingCache<String, JsonPath> _jsonPathCache =
       CacheBuilder.newBuilder().maximumSize(DEFAULT_CACHE_MAXIMUM_SIZE)
-          .build(new CacheLoader<String, JsonPath>() {
+          .build(new CacheLoader<>() {
             @Override
-            public JsonPath load(@Nonnull String jsonPath) {
+            public JsonPath load(String jsonPath) {
               return JsonPath.compile(jsonPath, NO_PREDICATES);
             }
           });

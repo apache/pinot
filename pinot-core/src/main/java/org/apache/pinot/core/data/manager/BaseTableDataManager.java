@@ -57,6 +57,7 @@ import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
@@ -216,18 +217,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
           _streamSegmentDownloadUntarRateLimitBytesPerSec);
     }
     int maxParallelSegmentDownloads = instanceDataManagerConfig.getMaxParallelSegmentDownloads();
+    _numSegmentsAcquiredDownloadSemaphore = new AtomicInteger(0);
+    _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT, 0);
     if (maxParallelSegmentDownloads > 0) {
       LOGGER.info(
           "Construct segment download semaphore for Table: {}. Maximum number of parallel segment downloads: {}",
           _tableNameWithType, maxParallelSegmentDownloads);
       _segmentDownloadSemaphore = new Semaphore(maxParallelSegmentDownloads, true);
-      _numSegmentsAcquiredDownloadSemaphore = new AtomicInteger(0);
       _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_THROTTLE_THRESHOLD,
           maxParallelSegmentDownloads);
-      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT, 0);
     } else {
       _segmentDownloadSemaphore = null;
-      _numSegmentsAcquiredDownloadSemaphore = null;
     }
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
@@ -946,8 +946,6 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Acquiring table level segment download semaphore for segment: {}, queue-length: {} ", segmentName,
           _segmentDownloadSemaphore.getQueueLength());
       _segmentDownloadSemaphore.acquire();
-      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
-          _numSegmentsAcquiredDownloadSemaphore.incrementAndGet());
       _logger.info("Acquired table level segment download semaphore for segment: {} (lock-time={}ms, queue-length={}).",
           segmentName, System.currentTimeMillis() - startTime, _segmentDownloadSemaphore.getQueueLength());
     }
@@ -962,6 +960,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
                 + "queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
             segmentDownloadThrottler.getQueueLength());
       }
+      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
+          _numSegmentsAcquiredDownloadSemaphore.incrementAndGet());
+      long downloadStartTime = System.currentTimeMillis();
       try {
         File untarredSegmentDir;
         if (_isStreamSegmentDownloadUntar && zkMetadata.getCrypterName() == null) {
@@ -994,14 +995,17 @@ public abstract class BaseTableDataManager implements TableDataManager {
         if (_segmentOperationsThrottler != null) {
           _segmentOperationsThrottler.getSegmentDownloadThrottler().release();
         }
+        long downloadDuration = System.currentTimeMillis() - downloadStartTime;
+        _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.SEGMENT_DOWNLOAD_FROM_DEEP_STORE_TIME_MS,
+            downloadDuration, TimeUnit.MILLISECONDS);
         FileUtils.deleteQuietly(tempRootDir);
       }
     } finally {
       if (_segmentDownloadSemaphore != null) {
         _segmentDownloadSemaphore.release();
-        _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
-            _numSegmentsAcquiredDownloadSemaphore.decrementAndGet());
       }
+      _serverMetrics.setValueOfTableGauge(_tableNameWithType, ServerGauge.SEGMENT_TABLE_DOWNLOAD_COUNT,
+          _numSegmentsAcquiredDownloadSemaphore.decrementAndGet());
     }
   }
 
@@ -1023,6 +1027,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
               + "(lock-time={}ms, queue-length={}).", segmentName, System.currentTimeMillis() - startTime,
           segmentDownloadThrottler.getQueueLength());
     }
+    long downloadStartTime = System.currentTimeMillis();
     try {
       SegmentFetcherFactory.fetchAndDecryptSegmentToLocal(segmentName, _peerDownloadScheme, () -> {
         List<URI> peerServerURIs =
@@ -1043,6 +1048,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
       if (_segmentOperationsThrottler != null) {
         _segmentOperationsThrottler.getSegmentDownloadThrottler().release();
       }
+      long downloadDuration = System.currentTimeMillis() - downloadStartTime;
+      _serverMetrics.addTimedTableValue(_tableNameWithType, ServerTimer.SEGMENT_DOWNLOAD_FROM_PEERS_TIME_MS,
+          downloadDuration, TimeUnit.MILLISECONDS);
       FileUtils.deleteQuietly(tempRootDir);
     }
   }

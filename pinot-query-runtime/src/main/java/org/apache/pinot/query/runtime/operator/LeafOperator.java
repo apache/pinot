@@ -153,8 +153,10 @@ public class LeafOperator extends MultiStageOperator {
     if (_isEarlyTerminated) {
       return SuccessMseBlock.INSTANCE;
     }
+    // Here we use passive deadline because we end up waiting for the SSE operators
+    // which can timeout by their own
     BaseResultsBlock resultsBlock =
-        _blockingQueue.poll(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+        _blockingQueue.poll(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
     if (resultsBlock == null) {
       throw new TimeoutException("Timed out waiting for results block");
     }
@@ -238,6 +240,9 @@ public class LeafOperator extends MultiStageOperator {
           case TOTAL_DOCS:
             _statMap.merge(StatKey.TOTAL_DOCS, Long.parseLong(entry.getValue()));
             break;
+          case GROUPS_TRIMMED:
+            _statMap.merge(StatKey.GROUPS_TRIMMED, Boolean.parseBoolean(entry.getValue()));
+            break;
           case NUM_GROUPS_LIMIT_REACHED:
             _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
             break;
@@ -298,6 +303,8 @@ public class LeafOperator extends MultiStageOperator {
           case NUM_CONSUMING_SEGMENTS_MATCHED:
             _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
             break;
+          case SORTED:
+            break;
           default: {
             throw new IllegalArgumentException("Unhandled V1 execution stat: " + entry.getKey());
           }
@@ -319,7 +326,8 @@ public class LeafOperator extends MultiStageOperator {
     while (true) {
       BaseResultsBlock resultsBlock;
       try {
-        long timeout = _context.getDeadlineMs() - System.currentTimeMillis();
+        // Here we could use active or passive, given we don't actually execute anything
+        long timeout = _context.getPassiveDeadlineMs() - System.currentTimeMillis();
         resultsBlock = _blockingQueue.poll(timeout, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -437,13 +445,13 @@ public class LeafOperator extends MultiStageOperator {
             });
           }
           try {
-            if (!latch.await(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS)) {
+            if (!latch.await(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS)) {
               throw new TimeoutException("Timed out waiting for leaf stage to finish");
             }
             // Propagate the exception thrown by the leaf stage
             for (Future<Map<String, String>> future : futures) {
               Map<String, String> stats =
-                  future.get(_context.getDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+                  future.get(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
               mergeExecutionStats(stats);
             }
           } catch (TimeoutException e) {
@@ -465,7 +473,7 @@ public class LeafOperator extends MultiStageOperator {
   @VisibleForTesting
   void addResultsBlock(BaseResultsBlock resultsBlock)
       throws InterruptedException, TimeoutException {
-    if (!_blockingQueue.offer(resultsBlock, _context.getDeadlineMs() - System.currentTimeMillis(),
+    if (!_blockingQueue.offer(resultsBlock, _context.getPassiveDeadlineMs() - System.currentTimeMillis(),
         TimeUnit.MILLISECONDS)) {
       throw new TimeoutException("Timed out waiting to add results block");
     }
@@ -649,6 +657,7 @@ public class LeafOperator extends MultiStageOperator {
     NUM_SEGMENTS_PRUNED_INVALID(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_LIMIT(StatMap.Type.INT),
     NUM_SEGMENTS_PRUNED_BY_VALUE(StatMap.Type.INT),
+    GROUPS_TRIMMED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_GROUPS_WARNING_LIMIT_REACHED(StatMap.Type.BOOLEAN),
     NUM_RESIZES(StatMap.Type.INT, null),

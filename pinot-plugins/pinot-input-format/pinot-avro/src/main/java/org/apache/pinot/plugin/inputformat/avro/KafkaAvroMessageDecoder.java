@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.inputformat.avro;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -33,6 +32,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.NotThreadSafe;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericData.Record;
@@ -128,13 +128,16 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
     _md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }
 
+  @Nullable
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
     return decode(payload, 0, payload.length, destination);
   }
 
+  @Nullable
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+    // TODO: Revisit if these checks are needed
     if (payload == null || payload.length == 0 || length == 0) {
       return null;
     }
@@ -160,8 +163,8 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
             _md5ToAvroSchemaMap.addSchema(_reusableMD5Bytes, schema);
           } catch (Exception e) {
             schema = _defaultAvroSchema;
-            LOGGER
-                .error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri, e);
+            LOGGER.error("Error fetching schema using url {}. Attempting to continue with previous schema", schemaUri,
+                e);
             schemaUpdateFailed = true;
           }
         } else {
@@ -170,16 +173,15 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
         }
       }
     }
-    DatumReader<Record> reader = new GenericDatumReader<Record>(schema);
+    DatumReader<Record> reader = new GenericDatumReader<>(schema);
     try {
       GenericData.Record avroRecord = reader.read(null,
-          _decoderFactory.createBinaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
+          _decoderFactory.binaryDecoder(payload, HEADER_LENGTH + offset, length - HEADER_LENGTH, null));
       return _avroRecordExtractor.extract(avroRecord, destination);
-    } catch (IOException e) {
-      LOGGER.error("Caught exception while reading message using schema {}{}",
-          (schema == null ? "null" : schema.getName()),
-          (schemaUpdateFailed ? "(possibly due to schema update failure)" : ""), e);
-      return null;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "Caught exception while reading message using schema: " + (schema != null ? schema.getName() : "null") + (
+              schemaUpdateFailed ? " (possibly due to schema update failure)" : ""), e);
     }
   }
 

@@ -33,8 +33,8 @@ import org.apache.helix.zookeeper.zkclient.IZkChildListener;
 import org.apache.helix.zookeeper.zkclient.IZkDataListener;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.utils.LogicalTableConfigUtils;
-import org.apache.pinot.common.utils.SchemaUtils;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
+import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
+import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -124,7 +124,7 @@ public class LogicalTableMetadataCache {
       if (data != null) {
         ZNRecord znRecord = (ZNRecord) data;
         try {
-          TableConfig tableConfig = TableConfigUtils.fromZNRecord(znRecord);
+          TableConfig tableConfig = TableConfigSerDeUtils.fromZNRecord(znRecord);
           _tableConfigMap.put(tableConfig.getTableName(), tableConfig);
         } catch (Exception e) {
           LOGGER.error("Caught exception while refreshing table config for ZNRecord: {}", znRecord.getId(), e);
@@ -145,7 +145,7 @@ public class LogicalTableMetadataCache {
       if (data != null) {
         ZNRecord znRecord = (ZNRecord) data;
         try {
-          Schema schema = SchemaUtils.fromZNRecord(znRecord);
+          Schema schema = SchemaSerDeUtils.fromZNRecord(znRecord);
           _schemaMap.put(schema.getSchemaName(), schema);
         } catch (Exception e) {
           LOGGER.error("Caught exception while refreshing schema for ZNRecord: {}", znRecord.getId(), e);

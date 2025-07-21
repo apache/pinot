@@ -32,6 +32,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,12 +54,12 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
@@ -71,14 +72,18 @@ import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceCo
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceProgressStats;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantTableWithProperties;
+import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
@@ -126,6 +131,7 @@ public class PinotTenantRestletResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(PinotTenantRestletResource.class);
   private static final String TENANT_NAME = "tenantName";
   private static final String TABLES = "tables";
+  public static final String TABLES_WITH_PROPERTIES = "tablesWithProperties";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -135,6 +141,9 @@ public class PinotTenantRestletResource {
 
   @Inject
   TenantRebalancer _tenantRebalancer;
+
+  @Inject
+  TableSizeReader _tableSizeReader;
 
   @POST
   @Path("/tenants")
@@ -295,9 +304,11 @@ public class PinotTenantRestletResource {
       @ApiParam(value = "Tenant name", required = true) @PathParam("tenantName") String tenantName,
       @ApiParam(value = "Tenant type (server|broker)",
           required = false, allowableValues = "BROKER, SERVER", defaultValue = "SERVER")
-      @QueryParam("type") String tenantType, @Context HttpHeaders headers) {
+      @QueryParam("type") String tenantType,
+      @QueryParam("withTableProperties") @DefaultValue("false") boolean withTableProperties,
+      @Context HttpHeaders headers) {
     if (tenantType == null || tenantType.isEmpty() || tenantType.equalsIgnoreCase("server")) {
-      return getTablesServedFromServerTenant(tenantName, headers.getHeaderString(DATABASE));
+      return getTablesServedFromServerTenant(tenantName, headers.getHeaderString(DATABASE), withTableProperties);
     } else if (tenantType.equalsIgnoreCase("broker")) {
       return getTablesServedFromBrokerTenant(tenantName, headers.getHeaderString(DATABASE));
     } else {
@@ -386,23 +397,38 @@ public class PinotTenantRestletResource {
     }
   }
 
-  private String getTablesServedFromServerTenant(String tenantName, @Nullable String database) {
+  private String getTablesServedFromServerTenant(String tenantName, @Nullable String database,
+      boolean withTableProperties) {
     Set<String> tables = new HashSet<>();
+    Set<TenantTableWithProperties> tablePropertiesSet = withTableProperties ? new HashSet<>() : null;
     ObjectNode resourceGetRet = JsonUtils.newObjectNode();
 
-    for (String table : _pinotHelixResourceManager.getAllTables(database)) {
-      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(table);
+    for (String tableNameWithType : _pinotHelixResourceManager.getAllTables(database)) {
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
       if (tableConfig == null) {
-        LOGGER.error("Unable to retrieve table config for table: {}", table);
+        LOGGER.error("Unable to retrieve table config for table: {}", tableNameWithType);
         continue;
       }
       Set<String> relevantTags = TableConfigUtils.getRelevantTags(tableConfig);
       if (relevantTags.contains(TagNameUtils.getServerTagForTenant(tenantName, tableConfig.getTableType()))) {
-        tables.add(table);
+        tables.add(tableNameWithType);
+        if (withTableProperties) {
+          IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
+          if (idealState == null) {
+            LOGGER.error("Unable to retrieve ideal state for table: {}", tableNameWithType);
+            continue;
+          }
+          TenantTableWithProperties tableWithProperties = new TenantTableWithProperties(tableConfig,
+              idealState.getRecord().getMapFields(), _tableSizeReader);
+          tablePropertiesSet.add(tableWithProperties);
+        }
       }
     }
 
     resourceGetRet.set(TABLES, JsonUtils.objectToJsonNode(tables));
+    if (withTableProperties) {
+      resourceGetRet.set(TABLES_WITH_PROPERTIES, JsonUtils.objectToJsonNode(tablePropertiesSet));
+    }
     return resourceGetRet.toString();
   }
 
@@ -775,5 +801,18 @@ public class PinotTenantRestletResource {
     tenantRebalanceJobStatusResponse.setTenantRebalanceProgressStats(tenantRebalanceProgressStats);
     tenantRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
     return tenantRebalanceJobStatusResponse;
+  }
+
+  @GET
+  @Path("/tenants/{tenantName}/rebalanceJobs")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get list of rebalance jobs for this tenant",
+      notes = "Get list of rebalance jobs for this tenant")
+  public Map<String, Map<String, String>> getControllerJobs(
+      @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName) {
+    return _pinotHelixResourceManager.getAllJobs(Collections.singleton(ControllerJobTypes.TENANT_REBALANCE),
+        jobMetadata -> jobMetadata.get(CommonConstants.ControllerJob.TENANT_NAME)
+            .equals(tenantName));
   }
 }

@@ -24,7 +24,6 @@ import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
@@ -256,7 +255,6 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         _consumer.start(_startOffset);
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
-        TransformPipeline.Result reusedResult = new TransformPipeline.Result();
         while (_currentOffset.compareTo(_endOffset) < 0) {
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
@@ -276,12 +274,9 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
             if (decodedResult.getException() == null) {
               // Index message
               GenericRow row = decodedResult.getResult();
-
-              _transformPipeline.processRow(row, reusedResult);
-
-              List<GenericRow> transformedRows = reusedResult.getTransformedRows();
-
-              for (GenericRow transformedRow : transformedRows) {
+              assert row != null;
+              TransformPipeline.Result result = _transformPipeline.processRow(row);
+              for (GenericRow transformedRow : result.getTransformedRows()) {
                 _realtimeSegment.index(transformedRow, streamMessage.getMetadata());
               }
             } else {

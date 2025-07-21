@@ -168,7 +168,7 @@ public class QueryDispatcher {
     boolean cancelled = false;
     try {
       submit(requestId, dispatchableSubPlan, timeoutMs, servers, queryOptions);
-      QueryResult result = runReducer(requestId, dispatchableSubPlan, timeoutMs, queryOptions, _mailboxService);
+      QueryResult result = runReducer(dispatchableSubPlan, queryOptions, _mailboxService);
       if (result.getProcessingException() != null) {
         MultiStageQueryStats statsFromCancel = cancelWithStats(requestId, servers);
         cancelled = true;
@@ -320,7 +320,7 @@ public class QueryDispatcher {
         serializePlanFragments(stagePlans, serverInstancesOut, deadline);
 
     if (serverInstancesOut.isEmpty()) {
-      throw new RuntimeException("No server instances to dispatch query to");
+      return;
     }
 
     Map<String, String> requestMetadata =
@@ -352,7 +352,7 @@ public class QueryDispatcher {
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while dispatching query to server: {}", serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
-        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId(), serverInstance.getHostname());
       }
     }
     return dispatchCallbacks;
@@ -372,7 +372,10 @@ public class QueryDispatcher {
           // subsequent query failures
           if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
               != ConnectivityState.READY) {
-            _failureDetector.markServerUnhealthy(resp.getServerInstance().getInstanceId());
+            _failureDetector.markServerUnhealthy(
+                resp.getServerInstance().getInstanceId(),
+                resp.getServerInstance().getHostname()
+            );
           }
           throw new RuntimeException(
               String.format("Error dispatching query: %d to server: %s", requestId, resp.getServerInstance()),
@@ -452,6 +455,8 @@ public class QueryDispatcher {
     requestMetadata.put(CommonConstants.Query.Request.MetadataKeys.CORRELATION_ID, cid);
     requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
+    requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
+        Long.toString(QueryThreadContext.getPassiveDeadlineMs()));
     requestMetadata.putAll(queryOptions);
     return requestMetadata;
   }
@@ -577,15 +582,38 @@ public class QueryDispatcher {
     return _timeSeriesDispatchClientMap.computeIfAbsent(key, k -> new TimeSeriesDispatchClient(hostname, port));
   }
 
-  // There is no reduction happening here, results are simply concatenated.
+  /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
+  ///
+  /// This method assumes the caller thread is a query thread and therefore [QueryThreadContext] has been initialized.
+  private static QueryResult runReducer(
+      DispatchableSubPlan subPlan,
+      Map<String, String> queryOptions,
+      MailboxService mailboxService
+  ) {
+    return runReducer(
+        QueryThreadContext.getRequestId(),
+        subPlan,
+        QueryThreadContext.getActiveDeadlineMs(),
+        QueryThreadContext.getPassiveDeadlineMs(),
+        queryOptions,
+        mailboxService
+    );
+  }
+
+  /// Concatenates the results of the sub-plan and returns a [QueryResult] with the concatenated result.
+  ///
+  /// This method should be called from a query thread and therefore using
+  /// [#runReducer(DispatchableSubPlan, Map, MailboxService)] is preferred.
+  ///
+  /// Remember that in MSE there is no actual reduce but rather a single stage that concatenates the results.
   @VisibleForTesting
   public static QueryResult runReducer(long requestId,
       DispatchableSubPlan subPlan,
-      long timeoutMs,
+      long activeDeadlineMs,
+      long passiveDeadlineMs,
       Map<String, String> queryOptions,
       MailboxService mailboxService) {
     long startTimeMs = System.currentTimeMillis();
-    long deadlineMs = startTimeMs + timeoutMs;
     // NOTE: Reduce stage is always stage 0
     DispatchablePlanFragment stagePlan = subPlan.getQueryStageMap().get(0);
     PlanFragment planFragment = stagePlan.getPlanFragment();
@@ -597,8 +625,8 @@ public class QueryDispatcher {
     StageMetadata stageMetadata = new StageMetadata(0, workerMetadata, stagePlan.getCustomProperties());
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     OpChainExecutionContext executionContext =
-        new OpChainExecutionContext(mailboxService, requestId, deadlineMs, queryOptions, stageMetadata,
-            workerMetadata.get(0), null, parentContext, true);
+        new OpChainExecutionContext(mailboxService, requestId, activeDeadlineMs, passiveDeadlineMs,
+            queryOptions, stageMetadata, workerMetadata.get(0), null, parentContext, true);
 
     PairList<Integer, String> resultFields = subPlan.getQueryResultFields();
     DataSchema sourceSchema = rootNode.getDataSchema();

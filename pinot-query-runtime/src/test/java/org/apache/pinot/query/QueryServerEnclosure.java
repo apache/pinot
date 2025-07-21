@@ -28,8 +28,10 @@ import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 
 
@@ -55,13 +57,19 @@ public class QueryServerEnclosure {
   }
 
   public QueryServerEnclosure(MockInstanceDataManagerFactory factory, Map<String, Object> config) {
+    this(factory, config, new Tracing.DefaultThreadResourceUsageAccountant());
+  }
+
+  public QueryServerEnclosure(MockInstanceDataManagerFactory factory, Map<String, Object> config,
+      ThreadResourceUsageAccountant accountant) {
     _queryRunnerPort = QueryTestUtils.getAvailablePort();
     Map<String, Object> runnerConfig = new HashMap<>(config);
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, "Server_localhost");
     runnerConfig.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, _queryRunnerPort);
     InstanceDataManager instanceDataManager = factory.buildInstanceDataManager();
     _queryRunner = new QueryRunner();
-    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true);
+    _queryRunner.init(new PinotConfiguration(runnerConfig), instanceDataManager, null, () -> true,
+        accountant);
   }
 
   public int getPort() {

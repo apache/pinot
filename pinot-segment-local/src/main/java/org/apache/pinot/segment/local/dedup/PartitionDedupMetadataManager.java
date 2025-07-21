@@ -93,4 +93,6 @@ public interface PartitionDedupMetadataManager extends Closeable {
    * Stops the metadata manager. After invoking this method, no access to the metadata will be accepted.
    */
   void stop();
+
+  long getNumPrimaryKeys();
 }

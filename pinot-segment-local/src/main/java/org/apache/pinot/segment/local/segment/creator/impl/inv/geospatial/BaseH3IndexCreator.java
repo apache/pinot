@@ -29,9 +29,12 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Map;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.segment.local.segment.index.h3.H3IndexType;
 import org.apache.pinot.segment.local.utils.GeometrySerializer;
 import org.apache.pinot.segment.local.utils.H3Utils;
+import org.apache.pinot.segment.local.utils.MetricUtils;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.GeoSpatialIndexCreator;
 import org.apache.pinot.segment.spi.index.reader.H3IndexResolution;
@@ -67,6 +70,8 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   static final String BITMAP_OFFSET_FILE_NAME = "bitmap.offset.buf";
   static final String BITMAP_VALUE_FILE_NAME = "bitmap.value.buf";
 
+  final String _tableNameWithType;
+  final boolean _continueOnError;
   final File _indexFile;
   final File _tempDir;
   final File _dictionaryFile;
@@ -83,8 +88,11 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
 
   int _nextDocId;
 
-  BaseH3IndexCreator(File indexDir, String columnName, H3IndexResolution resolution)
+  BaseH3IndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
+      H3IndexResolution resolution)
       throws IOException {
+    _tableNameWithType = tableNameWithType;
+    _continueOnError = continueOnError;
     _indexFile = new File(indexDir, columnName + V1Constants.Indexes.H3_INDEX_FILE_EXTENSION);
     _tempDir = new File(indexDir, columnName + TEMP_DIR_SUFFIX);
     if (_tempDir.exists()) {
@@ -108,8 +116,14 @@ public abstract class BaseH3IndexCreator implements GeoSpatialIndexCreator {
   }
 
   @Override
-  public void add(Geometry geometry)
+  public void add(@Nullable Geometry geometry)
       throws IOException {
+    if (_continueOnError && !(geometry instanceof Point)) {
+      MetricUtils.updateIndexingErrorMetric(_tableNameWithType, H3IndexType.INDEX_DISPLAY_NAME);
+      _nextDocId++;
+      return;
+    }
+    Preconditions.checkState(geometry != null, "Null geometry record found and continueOnError is disabled");
     Preconditions.checkState(geometry instanceof Point, "H3 index can only be applied to Point, got: %s",
         geometry.getGeometryType());
     Coordinate coordinate = geometry.getCoordinate();

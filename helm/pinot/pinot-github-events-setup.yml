@@ -32,7 +32,6 @@ data:
         "timeType": "MILLISECONDS",
         "retentionTimeUnit": "DAYS",
         "retentionTimeValue": "60",
-        "schemaName": "pullRequestMergedEvents",
         "replication": "1",
         "replicasPerPartition": "1"
       },

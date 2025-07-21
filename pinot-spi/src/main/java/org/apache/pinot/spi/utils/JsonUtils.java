@@ -53,7 +53,6 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -80,7 +79,7 @@ public class JsonUtils {
   public static final String ARRAY_INDEX_KEY = ".$index";
   public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
-  private static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
+  public static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
       Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
 
   // For querying
@@ -222,6 +221,11 @@ public class JsonUtils {
   public static JsonNode bytesToJsonNode(byte[] jsonBytes)
       throws IOException {
     return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes));
+  }
+
+  public static JsonNode bytesToJsonNode(byte[] jsonBytes, int offset, int length)
+      throws IOException {
+    return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes, offset, length));
   }
 
   public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType)
@@ -737,14 +741,14 @@ public class JsonUtils {
     JsonNode jsonNode;
     try {
       jsonNode = JsonUtils.stringToJsonNode(jsonString);
-    } catch (JsonProcessingException e) {
+      return JsonUtils.flatten(jsonNode, jsonIndexConfig);
+    } catch (Exception e) {
       if (jsonIndexConfig.getSkipInvalidJson()) {
         return SKIPPED_FLATTENED_RECORD;
       } else {
         throw e;
       }
     }
-    return JsonUtils.flatten(jsonNode, jsonIndexConfig);
   }
 
   /**
@@ -754,7 +758,7 @@ public class JsonUtils {
    * @return the root node of the json index paths tree
    * @throws IllegalArgumentException
    */
-  private static JsonSchemaTreeNode createTree(@Nonnull JsonIndexConfig jsonIndexConfig)
+  private static JsonSchemaTreeNode createTree(JsonIndexConfig jsonIndexConfig)
       throws IllegalArgumentException {
     Set<String> indexPaths = jsonIndexConfig.getIndexPaths();
     JsonSchemaTreeNode rootNode = new JsonSchemaTreeNode("");

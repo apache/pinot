@@ -160,7 +160,12 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       }
     }
     // exception will be propagated through for assert purpose on runtime error
-    return QueryDispatcher.runReducer(requestId, dispatchableSubPlan, timeoutMs, Collections.emptyMap(),
+    long now = System.currentTimeMillis();
+    long extraPassiveTimeout = 1000;
+    return QueryDispatcher.runReducer(requestId, dispatchableSubPlan,
+        timeoutMs + now,
+        timeoutMs + now + extraPassiveTimeout,
+        Collections.emptyMap(),
         _mailboxService);
   }
 
@@ -172,7 +177,7 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
     for (Map.Entry<QueryServerInstance, List<Integer>> entry : dispatchableStagePlan.getServerInstanceToWorkerIdMap()
         .entrySet()) {
       QueryServerEnclosure serverEnclosure = _servers.get(entry.getKey());
-      Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE);
+      Tracing.ThreadAccountantOps.setupRunner(Long.toString(requestId), ThreadExecutionContext.TaskType.MSE, null);
       ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       List<WorkerMetadata> workerMetadataList =
           entry.getValue().stream().map(stageWorkerMetadataList::get).collect(Collectors.toList());
@@ -590,6 +595,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _keepOutputRowOrder;
       @JsonProperty("expectedNumSegments")
       public Integer _expectedNumSegments;
+      @JsonProperty("ignoreV2Optimizer")
+      public Boolean _ignoreV2Optimizer = false;
     }
 
     public static class ColumnAndType {
