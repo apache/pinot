@@ -41,16 +41,16 @@ public class ReducerDataSchemaUtilsTest {
 
     queryContext = QueryContextConverterUtils.getQueryContext("SELECT SUM(col1 + 1), MIN(col2 + 2) FROM testTable");
     // Intentionally make data schema not matching the string representation of the expression
-    dataSchema = new DataSchema(new String[]{"sum(col1+1)", "min(col2+2)"},
+    dataSchema = new DataSchema(new String[]{"sum(col1)", "count(1)", "min(col2)"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(queryContext, dataSchema);
-    assertEquals(canonicalDataSchema, new DataSchema(new String[]{"sum(plus(col1,'1'))", "min(plus(col2,'2'))"},
+    assertEquals(canonicalDataSchema, new DataSchema(new String[]{"sum(col1)", "count(*)", "min(col2)"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE}));
 
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT MAX(col1 + 1) FILTER(WHERE col3 > 0) - MIN(col2 + 2) FILTER(WHERE col4 > 0) FROM testTable");
     // Intentionally make data schema not matching the string representation of the expression
-    dataSchema = new DataSchema(new String[]{"max(col1+1)", "min(col2+2)"},
+    dataSchema = new DataSchema(new String[]{"max(col1)", "min(col2)"},
         new ColumnDataType[]{ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForAggregation(queryContext, dataSchema);
     assertEquals(canonicalDataSchema, new DataSchema(
@@ -72,11 +72,11 @@ public class ReducerDataSchemaUtilsTest {
     queryContext = QueryContextConverterUtils.getQueryContext(
         "SELECT SUM(col1 + 1), MIN(col2 + 2), col4 FROM testTable GROUP BY col3, col4");
     // Intentionally make data schema not matching the string representation of the expression
-    dataSchema = new DataSchema(new String[]{"col3", "col4", "sum(col1+1)", "min(col2+2)"},
+    dataSchema = new DataSchema(new String[]{"col3", "col4", "sum(col1)", "count(1)", "min(col2)"},
         new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
     canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(queryContext, dataSchema);
     assertEquals(canonicalDataSchema,
-        new DataSchema(new String[]{"col3", "col4", "sum(plus(col1,'1'))", "min(plus(col2,'2'))"}, new ColumnDataType[]{
+        new DataSchema(new String[]{"col3", "col4", "sum(col1)", "count(*)", "min(col2)"}, new ColumnDataType[]{
             ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
         }));
 

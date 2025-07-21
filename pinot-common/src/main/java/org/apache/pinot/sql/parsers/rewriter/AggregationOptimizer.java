@@ -62,28 +62,84 @@ public class AggregationOptimizer implements QueryRewriter {
     }
 
     Function function = expression.getFunctionCall();
-    if (function == null || !function.getOperator().equalsIgnoreCase("sum")) {
+    if (function == null) {
       return null;
     }
 
+    String operator = function.getOperator().toLowerCase();
     List<Expression> operands = function.getOperands();
+
     if (operands == null || operands.size() != 1) {
       return null;
     }
 
-    Expression sumOperand = operands.get(0);
-    return optimizeSumExpression(sumOperand);
+    Expression operand = operands.get(0);
+
+    switch (operator) {
+      case "sum":
+        return optimizeSumExpression(operand);
+      case "avg":
+        return optimizeAvgExpression(operand);
+      case "min":
+        return optimizeMinExpression(operand);
+      case "max":
+        return optimizeMaxExpression(operand);
+      default:
+        return null;
+    }
   }
 
   /**
    * Optimizes sum(expression) based on the expression type.
    */
   private Expression optimizeSumExpression(Expression sumOperand) {
-    if (sumOperand.getType() != ExpressionType.FUNCTION) {
+    return optimizeArithmeticExpression(sumOperand, "sum");
+  }
+
+  /**
+   * Optimizes avg(expression) based on the expression type.
+   * AVG(column + constant) = AVG(column) + constant
+   * AVG(column - constant) = AVG(column) - constant
+   * AVG(constant - column) = constant - AVG(column)
+   * AVG(column * constant) = AVG(column) * constant
+   */
+  private Expression optimizeAvgExpression(Expression avgOperand) {
+    return optimizeArithmeticExpression(avgOperand, "avg");
+  }
+
+  /**
+   * Optimizes min(expression) based on the expression type.
+   * MIN(column + constant) = MIN(column) + constant
+   * MIN(column - constant) = MIN(column) - constant
+   * MIN(constant - column) = constant - MAX(column)
+   * MIN(column * constant) = MIN(column) * constant (if constant > 0)
+   *                        = MAX(column) * constant (if constant < 0)
+   */
+  private Expression optimizeMinExpression(Expression minOperand) {
+    return optimizeArithmeticExpression(minOperand, "min");
+  }
+
+  /**
+   * Optimizes max(expression) based on the expression type.
+   * MAX(column + constant) = MAX(column) + constant
+   * MAX(column - constant) = MAX(column) - constant
+   * MAX(constant - column) = constant - MIN(column)
+   * MAX(column * constant) = MAX(column) * constant (if constant > 0)
+   *                        = MIN(column) * constant (if constant < 0)
+   */
+  private Expression optimizeMaxExpression(Expression maxOperand) {
+    return optimizeArithmeticExpression(maxOperand, "max");
+  }
+
+  /**
+   * Generic method to optimize arithmetic expressions for different aggregation functions.
+   */
+  private Expression optimizeArithmeticExpression(Expression operand, String aggregationFunction) {
+    if (operand.getType() != ExpressionType.FUNCTION) {
       return null;
     }
 
-    Function innerFunction = sumOperand.getFunctionCall();
+    Function innerFunction = operand.getFunctionCall();
     if (innerFunction == null) {
       return null;
     }
@@ -91,86 +147,180 @@ public class AggregationOptimizer implements QueryRewriter {
     String operator = innerFunction.getOperator();
     List<Expression> operands = innerFunction.getOperands();
 
-    if (operands == null || operands.size() != 2) {
-      return null;
+    // Handle direct arithmetic operations (used by sum)
+    if (operands != null && operands.size() == 2) {
+      Expression left = operands.get(0);
+      Expression right = operands.get(1);
+
+      switch (operator.toLowerCase()) {
+        case "add":
+        case "plus":
+          return optimizeAdditionForFunction(left, right, aggregationFunction);
+        case "sub":
+        case "minus":
+          return optimizeSubtractionForFunction(left, right, aggregationFunction);
+        case "mul":
+        case "mult":
+        case "multiply":
+          return optimizeMultiplicationForFunction(left, right, aggregationFunction);
+        default:
+          break;
+      }
     }
 
-    Expression left = operands.get(0);
-    Expression right = operands.get(1);
-
-    switch (operator.toLowerCase()) {
-      case "add":
-      case "plus":
-        return optimizeAddition(left, right);
-      case "sub":
-      case "minus":
-        return optimizeSubtraction(left, right);
-      default:
-        return null;
+    // Handle values wrapper function (used by avg, min, max)
+    if ("values".equals(operator.toLowerCase()) && operands != null && operands.size() == 1) {
+      Expression valuesOperand = operands.get(0);
+      if (valuesOperand.getType() == ExpressionType.FUNCTION) {
+        Function rowFunction = valuesOperand.getFunctionCall();
+        if (rowFunction != null && "row".equals(rowFunction.getOperator().toLowerCase())
+            && rowFunction.getOperands() != null && rowFunction.getOperands().size() == 1) {
+          Expression rowOperand = rowFunction.getOperands().get(0);
+          return optimizeArithmeticExpression(rowOperand, aggregationFunction);
+        }
+      }
     }
+
+    return null;
   }
 
   /**
-   * Optimizes sum(a + b) where one operand is a column and the other is a constant.
-   * Returns sum(column) + constant * count(1)
+   * Optimizes aggregation(a + b) where one operand is a column and the other is a constant.
    */
-  private Expression optimizeAddition(Expression left, Expression right) {
+  private Expression optimizeAdditionForFunction(Expression left, Expression right, String aggregationFunction) {
     if (isColumn(left) && isConstant(right)) {
-      // sum(column + constant) → sum(column) + constant * count(1)
-      return createOptimizedAddition(left, right);
+      // AGG(column + constant) → AGG(column) + constant (for avg/min/max)
+      // or AGG(column) + constant * count(1) (for sum)
+      return createOptimizedAddition(left, right, aggregationFunction);
     } else if (isConstant(left) && isColumn(right)) {
-      // sum(constant + column) → sum(column) + constant * count(1)
-      return createOptimizedAddition(right, left);
+      // AGG(constant + column) → AGG(column) + constant (for avg/min/max)
+      // or AGG(column) + constant * count(1) (for sum)
+      return createOptimizedAddition(right, left, aggregationFunction);
     }
     return null;
   }
 
   /**
-   * Optimizes sum(a - b) where one operand is a column and the other is a constant.
+   * Optimizes aggregation(a - b) where one operand is a column and the other is a constant.
    */
-  private Expression optimizeSubtraction(Expression left, Expression right) {
+  private Expression optimizeSubtractionForFunction(Expression left, Expression right, String aggregationFunction) {
     if (isColumn(left) && isConstant(right)) {
-      // sum(column - constant) → sum(column) - constant * count(1)
-      return createOptimizedSubtraction(left, right);
+      // AGG(column - constant) → AGG(column) - constant (for avg/min/max)
+      // or AGG(column) - constant * count(1) (for sum)
+      return createOptimizedSubtraction(left, right, aggregationFunction);
     } else if (isConstant(left) && isColumn(right)) {
-      // sum(constant - column) → constant * count(1) - sum(column)
-      return createOptimizedSubtractionReversed(left, right);
+      // Special cases: constant - AGG(column)
+      return createOptimizedSubtractionReversed(left, right, aggregationFunction);
     }
     return null;
   }
 
   /**
-   * Creates the optimized expression: sum(column) + constant * count(1)
+   * Optimizes aggregation(a * b) where one operand is a column and the other is a constant.
+   * AGG(column * constant) = AGG(column) * constant (for avg, and min/max when constant > 0)
+   * For min/max with negative constants, the order flips:
+   * MIN(col * neg) = MAX(col) * neg
    */
-  private Expression createOptimizedAddition(Expression column, Expression constant) {
-    Expression sumColumn = createSumExpression(column);
-    Expression constantTimesCount = createConstantTimesCount(constant);
-    return RequestUtils.getFunctionExpression("add", sumColumn, constantTimesCount);
+  private Expression optimizeMultiplicationForFunction(Expression left, Expression right, String aggregationFunction) {
+    if (isColumn(left) && isConstant(right)) {
+      return createOptimizedMultiplication(left, right, aggregationFunction);
+    } else if (isConstant(left) && isColumn(right)) {
+      return createOptimizedMultiplication(right, left, aggregationFunction);
+    }
+    return null;
   }
 
   /**
-   * Creates the optimized expression: sum(column) - constant * count(1)
+   * Creates the optimized expression for addition based on aggregation function.
+   * For sum: AGG(column) + constant * count(1)
+   * For avg/min/max: AGG(column) + constant
    */
-  private Expression createOptimizedSubtraction(Expression column, Expression constant) {
-    Expression sumColumn = createSumExpression(column);
-    Expression constantTimesCount = createConstantTimesCount(constant);
-    return RequestUtils.getFunctionExpression("sub", sumColumn, constantTimesCount);
+  private Expression createOptimizedAddition(Expression column, Expression constant, String aggregationFunction) {
+    Expression aggColumn = createAggregationExpression(column, aggregationFunction);
+    Expression rightOperand;
+
+    if ("sum".equals(aggregationFunction)) {
+      rightOperand = createConstantTimesCount(constant);
+    } else {
+      rightOperand = constant;
+    }
+
+    return RequestUtils.getFunctionExpression("add", aggColumn, rightOperand);
   }
 
   /**
-   * Creates the optimized expression: constant * count(1) - sum(column)
+   * Creates the optimized expression for subtraction based on aggregation function.
+   * For sum: AGG(column) - constant * count(1)
+   * For avg/min/max: AGG(column) - constant
    */
-  private Expression createOptimizedSubtractionReversed(Expression constant, Expression column) {
-    Expression constantTimesCount = createConstantTimesCount(constant);
-    Expression sumColumn = createSumExpression(column);
-    return RequestUtils.getFunctionExpression("sub", constantTimesCount, sumColumn);
+  private Expression createOptimizedSubtraction(Expression column, Expression constant, String aggregationFunction) {
+    Expression aggColumn = createAggregationExpression(column, aggregationFunction);
+    Expression rightOperand;
+
+    if ("sum".equals(aggregationFunction)) {
+      rightOperand = createConstantTimesCount(constant);
+    } else {
+      rightOperand = constant;
+    }
+
+    return RequestUtils.getFunctionExpression("sub", aggColumn, rightOperand);
   }
 
   /**
-   * Creates sum(column) expression
+   * Creates the optimized expression for reversed subtraction based on aggregation function.
+   * For sum: constant * count(1) - sum(column)
+   * For avg: constant - avg(column)
+   * For min: constant - max(column)
+   * For max: constant - min(column)
    */
-  private Expression createSumExpression(Expression column) {
-    return RequestUtils.getFunctionExpression("sum", column);
+  private Expression createOptimizedSubtractionReversed(Expression constant, Expression column,
+      String aggregationFunction) {
+    Expression leftOperand;
+    Expression aggColumn;
+
+    if ("sum".equals(aggregationFunction)) {
+      leftOperand = createConstantTimesCount(constant);
+      aggColumn = createAggregationExpression(column, "sum");
+    } else if ("min".equals(aggregationFunction)) {
+      leftOperand = constant;
+      aggColumn = createAggregationExpression(column, "max");  // min(c - col) = c - max(col)
+    } else if ("max".equals(aggregationFunction)) {
+      leftOperand = constant;
+      aggColumn = createAggregationExpression(column, "min");  // max(c - col) = c - min(col)
+    } else {  // avg
+      leftOperand = constant;
+      aggColumn = createAggregationExpression(column, "avg");
+    }
+
+    return RequestUtils.getFunctionExpression("sub", leftOperand, aggColumn);
+  }
+
+  /**
+   * Creates optimized multiplication expression based on aggregation function.
+   * For avg: avg(column) * constant
+   * For sum: sum(column) * constant
+   * For min/max with positive constant: min/max(column) * constant
+   * For min/max with negative constant: max/min(column) * constant (order flips)
+   */
+  private Expression createOptimizedMultiplication(Expression column, Expression constant, String aggregationFunction) {
+    Expression aggColumn;
+
+    if ("min".equals(aggregationFunction) && isNegativeConstant(constant)) {
+      aggColumn = createAggregationExpression(column, "max");  // min(col * neg) = max(col) * neg
+    } else if ("max".equals(aggregationFunction) && isNegativeConstant(constant)) {
+      aggColumn = createAggregationExpression(column, "min");  // max(col * neg) = min(col) * neg
+    } else {
+      aggColumn = createAggregationExpression(column, aggregationFunction);
+    }
+
+    return RequestUtils.getFunctionExpression("mult", aggColumn, constant);
+  }
+
+  /**
+   * Creates aggregation function expression for the given column.
+   */
+  private Expression createAggregationExpression(Expression column, String aggregationFunction) {
+    return RequestUtils.getFunctionExpression(aggregationFunction, column);
   }
 
   /**
@@ -215,5 +365,26 @@ public class AggregationOptimizer implements QueryRewriter {
     // Check if it's a numeric literal
     return literal.isSetIntValue() || literal.isSetLongValue()
         || literal.isSetFloatValue() || literal.isSetDoubleValue();
+  }
+
+  /**
+   * Checks if the expression is a negative numeric constant.
+   */
+  private boolean isNegativeConstant(Expression expression) {
+    if (!isConstant(expression)) {
+      return false;
+    }
+
+    Literal literal = expression.getLiteral();
+    if (literal.isSetIntValue()) {
+      return literal.getIntValue() < 0;
+    } else if (literal.isSetLongValue()) {
+      return literal.getLongValue() < 0;
+    } else if (literal.isSetFloatValue()) {
+      return literal.getFloatValue() < 0;
+    } else if (literal.isSetDoubleValue()) {
+      return literal.getDoubleValue() < 0;
+    }
+    return false;
   }
 }
