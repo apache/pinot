@@ -49,6 +49,36 @@ import { parseTimeseriesResponse, isPrometheusFormat } from '../../utils/Timeser
 import { ChartSeries } from 'Models';
 import { MAX_SERIES_LIMIT } from '../../utils/ChartConstants';
 
+// Define proper types
+interface TimeseriesQueryResponse {
+  data: {
+    resultType: string;
+    result: Array<{
+      metric: Record<string, string>;
+      values: [number, number][];
+    }>;
+  };
+}
+
+interface CodeMirrorEditor {
+  getValue: () => string;
+  setValue: (value: string) => void;
+}
+
+interface CodeMirrorChangeData {
+  from: { line: number; ch: number };
+  to: { line: number; ch: number };
+  text: string[];
+  removed: string[];
+  origin: string;
+}
+
+interface KeyboardEvent {
+  keyCode: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+}
+
 const useStyles = makeStyles((theme) => ({
   rightPanel: {},
   codeMirror: {
@@ -140,7 +170,7 @@ const ViewToggle: React.FC<{
   isChartDisabled: boolean;
   onCopy: () => void;
   copyMsg: boolean;
-  classes: any;
+  classes: ReturnType<typeof useStyles>;
 }> = ({ viewType, onViewChange, isChartDisabled, onCopy, copyMsg, classes }) => (
   <Grid container className={classes.actionBtns} alignItems="center" justify="space-between">
     <Grid item>
@@ -222,7 +252,7 @@ const TimeseriesQueryPage = () => {
   });
 
   const [rawOutput, setRawOutput] = useState<string>('');
-  const [rawData, setRawData] = useState<any>(null);
+  const [rawData, setRawData] = useState<TimeseriesQueryResponse | null>(null);
   const [chartSeries, setChartSeries] = useState<ChartSeries[]>([]);
   const [truncatedChartSeries, setTruncatedChartSeries] = useState<ChartSeries[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -277,15 +307,15 @@ const TimeseriesQueryPage = () => {
     });
   }, [history, location.pathname]);
 
-  const handleConfigChange = (field: keyof TimeseriesQueryConfig, value: any) => {
+  const handleConfigChange = (field: keyof TimeseriesQueryConfig, value: string | number | boolean) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleQueryChange = (editor: any, data: any, value: string) => {
+  const handleQueryChange = (editor: CodeMirrorEditor, data: CodeMirrorChangeData, value: string) => {
     setConfig(prev => ({ ...prev, query: value }));
   };
 
-  const handleQueryInterfaceKeyDown = (editor: any, event: any) => {
+  const handleQueryInterfaceKeyDown = (editor: CodeMirrorEditor, event: KeyboardEvent) => {
     const modifiedEnabled = event.metaKey == true || event.ctrlKey == true;
 
     // Map (Cmd/Ctrl) + Enter KeyPress to executing the query
@@ -301,7 +331,7 @@ const TimeseriesQueryPage = () => {
   }, [handleQueryInterfaceKeyDown]);
 
   // Extract data processing logic
-  const processQueryResponse = useCallback((parsedData: any) => {
+  const processQueryResponse = useCallback((parsedData: TimeseriesQueryResponse) => {
     setRawData(parsedData);
     setRawOutput(JSON.stringify(parsedData, null, 2));
 
@@ -409,7 +439,7 @@ const TimeseriesQueryPage = () => {
               <InputLabel>Query Language</InputLabel>
               <Select
                 value={config.queryLanguage}
-                onChange={(e) => handleConfigChange('queryLanguage', e.target.value)}
+                onChange={(e) => handleConfigChange('queryLanguage', e.target.value as string)}
               >
                 {SUPPORTED_QUERY_LANGUAGES.map((lang) => (
                   <MenuItem key={lang.value} value={lang.value}>
@@ -426,7 +456,7 @@ const TimeseriesQueryPage = () => {
               <Input
                 type="text"
                 value={config.startTime}
-                onChange={(e) => handleConfigChange('startTime', e.target.value)}
+                onChange={(e) => handleConfigChange('startTime', e.target.value as string)}
                 placeholder={getOneMinuteAgoTimestamp()}
               />
             </FormControl>
@@ -438,7 +468,7 @@ const TimeseriesQueryPage = () => {
               <Input
                 type="text"
                 value={config.endTime}
-                onChange={(e) => handleConfigChange('endTime', e.target.value)}
+                onChange={(e) => handleConfigChange('endTime', e.target.value as string)}
                 placeholder={getCurrentTimestamp()}
               />
             </FormControl>
@@ -450,7 +480,7 @@ const TimeseriesQueryPage = () => {
               <Input
                 type="text"
                 value={config.timeout}
-                onChange={(e) => handleConfigChange('timeout', parseInt(e.target.value) || 60000)}
+                onChange={(e) => handleConfigChange('timeout', parseInt(e.target.value as string) || 60000)}
               />
             </FormControl>
           </Grid>

@@ -19,10 +19,18 @@
 
 import { ChartSeries, TimeseriesData, ChartDataPoint, MetricStats } from 'Models';
 
+// Define proper types for API responses
+interface PrometheusResponse {
+  data: {
+    resultType?: string;
+    result: TimeseriesData[];
+  };
+}
+
 /**
  * Parse Prometheus-compatible timeseries response
  */
-export const parseTimeseriesResponse = (response: any): ChartSeries[] => {
+export const parseTimeseriesResponse = (response: PrometheusResponse): ChartSeries[] => {
   if (!response || !response.data || !response.data.result) {
     return [];
   }
@@ -131,10 +139,9 @@ export const formatSeriesName = (metric: Record<string, string>): string => {
 /**
  * Check if response is in Prometheus format
  */
-export const isPrometheusFormat = (response: any): boolean => {
+export const isPrometheusFormat = (response: PrometheusResponse): boolean => {
   return response &&
          response.data &&
-         response.data.resultType &&
          Array.isArray(response.data.result);
 };
 

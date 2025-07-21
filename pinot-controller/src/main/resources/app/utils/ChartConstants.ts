@@ -31,6 +31,11 @@ export const CHART_COLORS = [
 export const MAX_SERIES_LIMIT = 20;
 
 /**
+ * Chart padding percentage for time axis and series
+ */
+export const CHART_PADDING_PERCENTAGE = 0.05; // 5%
+
+/**
  * Get color for a series by index
  * @param index - The series index
  * @returns The color for the series

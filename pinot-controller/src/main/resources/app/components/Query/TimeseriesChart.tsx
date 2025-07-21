@@ -22,7 +22,14 @@ import ReactECharts from 'echarts-for-react';
 import { makeStyles } from '@material-ui/core/styles';
 import { Typography, Paper } from '@material-ui/core';
 import { ChartSeries } from 'Models';
-import { getSeriesColor, MAX_SERIES_LIMIT } from '../../utils/ChartConstants';
+import { getSeriesColor, MAX_SERIES_LIMIT, CHART_PADDING_PERCENTAGE } from '../../utils/ChartConstants';
+
+// Define proper types for ECharts parameters
+interface EChartsTooltipParams {
+  value: [number, number];
+  seriesName: string;
+  color: string;
+}
 
 // Extract chart configuration functions
 const createChartSeries = (series: ChartSeries[], selectedMetric?: string) => {
@@ -56,15 +63,15 @@ const createChartSeries = (series: ChartSeries[], selectedMetric?: string) => {
 };
 
 const createTooltipFormatter = (selectedMetric?: string) => {
-  return function (params: any) {
+  return function (params: EChartsTooltipParams[]) {
     let result = `<div style="font-weight: bold;">${new Date(params[0].value[0]).toLocaleString()}</div>`;
 
     // Filter params to only show selected series when one is selected
     const filteredParams = selectedMetric
-      ? params.filter((param: any) => param.seriesName === selectedMetric)
+      ? params.filter((param: EChartsTooltipParams) => param.seriesName === selectedMetric)
       : params;
 
-    filteredParams.forEach((param: any) => {
+    filteredParams.forEach((param: EChartsTooltipParams) => {
       const color = param.color;
       const name = param.seriesName;
       const value = param.value[1];
@@ -124,9 +131,10 @@ const TimeseriesChart: React.FC<TimeseriesChartProps> = ({
 
     const chartSeries = createChartSeries(series, selectedMetric);
     const { minTime, maxTime } = getTimeRange(series);
+    const timeRange = maxTime - minTime;
+    const padding = timeRange * CHART_PADDING_PERCENTAGE;
 
     return {
-
       tooltip: {
         trigger: 'axis',
         formatter: createTooltipFormatter(selectedMetric),
@@ -135,6 +143,29 @@ const TimeseriesChart: React.FC<TimeseriesChartProps> = ({
           label: {
             backgroundColor: '#6a7985',
           },
+        },
+        // Fix hover popup positioning to keep it within chart area
+        confine: true,
+        position: function (point: [number, number], params: unknown, dom: HTMLElement, rect: { x: number; y: number; width: number; height: number }, size: { viewSize: [number, number]; contentSize: [number, number] }) {
+          // Ensure tooltip stays within chart bounds
+          const [x, y] = point;
+          const [viewWidth, viewHeight] = size.viewSize;
+          const [contentWidth, contentHeight] = size.contentSize;
+
+          let posX = x + 10;
+          let posY = y - 10;
+
+          // Adjust horizontal position if tooltip would go outside
+          if (posX + contentWidth > viewWidth) {
+            posX = x - contentWidth - 10;
+          }
+
+          // Adjust vertical position if tooltip would go outside
+          if (posY - contentHeight < 0) {
+            posY = y + 10;
+          }
+
+          return [posX, posY];
         },
       },
       // Remove legend - colors will be shown in the stats table instead
@@ -148,8 +179,8 @@ const TimeseriesChart: React.FC<TimeseriesChartProps> = ({
       xAxis: {
         type: 'time',
         boundaryGap: false,
-        min: minTime - (maxTime - minTime) * 0.05, // Add 5% padding on left
-        max: maxTime + (maxTime - minTime) * 0.05, // Add 5% padding on right
+        min: minTime - padding, // Apply consistent padding
+        max: maxTime + padding, // Apply consistent padding
         axisLabel: {
           formatter: function (value: number) {
             return new Date(value).toLocaleTimeString();
