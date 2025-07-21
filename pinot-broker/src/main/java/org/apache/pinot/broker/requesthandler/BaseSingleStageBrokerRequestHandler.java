@@ -431,6 +431,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);
+      // Accounts for resource usage of the authorization phase.
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
 
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
