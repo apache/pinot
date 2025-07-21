@@ -59,17 +59,9 @@ public class RegexpLikePredicate extends BasePredicate {
 
   public Pattern getPattern() {
     if (_pattern == null) {
-      _pattern = buildPattern(_value, _caseInsensitive);
+      _pattern = PatternFactory.compile(_value, _caseInsensitive);
     }
     return _pattern;
-  }
-
-  private Pattern buildPattern(String pattern, boolean caseInsensitive) {
-    if (caseInsensitive) {
-      return PatternFactory.compileCaseInsensitive(pattern);
-    } else {
-      return PatternFactory.compile(pattern);
-    }
   }
 
   @Override

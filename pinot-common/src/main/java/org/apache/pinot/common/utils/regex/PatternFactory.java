@@ -39,7 +39,7 @@ public class PatternFactory {
    * @param caseInsensitive whether the pattern should be case-insensitive
    * @return the compiled Pattern
    */
-  public static org.apache.pinot.common.utils.regex.Pattern compile(String regex, boolean caseInsensitive) {
+  public static Pattern compile(String regex, boolean caseInsensitive) {
     // un-initialized factory will use java.util.regex to avoid requiring initialization in tests
     if (_regexClass == null) {
       return new JavaUtilPattern(regex, caseInsensitive);
@@ -60,14 +60,7 @@ public class PatternFactory {
    * @param regex to compile the Pattern for
    * @return the compiled Pattern
    */
-  public static org.apache.pinot.common.utils.regex.Pattern compile(String regex) {
+  public static Pattern compile(String regex) {
     return compile(regex, false);
-  }
-
-  /**
-   * Compiles a pattern with CASE_INSENSITIVE and UNICODE_CASE flags.
-   */
-  public static org.apache.pinot.common.utils.regex.Pattern compileCaseInsensitive(String regex) {
-    return compile(regex, true);
   }
 }

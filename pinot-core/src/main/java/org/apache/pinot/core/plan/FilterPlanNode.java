@@ -299,9 +299,8 @@ public class FilterPlanNode implements PlanNode {
             case REGEXP_LIKE:
               // Check if case-insensitive flag is present
               RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
-              boolean isCaseInsensitive = regexpLikePredicate.isCaseInsensitive();
-
-              if (isCaseInsensitive) {
+              boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
+              if (caseInsensitive) {
                 if (dataSource.getIFSTIndex() != null) {
                   predicateEvaluator =
                       IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,

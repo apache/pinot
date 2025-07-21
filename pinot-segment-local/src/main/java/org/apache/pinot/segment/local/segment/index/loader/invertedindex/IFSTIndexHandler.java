@@ -17,6 +17,7 @@
  * under the License.
  */
 package org.apache.pinot.segment.local.segment.index.loader.invertedindex;
+
 import java.io.File;
 import java.util.HashSet;
 import java.util.Map;
@@ -44,6 +45,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION;
+
+
 /**
  * Helper class for IFST (case-insensitive FST) indexes used by {@link SegmentPreProcessor}.
  * to create IFST index for column during segment load time. Currently IFST index is always
@@ -65,11 +68,13 @@ import static org.apache.pinot.segment.spi.V1Constants.Indexes.LUCENE_V912_IFST_
 public class IFSTIndexHandler extends BaseIndexHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(IFSTIndexHandler.class);
   private final Set<String> _columnsToAddIdx;
+
   public IFSTIndexHandler(SegmentDirectory segmentDirectory, Map<String, FieldIndexConfigs> fieldIndexConfigs,
       @Nullable TableConfig tableConfig, Schema schema) {
     super(segmentDirectory, fieldIndexConfigs, tableConfig, schema);
     _columnsToAddIdx = FieldIndexConfigsUtil.columnsWithIndexEnabled(StandardIndexes.ifst(), _fieldIndexConfigs);
   }
+
   @Override
   public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
@@ -92,6 +97,7 @@ public class IFSTIndexHandler extends BaseIndexHandler {
     }
     return false;
   }
+
   @Override
   public void updateIndices(SegmentDirectory.Writer segmentWriter)
       throws Exception {
@@ -113,10 +119,12 @@ public class IFSTIndexHandler extends BaseIndexHandler {
       }
     }
   }
+
   @Override
   public void postUpdateIndicesCleanup(SegmentDirectory.Writer segmentWriter)
       throws Exception {
   }
+
   private boolean shouldCreateIFSTIndex(ColumnMetadata columnMetadata) {
     if (columnMetadata != null) {
       // Fail fast upon unsupported operations.
@@ -125,6 +133,7 @@ public class IFSTIndexHandler extends BaseIndexHandler {
     }
     return false;
   }
+
   private void checkUnsupportedOperationsForIFSTIndex(ColumnMetadata columnMetadata) {
     String column = columnMetadata.getColumnName();
     if (columnMetadata.getDataType() != FieldSpec.DataType.STRING) {
@@ -139,6 +148,7 @@ public class IFSTIndexHandler extends BaseIndexHandler {
           "IFST index is currently not supported on multi-value columns: " + column);
     }
   }
+
   private void createIFSTIndexForColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();

@@ -17,11 +17,15 @@
  * under the License.
  */
 package org.apache.pinot.segment.local.segment.index.fst;
+
 import com.google.auto.service.AutoService;
 import org.apache.pinot.segment.spi.index.IndexPlugin;
+
+
 @AutoService(IndexPlugin.class)
 public class IFSTIndexPlugin implements IndexPlugin<IFSTIndexType> {
   private static final IFSTIndexType INSTANCE = new IFSTIndexType();
+
   @Override
   public IFSTIndexType getIndexType() {
     return INSTANCE;

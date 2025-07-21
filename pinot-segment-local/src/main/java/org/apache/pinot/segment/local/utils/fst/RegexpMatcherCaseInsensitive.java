@@ -40,21 +40,18 @@ import org.apache.lucene.util.fst.FST;
  * from case-sensitive logic and doesn't share code.
  */
 public class RegexpMatcherCaseInsensitive {
-  private final String _regexQuery;
-  private final FST<BytesRef> _fst;
+  private final FST<BytesRef> _ifst;
   private final Automaton _automaton;
 
-  public RegexpMatcherCaseInsensitive(String regexQuery, FST<BytesRef> fst) {
-    _fst = fst;
+  public RegexpMatcherCaseInsensitive(String regexQuery, FST<BytesRef> ifst) {
+    _ifst = ifst;
     // For case-insensitive FSTs, convert regex to lowercase since we only store lowercase keys
-    _regexQuery = regexQuery.toLowerCase();
-    _automaton = (new RegExp(_regexQuery)).toAutomaton();
+    _automaton = (new RegExp(regexQuery.toLowerCase())).toAutomaton();
   }
 
-  public static List<Long> regexMatch(String regexQuery, FST<BytesRef> fst)
+  public static List<Long> regexMatch(String regexQuery, FST<BytesRef> ifst)
       throws IOException {
-    RegexpMatcherCaseInsensitive matcher = new RegexpMatcherCaseInsensitive(regexQuery, fst);
-    return matcher.regexMatchOnFST();
+    return new RegexpMatcherCaseInsensitive(regexQuery, ifst).regexMatchOnFST();
   }
 
   // Matches "input" string with _regexQuery Automaton (case-insensitive).
@@ -89,10 +86,10 @@ public class RegexpMatcherCaseInsensitive {
 
     // Automaton start state and FST start node is added to the queue.
     queue.add(
-        new Path<>(0, _fst.getFirstArc(new FST.Arc<BytesRef>()), _fst.outputs.getNoOutput(), new IntsRefBuilder()));
+        new Path<>(0, _ifst.getFirstArc(new FST.Arc<BytesRef>()), _ifst.outputs.getNoOutput(), new IntsRefBuilder()));
 
     final FST.Arc<BytesRef> scratchArc = new FST.Arc<>();
-    final FST.BytesReader fstReader = _fst.getBytesReader();
+    final FST.BytesReader fstReader = _ifst.getBytesReader();
 
     Transition t = new Transition();
     while (!queue.isEmpty()) {
@@ -107,7 +104,7 @@ public class RegexpMatcherCaseInsensitive {
           BytesRef completeOutput;
           if (finalOutput != null && finalOutput.length > 0) {
             // Combine accumulated output with final output
-            completeOutput = _fst.outputs.add(path._output, finalOutput);
+            completeOutput = _ifst.outputs.add(path._output, finalOutput);
           } else {
             // Use the accumulated output if no final output
             completeOutput = path._output;
@@ -125,24 +122,24 @@ public class RegexpMatcherCaseInsensitive {
         final int min = t.min;
         final int max = t.max;
         if (min == max) {
-          final FST.Arc<BytesRef> nextArc = _fst.findTargetArc(t.min, path._fstNode, scratchArc, fstReader);
+          final FST.Arc<BytesRef> nextArc = _ifst.findTargetArc(t.min, path._fstNode, scratchArc, fstReader);
           if (nextArc != null) {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(t.min);
             queue.add(new Path<BytesRef>(t.dest, new FST.Arc<BytesRef>().copyFrom(nextArc),
-                _fst.outputs.add(path._output, nextArc.output()), newInput));
+                _ifst.outputs.add(path._output, nextArc.output()), newInput));
           }
         } else {
           FST.Arc<BytesRef> nextArc =
-              org.apache.lucene.util.fst.Util.readCeilArc(min, _fst, path._fstNode, scratchArc, fstReader);
+              org.apache.lucene.util.fst.Util.readCeilArc(min, _ifst, path._fstNode, scratchArc, fstReader);
           while (nextArc != null && nextArc.label() <= max) {
             final IntsRefBuilder newInput = new IntsRefBuilder();
             newInput.copyInts(currentInput.get());
             newInput.append(nextArc.label());
             queue.add(new Path<>(t.dest, new FST.Arc<BytesRef>().copyFrom(nextArc),
-                _fst.outputs.add(path._output, nextArc.output()), newInput));
-            nextArc = nextArc.isLast() ? null : _fst.readNextRealArc(nextArc, fstReader);
+                _ifst.outputs.add(path._output, nextArc.output()), newInput));
+            nextArc = nextArc.isLast() ? null : _ifst.readNextRealArc(nextArc, fstReader);
           }
         }
       }
@@ -152,7 +149,7 @@ public class RegexpMatcherCaseInsensitive {
     ArrayList<Long> matchedIds = new ArrayList<>();
     for (Path<BytesRef> path : endNodes) {
       // Deserialize BytesRef to List<Integer> and convert to List<Long>
-      List<Integer> intValues = FSTBuilder.deserializeBytesRefToIntegerList(path._output);
+      List<Integer> intValues = IFSTBuilder.deserializeBytesRefToIntegerList(path._output);
       for (Integer value : intValues) {
         matchedIds.add(value.longValue());
       }

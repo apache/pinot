@@ -54,9 +54,8 @@ import org.apache.pinot.spi.data.Schema;
 
 public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "ifst";
-  private static final List<String> EXTENSIONS = ImmutableList.of(V1Constants.Indexes.LUCENE_IFST_INDEX_FILE_EXTENSION,
-      V1Constants.Indexes.LUCENE_V9_IFST_INDEX_FILE_EXTENSION, V1Constants.Indexes.LUCENE_V99_IFST_INDEX_FILE_EXTENSION,
-      V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION);
+  private static final List<String> EXTENSIONS =
+      ImmutableList.of(V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION);
 
   protected IFSTIndexType() {
     super(StandardIndexes.IFST_ID);

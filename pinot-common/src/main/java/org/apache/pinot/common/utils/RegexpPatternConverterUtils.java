@@ -20,6 +20,8 @@ package org.apache.pinot.common.utils;
 
 
 import com.google.common.primitives.Chars;
+import org.apache.commons.lang3.StringUtils;
+
 
 /**
  * Utility for converting regex patterns.
@@ -34,19 +36,20 @@ public class RegexpPatternConverterUtils {
    * So it is handled separately in the conversion logic.
    */
   public static final char[] REGEXP_METACHARACTERS = new char[]{
-          '^', '$', '.', '{', '}', '[', ']', '(', ')', '*', '+', '?', '|', '<', '>', '-', '&', '/'};
+      '^', '$', '.', '{', '}', '[', ']', '(', ')', '*', '+', '?', '|', '<', '>', '-', '&', '/'
+  };
   public static final char BACK_SLASH = '\\';
 
   /**
    * Validates and converts a single character match parameter to case sensitivity.
-   * Onlyi (case-insensitive) and 'c'/'C (case-sensitive) are supported.
+   * Only 'i'/'I' (case-insensitive) and 'c'/'C' (case-sensitive) are supported.
    *
    * @param matchParameter the match parameter string
    * @return true if case-insensitive, false if case-sensitive
    * @throws IllegalArgumentException if the parameter is invalid
    */
   public static boolean isCaseInsensitive(String matchParameter) {
-    if (matchParameter == null || matchParameter.isEmpty()) {
+    if (StringUtils.isEmpty(matchParameter)) {
       return false;
     }
 

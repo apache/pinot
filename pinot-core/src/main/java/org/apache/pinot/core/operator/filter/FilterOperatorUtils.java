@@ -109,8 +109,8 @@ public class FilterOperatorUtils {
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
         // Check if case-insensitive flag is present
         RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicateEvaluator.getPredicate();
-        boolean isCaseInsensitive = regexpLikePredicate.isCaseInsensitive();
-        if (isCaseInsensitive) {
+        boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
+        if (caseInsensitive) {
           if (dataSource.getIFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()
               && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
             return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
