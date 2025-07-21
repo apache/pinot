@@ -416,6 +416,7 @@ public class Tracing {
     // Check for thread interruption, every time after merging 8192 keys
     public static void sampleAndCheckInterruptionPeriodically(int mergedKeys) {
       if ((mergedKeys & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0) {
+        checkMemoryAndInterruptIfExceeded();
         sampleAndCheckInterruption();
       }
     }

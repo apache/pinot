@@ -56,6 +56,7 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,7 +143,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     protected final Set<String> _inactiveQuery;
 
-    protected Set<String> _cancelSentQueries;
+    protected volatile Set<String> _cancelSentQueries;
 
     // the periodical task that aggregates and preempts queries
     protected final WatcherTask _watcherTask;
@@ -176,7 +177,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _inactiveQuery = inactiveQuery;
       _instanceId = instanceId;
       _instanceType = instanceType;
-      _cancelSentQueries = new HashSet<>();
+      _cancelSentQueries = ConcurrentHashMap.newKeySet();
       _watcherTask = createWatcherTask();
       _queryCancelCallbacks = CacheBuilder.newBuilder().build();
     }
@@ -240,7 +241,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       // task/query tracking
       _inactiveQuery = new HashSet<>();
-      _cancelSentQueries = new HashSet<>();
+      _cancelSentQueries = ConcurrentHashMap.newKeySet();
       _watcherTask = createWatcherTask();
     }
 
@@ -274,7 +275,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
 
         // if current thread is not idle
-        if (currentTaskStatus != null) {
+        if (currentTaskStatus != null && !currentTaskStatus.getAnchorThread().isInterrupted()) {
           // extract query id from queryTask string
           String queryId = currentTaskStatus.getQueryId();
           if (queryId != null) {
@@ -331,39 +332,154 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return getWatcherTask().getHeapUsageBytes() > getWatcherTask().getQueryMonitorConfig().getAlarmingLevel();
     }
 
+    /**
+     * Thread-safe method to check memory usage and interrupt queries if needed.
+     * Uses synchronized blocks and atomic operations to prevent race conditions
+     * when multiple threads attempt to cancel the same query.
+     */
     public void checkMemoryAndInterruptIfExceeded() {
-      // Use QueryMonitorConfig for runtime-changeable settings
-      QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
-      if (!config.isPerThreadQueryMemoryCheckEnabled() || !_isThreadMemorySamplingEnabled) {
-        return;
-      }
+      WatcherTask watcherTask = getWatcherTask();
+      QueryMonitorConfig config = watcherTask.getQueryMonitorConfig();
+      LOGGER.debug("Operator Checking memory usage: {}, alarming level {}, critical level {}, panic level {}",
+          watcherTask.getHeapUsageBytes(), config.getAlarmingLevel(), config.getCriticalLevel(),
+          config.getPanicLevel());
 
-      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
-      CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
+      while (watcherTask.getHeapUsageBytes() > config.getAlarmingLevel()) {
+        long currentHeapUsage = watcherTask.getHeapUsageBytes();
+        long alarmingLevel = config.getAlarmingLevel();
+        long criticalLevel = config.getCriticalLevel();
+        long panicLevel = config.getPanicLevel();
 
-      if (currentTaskStatus == null) {
-        return; // No active query on this thread
-      }
-
-      long currentMemoryUsage = threadEntry._currentThreadMemoryAllocationSampleBytes;
-      long memoryLimit = config.getPerThreadQueryMemoryLimitBytes();
-      if (currentMemoryUsage > memoryLimit) {
-        String queryId = currentTaskStatus.getQueryId();
-        String errorMessage = String.format(
-            "Query %s exceeded per-thread memory limit of %d bytes (current usage: %d bytes) on %s: %s. "
-                + "Query terminated proactively to prevent OOM.",
-            queryId, memoryLimit, currentMemoryUsage, _instanceType, _instanceId);
-
-        // Set error status to terminate the query
-        threadEntry._errorStatus.set(new RuntimeException(errorMessage));
-
-        // Also interrupt the anchor thread if available
-        Thread anchorThread = currentTaskStatus.getAnchorThread();
-        if (anchorThread != null) {
-          anchorThread.interrupt();
+        // Get current thread's execution context
+        ThreadExecutionContext context = getThreadExecutionContext();
+        if (context == null || context.getQueryId() == null) {
+          // No query context, just break out
+          break;
         }
 
-        LOGGER.warn("Per-thread memory limit exceeded: {}", errorMessage);
+        String currentQueryId = context.getQueryId();
+
+        // Thread-safe check: Skip if query already cancelled
+        if (_cancelSentQueries.contains(currentQueryId)) {
+          // Query is already being canceled, but ensure the anchor thread is interrupted.
+          if (context.getAnchorThread() != null && !context.getAnchorThread().isInterrupted()) {
+            context.getAnchorThread().interrupt();
+          }
+          break;
+        }
+
+        // Kill if heap is at panic level (scenario 3)
+        if (currentHeapUsage >= panicLevel) {
+          // Synchronized block to prevent race conditions in query cancellation
+          synchronized (this) {
+            // Double-check if query is still not cancelled
+            if (!_cancelSentQueries.contains(currentQueryId)) {
+              CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
+              threadEntry._errorStatus.set(new RuntimeException(
+                  String.format("Query %s killed due to panic level heap usage: %d bytes (panic threshold: %d bytes)",
+                      currentQueryId, currentHeapUsage, panicLevel)));
+
+              if (context.getAnchorThread() != null) {
+                cancelQuery(currentQueryId, context.getAnchorThread());
+              }
+            }
+          }
+          break;
+        }
+
+        // Get current query resource usage (thread-safe snapshot)
+        final Map<String, ? extends QueryResourceTracker> queryResources = getQueryResources();
+        final QueryResourceTracker currentQueryTracker = queryResources.get(currentQueryId);
+
+        // Kill if heap is at critical level (scenarios 1 and 2)
+        if (currentHeapUsage >= criticalLevel && currentHeapUsage < panicLevel) {
+          boolean shouldKill = false;
+          String killReason = "";
+
+          // Scenario 1: heap is at critical level + thread exceed thread heap limit
+          if (_isPerQueryMemoryCheckEnabled && currentQueryTracker != null
+              && currentQueryTracker.getAllocatedBytes() > _perQueryMemoryLimitBytes) {
+            shouldKill = true;
+            killReason = String.format(
+                "Query %s killed due to critical heap level and exceeding per-query limit: %d bytes (limit: %d bytes)",
+                currentQueryId, currentQueryTracker.getAllocatedBytes(), _perQueryMemoryLimitBytes);
+          } else {
+            // Scenario 2: heap is at critical level + if all threads not exceed thread limit, I still need to kill
+            // the query with most heap usage to free up memory for other queries
+            QueryResourceTracker maxUsageQuery = queryResources.values().stream()
+                .filter(tracker -> !_cancelSentQueries.contains(tracker.getQueryId()))
+                .max(Comparator.comparing(QueryResourceTracker::getAllocatedBytes))
+                .orElse(null);
+
+            if (maxUsageQuery != null && maxUsageQuery.getQueryId().equals(currentQueryId)) {
+              shouldKill = true;
+              killReason =
+                  String.format("Query %s killed due to critical heap level as highest memory consumer: %d bytes",
+                      currentQueryId, currentQueryTracker != null ? currentQueryTracker.getAllocatedBytes() : 0);
+            }
+          }
+
+          if (shouldKill) {
+            LOGGER.debug("Trying to kill query: {}, reason: {}", currentQueryId, killReason);
+            // Synchronized block to prevent race conditions in query cancellation
+            synchronized (this) {
+              // Double-check if query is still not cancelled
+              if (!_cancelSentQueries.contains(currentQueryId)) {
+                CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = _threadLocalEntry.get();
+                threadEntry._errorStatus.set(new RuntimeException(killReason));
+
+                if (context.getAnchorThread() != null) {
+                  cancelQuery(currentQueryId, context.getAnchorThread());
+                }
+              }
+            }
+            break;
+          }
+        }
+
+        // Handle alarm level scenario
+        if (currentHeapUsage >= alarmingLevel && currentHeapUsage < criticalLevel) {
+          // Determine if current query should proceed based on global query ID grouping and leaf stage priority
+          boolean shouldProceed = false;
+
+          if (!queryResources.isEmpty()) {
+            // Get the start time of the current query from QueryThreadContext
+            long currentQueryStartTime = QueryThreadContext.getStartTimeMs();
+
+            if (currentQueryStartTime > 0) {
+              // Group queries by global query ID and prioritize leaf stages (later start times) within each group
+              String currentGlobalQueryId = extractGlobalQueryId(currentQueryId);
+
+              // Find the query that should proceed based on the new logic
+              String selectedQueryId = findQueryToProcessAtAlarmLevel(queryResources, currentGlobalQueryId,
+                  currentQueryId, currentQueryStartTime);
+
+              shouldProceed = selectedQueryId != null && selectedQueryId.equals(currentQueryId);
+
+              // Log waiting status for debugging
+              if (!shouldProceed) {
+                LOGGER.debug("Query {} waiting due to alarm level heap usage. Selected query to proceed: {}",
+                    currentQueryId, selectedQueryId);
+              }
+            }
+          }
+
+          if (shouldProceed) {
+            // Proceed when the query is selected to proceed
+            LOGGER.debug(
+                "Query {} proceeding as it is selected based on global query ID grouping and leaf stage priority",
+                currentQueryId);
+            break;
+          } else {
+            // Wait and let the outer loop re-evaluate - pause 100ms before next iteration
+            try {
+              Thread.sleep(100);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              return; // Exit the entire method if interrupted
+            }
+          }
+        }
       }
     }
 
@@ -413,7 +529,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     @Override
     public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes,
-                                             TrackingScope trackingScope) {
+        TrackingScope trackingScope) {
       if (trackingScope != TrackingScope.QUERY) {
         // only update for QUERY scope
         return;
@@ -460,7 +576,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
       setupRunner(queryId, taskId, taskType, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
     }
-
 
     @Override
     public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
@@ -642,15 +757,131 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
     }
 
-    public void cancelQuery(String queryId, Thread anchorThread) {
+    /**
+     * Extracts the global query ID from different query ID formats.
+     * For SSE queries: brokerId_requestId_O/R -> requestId
+     * For MSE queries: requestId_virtualServerId_stageId -> requestId
+     * For other formats: returns the original queryId
+     */
+    protected String extractGlobalQueryId(String queryId) {
+      if (queryId == null) {
+        return null;
+      }
+
+      // Handle SSE format: brokerId_requestId_O/R
+      if (queryId.endsWith("_O") || queryId.endsWith("_R")) {
+        String[] parts = queryId.split("_");
+        if (parts.length >= 3) {
+          // Return the requestId part (second-to-last part before the suffix)
+          return parts[parts.length - 2];
+        }
+      }
+
+      // Handle MSE format: requestId_virtualServerId_stageId
+      String[] parts = queryId.split("_");
+      if (parts.length >= 3) {
+        try {
+          // Verify that all parts are numeric for MSE format
+          Long.parseLong(parts[0]); // requestId
+          Integer.parseInt(parts[1]); // virtualServerId
+          Integer.parseInt(parts[2]); // stageId
+          return parts[0]; // Return requestId
+        } catch (NumberFormatException e) {
+          // Not MSE format, fall through to default
+        }
+      }
+
+      // For other formats or if parsing fails, return the original queryId
+      return queryId;
+    }
+
+    /**
+     * Finds the query that should proceed at alarm level based on global query ID grouping
+     * and leaf stage priority (later start times within the same global query).
+     */
+    protected String findQueryToProcessAtAlarmLevel(Map<String, ? extends QueryResourceTracker> queryResources,
+        String currentGlobalQueryId, String currentQueryId, long currentQueryStartTime) {
+
+      // Group queries by global query ID
+      Map<String, Map<String, Long>> globalQueryGroups = new HashMap<>();
+      Map<String, String> queryIdToGlobalId = new HashMap<>();
+
+      for (String queryId : queryResources.keySet()) {
+        if (_cancelSentQueries.contains(queryId)) {
+          continue; // Skip cancelled queries
+        }
+
+        String globalQueryId = extractGlobalQueryId(queryId);
+        queryIdToGlobalId.put(queryId, globalQueryId);
+
+        // For simplicity, we'll use the query start time from the current context
+        // In a real implementation, you might want to store start times per query
+        long startTime = queryId.equals(currentQueryId) ? currentQueryStartTime : estimateStartTimeFromQueryId(queryId);
+
+        globalQueryGroups.computeIfAbsent(globalQueryId, k -> new HashMap<>())
+            .put(queryId, startTime);
+      }
+
+      // Find the earliest global query ID (lexicographically smallest as proxy for FIFO)
+      String earliestGlobalQueryId = globalQueryGroups.keySet().stream()
+          .min(String::compareTo)
+          .orElse(null);
+
+      if (earliestGlobalQueryId == null) {
+        return null;
+      }
+
+      // Within the earliest global query group, find the query with the latest start time (leaf stage)
+      Map<String, Long> selectedGroup = globalQueryGroups.get(earliestGlobalQueryId);
+      return selectedGroup.entrySet().stream()
+          .max(Map.Entry.comparingByValue()) // Latest start time (leaf stage)
+          .map(Map.Entry::getKey)
+          .orElse(null);
+    }
+
+    /**
+     * Estimates start time from query ID. This is a fallback when actual start time is not available.
+     * For MSE queries, we can extract timestamp information from the requestId.
+     */
+    protected long estimateStartTimeFromQueryId(String queryId) {
+      String globalQueryId = extractGlobalQueryId(queryId);
+      try {
+        // For MSE queries, the requestId often contains timestamp information
+        long requestId = Long.parseLong(globalQueryId);
+        // The request ID generation in BrokerRequestIdGenerator uses a pattern that includes timing
+        // We'll use the request ID as a proxy for timing (lower ID = earlier)
+        return requestId;
+      } catch (NumberFormatException e) {
+        // If we can't parse as number, use hash code as fallback
+        return globalQueryId.hashCode();
+      }
+    }
+
+    public synchronized void cancelQuery(String queryId, Thread anchorThread) {
+      // Prevent duplicate cancellation attempts
+      if (_cancelSentQueries.contains(queryId)) {
+
+        // Query is already being canceled, but ensure the anchor thread is interrupted.
+        if (anchorThread != null && !anchorThread.isInterrupted()) {
+          LOGGER.info("Query {} is already being canceled, interrupting the anchor thread.", queryId);
+          anchorThread.interrupt();
+        } else {
+          LOGGER.info("Query {} already marked for cancellation, skipping", queryId);
+        }
+        return;
+      }
+
       MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(queryId);
       if (callback != null) {
         callback.cancelQuery(Long.parseLong(queryId));
         _queryCancelCallbacks.invalidate(queryId);
-      } else {
-        anchorThread.interrupt();
       }
       _cancelSentQueries.add(queryId);
+      if (anchorThread != null) {
+        anchorThread.interrupt();
+      }
+
+      LOGGER.info("Query {}, successfully marked for cancellation", queryId);
     }
 
     protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage,
