@@ -144,7 +144,7 @@
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.2</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.19.1</jackson.version>
+    <jackson.version>2.19.2</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
     <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.47</jersey.version>
