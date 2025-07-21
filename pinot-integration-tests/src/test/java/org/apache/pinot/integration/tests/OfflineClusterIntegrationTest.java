@@ -63,14 +63,17 @@ import org.apache.pinot.common.utils.FileUploadDownloadClient;
 import org.apache.pinot.common.utils.ServiceStatus;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.operator.query.NonScanBasedAggregationOperator;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
+import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.FieldConfig.CompressionCodec;
 import org.apache.pinot.spi.config.table.IndexingConfig;
+import org.apache.pinot.spi.config.table.PageCacheWarmupConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.StarTreeIndexConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -4277,5 +4280,54 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
+  }
+
+  /**
+   * Test the page cache warmup flow
+   * 1. Enable page cache warmup in the table config
+   * 2. Add queries to the page cache warmup, verify that the queries are added successfully
+   * 3. Get the queries from the page cache warmup, verify that the queries are returned successfully
+   * 4. Start an additional server to test the page cache warmup, doesn't cause any issues
+   * 5. Reset the page cache warmup config
+   * 6. Stop the additional server
+   * 7. Delete the queries from the page cache warmup, verify that the queries are deleted successfully
+   */
+  @Test
+  public void testPageCacheWarmupFlow() throws IOException {
+    BaseServerStarter serverStarter0 = null;
+    try {
+      PageCacheWarmupConfig pageCacheWarmupConfig = new PageCacheWarmupConfig(true, true, 30, null);
+      _tableConfig.setPageCacheWarmupConfig(pageCacheWarmupConfig);
+      // Add Queries
+      List<String> queries = List.of(
+          "SELECT COUNT(*) FROM " + getTableName(),
+          "SELECT DISTINCT Origin FROM " + getTableName() + " LIMIT 10"
+      );
+      assertTrue(_controllerRequestClient.storePageCacheWarmupQueries(DEFAULT_TABLE_NAME, "OFFLINE", queries));
+      // Get Queries
+      List<String> storedQueries = _controllerRequestClient.getPageCacheWarmupQueries(DEFAULT_TABLE_NAME, "OFFLINE");
+      assertEquals(storedQueries.size(), queries.size(), "Number of stored queries does not match");
+      // Add additional server for testing page cache warmup
+      serverStarter0 = startOneServer(NUM_SERVERS);
+      // See if the server is added to the table
+      PinotHelixResourceManager pinotHelixResourceManager = _controllerStarter.getHelixResourceManager();
+      int finalServers = pinotHelixResourceManager.getServerInstancesForTable(getTableName(), TableType.OFFLINE).size();
+      assertEquals(finalServers, NUM_SERVERS + 1, "Server was not added to the table");
+    } catch (Exception e) {
+      fail("Failed to start server with page cache warmup enabled: " + e.getMessage());
+    } finally {
+      // Reset the page cache warmup config
+      _tableConfig.setPageCacheWarmupConfig(null);
+      // Stop the additional server
+      if (serverStarter0 != null) {
+        serverStarter0.stop();
+        BaseServerStarter finalServerStarter = serverStarter0;
+        TestUtils.waitForCondition(
+            aVoid -> getHelixResourceManager().dropInstance(finalServerStarter.getInstanceId()).isSuccessful(),
+            60_000L, "Failed to drop added server");
+      }
+      // Delete the queries from the page cache warmup
+      _controllerRequestClient.deletePageCacheWarmupQueries(DEFAULT_TABLE_NAME, "OFFLINE");
+    }
   }
 }

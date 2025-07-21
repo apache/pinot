@@ -694,4 +694,8 @@ public class ControllerRequestURLBuilder {
   public String forTableTimeBoundary(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "timeBoundary");
   }
+
+  public String forPageCacheWarmupQueries(String tableName, String tableType) {
+    return StringUtil.join("/", _baseUrl, "pagecache", "queries", tableName) + "?tableType=" + tableType;
+  }
 }
