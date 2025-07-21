@@ -24,7 +24,13 @@
 Logical NOT function for a boolean value. Returns true if the argument is false, false if true, and null if null.
 ### Summary
 
-The UDF not is supported in all scenarios with at least EQUAL semantic.
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| not(NULL) | NULL | true |
+| not(false) | true | true |
+| not(true) | false | false |
+
+The UDF not is supported in all scenarios
 
 ### Signatures
 
@@ -37,6 +43,10 @@ Returns the logical negation of the input value.
 | value | boolean | A boolean value to negate. |
 ### Scenarios
 
+<details>
+
+<summary>Click to open</summary>
+
 #### Ingestion time transformer
 
 
@@ -45,7 +55,6 @@ Returns the logical negation of the input value.
 | (value: boolean) -> boolean |not(NULL) |NULL |NULL |EQUAL |
 | (value: boolean) -> boolean |not(false) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(true) |false |false |EQUAL |
-
 
 #### MSE intermediate stage (with null handling)
 
@@ -56,7 +65,6 @@ Returns the logical negation of the input value.
 | (value: boolean) -> boolean |not(false) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(true) |false |false |EQUAL |
 
-
 #### MSE intermediate stage (without null handling)
 
 
@@ -65,7 +73,6 @@ Returns the logical negation of the input value.
 | (value: boolean) -> boolean |not(NULL) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(false) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(true) |false |false |EQUAL |
-
 
 #### SSE predicate (with null handling)
 
@@ -76,7 +83,6 @@ Returns the logical negation of the input value.
 | (value: boolean) -> boolean |not(false) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(true) |true |true |EQUAL |
 
-
 #### SSE predicate (without null handling)
 
 
@@ -85,7 +91,6 @@ Returns the logical negation of the input value.
 | (value: boolean) -> boolean |not(NULL) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(false) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(true) |true |true |EQUAL |
-
 
 #### SSE projection (with null handling)
 
@@ -96,7 +101,6 @@ Returns the logical negation of the input value.
 | (value: boolean) -> boolean |not(false) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(true) |false |false |EQUAL |
 
-
 #### SSE projection (without null handling)
 
 
@@ -106,4 +110,6 @@ Returns the logical negation of the input value.
 | (value: boolean) -> boolean |not(false) |true |true |EQUAL |
 | (value: boolean) -> boolean |not(true) |false |false |EQUAL |
 
+
+</details>
 

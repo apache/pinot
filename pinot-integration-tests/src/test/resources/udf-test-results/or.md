@@ -24,7 +24,19 @@
 Logical OR function for two boolean values. Returns true if either argument is true, false if both are false, and null if both are null or one is null and the other is false.
 ### Summary
 
-The UDF or is supported in all scenarios with at least EQUAL semantic.
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| or(NULL, true) | true | true |
+| or(NULL, NULL) | NULL | false |
+| or(false, true) | true | true |
+| or(true, true) | true | true |
+| or(false, false) | false | false |
+| or(NULL, false) | NULL | false |
+| or(false, NULL) | NULL | false |
+| or(true, false) | true | true |
+| or(true, NULL) | true | true |
+
+The UDF or is supported in all scenarios
 
 ### Signatures
 
@@ -37,6 +49,10 @@ Result of the OR operation, true if either operand is true, false otherwise
 | left | boolean | Left operand of the OR operation |
 | right | boolean | Right operand of the OR operation |
 ### Scenarios
+
+<details>
+
+<summary>Click to open</summary>
 
 #### Ingestion time transformer
 
@@ -53,7 +69,6 @@ Result of the OR operation, true if either operand is true, false otherwise
 | (left: boolean, right: boolean) -> boolean |or(true, false) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, NULL) |true |true |EQUAL |
 
-
 #### MSE intermediate stage (with null handling)
 
 
@@ -68,7 +83,6 @@ Result of the OR operation, true if either operand is true, false otherwise
 | (left: boolean, right: boolean) -> boolean |or(false, NULL) |NULL |NULL |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, false) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, NULL) |true |true |EQUAL |
-
 
 #### MSE intermediate stage (without null handling)
 
@@ -85,7 +99,6 @@ Result of the OR operation, true if either operand is true, false otherwise
 | (left: boolean, right: boolean) -> boolean |or(true, false) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, NULL) |true |true |EQUAL |
 
-
 #### SSE predicate (with null handling)
 
 
@@ -100,7 +113,6 @@ Result of the OR operation, true if either operand is true, false otherwise
 | (left: boolean, right: boolean) -> boolean |or(false, NULL) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, false) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, NULL) |true |true |EQUAL |
-
 
 #### SSE predicate (without null handling)
 
@@ -117,7 +129,6 @@ Result of the OR operation, true if either operand is true, false otherwise
 | (left: boolean, right: boolean) -> boolean |or(true, false) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, NULL) |true |true |EQUAL |
 
-
 #### SSE projection (with null handling)
 
 
@@ -132,7 +143,6 @@ Result of the OR operation, true if either operand is true, false otherwise
 | (left: boolean, right: boolean) -> boolean |or(false, NULL) |NULL |NULL |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, false) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, NULL) |true |true |EQUAL |
-
 
 #### SSE projection (without null handling)
 
@@ -149,4 +159,6 @@ Result of the OR operation, true if either operand is true, false otherwise
 | (left: boolean, right: boolean) -> boolean |or(true, false) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |or(true, NULL) |true |true |EQUAL |
 
+
+</details>
 

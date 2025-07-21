@@ -137,8 +137,8 @@ SSE projection (without null handling):
         expectedResult: false
       null input:
         actualResult: true
-        equivalence: null
-        error: "Unexpected value"
-        expectedResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null

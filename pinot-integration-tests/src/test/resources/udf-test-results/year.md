@@ -24,6 +24,14 @@
 Returns the year from the given epoch millis in UTC timezone.
 ### Summary
 
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| year(1577836800000) | 2020 | 2020 |
+| year(NULL) | NULL | 1970 |
+| year(0) | 1970 | 1970 |
+
+This UDF has different semantics in different scenarios:
+
 | Scenario | Semantic |
 |----------|----------|
 | Ingestion time transformer | EQUAL |
@@ -44,6 +52,10 @@ Returns the year as an integer
 | millis | long | A long value representing epoch millise.g., 1577836800000L for 2020-01-01T00:00:00Z |
 ### Scenarios
 
+<details>
+
+<summary>Click to open</summary>
+
 #### Ingestion time transformer
 
 
@@ -52,7 +64,6 @@ Returns the year as an integer
 | (millis: long) -> int |year(1577836800000) |2020 |2020 |EQUAL |
 | (millis: long) -> int |year(NULL) |NULL |NULL |EQUAL |
 | (millis: long) -> int |year(0) |1970 |1970 |EQUAL |
-
 
 #### MSE intermediate stage (with null handling)
 
@@ -63,7 +74,6 @@ Returns the year as an integer
 | (millis: long) -> int |year(NULL) |NULL |NULL |EQUAL |
 | (millis: long) -> int |year(0) |1970 (Integer) |1970 (Long) |NUMBER_AS_DOUBLE |
 
-
 #### MSE intermediate stage (without null handling)
 
 
@@ -72,7 +82,6 @@ Returns the year as an integer
 | (millis: long) -> int |year(1577836800000) |2020 (Integer) |2020 (Long) |NUMBER_AS_DOUBLE |
 | (millis: long) -> int |year(NULL) |1970 (Integer) |1970 (Long) |NUMBER_AS_DOUBLE |
 | (millis: long) -> int |year(0) |1970 (Integer) |1970 (Long) |NUMBER_AS_DOUBLE |
-
 
 #### SSE predicate (with null handling)
 
@@ -83,7 +92,6 @@ Returns the year as an integer
 | (millis: long) -> int |year(NULL) |true |true |EQUAL |
 | (millis: long) -> int |year(0) |true |true |EQUAL |
 
-
 #### SSE predicate (without null handling)
 
 
@@ -92,7 +100,6 @@ Returns the year as an integer
 | (millis: long) -> int |year(1577836800000) |true |true |EQUAL |
 | (millis: long) -> int |year(NULL) |true |true |EQUAL |
 | (millis: long) -> int |year(0) |true |true |EQUAL |
-
 
 #### SSE projection (with null handling)
 
@@ -103,7 +110,6 @@ Returns the year as an integer
 | (millis: long) -> int |year(NULL) |NULL |NULL |EQUAL |
 | (millis: long) -> int |year(0) |1970 |1970 |EQUAL |
 
-
 #### SSE projection (without null handling)
 
 
@@ -113,4 +119,6 @@ Returns the year as an integer
 | (millis: long) -> int |year(NULL) |1970 |1970 |EQUAL |
 | (millis: long) -> int |year(0) |1970 |1970 |EQUAL |
 
+
+</details>
 

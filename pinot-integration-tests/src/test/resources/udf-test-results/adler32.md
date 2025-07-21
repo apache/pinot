@@ -24,7 +24,14 @@
 Stub for adler32 function. Not implemented.
 ### Summary
 
-The UDF adler32 is supported in all scenarios with at least EQUAL semantic.
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| adler32(hexToBytes('01')) | 131074 | 131074 |
+| adler32(hexToBytes('01020304')) | 1572875 | 1572875 |
+| adler32(NULL) | NULL | 1 |
+| adler32(hexToBytes('')) | 1 | 1 |
+
+The UDF adler32 is supported in all scenarios
 
 ### Signatures
 
@@ -37,6 +44,10 @@ The Adler-32 checksum of the input byte array
 | input | bytes | Input byte array to compute the Adler-32 checksum |
 ### Scenarios
 
+<details>
+
+<summary>Click to open</summary>
+
 #### Ingestion time transformer
 
 
@@ -46,7 +57,6 @@ The Adler-32 checksum of the input byte array
 | (input: bytes) -> int |adler32(hexToBytes('01020304')) |1572875 |1572875 |EQUAL |
 | (input: bytes) -> int |adler32(NULL) |NULL |NULL |EQUAL |
 | (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
-
 
 #### MSE intermediate stage (with null handling)
 
@@ -58,7 +68,6 @@ The Adler-32 checksum of the input byte array
 | (input: bytes) -> int |adler32(NULL) |NULL |NULL |EQUAL |
 | (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
 
-
 #### MSE intermediate stage (without null handling)
 
 
@@ -68,7 +77,6 @@ The Adler-32 checksum of the input byte array
 | (input: bytes) -> int |adler32(hexToBytes('01020304')) |1572875 |1572875 |EQUAL |
 | (input: bytes) -> int |adler32(NULL) |1 |1 |EQUAL |
 | (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
-
 
 #### SSE predicate (with null handling)
 
@@ -80,7 +88,6 @@ The Adler-32 checksum of the input byte array
 | (input: bytes) -> int |adler32(NULL) |true |true |EQUAL |
 | (input: bytes) -> int |adler32(hexToBytes('')) |true |true |EQUAL |
 
-
 #### SSE predicate (without null handling)
 
 
@@ -90,7 +97,6 @@ The Adler-32 checksum of the input byte array
 | (input: bytes) -> int |adler32(hexToBytes('01020304')) |true |true |EQUAL |
 | (input: bytes) -> int |adler32(NULL) |true |true |EQUAL |
 | (input: bytes) -> int |adler32(hexToBytes('')) |true |true |EQUAL |
-
 
 #### SSE projection (with null handling)
 
@@ -102,7 +108,6 @@ The Adler-32 checksum of the input byte array
 | (input: bytes) -> int |adler32(NULL) |NULL |NULL |EQUAL |
 | (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
 
-
 #### SSE projection (without null handling)
 
 
@@ -113,4 +118,6 @@ The Adler-32 checksum of the input byte array
 | (input: bytes) -> int |adler32(NULL) |1 |1 |EQUAL |
 | (input: bytes) -> int |adler32(hexToBytes('')) |1 |1 |EQUAL |
 
+
+</details>
 

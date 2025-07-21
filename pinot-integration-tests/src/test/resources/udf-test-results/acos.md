@@ -24,7 +24,16 @@
 Returns the arc cosine of a numeric input (in radians).
 ### Summary
 
-The UDF acos is supported in all scenarios with at least EQUAL semantic.
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| acos(NULL) | NULL | 1.5707963267948966 |
+| acos(0.0) | 1.5707963267948966 | 1.5707963267948966 |
+| acos(1.0) | 0.0 | 0.0 |
+| acos(-10.0) | NaN | NaN |
+| acos(10.0) | NaN | NaN |
+| acos(-1.0) | 3.141592653589793 | 3.141592653589793 |
+
+The UDF acos is supported in all scenarios
 
 ### Signatures
 
@@ -36,6 +45,10 @@ The arc cosine of the input value, in radians.
 |-----------|------|-------------|
 | d | double | The double value for which to compute the arc cosine. |
 ### Scenarios
+
+<details>
+
+<summary>Click to open</summary>
 
 #### Ingestion time transformer
 
@@ -49,7 +62,6 @@ The arc cosine of the input value, in radians.
 | (d: double) -> double |acos(10.0) |NaN |NaN |EQUAL |
 | (d: double) -> double |acos(-1.0) |3.141592653589793 |3.141592653589793 |EQUAL |
 
-
 #### MSE intermediate stage (with null handling)
 
 
@@ -61,7 +73,6 @@ The arc cosine of the input value, in radians.
 | (d: double) -> double |acos(0.0) |1.5707963267948966 |1.5707963267948966 |EQUAL |
 | (d: double) -> double |acos(1.0) |0.0 |0.0 |EQUAL |
 | (d: double) -> double |acos(-1.0) |3.141592653589793 |3.141592653589793 |EQUAL |
-
 
 #### MSE intermediate stage (without null handling)
 
@@ -75,7 +86,6 @@ The arc cosine of the input value, in radians.
 | (d: double) -> double |acos(1.0) |0.0 |0.0 |EQUAL |
 | (d: double) -> double |acos(-1.0) |3.141592653589793 |3.141592653589793 |EQUAL |
 
-
 #### SSE predicate (with null handling)
 
 
@@ -87,7 +97,6 @@ The arc cosine of the input value, in radians.
 | (d: double) -> double |acos(-10.0) |true |true |EQUAL |
 | (d: double) -> double |acos(10.0) |true |true |EQUAL |
 | (d: double) -> double |acos(-1.0) |true |true |EQUAL |
-
 
 #### SSE predicate (without null handling)
 
@@ -101,7 +110,6 @@ The arc cosine of the input value, in radians.
 | (d: double) -> double |acos(10.0) |true |true |EQUAL |
 | (d: double) -> double |acos(-1.0) |true |true |EQUAL |
 
-
 #### SSE projection (with null handling)
 
 
@@ -113,7 +121,6 @@ The arc cosine of the input value, in radians.
 | (d: double) -> double |acos(0.0) |1.5707963267948966 |1.5707963267948966 |EQUAL |
 | (d: double) -> double |acos(1.0) |0.0 |0.0 |EQUAL |
 | (d: double) -> double |acos(-1.0) |3.141592653589793 |3.141592653589793 |EQUAL |
-
 
 #### SSE projection (without null handling)
 
@@ -127,4 +134,6 @@ The arc cosine of the input value, in radians.
 | (d: double) -> double |acos(1.0) |0.0 |0.0 |EQUAL |
 | (d: double) -> double |acos(-1.0) |3.141592653589793 |3.141592653589793 |EQUAL |
 
+
+</details>
 

@@ -907,7 +907,7 @@ jsonextractindex:
   transform: true
   udf: null
 jsonextractkey:
-  scalar: false
+  scalar: true
   transform: true
   udf: null
 jsonextractscalar:
