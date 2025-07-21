@@ -44,8 +44,10 @@ public class PinotPreparedStatementTest {
   @Test
   public void testSetAndClearValues()
       throws Exception {
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection connection =
-        new PinotConnection(new Properties(), "dummy", _dummyPinotClientTransport, "dummy",
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
             _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(QUERY);
 
@@ -82,8 +84,10 @@ public class PinotPreparedStatementTest {
   @Test
   public void testSetDateTime()
       throws Exception {
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection connection =
-        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(DATE_QUERY);
 
     Long currentTimestamp = System.currentTimeMillis();
@@ -104,8 +108,10 @@ public class PinotPreparedStatementTest {
   @Test
   public void testSetAdditionalDataTypes()
       throws Exception {
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection connection =
-        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = connection.prepareStatement(SINGLE_STRING_QUERY);
 
     String value = "1234567891011121314151617181920";
@@ -129,6 +135,7 @@ public class PinotPreparedStatementTest {
       throws Exception {
     Properties props = new Properties();
     props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
         new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = pinotConnection.prepareStatement(BASIC_TEST_QUERY);
@@ -143,6 +150,7 @@ public class PinotPreparedStatementTest {
       throws Exception {
     Properties props = new Properties();
     props.put(QueryOptionKey.ENABLE_NULL_HANDLING, "true");
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
         new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     PreparedStatement preparedStatement = pinotConnection.prepareStatement("");
