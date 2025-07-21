@@ -36,7 +36,7 @@ import org.apache.pinot.spi.annotations.ScalarFunction;
 /// The first are row based (are called once per row) and the second are block based (are called once per block), which
 /// makes them more efficient for large datasets.
 ///
-/// These functiosn can be used in different parts of the Pinot query processing pipeline. For example,
+/// These functions can be used in different parts of the Pinot query processing pipeline. For example,
 /// TransformFunctions are when ProjectPlanNodes in SSE are materialized into TransformOpeartors, while scalar functions
 /// are used mostly everywhere else, such as in filter expressions or even project nodes in MSE.
 /// But although a ScalarFunction can be wrapped into a TransformFunction using ScalarTransformFunctionWrapper,
