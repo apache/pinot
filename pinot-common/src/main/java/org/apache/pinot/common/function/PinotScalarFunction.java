@@ -74,14 +74,6 @@ public interface PinotScalarFunction {
   @Nullable
   FunctionInfo getFunctionInfo(int numArguments);
 
-  static Set<PinotScalarFunction> fromAnnotatedMethod(Method method) {
-    ScalarFunction annotation = method.getAnnotation(ScalarFunction.class);
-    if (annotation == null) {
-      throw new IllegalArgumentException("Method " + method + " is not annotated with @ScalarFunction");
-    }
-    return fromMethod(method, annotation.isVarArg(), annotation.nullableParameters(), annotation.names());
-  }
-
   static Set<PinotScalarFunction> fromMethod(Method method, boolean isVarArg, boolean supportNullArgs,
       @Nullable String... names) {
     int numArguments = isVarArg ? FunctionRegistry.VAR_ARG_KEY : method.getParameterCount();
