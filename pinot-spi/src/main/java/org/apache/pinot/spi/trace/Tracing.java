@@ -67,7 +67,8 @@ public class Tracing {
 
   private static final class Holder {
     static final Tracer TRACER = TRACER_REGISTRATION.get() == null ? createDefaultTracer() : TRACER_REGISTRATION.get();
-    static ThreadResourceUsageAccountant _accountant = null;
+    static ThreadResourceUsageAccountant _accountant =
+        ACCOUNTANT_REGISTRATION.get() == null ? createDefaultThreadAccountant() : ACCOUNTANT_REGISTRATION.get();
   }
 
   /**
@@ -340,7 +341,6 @@ public class Tracing {
 
     public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
-      ThreadResourceUsageAccountant accountant = createThreadAccountant(config, instanceId, instanceType);
       createThreadAccountant(config, instanceId, instanceType);
     }
 
@@ -356,19 +356,19 @@ public class Tracing {
               (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
           LOGGER.info("Using accountant provided by {}", factoryName);
           accountant = threadAccountantFactory.init(config, instanceId, instanceType);
+          boolean registered = register(accountant);
+          if (!registered) {
+            accountant = null;
+            LOGGER.warn("ThreadAccountant register unsuccessful, as it is already registered.");
+          }
         } catch (Exception exception) {
           LOGGER.warn("Using default implementation of thread accountant, "
               + "due to invalid thread accountant factory {} provided, exception:", factoryName, exception);
         }
       }
       // If no factory is specified or the factory creation failed, use the default implementation
-      LOGGER.info("Using default thread accountant implementation");
       if (accountant == null) {
         accountant = createDefaultThreadAccountant();
-      }
-      boolean registered = register(accountant);
-      if (!registered) {
-        LOGGER.warn("ThreadAccountant register unsuccessful, as it is already registered.");
       }
       return accountant;
     }
