@@ -77,6 +77,11 @@ public class UdfReporter {
       TreeSet<UdfTestScenario> scenarios) {
     report.append("### Scenarios\n\n");
 
+    // This is used to create a collapsed section in the markdown report
+    report.append("<details>\n"
+        + "\n"
+        + "<summary>Click to open</summary>\n\n");
+
     for (UdfTestScenario scenario : scenarios) {
       UdfTestResult.BySignature bySignature = byScenario.getMap().get(scenario);
 
@@ -134,8 +139,10 @@ public class UdfReporter {
               .append(" |\n");
         }
       }
-      report.append("\n\n");
+      report.append("\n");
     }
+    // Close the collapsed section
+    report.append("\n</details>\n\n");
   }
 
   private static void reportSignatures(Udf udf, PrintWriter report) {
@@ -144,6 +151,7 @@ public class UdfReporter {
     if (!signatures.isEmpty()) {
       report.append("### Signatures\n\n");
 
+      boolean paramsAlreadyPrinted = false;
       for (UdfSignature signature : signatures) {
         report.append("#### ").append(udf.getMainFunctionName()).append(signature.toString()).append("\n\n");
 
@@ -152,14 +160,29 @@ public class UdfReporter {
           report.append(resultDescription).append("\n\n");
         }
 
-        report.append("| Parameter | Type | Description |\n");
-        report.append("|-----------|------|-------------|\n");
-        for (UdfParameter parameter : signature.getParameters()) {
-          report.append("| ")
-              .append(parameter.getName()).append(" | ")
-              .append(parameter.getDataType().toString().toLowerCase(Locale.US)).append(" | ")
-              .append(parameter.getDescription() != null ? parameter.getDescription() : "")
-              .append(" |\n");
+        if (signature.getParameters().stream().anyMatch(p -> p.getDescription() != null)) {
+          // This is used to create a collapsed section in the markdown report
+          if (paramsAlreadyPrinted) {
+            report.append("<details>\n"
+                + "\n"
+                + "<summary>Click to open</summary>\n\n");
+          }
+
+          report.append("| Parameter | Type | Description |\n");
+          report.append("|-----------|------|-------------|\n");
+          for (UdfParameter parameter : signature.getParameters()) {
+            report.append("| ")
+                .append(parameter.getName()).append(" | ")
+                .append(parameter.getDataType().toString().toLowerCase(Locale.US)).append(" | ")
+                .append(parameter.getDescription() != null ? parameter.getDescription() : "")
+                .append(" |\n");
+          }
+          if (paramsAlreadyPrinted) {
+            // Close the collapsed section
+            report.append("\n</details>\n\n");
+          } else {
+            paramsAlreadyPrinted = true;
+          }
         }
       }
     }
@@ -173,6 +196,31 @@ public class UdfReporter {
       summaries.put(scenario, summarize(bySignature));
     }
     report.append("### Summary\n\n");
+
+    udf.getExamples().keySet().stream()
+        .min(Comparator.comparing(UdfSignature::toString))
+        .ifPresent(udfSignature -> {
+
+          report.append("|Call | Result (with null handling) | Result (without null handling)\n");
+          report.append("|-----|-----------------------------|------------------------------|\n");
+
+          for (UdfExample example : udf.getExamples().get(udfSignature)) {
+            // Expected result
+            Object withNull = example.getResult(true);
+            Object withoutNull = example.getResult(false);
+
+            // Call column
+            report.append("| ")
+                .append(asSqlCallWithLiteralArgs(udf, udf.getMainFunctionName(), example.getInputValues()))
+                .append(" | ")
+                .append(withNull == null ? "NULL" : withNull.toString())
+                .append(" | ")
+                .append(withoutNull == null ? "NULL" : withoutNull.toString())
+                .append(" |\n");
+          }
+          report.append("\n");
+        });
+
     if (summaries.values().stream().distinct().count() == 1) {
       String summary = summaries.values().iterator().next();
       if (summary.equals("❌ Unsupported")) {
@@ -182,12 +230,17 @@ public class UdfReporter {
         report.append("The UDF ").append(udf.getMainFunctionName())
             .append(" has failed in all scenarios with the following error: ")
             .append(summary).append("\n\n");
+      } else if (summary.equals("EQUAL")) {
+        report.append("The UDF ").append(udf.getMainFunctionName())
+            .append(" is supported in all scenarios\n\n");
       } else {
         report.append("The UDF ").append(udf.getMainFunctionName())
             .append(" is supported in all scenarios with at least ")
             .append(summary).append(" semantic.\n\n");
       }
     } else {
+      report.append("This UDF has different semantics in different scenarios:\n\n");
+
       report.append("| Scenario | Semantic |\n");
       report.append("|----------|----------|\n");
 

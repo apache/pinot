@@ -24,7 +24,17 @@
 Stub for and function. Not implemented.
 ### Summary
 
-The UDF and is supported in all scenarios with at least EQUAL semantic.
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| and(false, true) | false | false |
+| and(true, NULL) | NULL | false |
+| and(NULL, NULL) | NULL | false |
+| and(false, false) | false | false |
+| and(true, true) | true | true |
+| and(NULL, true) | NULL | false |
+| and(true, false) | false | false |
+
+The UDF and is supported in all scenarios
 
 ### Signatures
 
@@ -37,6 +47,10 @@ Result of the AND operation, true if both operands are true, false otherwise
 | left | boolean | Left operand of the AND operation |
 | right | boolean | Right operand of the AND operation |
 ### Scenarios
+
+<details>
+
+<summary>Click to open</summary>
 
 #### Ingestion time transformer
 
@@ -51,7 +65,6 @@ Result of the AND operation, true if both operands are true, false otherwise
 | (left: boolean, right: boolean) -> boolean |and(NULL, true) |NULL |NULL |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(true, false) |false |false |EQUAL |
 
-
 #### MSE intermediate stage (with null handling)
 
 
@@ -64,7 +77,6 @@ Result of the AND operation, true if both operands are true, false otherwise
 | (left: boolean, right: boolean) -> boolean |and(true, true) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(NULL, true) |NULL |NULL |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(true, false) |false |false |EQUAL |
-
 
 #### MSE intermediate stage (without null handling)
 
@@ -79,7 +91,6 @@ Result of the AND operation, true if both operands are true, false otherwise
 | (left: boolean, right: boolean) -> boolean |and(NULL, true) |false |false |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(true, false) |false |false |EQUAL |
 
-
 #### SSE predicate (with null handling)
 
 
@@ -92,7 +103,6 @@ Result of the AND operation, true if both operands are true, false otherwise
 | (left: boolean, right: boolean) -> boolean |and(true, true) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(NULL, true) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(true, false) |true |true |EQUAL |
-
 
 #### SSE predicate (without null handling)
 
@@ -107,7 +117,6 @@ Result of the AND operation, true if both operands are true, false otherwise
 | (left: boolean, right: boolean) -> boolean |and(NULL, true) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(true, false) |true |true |EQUAL |
 
-
 #### SSE projection (with null handling)
 
 
@@ -120,7 +129,6 @@ Result of the AND operation, true if both operands are true, false otherwise
 | (left: boolean, right: boolean) -> boolean |and(true, true) |true |true |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(NULL, true) |NULL |NULL |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(true, false) |false |false |EQUAL |
-
 
 #### SSE projection (without null handling)
 
@@ -135,4 +143,6 @@ Result of the AND operation, true if both operands are true, false otherwise
 | (left: boolean, right: boolean) -> boolean |and(NULL, true) |false |false |EQUAL |
 | (left: boolean, right: boolean) -> boolean |and(true, false) |false |false |EQUAL |
 
+
+</details>
 

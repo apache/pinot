@@ -24,6 +24,12 @@
 Given an array with numeric values, this function returns the maximum value in the array. * asdf 
 ### Summary
 
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| arrayMax([1, 2, 3]) | 3 | 3 |
+
+This UDF has different semantics in different scenarios:
+
 | Scenario | Semantic |
 |----------|----------|
 | Ingestion time transformer | ❌ Unsupported |
@@ -42,13 +48,16 @@ Given an array with numeric values, this function returns the maximum value in t
 | arr | int | Input array of integers |
 ### Scenarios
 
+<details>
+
+<summary>Click to open</summary>
+
 #### Ingestion time transformer
 
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
 | (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
-
 
 #### MSE intermediate stage (with null handling)
 
@@ -57,14 +66,12 @@ Given an array with numeric values, this function returns the maximum value in t
 |-----------|------|-----------------|---------------|---------------------|
 | (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
 
-
 #### MSE intermediate stage (without null handling)
 
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
 | (arr: ARRAY(int)) -> int | - | - | - | ❌ Unsupported |
-
 
 #### SSE predicate (with null handling)
 
@@ -73,14 +80,12 @@ Given an array with numeric values, this function returns the maximum value in t
 |-----------|------|-----------------|---------------|---------------------|
 | (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
 
-
 #### SSE predicate (without null handling)
 
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
 | (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |true |true |EQUAL |
-
 
 #### SSE projection (with null handling)
 
@@ -89,7 +94,6 @@ Given an array with numeric values, this function returns the maximum value in t
 |-----------|------|-----------------|---------------|---------------------|
 | (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
 
-
 #### SSE projection (without null handling)
 
 
@@ -97,4 +101,6 @@ Given an array with numeric values, this function returns the maximum value in t
 |-----------|------|-----------------|---------------|---------------------|
 | (arr: ARRAY(int)) -> int |arrayMax([1, 2, 3]) |3 |3 |EQUAL |
 
+
+</details>
 

@@ -24,6 +24,15 @@
 Returns true if the input is false (0), otherwise false. Null inputs return false.
 ### Summary
 
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| isFalse(0) | true | true |
+| isFalse(NULL) | false | true |
+| isFalse(-1) | false | false |
+| isFalse(1) | false | false |
+
+This UDF has different semantics in different scenarios:
+
 | Scenario | Semantic |
 |----------|----------|
 | Ingestion time transformer | ❌ Unsupported |
@@ -32,7 +41,7 @@ Returns true if the input is false (0), otherwise false. Null inputs return fals
 | SSE predicate (with null handling) | EQUAL |
 | SSE predicate (without null handling) | EQUAL |
 | SSE projection (with null handling) | EQUAL |
-| SSE projection (without null handling) | EQUAL with 1 errors. |
+| SSE projection (without null handling) | EQUAL |
 ### Signatures
 
 #### isFalse(input: int) -> boolean
@@ -42,13 +51,16 @@ Returns true if the input is false (0), otherwise false. Null inputs return fals
 | input | int | Input value to check if it is false (0) |
 ### Scenarios
 
+<details>
+
+<summary>Click to open</summary>
+
 #### Ingestion time transformer
 
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
 | (input: int) -> boolean | - | - | - | ❌ Unsupported |
-
 
 #### MSE intermediate stage (with null handling)
 
@@ -57,14 +69,12 @@ Returns true if the input is false (0), otherwise false. Null inputs return fals
 |-----------|------|-----------------|---------------|---------------------|
 | (input: int) -> boolean | - | - | - | ❌ "QueryValidationError: From line 15, column 3 to line 15, column 19: No match found for function signature isFalse(<NUMERIC>). From line 15, column 3 to line 15, column 19: No match found for function signature isFalse(<NUMERIC>). No match found for function signature isFalse(<NUMERIC>)" |
 
-
 #### MSE intermediate stage (without null handling)
 
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
 | (input: int) -> boolean | - | - | - | ❌ "QueryValidationError: From line 14, column 3 to line 14, column 19: No match found for function signature isFalse(<NUMERIC>). From line 14, column 3 to line 14, column 19: No match found for function signature isFalse(<NUMERIC>). No match found for function signature isFalse(<NUMERIC>)" |
-
 
 #### SSE predicate (with null handling)
 
@@ -76,7 +86,6 @@ Returns true if the input is false (0), otherwise false. Null inputs return fals
 | (input: int) -> boolean |isFalse(-1) |true |true |EQUAL |
 | (input: int) -> boolean |isFalse(1) |true |true |EQUAL |
 
-
 #### SSE predicate (without null handling)
 
 
@@ -87,17 +96,15 @@ Returns true if the input is false (0), otherwise false. Null inputs return fals
 | (input: int) -> boolean |isFalse(-1) |true |true |EQUAL |
 | (input: int) -> boolean |isFalse(1) |true |true |EQUAL |
 
-
 #### SSE projection (with null handling)
 
 
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
 | (input: int) -> boolean |isFalse(0) |true |true |EQUAL |
-| (input: int) -> boolean |isFalse(NULL) |false |false |EQUAL |
 | (input: int) -> boolean |isFalse(-1) |false |false |EQUAL |
+| (input: int) -> boolean |isFalse(NULL) |false |false |EQUAL |
 | (input: int) -> boolean |isFalse(1) |false |false |EQUAL |
-
 
 #### SSE projection (without null handling)
 
@@ -105,8 +112,10 @@ Returns true if the input is false (0), otherwise false. Null inputs return fals
 | Signature | Call | Expected result | Actual result | Comparison or Error |
 |-----------|------|-----------------|---------------|---------------------|
 | (input: int) -> boolean |isFalse(0) |true |true |EQUAL |
-| (input: int) -> boolean |isFalse(NULL) |false |true |❌ Unexpected value |
 | (input: int) -> boolean |isFalse(-1) |false |false |EQUAL |
+| (input: int) -> boolean |isFalse(NULL) |true |true |EQUAL |
 | (input: int) -> boolean |isFalse(1) |false |false |EQUAL |
 
+
+</details>
 

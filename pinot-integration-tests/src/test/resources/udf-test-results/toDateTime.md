@@ -24,7 +24,12 @@
 Converts epoch millis to a DateTime string represented by the given pattern. Optionally, a timezone can be provided.
 ### Summary
 
-The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
+|Call | Result (with null handling) | Result (without null handling)
+|-----|-----------------------------|------------------------------|
+| toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') | 2020-01-01T00:00:00Z | 2020-01-01T00:00:00Z |
+| toDateTime(1577836800000, 'yyyy-MM-dd') | 2020-01-01 | 2020-01-01 |
+
+The UDF toDateTime is supported in all scenarios
 
 ### Signatures
 
@@ -36,6 +41,10 @@ The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
 | format | string | A string literal representing the date format, e.g., 'yyyy-MM-dd'T'HH:mm:ss'Z' or 'yyyy-MM-dd' |
 ### Scenarios
 
+<details>
+
+<summary>Click to open</summary>
+
 #### Ingestion time transformer
 
 
@@ -43,7 +52,6 @@ The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
 |-----------|------|-----------------|---------------|---------------------|
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
-
 
 #### MSE intermediate stage (with null handling)
 
@@ -53,7 +61,6 @@ The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
 
-
 #### MSE intermediate stage (without null handling)
 
 
@@ -61,7 +68,6 @@ The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
 |-----------|------|-----------------|---------------|---------------------|
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
-
 
 #### SSE predicate (with null handling)
 
@@ -71,7 +77,6 @@ The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |true |true |EQUAL |
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |true |true |EQUAL |
 
-
 #### SSE predicate (without null handling)
 
 
@@ -79,7 +84,6 @@ The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
 |-----------|------|-----------------|---------------|---------------------|
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |true |true |EQUAL |
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |true |true |EQUAL |
-
 
 #### SSE projection (with null handling)
 
@@ -89,7 +93,6 @@ The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
 
-
 #### SSE projection (without null handling)
 
 
@@ -98,4 +101,6 @@ The UDF toDateTime is supported in all scenarios with at least EQUAL semantic.
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd') |2020-01-01 |2020-01-01 |EQUAL |
 | (mills: long, format: string) -> string |toDateTime(1577836800000, 'yyyy-MM-dd''T''HH:mm:ss''Z''') |2020-01-01T00:00:00Z |2020-01-01T00:00:00Z |EQUAL |
 
+
+</details>
 

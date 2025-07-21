@@ -54,7 +54,7 @@ public class IsFalseUdf extends Udf {
         .addExample("input is 0 (false)", 0, true)
         .addExample("input is 1 (true)", 1, false)
         .addExample("input is -1 (not false)", -1, false)
-        .addExample(UdfExample.create("null input", null, false))
+        .addExample(UdfExample.create("null input", null, false).withoutNull(true))
         .build()
         .generateExamples();
   }
