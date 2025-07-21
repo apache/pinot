@@ -117,8 +117,6 @@ public class SegmentPrunerService {
             _prunerStatsUpdaters.get(segmentPruner).accept(stats, originalSegmentsSize - segments.size());
           }
         }
-        // Account for resource usage in pruning, given that it can be expensive for large segment lists.
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       }
       scope.setNumChildren(invokedPrunersCount);
     }

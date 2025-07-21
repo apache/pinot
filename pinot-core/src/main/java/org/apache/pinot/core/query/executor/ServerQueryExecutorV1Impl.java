@@ -313,6 +313,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
 
     TableExecutionInfo.SelectedSegmentsInfo selectedSegmentsInfo =
         executionInfo.getSelectedSegmentsInfo(queryContext, timerContext, executorService, _segmentPrunerService);
+    // Account for resource usage in pruning, given that it can be expensive for large segment lists.
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
 
     InstanceResponseBlock instanceResponse =
         execute(selectedSegmentsInfo.getIndexSegments(), queryContext, timerContext, executorService, streamer,
@@ -580,6 +582,8 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     }
     InstanceResponseBlock instanceResponse;
     Plan queryPlan = planCombineQuery(queryContext, timerContext, executorService, streamer, selectedSegmentContexts);
+    // Sample to track usage of query planning, since it can be expensive for large segment lists.
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
 
     TimerContext.Timer planExecTimer = timerContext.startNewPhaseTimer(ServerQueryPhase.QUERY_PLAN_EXECUTION);
     instanceResponse = queryPlan.execute();
