@@ -52,17 +52,17 @@ public class RadixPartitionedIntermediateRecords {
       _partitionBoundaries[i] = _partitionBoundaries[i - 1] + partitionSizes[i - 1];
     }
     assert (_partitionBoundaries[_numPartitions] == _records.size());
-    int[] _nextIdx = new int[_numPartitions];
-    System.arraycopy(_partitionBoundaries, 0, _nextIdx, 0, _numPartitions);
+    int[] nextIdx = new int[_numPartitions];
+    System.arraycopy(_partitionBoundaries, 0, nextIdx, 0, _numPartitions);
 
     for (int p = 0; p < _numPartitions; p++) {
-      while (_nextIdx[p] < _partitionBoundaries[p + 1]) {
-        int fromIdx = _nextIdx[p];
+      while (nextIdx[p] < _partitionBoundaries[p + 1]) {
+        int fromIdx = nextIdx[p];
         IntermediateRecord record = _records.get(fromIdx);
         int targetPartition = partition(record);
-        int targetIdx = _nextIdx[targetPartition];
+        int targetIdx = nextIdx[targetPartition];
         Collections.swap(_records, fromIdx, targetIdx);
-        _nextIdx[targetPartition]++;
+        nextIdx[targetPartition]++;
       }
     }
   }

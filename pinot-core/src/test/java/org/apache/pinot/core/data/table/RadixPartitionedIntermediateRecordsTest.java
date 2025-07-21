@@ -31,7 +31,7 @@ import org.testng.annotations.Test;
 public class RadixPartitionedIntermediateRecordsTest {
   @Test
   public void testInPlacePartition() {
-    for (int numRadixBit : List.of(0, 1, 2, 3)){
+    for (int numRadixBit : List.of(0, 1, 2, 3)) {
       List<IntermediateRecord> list = new ArrayList<>();
       Map<Integer, Set<IntermediateRecord>> expectedPartitions = new HashMap<>();
       int numRecords = 1000;

@@ -188,7 +188,8 @@ public final class GroupByUtils {
    * Creates an indexed table for the worker thread local combine of
    * partitioned segment results
    */
-  public static SimpleIndexedTable createIndexedTableForPartitionMerge(DataSchema dataSchema, QueryContext queryContext, ExecutorService executorService, int initialCapacity) {
+  public static SimpleIndexedTable createIndexedTableForPartitionMerge(DataSchema dataSchema, QueryContext queryContext,
+      ExecutorService executorService, int initialCapacity) {
     // single worker thread merges single partition number
     int limit = queryContext.getLimit();
     boolean hasOrderBy = queryContext.getOrderByExpressions() != null;

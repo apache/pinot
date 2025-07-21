@@ -107,7 +107,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _mergedIndexedTables = new SimpleIndexedTable[_queryContext.getGroupByNumPartitions()];
 
     _partitionSizes = new AtomicInteger[queryContext.getGroupByNumPartitions()];
-    for (int i=0; i< queryContext.getGroupByNumPartitions(); i++) {
+    for (int i = 0; i < queryContext.getGroupByNumPartitions(); i++) {
       _partitionSizes[i] = new AtomicInteger(0);
     }
   }
@@ -152,7 +152,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (_dataSchema == null) {
           _dataSchema = resultsBlock.getDataSchema();
         }
-
 
         if (resultsBlock.isGroupsTrimmed()) {
           _groupsTrimmed = true;
@@ -200,15 +199,15 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
 
         // in-place partition segment results
         RadixPartitionedIntermediateRecords partitionedRecords =
-            new RadixPartitionedIntermediateRecords(_queryContext.getGroupByPartitionNumRadixBits(), operatorId, intermediateRecords);
+            new RadixPartitionedIntermediateRecords(_queryContext.getGroupByPartitionNumRadixBits(), operatorId,
+                intermediateRecords);
 
         // CE
-        for (int i=0; i < _queryContext.getGroupByNumPartitions(); i++) {
+        for (int i = 0; i < _queryContext.getGroupByNumPartitions(); i++) {
           _partitionSizes[i].getAndAdd(partitionedRecords.getPartition(i).size());
         }
 
         _partitionedRecordsFutures[operatorId].complete(partitionedRecords);
-
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
       } finally {
@@ -231,7 +230,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         SimpleIndexedTable table =
             GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService, initialSize);
 
-        Map<Integer, CompletableFuture<RadixPartitionedIntermediateRecords>> pendingFutures = new HashMap<>(_numOperators);
+        Map<Integer, CompletableFuture<RadixPartitionedIntermediateRecords>> pendingFutures =
+            new HashMap<>(_numOperators);
         for (int segmentId = 0; segmentId < _numOperators; segmentId++) {
           pendingFutures.put(segmentId, _partitionedRecordsFutures[segmentId]);
         }

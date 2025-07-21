@@ -31,7 +31,8 @@ import org.apache.pinot.core.query.request.context.QueryContext;
  */
 public class PartitionedIndexedTable extends IndexedTable {
   public PartitionedIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
-      int resultSize, int trimSize, int trimThreshold, RadixPartitionedHashMap<Key, Record> map, ExecutorService executorService) {
+      int resultSize, int trimSize, int trimThreshold, RadixPartitionedHashMap<Key, Record> map,
+      ExecutorService executorService) {
     super(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold, map,
         executorService);
   }
