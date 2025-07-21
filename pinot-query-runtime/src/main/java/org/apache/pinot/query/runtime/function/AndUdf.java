@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.core.operator.transform.function.AndOperatorTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
@@ -75,6 +76,6 @@ public class AndUdf extends Udf {
 
   @Override
   public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.AND, TransformFunction.class);
+    return Map.of(TransformFunctionType.AND, AndOperatorTransformFunction.class);
   }
 }
