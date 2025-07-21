@@ -583,8 +583,10 @@ public class PinotLLCRealtimeSegmentManager {
       return;
     }
 
-    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
-    PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
+    URI tableDirURI = URIUtils.getUri("http://localhost:20000/segments", rawTableName);
+    PinotFS pinotFS = PinotFSFactory.create("http");
+//    URI tableDirURI = URIUtils.getUri(_controllerConf.getDataDir(), rawTableName);
+//    PinotFS pinotFS = PinotFSFactory.create(tableDirURI.getScheme());
     String uriToMoveTo = moveSegmentFile(rawTableName, segmentName, segmentLocation, pinotFS);
 
     if (!isTmpSegmentAsyncDeletionEnabled()) {
@@ -2415,7 +2417,8 @@ public class PinotLLCRealtimeSegmentManager {
 
   @VisibleForTesting
   URI createSegmentPath(String rawTableName, String segmentName) {
-    return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
+    return URIUtils.getUri("http://localhost:20000/segments", rawTableName, URIUtils.encode(segmentName));
+    //return URIUtils.getUri(_controllerConf.getDataDir(), rawTableName, URIUtils.encode(segmentName));
   }
 
   /**

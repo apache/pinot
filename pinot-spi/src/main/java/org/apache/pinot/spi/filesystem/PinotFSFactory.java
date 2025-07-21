@@ -42,6 +42,7 @@ public class PinotFSFactory {
   private static final Map<String, PinotFS> PINOT_FS_MAP = new HashMap<String, PinotFS>() {
     {
       put(LOCAL_PINOT_FS_SCHEME, new NoClosePinotFS(new LocalPinotFS()));
+//      put("http", new NoClosePinotFS(new LiLocalPinotFS()));
     }
   };
 

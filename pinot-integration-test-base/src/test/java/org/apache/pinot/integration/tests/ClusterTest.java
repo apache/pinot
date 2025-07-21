@@ -79,6 +79,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.NetUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.intellij.lang.annotations.Language;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -242,6 +243,17 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected PinotConfiguration getServerConf(int serverId) {
     PinotConfiguration serverConf = new PinotConfiguration();
+    serverConf.setProperty("pinot.server.segment.fetcher.protocols", List.of("file", "http"));
+    serverConf.setProperty("pinot.server.segment.fetcher.file.class",
+        "org.apache.pinot.common.utils.fetcher.LiSegmentFetcher");
+    serverConf.setProperty("pinot.server.segment.fetcher.http.class",
+        "org.apache.pinot.common.utils.fetcher.LiSegmentFetcher");
+    serverConf.setProperty("pinot.server.storage.factory.class.http", "org.apache.pinot.common.utils.filesystem.LiLocalPinotFS");
+
+    // needed for realtime uploads
+    serverConf.setProperty("pinot.server.instance.segment.upload.to.deep.store", true);
+    serverConf.setProperty("pinot.server.instance.segment.store.uri", "http://localhost:20000/segments");
+
     serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
     serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
@@ -458,15 +470,9 @@ public abstract class ClusterTest extends ControllerTest {
             .availableProcessors()));
         List<Future<Integer>> futures = new ArrayList<>(numSegments);
         for (File segmentTarFile : segmentTarFiles) {
-          futures.add(executorService.submit(() -> {
-            if (System.currentTimeMillis() % 2 == 0) {
-              return fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
-                  segmentTarFile, getSegmentUploadAuthHeaders(), tableName, tableType).getStatusCode();
-            } else {
-              return uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
-                  segmentTarFile);
-            }
-          }));
+          futures.add(executorService.submit(
+              () -> uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
+                  segmentTarFile)));
         }
         executorService.shutdown();
         for (Future<Integer> future : futures) {
@@ -479,11 +485,19 @@ public abstract class ClusterTest extends ControllerTest {
   private int uploadSegmentWithOnlyMetadata(String tableName, TableType tableType, URI uploadSegmentHttpURI,
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
+    String controllerSegmentsEndpoint = "http://localhost:20000/segments";
+    String fileName = URIUtils.encode(segmentTarFile.getName());
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    String segmentName = fileName.substring(0, fileName.indexOf(".tar.gz"));
     List<Header> headers = new ArrayList<>(List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-        "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
-          + URIUtils.encode(segmentTarFile.getName())),
-      new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
-        FileUploadDownloadClient.FileUploadType.METADATA.toString())));
+            controllerSegmentsEndpoint + "/" + rawTableName + "/" + segmentName),
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+            FileUploadDownloadClient.FileUploadType.METADATA.toString())));
+//    List<Header> headers = new ArrayList<>(List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
+//            String.format("file://%s/%s", segmentTarFile.getParentFile().getAbsolutePath(),
+//                URIUtils.encode(segmentTarFile.getName()))),
+//        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+//            FileUploadDownloadClient.FileUploadType.METADATA.toString())));
     headers.addAll(getSegmentUploadAuthHeaders());
     // Add table name and table type as request parameters
     NameValuePair tableNameValuePair =

@@ -166,7 +166,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected int getNumKafkaPartitions() {
-    return DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
+    return DEFAULT_LLC_NUM_KAFKA_PARTITIONS; //1; //DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
   }
 
   protected String getKafkaTopic() {

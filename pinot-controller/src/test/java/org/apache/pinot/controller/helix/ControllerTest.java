@@ -280,6 +280,18 @@ public class ControllerTest {
     properties.put(ControllerConf.CONSOLE_SWAGGER_ENABLE, false);
     properties.put(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     properties.put(ControllerConf.CLUSTER_TENANT_ISOLATION_ENABLE, true);
+
+//    properties.put("pinot.controller.storage.factory.class.s3", "org.apache.pinot.plugin.filesystem.S3PinotFS");
+//    properties.put("controller.data.dir", "s3://127.0.0.1:9000/pinot-bucket");
+//    properties.put("pinot.controller.storage.factory.s3.region", "us-east-1");
+//    properties.put("pinot.controller.segment.fetcher.protocols", "file,http,s3");
+//    properties.put("pinot.controller.segment.fetcher.s3.class", "org.apache.pinot.common.utils.fetcher.LiSegmentFetcher");
+//    properties.put("pinot.controller.storage.factory.s3.accessKey", "minioadmin");
+//    properties.put("pinot.controller.storage.factory.s3.secretKey", "minioadmin");
+
+    properties.put("pinot.controller.storage.factory.class.http", "org.apache.pinot.common.utils.filesystem.LiLocalPinotFS");
+
+
     overrideControllerConf(properties);
     return properties;
   }

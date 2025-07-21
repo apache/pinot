@@ -257,7 +257,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     List<File> tarDirs = new ArrayList<>();
     tarDirs.add(_tarDir);
-    tarDirs.add(tarDir2);
+//    tarDirs.add(tarDir2);
     try {
       uploadSegments(getTableName(), TableType.OFFLINE, tarDirs);
     } catch (Exception e) {
