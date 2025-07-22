@@ -1600,7 +1600,7 @@ public class CommonConstants {
     public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
     public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
         "accounting.secondary.workload.cpu.percentage";
-    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 10.0;
+    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
   }
 
   public static class ExecutorService {

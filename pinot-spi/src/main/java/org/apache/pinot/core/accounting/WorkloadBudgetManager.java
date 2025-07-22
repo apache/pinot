@@ -36,7 +36,6 @@ public class WorkloadBudgetManager {
   private final ConcurrentHashMap<String, Budget> _workloadBudgets = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
   private volatile boolean _isEnabled;
-  private String _secondaryWorkloadName;
 
   public WorkloadBudgetManager(PinotConfiguration config) {
     _isEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION,
@@ -58,7 +57,7 @@ public class WorkloadBudgetManager {
    * This is fixed budget allocated during host startup and used across all secondary queries.
    */
   private void initSecondaryWorkloadBudget(PinotConfiguration config) {
-    _secondaryWorkloadName = config.getProperty(
+    String secondaryWorkloadName = config.getProperty(
         CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
         CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
 
@@ -69,9 +68,13 @@ public class WorkloadBudgetManager {
     // The Secondary CPU budget is based on the CPU percentage allocated for secondary workload.
     // The memory budget is set to Long.MAX_VALUE for now, since we do not have a specific memory budget for
     // secondary queries.
-    long secondaryCpuBudget = (long) (secondaryCpuPercentage * _enforcementWindowMs * 100_000L);
+    int availableProcessors = Runtime.getRuntime().availableProcessors();
+    // Total CPU capacity available in one enforcement window:
+    // window(ms) × 1_000_000 (ns per ms) × number of logical processors
+    long totalCpuCapacityNs = _enforcementWindowMs * 1_000_000L * availableProcessors;
+    long secondaryCpuBudget = (long) (secondaryCpuPercentage * totalCpuCapacityNs);
     // TODO: Add memory budget for secondary workload queries
-    addOrUpdateWorkload(_secondaryWorkloadName, secondaryCpuBudget, Long.MAX_VALUE);
+    addOrUpdateWorkload(secondaryWorkloadName, secondaryCpuBudget, Long.MAX_VALUE);
   }
 
   public void shutdown() {
@@ -185,13 +188,11 @@ public class WorkloadBudgetManager {
    * @param workload the workload identifier to check budget for
    * @return true if the query may be accepted; false if budget is insufficient
    */
-  public boolean canAdmitQuery(String workload, boolean isSecondary) {
+  public boolean canAdmitQuery(String workload) {
     // If disabled or no budget configured, always admit
     if (!_isEnabled) {
       return true;
     }
-    // This is to support backward compatibility of the isSecondaryWorkload QueryOption.
-    workload = isSecondary ? _secondaryWorkloadName : workload;
     Budget budget = _workloadBudgets.get(workload);
     if (budget == null) {
       LOGGER.debug("No budget found for workload: {}", workload);
@@ -199,10 +200,6 @@ public class WorkloadBudgetManager {
     }
     BudgetStats stats = budget.getStats();
     return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
-  }
-
-  public long getEnforcementWindowMs() {
-    return _enforcementWindowMs;
   }
 
   /**

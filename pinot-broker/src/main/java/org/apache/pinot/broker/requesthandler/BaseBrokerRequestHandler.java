@@ -100,6 +100,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   protected final Map<Long, String> _clientQueryIds;
   protected final WorkloadBudgetManager _workloadBudgetManager;
+  String _secondaryWorkloadName;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
@@ -129,6 +130,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _clientQueryIds = null;
     }
     _workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
+    _secondaryWorkloadName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
+        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
   }
 
   @Override
@@ -203,16 +206,22 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         return new BrokerResponseNative(QueryErrorCode.TOO_MANY_REQUESTS, errorMessage);
       }
 
-      String workloadName = sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.WORKLOAD_NAME);
+      // This is for backward compatibility, where we want to honor the isSecondary query option to use the secondary
+      // workload budget.
       boolean isSecondary = Boolean.parseBoolean(sqlNodeAndOptions.getOptions()
           .getOrDefault(Broker.Request.QueryOptionKey.IS_SECONDARY_WORKLOAD, "false"));
+      String workloadName = isSecondary
+          ? _secondaryWorkloadName
+          : sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.WORKLOAD_NAME);
       if (workloadName != null && _workloadBudgetManager != null
-          && !_workloadBudgetManager.canAdmitQuery(workloadName, isSecondary)) {
+          && !_workloadBudgetManager.canAdmitQuery(workloadName)) {
+        _brokerMetrics.addMeteredValue(workloadName, BrokerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
+        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.WORKLOAD_BUDGET_EXCEEDED, 1L);
         String errorMessage = "Request " + requestId + ": " + query + " exceeds query quota for workload: "
             + workloadName;
         LOGGER.info(errorMessage);
-        requestContext.setErrorCode(QueryErrorCode.WORKLOAD_QUOTA_EXCEEDED);
-        return new BrokerResponseNative(QueryErrorCode.WORKLOAD_QUOTA_EXCEEDED, errorMessage);
+        requestContext.setErrorCode(QueryErrorCode.WORKLOAD_BUDGET_EXCEEDED);
+        return new BrokerResponseNative(QueryErrorCode.WORKLOAD_BUDGET_EXCEEDED, errorMessage);
       }
 
       // Add null handling option from broker config only if there is no override in the query

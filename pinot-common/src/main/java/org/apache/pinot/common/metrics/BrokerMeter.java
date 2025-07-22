@@ -261,6 +261,9 @@ public class BrokerMeter implements AbstractMetrics.Meter {
       "GRPC_TRANSPORT_TERMINATED", "grpcTransport", true);
 
   public static final BrokerMeter RLS_FILTERS_APPLIED = create("RLS_FILTERS_APPLIED", "queries", false);
+  // Workload Budget exceeded counter
+  public static final BrokerMeter WORKLOAD_BUDGET_EXCEEDED = create(
+      "WORKLOAD_BUDGET_EXCEEDED", "workloadBudgetExceeded", true);
 
   private static final Map<QueryErrorCode, BrokerMeter> QUERY_ERROR_CODE_METER_MAP;
 
