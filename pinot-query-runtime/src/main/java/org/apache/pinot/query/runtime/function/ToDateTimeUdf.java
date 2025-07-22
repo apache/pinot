@@ -35,8 +35,9 @@ import org.apache.pinot.spi.data.FieldSpec;
 @AutoService(Udf.class)
 public class ToDateTimeUdf extends Udf.FromAnnotatedMethod {
 
-  public ToDateTimeUdf() throws NoSuchMethodException {
-    super(DateTimeFunctions.class, "toDateTime", long.class, String.class);
+  public ToDateTimeUdf()
+      throws NoSuchMethodException {
+    super(DateTimeFunctions.class.getMethod("toDateTime", long.class, String.class));
   }
 
   @Override
@@ -48,16 +49,16 @@ public class ToDateTimeUdf extends Udf.FromAnnotatedMethod {
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(
-        UdfSignature.of(
-            UdfParameter.of("mills", FieldSpec.DataType.LONG)
-                .withDescription("A long value representing epoch millis, "
-                    + "e.g., 1577836800000L for 2020-01-01T00:00:00Z"),
-            UdfParameter.of("format", FieldSpec.DataType.STRING)
-                .withDescription("A string literal representing the date format, "
-                    + "e.g., 'yyyy-MM-dd'T'HH:mm:ss'Z' or 'yyyy-MM-dd'")
-                .asLiteralOnly(),
-            UdfParameter.result(FieldSpec.DataType.STRING) // Return type is single value STRING
-        ))
+            UdfSignature.of(
+                UdfParameter.of("mills", FieldSpec.DataType.LONG)
+                    .withDescription("A long value representing epoch millis, "
+                        + "e.g., 1577836800000L for 2020-01-01T00:00:00Z"),
+                UdfParameter.of("format", FieldSpec.DataType.STRING)
+                    .withDescription("A string literal representing the date format, "
+                        + "e.g., 'yyyy-MM-dd'T'HH:mm:ss'Z' or 'yyyy-MM-dd'")
+                    .asLiteralOnly(),
+                UdfParameter.result(FieldSpec.DataType.STRING) // Return type is single value STRING
+            ))
         .addExample("UTC ISO8601", 1577836800000L, "yyyy-MM-dd'T'HH:mm:ss'Z'", "2020-01-01T00:00:00Z")
         .addExample("Date only", 1577836800000L, "yyyy-MM-dd", "2020-01-01")
         //.addExample(UdfExample.create("null millis", null, "yyyy-MM-dd", null).withoutNull("1970-01-01"))

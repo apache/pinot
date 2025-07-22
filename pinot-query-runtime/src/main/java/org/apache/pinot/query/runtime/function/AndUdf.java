@@ -50,12 +50,12 @@ public class AndUdf extends Udf {
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-          UdfParameter.of("left", FieldSpec.DataType.BOOLEAN)
-              .withDescription("Left operand of the AND operation"),
-          UdfParameter.of("right", FieldSpec.DataType.BOOLEAN)
-              .withDescription("Right operand of the AND operation"),
-          UdfParameter.result(FieldSpec.DataType.BOOLEAN)
-              .withDescription("Result of the AND operation, true if both operands are true, false otherwise")
+            UdfParameter.of("left", FieldSpec.DataType.BOOLEAN)
+                .withDescription("Left operand of the AND operation"),
+            UdfParameter.of("right", FieldSpec.DataType.BOOLEAN)
+                .withDescription("Right operand of the AND operation"),
+            UdfParameter.result(FieldSpec.DataType.BOOLEAN)
+                .withDescription("Result of the AND operation, true if both operands are true, false otherwise")
         ))
         .addExample("true and true", true, true, true)
         .addExample("true and false", true, false, false)

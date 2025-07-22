@@ -32,11 +32,13 @@ import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
+
 @AutoService(Udf.class)
 public class DegreesUdf extends Udf.FromAnnotatedMethod {
 
-  public DegreesUdf() throws NoSuchMethodException {
-    super(TrigonometricFunctions.class, "degrees", double.class);
+  public DegreesUdf()
+      throws NoSuchMethodException {
+    super(TrigonometricFunctions.class.getMethod("degrees", double.class));
   }
 
   @Override

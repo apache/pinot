@@ -274,7 +274,7 @@ public interface UdfExampleBuilder {
     }
   }
 
-  class MultiBuilder {
+  class MultiBuilder implements UdfExampleBuilder {
     private final Map<UdfSignature, Set<UdfExample>> _cases = new HashMap<>();
 
     public MultiBuilder and(UdfExampleBuilder testCaseGenerator) {
@@ -286,6 +286,11 @@ public interface UdfExampleBuilder {
         });
       }
       return this;
+    }
+
+    @Override
+    public Map<UdfSignature, Set<UdfExample>> generateExamples() {
+      return _cases;
     }
   }
 }

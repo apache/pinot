@@ -39,7 +39,7 @@ public class NotUdf extends Udf.FromAnnotatedMethod {
 
   public NotUdf()
       throws NoSuchMethodException {
-    super(LogicalFunctions.class, "not", boolean.class);
+    super(LogicalFunctions.class.getMethod("not", boolean.class));
   }
 
   @Override

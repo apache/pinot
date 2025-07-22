@@ -314,8 +314,26 @@ public class UdfReporter {
         if (value == null) {
           return "NULL";
         } else if (value.getClass().isArray()) {
-          return Arrays.toString((Object[]) value)
-              + " ( array of " + value.getClass().getComponentType().getSimpleName() + ")";
+          String componentTypeName = value.getClass().getComponentType().getSimpleName();
+          String valueDesc;
+          switch (componentTypeName) {
+            case "int":
+              valueDesc = Arrays.toString((int[]) value);
+              break;
+            case "long":
+              valueDesc = Arrays.toString((long[]) value);
+              break;
+            case "float":
+              valueDesc = Arrays.toString((float[]) value);
+              break;
+            case "double":
+              valueDesc = Arrays.toString((double[]) value);
+              break;
+            default:
+              valueDesc = Arrays.toString((Object[]) value);
+              break;
+          }
+          return valueDesc + " ( array of " + componentTypeName + ")";
         } else {
           return value + " (" + value.getClass().getSimpleName() + ")";
         }

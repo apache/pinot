@@ -32,6 +32,7 @@ import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
+
 @AutoService(Udf.class)
 public class OrUdf extends Udf {
   @Override
@@ -48,12 +49,12 @@ public class OrUdf extends Udf {
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-          UdfParameter.of("left", FieldSpec.DataType.BOOLEAN)
-              .withDescription("Left operand of the OR operation"),
-          UdfParameter.of("right", FieldSpec.DataType.BOOLEAN)
-              .withDescription("Right operand of the OR operation"),
-          UdfParameter.result(FieldSpec.DataType.BOOLEAN)
-              .withDescription("Result of the OR operation, true if either operand is true, false otherwise")
+            UdfParameter.of("left", FieldSpec.DataType.BOOLEAN)
+                .withDescription("Left operand of the OR operation"),
+            UdfParameter.of("right", FieldSpec.DataType.BOOLEAN)
+                .withDescription("Right operand of the OR operation"),
+            UdfParameter.result(FieldSpec.DataType.BOOLEAN)
+                .withDescription("Result of the OR operation, true if either operand is true, false otherwise")
         ))
         .addExample("true or true", true, true, true)
         .addExample("true or false", true, false, true)

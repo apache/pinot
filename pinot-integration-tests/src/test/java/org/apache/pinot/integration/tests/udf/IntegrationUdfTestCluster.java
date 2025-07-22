@@ -121,20 +121,27 @@ public class IntegrationUdfTestCluster extends BaseClusterIntegrationTest
 
         Iterator<GenericRow> it = rows.iterator();
         while (it.hasNext()) {
-          sink.consume(it.next());
+          GenericRow row = it.next();
+          try {
+            sink.consume(row);
+          } catch (Exception e) {
+            throw new RuntimeException("Failed to add row " + row + " to table: " + tableName, e);
+          }
           numRows++;
         }
       }
 
       try {
         createAndUploadSegmentFromFile(tableConfig, schema, tempFile, FileFormat.AVRO, numRows, 10_000);
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to add rows to table: " + tableName, e);
       } finally {
         if (tempFile.exists()) {
           tempFile.delete();
         }
       }
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to add rows to table: " + tableName, e);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
     }
   }
 

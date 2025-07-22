@@ -84,7 +84,6 @@ public interface PinotScalarFunction {
         ? Arrays.asList(names)
         : List.of(method.getName());
 
-
     return nameList.stream()
         .map(FunctionRegistry::canonicalize)
         .distinct()

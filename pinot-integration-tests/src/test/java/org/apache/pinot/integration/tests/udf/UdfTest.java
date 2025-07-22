@@ -40,9 +40,12 @@ import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.output.StringBuilderWriter;
 import org.apache.hadoop.util.Sets;
 import org.apache.pinot.common.function.FunctionRegistry;
+import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunctionFactory;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.udf.test.UdfReporter;
@@ -222,25 +225,28 @@ public class UdfTest {
   /// Returns a map whose keys are all the function names (including scalar and transform functions) and values are the
   /// Udf of that function, or null if the function is not UDF registered.
   private TreeMap<String, AllFunctionsValue> generateUdfMapForAllFunctions() {
-    Set<String> scalarFunctions = FunctionRegistry.getFunctionNames();
-    Set<String> transformFunctions = TransformFunctionFactory.getAllFunctionNames();
-    Set<String> allFunctions = new TreeSet<>(Sets.union(scalarFunctions, transformFunctions));
+    Map<String, PinotScalarFunction> scalarFunctions = FunctionRegistry.getFunctions();
+    Map<String, Class<? extends TransformFunction>> transformFunctions = TransformFunctionFactory.getAllFunctions();
 
     TreeMap<String, AllFunctionsValue> udfMap = new TreeMap<>();
     for (Udf udf : _framework.getUdfs()) {
       for (String name : udf.getAllFunctionNames()) {
+        PinotScalarFunction pinotScalarFunction = scalarFunctions.get(name);
         udfMap.put(name, new AllFunctionsValue(
             udf.getClass(),
-            transformFunctions.contains(name),
-            scalarFunctions.contains(name))
+            transformFunctions.get(name),
+            pinotScalarFunction != null ? pinotScalarFunction.toString() : null)
         );
       }
     }
+
+    Set<String> allFunctions = new TreeSet<>(Sets.union(scalarFunctions.keySet(), transformFunctions.keySet()));
     for (String function : allFunctions) {
       if (!udfMap.containsKey(function)) {
+        PinotScalarFunction pinotScalarFunction = scalarFunctions.get(function);
         udfMap.put(function, new AllFunctionsValue(null,
-            transformFunctions.contains(function),
-            scalarFunctions.contains(function)
+            transformFunctions.get(function),
+            pinotScalarFunction != null ? pinotScalarFunction.toString() : null
         ));
       }
     }
@@ -248,15 +254,18 @@ public class UdfTest {
   }
 
   public static class AllFunctionsValue {
+    @Nullable
     private final Class<? extends Udf> _udf;
-    private final boolean _transform;
-    private final boolean _scalar;
+    @Nullable
+    private final Class<? extends TransformFunction> _transform;
+    @Nullable
+    private final String _scalar;
 
     @JsonCreator
     public AllFunctionsValue(
-        @JsonProperty("udf") Class<? extends Udf> udf,
-        @JsonProperty("transform") boolean transform,
-        @JsonProperty("scalar") boolean scalar) {
+        @Nullable @JsonProperty("udf") Class<? extends Udf> udf,
+        @Nullable @JsonProperty("transform") Class<? extends TransformFunction> transform,
+        @Nullable @JsonProperty("scalar") String scalar) {
       _udf = udf;
       _transform = transform;
       _scalar = scalar;
@@ -266,11 +275,13 @@ public class UdfTest {
       return _udf;
     }
 
-    public boolean isTransform() {
+    @Nullable
+    public Class<? extends TransformFunction> getTransform() {
       return _transform;
     }
 
-    public boolean isScalar() {
+    @Nullable
+    public String getScalar() {
       return _scalar;
     }
   }

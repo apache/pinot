@@ -109,11 +109,6 @@ public abstract class Udf {
     private final Method _method;
     private final ScalarFunction _annotation;
 
-    public FromAnnotatedMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes)
-        throws NoSuchMethodException {
-      this(clazz.getMethod(methodName, parameterTypes));
-    }
-
     public FromAnnotatedMethod(Method method) {
       _method = method;
       _annotation = Preconditions.checkNotNull(method.getAnnotation(ScalarFunction.class),

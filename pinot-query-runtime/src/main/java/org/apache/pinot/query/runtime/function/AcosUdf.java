@@ -38,7 +38,7 @@ public class AcosUdf extends Udf.FromAnnotatedMethod {
 
   public AcosUdf()
       throws NoSuchMethodException {
-    super(TrigonometricFunctions.class, "acos", double.class);
+    super(TrigonometricFunctions.class.getMethod("acos", double.class));
   }
 
   @Override

@@ -22,10 +22,12 @@ import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
@@ -186,8 +188,8 @@ public class FunctionRegistry {
         numArguments == VAR_ARG_KEY ? "variable" : numArguments);
   }
 
-  public static Set<String> getFunctionNames() {
-    return FUNCTION_MAP.keySet();
+  public static Map<String, PinotScalarFunction> getFunctions() {
+    return Collections.unmodifiableMap(FUNCTION_MAP);
   }
 
   /**
@@ -330,6 +332,23 @@ public class FunctionRegistry {
     public FunctionInfo getFunctionInfo(int numArguments) {
       FunctionInfo functionInfo = _functionInfoMap.get(numArguments);
       return functionInfo != null ? functionInfo : _functionInfoMap.get(VAR_ARG_KEY);
+    }
+
+    @Override
+    public String toString() {
+      if (_functionInfoMap.size() == 1) {
+        String singleFunInfo = printFunctionInfo(_functionInfoMap.values().iterator().next());
+        return "ArgumentCountBasedScalarFunction{" + singleFunInfo + "}";
+      }
+      String mapDescription = _functionInfoMap.entrySet().stream()
+          .map(pair -> pair.getKey() + ": " + printFunctionInfo(pair.getValue()))
+          .collect(Collectors.joining(", ", "[", "]"));
+      return "ArgumentCountBasedScalarFunction{" + mapDescription + "}";
+    }
+
+    private String printFunctionInfo(FunctionInfo functionInfo) {
+      Method method = functionInfo.getMethod();
+      return method.getDeclaringClass().getTypeName() + '.' + method.getName();
     }
   }
 }

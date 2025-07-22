@@ -36,8 +36,9 @@ import org.apache.pinot.spi.data.FieldSpec;
 @AutoService(Udf.class)
 public class YearUdf extends Udf.FromAnnotatedMethod {
 
-  public YearUdf() throws NoSuchMethodException {
-    super(DateTimeFunctions.class, "year", long.class);
+  public YearUdf()
+      throws NoSuchMethodException {
+    super(DateTimeFunctions.class.getMethod("year", long.class));
   }
 
   @Override
@@ -48,13 +49,13 @@ public class YearUdf extends Udf.FromAnnotatedMethod {
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(
-        UdfSignature.of(
-            UdfParameter.of("millis", FieldSpec.DataType.LONG)
-                .withDescription("A long value representing epoch millis"
-                    + "e.g., 1577836800000L for 2020-01-01T00:00:00Z"),
-            UdfParameter.result(FieldSpec.DataType.INT)
-                .withDescription("Returns the year as an integer")
-        ))
+            UdfSignature.of(
+                UdfParameter.of("millis", FieldSpec.DataType.LONG)
+                    .withDescription("A long value representing epoch millis"
+                        + "e.g., 1577836800000L for 2020-01-01T00:00:00Z"),
+                UdfParameter.result(FieldSpec.DataType.INT)
+                    .withDescription("Returns the year as an integer")
+            ))
         .addExample("2020-01-01T00:00:00Z", 1577836800000L, 2020)
         .addExample("1970-01-01T00:00:00Z", 0L, 1970)
         .addExample(UdfExample.create("null input", null, null).withoutNull(1970))

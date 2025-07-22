@@ -32,6 +32,7 @@ import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfSignature;
 
+
 @AutoService(Udf.class)
 public class MultUdf extends Udf {
   @Override

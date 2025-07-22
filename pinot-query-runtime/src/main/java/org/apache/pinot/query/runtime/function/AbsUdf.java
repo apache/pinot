@@ -30,12 +30,13 @@ import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfSignature;
 
+
 @AutoService(Udf.class)
 public class AbsUdf extends Udf.FromAnnotatedMethod {
 
   public AbsUdf()
       throws NoSuchMethodException {
-    super(ArithmeticFunctions.class, "abs", double.class);
+    super(ArithmeticFunctions.class.getMethod("abs", double.class));
   }
 
   @Override

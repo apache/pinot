@@ -49,10 +49,10 @@ public class ArrayMaxUdf extends Udf {
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-          UdfParameter.of("arr", FieldSpec.DataType.INT)
-              .withDescription("Input array of integers")
-              .asMultiValued(),  // Input is an array of INT
-          UdfParameter.result(FieldSpec.DataType.INT)  // Return type is single value INT
+            UdfParameter.of("arr", FieldSpec.DataType.INT)
+                .withDescription("Input array of integers")
+                .asMultiValued(),  // Input is an array of INT
+            UdfParameter.result(FieldSpec.DataType.INT)  // Return type is single value INT
         ))
         .addExample("array with small values", new Integer[]{1, 2, 3}, 3)
         .build()

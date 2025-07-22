@@ -32,6 +32,7 @@ import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
+
 @AutoService(Udf.class)
 public class IsFalseUdf extends Udf {
   @Override
@@ -47,9 +48,9 @@ public class IsFalseUdf extends Udf {
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-          UdfParameter.of("input", FieldSpec.DataType.INT)
-              .withDescription("Input value to check if it is false (0)"),
-          UdfParameter.result(FieldSpec.DataType.BOOLEAN)
+            UdfParameter.of("input", FieldSpec.DataType.INT)
+                .withDescription("Input value to check if it is false (0)"),
+            UdfParameter.result(FieldSpec.DataType.BOOLEAN)
         ))
         .addExample("input is 0 (false)", 0, true)
         .addExample("input is 1 (true)", 1, false)

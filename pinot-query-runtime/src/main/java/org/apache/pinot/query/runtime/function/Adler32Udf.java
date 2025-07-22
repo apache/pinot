@@ -38,23 +38,24 @@ public class Adler32Udf extends Udf.FromAnnotatedMethod {
 
   public Adler32Udf()
       throws NoSuchMethodException {
-    super(HashFunctions.class, "adler32", byte[].class);
+    super(HashFunctions.class.getMethod("adler32", byte[].class));
   }
 
   @Override
   public String getDescription() {
-    return "Stub for adler32 function. Not implemented.";
+    return "Computes the Adler-32 checksum of a byte array. "
+        + "Adler-32 is a checksum algorithm that is simple and fast, but not cryptographically secure.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(
-        UdfSignature.of(
-            UdfParameter.of("input", FieldSpec.DataType.BYTES)
-                .withDescription("Input byte array to compute the Adler-32 checksum"),
-            UdfParameter.result(FieldSpec.DataType.INT)
-                .withDescription("The Adler-32 checksum of the input byte array")
-        ))
+            UdfSignature.of(
+                UdfParameter.of("input", FieldSpec.DataType.BYTES)
+                    .withDescription("Input byte array to compute the Adler-32 checksum"),
+                UdfParameter.result(FieldSpec.DataType.INT)
+                    .withDescription("The Adler-32 checksum of the input byte array")
+            ))
         .addExample("empty", new byte[0], 1)
         .addExample("single byte", new byte[]{1}, 131074)
         .addExample("multiple bytes", new byte[]{1, 2, 3, 4}, 1572875)
