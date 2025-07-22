@@ -380,7 +380,8 @@ public class Tracing {
     }
 
     public static boolean isInterrupted() {
-      return Thread.interrupted() || Tracing.getThreadAccountant().isQueryTerminated();
+      return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted() ||
+          Tracing.getThreadAccountant().isQueryTerminated();
     }
 
     public static void sampleAndCheckInterruption() {

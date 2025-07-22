@@ -322,12 +322,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     @Override
     public boolean isQueryTerminated() {
-      if (isAnchorThreadInterrupted()) {
-        // If the anchor thread is interrupted, then terminate
-        LOGGER.warn("Anchor thread is interrupted, self-terminating");
-        return true;
-      }
-
       QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
       // Short-circuit when not in critical stage.
       if (!config.isThreadSelfTerminate() || _watcherTask.getHeapUsageBytes() < config.getCriticalLevel()) {
