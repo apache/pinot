@@ -322,22 +322,27 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     @Override
     public boolean isQueryTerminated() {
-      QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
-      // Short-circuit when not in critical stage.
-      if (_watcherTask.getHeapUsageBytes() < config.getCriticalLevel()) {
-        return false;
-      }
       if (isAnchorThreadInterrupted()) {
         // If the anchor thread is interrupted, then terminate
         LOGGER.warn("Anchor thread is interrupted, self-terminating");
         return true;
-      } else if (config.isThreadSelfTerminateOnPanic() && _watcherTask.getHeapUsageBytes() > config.getPanicLevel()) {
+      }
+
+      QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
+      // Short-circuit when not in critical stage.
+      if (!config.isThreadSelfTerminate() || _watcherTask.getHeapUsageBytes() < config.getCriticalLevel()) {
+        return false;
+      }
+
+      if (_watcherTask.getHeapUsageBytes() > config.getPanicLevel()) {
         // If in panic mode, then terminate
         LOGGER.warn("Heap usage {} exceeds panic level {}, self-terminating",
             _watcherTask.getHeapUsageBytes(), config.getPanicLevel());
+        return true;
       } else if (_maxMemoryUsageQueryId != null && _maxMemoryUsageQueryId.equals(QueryThreadContext.getCid())) {
         // If this is the most expensive query, then terminate
         LOGGER.warn("Query {} is the most expensive query, self-terminating", QueryThreadContext.getCid());
+        return false;
       }
       return false;
     }

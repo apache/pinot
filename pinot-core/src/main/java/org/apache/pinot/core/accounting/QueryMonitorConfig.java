@@ -62,7 +62,7 @@ public class QueryMonitorConfig {
 
   private final boolean _isQueryKilledMetricEnabled;
 
-  private final boolean _isThreadSelfTerminateOnPanic;
+  private final boolean _isThreadSelfTerminate;
 
   public QueryMonitorConfig(PinotConfiguration config, long maxHeapSize) {
     _maxHeapSize = maxHeapSize;
@@ -109,8 +109,8 @@ public class QueryMonitorConfig {
     _isQueryKilledMetricEnabled = config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
         CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
 
-    _isThreadSelfTerminateOnPanic = config.getProperty(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE_IN_PANIC_MODE,
-        CommonConstants.Accounting.DEFAULT_THREAD_SELF_TERMINATE_IN_PANIC_MODE);
+    _isThreadSelfTerminate = config.getProperty(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE,
+        CommonConstants.Accounting.DEFAULT_THREAD_SELF_TERMINATE);
   }
 
   QueryMonitorConfig(QueryMonitorConfig oldConfig, Set<String> changedConfigs, Map<String, String> clusterConfigs) {
@@ -251,16 +251,16 @@ public class QueryMonitorConfig {
       _isQueryKilledMetricEnabled = oldConfig._isQueryKilledMetricEnabled;
     }
 
-    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE_IN_PANIC_MODE)) {
+    if (changedConfigs.contains(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE)) {
       if (clusterConfigs == null || !clusterConfigs.containsKey(
-          CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE_IN_PANIC_MODE)) {
-        _isThreadSelfTerminateOnPanic = CommonConstants.Accounting.DEFAULT_THREAD_SELF_TERMINATE_IN_PANIC_MODE;
+          CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE)) {
+        _isThreadSelfTerminate = CommonConstants.Accounting.DEFAULT_THREAD_SELF_TERMINATE;
       } else {
-        _isThreadSelfTerminateOnPanic =
-            Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE_IN_PANIC_MODE));
+        _isThreadSelfTerminate =
+            Boolean.parseBoolean(clusterConfigs.get(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE));
       }
     } else {
-      _isThreadSelfTerminateOnPanic = oldConfig._isThreadSelfTerminateOnPanic;
+      _isThreadSelfTerminate = oldConfig._isThreadSelfTerminate;
     }
   }
 
@@ -312,7 +312,7 @@ public class QueryMonitorConfig {
     return _isQueryKilledMetricEnabled;
   }
 
-  public boolean isThreadSelfTerminateOnPanic() {
-    return _isThreadSelfTerminateOnPanic;
+  public boolean isThreadSelfTerminate() {
+    return _isThreadSelfTerminate;
   }
 }

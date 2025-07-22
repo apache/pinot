@@ -81,7 +81,7 @@ public class QueryMonitorConfigTest {
     CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED),
         Boolean.toString(EXPECTED_IS_QUERY_KILLED_METRIC_ENABLED));
     CLUSTER_CONFIGS.put(
-        getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE_IN_PANIC_MODE),
+        getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE),
         Boolean.toString(EXPECTED_IS_THREAD_SELF_TERMINATE_IN_PANIC_MODE));
   }
 
@@ -254,10 +254,10 @@ public class QueryMonitorConfigTest {
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
             InstanceType.SERVER);
 
-    assertFalse(accountant.getWatcherTask().getQueryMonitorConfig().isThreadSelfTerminateOnPanic());
+    assertFalse(accountant.getWatcherTask().getQueryMonitorConfig().isThreadSelfTerminate());
     accountant.getWatcherTask().onChange(
-        Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE_IN_PANIC_MODE)),
+        Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE)),
         CLUSTER_CONFIGS);
-    assertTrue(accountant.getWatcherTask().getQueryMonitorConfig().isThreadSelfTerminateOnPanic());
+    assertTrue(accountant.getWatcherTask().getQueryMonitorConfig().isThreadSelfTerminate());
   }
 }
