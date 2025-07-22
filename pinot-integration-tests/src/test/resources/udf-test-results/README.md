@@ -30,5 +30,6 @@ There are two main types of files in this directory:
   The content of these files is the YAML serialization of the `UdfTestResult.BySignature.Dto` class.
 3. `<function-name>.md`: These files contain the results of running the UDF tests for each function in Markdown format.
   The content of these files is generated from the `UdfTestResult.BySignature` class and they are intended to be 
-  directly used as documentation, copying these files to the `pinot-docs` repository. This is not yet tested.
+  directly used as documentation, copying these files to the `pinot-docs` repository. 
+  This is not yet tested and the generated .md files will be _gitignored_ by default.
 

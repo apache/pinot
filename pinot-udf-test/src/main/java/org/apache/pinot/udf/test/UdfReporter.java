@@ -106,19 +106,19 @@ public class UdfReporter {
 
             // Signature column
             report.append("| ")
-                .append(signature.toString()).append(" |");
+                .append(signature.toString()).append(" | ");
 
             // Call column
             report.append(asSqlCallWithLiteralArgs(udf, udf.getMainFunctionName(), example.getInputValues()))
-                .append(" |");
+                .append(" | ");
 
             // Expected result
             Object expected = testResult.getExpectedResult();
             Object actual = testResult.getActualResult();
 
             Function<Object, String> valueFormatter = getResultFormatter(expected, actual);
-            report.append(valueFormatter.apply(expected)).append(" |")
-                .append(valueFormatter.apply(actual)).append(" |");
+            report.append(valueFormatter.apply(expected)).append(" | ")
+                .append(valueFormatter.apply(actual)).append(" | ");
 
             // Comparison or Error
             String error = partial.getErrorsByExample().get(example);
