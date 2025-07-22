@@ -78,7 +78,7 @@
                 <artifactItem>
                   <groupId>commons-io</groupId>
                   <artifactId>commons-io</artifactId>
-                  <version>2.11.0</version> <!-- @dependabot ignore -->
+                  <version>2.20.0</version> <!-- @dependabot ignore -->
                   <outputDirectory>${project.build.testOutputDirectory}/plugins/assemblybased-pinot-plugin</outputDirectory>
                 </artifactItem>
                 <artifactItem>
