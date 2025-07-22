@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -230,29 +229,29 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         SimpleIndexedTable table =
             GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService, initialSize);
 
-        Map<Integer, CompletableFuture<RadixPartitionedIntermediateRecords>> pendingFutures =
-            new HashMap<>(_numOperators);
+        CompletableFuture[] buf = new CompletableFuture[_numOperators];
         for (int segmentId = 0; segmentId < _numOperators; segmentId++) {
-          pendingFutures.put(segmentId, _partitionedRecordsFutures[segmentId]);
+          buf[segmentId] = _partitionedRecordsFutures[segmentId];
         }
 
-        // We only handle sort and not sort by group key case, since unsorted case will be converted to safeTrim
-        // merge partitions in arbitrary order as they are ready
-        // TODO: compare anyOf() to sequential approach
-        while (!pendingFutures.isEmpty()) {
-          CompletableFuture fut =
-              CompletableFuture.anyOf(pendingFutures.values().toArray(CompletableFuture[]::new));
+        int completed = 0;
+        while (completed < _numOperators) {
+          CompletableFuture fut = CompletableFuture.anyOf(buf);
           RadixPartitionedIntermediateRecords partition = (RadixPartitionedIntermediateRecords) fut.get();
           for (IntermediateRecord record : partition.getPartition(partitionId)) {
             // TODO: upsert like SimpleIndexedTable, sort + trim to trimSize when reaching trimThreshold if trimEnabled
             table.upsert(record._key, record._record);
           }
           int processedSegmentId = partition.getSegmentId();
-          pendingFutures.remove(processedSegmentId);
+          buf[processedSegmentId] = buf[processedSegmentId].newIncompleteFuture();
+          completed++;
         }
 
         // sort and trim per-segment result if needed
         table.finish(false);
+        if (table.isTrimmed() && _queryContext.isUnsafeTrim()) {
+          _groupsTrimmed = true;
+        }
 
         _mergedIndexedTables[partitionId] = table;
       } catch (Exception e) {
