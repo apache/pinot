@@ -381,6 +381,7 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration config = getConfig(20, 2, configs);
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
+    Tracing.unregisterThreadAccountant();
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
@@ -404,7 +405,7 @@ public class ResourceManagerAccountingTest {
         }
       });
     }
-    latch.await();
+    latch.await(1, java.util.concurrent.TimeUnit.MINUTES);
     // assert that EarlyTerminationException was thrown in at least one runner thread
     Assert.assertTrue(earlyTerminationOccurred.get());
   }
@@ -452,6 +453,7 @@ public class ResourceManagerAccountingTest {
 
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
+    Tracing.unregisterThreadAccountant();
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
@@ -475,7 +477,7 @@ public class ResourceManagerAccountingTest {
         }
       });
     }
-    latch.await();
+    latch.await(1, java.util.concurrent.TimeUnit.MINUTES);
     // assert that EarlyTerminationException was thrown in at least one runner thread
     Assert.assertTrue(earlyTerminationOccurred.get());
   }
@@ -509,6 +511,7 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration config = getConfig(2, 2, configs);
     ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
     // init accountant and start watcher task
+    Tracing.unregisterThreadAccountant();
     Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM",
         InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
@@ -575,7 +578,7 @@ public class ResourceManagerAccountingTest {
         }
       });
 
-      latch.await();
+      latch.await(1, java.util.concurrent.TimeUnit.MINUTES);
       Assert.assertTrue(mutableEarlyTerminationOccurred.get(),
           "Expected early termination reading the mutable index");
       Assert.assertTrue(immutableEarlyTerminationOccurred.get(),
