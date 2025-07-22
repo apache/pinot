@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.AtomicDouble;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.RateLimiter;
@@ -32,7 +33,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -92,11 +92,11 @@ public class RealtimeConsumptionRateManager {
     double serverRateLimit =
         serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
             CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
-    createServerRateLimiter(serverRateLimit, serverMetrics);
+    createOrUpdateServerRateLimiter(serverRateLimit, serverMetrics);
     return _serverRateLimiter;
   }
 
-  private void createServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
+  private void createOrUpdateServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
     LOGGER.info("Setting up ServerRateLimiter with rate limit: {}", serverRateLimit);
     ConsumptionRateLimiter currentRateLimiter = _serverRateLimiter;
     if (serverRateLimit > 0) {
@@ -120,7 +120,7 @@ public class RealtimeConsumptionRateManager {
 
   public void updateServerRateLimiter(double newRateLimit, ServerMetrics serverMetrics) {
     LOGGER.info("Updating serverRateLimiter from: {} to: {}", _serverRateLimiter, newRateLimit);
-    createServerRateLimiter(newRateLimit, serverMetrics);
+    createOrUpdateServerRateLimiter(newRateLimit, serverMetrics);
   }
 
   public ConsumptionRateLimiter getServerRateLimiter() {
@@ -295,6 +295,7 @@ public class RealtimeConsumptionRateManager {
    *
    * <p>This class is thread-safe
    */
+  @VisibleForTesting
   static class ServerRateLimiter implements ConsumptionRateLimiter {
     private final RateLimiter _rateLimiter;
     private final AsyncMetricEmitter _metricEmitter;
@@ -380,14 +381,14 @@ public class RealtimeConsumptionRateManager {
    */
   static class AsyncMetricEmitter {
     private static final int METRIC_EMIT_FREQUENCY_SEC = 60;
-    private final AtomicReference<Double> _rateLimit;
+    private final AtomicDouble _rateLimit;
     private final LongAdder _messageCount = new LongAdder();
     private final ScheduledExecutorService _executor;
     private final AtomicBoolean _running = new AtomicBoolean(false);
     private final QuotaUtilizationTracker _tracker;
 
     public AsyncMetricEmitter(ServerMetrics serverMetrics, String metricKeyName, double initialRateLimit) {
-      _rateLimit = new AtomicReference<>(initialRateLimit);
+      _rateLimit = new AtomicDouble(initialRateLimit);
       _tracker = new QuotaUtilizationTracker(serverMetrics, metricKeyName);
       _executor = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "server-rate-limit-metric-emitter");
@@ -418,10 +419,14 @@ public class RealtimeConsumptionRateManager {
     }
 
     private void emit() {
-      double rateLimit = _rateLimit.get();
-      Instant now = Instant.now();
-      int count = (int) _messageCount.sumThenReset();
-      _tracker.update(count, rateLimit, now);
+      try {
+        double rateLimit = _rateLimit.get();
+        Instant now = Instant.now();
+        int count = (int) _messageCount.sumThenReset();
+        _tracker.update(count, rateLimit, now);
+      } catch (Exception e) {
+        LOGGER.warn("Encountered an error while emitting the rate limit metrics.", e);
+      }
     }
 
     @VisibleForTesting
