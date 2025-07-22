@@ -74,6 +74,7 @@ import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestUtils;
 import org.apache.pinot.query.runtime.timeseries.PhysicalTimeSeriesServerPlanVisitor;
 import org.apache.pinot.query.runtime.timeseries.TimeSeriesExecutionContext;
 import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
+import org.apache.pinot.spi.accounting.MseCancelCallback;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -141,6 +142,10 @@ public class QueryRunner {
   @Nullable
   private PhysicalTimeSeriesServerPlanVisitor _timeSeriesPhysicalPlanVisitor;
   private BooleanSupplier _sendStats;
+  private ThreadResourceUsageAccountant _resourceUsageAccountant;
+  private final MseCancelCallback _mseCancelCallback = (requestId -> {
+    _opChainScheduler.cancel(requestId);
+  });
 
   /**
    * Initializes the query executor.
@@ -247,6 +252,7 @@ public class QueryRunner {
 
     _sendStats = sendStats;
 
+    _resourceUsageAccountant = resourceUsageAccountant;
     LOGGER.info("Initialized QueryRunner with hostname: {}, port: {}", hostname, port);
   }
 
@@ -267,6 +273,9 @@ public class QueryRunner {
   /// If any error happened during the asynchronous execution, an error block will be sent to all receiver mailboxes.
   public CompletableFuture<Void> processQuery(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> requestMetadata, @Nullable ThreadExecutionContext parentContext) {
+    String requestIdStr = Long.toString(QueryThreadContext.getRequestId());
+    _resourceUsageAccountant.registerMseCancelCallback(requestIdStr, _mseCancelCallback);
+
     Runnable runnable = () -> processQueryBlocking(workerMetadata, stagePlan, requestMetadata, parentContext);
     return CompletableFuture.runAsync(runnable, _executorService);
   }

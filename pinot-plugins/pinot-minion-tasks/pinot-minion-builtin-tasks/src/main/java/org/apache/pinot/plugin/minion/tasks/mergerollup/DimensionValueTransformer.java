@@ -36,39 +36,33 @@ import org.slf4j.LoggerFactory;
 public class DimensionValueTransformer implements RecordTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DimensionValueTransformer.class);
 
-  private final Map<String, Object> _defaultNullValues = new HashMap<>();
-  private final Set<String> _dimensionsToErase;
+  private final Map<String, Object> _dimensionValues = new HashMap<>();
 
   public DimensionValueTransformer(Schema schema, Set<String> dimensionsToErase) {
-    _dimensionsToErase = dimensionsToErase;
-    for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      String fieldName = fieldSpec.getName();
-      Object defaultNullValue = fieldSpec.getDefaultNullValue();
-      if (fieldSpec.isSingleValueField()) {
-        _defaultNullValues.put(fieldName, defaultNullValue);
+    for (String dimension : dimensionsToErase) {
+      FieldSpec fieldSpec = schema.getFieldSpecFor(dimension);
+      if (fieldSpec == null) {
+        LOGGER.warn("Dimension name: {} does not exist in schema and will be ignored.", dimension);
       } else {
-        _defaultNullValues.put(fieldName, new Object[]{defaultNullValue});
-      }
-    }
-
-    for (String key : dimensionsToErase) {
-      if (!_defaultNullValues.containsKey(key)) {
-        LOGGER.warn("Dimension name: {} does not exist in schema and will be ignored.", key);
+        Object defaultNullValue = fieldSpec.getDefaultNullValue();
+        if (fieldSpec.isSingleValueField()) {
+          _dimensionValues.put(dimension, defaultNullValue);
+        } else {
+          _dimensionValues.put(dimension, new Object[]{defaultNullValue});
+        }
       }
     }
   }
 
   @Override
   public boolean isNoOp() {
-    return _dimensionsToErase.isEmpty();
+    return _dimensionValues.isEmpty();
   }
 
   @Override
-  public GenericRow transform(GenericRow record) {
-    for (String dimensionName : _dimensionsToErase) {
-      Object defaultNullValue = _defaultNullValues.get(dimensionName);
-      record.putDefaultNullValue(dimensionName, defaultNullValue);
+  public void transform(GenericRow record) {
+    for (Map.Entry<String, Object> entry : _dimensionValues.entrySet()) {
+      record.putDefaultNullValue(entry.getKey(), entry.getValue());
     }
-    return record;
   }
 }

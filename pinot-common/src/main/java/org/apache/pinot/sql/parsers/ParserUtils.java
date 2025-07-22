@@ -77,15 +77,25 @@ public class ParserUtils {
   }
 
   private static void validateJsonExtractKeyFunction(List<Expression> operands) {
-    // Check that there are exactly 2 arguments
-    if (operands.size() != 2) {
+    // Check that there are 2 or 3 arguments
+    if (operands.size() < 2 || operands.size() > 3) {
       throw new SqlCompilationException(
-          "Expect 2 arguments are required for transform function: jsonExtractKey(jsonFieldName, 'jsonPath')");
+          "2 or 3 arguments are required for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [optionalParameters])");
     }
     if (!operands.get(1).isSetLiteral()) {
       throw new SqlCompilationException(
-          "Expect the 2nd argument for transform function: jsonExtractKey(jsonFieldName, 'jsonPath') to be a "
-              + "single-quoted literal value.");
+          "Expect the 2nd argument for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [optionalParameters]) "
+              + "to be a single-quoted literal value.");
     }
+    // Note: 3rd argument (optionalParameters) should be a string literal
+    if (operands.size() > 2 && !operands.get(2).isSetLiteral()) {
+      throw new SqlCompilationException(
+          "Expect the 3rd argument for transform function: "
+              + "jsonExtractKey(jsonFieldName, 'jsonPath', [optionalParameters]) "
+              + "to be a single-quoted literal value.");
+    }
+    // Runtime validation will ensure correct types
   }
 }

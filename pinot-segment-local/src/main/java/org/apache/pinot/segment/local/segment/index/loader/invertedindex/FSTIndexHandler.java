@@ -173,6 +173,8 @@ public class FSTIndexHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     FstIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.fst());
 
