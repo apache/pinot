@@ -80,6 +80,8 @@
     "codemirror": "5.65.5",
     "cross-fetch": "3.1.5",
     "dagre": "^0.8.5",
+    "echarts": "^5.4.3",
+    "echarts-for-react": "^3.0.2",
     "export-from-json": "1.6.0",
     "file": "0.2.2",
     "json-bigint": "1.0.0",
