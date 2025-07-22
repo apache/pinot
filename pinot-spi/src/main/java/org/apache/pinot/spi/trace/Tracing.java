@@ -155,6 +155,9 @@ public class Tracing {
    * createThreadAccountant will register the new thread accountant.
    */
   public static void unregisterThreadAccountant() {
+    if (Holder._accountant != null) {
+      Holder._accountant.stopWatcherTask();
+    }
     Holder._accountant = null;
     ACCOUNTANT_REGISTRATION.set(null);
   }

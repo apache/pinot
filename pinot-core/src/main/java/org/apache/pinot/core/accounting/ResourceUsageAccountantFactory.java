@@ -54,7 +54,7 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     private static final String ACCOUNTANT_TASK_NAME = "ResourceUsageAccountant";
     private static final int ACCOUNTANT_PRIORITY = 4;
 
-    private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(1, r -> {
+    private final ExecutorService _executorService = Executors.newFixedThreadPool(1, r -> {
       Thread thread = new Thread(r);
       thread.setPriority(ACCOUNTANT_PRIORITY);
       thread.setDaemon(true);
@@ -286,7 +286,12 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
 
     @Override
     public void startWatcherTask() {
-      EXECUTOR_SERVICE.submit(_watcherTask);
+      _executorService.submit(_watcherTask);
+    }
+
+    @Override
+    public void stopWatcherTask() {
+      _executorService.shutdownNow();
     }
 
     @Override
@@ -315,7 +320,7 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       @Override
       public void run() {
         LOGGER.debug("Running timed task for {}", this.getClass().getName());
-        while (true) {
+        while (!Thread.currentThread().isInterrupted()) {
           try {
             // Preaggregation.
             runPreAggregation();
