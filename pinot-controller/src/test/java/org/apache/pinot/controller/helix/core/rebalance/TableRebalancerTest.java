@@ -51,8 +51,20 @@ public class TableRebalancerTest {
     return name == null ? -1 : name.getPartitionGroupId();
   };
 
-  private static final TableRebalancer.DataLossRiskAssessor DEFAULT_DATA_LOSS_RISK_ASSESSOR = segmentName -> false;
-  private static final TableRebalancer.DataLossRiskAssessor ALWAYS_TRUE_DATA_LOSS_RISK_ASSESSOR = segmentName -> true;
+  private static final TableRebalancer.DataLossRiskAssessor DEFAULT_DATA_LOSS_RISK_ASSESSOR =
+      new TableRebalancer.NoOpRiskAssessor();
+  private static final TableRebalancer.DataLossRiskAssessor ALWAYS_TRUE_DATA_LOSS_RISK_ASSESSOR =
+      new TableRebalancer.DataLossRiskAssessor() {
+        @Override
+        public boolean hasDataLossRisk(String segmentName) {
+          return true;
+        }
+
+        @Override
+        public String generateDataLossRiskMessage(String segmentName) {
+          return "test data loss risk message";
+        }
+      };
 
   @Test
   public void testDowntimeMode() {
@@ -2696,8 +2708,7 @@ public class TableRebalancerTest {
     assertEquals((int) numSegmentsToOffloadMap.get("host5"), -2);
     assertEquals((int) numSegmentsToOffloadMap.get("host6"), -2);
 
-    // Next assignment with 2 minimum available replicas with or without strict replica-group should reach the target
-    // assignment after two steps. Batch size = 1, unique partitionIds
+    // The DataLossRiskAssessor returns true, so we expect an exception to be thrown
     for (boolean enableStrictReplicaGroup : Arrays.asList(false, true)) {
       Object2IntOpenHashMap<String> segmentToPartitionIdMap = new Object2IntOpenHashMap<>();
       assertThrows(IllegalStateException.class, () -> TableRebalancer.getNextAssignment(currentAssignment,
