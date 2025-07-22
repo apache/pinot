@@ -252,7 +252,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         }
 
         // sort and trim per-segment result if needed
-        table.finish(true, false);
+        table.finish(false);
 
         _mergedIndexedTables[partitionId] = table;
       } catch (Exception e) {
