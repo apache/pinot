@@ -317,7 +317,7 @@ public class RealtimeConsumptionRateManager {
 
     public void updateRateLimit(double newRateLimit) {
       _rateLimiter.setRate(newRateLimit);
-      _metricEmitter.setRateLimit(newRateLimit);
+      _metricEmitter.updateRateLimit(newRateLimit);
     }
 
     public void close() {
@@ -410,7 +410,7 @@ public class RealtimeConsumptionRateManager {
       }
     }
 
-    public void setRateLimit(double newRateLimit) {
+    public void updateRateLimit(double newRateLimit) {
       _rateLimit.set(newRateLimit);
     }
 
@@ -425,7 +425,7 @@ public class RealtimeConsumptionRateManager {
         int count = (int) _messageCount.sumThenReset();
         _tracker.update(count, rateLimit, now);
       } catch (Exception e) {
-        LOGGER.warn("Encountered an error while emitting the rate limit metrics.", e);
+        LOGGER.warn("Encountered an error while emitting the metrics.", e);
       }
     }
 
