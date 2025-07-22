@@ -430,10 +430,7 @@ public class TableRebalancer {
           if (!assignment.equals(targetAssignment.get(segmentName))
               && dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
             // Fail the rebalance if a segment with the potential for data loss is found
-            String errorMsg = "Moving segment " + segmentName + " as part of rebalance is risky for peer-download "
-                + "enabled tables, ensure the deep store has a copy of the segment and if upsert / dedup enabled "
-                + "that it is completed and try again. It is recommended to forceCommit and pause ingestion prior to "
-                + "rebalancing";
+            String errorMsg = dataLossRiskAssessor.generateDataLossRiskMessage(segmentName);
             onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
             return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
                 tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
@@ -1203,7 +1200,7 @@ public class TableRebalancer {
             getInstancePartitions(tableConfig, InstancePartitionsType.COMPLETED, reassignInstances, bootstrap, dryRun,
                 minimizeDataMovement, tableRebalanceLogger);
         tableRebalanceLogger.info("COMPLETED segments should be relocated, fetching/computing COMPLETED instance "
-                + "partitions for table: {}", tableNameWithType);
+            + "partitions for table: {}", tableNameWithType);
         instancePartitionsMap.put(InstancePartitionsType.COMPLETED, partitionAndUnchangedForCompleted.getLeft());
         instancePartitionsUnchanged &= partitionAndUnchangedForCompleted.getRight();
       } else {
@@ -1289,7 +1286,7 @@ public class TableRebalancer {
         return Pair.of(instancePartitions, instancePartitionsUnchanged);
       } else {
         tableRebalanceLogger.info("{} instance assignment is not allowed, using default instance partitions for "
-                + "table: {}", instancePartitionsType, tableNameWithType);
+            + "table: {}", instancePartitionsType, tableNameWithType);
         InstancePartitions instancePartitions =
             InstancePartitionsUtils.computeDefaultInstancePartitions(_helixManager, tableConfig,
                 instancePartitionsType);
@@ -1443,7 +1440,7 @@ public class TableRebalancer {
           allSegmentsFromIdealState = idealState.getRecord().getMapFields().keySet();
           if (_tableRebalanceObserver.isStopped()) {
             throw new RuntimeException(String.format("Rebalance has already stopped with status: %s",
-                    _tableRebalanceObserver.getStopStatus()));
+                _tableRebalanceObserver.getStopStatus()));
           }
           if (isExternalViewConverged(externalView.getRecord().getMapFields(), idealState.getRecord().getMapFields(),
               lowDiskMode, bestEfforts, segmentsToMonitor, tableRebalanceLogger)) {
@@ -1794,8 +1791,7 @@ public class TableRebalancer {
           // Since next assignment doesn't match current assignment, it means the segment will be moved. Check if there
           // is a data loss risk
           if (dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
-            throw new IllegalStateException(String.format("Found data loss risk for segment: %s while rebalancing",
-                segmentName));
+            throw new IllegalStateException(dataLossRiskAssessor.generateDataLossRiskMessage(segmentName));
           }
         }
       }
@@ -1883,9 +1879,10 @@ public class TableRebalancer {
   }
 
   @VisibleForTesting
-  @FunctionalInterface
   interface DataLossRiskAssessor {
     boolean hasDataLossRisk(String segmentName);
+
+    String generateDataLossRiskMessage(String segmentName);
   }
 
   /**
@@ -1900,6 +1897,11 @@ public class TableRebalancer {
     @Override
     public boolean hasDataLossRisk(String segmentName) {
       return false;
+    }
+
+    @Override
+    public String generateDataLossRiskMessage(String segmentName) {
+      throw new UnsupportedOperationException("No data loss risk message should be generated for NoOpRiskAssessor");
     }
   }
 
@@ -1955,6 +1957,14 @@ public class TableRebalancer {
       return _isPauselessEnabled && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
           && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig);
     }
+
+    @Override
+    public String generateDataLossRiskMessage(String segmentName) {
+      return "Moving segment " + segmentName + " as part of rebalance is risky for peer-download "
+          + "enabled tables, ensure the deep store has a copy of the segment and if upsert / dedup enabled "
+          + "that it is completed and try again. It is recommended to forceCommit and pause ingestion prior to "
+          + "rebalancing";
+    }
   }
 
   private static Map<String, Map<String, String>> getNextNonStrictReplicaGroupAssignment(
@@ -1997,8 +2007,7 @@ public class TableRebalancer {
           // Since next assignment doesn't match current assignment, it means the segment will be moved. Check if there
           // is a data loss risk
           if (dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
-            throw new IllegalStateException(String.format("Found data loss risk for segment: %s while rebalancing",
-                segmentName));
+            throw new IllegalStateException(dataLossRiskAssessor.generateDataLossRiskMessage(segmentName));
           }
         }
       }
