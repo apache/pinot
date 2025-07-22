@@ -361,7 +361,6 @@ public class Tracing {
           accountant = threadAccountantFactory.init(config, instanceId, instanceType);
           boolean registered = register(accountant);
           if (!registered) {
-            accountant = null;
             LOGGER.warn("ThreadAccountant register unsuccessful, as it is already registered.");
           }
         } catch (Exception exception) {
