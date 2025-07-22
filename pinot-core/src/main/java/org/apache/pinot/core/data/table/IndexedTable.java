@@ -270,6 +270,10 @@ public abstract class IndexedTable extends BaseTable {
     return _lookupMap;
   }
 
+  public Collection<Record> getTopRecords() {
+    return _topRecords;
+  }
+
   public int getNumResizes() {
     return _numResizes;
   }

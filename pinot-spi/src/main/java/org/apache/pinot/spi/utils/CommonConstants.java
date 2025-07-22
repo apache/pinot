@@ -1104,7 +1104,7 @@ public class CommonConstants {
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
     // threshold for number of rows per segment result for doing partitioned group-by
-    public static final int DEFAULT_GROUPBY_RADIX_BITS = 3;
+    public static final int DEFAULT_GROUPBY_RADIX_BITS = 4;
     // number of partitions when doing partitioned group-by
     public static final int DEFAULT_GROUPBY_PARTITION_THRESHOLD = 10_000;
 
