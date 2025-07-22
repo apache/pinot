@@ -67,9 +67,11 @@ public class RadixPartitionedIntermediateRecords {
     }
   }
 
-  // TODO: make hashCode faster, and cache it
   public int partition(IntermediateRecord record) {
-    return record._key.hashCode() & _mask;
+    if (record._keyHashCode == -1) {
+      record._keyHashCode = record._key.hashCode();
+    }
+    return record._keyHashCode & _mask;
   }
 
   public List<IntermediateRecord> getPartition(int partition) {

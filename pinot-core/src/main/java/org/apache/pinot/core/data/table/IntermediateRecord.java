@@ -28,6 +28,7 @@ public class IntermediateRecord {
   public final Key _key;
   public final Record _record;
   public final Comparable[] _values;
+  public int _keyHashCode = -1;
 
   public IntermediateRecord(Key key, Record record, Comparable[] values) {
     _key = key;
