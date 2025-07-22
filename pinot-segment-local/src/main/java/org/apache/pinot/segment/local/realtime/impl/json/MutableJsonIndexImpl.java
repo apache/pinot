@@ -82,6 +82,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   private int _nextDocId;
   private int _nextFlattenedDocId;
   private long _bytesSize;
+  private long _invalidJsonRows;
   private ServerMetrics _serverMetrics;
 
   public MutableJsonIndexImpl(JsonIndexConfig jsonIndexConfig, String segmentName, String columnName) {
@@ -106,6 +107,9 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       throws IOException {
     try {
       List<Map<String, String>> flattenedRecords = JsonUtils.flatten(jsonString, _jsonIndexConfig);
+      if (flattenedRecords.equals(JsonUtils.SKIPPED_FLATTENED_RECORD)) {
+        _invalidJsonRows++;
+      }
       _writeLock.lock();
       try {
         addFlattenedRecords(flattenedRecords);
@@ -757,6 +761,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       String tableName = SegmentUtils.getTableNameFromSegmentName(_segmentName);
       _serverMetrics.addMeteredTableValue(tableName, _columnName, ServerMeter.MUTABLE_JSON_INDEX_MEMORY_USAGE,
           _bytesSize);
+      _serverMetrics.addMeteredTableValue(tableName, _columnName, ServerMeter.INVALID_JSON_ROWS, _invalidJsonRows);
     } catch (Exception e) {
       LOGGER.warn(
           "Caught exception while updating mutable json index memory usage for segment: {}, column: {}, value: {}",
