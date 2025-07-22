@@ -513,7 +513,7 @@ decodeurl:
 degrees:
   scalar: true
   transform: true
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.DegreesUdf"
 div:
   scalar: true
   transform: true
