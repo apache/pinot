@@ -101,8 +101,8 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg, "testCPUtimeProvider",
-        InstanceType.SERVER);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg,
+        "testCPUtimeProvider", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     ResourceManager rm = getResourceManager(20, 40, 1, 1, configs, accountant);
@@ -167,8 +167,8 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg, "testCPUtimeProvider",
-        InstanceType.SERVER);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg,
+        "testCPUtimeProvider", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     ResourceManager rm = getResourceManager(20, 40, 1, 1, configs, accountant);
@@ -244,8 +244,8 @@ public class ResourceManagerAccountingTest {
 
     String workloadName = CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg, "testWorkloadMemoryAccounting",
-        InstanceType.SERVER);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg,
+        "testWorkloadMemoryAccounting", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
     WorkloadBudgetManager workloadBudgetManager =
         Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
@@ -304,7 +304,8 @@ public class ResourceManagerAccountingTest {
   @Test
   public void testWorkerThreadInterruption()
       throws Exception {
-    ResourceManager rm = getResourceManager(2, 5, 1, 3, Collections.emptyMap(), new Tracing.DefaultThreadResourceUsageAccountant());
+    ResourceManager rm = getResourceManager(2, 5, 1, 3, Collections.emptyMap(),
+        new Tracing.DefaultThreadResourceUsageAccountant());
     AtomicReference<Future>[] futures = new AtomicReference[5];
     for (int i = 0; i < 5; i++) {
       futures[i] = new AtomicReference<>();
@@ -384,7 +385,8 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration config = getConfig(20, 2, configs);
     // init accountant and start watcher task
     Tracing.unregisterThreadAccountant();
-    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config, "testSelect", InstanceType.SERVER);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config,
+        "testSelect", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs, accountant);
 
@@ -456,7 +458,8 @@ public class ResourceManagerAccountingTest {
 
     // init accountant and start watcher task
     Tracing.unregisterThreadAccountant();
-    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config, "testGroupBy", InstanceType.SERVER);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config,
+        "testGroupBy", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     ResourceManager rm = getResourceManager(20, 2, 1, 1, configs, accountant);
@@ -515,8 +518,8 @@ public class ResourceManagerAccountingTest {
     PinotConfiguration config = getConfig(2, 2, configs);
     // init accountant and start watcher task
     Tracing.unregisterThreadAccountant();
-    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config, "testJsonIndexExtractMapOOM",
-        InstanceType.SERVER);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config,
+        "testJsonIndexExtractMapOOM", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     ResourceManager rm = getResourceManager(2, 2, 1, 1, configs, accountant);
