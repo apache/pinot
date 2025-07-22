@@ -47,8 +47,7 @@ public class IntermediateUdfTestScenario extends AbstractUdfTestScenario {
 
   @Override
   public String getDescription() {
-    // TODO: add a detailed description
-    return getTitle();
+    return "This scenario tests the UDF as an intermediate stage of the MSE. ";
   }
 
   @Override

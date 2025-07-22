@@ -45,8 +45,7 @@ public class ExpressionTransformerTestScenario implements UdfTestScenario {
 
   @Override
   public String getDescription() {
-    // TODO: add a detailed description
-    return getTitle();
+    return "This scenario tests the UDF as an ingestion time transformer.";
   }
 
   @Override

@@ -42,8 +42,7 @@ public class TransformationUdfTestScenario extends AbstractUdfTestScenario {
 
   @Override
   public String getDescription() {
-    // TODO: add a detailed description
-    return getTitle();
+    return "This scenario tests the UDF as a projection in the SSE.";
   }
 
   @Override

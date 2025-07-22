@@ -45,8 +45,7 @@ public class PredicateUdfTestScenario extends AbstractUdfTestScenario {
 
   @Override
   public String getDescription() {
-    // TODO: add a detailed description
-    return getTitle();
+    return "This scenario tests the UDF as a predicate in the SSE.";
   }
 
   @Override
