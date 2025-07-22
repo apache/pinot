@@ -35,8 +35,7 @@ public class StreamDataDecoderImplTest {
   private static final String SEQNO_RECORD_METADATA = "seqNo";
 
   @Test
-  public void testDecodeValueOnly()
-      throws Exception {
+  public void testDecodeValueOnly() {
     TestDecoder messageDecoder = new TestDecoder();
     messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "");
     String value = "Alice";
@@ -52,8 +51,7 @@ public class StreamDataDecoderImplTest {
   }
 
   @Test
-  public void testDecodeKeyAndHeaders()
-      throws Exception {
+  public void testDecodeKeyAndHeaders() {
     TestDecoder messageDecoder = new TestDecoder();
     messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "");
     String value = "Alice";
@@ -80,8 +78,7 @@ public class StreamDataDecoderImplTest {
   }
 
   @Test
-  public void testNoExceptionIsThrown()
-      throws Exception {
+  public void testNoExceptionIsThrown() {
     ThrowingDecoder messageDecoder = new ThrowingDecoder();
     messageDecoder.init(Collections.emptyMap(), ImmutableSet.of(NAME_FIELD), "");
     String value = "Alice";
@@ -92,11 +89,10 @@ public class StreamDataDecoderImplTest {
     Assert.assertNull(result.getResult());
   }
 
-  class ThrowingDecoder implements StreamMessageDecoder<byte[]> {
+  private static class ThrowingDecoder implements StreamMessageDecoder<byte[]> {
 
     @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-        throws Exception {
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
     }
 
     @Nullable
@@ -108,24 +104,21 @@ public class StreamDataDecoderImplTest {
     @Nullable
     @Override
     public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-      return decode(payload, destination);
+      throw new RuntimeException("something failed during decoding");
     }
   }
 
-  class TestDecoder implements StreamMessageDecoder<byte[]> {
+  private static class TestDecoder implements StreamMessageDecoder<byte[]> {
     @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
-        throws Exception {
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
     }
 
-    @Nullable
     @Override
     public GenericRow decode(byte[] payload, GenericRow destination) {
       destination.putValue(NAME_FIELD, new String(payload, StandardCharsets.UTF_8));
       return destination;
     }
 
-    @Nullable
     @Override
     public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
       return decode(payload, destination);

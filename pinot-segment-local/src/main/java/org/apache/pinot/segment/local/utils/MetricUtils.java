@@ -16,35 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.segment.spi.index.creator;
+package org.apache.pinot.segment.local.utils;
 
-import java.io.IOException;
-import javax.annotation.Nullable;
-import org.apache.pinot.segment.spi.index.IndexCreator;
+import java.util.Locale;
+import org.apache.pinot.common.metrics.ServerMeter;
+import org.apache.pinot.common.metrics.ServerMetrics;
 
 
-public interface FSTIndexCreator extends IndexCreator {
+/**
+ * Utils for metrics
+ */
+public class MetricUtils {
 
-  @Override
-  default void add(Object value, int dictId)
-      throws IOException {
-    // FST indexes should do nothing when called for each row
+
+  private MetricUtils() {
   }
 
-  @Override
-  default void add(Object[] values, @Nullable int[] dictIds)
-      throws IOException {
-    // FST indexes should do nothing when called for each row
+  public static void updateIndexingErrorMetric(String tableNameWithType, String indexDisplayName) {
+    String metricKeyName =
+        tableNameWithType + "-" + indexDisplayName.toUpperCase(Locale.US) + "-indexingError";
+    ServerMetrics.get().addMeteredTableValue(metricKeyName, ServerMeter.INDEXING_FAILURES, 1);
   }
-
-  /**
-   * Adds the next document.
-   */
-  void add(String document)
-      throws IOException;
-
-  /**
-   * Adds a set of documents to the index
-   */
-  void add(String[] document, int length);
 }

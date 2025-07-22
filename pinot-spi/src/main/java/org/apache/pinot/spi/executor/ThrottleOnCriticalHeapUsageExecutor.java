@@ -21,6 +21,7 @@ package org.apache.pinot.spi.executor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 
 
 /**
@@ -38,7 +39,7 @@ public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorServic
 
   protected void checkTaskAllowed() {
     if (_threadResourceUsageAccountant.throttleQuerySubmission()) {
-      throw new IllegalStateException("Tasks throttled due to high heap usage.");
+      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Tasks throttled due to high heap usage.");
     }
   }
 
