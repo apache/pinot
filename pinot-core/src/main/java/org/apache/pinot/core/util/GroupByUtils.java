@@ -98,12 +98,15 @@ public final class GroupByUtils {
   }
 
   /**
-   * whether we should do partitionedGroupBy, currently only handle no trimming, i.e. no orderBy or orderBy with
-   * infinite trimThreshold
+   * whether we should do partitionedGroupBy, currently only handle safeTrim
+   * case for backward compatible results
+   * TODO: handle unsafeTrim case using sort-aggregate
    */
   public static boolean shouldPartitionGroupBy(QueryContext queryContext) {
     // TODO: add more conditions
-    return isTrimDisabled(queryContext);
+//    return QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY > 4;
+//    return true;
+    return !queryContext.isUnsafeTrim();
   }
 
   ///  whether the result table should be trimmed
