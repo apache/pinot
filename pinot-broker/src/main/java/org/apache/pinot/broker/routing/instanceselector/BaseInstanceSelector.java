@@ -98,6 +98,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final Clock _clock;
   final boolean _useFixedReplica;
   final long _newSegmentExpirationTimeInSeconds;
+  final long _newRefreshedSegmentExpirationTimeInSeconds;
   final int _tableNameHashForFixedReplicaRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
@@ -113,7 +114,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useFixedReplica, long newSegmentExpirationTimeInSeconds) {
+      boolean useFixedReplica, long newSegmentExpirationTimeInSeconds,
+      long newRefreshedSegmentExpirationTimeInSeconds) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
@@ -121,6 +123,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _clock = clock;
     _useFixedReplica = useFixedReplica;
     _newSegmentExpirationTimeInSeconds = newSegmentExpirationTimeInSeconds;
+    _newRefreshedSegmentExpirationTimeInSeconds = newRefreshedSegmentExpirationTimeInSeconds;
     // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
     // instance
     // Math.abs(Integer.MIN_VALUE) = Integer.MIN_VALUE, so we use & 0x7FFFFFFF to get a positive value
@@ -183,7 +186,9 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       }
       SegmentZKMetadata segmentZKMetadata = new SegmentZKMetadata(record);
       long creationTimeMs = SegmentUtils.getSegmentCreationTimeMs(segmentZKMetadata);
-      if (InstanceSelector.isNewSegment(creationTimeMs, currentTimeMs, _newSegmentExpirationTimeInSeconds * 1000)) {
+      long segmentExpirationTimeInSec = segmentZKMetadata.getSegmentName().startsWith("refreshed__")
+          ? _newRefreshedSegmentExpirationTimeInSeconds : _newSegmentExpirationTimeInSeconds;
+      if (InstanceSelector.isNewSegment(creationTimeMs, currentTimeMs, segmentExpirationTimeInSec * 1000)) {
         newSegmentCreationTimeMap.put(segmentZKMetadata.getSegmentName(), creationTimeMs);
       }
     }
@@ -415,8 +420,10 @@ abstract class BaseInstanceSelector implements InstanceSelector {
       long creationTimeMs = 0;
       if (newSegmentState != null) {
         // It was a new segment before, check the creation time and segment state to see if it is still a new segment
+        long segmentExpirationTimeInSec = segment.startsWith("refreshed__")
+            ? _newRefreshedSegmentExpirationTimeInSeconds : _newSegmentExpirationTimeInSeconds;
         if (InstanceSelector.isNewSegment(newSegmentState.getCreationTimeMs(), currentTimeMs,
-            _newSegmentExpirationTimeInSeconds * 1000)) {
+            segmentExpirationTimeInSec * 1000)) {
           creationTimeMs = newSegmentState.getCreationTimeMs();
         }
       } else if (!_oldSegmentCandidatesMap.containsKey(segment)) {

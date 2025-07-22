@@ -76,6 +76,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
     public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;
   }
+
   public static final String JFR = "pinot.jfr";
 
   public static final String RLS_FILTERS = "rlsFilters";
@@ -489,6 +490,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS = "pinot.broker.new.segment.expiration.seconds";
     public static final long DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS = TimeUnit.MINUTES.toSeconds(5);
+
+    public static final String CONFIG_OF_NEW_REFRESHED_SEGMENT_EXPIRATION_SECONDS =
+        "pinot.broker.new.refreshed.segment.expiration.seconds";
+    public static final long DEFAULT_VALUE_OF_NEW_REFRESHED_SEGMENT_EXPIRATION_SECONDS = TimeUnit.HOURS.toSeconds(1);
 
     // If this config is set to true, the broker will check every query executed using the v1 query engine and attempt
     // to determine whether the query could have successfully been run on the v2 / multi-stage query engine. If not,
@@ -1610,7 +1615,7 @@ public class CommonConstants {
       public enum Status {
         IN_PROGRESS, // The segment is still consuming data
         COMMITTING, // This state will only be utilised by pauseless ingestion when the segment has been consumed but
-                    // is yet to be build and uploaded by the server.
+        // is yet to be build and uploaded by the server.
         DONE, // The segment has finished consumption and has been committed to the segment store
         UPLOADED; // The segment is uploaded by an external party
 
