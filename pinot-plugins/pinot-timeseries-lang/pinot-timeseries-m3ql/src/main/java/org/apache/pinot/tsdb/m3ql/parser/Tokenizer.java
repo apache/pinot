@@ -90,18 +90,30 @@ public class Tokenizer {
   }
 
   public static boolean isValidToken(String input) {
-    if (input == null || input.length() < 2 || input.charAt(input.length() - 1) != '}') {
+    if (input == null || input.length() < 2) {
       return false;
     }
     int openIndex = -1;
+    int closeIndex = -1;
     // Find first '{' from the front
-    for (int i = 0; i < input.length() - 1; i++) {
+    for (int i = 0; i < input.length(); i++) {
       if (input.charAt(i) == '{') {
         openIndex = i;
         break;
       }
     }
     // If no '{' found
-    return openIndex != -1;
+    if (openIndex == -1) {
+      return false;
+    }
+    // Find first '}' from the back
+    for (int i = input.length() - 1; i > openIndex; i--) {
+      if (input.charAt(i) == '}') {
+        closeIndex = i;
+        break;
+      }
+    }
+    // Valid only if '}' found after '{'
+    return closeIndex != -1;
   }
 }
