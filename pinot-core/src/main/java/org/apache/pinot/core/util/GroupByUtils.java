@@ -19,7 +19,6 @@
 package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -100,31 +99,12 @@ public final class GroupByUtils {
   /**
    * whether we should do partitionedGroupBy, currently only handle safeTrim
    * case for backward compatible results
-   * TODO: handle unsafeTrim case using sort-aggregate
+   * TODO: handle unsafeTrim case using sort-aggregate separately
+   * TODO: add conditions checking for number of threads available
    */
   public static boolean shouldPartitionGroupBy(QueryContext queryContext) {
-    // TODO: add more conditions
-//    return QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY > 4;
-//    return true;
+//    return QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY > 4 && !queryContext.isUnsafeTrim();
     return !queryContext.isUnsafeTrim();
-  }
-
-  ///  whether the result table should be trimmed
-  public static boolean isTrimDisabled(QueryContext queryContext) {
-    int limit = queryContext.getLimit();
-    int minTrimSize =
-        queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
-    boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
-    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
-    int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
-    return (!hasOrderBy || trimThreshold == Integer.MAX_VALUE);
-  }
-
-  public static void addOrUpdateRecord(Map<Key, Record> map, Key key, Record newRecord,
-      AggregationFunction[] aggregationFunctions, int numKeyColumns) {
-    map.compute(key, (k, v) -> v == null
-        ? newRecord
-        : updateRecord(v, newRecord, aggregationFunctions, numKeyColumns));
   }
 
   private static Record updateRecord(Record existingRecord, Record newRecord,
