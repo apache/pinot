@@ -22,7 +22,7 @@
 
 ---
 Ingestion time transformer:
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(float), value2: ARRAY(float)) -> ARRAY(float)':
     entries:
       empty with not empty:
         actualResult:
@@ -78,7 +78,7 @@ Ingestion time transformer:
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(float), value2: ARRAY(float)) -> ARRAY(float)':
     entries:
       empty with not empty:
         actualResult: []
@@ -130,11 +130,11 @@ MSE intermediate stage (with null handling):
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(float), value2: ARRAY(float)) -> ARRAY(float)':
     entries:
       empty with not empty:
         actualResult:
-        - -Infinity
+        - 0.0
         - 1.0
         - 2.0
         equivalence: null
@@ -146,7 +146,7 @@ MSE intermediate stage (without null handling):
         actualResult:
         - 1.0
         - 2.0
-        - -Infinity
+        - 0.0
         equivalence: null
         error: "Unexpected value"
         expectedResult:
@@ -156,7 +156,7 @@ MSE intermediate stage (without null handling):
         actualResult:
         - 1.0
         - 2.0
-        - -Infinity
+        - 0.0
         equivalence: null
         error: "Unexpected value"
         expectedResult:
@@ -164,7 +164,7 @@ MSE intermediate stage (without null handling):
         - 2.0
       null concat not null:
         actualResult:
-        - -Infinity
+        - 0.0
         - 1.0
         - 2.0
         equivalence: null
@@ -174,15 +174,15 @@ MSE intermediate stage (without null handling):
         - 2.0
       null input:
         actualResult:
-        - -Infinity
-        - -Infinity
+        - 0.0
+        - 0.0
         equivalence: null
         error: "Unexpected value"
         expectedResult: []
       two empty arrays:
         actualResult:
-        - -Infinity
-        - -Infinity
+        - 0.0
+        - 0.0
         equivalence: null
         error: "Unexpected value"
         expectedResult: []
@@ -202,19 +202,19 @@ MSE intermediate stage (without null handling):
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(float), value2: ARRAY(float)) -> ARRAY(float)':
     entries: null
     error: true
     errorMessage: "\"Caught exception while initializing transform function: minus:\
       \ every argument of SUB transform function must be single-valued\""
 SSE predicate (without null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(float), value2: ARRAY(float)) -> ARRAY(float)':
     entries: null
     error: true
     errorMessage: "\"Caught exception while initializing transform function: minus:\
       \ every argument of SUB transform function must be single-valued\""
 SSE projection (with null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(float), value2: ARRAY(float)) -> ARRAY(float)':
     entries:
       empty with not empty:
         actualResult: []
@@ -266,11 +266,11 @@ SSE projection (with null handling):
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(float), value2: ARRAY(float)) -> ARRAY(float)':
     entries:
       empty with not empty:
         actualResult:
-        - -Infinity
+        - 0.0
         - 1.0
         - 2.0
         equivalence: null
@@ -282,7 +282,7 @@ SSE projection (without null handling):
         actualResult:
         - 1.0
         - 2.0
-        - -Infinity
+        - 0.0
         equivalence: null
         error: "Unexpected value"
         expectedResult:
@@ -292,7 +292,7 @@ SSE projection (without null handling):
         actualResult:
         - 1.0
         - 2.0
-        - -Infinity
+        - 0.0
         equivalence: null
         error: "Unexpected value"
         expectedResult:
@@ -300,7 +300,7 @@ SSE projection (without null handling):
         - 2.0
       null concat not null:
         actualResult:
-        - -Infinity
+        - 0.0
         - 1.0
         - 2.0
         equivalence: null
@@ -310,15 +310,15 @@ SSE projection (without null handling):
         - 2.0
       null input:
         actualResult:
-        - -Infinity
-        - -Infinity
+        - 0.0
+        - 0.0
         equivalence: null
         error: "Unexpected value"
         expectedResult: []
       two empty arrays:
         actualResult:
-        - -Infinity
-        - -Infinity
+        - 0.0
+        - 0.0
         equivalence: null
         error: "Unexpected value"
         expectedResult: []

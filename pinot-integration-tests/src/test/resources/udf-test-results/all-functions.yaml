@@ -69,23 +69,23 @@ arrayconcatdouble:
 arrayconcatfloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatFloat}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayConcatFloatUdf"
 arrayconcatint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayConcatIntUdf"
 arrayconcatlong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayConcatLongUdf"
 arrayconcatstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayConcatStringUdf"
 arraycontainsint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayContainsInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayContainsIntUdf"
 arraycontainsstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayContainsString}"
   transform: null

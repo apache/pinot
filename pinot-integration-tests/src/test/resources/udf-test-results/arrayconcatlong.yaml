@@ -22,26 +22,26 @@
 
 ---
 Ingestion time transformer:
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(long), value2: ARRAY(long)) -> ARRAY(long)':
     entries:
       empty with not empty:
         actualResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
         equivalence: "EQUAL"
         error: null
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not empty with empty:
         actualResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
         equivalence: "EQUAL"
         error: null
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not null concat null:
         actualResult: null
         equivalence: "EQUAL"
@@ -64,36 +64,36 @@ Ingestion time transformer:
         expectedResult: []
       two not empty arrays:
         actualResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
         equivalence: "EQUAL"
         error: null
         expectedResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(long), value2: ARRAY(long)) -> ARRAY(long)':
     entries:
       empty with not empty:
         actualResult: []
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not empty with empty:
         actualResult: []
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not null concat null:
         actualResult: []
         equivalence: null
@@ -116,120 +116,120 @@ MSE intermediate stage (with null handling):
         expectedResult: []
       two not empty arrays:
         actualResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
         equivalence: "EQUAL"
         error: null
         expectedResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(long), value2: ARRAY(long)) -> ARRAY(long)':
     entries:
       empty with not empty:
         actualResult:
-        - -Infinity
-        - 1.0
-        - 2.0
+        - -9223372036854775808
+        - 1
+        - 2
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not empty with empty:
         actualResult:
-        - 1.0
-        - 2.0
-        - -Infinity
+        - 1
+        - 2
+        - -9223372036854775808
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not null concat null:
         actualResult:
-        - 1.0
-        - 2.0
-        - -Infinity
+        - 1
+        - 2
+        - -9223372036854775808
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       null concat not null:
         actualResult:
-        - -Infinity
-        - 1.0
-        - 2.0
+        - -9223372036854775808
+        - 1
+        - 2
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       null input:
         actualResult:
-        - -Infinity
-        - -Infinity
+        - -9223372036854775808
+        - -9223372036854775808
         equivalence: null
         error: "Unexpected value"
         expectedResult: []
       two empty arrays:
         actualResult:
-        - -Infinity
-        - -Infinity
+        - -9223372036854775808
+        - -9223372036854775808
         equivalence: null
         error: "Unexpected value"
         expectedResult: []
       two not empty arrays:
         actualResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
         equivalence: "EQUAL"
         error: null
         expectedResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(long), value2: ARRAY(long)) -> ARRAY(long)':
     entries: null
     error: true
     errorMessage: "\"Caught exception while initializing transform function: minus:\
       \ every argument of SUB transform function must be single-valued\""
 SSE predicate (without null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(long), value2: ARRAY(long)) -> ARRAY(long)':
     entries: null
     error: true
     errorMessage: "\"Caught exception while initializing transform function: minus:\
       \ every argument of SUB transform function must be single-valued\""
 SSE projection (with null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(long), value2: ARRAY(long)) -> ARRAY(long)':
     entries:
       empty with not empty:
         actualResult: []
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not empty with empty:
         actualResult: []
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not null concat null:
         actualResult: []
         equivalence: null
@@ -252,88 +252,88 @@ SSE projection (with null handling):
         expectedResult: []
       two not empty arrays:
         actualResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
         equivalence: "EQUAL"
         error: null
         expectedResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(value1: ARRAY(double), value2: ARRAY(double)) -> ARRAY(double)':
+  '(value1: ARRAY(long), value2: ARRAY(long)) -> ARRAY(long)':
     entries:
       empty with not empty:
         actualResult:
-        - -Infinity
-        - 1.0
-        - 2.0
+        - -9223372036854775808
+        - 1
+        - 2
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not empty with empty:
         actualResult:
-        - 1.0
-        - 2.0
-        - -Infinity
+        - 1
+        - 2
+        - -9223372036854775808
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       not null concat null:
         actualResult:
-        - 1.0
-        - 2.0
-        - -Infinity
+        - 1
+        - 2
+        - -9223372036854775808
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       null concat not null:
         actualResult:
-        - -Infinity
-        - 1.0
-        - 2.0
+        - -9223372036854775808
+        - 1
+        - 2
         equivalence: null
         error: "Unexpected value"
         expectedResult:
-        - 1.0
-        - 2.0
+        - 1
+        - 2
       null input:
         actualResult:
-        - -Infinity
-        - -Infinity
+        - -9223372036854775808
+        - -9223372036854775808
         equivalence: null
         error: "Unexpected value"
         expectedResult: []
       two empty arrays:
         actualResult:
-        - -Infinity
-        - -Infinity
+        - -9223372036854775808
+        - -9223372036854775808
         equivalence: null
         error: "Unexpected value"
         expectedResult: []
       two not empty arrays:
         actualResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
         equivalence: "EQUAL"
         error: null
         expectedResult:
-        - 1.0
-        - 3.0
-        - 2.0
-        - 4.0
+        - 1
+        - 3
+        - 2
+        - 4
     error: false
     errorMessage: null
