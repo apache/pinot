@@ -62,4 +62,3 @@ public class ArrayContainsIntUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

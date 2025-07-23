@@ -62,4 +62,3 @@ public class ArrayContainsStringUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

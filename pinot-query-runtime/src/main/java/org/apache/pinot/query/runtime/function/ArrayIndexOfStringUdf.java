@@ -64,4 +64,3 @@ public class ArrayIndexOfStringUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

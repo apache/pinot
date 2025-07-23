@@ -23,7 +23,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -94,7 +93,7 @@ public interface PinotScalarFunction {
   @Nullable
   FunctionInfo getFunctionInfo(int numArguments);
 
-  static Set<PinotScalarFunction> fromMethod(Method method, boolean isVarArg, boolean supportNullArgs,
+  static PinotScalarFunction fromMethod(Method method, boolean isVarArg, boolean supportNullArgs,
       @Nullable String... names) {
     int numArguments = isVarArg ? FunctionRegistry.VAR_ARG_KEY : method.getParameterCount();
     FunctionInfo functionInfo = new FunctionInfo(method, method.getDeclaringClass(), supportNullArgs);
@@ -104,10 +103,6 @@ public interface PinotScalarFunction {
         ? Arrays.asList(names)
         : List.of(method.getName());
 
-    return nameList.stream()
-        .map(FunctionRegistry::canonicalize)
-        .distinct()
-        .map(name -> new FunctionRegistry.ArgumentCountBasedScalarFunction(name, functionInfoMap))
-        .collect(Collectors.toSet());
+    return new FunctionRegistry.ArgumentCountBasedScalarFunction(nameList, functionInfoMap);
   }
 }

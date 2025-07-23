@@ -22,8 +22,11 @@ import com.google.auto.service.AutoService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
+import org.apache.pinot.core.operator.transform.function.ArrayMinTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
@@ -31,7 +34,6 @@ import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.core.operator.transform.function.ArrayMinTransformFunction;
 
 @AutoService(Udf.class)
 public class ArrayMinUdf extends Udf {
@@ -64,13 +66,13 @@ public class ArrayMinUdf extends Udf {
   }
 
   @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of();
+  @Nullable
+  public PinotScalarFunction getScalarFunction() {
+    return null;
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ARRAY_MIN, ArrayMinTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.ARRAY_MIN, ArrayMinTransformFunction.class);
   }
 }
-

@@ -66,4 +66,3 @@ public class ArrayElementAtStringUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

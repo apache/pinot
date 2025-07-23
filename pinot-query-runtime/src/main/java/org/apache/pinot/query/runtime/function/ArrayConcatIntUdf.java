@@ -67,4 +67,3 @@ public class ArrayConcatIntUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

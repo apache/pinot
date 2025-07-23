@@ -65,4 +65,3 @@ public class ArrayIndexesOfDoubleUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

@@ -68,4 +68,3 @@ public class ArrayElementAtDoubleUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-
