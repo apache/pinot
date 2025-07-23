@@ -1101,7 +1101,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     trackUpdatedSegmentsSinceLastSnapshot(segment);
   }
 
-  private void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
+  protected void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
     if (_enableSnapshot && segment instanceof ImmutableSegment) {
       _updatedSegmentsSinceLastSnapshot.add(segment);
     }

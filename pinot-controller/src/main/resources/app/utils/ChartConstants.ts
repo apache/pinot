@@ -16,32 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.utils.regex;
 
-import com.google.re2j.Pattern;
+// Standard chart colors matching the ECharts palette
+export const CHART_COLORS = [
+    "#5470C6", "#91CC75", "#EE6666", "#FAC858", "#73C0DE",
+    "#3BA272", "#FC8452", "#9A60B4", "#EA7CCC", "#6E7074",
+    "#546570", "#C4CCD3", "#F05B72", "#FF715E", "#FFAF51",
+    "#FFE153", "#47B39C", "#5BACE1", "#32C5E9", "#96BFFF"
+];
 
+/**
+ * Maximum number of series that can be rendered in the chart
+ */
+export const MAX_SERIES_LIMIT = 20;
 
-public class Re2jPattern implements org.apache.pinot.common.utils.regex.Pattern {
-  Pattern _pattern;
+/**
+ * Chart padding percentage for time axis and series
+ */
+export const CHART_PADDING_PERCENTAGE = 0.05; // 5%
 
-  public Re2jPattern(String regex) {
-    this(regex, false);
-  }
-
-  public Re2jPattern(String regex, boolean caseInsensitive) {
-    if (caseInsensitive) {
-      _pattern = Pattern.compile(regex, Pattern.CASE_INSENSITIVE);
-    } else {
-      _pattern = Pattern.compile(regex);
-    }
-  }
-
-  @Override
-  public Matcher matcher(CharSequence input) {
-    return MatcherFactory.matcher(this, input);
-  }
-
-  protected Pattern getPattern() {
-    return _pattern;
-  }
-}
+/**
+ * Get color for a series by index
+ * @param index - The series index
+ * @returns The color for the series
+ */
+export const getSeriesColor = (index: number): string => {
+  return CHART_COLORS[index % CHART_COLORS.length];
+};

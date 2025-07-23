@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.client;
 
+import com.google.common.base.Splitter;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,7 +30,6 @@ import java.util.Properties;
 import org.apache.pinot.client.base.AbstractBaseConnection;
 import org.apache.pinot.client.controller.PinotControllerTransport;
 import org.apache.pinot.client.controller.PinotControllerTransportFactory;
-import org.apache.pinot.client.controller.response.ControllerTenantBrokerResponse;
 import org.apache.pinot.client.utils.DriverUtils;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
@@ -59,13 +58,13 @@ public class PinotConnection extends AbstractBaseConnection {
     } else {
       _controllerTransport = controllerTransport;
     }
-    List<String> brokers;
     if (properties.containsKey(BROKER_LIST)) {
-      brokers = Arrays.asList(properties.getProperty(BROKER_LIST).split(";"));
+      List<String> brokers =
+          Splitter.on(";").trimResults().omitEmptyStrings().splitToList(properties.getProperty(BROKER_LIST));
+      _session = ConnectionFactory.fromHostList(properties, brokers, transport);
     } else {
-      brokers = getBrokerList(controllerURL, tenant);
+      _session = ConnectionFactory.fromController(properties, _controllerURL, transport);
     }
-    _session = new org.apache.pinot.client.Connection(properties, brokers, transport);
 
     for (Map.Entry<Object, Object> property : properties.entrySet()) {
       String configKey = QueryOptionsUtils.resolveCaseInsensitiveKey(property.getKey());
@@ -75,19 +74,12 @@ public class PinotConnection extends AbstractBaseConnection {
     }
   }
 
-
   public org.apache.pinot.client.Connection getSession() {
     return _session;
   }
 
   public Map<String, Object> getQueryOptions() {
     return _queryOptions;
-  }
-
-  private List<String> getBrokerList(String controllerURL, String tenant) {
-    ControllerTenantBrokerResponse controllerTenantBrokerResponse =
-        _controllerTransport.getBrokersFromController(controllerURL, tenant);
-    return controllerTenantBrokerResponse.getBrokers();
   }
 
   @Override

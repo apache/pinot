@@ -20,11 +20,12 @@ package org.apache.pinot.segment.local.segment.index.readers;
 
 import java.io.IOException;
 import java.util.List;
+import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.fst.ByteSequenceOutputs;
 import org.apache.lucene.util.fst.FST;
 import org.apache.lucene.util.fst.OffHeapFSTStore;
-import org.apache.lucene.util.fst.PositiveIntOutputs;
 import org.apache.pinot.segment.local.utils.fst.PinotBufferIndexInput;
-import org.apache.pinot.segment.local.utils.fst.RegexpMatcher;
+import org.apache.pinot.segment.local.utils.fst.RegexpMatcherCaseInsensitive;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
@@ -39,17 +40,17 @@ import org.slf4j.LoggerFactory;
  * stores dict ids as values this class only implements getDictIds method.
  *
  */
-public class LuceneFSTIndexReader implements TextIndexReader {
+public class LuceneIFSTIndexReader implements TextIndexReader {
   public static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexReader.class);
 
-  private final FST<Long> _fst;
+  private final FST<BytesRef> _ifst;
 
-  public LuceneFSTIndexReader(PinotDataBuffer pinotDataBuffer)
+  public LuceneIFSTIndexReader(PinotDataBuffer pinotDataBuffer)
       throws IOException {
     PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, pinotDataBuffer.size());
-    FST.FSTMetadata<Long> metadata = FST.readMetadata(indexInput, PositiveIntOutputs.getSingleton());
+    FST.FSTMetadata<BytesRef> metadata = FST.readMetadata(indexInput, ByteSequenceOutputs.getSingleton());
     OffHeapFSTStore fstStore = new OffHeapFSTStore(indexInput, indexInput.getFilePointer(), metadata);
-    _fst = FST.fromFSTReader(metadata, fstStore);
+    _ifst = FST.fromFSTReader(metadata, fstStore);
   }
 
   @Override
@@ -61,7 +62,7 @@ public class LuceneFSTIndexReader implements TextIndexReader {
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
       MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
-      List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, _fst);
+      List<Long> matchingIds = RegexpMatcherCaseInsensitive.regexMatch(searchQuery, _ifst);
       for (Long matchingId : matchingIds) {
         dictIds.add(matchingId.intValue());
       }
