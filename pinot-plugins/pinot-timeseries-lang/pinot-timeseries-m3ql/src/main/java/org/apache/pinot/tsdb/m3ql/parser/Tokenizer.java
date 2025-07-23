@@ -37,6 +37,7 @@ public class Tokenizer {
     String[] pipelines = _query.split("\\|");
     List<List<String>> result = new ArrayList<>();
     for (String pipeline : pipelines) {
+      Preconditions.checkState(isValidToken(pipeline), String.format("Invalid token: %s", pipeline));
       String command = pipeline.trim().substring(0, pipeline.indexOf("{"));
       if (command.equals("fetch")) {
         result.add(consumeFetch(pipeline.trim()));
@@ -86,5 +87,21 @@ public class Tokenizer {
       result.add(arg);
     }
     return result;
+  }
+
+  public static boolean isValidToken(String input) {
+    if (input == null || input.length() < 2 || input.charAt(input.length() - 1) != '}') {
+      return false;
+    }
+    int openIndex = -1;
+    // Find first '{' from the front
+    for (int i = 0; i < input.length() - 1; i++) {
+      if (input.charAt(i) == '{') {
+        openIndex = i;
+        break;
+      }
+    }
+    // If no '{' found
+    return openIndex != -1;
   }
 }
