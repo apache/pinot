@@ -427,10 +427,11 @@ public class TableRebalancer {
         for (Map.Entry<String, Map<String, String>> segmentToAssignment : currentAssignment.entrySet()) {
           String segmentName = segmentToAssignment.getKey();
           Map<String, String> assignment = segmentToAssignment.getValue();
+          Pair<Boolean, String> dataLossResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
           if (!assignment.equals(targetAssignment.get(segmentName))
-              && dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
+              && dataLossResult.getLeft()) {
             // Fail the rebalance if a segment with the potential for data loss is found
-            String errorMsg = dataLossRiskAssessor.generateDataLossRiskMessage(segmentName);
+            String errorMsg = dataLossResult.getRight();
             onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
             return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
                 tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
@@ -1790,8 +1791,9 @@ public class TableRebalancer {
 
           // Since next assignment doesn't match current assignment, it means the segment will be moved. Check if there
           // is a data loss risk
-          if (dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
-            throw new IllegalStateException(dataLossRiskAssessor.generateDataLossRiskMessage(segmentName));
+          Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+          if (dataLossRiskResult.getLeft()) {
+            throw new IllegalStateException(dataLossRiskResult.getRight());
           }
         }
       }
@@ -1879,10 +1881,16 @@ public class TableRebalancer {
   }
 
   @VisibleForTesting
+  @FunctionalInterface
   interface DataLossRiskAssessor {
-    boolean hasDataLossRisk(String segmentName);
-
-    String generateDataLossRiskMessage(String segmentName);
+    /**
+     * Assess the risk of data loss for the given segment.
+     *
+     * @param segmentName Name of the segment to assess
+     * @return A pair where the first element indicates if there is a risk of data loss, and the second element is a
+     *         message describing the risk (if any).
+     */
+    Pair<Boolean, String> assessDataLossRisk(String segmentName);
   }
 
   /**
@@ -1895,13 +1903,8 @@ public class TableRebalancer {
     }
 
     @Override
-    public boolean hasDataLossRisk(String segmentName) {
-      return false;
-    }
-
-    @Override
-    public String generateDataLossRiskMessage(String segmentName) {
-      throw new UnsupportedOperationException("No data loss risk message should be generated for NoOpRiskAssessor");
+    public Pair<Boolean, String> assessDataLossRisk(String segmentName) {
+      return Pair.of(false, "");
     }
   }
 
@@ -1931,16 +1934,17 @@ public class TableRebalancer {
     }
 
     @Override
-    public boolean hasDataLossRisk(String segmentName) {
+    public Pair<Boolean, String> assessDataLossRisk(String segmentName) {
       SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
           .getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _tableNameWithType, segmentName);
       if (segmentZKMetadata == null) {
-        return false;
+        return Pair.of(false, "");
       }
 
-      // If the segment state is COMPLETED and the peer download URL is empty, there is a data loss risk
-      if (segmentZKMetadata.getStatus().isCompleted()) {
-        return CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(segmentZKMetadata.getDownloadUrl());
+      // If the segment state is COMPLETED and the download URL is empty, there is a data loss risk
+      if (segmentZKMetadata.getStatus().isCompleted() && CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(
+          segmentZKMetadata.getDownloadUrl())) {
+        return Pair.of(true, generateDataLossRiskMessage(segmentName));
       }
 
       // If the segment is not yet completed, then the following scenarios are possible:
@@ -1954,12 +1958,14 @@ public class TableRebalancer {
       //       RealtimeSegmentValidationManager does not automatically try to fix up these segments. To be safe it is
       //       best to return that there is a risk of data loss for pauseless enabled tables for segments in COMMITTING
       //       state
-      return _isPauselessEnabled && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
-          && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig);
+      if (_isPauselessEnabled && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
+          && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig)) {
+        return Pair.of(true, generateDataLossRiskMessage(segmentName));
+      }
+      return Pair.of(false, "");
     }
 
-    @Override
-    public String generateDataLossRiskMessage(String segmentName) {
+    private static String generateDataLossRiskMessage(String segmentName) {
       return "Moving segment " + segmentName + " as part of rebalance is risky for peer-download "
           + "enabled tables, ensure the deep store has a copy of the segment and if upsert / dedup enabled "
           + "that it is completed and try again. It is recommended to forceCommit and pause ingestion prior to "
@@ -2006,8 +2012,9 @@ public class TableRebalancer {
         if (!nextAssignment.get(segmentName).equals(currentInstanceStateMap)) {
           // Since next assignment doesn't match current assignment, it means the segment will be moved. Check if there
           // is a data loss risk
-          if (dataLossRiskAssessor.hasDataLossRisk(segmentName)) {
-            throw new IllegalStateException(dataLossRiskAssessor.generateDataLossRiskMessage(segmentName));
+          Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+          if (dataLossRiskResult.getLeft()) {
+            throw new IllegalStateException(dataLossRiskResult.getRight());
           }
         }
       }

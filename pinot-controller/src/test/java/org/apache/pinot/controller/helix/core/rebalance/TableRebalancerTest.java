@@ -54,17 +54,7 @@ public class TableRebalancerTest {
   private static final TableRebalancer.DataLossRiskAssessor DEFAULT_DATA_LOSS_RISK_ASSESSOR =
       new TableRebalancer.NoOpRiskAssessor();
   private static final TableRebalancer.DataLossRiskAssessor ALWAYS_TRUE_DATA_LOSS_RISK_ASSESSOR =
-      new TableRebalancer.DataLossRiskAssessor() {
-        @Override
-        public boolean hasDataLossRisk(String segmentName) {
-          return true;
-        }
-
-        @Override
-        public String generateDataLossRiskMessage(String segmentName) {
-          return "test data loss risk message";
-        }
-      };
+      segmentName -> Pair.of(true, "");
 
   @Test
   public void testDowntimeMode() {
