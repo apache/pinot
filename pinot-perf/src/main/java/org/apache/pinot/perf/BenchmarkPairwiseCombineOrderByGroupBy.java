@@ -74,9 +74,9 @@ import org.openjdk.jmh.runner.options.TimeValue;
 public class BenchmarkPairwiseCombineOrderByGroupBy {
 
   public static final String QUERY = "SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY d1, d2";
-  @Param({"20"})
+  @Param({"20", "200"})
   private int _numSegments;
-  @Param({"10000"})
+  @Param({"1000", "10000"})
   private int _numRecordsPerSegment;
   @Param({"500", "1000"})
   private int _limit;
