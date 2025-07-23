@@ -101,11 +101,11 @@ arraydistinctstring:
 arrayelementatdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtDouble}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtDoubleUdf"
 arrayelementatfloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtFloat}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtFloatUdf"
 arrayelementatint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtInt}"
   transform: null
@@ -113,11 +113,11 @@ arrayelementatint:
 arrayelementatlong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtLongUdf"
 arrayelementatstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtStringUdf"
 arrayindexesofdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfDouble}"
   transform: null
