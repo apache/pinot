@@ -141,11 +141,11 @@ arrayindexesofstring:
 arrayindexofint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexOfInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexOfIntUdf"
 arrayindexofstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexOfString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexOfStringUdf"
 arraylength:
   scalar: "org.apache.pinot.common.function.scalar.array.ArrayLengthScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.ArrayLengthTransformFunction"
