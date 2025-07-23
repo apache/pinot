@@ -42,6 +42,7 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.SortedRecordTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -61,6 +62,7 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
@@ -171,7 +173,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void concurrentIndexedTableForCombineGroupBy()
+  public void concurrentIndexedTableForCombineGroupBy(Blackhole blackhole)
       throws InterruptedException, ExecutionException, TimeoutException {
     AtomicInteger nextSegmentId1 = new AtomicInteger(0);
     int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit());
@@ -206,6 +208,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
     }
 
     concurrentIndexedTable.finish(false);
+    blackhole.consume(concurrentIndexedTable);
   }
 
   // prev approach
@@ -215,7 +218,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
-  public void sortedPairwiseCombineGroupBy()
+  public void sortedPairwiseCombineGroupBy(Blackhole blackhole)
       throws InterruptedException, ExecutionException, TimeoutException {
     final AtomicInteger nextSegmentId = new AtomicInteger(0);
 
@@ -236,6 +239,26 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
 
     SortedRecordTable table = _satisfiedTable.get();
     table.finish(true);
+    blackhole.consume(table);
+  }
+
+  // ---
+  // single approach
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MICROSECONDS)
+  public void sequentialCombineGroupBy(Blackhole blackhole) {
+    int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit());
+    SimpleIndexedTable table = new SimpleIndexedTable(_dataSchema, false, _queryContext, trimSize, trimSize,
+        Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD,
+        Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY, _executorService);
+    for (int i = 0; i < _numSegments; i++) {
+      for (IntermediateRecord record : _segmentIntermediateRecords.get(i)) {
+        table.upsert(record._key, record._record);
+      }
+    }
+    table.finish(false);
+    blackhole.consume(table);
   }
 
   public void processSortedGroupByCombine(AtomicInteger nextSegmentId) {
@@ -302,7 +325,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
         new OptionsBuilder().include(BenchmarkPairwiseCombineOrderByGroupBy.class.getSimpleName())
             .warmupTime(TimeValue.seconds(1))
             .warmupIterations(3)
-            .measurementTime(TimeValue.seconds(1))
+            .measurementTime(TimeValue.seconds(10))
             .measurementIterations(3)
             .forks(1);
 
