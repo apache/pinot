@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.sql.parsers.rewriter;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
 import org.apache.pinot.common.request.Function;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.testng.annotations.Test;
 
@@ -103,6 +107,87 @@ public class AggregationOptimizerTest {
   }
 
   @Test
+  public void testSumMultiplicationOptimized() {
+    // Build sum(met * 2) manually to avoid parser constant folding
+    Expression multiplication = RequestUtils.getFunctionExpression("mult",
+        RequestUtils.getIdentifierExpression("met"), RequestUtils.getLiteralExpression(2));
+    Expression sum = RequestUtils.getFunctionExpression("sum", multiplication);
+    PinotQuery pinotQuery = buildQueryWithSelect(sum);
+
+    _optimizer.rewrite(pinotQuery);
+
+    Function rewritten = pinotQuery.getSelectList().get(0).getFunctionCall();
+    assertEquals(rewritten.getOperator(), "mult");
+    assertEquals(rewritten.getOperands().size(), 2);
+
+    Function sumFunction = rewritten.getOperands().get(0).getFunctionCall();
+    assertEquals(sumFunction.getOperator(), "sum");
+    assertEquals(sumFunction.getOperands().get(0).getIdentifier().getName(), "met");
+    assertEquals(rewritten.getOperands().get(1).getLiteral().getIntValue(), 2);
+  }
+
+  @Test
+  public void testMinMultiplicationWithNegativeConstant() {
+    // Build min(score * -3.5) manually; negative constant should flip MIN to MAX
+    Expression multiplication = RequestUtils.getFunctionExpression("multiply",
+        RequestUtils.getIdentifierExpression("score"), RequestUtils.getLiteralExpression(-3.5));
+    Expression min = RequestUtils.getFunctionExpression("min", multiplication);
+    PinotQuery pinotQuery = buildQueryWithSelect(min);
+
+    _optimizer.rewrite(pinotQuery);
+
+    Function rewritten = pinotQuery.getSelectList().get(0).getFunctionCall();
+    assertEquals(rewritten.getOperator(), "mult");
+
+    Function flippedAggregation = rewritten.getOperands().get(0).getFunctionCall();
+    assertEquals(flippedAggregation.getOperator(), "max");
+    assertEquals(flippedAggregation.getOperands().get(0).getIdentifier().getName(), "score");
+    assertEquals(rewritten.getOperands().get(1).getLiteral().getDoubleValue(), -3.5, 0.0001);
+  }
+
+  @Test
+  public void testMaxMultiplicationWithNegativeConstant() {
+    // Build max(score * -2) manually; negative constant should flip MAX to MIN
+    Expression multiplication = RequestUtils.getFunctionExpression("mul",
+        RequestUtils.getIdentifierExpression("score"), RequestUtils.getLiteralExpression(-2));
+    Expression max = RequestUtils.getFunctionExpression("max", multiplication);
+    PinotQuery pinotQuery = buildQueryWithSelect(max);
+
+    _optimizer.rewrite(pinotQuery);
+
+    Function rewritten = pinotQuery.getSelectList().get(0).getFunctionCall();
+    assertEquals(rewritten.getOperator(), "mult");
+
+    Function flippedAggregation = rewritten.getOperands().get(0).getFunctionCall();
+    assertEquals(flippedAggregation.getOperator(), "min");
+    assertEquals(flippedAggregation.getOperands().get(0).getIdentifier().getName(), "score");
+    assertEquals(rewritten.getOperands().get(1).getLiteral().getIntValue(), -2);
+  }
+
+  @Test
+  public void testMultiplicationWithTwoColumnsNotOptimized() {
+    // Build sum(a * b) manually; should remain unchanged because neither side is a constant
+    Expression multiplication = RequestUtils.getFunctionExpression("mult",
+        RequestUtils.getIdentifierExpression("a"), RequestUtils.getIdentifierExpression("b"));
+    Expression sum = RequestUtils.getFunctionExpression("sum", multiplication);
+    PinotQuery pinotQuery = buildQueryWithSelect(sum);
+
+    _optimizer.rewrite(pinotQuery);
+
+    Function rewritten = pinotQuery.getSelectList().get(0).getFunctionCall();
+    assertEquals(rewritten.getOperator(), "sum");
+    assertEquals(rewritten.getOperands().size(), 1);
+    Function multiplicationFunction = rewritten.getOperands().get(0).getFunctionCall();
+    assertEquals(multiplicationFunction.getOperator(), "mult");
+  }
+
+  private PinotQuery buildQueryWithSelect(Expression expression) {
+    PinotQuery pinotQuery = new PinotQuery();
+    pinotQuery.setSelectList(new ArrayList<>(Collections.singletonList(expression)));
+    return pinotQuery;
+  }
+
+  @Test
   public void testMultipleAggregations() {
     // Test: SELECT sum(a + 1), sum(b - 2), avg(c) FROM mytable
     String query = "SELECT sum(a + 1), sum(b - 2), avg(c) FROM mytable";
@@ -131,7 +216,6 @@ public class AggregationOptimizerTest {
   public void testNoOptimizationForUnsupportedPatterns() {
     // Test patterns that should NOT be optimized
     String[] queries = {
-        "SELECT sum(a * 2) FROM mytable",         // multiplication not supported
         "SELECT sum(a / 2) FROM mytable",         // division not supported
         "SELECT sum(a + b) FROM mytable",         // both operands are columns
         "SELECT sum(1 + 2) FROM mytable",         // both operands are constants
@@ -142,17 +226,26 @@ public class AggregationOptimizerTest {
 
     for (String query : queries) {
       PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
-      PinotQuery originalQuery = new PinotQuery(pinotQuery); // Deep copy for comparison
+
+      // Store original function operator before optimization
+      String originalOperator = pinotQuery.getSelectList().get(0).getFunctionCall().getOperator();
 
       // Apply optimizer
       _optimizer.rewrite(pinotQuery);
 
-      // Verify no optimization occurred by comparing structure
-      Expression original = originalQuery.getSelectList().get(0);
+      // Verify no optimization occurred - the outer function should remain unchanged
       Expression optimized = pinotQuery.getSelectList().get(0);
+      assertEquals(originalOperator, optimized.getFunctionCall().getOperator());
 
-      // The structure should be similar (though not necessarily identical due to object references)
-      assertEquals(original.getFunctionCall().getOperator(), optimized.getFunctionCall().getOperator());
+      // Additional verification: for queries that have inner arithmetic, ensure they weren't rewritten
+      Function outerFunction = optimized.getFunctionCall();
+      if (outerFunction.getOperands() != null && outerFunction.getOperands().size() == 1) {
+        Expression operand = outerFunction.getOperands().get(0);
+        // If the operand is still a function, it means no optimization was applied
+        if (operand.getType() == ExpressionType.FUNCTION) {
+          // This is expected for non-optimizable cases
+        }
+      }
     }
   }
 

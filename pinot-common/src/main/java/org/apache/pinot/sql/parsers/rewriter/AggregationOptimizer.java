@@ -34,6 +34,8 @@ import org.apache.pinot.common.utils.request.RequestUtils;
  * - sum(column - constant) → sum(column) - constant * count(1)
  * - sum(constant + column) → sum(column) + constant * count(1)
  * - sum(constant - column) → constant * count(1) - sum(column)
+ * - sum/avg/min/max(column * constant) → aggregation(column) * constant
+ *   (for min/max, negative constants flip the aggregation to max/min)
  */
 public class AggregationOptimizer implements QueryRewriter {
 
@@ -66,7 +68,10 @@ public class AggregationOptimizer implements QueryRewriter {
       return null;
     }
 
-    String operator = function.getOperator().toLowerCase();
+    String operator = function.getOperator();
+    if (operator == null) {
+      return null;
+    }
     List<Expression> operands = function.getOperands();
 
     if (operands == null || operands.size() != 1) {
@@ -75,18 +80,16 @@ public class AggregationOptimizer implements QueryRewriter {
 
     Expression operand = operands.get(0);
 
-    switch (operator) {
-      case "sum":
-        return optimizeSumExpression(operand);
-      case "avg":
-        return optimizeAvgExpression(operand);
-      case "min":
-        return optimizeMinExpression(operand);
-      case "max":
-        return optimizeMaxExpression(operand);
-      default:
-        return null;
+    if ("sum".equalsIgnoreCase(operator)) {
+      return optimizeSumExpression(operand);
+    } else if ("avg".equalsIgnoreCase(operator)) {
+      return optimizeAvgExpression(operand);
+    } else if ("min".equalsIgnoreCase(operator)) {
+      return optimizeMinExpression(operand);
+    } else if ("max".equalsIgnoreCase(operator)) {
+      return optimizeMaxExpression(operand);
     }
+    return null;
   }
 
   /**
@@ -145,6 +148,9 @@ public class AggregationOptimizer implements QueryRewriter {
     }
 
     String operator = innerFunction.getOperator();
+    if (operator == null) {
+      return null;
+    }
     List<Expression> operands = innerFunction.getOperands();
 
     // Handle direct arithmetic operations (used by sum)
@@ -152,28 +158,22 @@ public class AggregationOptimizer implements QueryRewriter {
       Expression left = operands.get(0);
       Expression right = operands.get(1);
 
-      switch (operator.toLowerCase()) {
-        case "add":
-        case "plus":
-          return optimizeAdditionForFunction(left, right, aggregationFunction);
-        case "sub":
-        case "minus":
-          return optimizeSubtractionForFunction(left, right, aggregationFunction);
-        case "mul":
-        case "mult":
-        case "multiply":
-          return optimizeMultiplicationForFunction(left, right, aggregationFunction);
-        default:
-          break;
+      if ("add".equalsIgnoreCase(operator) || "plus".equalsIgnoreCase(operator)) {
+        return optimizeAdditionForFunction(left, right, aggregationFunction);
+      } else if ("sub".equalsIgnoreCase(operator) || "minus".equalsIgnoreCase(operator)) {
+        return optimizeSubtractionForFunction(left, right, aggregationFunction);
+      } else if ("mul".equalsIgnoreCase(operator) || "mult".equalsIgnoreCase(operator)
+          || "multiply".equalsIgnoreCase(operator)) {
+        return optimizeMultiplicationForFunction(left, right, aggregationFunction);
       }
     }
 
     // Handle values wrapper function (used by avg, min, max)
-    if ("values".equals(operator.toLowerCase()) && operands != null && operands.size() == 1) {
+    if ("values".equalsIgnoreCase(operator) && operands != null && operands.size() == 1) {
       Expression valuesOperand = operands.get(0);
       if (valuesOperand.getType() == ExpressionType.FUNCTION) {
         Function rowFunction = valuesOperand.getFunctionCall();
-        if (rowFunction != null && "row".equals(rowFunction.getOperator().toLowerCase())
+        if (rowFunction != null && "row".equalsIgnoreCase(rowFunction.getOperator())
             && rowFunction.getOperands() != null && rowFunction.getOperands().size() == 1) {
           Expression rowOperand = rowFunction.getOperands().get(0);
           return optimizeArithmeticExpression(rowOperand, aggregationFunction);

@@ -22,9 +22,6 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.sql.parsers.CalciteSqlParser.QUERY_REWRITERS;
-import static org.apache.pinot.sql.parsers.rewriter.QueryRewriterFactory.DEFAULT_QUERY_REWRITERS_CLASS_NAMES;
-
-
 public class QueryRewriterFactoryTest {
 
   @Test
