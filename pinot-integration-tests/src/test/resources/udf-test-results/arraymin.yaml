@@ -22,22 +22,22 @@
 
 ---
 Ingestion time transformer:
-  '(arr: ARRAY(int)) -> int':
+  '(array: ARRAY(int)) -> int':
     entries: null
     error: true
     errorMessage: "Unsupported"
 MSE intermediate stage (with null handling):
-  '(arr: ARRAY(int)) -> int':
+  '(array: ARRAY(int)) -> int':
     entries: null
     error: true
     errorMessage: "Unsupported"
 MSE intermediate stage (without null handling):
-  '(arr: ARRAY(int)) -> int':
+  '(array: ARRAY(int)) -> int':
     entries: null
     error: true
     errorMessage: "Unsupported"
 SSE predicate (with null handling):
-  '(arr: ARRAY(int)) -> int':
+  '(array: ARRAY(int)) -> int':
     entries:
       empty array:
         actualResult: true
@@ -67,7 +67,7 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(arr: ARRAY(int)) -> int':
+  '(array: ARRAY(int)) -> int':
     entries:
       empty array:
         actualResult: true
@@ -97,7 +97,7 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(arr: ARRAY(int)) -> int':
+  '(array: ARRAY(int)) -> int':
     entries:
       empty array:
         actualResult: null
@@ -105,15 +105,15 @@ SSE projection (with null handling):
         error: null
         expectedResult: null
       negative values:
-        actualResult: 0
+        actualResult: -5
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
+        expectedResult: -5
       normal array:
-        actualResult: 3
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 3
+        expectedResult: 1
       null array:
         actualResult: null
         equivalence: "EQUAL"
@@ -127,7 +127,7 @@ SSE projection (with null handling):
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(arr: ARRAY(int)) -> int':
+  '(array: ARRAY(int)) -> int':
     entries:
       empty array:
         actualResult: -2147483648
@@ -135,15 +135,15 @@ SSE projection (without null handling):
         error: null
         expectedResult: -2147483648
       negative values:
-        actualResult: 0
+        actualResult: -5
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0
+        expectedResult: -5
       normal array:
-        actualResult: 3
+        actualResult: 1
         equivalence: "EQUAL"
         error: null
-        expectedResult: 3
+        expectedResult: 1
       null array:
         actualResult: -2147483648
         equivalence: "EQUAL"

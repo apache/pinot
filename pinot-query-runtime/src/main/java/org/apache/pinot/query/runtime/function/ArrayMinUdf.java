@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.core.operator.transform.function.ArrayMaxTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
@@ -32,45 +31,46 @@ import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
-
+import org.apache.pinot.core.operator.transform.function.ArrayMinTransformFunction;
 
 @AutoService(Udf.class)
-public class ArrayMaxUdf extends Udf {
+public class ArrayMinUdf extends Udf {
   @Override
   public String getMainName() {
-    return "arrayMax";
+    return "arrayMin";
   }
 
   @Override
   public String getDescription() {
-    return "Given an array with numeric values, this function returns the maximum value in the array. "
-        + "* asdf ";
+    return "Returns the minimum value in the input array. If the array is empty or null, returns null.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-            UdfParameter.of("arr", FieldSpec.DataType.INT)
-                .withDescription("Input array of integers")
-                .asMultiValued(),  // Input is an array of INT
-            UdfParameter.result(FieldSpec.DataType.INT)  // Return type is single value INT
+            UdfParameter.of("array", FieldSpec.DataType.INT)
+                .asMultiValued()
+                .withDescription("Array of numbers"),
+            UdfParameter.result(FieldSpec.DataType.INT)
+                .withDescription("Minimum value in the array, or null if array is empty or null.")
         ))
-        .addExample("normal array", List.of(1, 2, 3), 3)
-        .addExample("negative values", List.of(-5, -2, 0), 0)
+        .addExample("normal array", List.of(1, 2, 3), 1)
+        .addExample("negative values", List.of(-5, -2, 0), -5)
         .addExample("single element", List.of(42), 42)
-        .addExample(UdfExample.create("empty array", List.of(), null).withoutNull(-2147483648))
-        .addExample(UdfExample.create("null array", null, null).withoutNull(-2147483648))
+        .addExample(UdfExample.create("empty array", List.of(), null).withoutNull(-2147483648	))
+        .addExample(UdfExample.create("null array", null, null).withoutNull(-2147483648	))
         .build()
         .generateExamples();
-  }
-
-  @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ARRAY_MAX, ArrayMaxTransformFunction.class);
   }
 
   @Override
   public Set<PinotScalarFunction> getScalarFunctions() {
     return Set.of();
   }
+
+  @Override
+  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
+    return Map.of(TransformFunctionType.ARRAY_MIN, ArrayMinTransformFunction.class);
+  }
 }
+

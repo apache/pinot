@@ -157,7 +157,7 @@ arraymax:
 arraymin:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ArrayMinTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayMinUdf"
 arrayremoveint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayRemoveInt}"
   transform: null
