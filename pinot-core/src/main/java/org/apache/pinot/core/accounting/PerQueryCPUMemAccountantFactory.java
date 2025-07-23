@@ -905,8 +905,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       /**
        * Kill the query with the highest cost (memory footprint/cpu time/...)
-       * Will trigger gc when killing a consecutive number of queries
-       * use XX:+ExplicitGCInvokesConcurrent to avoid a full gc when system.gc is triggered
        */
       private void killMostExpensiveQuery() {
         if (!_isThreadMemorySamplingEnabled) {
