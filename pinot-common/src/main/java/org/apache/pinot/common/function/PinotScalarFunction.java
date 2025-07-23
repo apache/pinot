@@ -52,6 +52,26 @@ public interface PinotScalarFunction {
   }
 
   /**
+   * Returns an identifier for the scalar function, which is used to identify the actual PinotScalarFunction class that
+   * is registered in the FunctionRegistry.
+   *
+   * This was originally created to facilitate the debug process, so it is possible to identify the class that
+   * implements a given scalar function. This is for example used to generate the all-functions.yml file, which lists
+   * all the scalar and transform functions available in Pinot in order to test UDF implementations.
+   *
+   * See for example {@link FunctionRegistry.ArgumentCountBasedScalarFunction} which overrides this method to also
+   * include the different FunctionInfo for the different argument counts.
+   *
+   * It is important that this method returns a stable identifier. This means it should not change unless we change the
+   * class. For example, this should not be a call to {@link java.util.Objects#toIdentityString(Object)}, given it will
+   * include the hash code of the object id, which will be different for each instance of the object. Instead, it should
+   * depend on the class.
+   */
+  default String getScalarFunctionId() {
+    return getClass().getCanonicalName();
+  }
+
+  /**
    * Returns the corresponding {@link PinotSqlFunction} to be registered into the OperatorTable, or {@code null} if it
    * doesn't need to be registered (e.g. standard SqlFunction).
    */

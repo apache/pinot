@@ -36,7 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 @AutoService(Udf.class)
 public class OrUdf extends Udf {
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "or";
   }
 

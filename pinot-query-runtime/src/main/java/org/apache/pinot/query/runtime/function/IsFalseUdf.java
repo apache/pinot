@@ -36,7 +36,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 @AutoService(Udf.class)
 public class IsFalseUdf extends Udf {
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "isFalse";
   }
 

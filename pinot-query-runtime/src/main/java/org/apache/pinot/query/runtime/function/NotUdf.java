@@ -43,7 +43,7 @@ public class NotUdf extends Udf.FromAnnotatedMethod {
   }
 
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "not";
   }
 

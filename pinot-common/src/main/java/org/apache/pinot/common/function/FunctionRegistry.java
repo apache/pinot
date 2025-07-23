@@ -335,7 +335,7 @@ public class FunctionRegistry {
     }
 
     @Override
-    public String toString() {
+    public String getScalarFunctionId() {
       if (_functionInfoMap.size() == 1) {
         String singleFunInfo = printFunctionInfo(_functionInfoMap.values().iterator().next());
         return "ArgumentCountBasedScalarFunction{" + singleFunInfo + "}";

@@ -83,7 +83,7 @@ public class PinotFunctionEnvGenerator {
     if (udf.getExamples().keySet().stream()
         .flatMap(signature -> signature.getParameters().stream())
         .anyMatch(param -> !param.getConstraints().isEmpty())) {
-      return "udf_test_" + udf.getMainFunctionName().replaceAll("[^a-zA-Z0-9]", "_");
+      return "udf_test_" + udf.getMainCanonicalName().replaceAll("[^a-zA-Z0-9]", "_");
     }
     return "udf_test";
   }
@@ -294,7 +294,7 @@ public class PinotFunctionEnvGenerator {
       UdfSignature signature,
       UdfExample testCase) {
     GenericRow row = new GenericRow();
-    row.putValue(getUdfColumnName(), udf.getMainFunctionName());
+    row.putValue(getUdfColumnName(), udf.getMainCanonicalName());
     row.putValue(getTestColumnName(), testCase.getId());
     row.putValue(getSignatureColumnName(), signature.toString());
     row.putValue(getResultColumnName(signature, false), testCase.getResult(false));

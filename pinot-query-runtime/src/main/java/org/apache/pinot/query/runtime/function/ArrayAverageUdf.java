@@ -37,7 +37,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 @AutoService(Udf.class)
 public class ArrayAverageUdf extends Udf {
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "arrayaverage";
   }
 

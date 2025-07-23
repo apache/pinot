@@ -31,17 +31,17 @@ MSE intermediate stage (with null handling):
     entries: null
     error: true
     errorMessage: "\"QueryValidationError: From line 15, column 3 to line 15, column\
-      \ 19: No match found for function signature isFalse(<NUMERIC>). From line 15,\
-      \ column 3 to line 15, column 19: No match found for function signature isFalse(<NUMERIC>).\
-      \ No match found for function signature isFalse(<NUMERIC>)\""
+      \ 19: No match found for function signature isfalse(<NUMERIC>). From line 15,\
+      \ column 3 to line 15, column 19: No match found for function signature isfalse(<NUMERIC>).\
+      \ No match found for function signature isfalse(<NUMERIC>)\""
 MSE intermediate stage (without null handling):
   '(input: int) -> boolean':
     entries: null
     error: true
     errorMessage: "\"QueryValidationError: From line 14, column 3 to line 14, column\
-      \ 19: No match found for function signature isFalse(<NUMERIC>). From line 14,\
-      \ column 3 to line 14, column 19: No match found for function signature isFalse(<NUMERIC>).\
-      \ No match found for function signature isFalse(<NUMERIC>)\""
+      \ 19: No match found for function signature isfalse(<NUMERIC>). From line 14,\
+      \ column 3 to line 14, column 19: No match found for function signature isfalse(<NUMERIC>).\
+      \ No match found for function signature isfalse(<NUMERIC>)\""
 SSE predicate (with null handling):
   '(input: int) -> boolean':
     entries:

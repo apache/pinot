@@ -39,7 +39,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 @AutoService(Udf.class)
 public class AndUdf extends Udf {
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "and";
   }
 

@@ -57,7 +57,7 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
     return templateSql
         .replace("@table", PinotFunctionEnvGenerator.getTableName(udf))
         .replace("@udfCol", PinotFunctionEnvGenerator.getUdfColumnName())
-        .replace("@udfName", udf.getMainFunctionName())
+        .replace("@udfName", udf.getMainCanonicalName())
         .replace("@testCol", PinotFunctionEnvGenerator.getTestColumnName())
         .replace("@resultCol", PinotFunctionEnvGenerator.getResultColumnName(signature, nullHandling))
         // Important, we need to replace the @testCol and @resultCol before replacing @test and @result respectively
@@ -73,7 +73,7 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
       UdfExample example,
       /* language=sql*/ String templateSql) {
     List<String> argsForCall = PinotFunctionEnvGenerator.getArgsForCall(signature, example);
-    String call = udf.asSqlCall(udf.getMainFunctionName(), argsForCall);
+    String call = udf.asSqlCall(udf.getMainCanonicalName(), argsForCall);
     return templateSql
         .replace("@example", example.getId())
         .replace("@call", call);

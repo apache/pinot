@@ -54,7 +54,7 @@ public class ExpressionTransformerTestScenario implements UdfTestScenario {
     Map<UdfExample, UdfExampleResult> result = new HashMap<>();
 
     for (UdfExample testCase : udf.getExamples().get(signature)) {
-      String sqlCall = udf.asSqlCall(udf.getMainFunctionName(), PinotFunctionEnvGenerator.getArgsForCall(signature));
+      String sqlCall = udf.asSqlCall(udf.getMainCanonicalName(), PinotFunctionEnvGenerator.getArgsForCall(signature));
       FunctionEvaluator funEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(sqlCall);
       GenericRow row = PinotFunctionEnvGenerator.asRow(udf, signature, testCase);
       try {

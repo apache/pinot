@@ -22,7 +22,9 @@ import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.arrow.util.Preconditions;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -58,13 +60,31 @@ public abstract class Udf {
   ///
   /// This is treated as an ID, which means that on a single Pinot process there should be only one UDF with a given
   /// main function name.
-  public abstract String getMainFunctionName();
+  public abstract String getMainName();
+
+  /// Returns the main function name of the UDF, canonicalized as defined in [FunctionRegistry#canonicalize].
+  /// This is used to ensure that the function name is in a consistent format, which is important for
+  /// function registration, lookup and reporting.
+  public String getMainCanonicalName() {
+    return FunctionRegistry.canonicalize(getMainName());
+  }
 
   /// A set with all names of the functions that this UDF can be called with, including the main name.
   ///
   /// This is used to support different aliases for the same function, so that users can call the function.
-  public Set<String> getAllFunctionNames() {
-    return Set.of(getMainFunctionName());
+  public Set<String> getAllNames() {
+    return Set.of(getMainName());
+  }
+
+  /// Returns a set with all names of the functions that this UDF can be called with, including the main name,
+  /// canonicalized as defined in [FunctionRegistry#canonicalize].
+  ///
+  /// This is used to ensure that the function names are in a consistent format, which is important for
+  /// function registration, lookup and reporting.
+  public Set<String> getAllCanonicalNames() {
+    return getAllNames().stream()
+        .map(FunctionRegistry::canonicalize)
+        .collect(Collectors.toSet());
   }
 
   /// A description of the UDF, which should be used in documentation or for debugging purposes.
@@ -102,7 +122,7 @@ public abstract class Udf {
 
   @Override
   public String toString() {
-    return getMainFunctionName();
+    return getMainName();
   }
 
   public static abstract class FromAnnotatedMethod extends Udf {
@@ -116,7 +136,7 @@ public abstract class Udf {
     }
 
     @Override
-    public Set<String> getAllFunctionNames() {
+    public Set<String> getAllNames() {
       if (_annotation.names().length > 0) {
         return Set.of(_annotation.names());
       }
@@ -124,7 +144,7 @@ public abstract class Udf {
     }
 
     @Override
-    public String getMainFunctionName() {
+    public String getMainName() {
       if (_annotation.names().length > 0) {
         return _annotation.names()[0];
       }

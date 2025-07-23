@@ -50,12 +50,12 @@ public class UdfReporter {
   /// Generates a markdown report for the given UDF and its test results.
   public static void reportAsMarkdown(Udf udf, UdfTestResult.ByScenario byScenario, Writer writer) {
     try (PrintWriter report = new PrintWriter(writer)) {
-      report.append("## ").append(udf.getMainFunctionName()).append("\n\n");
+      report.append("## ").append(udf.getMainName()).append("\n\n");
 
-      if (udf.getAllFunctionNames().size() > 1) {
+      if (udf.getAllNames().size() > 1) {
         report.append("Other names: ")
-            .append(udf.getAllFunctionNames().stream()
-                .filter(name -> !name.equals(udf.getMainFunctionName()))
+            .append(udf.getAllNames().stream()
+                .filter(name -> !name.equals(udf.getMainName()))
                 .collect(Collectors.joining(", ")))
             .append("\n\n");
       }
@@ -109,7 +109,7 @@ public class UdfReporter {
                 .append(signature.toString()).append(" | ");
 
             // Call column
-            report.append(asSqlCallWithLiteralArgs(udf, udf.getMainFunctionName(), example.getInputValues()))
+            report.append(asSqlCallWithLiteralArgs(udf, udf.getMainName(), example.getInputValues()))
                 .append(" | ");
 
             // Expected result
@@ -153,7 +153,7 @@ public class UdfReporter {
 
       boolean paramsAlreadyPrinted = false;
       for (UdfSignature signature : signatures) {
-        report.append("#### ").append(udf.getMainFunctionName()).append(signature.toString()).append("\n\n");
+        report.append("#### ").append(udf.getMainName()).append(signature.toString()).append("\n\n");
 
         String resultDescription = signature.getReturnType().getDescription();
         if (resultDescription != null) {
@@ -211,7 +211,7 @@ public class UdfReporter {
 
             // Call column
             report.append("| ")
-                .append(asSqlCallWithLiteralArgs(udf, udf.getMainFunctionName(), example.getInputValues()))
+                .append(asSqlCallWithLiteralArgs(udf, udf.getMainName(), example.getInputValues()))
                 .append(" | ")
                 .append(withNull == null ? "NULL" : withNull.toString())
                 .append(" | ")
@@ -224,17 +224,17 @@ public class UdfReporter {
     if (summaries.values().stream().distinct().count() == 1) {
       String summary = summaries.values().iterator().next();
       if (summary.equals("❌ Unsupported")) {
-        report.append("The UDF ").append(udf.getMainFunctionName())
+        report.append("The UDF ").append(udf.getMainName())
             .append(" is not supported in all scenarios.\n\n");
       } else if (summary.contains("❌")) {
-        report.append("The UDF ").append(udf.getMainFunctionName())
+        report.append("The UDF ").append(udf.getMainName())
             .append(" has failed in all scenarios with the following error: ")
             .append(summary).append("\n\n");
       } else if (summary.equals("EQUAL")) {
-        report.append("The UDF ").append(udf.getMainFunctionName())
+        report.append("The UDF ").append(udf.getMainName())
             .append(" is supported in all scenarios\n\n");
       } else {
-        report.append("The UDF ").append(udf.getMainFunctionName())
+        report.append("The UDF ").append(udf.getMainName())
             .append(" is supported in all scenarios with at least ")
             .append(summary).append(" semantic.\n\n");
       }
@@ -256,7 +256,7 @@ public class UdfReporter {
   public static void reportAsMarkdown(UdfTestResult results, Function<Udf, OutputStream> osGenerator)
       throws IOException {
 
-    TreeSet<Udf> udfs = new TreeSet<>(Comparator.comparing(Udf::getMainFunctionName));
+    TreeSet<Udf> udfs = new TreeSet<>(Comparator.comparing(Udf::getMainCanonicalName));
     udfs.addAll(results.getResults().keySet());
     for (Udf udf : udfs) {
       try (OutputStream os = osGenerator.apply(udf);

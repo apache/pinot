@@ -36,13 +36,13 @@ import org.apache.pinot.core.udf.UdfSignature;
 @AutoService(Udf.class)
 public class MultUdf extends Udf {
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "mult";
   }
 
   @Override
-  public Set<String> getAllFunctionNames() {
-    return Set.of(getMainFunctionName(), "times");
+  public Set<String> getAllNames() {
+    return Set.of(getMainName(), "times");
   }
 
   @Override
@@ -52,7 +52,7 @@ public class MultUdf extends Udf {
 
   @Override
   public String asSqlCall(String name, List<String> sqlArgValues) {
-    if (name.equals(getMainFunctionName())) {
+    if (name.equals(getMainCanonicalName())) {
       return "(" + String.join(" * ", sqlArgValues) + ")";
     } else {
       return super.asSqlCall(name, sqlArgValues);
