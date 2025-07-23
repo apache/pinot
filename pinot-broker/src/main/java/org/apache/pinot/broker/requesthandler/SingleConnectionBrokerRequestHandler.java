@@ -75,7 +75,7 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
       ServerRoutingStatsManager serverRoutingStatsManager, FailureDetector failureDetector,
       ThreadResourceUsageAccountant accountant) {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
-    _brokerReduceService = new BrokerReduceService(_config);
+    _brokerReduceService = new BrokerReduceService(_config, accountant);
     _queryRouter = new QueryRouter(_brokerId, _brokerMetrics, nettyConfig, tlsConfig, serverRoutingStatsManager);
     _failureDetector = failureDetector;
     _failureDetector.registerUnhealthyServerRetrier(this::retryUnhealthyServer);
