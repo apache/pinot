@@ -141,7 +141,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     protected Set<String> _cancelSentQueries;
 
-    protected String _maxMemoryUsageQueryId;
+    protected AtomicReference<String> _maxMemoryUsageQueryId = new AtomicReference<>(null);
 
     // the periodical task that aggregates and preempts queries
     protected final WatcherTask _watcherTask;
@@ -328,15 +328,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         return false;
       }
 
+      String maxMemoryUsageQueryId = _maxMemoryUsageQueryId.get();
+
       if (_watcherTask.getHeapUsageBytes() > config.getPanicLevel()) {
         // If in panic mode, then terminate
         LOGGER.warn("Heap usage {} exceeds panic level {}, self-terminating",
             _watcherTask.getHeapUsageBytes(), config.getPanicLevel());
         return true;
-      } else if (_maxMemoryUsageQueryId != null && _maxMemoryUsageQueryId.equals(QueryThreadContext.getCid())) {
+      } else if (maxMemoryUsageQueryId != null && maxMemoryUsageQueryId.equals(QueryThreadContext.getCid())) {
         // If this is the most expensive query, then terminate
         LOGGER.warn("Query {} is the most expensive query, self-terminating", QueryThreadContext.getCid());
-        return false;
+        return true;
       }
       return false;
     }
@@ -821,9 +823,9 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           if (_triggeringLevel.ordinal() > TriggeringLevel.Normal.ordinal()) {
             _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
             _aggregatedUsagePerActiveQuery.values().stream()
-                .filter(stats -> !_cancelSentQueries.contains(stats.getQueryId()))
+                .filter(stats -> stats.getAllocatedBytes() > config.getMinMemoryFootprintForKill())
                 .max(Comparator.comparing(AggregatedStats::getAllocatedBytes))
-                .ifPresent(maxStats -> _maxMemoryUsageQueryId = maxStats.getQueryId());
+                .ifPresent(maxStats -> _maxMemoryUsageQueryId.set(maxStats.getQueryId()));
           } else {
             _maxMemoryUsageQueryId = null;
           }
