@@ -955,6 +955,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
 
+  protected void deleteSnapshot(ImmutableSegmentImpl segment) {
+    segment.deleteValidDocIdsSnapshot();
+  }
+
   protected File getWatermarkFile() {
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
