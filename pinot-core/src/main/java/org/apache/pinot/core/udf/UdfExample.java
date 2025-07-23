@@ -42,8 +42,6 @@ public abstract class UdfExample {
   /// The result of the example. It may be different depending on whether null handling is enabled or not.
   public abstract Object getResult(NullHandling nullHandling);
 
-  public abstract Object getResult(boolean nullHandling);
-
   /// Creates a new UdfExample with the given name and some values.
   ///
   /// The values array is processed assuming that the last value is the expected result, while all the previous values
