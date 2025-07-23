@@ -132,6 +132,13 @@ public interface ThreadResourceUsageAccountant {
    */
   void startWatcherTask();
 
+  /**
+   * Stop the periodic watcher task.
+   */
+  default void stopWatcherTask() {
+    // Default implementation does nothing. Subclasses can override to stop the watcher task.
+  }
+
   @Nullable
   default PinotClusterConfigChangeListener getClusterConfigChangeListener() {
     return null;

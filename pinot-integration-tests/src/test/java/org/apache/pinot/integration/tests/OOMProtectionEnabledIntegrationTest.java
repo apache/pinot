@@ -19,14 +19,22 @@
 package org.apache.pinot.integration.tests;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
+import org.apache.pinot.core.accounting.QueryMonitorConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class OOMProtectionEnabledIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -62,6 +70,7 @@ public class OOMProtectionEnabledIntegrationTest extends BaseClusterIntegrationT
     startZk();
     startController();
     startBroker();
+    Tracing.unregisterThreadAccountant();
     startServer();
     startKafka();
 
@@ -99,5 +108,50 @@ public class OOMProtectionEnabledIntegrationTest extends BaseClusterIntegrationT
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageEngine);
     super.testHardcodedQueries();
+  }
+
+  @Test
+  public void testChangeOomKillQueryEnabled()
+      throws IOException {
+    assertTrue(_serverStarters.get(0)
+        .getResourceUsageAccountant() instanceof PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant);
+    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
+        (PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant) _serverStarters.get(0)
+            .getResourceUsageAccountant();
+
+    QueryMonitorConfig queryMonitorConfig = accountant.getQueryMonitorConfig();
+    assertFalse(queryMonitorConfig.isOomKillQueryEnabled());
+
+    updateClusterConfig(Map.of("pinot.query.scheduler.accounting.oom.enable.killing.query", "true",
+        "pinot.query.scheduler.accounting.query.killed.metric.enabled", "true"));
+
+    TestUtils.waitForCondition(aVoid -> {
+      QueryMonitorConfig updatedQueryMonitorConfig = accountant.getQueryMonitorConfig();
+      return updatedQueryMonitorConfig.isOomKillQueryEnabled()
+          && updatedQueryMonitorConfig.isQueryKilledMetricEnabled();
+    }, 1000L, "Waiting for OOM protection to be enabled");
+  }
+
+  @Test
+  public void testChangeThresholds()
+      throws IOException {
+    assertTrue(_serverStarters.get(0)
+        .getResourceUsageAccountant() instanceof PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant);
+    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
+        (PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant) _serverStarters.get(0)
+            .getResourceUsageAccountant();
+
+
+    QueryMonitorConfig queryMonitorConfig = accountant.getQueryMonitorConfig();
+    updateClusterConfig(Map.of("pinot.query.scheduler.accounting.oom.alarming.usage.ratio", "0.7f",
+        "pinot.query.scheduler.accounting.oom.critical.heap.usage.ratio", "0.75f",
+        "pinot.query.scheduler.accounting.oom.panic.heap.usage.ratio", "0.8f"));
+
+    TestUtils.waitForCondition(aVoid -> {
+      QueryMonitorConfig updatedQueryMonitorConfig = accountant.getQueryMonitorConfig();
+      return updatedQueryMonitorConfig.getAlarmingLevel() != queryMonitorConfig.getAlarmingLevel()
+          && updatedQueryMonitorConfig.getCriticalLevel() != queryMonitorConfig.getCriticalLevel()
+          && updatedQueryMonitorConfig.getPanicLevel() != queryMonitorConfig.getPanicLevel();
+    }, 1000L, "Waiting for OOM protection to be enabled");
   }
 }

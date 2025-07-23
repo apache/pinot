@@ -85,6 +85,7 @@ import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -153,6 +154,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected AbstractResponseStore _responseStore;
   protected BrokerGrpcServer _brokerGrpcServer;
   protected FailureDetector _failureDetector;
+  protected ThreadResourceUsageAccountant _resourceUsageAccountant;
 
   @Override
   public void init(PinotConfiguration brokerConf)
@@ -415,9 +417,10 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             CommonConstants.Broker.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(
+    _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
         _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.BROKER);
+    Preconditions.checkNotNull(_resourceUsageAccountant);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
