@@ -45,11 +45,11 @@ adler32:
 ago:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DateTimeFunctions.ago}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.AgoUdf"
 agomv:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DateTimeFunctions.agoMV}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.AgoMvUdf"
 and:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.AndOperatorTransformFunction"
