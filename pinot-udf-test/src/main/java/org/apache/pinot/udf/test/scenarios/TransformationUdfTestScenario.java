@@ -30,14 +30,14 @@ import org.apache.pinot.udf.test.UdfTestScenario;
 
 /// A test scenario where the UDF is executed as a TransformFunction.
 public class TransformationUdfTestScenario extends AbstractUdfTestScenario {
-  public TransformationUdfTestScenario(UdfTestCluster cluster, boolean nullHandlingEnabled) {
-    super(cluster, nullHandlingEnabled);
+  public TransformationUdfTestScenario(UdfTestCluster cluster, UdfExample.NullHandling nullHandlingMode) {
+    super(cluster, nullHandlingMode);
   }
 
   @Override
   public String getTitle() {
-    return "SSE projection ("
-        + (isNullHandlingEnabled() ? "with" : "without") + " null handling)";
+    return "SSE projection (" + (getNullHandlingMode() == UdfExample.NullHandling.ENABLED ? "with" : "without")
+        + " null handling)";
   }
 
   @Override
@@ -61,7 +61,7 @@ public class TransformationUdfTestScenario extends AbstractUdfTestScenario {
         + "  AND @testCol = '@example' \n";
 
     UdfTestCluster.ExecutionContext context = new UdfTestCluster.ExecutionContext(
-        isNullHandlingEnabled(),
+        getNullHandlingMode(),
         false);
 
     return extractResultsByCase(suite, signature, context, sqlTemplate);
@@ -71,7 +71,7 @@ public class TransformationUdfTestScenario extends AbstractUdfTestScenario {
   @AutoService(UdfTestScenario.Factory.class)
   public static class WithNullHandlingFactory extends UdfTestScenario.Factory.FromCluster {
     public WithNullHandlingFactory() {
-      super(cluster -> new TransformationUdfTestScenario(cluster, true));
+      super(cluster -> new TransformationUdfTestScenario(cluster, UdfExample.NullHandling.ENABLED));
     }
   }
 
@@ -79,7 +79,7 @@ public class TransformationUdfTestScenario extends AbstractUdfTestScenario {
   @AutoService(UdfTestScenario.Factory.class)
   public static class WithoutNullHandlingFactory extends UdfTestScenario.Factory.FromCluster {
     public WithoutNullHandlingFactory() {
-      super(cluster -> new TransformationUdfTestScenario(cluster, false));
+      super(cluster -> new TransformationUdfTestScenario(cluster, UdfExample.NullHandling.DISABLED));
     }
   }
 }

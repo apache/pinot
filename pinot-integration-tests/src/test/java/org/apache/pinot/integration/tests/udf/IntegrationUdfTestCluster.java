@@ -33,6 +33,7 @@ import org.apache.pinot.client.grpc.GrpcUtils;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.controller.helix.ControllerRequestClient;
+import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.integration.tests.BaseClusterIntegrationTest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -215,7 +216,7 @@ public class IntegrationUdfTestCluster extends BaseClusterIntegrationTest
 
   public Iterator<Broker.BrokerResponse> queryGrpc(ExecutionContext context, String sql) {
     String prefix = "";
-    if (context.isNullHandlingEnabled()) {
+    if (context.getNullHandlingMode() == UdfExample.NullHandling.ENABLED) {
       prefix = "SET enableNullHandling=true;\n" + prefix;
     }
     if (context.isUseMultistageEngine()) {
