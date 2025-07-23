@@ -89,7 +89,7 @@ arraycontainsint:
 arraycontainsstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayContainsString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayContainsStringUdf"
 arraydistinctint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayDistinctInt}"
   transform: null
