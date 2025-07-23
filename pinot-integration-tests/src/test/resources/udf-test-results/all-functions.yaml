@@ -121,23 +121,23 @@ arrayelementatstring:
 arrayindexesofdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfDouble}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfDoubleUdf"
 arrayindexesoffloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfFloat}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfFloatUdf"
 arrayindexesofint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfIntUdf"
 arrayindexesoflong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfLongUdf"
 arrayindexesofstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfStringUdf"
 arrayindexofint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexOfInt}"
   transform: null
