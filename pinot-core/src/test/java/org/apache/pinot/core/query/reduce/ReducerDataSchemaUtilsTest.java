@@ -73,11 +73,13 @@ public class ReducerDataSchemaUtilsTest {
         "SELECT SUM(col1 + 1), MIN(col2 + 2), col4 FROM testTable GROUP BY col3, col4");
     // Intentionally make data schema not matching the string representation of the expression
     dataSchema = new DataSchema(new String[]{"col3", "col4", "sum(col1)", "count(1)", "min(col2)"},
-        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE});
+        new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE,
+            ColumnDataType.LONG, ColumnDataType.DOUBLE});
     canonicalDataSchema = ReducerDataSchemaUtils.canonicalizeDataSchemaForGroupBy(queryContext, dataSchema);
     assertEquals(canonicalDataSchema,
         new DataSchema(new String[]{"col3", "col4", "sum(col1)", "count(*)", "min(col2)"}, new ColumnDataType[]{
-            ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.DOUBLE
+            ColumnDataType.INT, ColumnDataType.LONG, ColumnDataType.DOUBLE, ColumnDataType.LONG,
+            ColumnDataType.DOUBLE
         }));
 
     queryContext = QueryContextConverterUtils.getQueryContext(

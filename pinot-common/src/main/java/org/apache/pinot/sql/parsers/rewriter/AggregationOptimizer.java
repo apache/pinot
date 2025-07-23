@@ -66,7 +66,7 @@ public class AggregationOptimizer implements QueryRewriter {
       return null;
     }
 
-    String operator = function.getOperator().toLowerCase();
+    String operator = function.getOperator();
     List<Expression> operands = function.getOperands();
 
     if (operands == null || operands.size() != 1) {
@@ -75,7 +75,7 @@ public class AggregationOptimizer implements QueryRewriter {
 
     Expression operand = operands.get(0);
 
-    switch (operator) {
+    switch (operator.toLowerCase()) {
       case "sum":
         return optimizeSumExpression(operand);
       case "avg":
@@ -169,11 +169,11 @@ public class AggregationOptimizer implements QueryRewriter {
     }
 
     // Handle values wrapper function (used by avg, min, max)
-    if ("values".equals(operator.toLowerCase()) && operands != null && operands.size() == 1) {
+    if ("values".equalsIgnoreCase(operator) && operands != null && operands.size() == 1) {
       Expression valuesOperand = operands.get(0);
       if (valuesOperand.getType() == ExpressionType.FUNCTION) {
         Function rowFunction = valuesOperand.getFunctionCall();
-        if (rowFunction != null && "row".equals(rowFunction.getOperator().toLowerCase())
+        if (rowFunction != null && "row".equalsIgnoreCase(rowFunction.getOperator())
             && rowFunction.getOperands() != null && rowFunction.getOperands().size() == 1) {
           Expression rowOperand = rowFunction.getOperands().get(0);
           return optimizeArithmeticExpression(rowOperand, aggregationFunction);
