@@ -30,7 +30,6 @@ import javax.annotation.Nullable;
 import org.apache.avro.Conversions;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
-import org.apache.avro.data.TimeConversions;
 import org.apache.avro.file.DataFileStream;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;

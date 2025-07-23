@@ -69,4 +69,3 @@ public class DegreesUdf extends Udf.FromAnnotatedMethod {
     return Map.of(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
   }
 }
-

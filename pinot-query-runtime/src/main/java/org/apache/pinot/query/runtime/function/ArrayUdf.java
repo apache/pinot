@@ -49,4 +49,3 @@ public class ArrayUdf extends Udf.FromAnnotatedMethod {
     return Collections.emptyMap();
   }
 }
-

@@ -73,4 +73,3 @@ public class ArrayAverageUdf extends Udf {
     return Map.of(TransformFunctionType.ARRAY_AVERAGE, ArrayAverageTransformFunction.class);
   }
 }
-
