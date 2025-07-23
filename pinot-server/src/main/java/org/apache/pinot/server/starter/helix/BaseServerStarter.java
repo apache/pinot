@@ -797,7 +797,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
     _isServerReadyToServeQueries = true;
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
-    RealtimeConsumptionRateManager.getInstance().enableThrottling();
+    RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
 
     LOGGER.info("Pinot server ready");
 
