@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
+import org.apache.pinot.core.udf.UdfExample.NullHandling;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.udf.test.PinotFunctionEnvGenerator;
@@ -110,7 +111,7 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
         results.put(example, UdfExampleResult.error(example, errorMessage));
         continue;
       }
-      Object expectedResult = example.getResult(isNullHandlingEnabled());
+      Object expectedResult = example.getResult(isNullHandlingEnabled() ? NullHandling.ENABLED : NullHandling.DISABLED);
       results.put(example, UdfExampleResult.success(example, row.getValue("result"), expectedResult));
 
       if (rows.hasNext()) {
