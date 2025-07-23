@@ -19,8 +19,10 @@
 package org.apache.pinot.query.runtime.function;
 
 import com.google.auto.service.AutoService;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.transform.function.ArrayMaxTransformFunction;
@@ -54,18 +56,22 @@ public class ArrayMaxUdf extends Udf {
                 .asMultiValued(),  // Input is an array of INT
             UdfParameter.result(FieldSpec.DataType.INT)  // Return type is single value INT
         ))
-        .addExample("array with small values", new Integer[]{1, 2, 3}, 3)
+        .addExample("normal array", List.of(1, 2, 3), 3)
+        .addExample("negative values", List.of(-5, -2, 0), 0)
+        .addExample("single element", List.of(42), 42)
+        .addExample(UdfExample.create("empty array", List.of(), null).withoutNull(-2147483648))
+        .addExample(UdfExample.create("null array", null, null).withoutNull(-2147483648))
         .build()
         .generateExamples();
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ARRAY_MAX, ArrayMaxTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.ARRAY_MAX, ArrayMaxTransformFunction.class);
   }
 
   @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of();
+  public PinotScalarFunction getScalarFunction() {
+    return null;
   }
 }

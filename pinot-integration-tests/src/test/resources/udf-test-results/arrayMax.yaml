@@ -39,7 +39,27 @@ MSE intermediate stage (without null handling):
 SSE predicate (with null handling):
   '(arr: ARRAY(int)) -> int':
     entries:
-      array with small values:
+      empty array:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      negative values:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      normal array:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      null array:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      single element:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -49,7 +69,27 @@ SSE predicate (with null handling):
 SSE predicate (without null handling):
   '(arr: ARRAY(int)) -> int':
     entries:
-      array with small values:
+      empty array:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      negative values:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      normal array:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      null array:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      single element:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -59,20 +99,60 @@ SSE predicate (without null handling):
 SSE projection (with null handling):
   '(arr: ARRAY(int)) -> int':
     entries:
-      array with small values:
+      empty array:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      negative values:
+        actualResult: 0
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 0
+      normal array:
         actualResult: 3
         equivalence: "EQUAL"
         error: null
         expectedResult: 3
+      null array:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      single element:
+        actualResult: 42
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 42
     error: false
     errorMessage: null
 SSE projection (without null handling):
   '(arr: ARRAY(int)) -> int':
     entries:
-      array with small values:
+      empty array:
+        actualResult: -2147483648
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -2147483648
+      negative values:
+        actualResult: 0
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 0
+      normal array:
         actualResult: 3
         equivalence: "EQUAL"
         error: null
         expectedResult: 3
+      null array:
+        actualResult: -2147483648
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -2147483648
+      single element:
+        actualResult: 42
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 42
     error: false
     errorMessage: null

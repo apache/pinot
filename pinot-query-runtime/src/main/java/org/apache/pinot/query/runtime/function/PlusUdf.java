@@ -22,6 +22,7 @@ import com.google.auto.service.AutoService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.arithmetic.PlusScalarFunction;
@@ -70,12 +71,12 @@ public class PlusUdf extends Udf {
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ADD, AdditionTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.ADD, AdditionTransformFunction.class);
   }
 
   @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of(new PlusScalarFunction());
+  public PinotScalarFunction getScalarFunction() {
+    return new PlusScalarFunction();
   }
 }

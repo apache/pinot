@@ -23,7 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.arrow.util.Preconditions;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -114,11 +116,18 @@ public abstract class Udf {
   /// The pair of function type and transform function that implements this UDF.
   ///
   /// Unstable API: Transform functions still use an old model of registration using a model that is not polymorphic
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of();
+  @Nullable
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return null;
   }
 
-  public abstract Set<PinotScalarFunction> getScalarFunctions();
+  /// Returns the ScalarFunctions that implement this UDF, if any.
+  ///
+  /// Ideally all UDFs should have a corresponding ScalarFunction. Otherwise Pinot won't be able to use them in some
+  /// scenarios. This should be enforced for all new UDFs, but existing UDFs might not have a corresponding
+  /// ScalarFunction, in which case they can return null.
+  @Nullable
+  public abstract PinotScalarFunction getScalarFunction();
 
   @Override
   public String toString() {
@@ -152,7 +161,7 @@ public abstract class Udf {
     }
 
     @Override
-    public Set<PinotScalarFunction> getScalarFunctions() {
+    public PinotScalarFunction getScalarFunction() {
       return PinotScalarFunction.fromMethod(_method, _annotation.isVarArg(),
           _annotation.nullableParameters(), _annotation.names());
     }

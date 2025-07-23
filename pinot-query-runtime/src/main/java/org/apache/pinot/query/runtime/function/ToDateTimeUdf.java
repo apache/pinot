@@ -21,9 +21,7 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.DateTimeFunctions;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
@@ -65,11 +63,5 @@ public class ToDateTimeUdf extends Udf.FromAnnotatedMethod {
         //.addExample("null format", 1577836800000L, null, null)
         .build()
         .generateExamples();
-  }
-
-  @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    // No transform function for toDateTime, similar to ArrayMaxUdf
-    return Map.of();
   }
 }

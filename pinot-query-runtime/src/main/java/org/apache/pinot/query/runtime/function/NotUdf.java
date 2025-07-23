@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.LogicalFunctions;
@@ -70,12 +71,12 @@ public class NotUdf extends Udf.FromAnnotatedMethod {
   }
 
   @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of();
+  public PinotScalarFunction getScalarFunction() {
+    return null;
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.NOT, NotOperatorTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.NOT, NotOperatorTransformFunction.class);
   }
 }
