@@ -103,8 +103,8 @@ public final class GroupByUtils {
    * TODO: add conditions checking for number of threads available
    */
   public static boolean shouldPartitionGroupBy(QueryContext queryContext) {
-//    return QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY > 4 && !queryContext.isUnsafeTrim();
-    return !queryContext.isUnsafeTrim();
+//    return QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY > 4 && queryContext.isUnsafeTrim();
+    return queryContext.isUnsafeTrim() && queryContext.getOrderByExpressions() != null;
   }
 
   private static Record updateRecord(Record existingRecord, Record newRecord,

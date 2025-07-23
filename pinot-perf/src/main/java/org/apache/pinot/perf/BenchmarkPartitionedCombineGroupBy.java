@@ -75,7 +75,7 @@ public class BenchmarkPartitionedCombineGroupBy {
 
   @Param({"20", "50"})
   private int _numSegments;
-  @Param("1000")
+  @Param({"1000", "10000"})
   private int _numRecordsPerSegment;
   @Param({"500", "1000000000"})
   private int _limit;
