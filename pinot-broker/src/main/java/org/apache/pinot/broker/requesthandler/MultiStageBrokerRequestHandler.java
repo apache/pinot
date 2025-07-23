@@ -85,6 +85,7 @@ import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -133,8 +134,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
+      MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector,
+      ThreadResourceUsageAccountant accountant) {
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
@@ -528,8 +530,8 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try {
       String workloadName = QueryOptionsUtils.getWorkloadName(query.getOptions());
-      Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.MSE,
-          workloadName);
+      _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), CommonConstants.Accounting.ANCHOR_TASK_ID,
+          ThreadExecutionContext.TaskType.MSE, workloadName);
 
       long executionStartTimeNs = System.nanoTime();
       QueryDispatcher.QueryResult queryResults;

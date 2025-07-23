@@ -47,6 +47,7 @@ import org.apache.pinot.core.transport.ServerResponse;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
@@ -71,8 +72,9 @@ public class SingleConnectionBrokerRequestHandler extends BaseSingleStageBrokerR
   public SingleConnectionBrokerRequestHandler(PinotConfiguration config, String brokerId,
       BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
       QueryQuotaManager queryQuotaManager, TableCache tableCache, NettyConfig nettyConfig, TlsConfig tlsConfig,
-      ServerRoutingStatsManager serverRoutingStatsManager, FailureDetector failureDetector) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
+      ServerRoutingStatsManager serverRoutingStatsManager, FailureDetector failureDetector,
+      ThreadResourceUsageAccountant accountant) {
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
     _brokerReduceService = new BrokerReduceService(_config);
     _queryRouter = new QueryRouter(_brokerId, _brokerMetrics, nettyConfig, tlsConfig, serverRoutingStatsManager);
     _failureDetector = failureDetector;
