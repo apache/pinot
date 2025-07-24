@@ -2059,7 +2059,7 @@ public class ForwardIndexHandlerTest {
     }
     fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
     try (ForwardIndexReader<?> forwardIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
-        columnMetadata);) {
+        columnMetadata)) {
       Dictionary dictionary = null;
       if (columnMetadata.hasDictionary()) {
         dictionary = DictionaryIndexType.read(reader, columnMetadata);
