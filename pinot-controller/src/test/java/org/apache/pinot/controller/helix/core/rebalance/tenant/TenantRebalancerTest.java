@@ -28,8 +28,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -438,6 +440,52 @@ public class TenantRebalancerTest extends ControllerTest {
     jobContext = tableQueue.poll();
     assertNotNull(jobContext);
     assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+
+    // set table B in parallel blacklist, so that it ends up in sequential queue, and table A in parallel queue
+    Pair<ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext>,
+        Queue<TenantRebalancer.TenantTableRebalanceJobContext>>
+        queues =
+        tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(), null,
+            Collections.singleton(OFFLINE_TABLE_NAME_B));
+    Queue<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
+    Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
+    jobContext = parallelQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+    assertNull(parallelQueue.poll());
+    jobContext = sequentialQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+    assertNull(sequentialQueue.poll());
+
+    // set table B in parallel whitelist, so that it ends up in parallel queue, and table A in sequential queue
+    queues = tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(),
+        Collections.singleton(OFFLINE_TABLE_NAME_B), null);
+    parallelQueue = queues.getLeft();
+    sequentialQueue = queues.getRight();
+    jobContext = parallelQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+    assertNull(parallelQueue.poll());
+    jobContext = sequentialQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+    assertNull(sequentialQueue.poll());
+
+    // set both tables in parallel whitelist, and table B in parallel blacklist, so that B ends up in sequential
+    // queue, and table A in parallel queue
+    queues = tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(),
+        Set.of(OFFLINE_TABLE_NAME_A, OFFLINE_TABLE_NAME_B), Collections.singleton(OFFLINE_TABLE_NAME_B));
+    parallelQueue = queues.getLeft();
+    sequentialQueue = queues.getRight();
+    jobContext = parallelQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+    assertNull(parallelQueue.poll());
+    jobContext = sequentialQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+    assertNull(sequentialQueue.poll());
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
