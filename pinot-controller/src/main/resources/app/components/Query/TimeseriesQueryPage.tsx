@@ -51,6 +51,7 @@ import { MAX_SERIES_LIMIT } from '../../utils/ChartConstants';
 
 // Define proper types
 interface TimeseriesQueryResponse {
+  error: string;
   data: {
     resultType: string;
     result: Array<{
@@ -335,6 +336,14 @@ const TimeseriesQueryPage = () => {
     setRawData(parsedData);
     setRawOutput(JSON.stringify(parsedData, null, 2));
 
+    // Check if this is an error response
+    if (parsedData.error != null && parsedData.error !== '') {
+      setError(parsedData.error);
+      setChartSeries([]);
+      setTruncatedChartSeries([]);
+      return;
+    }
+
     // Parse timeseries data for chart and stats
     if (isPrometheusFormat(parsedData)) {
       const series = parseTimeseriesResponse(parsedData);
@@ -498,12 +507,6 @@ const TimeseriesQueryPage = () => {
           </Grid>
         </Grid>
 
-        {error && (
-          <Alert severity="error" className={classes.sqlError}>
-            {error}
-          </Alert>
-        )}
-
         {rawOutput && (
           <Grid item xs style={{ backgroundColor: 'white' }}>
                          <ViewToggle
@@ -514,6 +517,12 @@ const TimeseriesQueryPage = () => {
                copyMsg={copyMsg}
                classes={classes}
              />
+
+              {error && (
+                <Alert severity="error" className={classes.sqlError}>
+                  {error}
+                </Alert>
+              )}
 
                                     {viewType === 'chart' && (
               <SimpleAccordion
