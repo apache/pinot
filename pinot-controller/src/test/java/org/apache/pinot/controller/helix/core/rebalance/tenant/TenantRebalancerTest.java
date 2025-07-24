@@ -390,10 +390,15 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(serverInfo.getServersAdded().size(), 3);
     assertEquals(serverInfo.getServersRemoved().size(), 0);
 
-    Queue<String> tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
+    Queue<TenantRebalancer.TenantTableRebalanceJobContext> tableQueue =
+        tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
     // Dimension Table B should be rebalance first since it is a dim table, and we're doing scale out
-    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_B);
-    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_A);
+    TenantRebalancer.TenantTableRebalanceJobContext jobContext = tableQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+    jobContext = tableQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
 
     // untag server 0, now the rebalance is not a pure scale in/out
     _helixResourceManager.updateInstanceTags(SERVER_INSTANCE_ID_PREFIX + 0, "", false);
@@ -407,8 +412,12 @@ public class TenantRebalancerTest extends ControllerTest {
     tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
     // Dimension table B should be rebalance first in this case. (it does not matter whether dimension tables are
     // rebalanced first or last in this case, simply because we defaulted it to be first while non-pure scale in/out)
-    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_B);
-    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_A);
+    jobContext = tableQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
+    jobContext = tableQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
 
     // untag the added servers, now the rebalance is a pure scale in
     for (int i = numServers; i < numServers + numServersToAdd; i++) {
@@ -423,8 +432,12 @@ public class TenantRebalancerTest extends ControllerTest {
 
     tableQueue = tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
     // Dimension table B should be rebalance last in this case
-    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_A);
-    assertEquals(tableQueue.poll(), OFFLINE_TABLE_NAME_B);
+    jobContext = tableQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);
+    jobContext = tableQueue.poll();
+    assertNotNull(jobContext);
+    assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
 
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_A);
     _helixResourceManager.deleteOfflineTable(RAW_TABLE_NAME_B);
