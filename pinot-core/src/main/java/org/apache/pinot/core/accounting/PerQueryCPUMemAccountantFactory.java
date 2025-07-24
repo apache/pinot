@@ -56,7 +56,6 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -141,8 +140,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     protected Set<String> _cancelSentQueries;
 
-    protected AtomicReference<String> _maxMemoryUsageQueryId = new AtomicReference<>(null);
-
     // the periodical task that aggregates and preempts queries
     protected final WatcherTask _watcherTask;
 
@@ -164,7 +161,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _cancelSentQueries = new HashSet<>();
       _watcherTask = createWatcherTask();
       _queryCancelCallbacks = CacheBuilder.newBuilder().build();
-      _maxMemoryUsageQueryId = null;
     }
 
     public PerQueryCPUMemResourceUsageAccountant(PinotConfiguration config, String instanceId,
@@ -323,21 +319,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @Override
     public boolean isQueryTerminated() {
       QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
-      // Short-circuit when not in critical stage.
-      if (!config.isThreadSelfTerminate() || _watcherTask.getHeapUsageBytes() < config.getCriticalLevel()) {
-        return false;
-      }
-
-      String maxMemoryUsageQueryId = _maxMemoryUsageQueryId.get();
-
-      if (_watcherTask.getHeapUsageBytes() > config.getPanicLevel()) {
-        // If in panic mode, then terminate
-        LOGGER.warn("Heap usage {} exceeds panic level {}, self-terminating",
-            _watcherTask.getHeapUsageBytes(), config.getPanicLevel());
-        return true;
-      } else if (maxMemoryUsageQueryId != null && maxMemoryUsageQueryId.equals(QueryThreadContext.getCid())) {
-        // If this is the most expensive query, then terminate
-        LOGGER.warn("Query {} is the most expensive query, self-terminating", QueryThreadContext.getCid());
+      if (config.isThreadSelfTerminate() && _watcherTask.getHeapUsageBytes() > config.getPanicLevel()) {
+        logSelfTerminatedQuery(_threadLocalEntry.get().getQueryId(), Thread.currentThread());
         return true;
       }
       return false;
@@ -608,6 +591,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage, hasCallback);
     }
 
+    protected void logSelfTerminatedQuery(String queryId, Thread queryThread) {
+      if (!_cancelSentQueries.contains(queryId)) {
+        LOGGER.warn("{} self-terminated. Heap Usage: {}. Query Thread: {}",
+            queryId, _watcherTask.getHeapUsageBytes(), queryThread.getName());
+        _cancelSentQueries.add(queryId);
+      }
+    }
+
     @Override
     public Exception getErrorStatus() {
       return _threadLocalEntry.get()._errorStatus.getAndSet(null);
@@ -822,12 +813,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           reapFinishedTasks();
           if (_triggeringLevel.ordinal() > TriggeringLevel.Normal.ordinal()) {
             _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
-            _aggregatedUsagePerActiveQuery.values().stream()
-                .filter(stats -> stats.getAllocatedBytes() > config.getMinMemoryFootprintForKill())
-                .max(Comparator.comparing(AggregatedStats::getAllocatedBytes))
-                .ifPresent(maxStats -> _maxMemoryUsageQueryId.set(maxStats.getQueryId()));
-          } else {
-            _maxMemoryUsageQueryId = null;
           }
           // post aggregation function
           postAggregation(_aggregatedUsagePerActiveQuery);
