@@ -812,7 +812,7 @@ public class SegmentPreProcessorTest implements PinotBuffersAfterClassCheckRule 
             .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
             .build();
         try (ForwardIndexReader fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
-            columnMetadata);) {
+            columnMetadata)) {
           ChunkCompressionType compressionType = fwdIndexReader.getCompressionType();
           assertEquals(compressionType, expectedCompressionType);
         }
