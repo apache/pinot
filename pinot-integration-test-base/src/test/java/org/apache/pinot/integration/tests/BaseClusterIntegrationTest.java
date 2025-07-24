@@ -662,11 +662,25 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return false;
   }
 
-  protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
+  protected void createAndUploadSegmentFromClasspath(TableConfig tableConfig, Schema schema, String dataFilePath,
       FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
     URL dataPathUrl = getClass().getClassLoader().getResource(dataFilePath);
     assert dataPathUrl != null;
     File file = new File(dataPathUrl.getFile());
+
+    createAndUploadSegmentFromFile(tableConfig, schema, file, fileFormat, expectedNoOfDocs, timeoutMs);
+  }
+
+  /// @deprecated use createAndUploadSegmentFromClasspath instead, given what this class does is to look for
+  /// dataFilePath on the classpath
+  @Deprecated
+  protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+    createAndUploadSegmentFromClasspath(tableConfig, schema, dataFilePath, fileFormat, expectedNoOfDocs, timeoutMs);
+  }
+
+  protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, File file,
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
 
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
     ClusterIntegrationTestUtils.buildSegmentFromFile(file, tableConfig, schema, "%", _segmentDir, _tarDir, fileFormat);
