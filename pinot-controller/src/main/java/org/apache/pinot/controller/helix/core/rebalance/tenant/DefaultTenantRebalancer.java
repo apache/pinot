@@ -29,6 +29,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.config.TagNameUtils;
@@ -213,21 +214,22 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   }
 
   private static Set<String> getTablesToRunInParallel(Set<String> tables,
-      Set<String> parallelWhitelist, Set<String> parallelBlacklist) {
+      @Nullable Set<String> parallelWhitelist, @Nullable Set<String> parallelBlacklist) {
     Set<String> parallelTables = new HashSet<>(tables);
-    if (!parallelWhitelist.isEmpty()) {
+    if (parallelWhitelist != null && !parallelWhitelist.isEmpty()) {
       parallelTables.retainAll(parallelWhitelist);
     }
-    if (!parallelBlacklist.isEmpty()) {
+    if (parallelBlacklist != null && !parallelBlacklist.isEmpty()) {
       parallelTables.removeAll(parallelBlacklist);
     }
     return parallelTables;
   }
 
-  private Pair<ConcurrentLinkedQueue<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>>
+  @VisibleForTesting
+  Pair<ConcurrentLinkedQueue<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>>
   createParallelAndSequentialQueues(
-      TenantRebalanceConfig config, Map<String, RebalanceResult> dryRunResults, Set<String> parallelWhitelist,
-      Set<String> parallelBlacklist) {
+      TenantRebalanceConfig config, Map<String, RebalanceResult> dryRunResults, @Nullable Set<String> parallelWhitelist,
+      @Nullable Set<String> parallelBlacklist) {
     Set<String> parallelTables = getTablesToRunInParallel(dryRunResults.keySet(), parallelWhitelist, parallelBlacklist);
     Map<String, RebalanceResult> parallelTableDryRunResults = new HashMap<>();
     Map<String, RebalanceResult> sequentialTableDryRunResults = new HashMap<>();
