@@ -1947,21 +1947,6 @@ public class TableRebalancer {
         return Pair.of(true, generateDataLossRiskMessage(segmentName));
       }
 
-      // If the segment is not yet completed, then the following scenarios are possible:
-      // - Non-upsert / non-dedup table:
-      //     - data loss scenarios are not possible. Either the segment will restart consumption or the
-      //       RealtimeSegmentValidationManager will kick in to fix up the segment if pauseless is enabled
-      // - Upsert / dedup table:
-      //     - For non-pauseless tables, it is safe to move the segment without data loss concerns
-      //     - For pauseless tables, if the segment is still in CONSUMING state, moving it is safe, but if it is in
-      //       COMMITTING state then there is a risk of data loss on segment build failures as well since the
-      //       RealtimeSegmentValidationManager does not automatically try to fix up these segments. To be safe it is
-      //       best to return that there is a risk of data loss for pauseless enabled tables for segments in COMMITTING
-      //       state
-      if (_isPauselessEnabled && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
-          && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig)) {
-        return Pair.of(true, generateDataLossRiskMessage(segmentName));
-      }
       return Pair.of(false, "");
     }
 
