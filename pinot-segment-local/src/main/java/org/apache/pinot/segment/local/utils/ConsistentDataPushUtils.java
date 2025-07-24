@@ -164,7 +164,7 @@ public class ConsistentDataPushUtils {
       String segmentLineageEntryId = uriToLineageEntryIdMap.get(controllerUri);
       URI uri =
           FileUploadDownloadClient.getEndReplaceSegmentsURI(controllerUri, rawTableName, TableType.OFFLINE.toString(),
-              segmentLineageEntryId);
+              segmentLineageEntryId, false);
       DEFAULT_RETRY_POLICY.attempt(() -> {
         try {
           SimpleHttpResponse response =
