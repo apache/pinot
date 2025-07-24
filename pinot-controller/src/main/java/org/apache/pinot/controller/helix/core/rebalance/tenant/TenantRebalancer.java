@@ -18,7 +18,30 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
-
 public interface TenantRebalancer {
   TenantRebalanceResult rebalance(TenantRebalanceConfig config);
+
+  class TenantTableRebalanceJobContext {
+    private final String _tableName;
+    private final String _jobId;
+    private final boolean _shouldDowntime;
+
+    public TenantTableRebalanceJobContext(String tableName, String jobId, boolean shouldDowntime) {
+      _tableName = tableName;
+      _jobId = jobId;
+      _shouldDowntime = shouldDowntime;
+    }
+
+    public String getJobId() {
+      return _jobId;
+    }
+
+    public String getTableName() {
+      return _tableName;
+    }
+
+    public boolean shouldDowntime() {
+      return _shouldDowntime;
+    }
+  }
 }
