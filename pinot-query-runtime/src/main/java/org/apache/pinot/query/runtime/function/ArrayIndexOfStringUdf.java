@@ -38,8 +38,8 @@ public class ArrayIndexOfStringUdf extends Udf.FromAnnotatedMethod {
 
   @Override
   public String getDescription() {
-    return "Returns the 1-based index of the first occurrence of the specified value in an array of strings. " +
-        "If the value is not found, returns 0. If any argument is null, returns null.";
+    return "Returns the 1-based index of the first occurrence of the specified value in an array of strings. "
+        + "If the value is not found, returns 0. If any argument is null, returns null.";
   }
 
   @Override
@@ -51,7 +51,8 @@ public class ArrayIndexOfStringUdf extends Udf.FromAnnotatedMethod {
             UdfParameter.of("value", FieldSpec.DataType.STRING)
                 .withDescription("Value to search for"),
             UdfParameter.result(FieldSpec.DataType.INT)
-                .withDescription("1-based index of the value in the array. If not found, returns 0. If any argument is null, returns null.")
+                .withDescription("1-based index of the value in the array. "
+                    + "If not found, returns 0. If any argument is null, returns null.")
         ))
         .addExample("single match", List.of("a", "b", "c"), "b", 2)
         .addExample("multiple matches", List.of("a", "b", "b", "c"), "b", 2)

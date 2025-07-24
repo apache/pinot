@@ -64,10 +64,4 @@ public class ToDateTimeUdf extends Udf.FromAnnotatedMethod {
         .build()
         .generateExamples();
   }
-
-  @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    // No transform function for toDateTime, similar to ArrayMaxUdf
-    return Map.of();
-  }
 }

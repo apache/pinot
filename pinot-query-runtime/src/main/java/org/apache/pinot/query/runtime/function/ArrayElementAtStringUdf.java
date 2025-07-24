@@ -50,7 +50,8 @@ public class ArrayElementAtStringUdf extends Udf.FromAnnotatedMethod {
             UdfParameter.of("index", FieldSpec.DataType.INT)
                 .withDescription("One-based index of the element to retrieve"),
             UdfParameter.result(FieldSpec.DataType.STRING)
-                .withDescription("Element at the specified index or empty string if index is out of bounds. If any argument is null, returns null or empty string.")
+                .withDescription("Element at the specified index or empty string if index is out of bounds. "
+                    + "If any argument is null, returns null or empty string.")
         ))
         .addExample("middle element", List.of("a", "b", "c"), 2, "b")
         .addExample("first element", List.of("a", "b", "c"), 1, "a")

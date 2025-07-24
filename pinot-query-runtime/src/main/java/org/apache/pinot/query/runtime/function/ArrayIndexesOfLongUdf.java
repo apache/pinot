@@ -38,8 +38,8 @@ public class ArrayIndexesOfLongUdf extends Udf.FromAnnotatedMethod {
 
   @Override
   public String getDescription() {
-    return "Returns the 1-based indexes of the specified value in an array of longs. " +
-        "If the value is not found, returns an empty array. If any argument is null, returns null.";
+    return "Returns the 1-based indexes of the specified value in an array of longs. "
+        + "If the value is not found, returns an empty array. If any argument is null, returns null.";
   }
 
   @Override
@@ -52,7 +52,8 @@ public class ArrayIndexesOfLongUdf extends Udf.FromAnnotatedMethod {
                 .withDescription("Value to search for"),
             UdfParameter.result(FieldSpec.DataType.INT)
                 .asMultiValued()
-                .withDescription("1-based indexes of the value in the array. If not found, returns empty array. If any argument is null, returns null.")
+                .withDescription("1-based indexes of the value in the array. "
+                    + "If not found, returns empty array. If any argument is null, returns null.")
         ))
         .addExample("single match", List.of(1L, 2L, 3L), 2L, List.of(2))
         .addExample("multiple matches", List.of(1L, 2L, 2L, 3L), 2L, List.of(2, 3))

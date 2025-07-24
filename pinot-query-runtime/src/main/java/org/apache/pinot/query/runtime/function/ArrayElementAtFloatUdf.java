@@ -51,7 +51,8 @@ public class ArrayElementAtFloatUdf extends Udf.FromAnnotatedMethod {
             UdfParameter.of("index", FieldSpec.DataType.INT)
                 .withDescription("One-based index of the element to retrieve"),
             UdfParameter.result(FieldSpec.DataType.FLOAT)
-                .withDescription("Element at the specified index or 0 if index is out of bounds. If any argument is null, returns null or 0.")
+                .withDescription("Element at the specified index or 0 if index is out of bounds. "
+                    + "If any argument is null, returns null or 0.")
         ))
         .addExample("middle element", List.of(1.1f, 2.2f, 3.3f), 2, 2.2f)
         .addExample("first element", List.of(1.1f, 2.2f, 3.3f), 1, 1.1f)

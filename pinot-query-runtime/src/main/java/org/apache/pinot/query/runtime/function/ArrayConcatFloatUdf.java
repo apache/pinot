@@ -31,7 +31,7 @@ import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
 /**
- * UDF for the 'arrayConcatFloat' function. See org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatFloat for implementation.
+ * UDF for the 'arrayConcatFloat' function.
  */
 @AutoService(Udf.class)
 public class ArrayConcatFloatUdf extends Udf.FromAnnotatedMethod {

@@ -51,7 +51,8 @@ public class ArrayElementAtLongUdf extends Udf.FromAnnotatedMethod {
             UdfParameter.of("index", FieldSpec.DataType.INT)
                 .withDescription("One-based index of the element to retrieve"),
             UdfParameter.result(FieldSpec.DataType.LONG)
-                .withDescription("Element at the specified index or 0 if index is out of bounds. If any argument is null, returns null or 0.")
+                .withDescription("Element at the specified index or 0 if index is out of bounds. "
+                    + "If any argument is null, returns null or 0.")
         ))
         .addExample("middle element", List.of(10L, 20L, 30L), 2, 20L)
         .addExample("first element", List.of(10L, 20L, 30L), 1, 10L)

@@ -59,8 +59,8 @@ public class ArrayMinUdf extends Udf {
         .addExample("normal array", List.of(1, 2, 3), 1)
         .addExample("negative values", List.of(-5, -2, 0), -5)
         .addExample("single element", List.of(42), 42)
-        .addExample(UdfExample.create("empty array", List.of(), null).withoutNull(-2147483648	))
-        .addExample(UdfExample.create("null array", null, null).withoutNull(-2147483648	))
+        .addExample(UdfExample.create("empty array", List.of(), null).withoutNull(-2147483648))
+        .addExample(UdfExample.create("null array", null, null).withoutNull(-2147483648))
         .build()
         .generateExamples();
   }
