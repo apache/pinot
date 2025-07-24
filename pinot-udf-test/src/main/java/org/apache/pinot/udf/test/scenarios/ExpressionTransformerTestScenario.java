@@ -59,7 +59,7 @@ public class ExpressionTransformerTestScenario implements UdfTestScenario {
       GenericRow row = PinotFunctionEnvGenerator.asRow(udf, signature, testCase);
       try {
         Object callResult = funEvaluator.evaluate(row);
-        Object expectedResult = testCase.getResult(true);
+        Object expectedResult = testCase.getResult(UdfExample.NullHandling.ENABLED);
         result.put(testCase, UdfExampleResult.success(testCase, callResult, expectedResult));
       } catch (Exception e) {
         result.put(testCase, UdfExampleResult.error(testCase, e.getMessage()));

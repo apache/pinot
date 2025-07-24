@@ -205,8 +205,8 @@ public class UdfReporter {
 
           for (UdfExample example : udf.getExamples().get(udfSignature)) {
             // Expected result
-            Object withNull = example.getResult(true);
-            Object withoutNull = example.getResult(false);
+            Object withNull = example.getResult(UdfExample.NullHandling.DISABLED);
+            Object withoutNull = example.getResult(UdfExample.NullHandling.DISABLED);
 
             // Call column
             report.append("| ")

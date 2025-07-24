@@ -136,17 +136,17 @@ public class AvroSink implements AutoCloseable {
     NULL_MULTI_VALUE_MAP.put(dataType, Schema.createUnion(multiValueSchema, nullSchema));
   }
 
-  private static void convertGenericRowToAvroRecord(GenericRow genericRow,
-      GenericData.Record reusableRecord) {
-    for (String field : genericRow.getFieldToValueMap().keySet()) {
-      Object value = genericRow.getValue(field);
+  private static void convertGenericRowToAvroRecord(GenericRow input,
+      GenericData.Record output) {
+    for (String field : input.getFieldToValueMap().keySet()) {
+      Object value = input.getValue(field);
       if (value instanceof Object[]) {
-        reusableRecord.put(field, Arrays.asList((Object[]) value));
+        output.put(field, Arrays.asList((Object[]) value));
       } else {
         if (value instanceof byte[]) {
           value = ByteBuffer.wrap((byte[]) value);
         }
-        reusableRecord.put(field, value);
+        output.put(field, value);
       }
     }
   }

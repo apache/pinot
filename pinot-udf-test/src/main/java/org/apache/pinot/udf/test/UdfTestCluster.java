@@ -20,6 +20,7 @@ package org.apache.pinot.udf.test;
 
 import java.util.Iterator;
 import java.util.stream.Stream;
+import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
@@ -50,16 +51,16 @@ public interface UdfTestCluster extends AutoCloseable {
       throws Exception;
 
   class ExecutionContext {
-    private final boolean _nullHandlingEnabled;
+    private final UdfExample.NullHandling _nullHandlingMode;
     private final boolean _useMultistageEngine;
 
-    public ExecutionContext(boolean nullHandlingEnabled, boolean useMultistageEngine) {
-      _nullHandlingEnabled = nullHandlingEnabled;
+    public ExecutionContext(UdfExample.NullHandling nullHandlingMode, boolean useMultistageEngine) {
+      _nullHandlingMode = nullHandlingMode;
       _useMultistageEngine = useMultistageEngine;
     }
 
-    public boolean isNullHandlingEnabled() {
-      return _nullHandlingEnabled;
+    public UdfExample.NullHandling getNullHandlingMode() {
+      return _nullHandlingMode;
     }
 
     public boolean isUseMultistageEngine() {

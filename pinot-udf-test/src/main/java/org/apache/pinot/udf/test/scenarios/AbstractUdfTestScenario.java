@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
+import org.apache.pinot.core.udf.UdfExample.NullHandling;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.udf.test.PinotFunctionEnvGenerator;
@@ -38,21 +39,21 @@ import org.apache.pinot.udf.test.UdfTestScenario;
 public abstract class AbstractUdfTestScenario implements UdfTestScenario {
 
   protected final UdfTestCluster _cluster;
-  private final boolean _nullHandlingEnabled;
+  private final NullHandling _nullHandlingMode;
 
-  public AbstractUdfTestScenario(UdfTestCluster cluster, boolean nullHandlingEnabled) {
+  public AbstractUdfTestScenario(UdfTestCluster cluster, NullHandling nullHandlingMode) {
     _cluster = cluster;
-    _nullHandlingEnabled = nullHandlingEnabled;
+    _nullHandlingMode = nullHandlingMode;
   }
 
-  protected boolean isNullHandlingEnabled() {
-    return _nullHandlingEnabled;
+  protected NullHandling getNullHandlingMode() {
+    return _nullHandlingMode;
   }
 
   protected String replaceCommonVariables(
       Udf udf,
       UdfSignature signature,
-      boolean nullHandling,
+      NullHandling nullHandling,
       /* language=sql*/ String templateSql) {
     return templateSql
         .replace("@table", PinotFunctionEnvGenerator.getTableName(udf))
@@ -92,7 +93,7 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
     Set<UdfExample> examples = udf.getExamples().get(signature);
     Map<UdfExample, UdfExampleResult> results = Maps.newHashMapWithExpectedSize(examples.size());
 
-    String sqlTemplate2 = replaceCommonVariables(udf, signature, isNullHandlingEnabled(), sqlTemplate);
+    String sqlTemplate2 = replaceCommonVariables(udf, signature, getNullHandlingMode(), sqlTemplate);
 
     for (UdfExample example : examples) {
       String sql = replaceCall(udf, signature, example, sqlTemplate2);
@@ -110,7 +111,7 @@ public abstract class AbstractUdfTestScenario implements UdfTestScenario {
         results.put(example, UdfExampleResult.error(example, errorMessage));
         continue;
       }
-      Object expectedResult = example.getResult(isNullHandlingEnabled());
+      Object expectedResult = example.getResult(getNullHandlingMode());
       results.put(example, UdfExampleResult.success(example, row.getValue("result"), expectedResult));
 
       if (rows.hasNext()) {

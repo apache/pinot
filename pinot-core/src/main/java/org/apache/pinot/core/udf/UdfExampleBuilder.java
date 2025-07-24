@@ -191,11 +191,11 @@ public interface UdfExampleBuilder {
       private final FieldSpec.DataType _type;
 
       public NumericPinotUdfExample(UdfExample base, FieldSpec.DataType type) {
-        Preconditions.checkArgument(base.getResult(true) instanceof Number
-                || base.getResult(true) == null,
+        Preconditions.checkArgument(base.getResult(NullHandling.ENABLED) instanceof Number
+                || base.getResult(NullHandling.ENABLED) == null,
             "Base test case must return a Number type for numeric endomorphism functions");
-        Preconditions.checkArgument(base.getResult(false) instanceof Number
-                || base.getResult(false) == null,
+        Preconditions.checkArgument(base.getResult(NullHandling.DISABLED) instanceof Number
+                || base.getResult(NullHandling.DISABLED) == null,
             "Base test case must return a Number type for numeric endomorphism functions");
         if (base.getInputValues().stream()
             .anyMatch(value -> value != null && !(value instanceof Number))) {
@@ -249,7 +249,7 @@ public interface UdfExampleBuilder {
       }
 
       @Override
-      public Object getResult(boolean nullHandling) {
+      public Object getResult(NullHandling nullHandling) {
         Object baseValue = _base.getResult(nullHandling);
         if (baseValue instanceof Number) {
           switch (_type) {
