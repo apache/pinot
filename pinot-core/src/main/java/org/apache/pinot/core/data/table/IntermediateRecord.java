@@ -25,8 +25,8 @@ package org.apache.pinot.core.data.table;
  */
 @SuppressWarnings("rawtypes")
 public class IntermediateRecord {
-  public final Key _key;
-  public final Record _record;
+  public Key _key;
+  public Record _record;
   public final Comparable[] _values;
   public int _keyHashCode = -1;
 
@@ -34,6 +34,12 @@ public class IntermediateRecord {
     _key = key;
     _record = record;
     _values = values;
+  }
+
+  public static IntermediateRecord create(Key key, Record record, int keyHashCode) {
+    IntermediateRecord r = new IntermediateRecord(key, record, null);
+    r._keyHashCode = keyHashCode;
+    return r;
   }
 
   static IntermediateRecord createForTest(Key key, Record record, Comparable[] values) {
