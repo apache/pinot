@@ -395,6 +395,9 @@ public class DataLossRiskAssessorTest extends ControllerTest {
 
   @Test
   public void testDataLossRiskAssessorPeerDownloadEnabledPauselessEnabledCommittingSegment() {
+    // TODO: The data loss risk assessment for COMMITTING segments is turned off for now. It returns false for all
+    //  COMMITTING segments. Once we decide to how to precisely assess data loss risk for COMMITTING segment, this test
+    //  should be updated.
     String segmentName = "randomSegmentName";
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
@@ -428,7 +431,7 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
     }
 
-    // Enable dedup on the table, this should return true
+    // Enable dedup on the table, this should return false
     DedupConfig dedupConfig = new DedupConfig();
     dedupConfig.setDedupEnabled(true);
     tableConfig.setDedupConfig(dedupConfig);
@@ -449,10 +452,10 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
           new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertTrue(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
     }
 
-    // Enable upsert on the table in PARTIAL mode, this should return true
+    // Enable upsert on the table in PARTIAL mode, this should return false
     tableConfig.setDedupConfig(null);
     UpsertConfig upsertConfig = new UpsertConfig();
     upsertConfig.setMode(UpsertConfig.Mode.PARTIAL);
@@ -474,7 +477,7 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
           new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertTrue(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
     }
 
     // Enable upsert on the table in FULL mode, this should return false
