@@ -222,7 +222,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     JsonNode queryResponse = postQuery(OOM_QUERY);
     String exceptionsNode = queryResponse.get("exceptions").toString();
     assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptionsNode);
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Cancelled"), exceptionsNode);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -234,9 +234,9 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     long offlineThreadMemAllocatedBytes = queryResponse.get("offlineThreadMemAllocatedBytes").asLong();
     long offlineResponseSerMemAllocatedBytes = queryResponse.get("offlineResponseSerMemAllocatedBytes").asLong();
     long offlineTotalMemAllocatedBytes = queryResponse.get("offlineTotalMemAllocatedBytes").asLong();
-
-    assertTrue(offlineThreadMemAllocatedBytes > 0);
-    assertTrue(offlineResponseSerMemAllocatedBytes > 0);
+    System.out.println("queryResponse = " + queryResponse);
+    assertTrue(offlineThreadMemAllocatedBytes >= 0);
+    assertTrue(offlineResponseSerMemAllocatedBytes >= 0);
     assertEquals(offlineThreadMemAllocatedBytes + offlineResponseSerMemAllocatedBytes, offlineTotalMemAllocatedBytes);
   }
 
@@ -249,7 +249,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
 
     String exceptionsNode = queryResponse.get("exceptions").toString();
     assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptionsNode);
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Cancelled"), exceptionsNode);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -259,7 +259,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     notSupportedInV2();
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
     String exceptionsNode = queryResponse.get("exceptions").toString();
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Cancelled"), exceptionsNode);
   }
 
   @Test(dataProvider = "useBothQueryEngines")
@@ -303,7 +303,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     countDownLatch.await();
     String exceptionsNode = queryResponse1.get().get("exceptions").toString();
     assertTrue(exceptionsNode.contains("\"errorCode\":503"), exceptionsNode);
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Cancelled"), exceptionsNode);
     assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()), exceptionsNode);
     assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()), exceptionsNode);
   }

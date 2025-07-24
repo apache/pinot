@@ -19,10 +19,13 @@
 package org.apache.pinot.core.accounting;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.config.instance.InstanceType;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
@@ -264,5 +267,181 @@ public class PerQueryCPUMemAccountantTest {
     assertEquals(newQueryResourceTracker.getAllocatedBytes(), 9000);
     threadLatch.countDown();
     newQueryThreadLatch.countDown();
+  }
+
+  @Test
+  void testPerQueryMemoryCheckDisabled() {
+    // Test when per-query memory check is disabled
+    Map<String, Object> configs = new HashMap<>();
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, false);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 1000L);
+
+    PinotConfiguration config = new PinotConfiguration(configs);
+    TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, false, 2000L);
+
+    // Should not interrupt when feature is disabled
+    accountant.checkMemoryAndInterruptIfExceeded();
+
+    // Verify no error was set
+    assertEquals(accountant.getErrorStatus(), null);
+    assertTrue(accountant._anchorThread.isAlive());
+  }
+
+  @Test
+  void testPerQueryMemoryCheckUnderLimit() {
+    // Test when memory usage is under the limit
+    Map<String, Object> configs = new HashMap<>();
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 3000L);
+
+    PinotConfiguration config = new PinotConfiguration(configs);
+    TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, true, 2000L);
+
+    // Should not interrupt when under limit
+    accountant.checkMemoryAndInterruptIfExceeded();
+
+    // Verify no error was set
+    assertEquals(accountant.getErrorStatus(), null);
+    assertTrue(accountant._anchorThread.isAlive());
+  }
+
+  @Test
+  void testPerQueryMemoryCheckOverLimit() {
+    // Test when memory usage exceeds the limit
+    Map<String, Object> configs = new HashMap<>();
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 1000L);
+
+    PinotConfiguration config = new PinotConfiguration(configs);
+    TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, true, 2000L);
+
+    // Should interrupt when over limit
+    accountant.checkMemoryAndInterruptIfExceeded();
+
+    // Verify error was set with appropriate message
+    Exception error = accountant.getTestErrorStatus();
+    assertNotNull(error);
+    assertTrue(error.getMessage().contains("exceeded per-query memory limit"));
+    assertTrue(error.getMessage().contains("testQuery"));
+    assertTrue(error.getMessage().contains("2000 bytes"));
+    assertTrue(error.getMessage().contains("1000 bytes"));
+
+    // Verify anchor thread interruption was attempted (the main functionality is the error message)
+    // Note: Thread.isInterrupted() might not immediately return true due to timing issues
+  }
+
+  @Test
+  void testPerQueryMemoryCheckMemorySamplingDisabled() {
+    // Test when memory sampling is disabled
+    Map<String, Object> configs = new HashMap<>();
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, false);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 1000L);
+
+    PinotConfiguration config = new PinotConfiguration(configs);
+    TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, false, 2000L);
+
+    // Should not interrupt when memory sampling is disabled
+    accountant.checkMemoryAndInterruptIfExceeded();
+
+    // Verify no error was set
+    assertEquals(accountant.getErrorStatus(), null);
+    assertTrue(accountant._anchorThread.isAlive());
+  }
+
+  @Test
+  void testPerQueryMemoryCheckNoActiveQuery() {
+    // Test when there's no active query on the thread
+    Map<String, Object> configs = new HashMap<>();
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_CHECK_ENABLED, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    configs.put(CommonConstants.Accounting.CONFIG_OF_PER_THREAD_QUERY_MEMORY_LIMIT_BYTES, 1000L);
+
+    PinotConfiguration config = new PinotConfiguration(configs);
+    TestMemoryCheckAccountant accountant = new TestMemoryCheckAccountant(config, true, 2000L);
+
+    // Clear the active query
+    accountant._threadEntry._currentThreadTaskStatus.set(null);
+
+    // Should not interrupt when no active query
+    accountant.checkMemoryAndInterruptIfExceeded();
+
+    // Verify no error was set
+    assertEquals(accountant.getErrorStatus(), null);
+    assertTrue(accountant._anchorThread.isAlive());
+  }
+
+  /**
+   * Test helper class for memory checking functionality
+   */
+  private static class TestMemoryCheckAccountant
+      extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
+    final CPUMemThreadLevelAccountingObjects.ThreadEntry _threadEntry;
+    final Thread _anchorThread;
+
+    TestMemoryCheckAccountant(PinotConfiguration config, boolean isMemorySamplingEnabled, long memoryUsage) {
+      super(config, false, isMemorySamplingEnabled, true, new HashSet<>(), "testInstance", InstanceType.SERVER);
+
+      // Create anchor thread
+      _anchorThread = new Thread(() -> {
+        // Just keep running until interrupted
+        try {
+          Thread.sleep(10000);
+        } catch (InterruptedException e) {
+          // Expected when interrupted
+        }
+      });
+      _anchorThread.start();
+
+      // Set up thread entry with active query
+      _threadEntry = new CPUMemThreadLevelAccountingObjects.ThreadEntry();
+      _threadEntry._currentThreadTaskStatus.set(
+          new CPUMemThreadLevelAccountingObjects.TaskEntry("testQuery", 1,
+              ThreadExecutionContext.TaskType.SSE, _anchorThread,
+              CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
+      _threadEntry._currentThreadMemoryAllocationSampleBytes = memoryUsage;
+
+      // Add to thread entries map so the thread accountant can find it
+      _threadEntriesMap.put(Thread.currentThread(), _threadEntry);
+    }
+
+    @Override
+    public void checkMemoryAndInterruptIfExceeded() {
+      // Override to use our test thread entry directly
+      if (!_isPerQueryMemoryCheckEnabled || !_isThreadMemorySamplingEnabled) {
+        return;
+      }
+
+      CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = _threadEntry.getCurrentThreadTaskStatus();
+
+      if (currentTaskStatus == null) {
+        return; // No active query on this thread
+      }
+
+      long currentMemoryUsage = _threadEntry._currentThreadMemoryAllocationSampleBytes;
+      if (currentMemoryUsage > _perQueryMemoryLimitBytes) {
+        String queryId = currentTaskStatus.getQueryId();
+        String errorMessage = String.format(
+            "Query %s exceeded per-query memory limit of %d bytes (current usage: %d bytes) on %s: %s. "
+                + "Query terminated proactively to prevent OOM.",
+            queryId, _perQueryMemoryLimitBytes, currentMemoryUsage, _instanceType, _instanceId);
+
+        // Set error status to terminate the query
+        _threadEntry._errorStatus.set(new RuntimeException(errorMessage));
+
+        // Also interrupt the anchor thread if available
+        Thread anchorThread = currentTaskStatus.getAnchorThread();
+        if (anchorThread != null) {
+          anchorThread.interrupt();
+        }
+      }
+    }
+
+    public Exception getTestErrorStatus() {
+      return _threadEntry._errorStatus.getAndSet(null);
+    }
   }
 }

@@ -380,7 +380,8 @@ public class Tracing {
     }
 
     public static boolean isInterrupted() {
-      return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted();
+      return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted()
+          || Tracing.getThreadAccountant().isQueryTerminated();
     }
 
     public static void sampleAndCheckInterruption() {
@@ -388,6 +389,10 @@ public class Tracing {
         throw new EarlyTerminationException("Interrupted while merging records");
       }
       sample();
+    }
+
+    public static void checkMemoryAndInterruptIfExceeded() {
+      Tracing.getThreadAccountant().checkMemoryAndInterruptIfExceeded();
     }
 
     @Deprecated
@@ -411,12 +416,20 @@ public class Tracing {
     // Check for thread interruption, every time after merging 8192 keys
     public static void sampleAndCheckInterruptionPeriodically(int mergedKeys) {
       if ((mergedKeys & MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0) {
+        checkMemoryAndInterruptIfExceeded();
         sampleAndCheckInterruption();
       }
     }
 
     public static WorkloadBudgetManager getWorkloadBudgetManager() {
       return _workloadBudgetManager;
+    }
+
+    public static void interruptAnchorThread() {
+      ThreadExecutionContext context = getThreadAccountant().getThreadExecutionContext();
+      if (context != null && context.getAnchorThread() != null) {
+        context.getAnchorThread().interrupt();
+      }
     }
   }
 }
