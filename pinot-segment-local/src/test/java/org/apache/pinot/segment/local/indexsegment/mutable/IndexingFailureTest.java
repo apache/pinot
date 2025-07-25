@@ -47,6 +47,7 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
   private static final String INT_COL = "int_col";
   private static final String STRING_COL = "string_col";
   private static final String JSON_COL = "json_col";
+  private static final StreamMessageMetadata METADATA = mock(StreamMessageMetadata.class);
 
   private MutableSegmentImpl _mutableSegment;
   private ServerMetrics _serverMetrics;
@@ -55,7 +56,9 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
   public void setup() {
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(INT_COL, FieldSpec.DataType.INT)
         .addSingleValueDimension(STRING_COL, FieldSpec.DataType.STRING)
-        .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON).setSchemaName(TABLE_NAME).build();
+        .addSingleValueDimension(JSON_COL, FieldSpec.DataType.JSON)
+        .setSchemaName(TABLE_NAME)
+        .build();
     _serverMetrics = mock(ServerMetrics.class);
     _mutableSegment =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.emptySet(), Collections.emptySet(),
@@ -71,12 +74,11 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
   @Test
   public void testIndexingFailures()
       throws IOException {
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     GenericRow goodRow = new GenericRow();
     goodRow.putValue(INT_COL, 0);
     goodRow.putValue(STRING_COL, "a");
     goodRow.putValue(JSON_COL, "{\"valid\": \"json\"}");
-    _mutableSegment.index(goodRow, defaultMetadata);
+    _mutableSegment.index(goodRow, METADATA);
     assertEquals(_mutableSegment.getNumDocsIndexed(), 1);
     assertEquals(_mutableSegment.getDataSource(INT_COL).getInvertedIndex().getDocIds(0),
         ImmutableRoaringBitmap.bitmapOf(0));
@@ -92,7 +94,7 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     badRow.putValue(INT_COL, 0);
     badRow.putValue(STRING_COL, "b");
     badRow.putValue(JSON_COL, "{\"truncatedJson...");
-    _mutableSegment.index(badRow, defaultMetadata);
+    _mutableSegment.index(badRow, METADATA);
     assertEquals(_mutableSegment.getNumDocsIndexed(), 2);
     assertEquals(_mutableSegment.getDataSource(INT_COL).getInvertedIndex().getDocIds(0),
         ImmutableRoaringBitmap.bitmapOf(0, 1));
@@ -106,7 +108,7 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     anotherGoodRow.putValue(INT_COL, 2);
     anotherGoodRow.putValue(STRING_COL, "c");
     anotherGoodRow.putValue(JSON_COL, "{\"valid\": \"json\"}");
-    _mutableSegment.index(anotherGoodRow, defaultMetadata);
+    _mutableSegment.index(anotherGoodRow, METADATA);
     assertEquals(_mutableSegment.getNumDocsIndexed(), 3);
     assertEquals(_mutableSegment.getDataSource(INT_COL).getInvertedIndex().getDocIds(1),
         ImmutableRoaringBitmap.bitmapOf(2));
@@ -123,7 +125,7 @@ public class IndexingFailureTest implements PinotBuffersAfterMethodCheckRule {
     nullStringRow.putValue(STRING_COL, null);
     nullStringRow.addNullValueField(STRING_COL);
     nullStringRow.putValue(JSON_COL, "{\"valid\": \"json\"}");
-    _mutableSegment.index(nullStringRow, defaultMetadata);
+    _mutableSegment.index(nullStringRow, METADATA);
     assertEquals(_mutableSegment.getNumDocsIndexed(), 4);
     assertEquals(_mutableSegment.getDataSource(INT_COL).getInvertedIndex().getDocIds(0),
         ImmutableRoaringBitmap.bitmapOf(0, 1, 3));

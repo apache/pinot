@@ -192,7 +192,7 @@ public abstract class Udf {
           .map(udf -> new ScalarFunctionProvider() {
             @Override
             public String name() {
-              return udf.getMainFunctionName() + " (UDF)";
+              return udf.getMainCanonicalName() + " (UDF)";
             }
 
             @Override
@@ -202,7 +202,11 @@ public abstract class Udf {
 
             @Override
             public Set<PinotScalarFunction> getFunctions() {
-              return udf.getScalarFunctions();
+              PinotScalarFunction scalarFunction = udf.getScalarFunction();
+              if (scalarFunction == null) {
+                return Set.of();
+              }
+              return Set.of(scalarFunction);
             }
           })
           .collect(Collectors.toSet());

@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -230,23 +231,25 @@ public class TransformFunctionFactory {
     ServiceLoader.load(Udf.class).stream()
         .map(ServiceLoader.Provider::get)
         .forEach(udf -> {
-          for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> entry
-              : udf.getTransformFunctions().entrySet()) {
-            Udf oldUdf = typeToUdf.get(entry.getKey());
-            if (oldUdf == null) {
-              typeToUdf.put(entry.getKey(), udf);
-              typeToImplementation.put(entry.getKey(), entry.getValue());
-              LOGGER.debug("Adding transform function {} with UDF {}", entry.getKey(),
-                  udf.getClass().getCanonicalName());
-            } else if (oldUdf.priority() < udf.priority()) {
-              typeToUdf.put(entry.getKey(), udf);
-              typeToImplementation.put(entry.getKey(), entry.getValue());
-              LOGGER.info("Changing transform function {} from lower priority UDF {} with {}",
-                  entry.getKey(), oldUdf.getClass().getCanonicalName(), udf.getClass().getCanonicalName());
-            } else {
-              LOGGER.debug("Keeping transform function {} with UDF {} as it has higher priority than {}",
-                  entry.getKey(), oldUdf.getClass().getCanonicalName(), udf.getClass().getCanonicalName());
-            }
+          Pair<TransformFunctionType, Class<? extends TransformFunction>> entry = udf.getTransformFunction();
+          if (entry == null) {
+            LOGGER.debug("UDF {} does not have a transform function type, skipping", udf.getMainName());
+            return;
+          }
+          Udf oldUdf = typeToUdf.get(entry.getKey());
+          if (oldUdf == null) {
+            typeToUdf.put(entry.getKey(), udf);
+            typeToImplementation.put(entry.getKey(), entry.getValue());
+            LOGGER.debug("Adding transform function {} with UDF {}", entry.getKey(),
+                udf.getClass().getCanonicalName());
+          } else if (oldUdf.priority() < udf.priority()) {
+            typeToUdf.put(entry.getKey(), udf);
+            typeToImplementation.put(entry.getKey(), entry.getValue());
+            LOGGER.info("Changing transform function {} from lower priority UDF {} with {}",
+                entry.getKey(), oldUdf.getClass().getCanonicalName(), udf.getClass().getCanonicalName());
+          } else {
+            LOGGER.debug("Keeping transform function {} with UDF {} as it has higher priority than {}",
+                entry.getKey(), oldUdf.getClass().getCanonicalName(), udf.getClass().getCanonicalName());
           }
         });
 
