@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -29,13 +28,6 @@ import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -54,11 +46,10 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.io.IOUtils;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
-import org.apache.pinot.controller.ControllerConf;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -67,7 +58,6 @@ import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.apache.pinot.spi.utils.JsonUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,9 +83,6 @@ public class PinotBrokerRestletResource {
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
-
-  @Inject
-  ControllerConf _controllerConf;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -205,7 +192,7 @@ public class PinotBrokerRestletResource {
         new HashSet<>(_pinotHelixResourceManager.getAllInstancesConfigsForBrokerTenant(tenantName));
     Set<InstanceInfo> instanceInfoSet = tenantBrokers.stream()
         .map(x -> new InstanceInfo(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort()),
-            Integer.parseInt(x.getPort())))
+            Integer.parseInt(HelixHelper.getGrpcPort(x))))
         .collect(Collectors.toSet());
     applyStateChanges(instanceInfoSet, state);
     return ImmutableList.copyOf(instanceInfoSet);
@@ -243,7 +230,7 @@ public class PinotBrokerRestletResource {
           new HashSet<>(_pinotHelixResourceManager.getBrokerInstancesConfigsFor(tableNamesWithType.get(0)));
       Set<InstanceInfo> instanceInfoSet = tenantBrokers.stream()
           .map(x -> new InstanceInfo(x.getInstanceName(), x.getHostName(), Integer.parseInt(x.getPort()),
-              Integer.parseInt(x.getPort())))
+              Integer.parseInt(HelixHelper.getGrpcPort(x))))
           .collect(Collectors.toSet());
       applyStateChanges(instanceInfoSet, state);
       return ImmutableList.copyOf(instanceInfoSet);
@@ -299,51 +286,6 @@ public class PinotBrokerRestletResource {
     }
   }
 
-  @GET
-  @Produces(MediaType.APPLICATION_JSON)
-  @Path("/brokers/timeseries/languages")
-  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_BROKER)
-  @ApiOperation(value = "Get timeseries languages from brokers", notes = "Get timeseries languages from brokers")
-  public List<String> getBrokerTimeSeriesLanguages(@Context HttpHeaders headers) {
-    try {
-      List<String> brokerInstanceIds = _pinotHelixResourceManager.getAllBrokerInstances();
-      if (brokerInstanceIds.isEmpty()) {
-        throw new ControllerApplicationException(LOGGER, "No broker instances found.", Response.Status.NOT_FOUND);
-      }
-
-      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(brokerInstanceIds.get(0));
-      if (instanceConfig == null) {
-        throw new ControllerApplicationException(LOGGER,
-            String.format("Instance config not found for broker instance: %s", brokerInstanceIds.get(0)),
-            Response.Status.NOT_FOUND);
-      }
-
-      String url = String.format("%s://%s:%s/timeseries/languages",
-          _controllerConf.getControllerBrokerProtocol(),
-          instanceConfig.getHostName(),
-          instanceConfig.getPort());
-
-      String response = sendRequestRaw(url, "GET", "", null, Map.of());
-      JsonNode responseNode = JsonUtils.stringToJsonNode(response);
-
-      List<String> languages = new ArrayList<>();
-      if (responseNode.isArray()) {
-        responseNode.forEach(langNode -> {
-          if (langNode.isTextual()) {
-            languages.add(langNode.asText());
-          }
-        });
-      }
-
-      return languages;
-    } catch (Exception e) {
-      LOGGER.error("Error fetching timeseries languages from brokers", e);
-      throw new ControllerApplicationException(LOGGER,
-          "Error fetching timeseries languages from brokers: " + e.getMessage(),
-          Response.Status.INTERNAL_SERVER_ERROR);
-    }
-  }
-
   private void applyStateChanges(Set<InstanceInfo> brokers, String state) {
     if (state == null) {
       return;
@@ -362,39 +304,6 @@ public class PinotBrokerRestletResource {
         break;
       default:
         break;
-    }
-  }
-
-  private String sendRequestRaw(String urlString, String method, String body, JsonNode jsonNode,
-      Map<String, String> headers) throws IOException {
-    URL url = new URL(urlString);
-    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-    connection.setRequestMethod(method);
-    connection.setRequestProperty("Content-Type", "application/json");
-    connection.setRequestProperty("Accept", "application/json");
-
-    // Add headers
-    for (Map.Entry<String, String> entry : headers.entrySet()) {
-      connection.setRequestProperty(entry.getKey(), entry.getValue());
-    }
-
-    // Write body if present
-    if (jsonNode != null) {
-      try (OutputStream os = connection.getOutputStream()) {
-        byte[] input = JsonUtils.objectToBytes(jsonNode);
-        os.write(input, 0, input.length);
-      }
-    }
-
-    // Read response
-    try (InputStream is = connection.getInputStream();
-        InputStream errorStream = connection.getErrorStream()) {
-      if (errorStream != null) {
-        String error = IOUtils.toString(errorStream, StandardCharsets.UTF_8);
-        LOGGER.error("Error response from broker: {}", error);
-        throw new IOException("Error response from broker: " + error);
-      }
-      return IOUtils.toString(is, StandardCharsets.UTF_8);
     }
   }
 }
