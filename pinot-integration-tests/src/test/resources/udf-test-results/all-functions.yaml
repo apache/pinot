@@ -246,7 +246,7 @@ base64encode:
 between:
   scalar: "org.apache.pinot.common.function.scalar.comparison.BetweenScalarFunction"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.BetweenUdf"
 bigdecimaltobytes:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.bigDecimalToBytes}"
   transform: null

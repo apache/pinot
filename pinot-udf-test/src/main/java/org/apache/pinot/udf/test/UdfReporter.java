@@ -85,67 +85,77 @@ public class UdfReporter {
     for (UdfTestScenario scenario : scenarios) {
       UdfTestResult.BySignature bySignature = byScenario.getMap().get(scenario);
 
+      report.append("#### ").append(scenario.getTitle()).append("\n\n");
+
       TreeSet<UdfSignature> signatures = new TreeSet<>(Comparator.comparing(UdfSignature::toString));
       signatures.addAll(bySignature.getMap().keySet());
 
-      report.append("#### ").append(scenario.getTitle()).append("\n\n");
-
       report.append('\n');
 
-      report.append("| Example | Call | Expected result | Actual result | Report |\n");
-      report.append("|---------|------|-----------------|---------------|--------|\n");
-
-      for (UdfSignature signature : signatures) {
+      if (signatures.size() == 1) {
+        UdfSignature signature = signatures.iterator().next();
         ResultByExample resultByExample = bySignature.getMap().get(signature);
 
-        if (resultByExample instanceof ResultByExample.Partial) {
-          ResultByExample.Partial partial = (ResultByExample.Partial) resultByExample;
-          Set<Map.Entry<UdfExample, UdfExampleResult>> entries = new TreeSet<>(
-              Comparator.comparing(entry -> entry.getKey().getId()));
-          entries.addAll(partial.getResultsByExample().entrySet());
-          for (Map.Entry<UdfExample, UdfExampleResult> exampleEntry : entries) {
-            UdfExample example = exampleEntry.getKey();
-            UdfExampleResult testResult = exampleEntry.getValue();
+        reportScenarioForSignature(udf, report, resultByExample);
+      } else {
+        for (UdfSignature signature : signatures) {
+          report.append("##### For ").append(signature.toString()).append("\n\n");
 
-            // Signature column
-            report.append("| ")
-                .append(example.getId()).append(" | ");
-
-            // Call column
-            report.append(asSqlCallWithLiteralArgs(udf, udf.getMainName(), example.getInputValues()))
-                .append(" | ");
-
-            // Expected result
-            Object expected = testResult.getExpectedResult();
-            Object actual = testResult.getActualResult();
-
-            Function<Object, String> valueFormatter = getResultFormatter(expected, actual);
-            report.append(valueFormatter.apply(expected)).append(" | ")
-                .append(valueFormatter.apply(actual)).append(" | ");
-
-            // Comparison or Error
-            String error = partial.getErrorsByExample().get(example);
-            if (error != null) {
-              report.append("❌ ").append(error.replace("\n", " ")).append(" |\n");
-            } else {
-              UdfTestFramework.EquivalenceLevel comparison = partial.getEquivalenceByExample().get(example);
-              report.append(comparison != null ? comparison.name() : "").append(" |\n");
-            }
-          }
-        } else if (resultByExample instanceof ResultByExample.Failure) {
-          ResultByExample.Failure failure = (ResultByExample.Failure) resultByExample;
-
-          report.append("| ")
-              .append(signature.toString())
-              .append(" | - | - | - | ❌ ")
-              .append(failure.getErrorMessage().replace("\n", " "))
-              .append(" |\n");
+          ResultByExample resultByExample = bySignature.getMap().get(signature);
+          reportScenarioForSignature(udf, report, resultByExample);
         }
       }
       report.append("\n");
     }
     // Close the collapsed section
     report.append("\n</details>\n\n");
+  }
+
+  private static void reportScenarioForSignature(Udf udf, PrintWriter report, ResultByExample resultByExample) {
+    report.append("| Example | Call | Expected result | Actual result | Report |\n");
+    report.append("|---------|------|-----------------|---------------|--------|\n");
+
+    if (resultByExample instanceof ResultByExample.Partial) {
+      ResultByExample.Partial partial = (ResultByExample.Partial) resultByExample;
+      Set<Map.Entry<UdfExample, UdfExampleResult>> entries = new TreeSet<>(
+          Comparator.comparing(entry -> entry.getKey().getId()));
+      entries.addAll(partial.getResultsByExample().entrySet());
+      for (Map.Entry<UdfExample, UdfExampleResult> exampleEntry : entries) {
+        UdfExample example = exampleEntry.getKey();
+        UdfExampleResult testResult = exampleEntry.getValue();
+
+        // Signature column
+        report.append("| ")
+            .append(example.getId()).append(" | ");
+
+        // Call column
+        report.append(asSqlCallWithLiteralArgs(udf, udf.getMainName(), example.getInputValues()))
+            .append(" | ");
+
+        // Expected result
+        Object expected = testResult.getExpectedResult();
+        Object actual = testResult.getActualResult();
+
+        Function<Object, String> valueFormatter = getResultFormatter(expected, actual);
+        report.append(valueFormatter.apply(expected)).append(" | ")
+            .append(valueFormatter.apply(actual)).append(" | ");
+
+        // Comparison or Error
+        String error = partial.getErrorsByExample().get(example);
+        if (error != null) {
+          report.append("❌ ").append(error.replace("\n", " ")).append(" |\n");
+        } else {
+          UdfTestFramework.EquivalenceLevel comparison = partial.getEquivalenceByExample().get(example);
+          report.append(comparison != null ? comparison.name() : "").append(" |\n");
+        }
+      }
+    } else if (resultByExample instanceof ResultByExample.Failure) {
+      ResultByExample.Failure failure = (ResultByExample.Failure) resultByExample;
+
+      report.append("| - | - | - | - | ❌ ")
+          .append(failure.getErrorMessage().replace("\n", " "))
+          .append(" |\n");
+    }
   }
 
   private static void reportSignatures(Udf udf, PrintWriter report) {
