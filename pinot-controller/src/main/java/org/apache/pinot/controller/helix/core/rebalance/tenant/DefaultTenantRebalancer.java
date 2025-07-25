@@ -152,7 +152,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
       String table = jobContext.getTableName();
       RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
       rebalanceConfig.setDryRun(false);
-      if (jobContext.shouldDowntime()) {
+      if (jobContext.shouldRebalanceWithDowntime()) {
         rebalanceConfig.setMinAvailableReplicas(0);
       }
       rebalanceTable(table, rebalanceConfig, jobContext.getJobId(), observer);

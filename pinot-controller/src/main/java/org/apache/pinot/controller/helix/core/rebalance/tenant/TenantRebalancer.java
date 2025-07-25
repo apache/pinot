@@ -24,12 +24,21 @@ public interface TenantRebalancer {
   class TenantTableRebalanceJobContext {
     private final String _tableName;
     private final String _jobId;
-    private final boolean _shouldDowntime;
+    // Whether the rebalance should be done with downtime or minAvailableReplicas=0.
+    private final boolean _withDowntime;
 
-    public TenantTableRebalanceJobContext(String tableName, String jobId, boolean shouldDowntime) {
+    /**
+     * Create a context to run a table rebalance job with in a tenant rebalance operation.
+     *
+     * @param tableName The name of the table to rebalance.
+     * @param jobId The job ID for the rebalance operation.
+     * @param withDowntime Whether the rebalance should be done with downtime or minAvailableReplicas=0.
+     * @return The result of the rebalance operation.
+     */
+    public TenantTableRebalanceJobContext(String tableName, String jobId, boolean withDowntime) {
       _tableName = tableName;
       _jobId = jobId;
-      _shouldDowntime = shouldDowntime;
+      _withDowntime = withDowntime;
     }
 
     public String getJobId() {
@@ -40,8 +49,8 @@ public interface TenantRebalancer {
       return _tableName;
     }
 
-    public boolean shouldDowntime() {
-      return _shouldDowntime;
+    public boolean shouldRebalanceWithDowntime() {
+      return _withDowntime;
     }
   }
 }
