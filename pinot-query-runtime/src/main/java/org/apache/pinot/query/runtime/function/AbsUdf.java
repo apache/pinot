@@ -21,9 +21,9 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction;
 import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
@@ -57,7 +57,7 @@ public class AbsUdf extends Udf.FromAnnotatedMethod {
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ABS, SingleParamMathTransformFunction.AbsTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.ABS, SingleParamMathTransformFunction.AbsTransformFunction.class);
   }
 }

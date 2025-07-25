@@ -117,9 +117,9 @@ public class UdfTest {
   public void testUdf(Udf udf)
       throws IOException, InterruptedException {
     File snapshotDir = Path.of("src", "test", "resources", "udf-test-results").toFile();
-    File snapshotFile = new File(snapshotDir, udf.getMainFunctionName() + ".yaml");
+    File snapshotFile = new File(snapshotDir, udf.getMainCanonicalName() + ".yaml");
     if (!snapshotFile.exists()) {
-      Assert.fail("Snapshot file for UDF " + udf.getMainFunctionName() + " does not exist. "
+      Assert.fail("Snapshot file for UDF " + udf.getMainName() + " does not exist. "
           + "Please run the snapshot generation first.");
     }
 
@@ -139,7 +139,7 @@ public class UdfTest {
                 + "Expected version was %s. "
                 + "If you think the new solution is correct, please regenerate the examples and add them to the "
                 + "repository",
-            udf.getMainFunctionName(), snapshotFile.getAbsoluteFile())
+            udf.getMainName(), snapshotFile.getAbsoluteFile())
         .isEmpty();
   }
 
@@ -158,7 +158,7 @@ public class UdfTest {
       return;
     }
     Set<String> udfNames = _framework.getUdfs().stream()
-        .map(Udf::getMainFunctionName)
+        .map(Udf::getMainCanonicalName)
         .collect(Collectors.toSet());
 
     List<File> orphanedFiles = new ArrayList<>();
@@ -230,24 +230,19 @@ public class UdfTest {
 
     TreeMap<String, AllFunctionsValue> udfMap = new TreeMap<>();
     for (Udf udf : _framework.getUdfs()) {
-      for (String name : udf.getAllFunctionNames()) {
-        PinotScalarFunction pinotScalarFunction = scalarFunctions.get(name);
-        udfMap.put(name, new AllFunctionsValue(
-            udf.getClass(),
-            transformFunctions.get(name),
-            pinotScalarFunction != null ? pinotScalarFunction.toString() : null)
-        );
+      for (String name : udf.getAllCanonicalNames()) {
+        AllFunctionsValue funValue = new AllFunctionsValue(udf.getClass(), transformFunctions.get(name),
+            scalarFunctions.get(name));
+        udfMap.put(name, funValue);
       }
     }
 
     Set<String> allFunctions = new TreeSet<>(Sets.union(scalarFunctions.keySet(), transformFunctions.keySet()));
     for (String function : allFunctions) {
       if (!udfMap.containsKey(function)) {
-        PinotScalarFunction pinotScalarFunction = scalarFunctions.get(function);
-        udfMap.put(function, new AllFunctionsValue(null,
-            transformFunctions.get(function),
-            pinotScalarFunction != null ? pinotScalarFunction.toString() : null
-        ));
+        AllFunctionsValue funValue = new AllFunctionsValue(null, transformFunctions.get(function),
+            scalarFunctions.get(function));
+        udfMap.put(function, funValue);
       }
     }
     return udfMap;
@@ -257,14 +252,24 @@ public class UdfTest {
     @Nullable
     private final Class<? extends Udf> _udf;
     @Nullable
-    private final Class<? extends TransformFunction> _transform;
+    private final String _transform;
     @Nullable
     private final String _scalar;
+
+    public AllFunctionsValue(
+        @Nullable Class<? extends Udf> udf,
+        @Nullable Class<? extends TransformFunction> transform,
+        @Nullable PinotScalarFunction scalarFunction
+    ) {
+      _udf = udf;
+      _transform = transform == null ? null : transform.getCanonicalName();
+      _scalar = scalarFunction == null ? null : scalarFunction.getScalarFunctionId();
+    }
 
     @JsonCreator
     public AllFunctionsValue(
         @Nullable @JsonProperty("udf") Class<? extends Udf> udf,
-        @Nullable @JsonProperty("transform") Class<? extends TransformFunction> transform,
+        @Nullable @JsonProperty("transform") String transform,
         @Nullable @JsonProperty("scalar") String scalar) {
       _udf = udf;
       _transform = transform;
@@ -276,7 +281,7 @@ public class UdfTest {
     }
 
     @Nullable
-    public Class<? extends TransformFunction> getTransform() {
+    public String getTransform() {
       return _transform;
     }
 
@@ -306,7 +311,7 @@ public class UdfTest {
 
       for (Map.Entry<Udf, UdfTestResult.ByScenario> entry : results.entrySet()) {
         Udf udf = entry.getKey();
-        String udfName = udf.getMainFunctionName();
+        String udfName = udf.getMainCanonicalName();
         File outFile = new File(snapshotDir, udfName + ".yaml");
 
         // Serialize only the DTO for this UDF

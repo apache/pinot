@@ -21,6 +21,7 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.TrigonometricFunctions;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
@@ -65,7 +66,7 @@ public class DegreesUdf extends Udf.FromAnnotatedMethod {
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
   }
 }

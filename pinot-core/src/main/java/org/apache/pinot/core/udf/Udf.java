@@ -25,7 +25,9 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.arrow.util.Preconditions;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -62,13 +64,31 @@ public abstract class Udf {
   ///
   /// This is treated as an ID, which means that on a single Pinot process there should be only one UDF with a given
   /// main function name.
-  public abstract String getMainFunctionName();
+  public abstract String getMainName();
+
+  /// Returns the main function name of the UDF, canonicalized as defined in [FunctionRegistry#canonicalize].
+  /// This is used to ensure that the function name is in a consistent format, which is important for
+  /// function registration, lookup and reporting.
+  public String getMainCanonicalName() {
+    return FunctionRegistry.canonicalize(getMainName());
+  }
 
   /// A set with all names of the functions that this UDF can be called with, including the main name.
   ///
   /// This is used to support different aliases for the same function, so that users can call the function.
-  public Set<String> getAllFunctionNames() {
-    return Set.of(getMainFunctionName());
+  public Set<String> getAllNames() {
+    return Set.of(getMainName());
+  }
+
+  /// Returns a set with all names of the functions that this UDF can be called with, including the main name,
+  /// canonicalized as defined in [FunctionRegistry#canonicalize].
+  ///
+  /// This is used to ensure that the function names are in a consistent format, which is important for
+  /// function registration, lookup and reporting.
+  public Set<String> getAllCanonicalNames() {
+    return getAllNames().stream()
+        .map(FunctionRegistry::canonicalize)
+        .collect(Collectors.toSet());
   }
 
   /// A description of the UDF, which should be used in documentation or for debugging purposes.
@@ -98,11 +118,18 @@ public abstract class Udf {
   /// The pair of function type and transform function that implements this UDF.
   ///
   /// Unstable API: Transform functions still use an old model of registration using a model that is not polymorphic
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of();
+  @Nullable
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return null;
   }
 
-  public abstract Set<PinotScalarFunction> getScalarFunctions();
+  /// Returns the ScalarFunctions that implement this UDF, if any.
+  ///
+  /// Ideally all UDFs should have a corresponding ScalarFunction. Otherwise Pinot won't be able to use them in some
+  /// scenarios. This should be enforced for all new UDFs, but existing UDFs might not have a corresponding
+  /// ScalarFunction, in which case they can return null.
+  @Nullable
+  public abstract PinotScalarFunction getScalarFunction();
 
   /// Returns the priority of the UDF.
   ///
@@ -116,7 +143,7 @@ public abstract class Udf {
 
   @Override
   public String toString() {
-    return getMainFunctionName();
+    return getMainName();
   }
 
   public static abstract class FromAnnotatedMethod extends Udf {
@@ -130,7 +157,7 @@ public abstract class Udf {
     }
 
     @Override
-    public Set<String> getAllFunctionNames() {
+    public Set<String> getAllNames() {
       if (_annotation.names().length > 0) {
         return Set.of(_annotation.names());
       }
@@ -138,7 +165,7 @@ public abstract class Udf {
     }
 
     @Override
-    public String getMainFunctionName() {
+    public String getMainName() {
       if (_annotation.names().length > 0) {
         return _annotation.names()[0];
       }
@@ -146,7 +173,7 @@ public abstract class Udf {
     }
 
     @Override
-    public Set<PinotScalarFunction> getScalarFunctions() {
+    public PinotScalarFunction getScalarFunction() {
       return PinotScalarFunction.fromMethod(_method, _annotation.isVarArg(),
           _annotation.nullableParameters(), _annotation.names());
     }

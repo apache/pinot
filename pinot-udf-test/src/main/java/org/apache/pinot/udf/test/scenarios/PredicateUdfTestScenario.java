@@ -34,13 +34,14 @@ import org.apache.pinot.udf.test.UdfTestScenario;
 
 /// A test scenario where the UDF is executed as a predicate, which is always evaluated as a ScalarFunction.
 public class PredicateUdfTestScenario extends AbstractUdfTestScenario {
-  public PredicateUdfTestScenario(UdfTestCluster cluster, boolean nullHandlingEnabled) {
-    super(cluster, nullHandlingEnabled);
+  public PredicateUdfTestScenario(UdfTestCluster cluster, UdfExample.NullHandling nullHandlingMode) {
+    super(cluster, nullHandlingMode);
   }
 
   @Override
   public String getTitle() {
-    return "SSE predicate (" + (isNullHandlingEnabled() ? "with" : "without") + " null handling)";
+    return "SSE predicate (" + (getNullHandlingMode() == UdfExample.NullHandling.ENABLED ? "with" : "without")
+        + " null handling)";
   }
 
   @Override
@@ -65,7 +66,7 @@ public class PredicateUdfTestScenario extends AbstractUdfTestScenario {
         + "  )\n"
         + "  AND @testCol = '@example' \n";
     UdfTestCluster.ExecutionContext context = new UdfTestCluster.ExecutionContext(
-        isNullHandlingEnabled(),
+        getNullHandlingMode(),
         false);
     Map<UdfExample, UdfExampleResult> queryResult = extractResultsByCase(udf, signature, context, sqlTemplate);
 
@@ -102,7 +103,7 @@ public class PredicateUdfTestScenario extends AbstractUdfTestScenario {
   @AutoService(UdfTestScenario.Factory.class)
   public static class WithNullHandlingFactory extends UdfTestScenario.Factory.FromCluster {
     public WithNullHandlingFactory() {
-      super(cluster -> new PredicateUdfTestScenario(cluster, true));
+      super(cluster -> new PredicateUdfTestScenario(cluster, UdfExample.NullHandling.ENABLED));
     }
   }
 
@@ -110,7 +111,7 @@ public class PredicateUdfTestScenario extends AbstractUdfTestScenario {
   @AutoService(UdfTestScenario.Factory.class)
   public static class WithoutNullHandlingFactory extends UdfTestScenario.Factory.FromCluster {
     public WithoutNullHandlingFactory() {
-      super(cluster -> new PredicateUdfTestScenario(cluster, false));
+      super(cluster -> new PredicateUdfTestScenario(cluster, UdfExample.NullHandling.DISABLED));
     }
   }
 }

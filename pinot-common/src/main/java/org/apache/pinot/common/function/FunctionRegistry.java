@@ -20,10 +20,9 @@ package org.apache.pinot.common.function;
 
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -201,29 +200,43 @@ public class FunctionRegistry {
   }
 
   public static class ArgumentCountBasedScalarFunction implements PinotScalarFunction {
-    private final String _name;
+    private final String _mainName;
+    private final Set<String> _names;
     private final Map<Integer, FunctionInfo> _functionInfoMap;
 
     public ArgumentCountBasedScalarFunction(String name, Map<Integer, FunctionInfo> functionInfoMap) {
-      _name = name;
+      this(List.of(name), functionInfoMap);
+    }
+
+    public ArgumentCountBasedScalarFunction(List<String> names, Map<Integer, FunctionInfo> functionInfoMap) {
+      Preconditions.checkArgument(!names.isEmpty(), "At least one name is required");
+      _mainName = FunctionRegistry.canonicalize(names.get(0));
+      _names = names.stream()
+          .map(FunctionRegistry::canonicalize)
+          .collect(Collectors.toSet());
       _functionInfoMap = functionInfoMap;
     }
 
     @Override
     public String getName() {
-      return _name;
+      return _mainName;
+    }
+
+    @Override
+    public Set<String> getNames() {
+      return _names;
     }
 
     @Override
     public PinotSqlFunction toPinotSqlFunction() {
-      return new PinotSqlFunction(_name, getReturnTypeInference(), getOperandTypeChecker());
+      return new PinotSqlFunction(_mainName, getReturnTypeInference(), getOperandTypeChecker());
     }
 
     private SqlReturnTypeInference getReturnTypeInference() {
       return opBinding -> {
         int numArguments = opBinding.getOperandCount();
         FunctionInfo functionInfo = getFunctionInfo(numArguments);
-        Preconditions.checkState(functionInfo != null, "Failed to find function: %s with %s arguments", _name,
+        Preconditions.checkState(functionInfo != null, "Failed to find function: %s with %s arguments", _mainName,
             numArguments);
         RelDataTypeFactory typeFactory = opBinding.getTypeFactory();
         Method method = functionInfo.getMethod();
@@ -287,7 +300,7 @@ public class FunctionRegistry {
     }
 
     @Override
-    public String toString() {
+    public String getScalarFunctionId() {
       if (_functionInfoMap.size() == 1) {
         String singleFunInfo = printFunctionInfo(_functionInfoMap.values().iterator().next());
         return "ArgumentCountBasedScalarFunction{" + singleFunInfo + "}";

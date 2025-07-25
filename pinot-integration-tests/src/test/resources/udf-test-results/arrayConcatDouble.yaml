@@ -28,8 +28,8 @@ Ingestion time transformer:
         actualResult:
         - 1.0
         - 2.0
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
         - 1.0
         - 2.0
@@ -37,8 +37,8 @@ Ingestion time transformer:
         actualResult:
         - 1.0
         - 2.0
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
         - 1.0
         - 2.0
@@ -59,8 +59,8 @@ Ingestion time transformer:
         expectedResult: null
       two empty arrays:
         actualResult: []
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult: []
       two not empty arrays:
         actualResult:
@@ -68,8 +68,8 @@ Ingestion time transformer:
         - 3.0
         - 2.0
         - 4.0
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
         - 1.0
         - 3.0
@@ -111,8 +111,8 @@ MSE intermediate stage (with null handling):
         expectedResult: null
       two empty arrays:
         actualResult: []
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult: []
       two not empty arrays:
         actualResult:
@@ -120,8 +120,8 @@ MSE intermediate stage (with null handling):
         - 3.0
         - 2.0
         - 4.0
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
         - 1.0
         - 3.0
@@ -192,8 +192,8 @@ MSE intermediate stage (without null handling):
         - 3.0
         - 2.0
         - 4.0
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
         - 1.0
         - 3.0
@@ -247,8 +247,8 @@ SSE projection (with null handling):
         expectedResult: null
       two empty arrays:
         actualResult: []
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult: []
       two not empty arrays:
         actualResult:
@@ -256,8 +256,8 @@ SSE projection (with null handling):
         - 3.0
         - 2.0
         - 4.0
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
         - 1.0
         - 3.0
@@ -328,8 +328,8 @@ SSE projection (without null handling):
         - 3.0
         - 2.0
         - 4.0
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
         - 1.0
         - 3.0

@@ -22,6 +22,7 @@ import com.google.auto.service.AutoService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.arithmetic.MultScalarFunction;
@@ -36,13 +37,13 @@ import org.apache.pinot.core.udf.UdfSignature;
 @AutoService(Udf.class)
 public class MultUdf extends Udf {
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "mult";
   }
 
   @Override
-  public Set<String> getAllFunctionNames() {
-    return Set.of(getMainFunctionName(), "times");
+  public Set<String> getAllNames() {
+    return Set.of(getMainName(), "times");
   }
 
   @Override
@@ -52,7 +53,7 @@ public class MultUdf extends Udf {
 
   @Override
   public String asSqlCall(String name, List<String> sqlArgValues) {
-    if (name.equals(getMainFunctionName())) {
+    if (name.equals(getMainCanonicalName())) {
       return "(" + String.join(" * ", sqlArgValues) + ")";
     } else {
       return super.asSqlCall(name, sqlArgValues);
@@ -69,12 +70,12 @@ public class MultUdf extends Udf {
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.MULT, MultiplicationTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.MULT, MultiplicationTransformFunction.class);
   }
 
   @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of(new MultScalarFunction());
+  public PinotScalarFunction getScalarFunction() {
+    return new MultScalarFunction();
   }
 }

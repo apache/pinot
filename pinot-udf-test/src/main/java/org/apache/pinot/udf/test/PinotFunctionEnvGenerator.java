@@ -30,6 +30,7 @@ import java.util.Set;
 import org.apache.arrow.util.Preconditions;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
+import org.apache.pinot.core.udf.UdfExample.NullHandling;
 import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -83,7 +84,7 @@ public class PinotFunctionEnvGenerator {
     if (udf.getExamples().keySet().stream()
         .flatMap(signature -> signature.getParameters().stream())
         .anyMatch(param -> !param.getConstraints().isEmpty())) {
-      return "udf_test_" + udf.getMainFunctionName().replaceAll("[^a-zA-Z0-9]", "_");
+      return "udf_test_" + udf.getMainCanonicalName().replaceAll("[^a-zA-Z0-9]", "_");
     }
     return "udf_test";
   }
@@ -146,15 +147,15 @@ public class PinotFunctionEnvGenerator {
         + (param.isMultivalued() ? "_mv" : "");
   }
 
-  public static String getResultColumnName(UdfSignature signature, boolean nullHandling) {
+  public static String getResultColumnName(UdfSignature signature, NullHandling nullHandling) {
     return getResultColumnName(signature.getReturnType(), nullHandling);
   }
 
-  public static String getResultColumnName(UdfParameter param, boolean nullHandling) {
+  public static String getResultColumnName(UdfParameter param, NullHandling nullHandling) {
     return "result"
         + "_" + param.getDataType().name().toLowerCase(Locale.US)
         + (param.isMultivalued() ? "_mv" : "")
-        + (nullHandling ? "_null" : "");
+        + (nullHandling == NullHandling.ENABLED ? "_null" : "");
   }
 
   public static TableConfig generateTableConfig(List<Udf> udfs) {
@@ -213,15 +214,15 @@ public class PinotFunctionEnvGenerator {
       UdfParameter parameter,
       TableConfigBuilder tableConfigBuilder,
       Set<String> columnNames) {
-    createResultColInTableConfig(parameter, tableConfigBuilder, columnNames, false);
-    createResultColInTableConfig(parameter, tableConfigBuilder, columnNames, true);
+    createResultColInTableConfig(parameter, tableConfigBuilder, columnNames, NullHandling.DISABLED);
+    createResultColInTableConfig(parameter, tableConfigBuilder, columnNames, NullHandling.ENABLED);
   }
 
   private static void createResultColInTableConfig(
       UdfParameter parameter,
       TableConfigBuilder tableConfigBuilder,
       Set<String> columnNames,
-      boolean nullHandling) {
+      NullHandling nullHandling) {
     String columnName = getResultColumnName(parameter, nullHandling);
     if (!columnNames.contains(columnName)) {
       columnNames.add(columnName);
@@ -273,15 +274,15 @@ public class PinotFunctionEnvGenerator {
 
   private static void createResultColsInSchema(UdfParameter parameter,
       Schema.SchemaBuilder schemaBuilder, Set<String> columnNames) {
-    createResultColInSchema(parameter, schemaBuilder, columnNames, false);
-    createResultColInSchema(parameter, schemaBuilder, columnNames, true);
+    createResultColInSchema(parameter, schemaBuilder, columnNames, NullHandling.DISABLED);
+    createResultColInSchema(parameter, schemaBuilder, columnNames, NullHandling.ENABLED);
   }
 
   private static void createResultColInSchema(
       UdfParameter parameter,
       Schema.SchemaBuilder schemaBuilder,
       Set<String> columnNames,
-      boolean nullHandling) {
+      NullHandling nullHandling) {
     String columnName = getResultColumnName(parameter, nullHandling);
     if (!columnNames.contains(columnName)) {
       columnNames.add(columnName);
@@ -294,11 +295,11 @@ public class PinotFunctionEnvGenerator {
       UdfSignature signature,
       UdfExample testCase) {
     GenericRow row = new GenericRow();
-    row.putValue(getUdfColumnName(), udf.getMainFunctionName());
+    row.putValue(getUdfColumnName(), udf.getMainCanonicalName());
     row.putValue(getTestColumnName(), testCase.getId());
     row.putValue(getSignatureColumnName(), signature.toString());
-    row.putValue(getResultColumnName(signature, false), testCase.getResult(false));
-    row.putValue(getResultColumnName(signature, true), testCase.getResult(true));
+    row.putValue(getResultColumnName(signature, NullHandling.DISABLED), testCase.getResult(NullHandling.DISABLED));
+    row.putValue(getResultColumnName(signature, NullHandling.ENABLED), testCase.getResult(NullHandling.ENABLED));
     List<UdfParameter> params = signature.getParameters();
     for (int i = 0; i < params.size(); i++) {
       Object argValue = testCase.getInputValues().get(i);

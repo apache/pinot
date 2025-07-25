@@ -22,6 +22,7 @@ import com.google.auto.service.AutoService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.arithmetic.PlusScalarFunction;
@@ -36,13 +37,13 @@ import org.apache.pinot.core.udf.UdfSignature;
 @AutoService(Udf.class)
 public class PlusUdf extends Udf {
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "plus";
   }
 
   @Override
-  public Set<String> getAllFunctionNames() {
-    return Set.of(getMainFunctionName(), "add");
+  public Set<String> getAllNames() {
+    return Set.of(getMainName(), "add");
   }
 
   @Override
@@ -53,7 +54,7 @@ public class PlusUdf extends Udf {
 
   @Override
   public String asSqlCall(String name, List<String> sqlArgValues) {
-    if (name.equals(getMainFunctionName())) {
+    if (name.equals(getMainCanonicalName())) {
       return "(" + String.join(" + ", sqlArgValues) + ")";
     } else {
       return super.asSqlCall(name, sqlArgValues);
@@ -70,12 +71,12 @@ public class PlusUdf extends Udf {
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ADD, AdditionTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.ADD, AdditionTransformFunction.class);
   }
 
   @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of(new PlusScalarFunction());
+  public PinotScalarFunction getScalarFunction() {
+    return new PlusScalarFunction();
   }
 }

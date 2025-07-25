@@ -20,6 +20,8 @@ package org.apache.pinot.udf.test;
 
 import com.google.common.collect.Maps;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.ServiceLoader;
@@ -204,6 +206,8 @@ public class UdfTestFramework {
     ERROR;
 
     public void check(@Nullable Object expected, @Nullable Object actual) throws AssertionError {
+      expected = canonizeObject(expected);
+      actual = canonizeObject(actual);
       switch (this) {
         case EQUAL:
           if (!Objects.equals(expected, actual)) {
@@ -252,6 +256,33 @@ public class UdfTestFramework {
       String expectedDesc = expected == null ? "null" : expected + " (" + expected.getClass().getSimpleName() + ")";
       String actualDesc = actual == null ? "null" : actual + " (" + actual.getClass().getSimpleName() + ")";
       return "Expected: " + expectedDesc + ", but got: " + actualDesc;
+    }
+
+    private static Object canonizeObject(@Nullable Object value) {
+      if (value == null) {
+        return null;
+      }
+      if (value.getClass().isArray()) {
+        Class<?> componentType = value.getClass().getComponentType();
+        if (componentType == int.class) {
+          return Arrays.stream((int[]) value).boxed().collect(Collectors.toList());
+        } else if (componentType == long.class) {
+          return Arrays.stream((long[]) value).boxed().collect(Collectors.toList());
+        } else if (componentType == double.class) {
+          return Arrays.stream((double[]) value).boxed().collect(Collectors.toList());
+        } else if (componentType == float.class) {
+          // Convert float array to List<Float> for consistency
+          float[] floatArray = (float[]) value;
+          ArrayList<Float> list = new ArrayList<>(floatArray.length);
+          for (float f : floatArray) {
+            list.add(f);
+          }
+          return list;
+        } else {
+          return Arrays.asList((Object[]) value);
+        }
+      }
+      return value;
     }
   }
 }

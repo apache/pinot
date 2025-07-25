@@ -62,7 +62,7 @@ public class UdfTestResult {
   public Dto asDto() {
     Map<String, ByScenario.Dto> dtoMap = _results.entrySet().stream()
         .collect(Collectors.toMap(
-            entry -> entry.getKey().getMainFunctionName(),
+            entry -> entry.getKey().getMainName(),
             entry -> entry.getValue().asDto()
         ));
     return new Dto(dtoMap);

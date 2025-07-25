@@ -40,7 +40,7 @@ public abstract class UdfExample {
   public abstract List<Object> getInputValues();
 
   /// The result of the example. It may be different depending on whether null handling is enabled or not.
-  public abstract Object getResult(boolean nullHandling);
+  public abstract Object getResult(NullHandling nullHandling);
 
   /// Creates a new UdfExample with the given name and some values.
   ///
@@ -88,8 +88,8 @@ public abstract class UdfExample {
         return false;
       }
     }
-    return equalValues(getResult(false), that.getResult(false))
-        && equalValues(getResult(true), that.getResult(true));
+    return equalValues(getResult(NullHandling.DISABLED), that.getResult(NullHandling.DISABLED))
+        && equalValues(getResult(NullHandling.ENABLED), that.getResult(NullHandling.ENABLED));
   }
 
   private boolean equalValues(Object result1, Object result2) {
@@ -138,7 +138,7 @@ public abstract class UdfExample {
     }
 
     @Override
-    public Object getResult(boolean nullHandling) {
+    public Object getResult(NullHandling nullHandling) {
       return _expectedResult;
     }
   }
@@ -164,8 +164,8 @@ public abstract class UdfExample {
     }
 
     @Override
-    public Object getResult(boolean nullHandling) {
-      return !nullHandling ? _result : _base.getResult(false);
+    public Object getResult(NullHandling nullHandling) {
+      return nullHandling == NullHandling.DISABLED ? _result : _base.getResult(NullHandling.ENABLED);
     }
 
     /// Returns a new UdfExample that uses the given result when null handling is disabled instead of the one provided
@@ -192,5 +192,10 @@ public abstract class UdfExample {
     public int hashCode() {
       return Objects.hash(_base, _result);
     }
+  }
+
+  public enum NullHandling {
+    ENABLED,
+    DISABLED
   }
 }

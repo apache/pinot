@@ -36,13 +36,14 @@ import org.apache.pinot.udf.test.UdfTestScenario;
 /// A test scenario where the UDF is executed on an intermediate stage of the MSE.
 public class IntermediateUdfTestScenario extends AbstractUdfTestScenario {
 
-  public IntermediateUdfTestScenario(UdfTestCluster cluster, boolean nullHandlingEnabled) {
-    super(cluster, nullHandlingEnabled);
+  public IntermediateUdfTestScenario(UdfTestCluster cluster, UdfExample.NullHandling nullHandlingMode) {
+    super(cluster, nullHandlingMode);
   }
 
   @Override
   public String getTitle() {
-    return "MSE intermediate stage (" + (isNullHandlingEnabled() ? "with" : "without") + " null handling)";
+    return "MSE intermediate stage (" + (getNullHandlingMode() == UdfExample.NullHandling.ENABLED ? "with" : "without")
+        + " null handling)";
   }
 
   @Override
@@ -105,7 +106,7 @@ public class IntermediateUdfTestScenario extends AbstractUdfTestScenario {
         .replace("@otherCols", otherCols.toString());
 
     UdfTestCluster.ExecutionContext context = new UdfTestCluster.ExecutionContext(
-        isNullHandlingEnabled(),
+        getNullHandlingMode(),
         true);
 
     return extractResultsByCase(udf, signature, context, sqlTemplate);
@@ -115,7 +116,7 @@ public class IntermediateUdfTestScenario extends AbstractUdfTestScenario {
   @AutoService(UdfTestScenario.Factory.class)
   public static class WithNullHandlingFactory extends UdfTestScenario.Factory.FromCluster {
     public WithNullHandlingFactory() {
-      super(cluster -> new IntermediateUdfTestScenario(cluster, true));
+      super(cluster -> new IntermediateUdfTestScenario(cluster, UdfExample.NullHandling.ENABLED));
     }
   }
 
@@ -123,7 +124,7 @@ public class IntermediateUdfTestScenario extends AbstractUdfTestScenario {
   @AutoService(UdfTestScenario.Factory.class)
   public static class WithoutNullHandlingFactory extends UdfTestScenario.Factory.FromCluster {
     public WithoutNullHandlingFactory() {
-      super(cluster -> new IntermediateUdfTestScenario(cluster, false));
+      super(cluster -> new IntermediateUdfTestScenario(cluster, UdfExample.NullHandling.DISABLED));
     }
   }
 }

@@ -18,12 +18,10 @@
  */
 package org.apache.pinot.udf.test;
 
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -34,6 +32,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfParameter;
@@ -50,12 +49,12 @@ public class UdfReporter {
   /// Generates a markdown report for the given UDF and its test results.
   public static void reportAsMarkdown(Udf udf, UdfTestResult.ByScenario byScenario, Writer writer) {
     try (PrintWriter report = new PrintWriter(writer)) {
-      report.append("## ").append(udf.getMainFunctionName()).append("\n\n");
+      report.append("## ").append(udf.getMainName()).append("\n\n");
 
-      if (udf.getAllFunctionNames().size() > 1) {
+      if (udf.getAllNames().size() > 1) {
         report.append("Other names: ")
-            .append(udf.getAllFunctionNames().stream()
-                .filter(name -> !name.equals(udf.getMainFunctionName()))
+            .append(udf.getAllNames().stream()
+                .filter(name -> !name.equals(udf.getMainName()))
                 .collect(Collectors.joining(", ")))
             .append("\n\n");
       }
@@ -109,7 +108,7 @@ public class UdfReporter {
                 .append(signature.toString()).append(" | ");
 
             // Call column
-            report.append(asSqlCallWithLiteralArgs(udf, udf.getMainFunctionName(), example.getInputValues()))
+            report.append(asSqlCallWithLiteralArgs(udf, udf.getMainName(), example.getInputValues()))
                 .append(" | ");
 
             // Expected result
@@ -153,7 +152,7 @@ public class UdfReporter {
 
       boolean paramsAlreadyPrinted = false;
       for (UdfSignature signature : signatures) {
-        report.append("#### ").append(udf.getMainFunctionName()).append(signature.toString()).append("\n\n");
+        report.append("#### ").append(udf.getMainName()).append(signature.toString()).append("\n\n");
 
         String resultDescription = signature.getReturnType().getDescription();
         if (resultDescription != null) {
@@ -206,16 +205,16 @@ public class UdfReporter {
 
           for (UdfExample example : udf.getExamples().get(udfSignature)) {
             // Expected result
-            Object withNull = example.getResult(true);
-            Object withoutNull = example.getResult(false);
+            Object withNull = example.getResult(UdfExample.NullHandling.DISABLED);
+            Object withoutNull = example.getResult(UdfExample.NullHandling.DISABLED);
 
             // Call column
             report.append("| ")
-                .append(asSqlCallWithLiteralArgs(udf, udf.getMainFunctionName(), example.getInputValues()))
+                .append(asSqlCallWithLiteralArgs(udf, udf.getMainName(), example.getInputValues()))
                 .append(" | ")
-                .append(withNull == null ? "NULL" : withNull.toString())
+                .append(valueToString(withNull))
                 .append(" | ")
-                .append(withoutNull == null ? "NULL" : withoutNull.toString())
+                .append(valueToString(withoutNull))
                 .append(" |\n");
           }
           report.append("\n");
@@ -224,17 +223,17 @@ public class UdfReporter {
     if (summaries.values().stream().distinct().count() == 1) {
       String summary = summaries.values().iterator().next();
       if (summary.equals("❌ Unsupported")) {
-        report.append("The UDF ").append(udf.getMainFunctionName())
+        report.append("The UDF ").append(udf.getMainName())
             .append(" is not supported in all scenarios.\n\n");
       } else if (summary.contains("❌")) {
-        report.append("The UDF ").append(udf.getMainFunctionName())
+        report.append("The UDF ").append(udf.getMainName())
             .append(" has failed in all scenarios with the following error: ")
             .append(summary).append("\n\n");
       } else if (summary.equals("EQUAL")) {
-        report.append("The UDF ").append(udf.getMainFunctionName())
+        report.append("The UDF ").append(udf.getMainName())
             .append(" is supported in all scenarios\n\n");
       } else {
-        report.append("The UDF ").append(udf.getMainFunctionName())
+        report.append("The UDF ").append(udf.getMainName())
             .append(" is supported in all scenarios with at least ")
             .append(summary).append(" semantic.\n\n");
       }
@@ -251,18 +250,26 @@ public class UdfReporter {
     }
   }
 
-  /// Generates a markdown report for the given UDF test results.
-  /// The report is written to the output stream generated by the provided function.
-  public static void reportAsMarkdown(UdfTestResult results, Function<Udf, OutputStream> osGenerator)
-      throws IOException {
-
-    TreeSet<Udf> udfs = new TreeSet<>(Comparator.comparing(Udf::getMainFunctionName));
-    udfs.addAll(results.getResults().keySet());
-    for (Udf udf : udfs) {
-      try (OutputStream os = osGenerator.apply(udf);
-          BufferedWriter writer = new BufferedWriter(new PrintWriter(os))) {
-        reportAsMarkdown(udf, results.getResults().get(udf), writer);
+  private static String valueToString(@Nullable Object value) {
+    if (value == null) {
+      return "NULL";
+    } else if (value.getClass().isArray()) {
+      if (value.getClass().isAssignableFrom(byte[].class)) {
+        return "hexToBytes('" + BytesUtils.toHexString((byte[]) value) + "')";
       }
+      return Arrays.stream((Object[]) value)
+          .map(UdfReporter::valueToString)
+          .collect(Collectors.joining(", ", "[", "]"));
+    } else if (value instanceof String) {
+      return "'" + value.toString().replace("'", "''") + "'";
+    } else if (value instanceof Collection) {
+      return ((Collection<?>) value).stream()
+          .map(UdfReporter::valueToString)
+          .collect(Collectors.joining(", ", "[", "]"));
+    } else if (value instanceof Number || value instanceof Boolean) {
+      return value.toString();
+    } else {
+      return value.toString();
     }
   }
 
@@ -343,20 +350,9 @@ public class UdfReporter {
   }
 
   private static String asSqlCallWithLiteralArgs(Udf udf, String name, List<Object> inputs) {
-    List<String> args = inputs.stream().map(o -> {
-      if (o == null) {
-        return "NULL";
-      } else if (o.getClass().isArray()) {
-        if (o.getClass().isAssignableFrom(byte[].class)) {
-          return "hexToBytes('" + BytesUtils.toHexString((byte[]) o) + "')";
-        }
-        return Arrays.toString((Object[]) o);
-      } else if (o instanceof String) {
-        return "'" + o.toString().replace("'", "''") + "'";
-      } else {
-        return o.toString();
-      }
-    }).collect(Collectors.toList());
+    List<String> args = inputs.stream()
+        .map(UdfReporter::valueToString)
+        .collect(Collectors.toList());
     return udf.asSqlCall(name, args);
   }
 }

@@ -146,6 +146,12 @@ public class UdfParameter {
     return type;
   }
 
+  /// A constraint on a UDF parameter.
+  ///
+  /// This can be used to define specific constraints on the parameter, such as requiring it to be a literal value,
+  /// or to have a specific index.
+  ///
+  /// Remember equals and hashcode should be implemented. Otherwise UdfParameter.equals() may fail unexpectedly.
   public interface Constraint {
     void updateTableConfig(TableConfigBuilder tableConfigBuilder, String columnName);
   }
@@ -157,6 +163,16 @@ public class UdfParameter {
 
     @Override
     public void updateTableConfig(TableConfigBuilder tableConfigBuilder, String columnName) {
+    }
+
+    @Override
+    public int hashCode() {
+      return getClass().hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      return obj instanceof LiteralConstraint;
     }
   }
 }

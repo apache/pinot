@@ -22,6 +22,7 @@ import com.google.auto.service.AutoService;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.transform.function.ArrayAverageTransformFunction;
@@ -37,7 +38,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 @AutoService(Udf.class)
 public class ArrayAverageUdf extends Udf {
   @Override
-  public String getMainFunctionName() {
+  public String getMainName() {
     return "arrayaverage";
   }
 
@@ -64,12 +65,12 @@ public class ArrayAverageUdf extends Udf {
   }
 
   @Override
-  public Set<PinotScalarFunction> getScalarFunctions() {
-    return Set.of();
+  public PinotScalarFunction getScalarFunction() {
+    return null;
   }
 
   @Override
-  public Map<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunctions() {
-    return Map.of(TransformFunctionType.ARRAY_AVERAGE, ArrayAverageTransformFunction.class);
+  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
+    return Pair.of(TransformFunctionType.ARRAY_AVERAGE, ArrayAverageTransformFunction.class);
   }
 }
