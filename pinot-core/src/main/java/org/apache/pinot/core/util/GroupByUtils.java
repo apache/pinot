@@ -26,11 +26,11 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
-import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.PartitionedIndexedTable;
 import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.data.table.TwoLevelHashMapIndexedTable;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -103,7 +103,6 @@ public final class GroupByUtils {
    * TODO: add conditions checking for number of threads available
    */
   public static boolean shouldPartitionGroupBy(QueryContext queryContext) {
-//    return QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY > 4 && queryContext.isUnsafeTrim();
     return queryContext.isUnsafeTrim() && queryContext.getOrderByExpressions() != null;
   }
 
@@ -123,7 +122,7 @@ public final class GroupByUtils {
    * Creates an indexed table for partitioned group by combining
    */
   public static IndexedTable createPartitionedIndexedTableForCombineOperator(DataSchema dataSchema,
-      QueryContext queryContext, RadixPartitionedHashMap<Key, Record> map, ExecutorService executorService) {
+      QueryContext queryContext, RadixPartitionedHashMap map, ExecutorService executorService) {
     // single worker thread merges single partition number
     int limit = queryContext.getLimit();
     boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
@@ -171,7 +170,8 @@ public final class GroupByUtils {
    * Creates an indexed table for the worker thread local combine of
    * partitioned segment results
    */
-  public static SimpleIndexedTable createIndexedTableForPartitionMerge(DataSchema dataSchema, QueryContext queryContext,
+  public static TwoLevelHashMapIndexedTable createIndexedTableForPartitionMerge(
+      DataSchema dataSchema, QueryContext queryContext,
       ExecutorService executorService, int initialCapacity) {
     // single worker thread merges single partition number
     int limit = queryContext.getLimit();
@@ -195,7 +195,7 @@ public final class GroupByUtils {
         //       without ordering. Consider ordering on group-by columns if no ordering is specified.
         resultSize = limit;
       }
-      return new SimpleIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+      return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
           Integer.MAX_VALUE, initialCapacity, executorService);
     }
 
@@ -208,10 +208,10 @@ public final class GroupByUtils {
     }
     int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
     if (trimThreshold == Integer.MAX_VALUE) {
-      return new SimpleIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+      return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
           Integer.MAX_VALUE, initialCapacity, executorService);
     } else {
-      return new SimpleIndexedTable(dataSchema, false, queryContext, resultSize, trimSize,
+      return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, trimSize,
           trimThreshold, initialCapacity, executorService);
     }
   }

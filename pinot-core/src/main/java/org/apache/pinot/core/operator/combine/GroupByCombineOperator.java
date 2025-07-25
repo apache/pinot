@@ -21,7 +21,6 @@ package org.apache.pinot.core.operator.combine;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -38,7 +37,8 @@ import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
 import org.apache.pinot.core.data.table.RadixPartitionedIntermediateRecords;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.data.table.TwoLevelHashMapIndexedTable;
+import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashmap;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -79,7 +79,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private final CompletableFuture<RadixPartitionedIntermediateRecords>[] _partitionedRecordsFutures;
 
   private final AtomicInteger _nextPartitionId = new AtomicInteger(0);
-  private volatile SimpleIndexedTable[] _mergedIndexedTables;
+  private final TwoLevelHashMapIndexedTable[] _mergedIndexedTables;
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
@@ -103,7 +103,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       _partitionedRecordsFutures[i] = new CompletableFuture<>();
     }
 
-    _mergedIndexedTables = new SimpleIndexedTable[_queryContext.getGroupByNumPartitions()];
+    _mergedIndexedTables = new TwoLevelHashMapIndexedTable[_queryContext.getGroupByNumPartitions()];
 
     _partitionSizes = new AtomicInteger[queryContext.getGroupByNumPartitions()];
     for (int i = 0; i < queryContext.getGroupByNumPartitions(); i++) {
@@ -226,7 +226,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         int initialSize = HashUtil.getHashMapCapacity(
             (int) Math.round(_partitionSizes[partitionId].get() / Math.sqrt(_numOperators)));
 
-        SimpleIndexedTable table =
+        // TODO: change this to use a TwoLevelLinearProbingRecordHashMap
+        TwoLevelHashMapIndexedTable table =
             GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService, initialSize);
 
         CompletableFuture[] buf = new CompletableFuture[_numOperators];
@@ -239,7 +240,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           CompletableFuture fut = CompletableFuture.anyOf(buf);
           RadixPartitionedIntermediateRecords partition = (RadixPartitionedIntermediateRecords) fut.get();
           for (IntermediateRecord record : partition.getPartition(partitionId)) {
-            // TODO: upsert like SimpleIndexedTable, sort + trim to trimSize when reaching trimThreshold if trimEnabled
             table.upsert(record._key, record._record);
           }
           int processedSegmentId = partition.getSegmentId();
@@ -396,13 +396,14 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
 
     if (GroupByUtils.shouldPartitionGroupBy(_queryContext)) {
-      HashMap<Key, Record>[] lookupMaps = new HashMap[_queryContext.getGroupByNumPartitions()];
+      TwoLevelLinearProbingRecordHashmap[] lookupMaps =
+          new TwoLevelLinearProbingRecordHashmap[_queryContext.getGroupByNumPartitions()];
       int idx = 0;
-      for (SimpleIndexedTable table : _mergedIndexedTables) {
-        lookupMaps[idx++] = (HashMap<Key, Record>) table.getLookupMap();
+      for (TwoLevelHashMapIndexedTable table : _mergedIndexedTables) {
+        lookupMaps[idx++] = (TwoLevelLinearProbingRecordHashmap) table.getLookupMap();
       }
       // keep all partition records in the map, later finish will trim them if needed
-      RadixPartitionedHashMap<Key, Record> map = new RadixPartitionedHashMap<>(lookupMaps,
+      RadixPartitionedHashMap map = new RadixPartitionedHashMap(lookupMaps,
           _queryContext.getGroupByPartitionNumRadixBits());
       _indexedTable = GroupByUtils.createPartitionedIndexedTableForCombineOperator(_dataSchema, _queryContext, map,
           _executorService);

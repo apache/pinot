@@ -20,8 +20,8 @@ package org.apache.pinot.core.data.table;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,11 +32,11 @@ import javax.ws.rs.NotSupportedException;
 /**
  * Radix partitioned hashtable that provides a single view for multiple hashtable that could be indexed
  */
-public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
+public class RadixPartitionedHashMap implements Map<Key, Record> {
   private final int _numRadixBits;
   private final int _numPartitions;
   private final int _mask;
-  private final HashMap<K, V>[] _maps;
+  private final TwoLevelLinearProbingRecordHashmap[] _maps;
   private int _size;
   private int _segmentId = -1;
 
@@ -46,21 +46,21 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
     _numPartitions = 1 << numRadixBits;
     _mask = _numPartitions - 1;
     _segmentId = segmentId;
-    _maps = new HashMap[_numPartitions];
+    _maps = new TwoLevelLinearProbingRecordHashmap[_numPartitions];
     _size = 0;
     for (int i = 0; i < _numPartitions; i++) {
-      _maps[i] = new HashMap<>(partitionInitialCapacity);
+      _maps[i] = new TwoLevelLinearProbingRecordHashmap();
     }
   }
 
-  public RadixPartitionedHashMap(HashMap<K, V>[] maps, int numRadixBits) {
+  public RadixPartitionedHashMap(TwoLevelLinearProbingRecordHashmap[] maps, int numRadixBits) {
     _numRadixBits = numRadixBits;
     _numPartitions = 1 << numRadixBits;
     assert (maps.length == _numPartitions);
     _mask = _numPartitions - 1;
     _maps = maps;
     _size = 0;
-    for (HashMap<K, V> map : maps) {
+    for (TwoLevelLinearProbingRecordHashmap map : maps) {
       _size += map.size();
     }
   }
@@ -69,7 +69,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
     return _segmentId;
   }
 
-  public Map<K, V> getPartition(int i) {
+  public TwoLevelLinearProbingRecordHashmap getPartition(int i) {
     return _maps[i];
   }
 
@@ -77,7 +77,7 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
     return _numPartitions;
   }
 
-  public int partition(K key) {
+  public int partition(Key key) {
     return key.hashCode() & _mask;
   }
 
@@ -97,8 +97,8 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Override
   public boolean containsKey(Object o) {
-    HashMap<K, V> map = _maps[partition((K) o)];
-    return map.containsKey(o);
+    TwoLevelLinearProbingRecordHashmap map = _maps[partition((Key) o)];
+    return map.get((Key) o) != null;
   }
 
   @Override
@@ -107,14 +107,14 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   }
 
   @Override
-  public V get(Object o) {
-    HashMap<K, V> map = _maps[partition((K) o)];
-    return map.get(o);
+  public Record get(Object o) {
+    TwoLevelLinearProbingRecordHashmap map = _maps[partition((Key) o)];
+    return map.get((Key) o);
   }
 
-  public V putIntoPartition(K k, V v, int partition) {
-    HashMap<K, V> map = _maps[partition];
-    V prev = map.put(k, v);
+  public Record putIntoPartition(Key k, Record v, int partition) {
+    TwoLevelLinearProbingRecordHashmap map = _maps[partition];
+    Record prev = map.put((Key) k, (Record) v);
     if (prev == null) {
       _size++;
     }
@@ -123,9 +123,9 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
 
   @Nullable
   @Override
-  public V put(K k, V v) {
-    HashMap<K, V> map = _maps[partition(k)];
-    V prev = map.put(k, v);
+  public Record put(Key k, Record v) {
+    TwoLevelLinearProbingRecordHashmap map = _maps[partition(k)];
+    Record prev = map.put(k, v);
     if (prev == null) {
       _size++;
     }
@@ -133,52 +133,94 @@ public class RadixPartitionedHashMap<K, V> implements Map<K, V> {
   }
 
   @Override
-  public V remove(Object o) {
-    HashMap<K, V> map = _maps[partition((K) o)];
-    V prev = map.remove(o);
-    if (prev != null) {
-      _size--;
-    }
-    return prev;
+  public Record remove(Object o) {
+    throw new NotSupportedException("don't remove");
+//    TwoLevelLinearProbingRecordHashmap map = _maps[partition((Key) o)];
+//    Record prev = map.remove(o);
+//    if (prev != null) {
+//      _size--;
+//    }
+//    return prev;
   }
 
   @Override
-  public void putAll(Map<? extends K, ? extends V> map) {
+  public void putAll(Map<? extends Key, ? extends Record> map) {
     throw new NotSupportedException("partitioned map does not support removing by value");
   }
 
   @Override
   public void clear() {
-    for (HashMap<K, V> map : _maps) {
+    for (TwoLevelLinearProbingRecordHashmap map : _maps) {
       map.clear();
     }
     _size = 0;
   }
 
   @Override
-  public Set<K> keySet() {
-    Set<K> set = new HashSet<>();
-    for (int i = 0; i < _maps.length; i++) {
-      set.addAll(_maps[i].keySet());
+  public Set<Key> keySet() {
+    Set<Key> set = new HashSet<>();
+    for (TwoLevelLinearProbingRecordHashmap map : _maps) {
+      set.addAll(map.keys());
     }
     return set;
   }
 
   @Override
-  public Collection<V> values() {
-    List<V> list = new ArrayList<>();
-    for (int i = 0; i < _maps.length; i++) {
-      list.addAll(_maps[i].values());
+  public Collection<Record> values() {
+    List<Record> list = new ArrayList<>();
+    for (TwoLevelLinearProbingRecordHashmap map : _maps) {
+      list.addAll(map.values());
     }
     return list;
   }
 
   @Override
-  public Set<Entry<K, V>> entrySet() {
-    Set<Entry<K, V>> set = new HashSet<>();
-    for (int i = 0; i < _maps.length; i++) {
-      set.addAll(_maps[i].entrySet());
+  public Set<Entry<Key, Record>> entrySet() {
+    Set<Entry<Key, Record>> set = new HashSet<>();
+    for (TwoLevelLinearProbingRecordHashmap map : _maps) {
+      set.addAll(map.entrySet());
     }
     return set;
+  }
+
+  public Iterator<IntermediateRecord> iterator() {
+    return new RecordIterator();
+  }
+
+  public class RecordIterator implements Iterator<IntermediateRecord> {
+    int _partitionId;
+    Iterator<IntermediateRecord> _curIt;
+
+    RecordIterator() {
+      _partitionId = 0;
+      _curIt = getPartition(0).iterator();
+    }
+
+    @Override
+    public boolean hasNext() {
+      while (true) {
+        if (_curIt != null && _curIt.hasNext()) {
+          return true;
+        }
+        _partitionId++;
+        if (_partitionId >= _numPartitions) {
+          return false;
+        }
+        _curIt = getPartition(_partitionId).iterator();
+      }
+    }
+
+    @Override
+    public IntermediateRecord next() {
+      while (!_curIt.hasNext()) {
+        _partitionId++;
+        _curIt = getPartition(_partitionId).iterator();
+      }
+      return _curIt.next();
+    }
+  }
+
+  public List<Record> getPayloads(int partition) {
+    return _maps[partition].getPayloads();
   }
 }

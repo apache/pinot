@@ -20,18 +20,17 @@ package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.concurrent.NotThreadSafe;
+import javax.ws.rs.NotSupportedException;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
@@ -40,12 +39,12 @@ import org.apache.pinot.core.util.trace.TraceCallable;
 
 
 /**
- * Base implementation of Map-based Table for indexed lookup
+ * {@link Table} implementation for aggregating TableRecords based on combination of keys
  */
-@SuppressWarnings({"rawtypes", "unchecked"})
-public abstract class IndexedTable extends BaseTable {
+@NotThreadSafe
+public class TwoLevelHashMapIndexedTable extends BaseTable {
   protected final ExecutorService _executorService;
-  protected final Map<Key, Record> _lookupMap;
+  protected final TwoLevelLinearProbingRecordHashmap _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
   protected final int _numKeyColumns;
@@ -61,27 +60,16 @@ public abstract class IndexedTable extends BaseTable {
   protected int _numResizes;
   protected long _resizeTimeNs;
 
-  /**
-   * Constructor for the IndexedTable.
-   *
-   * @param dataSchema    Data schema of the table
-   * @param hasFinalInput Whether the input is the final aggregate result
-   * @param queryContext  Query context
-   * @param resultSize    Number of records to keep in the final result after calling {@link #finish(boolean, boolean)}
-   * @param trimSize      Number of records to keep when trimming the table
-   * @param trimThreshold Trim the table when the number of records exceeds the threshold
-   * @param lookupMap     Map from keys to records
-   */
-  protected IndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext, int resultSize,
-      int trimSize, int trimThreshold, Map<Key, Record> lookupMap, ExecutorService executorService) {
+  public TwoLevelHashMapIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
+      int resultSize,
+      int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
     super(dataSchema);
-
     Preconditions.checkArgument(resultSize >= 0, "Result size can't be negative");
     Preconditions.checkArgument(trimSize >= 0, "Trim size can't be negative");
     Preconditions.checkArgument(trimThreshold >= 0, "Trim threshold can't be negative");
 
     _executorService = executorService;
-    _lookupMap = lookupMap;
+    _lookupMap = new TwoLevelLinearProbingRecordHashmap();
     _hasFinalInput = hasFinalInput;
     _resultSize = resultSize;
 
@@ -103,17 +91,27 @@ public abstract class IndexedTable extends BaseTable {
 
   @Override
   public boolean upsert(Record record) {
-    // NOTE: The record will always have key columns (group-by expressions) in the front. This is handled in
-    //       AggregationGroupByOrderByOperator.
-    Object[] keyValues = Arrays.copyOf(record.getValues(), _numKeyColumns);
-    return upsert(new Key(keyValues), record);
+    throw new NotSupportedException();
   }
 
   /**
-   * Adds a record with new key or updates a record with existing key.
+   * Non thread safe implementation of upsert to insert {@link Record} into the {@link Table}
    */
-  protected void addOrUpdateRecord(Key key, Record newRecord) {
-    _lookupMap.compute(key, (k, v) -> v == null ? newRecord : updateRecord(v, newRecord));
+  @Override
+  public boolean upsert(Key key, Record record) {
+    if (_hasOrderBy) {
+      addOrUpdateRecord(key, record);
+      if (_lookupMap.size() >= _trimThreshold) {
+        resizePutOnly();
+      }
+    } else {
+      if (_lookupMap.size() < _resultSize) {
+        addOrUpdateRecord(key, record);
+      } else {
+        updateExistingRecord(key, record);
+      }
+    }
+    return true;
   }
 
   /**
@@ -123,34 +121,27 @@ public abstract class IndexedTable extends BaseTable {
     _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
   }
 
-  private Record updateRecord(Record existingRecord, Record newRecord) {
-    Object[] existingValues = existingRecord.getValues();
-    Object[] newValues = newRecord.getValues();
-    int numAggregations = _aggregationFunctions.length;
-    int index = _numKeyColumns;
-    if (!_hasFinalInput) {
-      for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = _aggregationFunctions[i].merge(existingValues[index], newValues[index]);
-      }
-    } else {
-      for (int i = 0; i < numAggregations; i++, index++) {
-        existingValues[index] = _aggregationFunctions[i].mergeFinalResult((Comparable) existingValues[index],
-            (Comparable) newValues[index]);
-      }
-    }
-    return existingRecord;
-  }
-
   /**
    * Resizes the lookup map based on the trim size.
+   * Used only by {@link TwoLevelHashMapIndexedTable}
    */
-  protected void resize() {
+  protected void resizePutOnly() {
     assert _hasOrderBy;
     long startTimeNs = System.nanoTime();
-    _tableResizer.resizeRecordsMap(_lookupMap, _trimSize);
+    _tableResizer.resizeRecordsMapPutOnly(_lookupMap, _trimSize);
     long resizeTimeNs = System.nanoTime() - startTimeNs;
     _numResizes++;
     _resizeTimeNs += resizeTimeNs;
+  }
+
+  @Override
+  public int size() {
+    return 0;
+  }
+
+  @Override
+  public Iterator<Record> iterator() {
+    return null;
   }
 
   @Override
@@ -167,7 +158,7 @@ public abstract class IndexedTable extends BaseTable {
     // TODO: Directly return final result in _tableResizer.getTopRecords to avoid extracting final result multiple times
     assert !(_hasFinalInput && !storeFinalResult);
     if (storeFinalResult && !_hasFinalInput) {
-      ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
+      DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
       int numAggregationFunctions = _aggregationFunctions.length;
       for (int i = 0; i < numAggregationFunctions; i++) {
         columnDataTypes[i + _numKeyColumns] = _aggregationFunctions[i].getFinalResultColumnType();
@@ -256,18 +247,29 @@ public abstract class IndexedTable extends BaseTable {
     return false;
   }
 
-  @Override
-  public int size() {
-    return _topRecords != null ? _topRecords.size() : _lookupMap.size();
+  /**
+   * Adds a record with new key or updates a record with existing key.
+   */
+  protected void addOrUpdateRecord(Key key, Record newRecord) {
+    _lookupMap.compute(key, (k, v) -> v == null ? newRecord : updateRecord(v, newRecord));
   }
 
-  @Override
-  public Iterator<Record> iterator() {
-    return _topRecords.iterator();
-  }
-
-  public Map<Key, Record> getLookupMap() {
-    return _lookupMap;
+  private Record updateRecord(Record existingRecord, Record newRecord) {
+    Object[] existingValues = existingRecord.getValues();
+    Object[] newValues = newRecord.getValues();
+    int numAggregations = _aggregationFunctions.length;
+    int index = _numKeyColumns;
+    if (!_hasFinalInput) {
+      for (int i = 0; i < numAggregations; i++, index++) {
+        existingValues[index] = _aggregationFunctions[i].merge(existingValues[index], newValues[index]);
+      }
+    } else {
+      for (int i = 0; i < numAggregations; i++, index++) {
+        existingValues[index] = _aggregationFunctions[i].mergeFinalResult((Comparable) existingValues[index],
+            (Comparable) newValues[index]);
+      }
+    }
+    return existingRecord;
   }
 
   public Collection<Record> getTopRecords() {
@@ -283,6 +285,10 @@ public abstract class IndexedTable extends BaseTable {
     // all other re-sizes are triggered by trim size and threshold
     int min = _topRecords != null && _hasOrderBy ? 1 : 0;
     return _numResizes > min;
+  }
+
+  public TwoLevelLinearProbingRecordHashmap getLookupMap() {
+    return _lookupMap;
   }
 
   public long getResizeTimeMs() {

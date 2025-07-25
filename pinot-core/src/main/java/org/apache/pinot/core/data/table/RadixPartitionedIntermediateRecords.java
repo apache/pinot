@@ -69,7 +69,7 @@ public class RadixPartitionedIntermediateRecords {
 
   public int partition(IntermediateRecord record) {
     if (record._keyHashCode == -1) {
-      record._keyHashCode = record._key.hashCode();
+      record._keyHashCode = record._key.hashCode() & 0x7fffffff;
     }
     return record._keyHashCode & _mask;
   }
