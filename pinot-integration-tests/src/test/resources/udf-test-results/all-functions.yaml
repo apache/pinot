@@ -193,15 +193,15 @@ arraysortstring:
 arraysum:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ArraySumTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySumUdf"
 arraysumint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySumInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySumIntUdf"
 arraysumlong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySumLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySumLongUdf"
 arraytostring:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.arrayToString,\
     \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.arrayToString]}"
