@@ -52,7 +52,7 @@ import org.apache.pinot.core.data.table.RadixPartitionedIntermediateRecords;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.TwoLevelHashMapIndexedTable;
-import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashmap;
+import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashMap;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.util.GroupByUtils;
@@ -85,7 +85,7 @@ public class BenchmarkPartitionedCombineGroupBy {
         new OptionsBuilder().include(BenchmarkPartitionedCombineGroupBy.class.getSimpleName())
             .warmupTime(TimeValue.seconds(1))
             .warmupIterations(3)
-            .measurementTime(TimeValue.seconds(1))
+            .measurementTime(TimeValue.seconds(3))
             .measurementIterations(3)
             .forks(1);
 
@@ -102,10 +102,9 @@ public class BenchmarkPartitionedCombineGroupBy {
 //  @Param({"500"})
   private int _limit;
 
-//  @Param({"3", "4"})
-  @Param({"3"})
-  private int _numRadixBit;
-  private int _numPartitions = 8;
+  //  @Param({"3", "4"})
+  private int _numRadixBit = 4;
+  private int _numPartitions = 16;
   private int _numThreads = 8;
 
   private static final int CARDINALITY_D1 = 2000;
@@ -270,7 +269,7 @@ public class BenchmarkPartitionedCombineGroupBy {
     }
 
     // stitch
-    TwoLevelLinearProbingRecordHashmap[] lookupMaps = new TwoLevelLinearProbingRecordHashmap[_numPartitions];
+    TwoLevelLinearProbingRecordHashMap[] lookupMaps = new TwoLevelLinearProbingRecordHashMap[_numPartitions];
     int idx = 0;
     int size = 0;
     for (TwoLevelHashMapIndexedTable table : _mergedTables) {
@@ -293,7 +292,6 @@ public class BenchmarkPartitionedCombineGroupBy {
     // phase1
     int segmentId;
     while ((segmentId = nextSegmentId.getAndIncrement()) < _numSegments) {
-      Preconditions.checkState(!_partitionedRecords[segmentId].isDone());
       _partitionedRecords[segmentId].complete(new RadixPartitionedIntermediateRecords(_numRadixBit, segmentId,
           _segmentIntermediateRecords.get(segmentId)));
     }
@@ -305,7 +303,7 @@ public class BenchmarkPartitionedCombineGroupBy {
       TwoLevelHashMapIndexedTable table =
           new TwoLevelHashMapIndexedTable(_dataSchema, false, _queryContext, trimSize, trimSize,
               Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD,
-              Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY, _executorService);
+              _executorService);
 
       CompletableFuture[] buf = new CompletableFuture[_numSegments];
       for (int sid = 0; sid < _numSegments; sid++) {
@@ -318,7 +316,7 @@ public class BenchmarkPartitionedCombineGroupBy {
         RadixPartitionedIntermediateRecords partition = (RadixPartitionedIntermediateRecords) fut.get();
         List<IntermediateRecord> records = partition.getPartition(partitionId);
         for (IntermediateRecord record : records) {
-          table.upsert(record._key, record._record);
+          table.upsert(record);
         }
         int processedSegmentId = partition.getSegmentId();
         buf[processedSegmentId] = buf[processedSegmentId].newIncompleteFuture();
@@ -330,11 +328,13 @@ public class BenchmarkPartitionedCombineGroupBy {
     }
   }
 
+  // curr approach
   // ---
   // original hashtable appraoch
-//  @Benchmark
-//  @BenchmarkMode(Mode.AverageTime)
-//  @OutputTimeUnit(TimeUnit.MICROSECONDS)
+
+  @Benchmark
+  @BenchmarkMode(Mode.AverageTime)
+  @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void partitionedCombineGroupByJavaHashTable(Blackhole blackhole)
       throws InterruptedException, ExecutionException, TimeoutException {
     final AtomicInteger nextSegmentId = new AtomicInteger(0);

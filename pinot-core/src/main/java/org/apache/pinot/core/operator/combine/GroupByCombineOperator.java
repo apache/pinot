@@ -29,7 +29,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -38,7 +37,7 @@ import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
 import org.apache.pinot.core.data.table.RadixPartitionedIntermediateRecords;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.TwoLevelHashMapIndexedTable;
-import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashmap;
+import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashMap;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -62,7 +61,6 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings("rawtypes")
 public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
-  public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GroupByCombineOperator.class);
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
@@ -84,9 +82,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
 
-  // CE
-  private final AtomicInteger[] _partitionSizes;
-
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
@@ -104,11 +99,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
 
     _mergedIndexedTables = new TwoLevelHashMapIndexedTable[_queryContext.getGroupByNumPartitions()];
-
-    _partitionSizes = new AtomicInteger[queryContext.getGroupByNumPartitions()];
-    for (int i = 0; i < queryContext.getGroupByNumPartitions(); i++) {
-      _partitionSizes[i] = new AtomicInteger(0);
-    }
   }
 
   /**
@@ -129,14 +119,25 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   }
 
   /**
-   * partitionedGroupBy execution
+   * <p>
+   * Two-phase Partitioned GroupBy Execution.
+   * </p><p>
+   * This handles any cases that has an OrderBy clause.
+   * </p><p>
    * phase 1:
-   * create thread-local partitioned hashTable
+   * each thread repeatedly takes a single segment and partition it into thread-local
+   * {@link RadixPartitionedIntermediateRecords}
+   * </p><p>
    * phase 2:
-   * each thread merge one partition of all hashTables
-   * finally stitch them together into one
-   *
-   * this handles cases that ORDER BY not by group keys
+   * each thread merge one partition of all {@link RadixPartitionedIntermediateRecords} into a single
+   * {@link TwoLevelHashMapIndexedTable} that internally uses a {@link TwoLevelLinearProbingRecordHashMap}
+   * for minimal movement and copy of the payload {@link IntermediateRecord}s
+   * </p><p>
+   * when all threads finishes, {@link GroupByCombineOperator#mergePartitionedGroupByResults()} is called to logically
+   * stitch the {@link TwoLevelHashMapIndexedTable} together into a single {@link RadixPartitionedHashMap} and
+   * then wrap it into a {@link org.apache.pinot.core.data.table.PartitionedIndexedTable} as final indexedTable
+   * </p><p>
+   * </p>
    */
   protected void processPartitionedGroupBy() {
     // phase 1 partition
@@ -201,11 +202,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
             new RadixPartitionedIntermediateRecords(_queryContext.getGroupByPartitionNumRadixBits(), operatorId,
                 intermediateRecords);
 
-        // CE
-        for (int i = 0; i < _queryContext.getGroupByNumPartitions(); i++) {
-          _partitionSizes[i].getAndAdd(partitionedRecords.getPartition(i).size());
-        }
-
         _partitionedRecordsFutures[operatorId].complete(partitionedRecords);
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
@@ -220,15 +216,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     while (_processingException.get() == null
         && (partitionId = _nextPartitionId.getAndIncrement()) < _queryContext.getGroupByNumPartitions()) {
       try {
-        // CE
-        // a magical way to approximate initial size needed for each partition
-        // the larger number of segments, the more likely there are heterogeneous keys
-        int initialSize = HashUtil.getHashMapCapacity(
-            (int) Math.round(_partitionSizes[partitionId].get() / Math.sqrt(_numOperators)));
-
-        // TODO: change this to use a TwoLevelLinearProbingRecordHashMap
         TwoLevelHashMapIndexedTable table =
-            GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService, initialSize);
+            GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService);
 
         CompletableFuture[] buf = new CompletableFuture[_numOperators];
         for (int segmentId = 0; segmentId < _numOperators; segmentId++) {
@@ -240,7 +229,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           CompletableFuture fut = CompletableFuture.anyOf(buf);
           RadixPartitionedIntermediateRecords partition = (RadixPartitionedIntermediateRecords) fut.get();
           for (IntermediateRecord record : partition.getPartition(partitionId)) {
-            table.upsert(record._key, record._record);
+            table.upsert(record);
           }
           int processedSegmentId = partition.getSegmentId();
           buf[processedSegmentId] = buf[processedSegmentId].newIncompleteFuture();
@@ -353,6 +342,47 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   }
 
   /**
+   * Logically stitch all merged {@link TwoLevelHashMapIndexedTable}'s _lookupMap
+   * into a single {@link RadixPartitionedHashMap}, then wrap it into a
+   * {@link org.apache.pinot.core.data.table.PartitionedIndexedTable}.
+   * sort and trim the indexedTable and return result block
+   */
+  private GroupByResultsBlock mergePartitionedGroupByResults() {
+    TwoLevelLinearProbingRecordHashMap[] lookupMaps =
+        new TwoLevelLinearProbingRecordHashMap[_queryContext.getGroupByNumPartitions()];
+    int idx = 0;
+    int resizeNum = 0;
+    long resizeTimeMs = 0;
+    for (TwoLevelHashMapIndexedTable table : _mergedIndexedTables) {
+      lookupMaps[idx++] = table.getLookupMap();
+      resizeNum += table.getNumResizes();
+      resizeTimeMs = Math.max(resizeTimeMs, table.getResizeTimeMs());
+    }
+    // keep all partition records in the map, later finish will trim them if needed
+    RadixPartitionedHashMap map = new RadixPartitionedHashMap(lookupMaps,
+        _queryContext.getGroupByPartitionNumRadixBits());
+    _indexedTable = GroupByUtils.createPartitionedIndexedTableForCombineOperator(_dataSchema, _queryContext, map,
+        _executorService);
+
+    // finish table and set stats
+    IndexedTable indexedTable = _indexedTable;
+    if (_queryContext.isServerReturnFinalResult()) {
+      indexedTable.finish(true, true);
+    } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
+      indexedTable.finish(false, true);
+    } else {
+      indexedTable.finish(false);
+    }
+    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(indexedTable, _queryContext);
+    mergedBlock.setGroupsTrimmed(_groupsTrimmed);
+    mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
+    mergedBlock.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);
+    mergedBlock.setNumResizes(resizeNum);
+    mergedBlock.setResizeTimeMs(resizeTimeMs);
+    return mergedBlock;
+  }
+
+  /**
    * {@inheritDoc}
    *
    * <p>Combines intermediate selection result blocks from underlying operators and returns a merged one.
@@ -396,17 +426,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     }
 
     if (GroupByUtils.shouldPartitionGroupBy(_queryContext)) {
-      TwoLevelLinearProbingRecordHashmap[] lookupMaps =
-          new TwoLevelLinearProbingRecordHashmap[_queryContext.getGroupByNumPartitions()];
-      int idx = 0;
-      for (TwoLevelHashMapIndexedTable table : _mergedIndexedTables) {
-        lookupMaps[idx++] = (TwoLevelLinearProbingRecordHashmap) table.getLookupMap();
-      }
-      // keep all partition records in the map, later finish will trim them if needed
-      RadixPartitionedHashMap map = new RadixPartitionedHashMap(lookupMaps,
-          _queryContext.getGroupByPartitionNumRadixBits());
-      _indexedTable = GroupByUtils.createPartitionedIndexedTableForCombineOperator(_dataSchema, _queryContext, map,
-          _executorService);
+      return mergePartitionedGroupByResults();
     }
 
     if (_indexedTable.isTrimmed() && _queryContext.isUnsafeTrim()) {

@@ -26,11 +26,13 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.PartitionedIndexedTable;
 import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.TwoLevelHashMapIndexedTable;
+import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashMap;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
@@ -106,6 +108,16 @@ public final class GroupByUtils {
     return queryContext.isUnsafeTrim() && queryContext.getOrderByExpressions() != null;
   }
 
+  /**
+   * Partition function used for both {@link org.apache.pinot.core.data.table.RadixPartitionedIntermediateRecords}
+   * and {@link TwoLevelLinearProbingRecordHashMap} on the partitioned group-by
+   * combine execution path.
+   * This hash is CACHED in {@link org.apache.pinot.core.data.table.IntermediateRecord} and is expected to be stable
+   */
+  public static int hashForPartition(Key key) {
+    return key.hashCode() & 0x7fffffff;
+  }
+
   private static Record updateRecord(Record existingRecord, Record newRecord,
       AggregationFunction[] aggregationFunctions, int numKeyColumns) {
     Object[] existingValues = existingRecord.getValues();
@@ -172,7 +184,7 @@ public final class GroupByUtils {
    */
   public static TwoLevelHashMapIndexedTable createIndexedTableForPartitionMerge(
       DataSchema dataSchema, QueryContext queryContext,
-      ExecutorService executorService, int initialCapacity) {
+      ExecutorService executorService) {
     // single worker thread merges single partition number
     int limit = queryContext.getLimit();
     boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
@@ -196,7 +208,7 @@ public final class GroupByUtils {
         resultSize = limit;
       }
       return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
-          Integer.MAX_VALUE, initialCapacity, executorService);
+          Integer.MAX_VALUE, executorService);
     }
 
     int resultSize;
@@ -209,10 +221,10 @@ public final class GroupByUtils {
     int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
     if (trimThreshold == Integer.MAX_VALUE) {
       return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
-          Integer.MAX_VALUE, initialCapacity, executorService);
+          Integer.MAX_VALUE, executorService);
     } else {
       return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, trimSize,
-          trimThreshold, initialCapacity, executorService);
+          trimThreshold, executorService);
     }
   }
 

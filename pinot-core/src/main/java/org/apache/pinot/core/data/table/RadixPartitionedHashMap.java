@@ -36,31 +36,18 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
   private final int _numRadixBits;
   private final int _numPartitions;
   private final int _mask;
-  private final TwoLevelLinearProbingRecordHashmap[] _maps;
+  private final TwoLevelLinearProbingRecordHashMap[] _maps;
   private int _size;
   private int _segmentId = -1;
 
-  public RadixPartitionedHashMap(int numRadixBits, int initialCapacity, int segmentId) {
-    int partitionInitialCapacity = initialCapacity >> numRadixBits;
-    _numRadixBits = numRadixBits;
-    _numPartitions = 1 << numRadixBits;
-    _mask = _numPartitions - 1;
-    _segmentId = segmentId;
-    _maps = new TwoLevelLinearProbingRecordHashmap[_numPartitions];
-    _size = 0;
-    for (int i = 0; i < _numPartitions; i++) {
-      _maps[i] = new TwoLevelLinearProbingRecordHashmap();
-    }
-  }
-
-  public RadixPartitionedHashMap(TwoLevelLinearProbingRecordHashmap[] maps, int numRadixBits) {
+  public RadixPartitionedHashMap(TwoLevelLinearProbingRecordHashMap[] maps, int numRadixBits) {
     _numRadixBits = numRadixBits;
     _numPartitions = 1 << numRadixBits;
     assert (maps.length == _numPartitions);
     _mask = _numPartitions - 1;
     _maps = maps;
     _size = 0;
-    for (TwoLevelLinearProbingRecordHashmap map : maps) {
+    for (TwoLevelLinearProbingRecordHashMap map : maps) {
       _size += map.size();
     }
   }
@@ -69,7 +56,7 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
     return _segmentId;
   }
 
-  public TwoLevelLinearProbingRecordHashmap getPartition(int i) {
+  public TwoLevelLinearProbingRecordHashMap getPartition(int i) {
     return _maps[i];
   }
 
@@ -97,7 +84,7 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
 
   @Override
   public boolean containsKey(Object o) {
-    TwoLevelLinearProbingRecordHashmap map = _maps[partition((Key) o)];
+    TwoLevelLinearProbingRecordHashMap map = _maps[partition((Key) o)];
     return map.get((Key) o) != null;
   }
 
@@ -108,12 +95,12 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
 
   @Override
   public Record get(Object o) {
-    TwoLevelLinearProbingRecordHashmap map = _maps[partition((Key) o)];
+    TwoLevelLinearProbingRecordHashMap map = _maps[partition((Key) o)];
     return map.get((Key) o);
   }
 
   public Record putIntoPartition(Key k, Record v, int partition) {
-    TwoLevelLinearProbingRecordHashmap map = _maps[partition];
+    TwoLevelLinearProbingRecordHashMap map = _maps[partition];
     Record prev = map.put((Key) k, (Record) v);
     if (prev == null) {
       _size++;
@@ -124,7 +111,7 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
   @Nullable
   @Override
   public Record put(Key k, Record v) {
-    TwoLevelLinearProbingRecordHashmap map = _maps[partition(k)];
+    TwoLevelLinearProbingRecordHashMap map = _maps[partition(k)];
     Record prev = map.put(k, v);
     if (prev == null) {
       _size++;
@@ -150,7 +137,7 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
 
   @Override
   public void clear() {
-    for (TwoLevelLinearProbingRecordHashmap map : _maps) {
+    for (TwoLevelLinearProbingRecordHashMap map : _maps) {
       map.clear();
     }
     _size = 0;
@@ -158,8 +145,8 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
 
   @Override
   public Set<Key> keySet() {
-    Set<Key> set = new HashSet<>();
-    for (TwoLevelLinearProbingRecordHashmap map : _maps) {
+    Set<Key> set = new HashSet<>(_size);
+    for (TwoLevelLinearProbingRecordHashMap map : _maps) {
       set.addAll(map.keys());
     }
     return set;
@@ -167,8 +154,8 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
 
   @Override
   public Collection<Record> values() {
-    List<Record> list = new ArrayList<>();
-    for (TwoLevelLinearProbingRecordHashmap map : _maps) {
+    List<Record> list = new ArrayList<>(_size);
+    for (TwoLevelLinearProbingRecordHashMap map : _maps) {
       list.addAll(map.values());
     }
     return list;
@@ -176,8 +163,8 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
 
   @Override
   public Set<Entry<Key, Record>> entrySet() {
-    Set<Entry<Key, Record>> set = new HashSet<>();
-    for (TwoLevelLinearProbingRecordHashmap map : _maps) {
+    Set<Entry<Key, Record>> set = new HashSet<>(_size);
+    for (TwoLevelLinearProbingRecordHashMap map : _maps) {
       set.addAll(map.entrySet());
     }
     return set;

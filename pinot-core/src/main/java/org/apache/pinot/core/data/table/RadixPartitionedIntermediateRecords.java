@@ -20,6 +20,7 @@ package org.apache.pinot.core.data.table;
 
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.core.util.GroupByUtils;
 
 
 public class RadixPartitionedIntermediateRecords {
@@ -27,8 +28,8 @@ public class RadixPartitionedIntermediateRecords {
   private final int _numPartitions;
   private final int _mask;
   private final List<IntermediateRecord> _records;
-  private int _segmentId = -1;
-  private int[] _partitionBoundaries;
+  private final int _segmentId;
+  private final int[] _partitionBoundaries;
 
   public RadixPartitionedIntermediateRecords(int numRadixBits, int segmentId, List<IntermediateRecord> records) {
     _records = records;
@@ -69,9 +70,13 @@ public class RadixPartitionedIntermediateRecords {
 
   public int partition(IntermediateRecord record) {
     if (record._keyHashCode == -1) {
-      record._keyHashCode = record._key.hashCode() & 0x7fffffff;
+      record._keyHashCode = hash(record._key);
     }
     return record._keyHashCode & _mask;
+  }
+
+  private int hash(Key key) {
+    return GroupByUtils.hashForPartition(key);
   }
 
   public List<IntermediateRecord> getPartition(int partition) {

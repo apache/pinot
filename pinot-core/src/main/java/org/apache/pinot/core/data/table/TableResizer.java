@@ -256,7 +256,7 @@ public class TableResizer {
   /**
    * Resizes the recordsMap to the given size.
    */
-  public void resizeRecordsMapPutOnly(TwoLevelLinearProbingRecordHashmap recordsMap, int size) {
+  public void resizeRecordsMapPutOnly(TwoLevelLinearProbingRecordHashMap recordsMap, int size) {
     int numRecordsToEvict = recordsMap.size() - size;
     if (numRecordsToEvict <= 0) {
       return;
@@ -266,14 +266,14 @@ public class TableResizer {
         getTopRecordsHeap(recordsMap, size, _intermediateRecordComparator.reversed());
     recordsMap.clear();
     for (IntermediateRecord recordToRetain : recordsToRetain) {
-      recordsMap.put(recordToRetain._key, recordToRetain._record);
+      recordsMap.put(recordToRetain);
     }
   }
 
   /**
    * Returns a heap of the top records from the recordsMap.
    */
-  private IntermediateRecord[] getTopRecordsHeap(TwoLevelLinearProbingRecordHashmap recordsMap, int size,
+  private IntermediateRecord[] getTopRecordsHeap(TwoLevelLinearProbingRecordHashMap recordsMap, int size,
       Comparator<IntermediateRecord> comparator) {
     // Should not reach here when map size <= heap size because there is no need to create a heap
     assert recordsMap.size() > size;
@@ -434,12 +434,12 @@ public class TableResizer {
     }
   }
 
-  public Collection<Record> getTopRecords(TwoLevelLinearProbingRecordHashmap recordsMap, int size, boolean sort) {
+  public Collection<Record> getTopRecords(TwoLevelLinearProbingRecordHashMap recordsMap, int size, boolean sort) {
     return sort ? getSortedTopRecords(recordsMap, size) : getUnsortedTopRecords(recordsMap, size);
   }
 
   @VisibleForTesting
-  List<Record> getSortedTopRecords(TwoLevelLinearProbingRecordHashmap recordsMap, int size) {
+  List<Record> getSortedTopRecords(TwoLevelLinearProbingRecordHashMap recordsMap, int size) {
     int numRecords = recordsMap.size();
     if (numRecords == 0) {
       return Collections.emptyList();
@@ -474,10 +474,10 @@ public class TableResizer {
     }
   }
 
-  private Collection<Record> getUnsortedTopRecords(TwoLevelLinearProbingRecordHashmap recordsMap, int size) {
+  private Collection<Record> getUnsortedTopRecords(TwoLevelLinearProbingRecordHashMap recordsMap, int size) {
     int numRecords = recordsMap.size();
     if (numRecords <= size) {
-      return recordsMap.values();
+      return recordsMap.getPayloads();
     } else {
       IntermediateRecord[] topRecords = getTopRecordsHeap(recordsMap, size, _intermediateRecordComparator.reversed());
       Record[] unsortedTopRecords = new Record[size];

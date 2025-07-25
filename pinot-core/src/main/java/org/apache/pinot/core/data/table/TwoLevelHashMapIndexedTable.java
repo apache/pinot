@@ -58,7 +58,7 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
 
   public TwoLevelHashMapIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
       int resultSize,
-      int trimSize, int trimThreshold, int initialCapacity, ExecutorService executorService) {
+      int trimSize, int trimThreshold, ExecutorService executorService) {
     super(dataSchema);
     Preconditions.checkArgument(resultSize >= 0, "Result size can't be negative");
     Preconditions.checkArgument(trimSize >= 0, "Trim size can't be negative");
