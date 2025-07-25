@@ -208,7 +208,7 @@ public class UdfReporter {
 
           for (UdfExample example : udf.getExamples().get(udfSignature)) {
             // Expected result
-            Object withNull = example.getResult(UdfExample.NullHandling.DISABLED);
+            Object withNull = example.getResult(UdfExample.NullHandling.ENABLED);
             Object withoutNull = example.getResult(UdfExample.NullHandling.DISABLED);
 
             // Call column
