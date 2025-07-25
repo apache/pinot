@@ -169,11 +169,11 @@ arrayremovestring:
 arrayreverseint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayReverseInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayReverseIntUdf"
 arrayreversestring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayReverseString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayReverseStringUdf"
 arraysliceint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySliceInt}"
   transform: null
