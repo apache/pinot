@@ -222,15 +222,15 @@ arrayvalueconstructor:
 asin:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.asin}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AsinTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.AsinUdf"
 atan:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.atan}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AtanTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.AtanUdf"
 atan2:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.atan2}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.Atan2TransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.Atan2Udf"
 avgreduce:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.core.query.reduce.function.InternalReduceFunctions.avgReduce}"
   transform: null
