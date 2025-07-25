@@ -99,7 +99,10 @@ public class UdfReporter {
 
         if (resultByExample instanceof ResultByExample.Partial) {
           ResultByExample.Partial partial = (ResultByExample.Partial) resultByExample;
-          for (Map.Entry<UdfExample, UdfExampleResult> exampleEntry : partial.getResultsByExample().entrySet()) {
+          Set<Map.Entry<UdfExample, UdfExampleResult>> entries = new TreeSet<>(
+              Comparator.comparing(entry -> entry.getKey().getId()));
+          entries.addAll(partial.getResultsByExample().entrySet());
+          for (Map.Entry<UdfExample, UdfExampleResult> exampleEntry : entries) {
             UdfExample example = exampleEntry.getKey();
             UdfExampleResult testResult = exampleEntry.getValue();
 
