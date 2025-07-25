@@ -210,11 +210,11 @@ arraytostring:
 arrayunionint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayUnionIntUdf"
 arrayunionstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayUnionStringUdf"
 arrayvalueconstructor:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayValueConstructor}"
   transform: null
