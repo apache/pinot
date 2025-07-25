@@ -35,11 +35,11 @@ import org.apache.commons.math3.stat.descriptive.moment.Variance;
 import org.apache.commons.math3.util.Precision;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.operator.query.AggregationOperator;
 import org.apache.pinot.core.operator.query.GroupByOperator;
-import org.apache.pinot.core.query.aggregation.groupby.AggregationGroupByResult;
 import org.apache.pinot.segment.local.customobject.CovarianceTuple;
 import org.apache.pinot.segment.local.customobject.PinotFourthMoment;
 import org.apache.pinot.segment.local.customobject.VarianceTuple;
@@ -389,10 +389,11 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    // TODO: change all aggregationGroupByResult to intermediateRecord
+    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
     assertNotNull(aggregationGroupByResult);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      CovarianceTuple actualCovTuple = (CovarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
+      CovarianceTuple actualCovTuple = (CovarianceTuple) aggregationGroupByResult.get(i)._record.getValues()[1];
       CovarianceTuple expectedCovTuple = _expectedGroupByResultVer1[i];
       checkWithPrecisionForCovariance(actualCovTuple, expectedCovTuple);
     }
@@ -414,11 +415,11 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 3, NUM_RECORDS);
-    aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    aggregationGroupByResult = resultsBlock.getIntermediateRecords();
     assertNotNull(aggregationGroupByResult);
 
     for (int i = 0; i < NUM_GROUPS; i++) {
-      CovarianceTuple actualCovTuple = (CovarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
+      CovarianceTuple actualCovTuple = (CovarianceTuple) aggregationGroupByResult.get(i)._record.getValues()[1];
       CovarianceTuple expectedCovTuple = _expectedGroupByResultVer2[i];
       checkWithPrecisionForCovariance(actualCovTuple, expectedCovTuple);
     }
@@ -576,11 +577,11 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
     assertNotNull(aggregationGroupByResult);
     for (int i = 0; i < NUM_GROUPS; i++) {
 
-      VarianceTuple actualVarianceTuple = (VarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
+      VarianceTuple actualVarianceTuple = (VarianceTuple) aggregationGroupByResult.get(i)._record.getValues()[1];
       checkWithPrecisionForVariance(actualVarianceTuple, NUM_RECORDS / NUM_GROUPS, expectedSum[i],
           expectedGroupByResult[i].getResult(), false);
     }
@@ -699,10 +700,10 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
     assertNotNull(aggregationGroupByResult);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      VarianceTuple actualVarianceTuple = (VarianceTuple) aggregationGroupByResult.getResultForGroupId(0, i);
+      VarianceTuple actualVarianceTuple = (VarianceTuple) aggregationGroupByResult.get(i)._record.getValues()[1];
       checkWithPrecisionForStandardDeviation(actualVarianceTuple, NUM_RECORDS / NUM_GROUPS, expectedSum[i],
           expectedGroupByResult[i].getResult(), false);
     }
@@ -783,10 +784,10 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
     assertNotNull(aggregationGroupByResult);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      PinotFourthMoment actual = (PinotFourthMoment) aggregationGroupByResult.getResultForGroupId(0, i);
+      PinotFourthMoment actual = (PinotFourthMoment) aggregationGroupByResult.get(i)._record.getValues()[1];
       checkWithPrecisionForSkew(actual, NUM_RECORDS / NUM_GROUPS, expectedGroupByResult[i].getResult());
     }
   }
@@ -866,10 +867,10 @@ public class StatisticalQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = groupByOperator.nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
     assertNotNull(aggregationGroupByResult);
     for (int i = 0; i < NUM_GROUPS; i++) {
-      PinotFourthMoment actual = (PinotFourthMoment) aggregationGroupByResult.getResultForGroupId(0, i);
+      PinotFourthMoment actual = (PinotFourthMoment) aggregationGroupByResult.get(i)._record.getValues()[1];
       checkWithPrecisionForKurt(actual, NUM_RECORDS / NUM_GROUPS, expectedGroupByResult[i].getResult());
     }
   }
