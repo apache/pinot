@@ -66,4 +66,3 @@ public class ArrayRemoveStringUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

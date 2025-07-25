@@ -65,4 +65,3 @@ public class ExpUdf extends Udf.FromAnnotatedMethod {
     return Pair.of(TransformFunctionType.EXP, ExpTransformFunction.class);
   }
 }
-

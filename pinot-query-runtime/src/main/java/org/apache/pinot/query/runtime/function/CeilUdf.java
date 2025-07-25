@@ -66,4 +66,3 @@ public class CeilUdf extends Udf.FromAnnotatedMethod {
     return Pair.of(TransformFunctionType.CEIL, SingleParamMathTransformFunction.CeilTransformFunction.class);
   }
 }
-

@@ -62,4 +62,3 @@ public class ArraySortStringUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

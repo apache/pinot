@@ -60,4 +60,3 @@ public class ArraySumIntUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

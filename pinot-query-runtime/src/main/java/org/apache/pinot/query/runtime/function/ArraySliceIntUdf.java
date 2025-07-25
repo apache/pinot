@@ -72,4 +72,3 @@ public class ArraySliceIntUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

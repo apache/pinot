@@ -63,4 +63,3 @@ public class Atan2Udf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

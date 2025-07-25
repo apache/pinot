@@ -26,7 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.ArrayFunctions;
 import org.apache.pinot.core.operator.transform.function.ArraySumTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
@@ -79,4 +78,3 @@ public class ArraySumUdf extends Udf {
     return Pair.of(TransformFunctionType.ARRAY_SUM, ArraySumTransformFunction.class);
   }
 }
-

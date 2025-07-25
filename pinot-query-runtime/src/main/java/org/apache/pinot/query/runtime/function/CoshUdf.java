@@ -65,4 +65,3 @@ public class CoshUdf extends Udf.FromAnnotatedMethod {
     return Pair.of(TransformFunctionType.COSH, CoshTransformFunction.class);
   }
 }
-

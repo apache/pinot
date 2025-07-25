@@ -57,4 +57,3 @@ public class ChrUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

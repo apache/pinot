@@ -65,4 +65,3 @@ public class CotUdf extends Udf.FromAnnotatedMethod {
     return Pair.of(TransformFunctionType.COT, CotTransformFunction.class);
   }
 }
-

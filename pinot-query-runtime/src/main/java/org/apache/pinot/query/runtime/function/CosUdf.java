@@ -66,4 +66,3 @@ public class CosUdf extends Udf.FromAnnotatedMethod {
     return Pair.of(TransformFunctionType.COS, CosTransformFunction.class);
   }
 }
-

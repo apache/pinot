@@ -61,4 +61,3 @@ public class ContainsUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

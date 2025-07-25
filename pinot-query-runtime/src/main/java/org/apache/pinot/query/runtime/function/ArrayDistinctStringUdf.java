@@ -62,4 +62,3 @@ public class ArrayDistinctStringUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

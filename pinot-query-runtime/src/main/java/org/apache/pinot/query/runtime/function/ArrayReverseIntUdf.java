@@ -60,4 +60,3 @@ public class ArrayReverseIntUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

@@ -60,4 +60,3 @@ public class StartsWithUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

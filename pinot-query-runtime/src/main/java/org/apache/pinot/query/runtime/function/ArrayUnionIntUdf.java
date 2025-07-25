@@ -68,4 +68,3 @@ public class ArrayUnionIntUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

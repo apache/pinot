@@ -71,4 +71,3 @@ public class ArrayUnionStringUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

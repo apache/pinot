@@ -21,11 +21,7 @@ package org.apache.pinot.query.runtime.function;
 import com.google.auto.service.AutoService;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
-import org.apache.pinot.core.operator.transform.function.TransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
@@ -60,4 +56,3 @@ public class ByteswapIntUdf extends Udf.FromAnnotatedMethod {
         .generateExamples();
   }
 }
-

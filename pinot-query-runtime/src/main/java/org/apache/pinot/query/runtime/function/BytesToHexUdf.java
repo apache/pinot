@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime.function;
 
 import com.google.auto.service.AutoService;
-import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
@@ -29,7 +28,6 @@ import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
-import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
 
 
