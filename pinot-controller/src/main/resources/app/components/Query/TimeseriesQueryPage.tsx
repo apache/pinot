@@ -263,7 +263,7 @@ const TimeseriesQueryPage = () => {
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
 
-  // Fetch supported languages from broker configuration
+  // Fetch supported languages from controller configuration
   useEffect(() => {
     const fetchLanguages = async () => {
       try {
@@ -432,7 +432,7 @@ const TimeseriesQueryPage = () => {
       {!languagesLoading && supportedLanguages.length === 0 && (
         <Grid item xs={12}>
           <Alert severity="warning" style={{ marginBottom: '16px' }}>
-            <strong>No timeseries languages enabled.</strong> Please configure timeseries languages in your broker configuration using the <code>pinot.timeseries.languages</code> property.
+            <strong>No timeseries languages enabled.</strong> Please configure timeseries languages in your controller, broker and server configurations using the <code>pinot.timeseries.languages</code> property.
           </Alert>
         </Grid>
       )}
