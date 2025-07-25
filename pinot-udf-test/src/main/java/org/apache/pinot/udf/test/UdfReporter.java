@@ -33,6 +33,7 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfParameter;
@@ -310,46 +311,9 @@ public class UdfReporter {
     }
   }
 
-  private static Function<Object, String> getResultFormatter(Object expected, Object actual) {
-    Function<Object, String> valueFormatter;
-    if (expected != null && actual != null && expected.getClass().equals(actual.getClass())) {
-      valueFormatter = value -> {
-        if (value.getClass().isArray()) {
-          return Arrays.toString((Object[]) value);
-        }
-        return value.toString();
-      };
-    } else {
-      valueFormatter = value -> {
-        if (value == null) {
-          return "NULL";
-        } else if (value.getClass().isArray()) {
-          String componentTypeName = value.getClass().getComponentType().getSimpleName();
-          String valueDesc;
-          switch (componentTypeName) {
-            case "int":
-              valueDesc = Arrays.toString((int[]) value);
-              break;
-            case "long":
-              valueDesc = Arrays.toString((long[]) value);
-              break;
-            case "float":
-              valueDesc = Arrays.toString((float[]) value);
-              break;
-            case "double":
-              valueDesc = Arrays.toString((double[]) value);
-              break;
-            default:
-              valueDesc = Arrays.toString((Object[]) value);
-              break;
-          }
-          return valueDesc + " ( array of " + componentTypeName + ")";
-        } else {
-          return value + " (" + value.getClass().getSimpleName() + ")";
-        }
-      };
-    }
-    return valueFormatter;
+  private static Function<Object, String> getResultFormatter(@Nullable Object expected, @Nullable Object actual) {
+    boolean describeType = expected == null || actual == null || expected.getClass().equals(actual.getClass());
+    return value -> describeValue(value, describeType);
   }
 
   private static String asSqlCallWithLiteralArgs(Udf udf, String name, List<Object> inputs) {
@@ -357,5 +321,30 @@ public class UdfReporter {
         .map(UdfReporter::valueToString)
         .collect(Collectors.toList());
     return udf.asSqlCall(name, args);
+  }
+
+  private static String describeValue(@Nullable Object value, boolean includeType) {
+    if (value == null) {
+      return "NULL";
+    }
+    if (value.getClass().isArray()) {
+      String componentTypeName = value.getClass().getComponentType().getSimpleName();
+      switch (componentTypeName) {
+        case "int":
+          return Arrays.toString((int[]) value) + (includeType ? " (array of int)" : "");
+        case "long":
+          return Arrays.toString((long[]) value) + (includeType ? " (array of long)" : "");
+        case "float":
+          return Arrays.toString((float[]) value) + (includeType ? " (array of float)" : "");
+        case "double":
+          return Arrays.toString((double[]) value) + (includeType ? " (array of double)" : "");
+        case "byte":
+          return "hexToBytes('" + BytesUtils.toHexString((byte[]) value) + "')"
+              + (includeType ? " (array of byte)" : "");
+        default:
+          return Arrays.toString((Object[]) value) + (includeType ? " (array of " + componentTypeName + ")" : "");
+      }
+    }
+    return value.toString() + (includeType ? " (" + value.getClass().getSimpleName() + ")" : "");
   }
 }

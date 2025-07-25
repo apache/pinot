@@ -238,11 +238,11 @@ avgreduce:
 base64decode:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.base64Decode}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.Base64DecodeUdf"
 base64encode:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.base64Encode}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.Base64EncodeUdf"
 between:
   scalar: "org.apache.pinot.common.function.scalar.comparison.BetweenScalarFunction"
   transform: null
