@@ -93,11 +93,11 @@ arraycontainsstring:
 arraydistinctint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayDistinctInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayDistinctIntUdf"
 arraydistinctstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayDistinctString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayDistinctStringUdf"
 arrayelementatdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtDouble}"
   transform: null
