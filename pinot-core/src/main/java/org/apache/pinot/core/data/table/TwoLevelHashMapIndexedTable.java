@@ -19,13 +19,9 @@
 package org.apache.pinot.core.data.table;
 
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.NotThreadSafe;
 import javax.ws.rs.NotSupportedException;
@@ -34,8 +30,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.core.util.QueryMultiThreadingUtils;
-import org.apache.pinot.core.util.trace.TraceCallable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -43,8 +39,9 @@ import org.apache.pinot.core.util.trace.TraceCallable;
  */
 @NotThreadSafe
 public class TwoLevelHashMapIndexedTable extends BaseTable {
+  private static final Logger log = LoggerFactory.getLogger(TwoLevelHashMapIndexedTable.class);
   protected final ExecutorService _executorService;
-  protected final TwoLevelLinearProbingRecordHashmap _lookupMap;
+  protected final TwoLevelLinearProbingRecordHashMap _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
   protected final int _numKeyColumns;
@@ -56,7 +53,6 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
   protected final int _numThreadsExtractFinalResult;
   protected final int _chunkSizeExtractFinalResult;
 
-  protected Collection<Record> _topRecords;
   protected int _numResizes;
   protected long _resizeTimeNs;
 
@@ -69,7 +65,7 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
     Preconditions.checkArgument(trimThreshold >= 0, "Trim threshold can't be negative");
 
     _executorService = executorService;
-    _lookupMap = new TwoLevelLinearProbingRecordHashmap();
+    _lookupMap = new TwoLevelLinearProbingRecordHashMap();
     _hasFinalInput = hasFinalInput;
     _resultSize = resultSize;
 
@@ -99,26 +95,45 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
    */
   @Override
   public boolean upsert(Key key, Record record) {
+    throw new NotSupportedException();
+  }
+
+  /**
+   * Non thread safe implementation of upsert to insert {@link Record} into the {@link Table}
+   * This method avoids creating new payload object and directly use the passed in
+   * {@code intermediateRecord} as payload or update existing payload.
+   */
+  public boolean upsert(IntermediateRecord intermediateRecord) {
     if (_hasOrderBy) {
-      addOrUpdateRecord(key, record);
+      addOrUpdateRecord(intermediateRecord);
       if (_lookupMap.size() >= _trimThreshold) {
         resizePutOnly();
       }
     } else {
       if (_lookupMap.size() < _resultSize) {
-        addOrUpdateRecord(key, record);
+        addOrUpdateRecord(intermediateRecord);
       } else {
-        updateExistingRecord(key, record);
+        updateExistingRecord(intermediateRecord);
       }
     }
     return true;
   }
 
   /**
-   * Updates a record with existing key. Record with new key will be ignored.
+   * Adds a record with new key or updates a record with existing key.
+   * The function should update the {@code} IntermediateRecord in-place
    */
-  protected void updateExistingRecord(Key key, Record newRecord) {
-    _lookupMap.computeIfPresent(key, (k, v) -> updateRecord(v, newRecord));
+  protected void addOrUpdateRecord(IntermediateRecord intermediateRecord) {
+    _lookupMap.compute(intermediateRecord,
+        (v) -> v == null ? intermediateRecord : updateRecord(v, intermediateRecord._record));
+  }
+
+  /**
+   * Updates a record with existing key. Record with new key will be ignored.
+   * The function should update the {@code} IntermediateRecord in-place
+   */
+  protected void updateExistingRecord(IntermediateRecord intermediateRecord) {
+    _lookupMap.computeIfPresent(intermediateRecord, (v) -> updateRecord(v, intermediateRecord._record));
   }
 
   /**
@@ -134,127 +149,32 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
     _resizeTimeNs += resizeTimeNs;
   }
 
+  ///  should only use after called {@code finish}
   @Override
   public int size() {
-    return 0;
+    return _lookupMap.size();
   }
 
   @Override
   public Iterator<Record> iterator() {
-    return null;
-  }
-
-  @Override
-  public void finish(boolean sort, boolean storeFinalResult) {
-    if (_hasOrderBy) {
-      long startTimeNs = System.nanoTime();
-      _topRecords = _tableResizer.getTopRecords(_lookupMap, _resultSize, sort);
-      long resizeTimeNs = System.nanoTime() - startTimeNs;
-      _numResizes++;
-      _resizeTimeNs += resizeTimeNs;
-    } else {
-      _topRecords = _lookupMap.values();
-    }
-    // TODO: Directly return final result in _tableResizer.getTopRecords to avoid extracting final result multiple times
-    assert !(_hasFinalInput && !storeFinalResult);
-    if (storeFinalResult && !_hasFinalInput) {
-      DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
-      int numAggregationFunctions = _aggregationFunctions.length;
-      for (int i = 0; i < numAggregationFunctions; i++) {
-        columnDataTypes[i + _numKeyColumns] = _aggregationFunctions[i].getFinalResultColumnType();
-      }
-      int numThreadsExtractFinalResult = inferNumThreadsExtractFinalResult();
-      // Submit task when the EXECUTOR_SERVICE is not overloaded
-      if (numThreadsExtractFinalResult > 1) {
-        // Multi-threaded final reduce
-        List<Future<Void>> futures = new ArrayList<>(numThreadsExtractFinalResult);
-        try {
-          List<Record> topRecordsList = new ArrayList<>(_topRecords);
-          int chunkSize = (topRecordsList.size() + numThreadsExtractFinalResult - 1) / numThreadsExtractFinalResult;
-          for (int threadId = 0; threadId < numThreadsExtractFinalResult; threadId++) {
-            int startIdx = threadId * chunkSize;
-            int endIdx = Math.min(startIdx + chunkSize, topRecordsList.size());
-            if (startIdx < endIdx) {
-              // Submit a task for processing a chunk of values
-              futures.add(_executorService.submit(new TraceCallable<Void>() {
-                @Override
-                public Void callJob() {
-                  for (int recordIdx = startIdx; recordIdx < endIdx; recordIdx++) {
-                    Object[] values = topRecordsList.get(recordIdx).getValues();
-                    for (int i = 0; i < numAggregationFunctions; i++) {
-                      int colId = i + _numKeyColumns;
-                      values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
-                    }
-                  }
-                  return null;
-                }
-              }));
-            }
-          }
-          // Wait for all tasks to complete
-          for (Future<Void> future : futures) {
-            future.get();
-          }
-        } catch (InterruptedException | ExecutionException e) {
-          // Cancel all running tasks
-          for (Future<Void> future : futures) {
-            future.cancel(true);
-          }
-          throw new RuntimeException("Error during multi-threaded final reduce", e);
-        }
-      } else {
-        for (Record record : _topRecords) {
-          Object[] values = record.getValues();
-          for (int i = 0; i < numAggregationFunctions; i++) {
-            int colId = i + _numKeyColumns;
-            values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
-          }
-        }
-      }
-    }
-  }
-
-  private int inferNumThreadsExtractFinalResult() {
-    if (_numThreadsExtractFinalResult > 1) {
-      return _numThreadsExtractFinalResult;
-    }
-    if (containsExpensiveAggregationFunctions()) {
-      int parallelChunkSize = _chunkSizeExtractFinalResult;
-      if (_topRecords != null && _topRecords.size() > parallelChunkSize) {
-        int estimatedThreads = (int) Math.ceil((double) _topRecords.size() / parallelChunkSize);
-        if (estimatedThreads == 0) {
-          return 1;
-        }
-        return Math.min(estimatedThreads, QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY);
-      }
-    }
-    // Default to 1 thread
-    return 1;
-  }
-
-  private boolean containsExpensiveAggregationFunctions() {
-    for (AggregationFunction aggregationFunction : _aggregationFunctions) {
-      switch (aggregationFunction.getType()) {
-        case FUNNELCOMPLETECOUNT:
-        case FUNNELCOUNT:
-        case FUNNELMATCHSTEP:
-        case FUNNELMAXSTEP:
-          return true;
-        default:
-          break;
-      }
-    }
-    return false;
+    throw new NotSupportedException();
   }
 
   /**
-   * Adds a record with new key or updates a record with existing key.
+   * Sort and trim the {@code _lookupMap} the final time
+   * Partitioned hash group by is only used when there are order by clause
    */
-  protected void addOrUpdateRecord(Key key, Record newRecord) {
-    _lookupMap.compute(key, (k, v) -> v == null ? newRecord : updateRecord(v, newRecord));
+  @Override
+  public void finish(boolean sort, boolean storeFinalResult) {
+    Preconditions.checkState(_hasOrderBy);
+    Preconditions.checkState(!sort);
+    Preconditions.checkState(!storeFinalResult);
+    resizePutOnly();
   }
 
-  private Record updateRecord(Record existingRecord, Record newRecord) {
+  ///  update an existing {@code IntermediateRecord._record} with a new record
+  private IntermediateRecord updateRecord(IntermediateRecord existingIntermdiaterecord, Record newRecord) {
+    Record existingRecord = existingIntermdiaterecord._record;
     Object[] existingValues = existingRecord.getValues();
     Object[] newValues = newRecord.getValues();
     int numAggregations = _aggregationFunctions.length;
@@ -269,11 +189,8 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
             (Comparable) newValues[index]);
       }
     }
-    return existingRecord;
-  }
-
-  public Collection<Record> getTopRecords() {
-    return _topRecords;
+    Preconditions.checkState(existingIntermdiaterecord._record == existingRecord);
+    return existingIntermdiaterecord;
   }
 
   public int getNumResizes() {
@@ -281,13 +198,12 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
   }
 
   public boolean isTrimmed() {
-    // single resize occurs on finish() if there's orderBy
+    // single resize occurs on finish()
     // all other re-sizes are triggered by trim size and threshold
-    int min = _topRecords != null && _hasOrderBy ? 1 : 0;
-    return _numResizes > min;
+    return _numResizes > 1;
   }
 
-  public TwoLevelLinearProbingRecordHashmap getLookupMap() {
+  public TwoLevelLinearProbingRecordHashMap getLookupMap() {
     return _lookupMap;
   }
 

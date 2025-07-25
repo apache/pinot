@@ -24,11 +24,11 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
 
 
-public class TwoLevelLinearProbingRecordHashmapTest {
+public class TwoLevelLinearProbingRecordHashMapTest {
 
   @Test
   public void testBasicPutAndGet() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     Key key1 = new Key(new Object[]{1});
     Record val1 = new Record(new Object[]{"one"});
     map.put(key1, val1);
@@ -39,7 +39,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testOverwriteValue() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     Key key = new Key(new Object[]{42});
     map.put(key, new Record(new Object[]{"a"}));
     map.put(key, new Record(new Object[]{"b"}));
@@ -50,13 +50,13 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testGetNonExistentKey() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     assertNull(map.get(new Key(new Object[]{999})));
   }
 
   @Test
   public void testResizeWithMultipleKeys() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     int count = 100;
     for (int i = 0; i < count; i++) {
       map.put(new Key(new Object[]{i}), new Record(new Object[]{"v" + i}));
@@ -70,7 +70,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testHashCollisionHandling() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
 
     Key key1 = new Key(new Object[]{1}) {
       @Override
@@ -107,7 +107,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testPutAfterResize() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     for (int i = 0; i < 2000; i++) {
       map.put(new Key(new Object[]{i}), new Record(new Object[]{"v" + i}));
     }
@@ -120,7 +120,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testPutLargeSize() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     for (int i = 0; i < 100000; i++) {
       map.put(new Key(new Object[]{i}), new Record(new Object[]{"v" + i}));
     }
@@ -134,14 +134,14 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testEmptyMap() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     assertEquals(0, map.size());
     assertNull(map.get(new Key(new Object[]{0})));
   }
 
   @Test
   public void testSingleInsertAndRetrieve() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     Key key = new Key(new Object[]{1});
     Record value = new Record(new Object[]{"value"});
     map.put(key, value);
@@ -151,7 +151,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testMultipleInsertsSameBucket() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     for (int i = 0; i < 100; i++) {
       map.put(new Key(new Object[]{i}), new Record(new Object[]{"val" + i}));
     }
@@ -163,7 +163,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testOverwritingExistingKey() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     Key key = new Key(new Object[]{42});
     map.put(key, new Record(new Object[]{"first"}));
     map.put(key, new Record(new Object[]{"second"}));
@@ -173,7 +173,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testHashCollisionDifferentKeys() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     Key key1 = new Key(new Object[]{"a"}) {
       @Override
       public int hashCode() {
@@ -209,7 +209,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testRetrieveAfterResize() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     int count = 500; // Force multiple resizes
     for (int i = 0; i < count; i++) {
       map.put(new Key(new Object[]{i}), new Record(new Object[]{"v" + i}));
@@ -223,7 +223,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testKeyObjectArrayEquality() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     Key k1 = new Key(new Object[]{"a", 1});
     Key k2 = new Key(new Object[]{"a", 1});
     Record r = new Record(new Object[]{"test"});
@@ -240,7 +240,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testNullRecordValue() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     Key key = new Key(new Object[]{999});
     map.put(key, null);  // Intentionally put null
     assertNull(map.get(key));
@@ -249,7 +249,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testDuplicateInsertMany() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     Key key = new Key(new Object[]{123});
     for (int i = 0; i < 100; i++) {
       map.put(key, new Record(new Object[]{"v" + i}));
@@ -260,7 +260,7 @@ public class TwoLevelLinearProbingRecordHashmapTest {
 
   @Test
   public void testStressWithSimilarKeys() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     for (int i = 0; i < 256; i++) {
       map.put(new Key(new Object[]{"group", i}), new Record(new Object[]{"r" + i}));
     }

@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashmap;
+import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashMap;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -50,12 +50,12 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @Fork(value = 1)
 @Warmup(iterations = 1, time = 1)
 @Measurement(iterations = 3, time = 1)
-public class BenchmarkTwoLevelLinearProbingRecordHashmap {
+public class BenchmarkTwoLevelLinearProbingRecordHashMap {
 
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt =
-        new OptionsBuilder().include(BenchmarkTwoLevelLinearProbingRecordHashmap.class.getSimpleName());
+        new OptionsBuilder().include(BenchmarkTwoLevelLinearProbingRecordHashMap.class.getSimpleName());
     new Runner(opt.build()).run();
   }
 
@@ -97,7 +97,7 @@ public class BenchmarkTwoLevelLinearProbingRecordHashmap {
 
   @Benchmark
   public Object testTwoLevelHashMapInsert() {
-    TwoLevelLinearProbingRecordHashmap map = new TwoLevelLinearProbingRecordHashmap();
+    TwoLevelLinearProbingRecordHashMap map = new TwoLevelLinearProbingRecordHashMap();
     for (int i = 0; i < _size; i++) {
       map.put(_records[i]);
     }
