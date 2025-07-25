@@ -42,6 +42,8 @@ import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+
 
 public class MutableSegmentImplIngestionAggregationTest {
   private static final String DIMENSION_1 = "dim1";
@@ -54,6 +56,8 @@ public class MutableSegmentImplIngestionAggregationTest {
   private static final String TIME_COLUMN2 = "time2";
   private static final String KEY_SEPARATOR = "\t\t";
   private static final int NUM_ROWS = 10001;
+
+  private static final StreamMessageMetadata METADATA = mock(StreamMessageMetadata.class);
 
   private static Schema.SchemaBuilder getSchemaBuilder() {
     return new Schema.SchemaBuilder().setSchemaName("testSchema")
@@ -150,13 +154,12 @@ public class MutableSegmentImplIngestionAggregationTest {
 
     long seed = 2;
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     // Generate random int to prevent overflow
     GenericRow row = getRow(random, 1);
     row.putValue(METRIC, null);
     try {
-      mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, METADATA);
       Assert.fail();
     } catch (NullPointerException e) {
       // expected
@@ -311,7 +314,6 @@ public class MutableSegmentImplIngestionAggregationTest {
     List<Metric> metrics = new ArrayList<>();
 
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     HashMap<String, HyperLogLog> hllMap = new HashMap<>();
     HashMap<String, Set<Integer>> distinctMap = new HashMap<>();
@@ -335,7 +337,7 @@ public class MutableSegmentImplIngestionAggregationTest {
         distinctMap.put(key, new HashSet<>(metricValue));
       }
 
-      mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, METADATA);
     }
 
     distinctMap.forEach(
@@ -355,7 +357,6 @@ public class MutableSegmentImplIngestionAggregationTest {
     List<Metric> metrics = new ArrayList<>();
 
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     HashMap<String, BigDecimal> bdMap = new HashMap<>();
     HashMap<String, ArrayList<BigDecimal>> bdIndividualMap = new HashMap<>();
@@ -378,7 +379,7 @@ public class MutableSegmentImplIngestionAggregationTest {
         bdIndividualMap.put(key, bdList);
       }
 
-      mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, METADATA);
     }
 
     for (String key : bdMap.keySet()) {
@@ -400,7 +401,6 @@ public class MutableSegmentImplIngestionAggregationTest {
     Set<String> keys = new HashSet<>();
 
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
 
     for (int i = 0; i < NUM_ROWS; i++) {
       // Generate random int to prevent overflow
@@ -410,7 +410,7 @@ public class MutableSegmentImplIngestionAggregationTest {
       row.putValue(METRIC, metricValue);
       row.putValue(METRIC_2, metric2Value);
 
-      mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, METADATA);
 
       String key = buildKey(row);
       metrics.add(Arrays.asList(new Metric(key, metricValue), new Metric(key, metric2Value)));
@@ -465,7 +465,6 @@ public class MutableSegmentImplIngestionAggregationTest {
 
     int seed = 1;
     Random random = new Random(seed);
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), null);
 
     MutableSegmentImpl mutableSegmentImpl =
         MutableSegmentImplTestUtils.createMutableSegmentImpl(schema, Collections.singleton(m1), VAR_LENGTH_SET,
@@ -477,7 +476,7 @@ public class MutableSegmentImplIngestionAggregationTest {
 
     row.putValue("metric", large);
     Assert.assertThrows(IllegalArgumentException.class, () -> {
-      mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, METADATA);
     });
 
     mutableSegmentImpl.destroy();
