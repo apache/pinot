@@ -185,11 +185,11 @@ arrayslicestring:
 arraysortint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySortInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySortIntUdf"
 arraysortstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySortString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySortStringUdf"
 arraysum:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ArraySumTransformFunction"
