@@ -278,6 +278,14 @@ public class UdfTestFramework {
             list.add(f);
           }
           return list;
+        } else if (componentType == byte.class) {
+          // Convert byte array to List<Byte> for consistency
+          byte[] byteArray = (byte[]) value;
+          ArrayList<Byte> list = new ArrayList<>(byteArray.length);
+          for (byte b : byteArray) {
+            list.add(b);
+          }
+          return list;
         } else {
           return Arrays.asList((Object[]) value);
         }
