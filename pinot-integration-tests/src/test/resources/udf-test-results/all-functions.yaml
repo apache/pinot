@@ -149,7 +149,7 @@ arrayindexofstring:
 arraylength:
   scalar: "org.apache.pinot.common.function.scalar.array.ArrayLengthScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.ArrayLengthTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayLengthUdf"
 arraymax:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ArrayMaxTransformFunction"
