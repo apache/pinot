@@ -91,8 +91,8 @@ public class UdfReporter {
 
       report.append('\n');
 
-      report.append("| Signature | Call | Expected result | Actual result | Comparison or Error |\n");
-      report.append("|-----------|------|-----------------|---------------|---------------------|\n");
+      report.append("| Example | Call | Expected result | Actual result | Report |\n");
+      report.append("|---------|------|-----------------|---------------|--------|\n");
 
       for (UdfSignature signature : signatures) {
         ResultByExample resultByExample = bySignature.getMap().get(signature);
@@ -105,7 +105,7 @@ public class UdfReporter {
 
             // Signature column
             report.append("| ")
-                .append(signature.toString()).append(" | ");
+                .append(example.getId()).append(" | ");
 
             // Call column
             report.append(asSqlCallWithLiteralArgs(udf, udf.getMainName(), example.getInputValues()))
