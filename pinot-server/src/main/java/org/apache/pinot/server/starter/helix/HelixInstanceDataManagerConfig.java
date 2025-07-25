@@ -331,4 +331,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   public boolean isUploadSegmentToDeepStore() {
     return _serverConfig.getProperty(UPLOAD_SEGMENT_TO_DEEP_STORE, DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE);
   }
+
+  @Override
+  public boolean isRemoveUnnestedFields() {
+    return _serverConfig.getProperty(CONFIG_OF_COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS,
+            DEFAULT_COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS);
+  }
 }

@@ -97,6 +97,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
   private final Map<String, String> _prefixesToRename;
   private final boolean _continueOnError;
+  private final boolean _removeUnnestedFields;
 
   private ComplexTypeTransformer(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
@@ -119,6 +120,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         Objects.requireNonNullElse(complexTypeConfig.getCollectionNotUnnestedToJson(), DEFAULT_COLLECTION_TO_JSON_MODE);
     _prefixesToRename = Objects.requireNonNullElse(complexTypeConfig.getPrefixesToRename(), Map.of());
     _continueOnError = ingestionConfig.isContinueOnError();
+    _removeUnnestedFields = complexTypeConfig.isRemoveUnnestedFields();
   }
 
   /// Returns a [ComplexTypeTransformer] if it is defined in the table config, `null` otherwise.
@@ -133,12 +135,13 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
   private ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter,
       CollectionNotUnnestedToJson collectionNotUnnestedToJson, Map<String, String> prefixesToRename,
-      boolean continueOnError) {
+      boolean continueOnError, boolean removeUnnestedFields) {
     _fieldsToUnnest = fieldsToUnnest;
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
     _continueOnError = continueOnError;
+    _removeUnnestedFields = removeUnnestedFields;
   }
 
   @VisibleForTesting
@@ -148,6 +151,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     private CollectionNotUnnestedToJson _collectionNotUnnestedToJson = DEFAULT_COLLECTION_TO_JSON_MODE;
     private Map<String, String> _prefixesToRename = Map.of();
     private boolean _continueOnError = false;
+    private boolean _removeUnnestedFields = false;
 
     public Builder setFieldsToUnnest(List<String> fieldsToUnnest) {
       _fieldsToUnnest = fieldsToUnnest;
@@ -174,9 +178,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
       return this;
     }
 
+    public Builder setRemoveUnnestedFields(boolean removeUnnestedFields) {
+      _removeUnnestedFields = removeUnnestedFields;
+      return this;
+    }
+
     public ComplexTypeTransformer build() {
       return new ComplexTypeTransformer(_fieldsToUnnest, _delimiter, _collectionNotUnnestedToJson, _prefixesToRename,
-          _continueOnError);
+          _continueOnError, _removeUnnestedFields);
     }
   }
 
@@ -201,7 +210,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
           for (String field : _fieldsToUnnest) {
             unnestedRecords = unnestCollection(unnestedRecords, field);
           }
-          unnestedRecords.forEach(unnestedRecord -> unnestedRecord.getFieldToValueMap().putAll(originalValues));
+          if (!_removeUnnestedFields) {
+            unnestedRecords.forEach(unnestedRecord -> unnestedRecord.getFieldToValueMap().putAll(originalValues));
+          }
           if (record.isIncomplete()) {
             unnestedRecords.forEach(GenericRow::markIncomplete);
           }
@@ -240,7 +251,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   private void unnestCollection(GenericRow record, String column, List<GenericRow> list) {
-    Object value = record.getValue(column);
+    Object value = _removeUnnestedFields ? record.removeValue(column) : record.getValue(column);
     if (value instanceof Collection) {
       if (((Collection) value).isEmpty()) {
         // use the record itself
@@ -396,7 +407,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
       Object value = map.get(field);
       String concatName = concat(path, field);
       if (value instanceof Map) {
-        Map<String, Object> innerMap = (Map<String, Object>) value;
+        Map<String, Object> innerMap = (Map<String, Object>) (_removeUnnestedFields ? map.remove(field) : value);
         List<String> innerMapFields = new ArrayList<>();
         for (Map.Entry<String, Object> innerEntry : new ArrayList<>(innerMap.entrySet())) {
           Object innerValue = innerEntry.getValue();
