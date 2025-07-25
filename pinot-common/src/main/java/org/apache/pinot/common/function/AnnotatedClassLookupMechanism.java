@@ -35,8 +35,8 @@ import org.slf4j.LoggerFactory;
 /// create tests and documentation.
 /// This is why any scalar function registered using this mechanism is registered using a negative priority, which is
 /// lower than the default priority, which is 0.
-@AutoService(FunctionRegistry.ScalarFunctionLookupMechanism.class)
-public class AnnotatedClassLookupMechanism implements FunctionRegistry.ScalarFunctionLookupMechanism {
+@AutoService(ScalarFunctionLookupMechanism.class)
+public class AnnotatedClassLookupMechanism implements ScalarFunctionLookupMechanism {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnnotatedClassLookupMechanism.class);
   /// The default priority for classes that are registered using this mechanism.
   public static final int DEFAULT_PRIORITY = -1_000;
@@ -45,7 +45,7 @@ public class AnnotatedClassLookupMechanism implements FunctionRegistry.ScalarFun
   public Set<ScalarFunctionProvider> getProviders() {
     Set<Class<?>> classes =
         PinotReflectionUtils.getClassesThroughReflection(".*\\.function\\..*", ScalarFunction.class);
-    Set<FunctionRegistry.ScalarFunctionLookupMechanism.ScalarFunctionProvider> providers = Sets
+    Set<ScalarFunctionLookupMechanism.ScalarFunctionProvider> providers = Sets
         .newHashSetWithExpectedSize(classes.size());
     for (Class<?> clazz : classes) {
       if (!Modifier.isPublic(clazz.getModifiers())) {
@@ -63,7 +63,7 @@ public class AnnotatedClassLookupMechanism implements FunctionRegistry.ScalarFun
       } catch (Exception e) {
         throw new IllegalStateException("Failed to instantiate PinotScalarFunction with class: " + clazz);
       }
-      providers.add(new FunctionRegistry.ScalarFunctionLookupMechanism.ScalarFunctionProvider() {
+      providers.add(new ScalarFunctionLookupMechanism.ScalarFunctionProvider() {
         @Override
         public String name() {
           return clazz.getCanonicalName();

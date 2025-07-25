@@ -33,22 +33,21 @@ import org.apache.pinot.spi.utils.PinotReflectionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/// This class implements a lookup mechanism for methods that extend [PinotScalarFunction] that are also annotated with
-/// [ScalarFunction].
+/// This class implements a lookup mechanism for methods that are also annotated with [ScalarFunction].
 ///
 /// This mechanism is the first one that was implemented and it is very limited in terms of functionality. For example,
 /// it does not support method overloading, so it is not possible to register multiple functions with the same name but
-/// different argument types (ie summing int + int = int but also double + double = double). This was the reason why
-/// before the introduction of other mechanisms, Pinot used doubles when applying most of the numeric UDFs.
+/// different argument types (ie summing int + int = int but also double + double = double). This is the reason why
+/// before the introduction of other mechanisms, Pinot casted to double when applying most of the numeric UDFs.
 ///
-/// Since then we introduced the [AnnotatedClassLookupMechanism] which supports method overloading and the UDF
-/// mechanism, which is the preferred way to register functions in Pinot, as it can also be used to register
-/// transform functions, create tests and documentation.
+/// This is why this mechanism is the least preferred one. For new functions try to use the UDF mechanism, which
+/// supports method overloading and can also be used to register transform functions and easily create tests and
+/// documentation.
 ///
-/// This is why any scalar function registered using this mechanism is registered using a very small negative priority,
-///  which is lower than the default priority and also the priority of the [AnnotatedClassLookupMechanism].
-@AutoService(FunctionRegistry.ScalarFunctionLookupMechanism.class)
-public class AnnotatedMethodLookupMechanism implements FunctionRegistry.ScalarFunctionLookupMechanism {
+/// Any scalar function registered using AnnotatedMethodLookupMechanism is registered using a very small negative
+/// priority, which is lower than the default priority and also the priority of the [AnnotatedClassLookupMechanism].
+@AutoService(ScalarFunctionLookupMechanism.class)
+public class AnnotatedMethodLookupMechanism implements ScalarFunctionLookupMechanism {
   private static final Logger LOGGER = LoggerFactory.getLogger(AnnotatedMethodLookupMechanism.class);
   /// The default priority for methods that are registered using this mechanism.
   public static final int DEFAULT_PRIORITY = -10_000;

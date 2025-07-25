@@ -316,46 +316,4 @@ public class FunctionRegistry {
       return method.getDeclaringClass().getTypeName() + '.' + method.getName();
     }
   }
-
-  /**
-   * Interface for looking up scalar functions.
-   *
-   * Each instance of this interface represents a mechanism to look up scalar functions. They should be registered
-   * as a service provider in the META-INF/services directory to be discovered by the ServiceLoader.
-   * Alternatively, they can be registered using the {@link com.google.auto.service.AutoService} annotation.
-   *
-   * @see AnnotatedClassLookupMechanism
-   * @see AnnotatedMethodLookupMechanism
-   */
-  public interface ScalarFunctionLookupMechanism {
-
-    /**
-     * Returns the set of {@link ScalarFunctionProvider} instances that can be used to look up scalar functions.
-     */
-    Set<ScalarFunctionProvider> getProviders();
-
-    /**
-     * Interface for providing scalar functions.
-     * <p>Each provider can provide multiple scalar functions, and they can have different priorities.
-     * <p>If two functions have the same canonical name, the one with higher priority will be used.
-     */
-    interface ScalarFunctionProvider {
-      /**
-       * Returns the name of the provider.
-       * <p>This is used for logging and debugging purposes when there are multiple providers for the same function.
-       */
-      String name();
-
-      /**
-       * Returns the priority of the provider. Higher priority providers are loaded first.
-       * <p>Default priority is 0.
-       */
-      int priority();
-
-      /**
-       * Returns a set of {@link PinotScalarFunction} instances.
-       */
-      Set<PinotScalarFunction> getFunctions();
-    }
-  }
 }

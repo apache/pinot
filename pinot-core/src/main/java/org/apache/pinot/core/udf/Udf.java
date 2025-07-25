@@ -30,6 +30,7 @@ import org.apache.arrow.util.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.ScalarFunctionLookupMechanism;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -183,8 +184,8 @@ public abstract class Udf {
   ///
   /// Ideally, this should be the only mechanism to register scalar functions in Pinot, but given we don't have a
   /// UDF for each scalar function, we still use the legacy mechanisms (with lower priority) for now.
-  @AutoService(FunctionRegistry.ScalarFunctionLookupMechanism.class)
-  public static class UdfScalarFunctionLookupMechanism implements FunctionRegistry.ScalarFunctionLookupMechanism {
+  @AutoService(ScalarFunctionLookupMechanism.class)
+  public static class UdfScalarFunctionLookupMechanism implements ScalarFunctionLookupMechanism {
     @Override
     public Set<ScalarFunctionProvider> getProviders() {
       return ServiceLoader.load(Udf.class).stream()
