@@ -16,18 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.query.runtime.function;
 
 import com.google.auto.service.AutoService;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.array.ArrayLengthScalarFunction;
-import org.apache.pinot.core.operator.transform.function.ArrayLengthTransformFunction;
+import org.apache.pinot.common.function.scalar.StringFunctions;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
@@ -37,46 +33,31 @@ import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
 @AutoService(Udf.class)
-public class ArrayLengthUdf extends Udf {
-  @Override
-  public String getMainName() {
-    return "arrayLength";
-  }
+public class CodepointUdf extends Udf.FromAnnotatedMethod {
 
-  @Override
-  public Set<String> getAllNames() {
-    return Set.of("array_length", "cardinality");
+  public CodepointUdf() throws NoSuchMethodException {
+    super(StringFunctions.class.getMethod("codepoint", String.class));
   }
 
   @Override
   public String getDescription() {
-    return "Returns the length of the input array.";
+    return "Returns the Unicode code point of the first character in the input string.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-            UdfParameter.of("arr", FieldSpec.DataType.STRING)
-                .asMultiValued()
-                .withDescription("Input array of strings"),
+            UdfParameter.of("input", FieldSpec.DataType.STRING)
+                .withDescription("The input string."),
             UdfParameter.result(FieldSpec.DataType.INT)
-                .withDescription("Length of the array")
+                .withDescription("The Unicode code point of the first character.")
         ))
-        .addExample("normal array", List.of("a", "b", "c"), 3)
-        .addExample("empty array", List.of(), 0)
-        .addExample("single element", List.of("x"), 1)
-        .addExample(UdfExample.create("null array", null, null).withoutNull(0))
+        .addExample("single character", "A", 65)
+        .addExample("not ascii", "€", 8364)
+        .addExample("a word", "pinot", 112)
+        .addExample(UdfExample.create("null input", null, null).withoutNull(0))
         .build()
         .generateExamples();
   }
-
-  @Override
-  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
-    return Pair.of(TransformFunctionType.ARRAY_LENGTH, ArrayLengthTransformFunction.class);
-  }
-
-  @Override
-  public PinotScalarFunction getScalarFunction() {
-    return new ArrayLengthScalarFunction();
-  }
 }
+

@@ -322,7 +322,7 @@ public class UdfReporter {
   }
 
   private static Function<Object, String> getResultFormatter(@Nullable Object expected, @Nullable Object actual) {
-    boolean describeType = expected == null || actual == null || expected.getClass().equals(actual.getClass());
+    boolean describeType = expected == null || actual == null || !expected.getClass().equals(actual.getClass());
     return value -> describeValue(value, describeType);
   }
 
@@ -355,6 +355,6 @@ public class UdfReporter {
           return Arrays.toString((Object[]) value) + (includeType ? " (array of " + componentTypeName + ")" : "");
       }
     }
-    return value.toString() + (includeType ? " (" + value.getClass().getSimpleName() + ")" : "");
+    return value + (includeType ? " (" + value.getClass().getSimpleName() + ")" : "");
   }
 }

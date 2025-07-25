@@ -16,19 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.query.runtime.function;
 
 import com.google.auto.service.AutoService;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.array.ArrayLengthScalarFunction;
-import org.apache.pinot.core.operator.transform.function.ArrayLengthTransformFunction;
+import org.apache.pinot.common.function.scalar.TrigonometricFunctions;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
+import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CoshTransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
 import org.apache.pinot.core.udf.UdfExampleBuilder;
@@ -37,46 +34,35 @@ import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
 
 @AutoService(Udf.class)
-public class ArrayLengthUdf extends Udf {
-  @Override
-  public String getMainName() {
-    return "arrayLength";
-  }
+public class CoshUdf extends Udf.FromAnnotatedMethod {
 
-  @Override
-  public Set<String> getAllNames() {
-    return Set.of("array_length", "cardinality");
+  public CoshUdf() throws NoSuchMethodException {
+    super(TrigonometricFunctions.class.getMethod("cosh", double.class));
   }
 
   @Override
   public String getDescription() {
-    return "Returns the length of the input array.";
+    return "Returns the hyperbolic cosine of the input value.";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-            UdfParameter.of("arr", FieldSpec.DataType.STRING)
-                .asMultiValued()
-                .withDescription("Input array of strings"),
-            UdfParameter.result(FieldSpec.DataType.INT)
-                .withDescription("Length of the array")
+            UdfParameter.of("value", FieldSpec.DataType.DOUBLE)
+                .withDescription("The value to compute the hyperbolic cosine for."),
+            UdfParameter.result(FieldSpec.DataType.DOUBLE)
+                .withDescription("The hyperbolic cosine of the value.")
         ))
-        .addExample("normal array", List.of("a", "b", "c"), 3)
-        .addExample("empty array", List.of(), 0)
-        .addExample("single element", List.of("x"), 1)
-        .addExample(UdfExample.create("null array", null, null).withoutNull(0))
+        .addExample("cosh(0)", 0d, 1d)
+        .addExample("cosh(1)", 1d, Math.cosh(1d))
+        .addExample(UdfExample.create("null input", null, null).withoutNull(1d))
         .build()
         .generateExamples();
   }
 
   @Override
   public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
-    return Pair.of(TransformFunctionType.ARRAY_LENGTH, ArrayLengthTransformFunction.class);
-  }
-
-  @Override
-  public PinotScalarFunction getScalarFunction() {
-    return new ArrayLengthScalarFunction();
+    return Pair.of(TransformFunctionType.COSH, CoshTransformFunction.class);
   }
 }
+

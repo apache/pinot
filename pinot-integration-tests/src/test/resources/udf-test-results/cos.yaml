@@ -24,26 +24,21 @@
 Ingestion time transformer:
   '(radians: double) -> double':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      cos(0):
+        actualResult: 1.0
         equivalence: "EQUAL"
         error: null
+        expectedResult: 1.0
+      cos(PI):
+        actualResult: -1.0
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.0
+      cos(PI/2):
+        actualResult: 6.123233995736766E-17
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -54,26 +49,21 @@ Ingestion time transformer:
 MSE intermediate stage (with null handling):
   '(radians: double) -> double':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      cos(0):
+        actualResult: 1.0
         equivalence: "EQUAL"
         error: null
+        expectedResult: 1.0
+      cos(PI):
+        actualResult: -1.0
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.0
+      cos(PI/2):
+        actualResult: 6.123233995736766E-17
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -84,26 +74,21 @@ MSE intermediate stage (with null handling):
 MSE intermediate stage (without null handling):
   '(radians: double) -> double':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      cos(0):
+        actualResult: 1.0
         equivalence: "EQUAL"
         error: null
+        expectedResult: 1.0
+      cos(PI):
+        actualResult: -1.0
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.0
+      cos(PI/2):
+        actualResult: 6.123233995736766E-17
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -114,22 +99,17 @@ MSE intermediate stage (without null handling):
 SSE predicate (with null handling):
   '(radians: double) -> double':
     entries:
-      degrees(0):
+      cos(0):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      cos(PI):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI/2):
+      cos(PI/2):
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -144,22 +124,17 @@ SSE predicate (with null handling):
 SSE predicate (without null handling):
   '(radians: double) -> double':
     entries:
-      degrees(0):
+      cos(0):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      cos(PI):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI/2):
+      cos(PI/2):
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -174,26 +149,21 @@ SSE predicate (without null handling):
 SSE projection (with null handling):
   '(radians: double) -> double':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      cos(0):
+        actualResult: 1.0
         equivalence: "EQUAL"
         error: null
+        expectedResult: 1.0
+      cos(PI):
+        actualResult: -1.0
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.0
+      cos(PI/2):
+        actualResult: 6.123233995736766E-17
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -204,30 +174,25 @@ SSE projection (with null handling):
 SSE projection (without null handling):
   '(radians: double) -> double':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      cos(0):
+        actualResult: 1.0
         equivalence: "EQUAL"
         error: null
+        expectedResult: 1.0
+      cos(PI):
+        actualResult: -1.0
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.0
+      cos(PI/2):
+        actualResult: 6.123233995736766E-17
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
       null input:
-        actualResult: 0.0
+        actualResult: 1.0
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
+        expectedResult: 1.0
     error: false
     errorMessage: null

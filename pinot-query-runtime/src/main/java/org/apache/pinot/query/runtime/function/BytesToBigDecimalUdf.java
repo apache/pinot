@@ -16,18 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.pinot.query.runtime.function;
 
 import com.google.auto.service.AutoService;
-import java.util.List;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.pinot.common.function.PinotScalarFunction;
 import org.apache.pinot.common.function.TransformFunctionType;
-import org.apache.pinot.common.function.scalar.array.ArrayLengthScalarFunction;
-import org.apache.pinot.core.operator.transform.function.ArrayLengthTransformFunction;
+import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
+import org.apache.pinot.common.function.scalar.DataTypeConversionFunctions;
+import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.core.udf.UdfExample;
@@ -35,48 +34,35 @@ import org.apache.pinot.core.udf.UdfExampleBuilder;
 import org.apache.pinot.core.udf.UdfParameter;
 import org.apache.pinot.core.udf.UdfSignature;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.utils.BigDecimalUtils;
+
 
 @AutoService(Udf.class)
-public class ArrayLengthUdf extends Udf {
-  @Override
-  public String getMainName() {
-    return "arrayLength";
-  }
+public class BytesToBigDecimalUdf extends Udf.FromAnnotatedMethod {
 
-  @Override
-  public Set<String> getAllNames() {
-    return Set.of("array_length", "cardinality");
+  public BytesToBigDecimalUdf()
+      throws NoSuchMethodException {
+    super(DataTypeConversionFunctions.class.getMethod("bytesToBigDecimal", byte[].class));
   }
 
   @Override
   public String getDescription() {
-    return "Returns the length of the input array.";
+    return "Converts a BYTES to a BIG_DECIMAL. \n"
+        + "The expected format is:\n"
+        + " - First 2 bytes: scale (big-endian, unsigned short)\n"
+        + " - Remaining bytes: unscaled value (big-endian two's complement, as per `BigInteger.toByteArray()`)\n";
   }
 
   @Override
   public Map<UdfSignature, Set<UdfExample>> getExamples() {
     return UdfExampleBuilder.forSignature(UdfSignature.of(
-            UdfParameter.of("arr", FieldSpec.DataType.STRING)
-                .asMultiValued()
-                .withDescription("Input array of strings"),
-            UdfParameter.result(FieldSpec.DataType.INT)
-                .withDescription("Length of the array")
+            UdfParameter.of("bytes", FieldSpec.DataType.BYTES)
+                .withDescription("Byte array to convert to BigDecimal"),
+            UdfParameter.result(FieldSpec.DataType.BIG_DECIMAL)
         ))
-        .addExample("normal array", List.of("a", "b", "c"), 3)
-        .addExample("empty array", List.of(), 0)
-        .addExample("single element", List.of("x"), 1)
-        .addExample(UdfExample.create("null array", null, null).withoutNull(0))
+        .addExample("BigDecimal 1.23", BigDecimalUtils.serialize(new BigDecimal("1.23")), new BigDecimal("1.23"))
+        //.addExample(UdfExample.create("null input", null, null).withoutNull(new BigDecimal("0.0")))
         .build()
         .generateExamples();
-  }
-
-  @Override
-  public Pair<TransformFunctionType, Class<? extends TransformFunction>> getTransformFunction() {
-    return Pair.of(TransformFunctionType.ARRAY_LENGTH, ArrayLengthTransformFunction.class);
-  }
-
-  @Override
-  public PinotScalarFunction getScalarFunction() {
-    return new ArrayLengthScalarFunction();
   }
 }

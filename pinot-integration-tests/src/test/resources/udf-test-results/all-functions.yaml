@@ -258,23 +258,23 @@ brokerid:
 bytestobigdecimal:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.bytesToBigDecimal}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.BytesToBigDecimalUdf"
 bytestohex:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.bytesToHex}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.BytesToHexUdf"
 byteswapint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.byteswapInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ByteswapIntUdf"
 byteswaplong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.byteswapLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ByteswapLongUdf"
 cardinality:
   scalar: "org.apache.pinot.common.function.scalar.array.ArrayLengthScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.ArrayLengthTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayLengthUdf"
 case:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ObjectFunctions.caseWhen}"
   transform: "org.apache.pinot.core.operator.transform.function.CaseTransformFunction"
@@ -290,15 +290,15 @@ cast:
 ceil:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.ceil}"
   transform: "org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CeilUdf"
 ceiling:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.ceil}"
   transform: "org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CeilUdf"
 chr:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.chr}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ChrUdf"
 cid:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.InternalFunctions.cid}"
   transform: null
@@ -331,7 +331,7 @@ coalesce:
 codepoint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.codepoint}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CodepointUdf"
 concat:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.StringFunctions.concat,\
     \ 3: org.apache.pinot.common.function.scalar.string.StringFunctions.concat]}"
@@ -344,15 +344,15 @@ concatws:
 contains:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.contains}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ContainsUdf"
 cos:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.cos}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CosTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CosUdf"
 cosh:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.cosh}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CoshTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CoshUdf"
 cosinedistance:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.VectorFunctions.cosineDistance,\
     \ 3: org.apache.pinot.common.function.scalar.VectorFunctions.cosineDistance]}"
@@ -361,7 +361,7 @@ cosinedistance:
 cot:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.cot}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CotTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CotUdf"
 cpcsketchtostring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.core.function.scalar.SketchFunctions.cpcSketchToString}"
   transform: null
@@ -570,7 +570,7 @@ encodeurl:
 endswith:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.endsWith}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.EndsWithUdf"
 endtime:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.InternalFunctions.endTime}"
   transform: null
@@ -586,7 +586,7 @@ euclideandistance:
 exp:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.exp}"
   transform: "org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ExpUdf"
 extract:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DateTimeFunctions.extract}"
   transform: "org.apache.pinot.core.operator.transform.function.ExtractTransformFunction"
@@ -1410,7 +1410,7 @@ starea:
 startswith:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.startsWith}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.StartsWithUdf"
 starttime:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.InternalFunctions.startTime}"
   transform: null
