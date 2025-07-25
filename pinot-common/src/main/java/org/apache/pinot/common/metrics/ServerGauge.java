@@ -126,7 +126,19 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   STARTUP_STATUS_CHECK_IN_PROGRESS("state", true,
       "Indicates whether the server startup status check is currently in progress"),
   CONSUMER_LOCK_WAIT_TIME_MS("milliseconds", false,
-      "Indicates the time consumer spends while waiting on the consumer lock.");
+      "Indicates the time consumer spends while waiting on the consumer lock."),
+
+  // ThrottleOnCriticalHeapUsageExecutor metrics
+  THROTTLE_EXECUTOR_QUEUE_SIZE("count", true,
+      "Current number of tasks in the throttle executor queue"),
+  THROTTLE_EXECUTOR_QUEUED_TASKS_TOTAL("count", true,
+      "Total number of tasks that have been queued in the throttle executor"),
+  THROTTLE_EXECUTOR_PROCESSED_TASKS_TOTAL("count", true,
+      "Total number of tasks processed from the throttle executor queue"),
+  THROTTLE_EXECUTOR_TIMED_OUT_TASKS_TOTAL("count", true,
+      "Total number of tasks that timed out in the throttle executor queue"),
+  THROTTLE_EXECUTOR_SHUTDOWN_CANCELED_TASKS_TOTAL("count", true,
+      "Total number of tasks canceled during throttle executor shutdown");
 
   private final String _gaugeName;
   private final String _unit;
