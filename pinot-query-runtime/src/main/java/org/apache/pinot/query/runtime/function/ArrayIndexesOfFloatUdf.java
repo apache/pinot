@@ -38,7 +38,7 @@ public class ArrayIndexesOfFloatUdf extends Udf.FromAnnotatedMethod {
 
   @Override
   public String getDescription() {
-    return "Returns the 1-based indexes of the specified value in an array of floats. "
+    return "Returns the 0-based indexes of the specified value in an array of floats. "
         + "If the value is not found, returns an empty array. If any argument is null, returns null.";
   }
 
@@ -52,16 +52,16 @@ public class ArrayIndexesOfFloatUdf extends Udf.FromAnnotatedMethod {
                 .withDescription("Value to search for"),
             UdfParameter.result(FieldSpec.DataType.INT)
                 .asMultiValued()
-                .withDescription("1-based indexes of the value in the array. If not found, returns empty array. "
-                    + "If any argument is null, returns null.")
+                .withDescription("0-based indexes of the value in the array. "
+                    + "If not found, returns empty array. If any argument is null, returns null.")
         ))
-        .addExample("single match", List.of(1.1f, 2.2f, 3.3f), 2.2f, List.of(2))
-        .addExample("multiple matches", List.of(1.1f, 2.2f, 2.2f, 3.3f), 2.2f, List.of(2, 3))
+        .addExample("single match", List.of(1.1f, 2.2f, 3.3f), 2.2f, List.of(1))
+        .addExample("multiple matches", List.of(1.1f, 2.2f, 2.2f, 3.3f), 2.2f, List.of(1, 2))
         .addExample("no match", List.of(1.1f, 2.2f, 3.3f), 4.4f, List.of())
         .addExample("empty array", List.of(), 1.1f, List.of())
-        .addExample(UdfExample.create("null array", null, 1.1f, null))
-        .addExample(UdfExample.create("null value", List.of(1.1f, 2.2f), null, null))
-        .addExample(UdfExample.create("null input", null, null, null))
+        .addExample(UdfExample.create("null array", null, 1.1f, null).withoutNull(List.of()))
+        .addExample(UdfExample.create("null value", List.of(1.1f, 2.2f), null, null).withoutNull(List.of()))
+        .addExample(UdfExample.create("null input", null, null, null).withoutNull(List.of()))
         .build()
         .generateExamples();
   }

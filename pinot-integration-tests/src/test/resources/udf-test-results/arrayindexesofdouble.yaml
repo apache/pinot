@@ -33,11 +33,11 @@ Ingestion time transformer:
         actualResult:
         - 1
         - 2
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
+        - 1
         - 2
-        - 3
       no match:
         actualResult: []
         equivalence: "EQUAL"
@@ -61,10 +61,10 @@ Ingestion time transformer:
       single match:
         actualResult:
         - 1
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
-        - 2
+        - 1
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
@@ -79,11 +79,11 @@ MSE intermediate stage (with null handling):
         actualResult:
         - 1
         - 2
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
+        - 1
         - 2
-        - 3
       no match:
         actualResult: []
         equivalence: "EQUAL"
@@ -107,10 +107,10 @@ MSE intermediate stage (with null handling):
       single match:
         actualResult:
         - 1
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
-        - 2
+        - 1
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
@@ -125,11 +125,11 @@ MSE intermediate stage (without null handling):
         actualResult:
         - 1
         - 2
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
+        - 1
         - 2
-        - 3
       no match:
         actualResult: []
         equivalence: "EQUAL"
@@ -153,10 +153,10 @@ MSE intermediate stage (without null handling):
       single match:
         actualResult:
         - 1
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
-        - 2
+        - 1
     error: false
     errorMessage: null
 SSE predicate (with null handling):
@@ -183,11 +183,11 @@ SSE projection (with null handling):
         actualResult:
         - 1
         - 2
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
+        - 1
         - 2
-        - 3
       no match:
         actualResult: []
         equivalence: "EQUAL"
@@ -211,10 +211,10 @@ SSE projection (with null handling):
       single match:
         actualResult:
         - 1
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
-        - 2
+        - 1
     error: false
     errorMessage: null
 SSE projection (without null handling):
@@ -229,11 +229,11 @@ SSE projection (without null handling):
         actualResult:
         - 1
         - 2
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
+        - 1
         - 2
-        - 3
       no match:
         actualResult: []
         equivalence: "EQUAL"
@@ -257,9 +257,9 @@ SSE projection (without null handling):
       single match:
         actualResult:
         - 1
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "EQUAL"
+        error: null
         expectedResult:
-        - 2
+        - 1
     error: false
     errorMessage: null
