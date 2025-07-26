@@ -25,6 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -68,8 +69,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
-  // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
-  // _futures (try to interrupt the execution if it already started).
   private final CountDownLatch _operatorLatch;
 
   private DataSchema _dataSchema;
@@ -163,44 +162,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         if (resultsBlock.isNumGroupsWarningLimitReached()) {
           _numGroupsWarningLimitReached = true;
         }
-        // Merge aggregation group-by result.
-        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        List<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
-        // Count the number of merged keys
-        int mergedKeys = 0;
-        // For now, only GroupBy OrderBy query has pre-constructed intermediate records
-        if (intermediateRecords == null) {
-          // Merge aggregation group-by result.
-          AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-          if (aggregationGroupByResult != null) {
-            IntermediateRecord[] convertedRecords = new IntermediateRecord[aggregationGroupByResult.getNumGroups()];
-            // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-            Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-            int idx = 0;
-            while (dicGroupKeyIterator.hasNext()) {
-              GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
-              Object[] keys = groupKey._keys;
-              Object[] values = Arrays.copyOf(keys, _numColumns);
-              int groupId = groupKey._groupId;
-              for (int i = 0; i < _numAggregationFunctions; i++) {
-                values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
-              }
-              // TODO: into list and sort in-place
-              convertedRecords[idx++] = new IntermediateRecord(new Key(keys), new Record(values), null);
-              Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-              mergedKeys++;
-            }
-            intermediateRecords = Arrays.asList(convertedRecords);
-          } else {
-            // empty segment result
-            intermediateRecords = new ArrayList<>();
-          }
-        }
-
-        // in-place partition segment results
         RadixPartitionedIntermediateRecords partitionedRecords =
-            new RadixPartitionedIntermediateRecords(_queryContext.getGroupByPartitionNumRadixBits(), operatorId,
-                intermediateRecords);
+            getRadixPartitionedIntermediateRecords(resultsBlock, operatorId);
 
         _partitionedRecordsFutures[operatorId].complete(partitionedRecords);
       } catch (RuntimeException e) {
@@ -219,34 +182,78 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         TwoLevelHashMapIndexedTable table =
             GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService);
 
-        CompletableFuture[] buf = new CompletableFuture[_numOperators];
-        for (int segmentId = 0; segmentId < _numOperators; segmentId++) {
-          buf[segmentId] = _partitionedRecordsFutures[segmentId];
-        }
-
-        int completed = 0;
-        while (completed < _numOperators) {
-          CompletableFuture fut = CompletableFuture.anyOf(buf);
-          RadixPartitionedIntermediateRecords partition = (RadixPartitionedIntermediateRecords) fut.get();
-          for (IntermediateRecord record : partition.getPartition(partitionId)) {
-            table.upsert(record);
-          }
-          int processedSegmentId = partition.getSegmentId();
-          buf[processedSegmentId] = buf[processedSegmentId].newIncompleteFuture();
-          completed++;
-        }
+        mergePartitionForAllSegments(partitionId, table);
 
         // sort and trim per-segment result if needed
         table.finish(false);
         if (table.isTrimmed() && _queryContext.isUnsafeTrim()) {
           _groupsTrimmed = true;
         }
-
         _mergedIndexedTables[partitionId] = table;
       } catch (Exception e) {
         throw wrapOperatorException(this, new RuntimeException(e));
       }
     }
+  }
+
+  /// merge a partition for all segments, wait for phase 1 futures and merge them
+  private void mergePartitionForAllSegments(int partitionId, TwoLevelHashMapIndexedTable table)
+      throws InterruptedException, ExecutionException {
+    CompletableFuture[] buf = new CompletableFuture[_numOperators];
+    System.arraycopy(_partitionedRecordsFutures, 0, buf, 0, _numOperators);
+
+    int completed = 0;
+    while (completed < _numOperators) {
+      CompletableFuture fut = CompletableFuture.anyOf(buf);
+      RadixPartitionedIntermediateRecords partition = (RadixPartitionedIntermediateRecords) fut.get();
+      for (IntermediateRecord record : partition.getPartition(partitionId)) {
+        table.upsert(record);
+      }
+      int processedSegmentId = partition.getSegmentId();
+      buf[processedSegmentId] = buf[processedSegmentId].newIncompleteFuture();
+      completed++;
+    }
+  }
+
+  /// get IntermediateRecords from resultBlock and partition in-place
+  private RadixPartitionedIntermediateRecords getRadixPartitionedIntermediateRecords(GroupByResultsBlock resultsBlock,
+      int operatorId) {
+    List<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();
+    // Count the number of merged keys
+    int mergedKeys = 0;
+    // For now, only GroupBy OrderBy query has pre-constructed intermediate records
+    if (intermediateRecords == null) {
+      // Merge aggregation group-by result.
+      AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
+      if (aggregationGroupByResult != null) {
+        IntermediateRecord[] convertedRecords = new IntermediateRecord[aggregationGroupByResult.getNumGroups()];
+        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+        Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+        int idx = 0;
+        while (dicGroupKeyIterator.hasNext()) {
+          GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+          Object[] keys = groupKey._keys;
+          Object[] values = Arrays.copyOf(keys, _numColumns);
+          int groupId = groupKey._groupId;
+          for (int i = 0; i < _numAggregationFunctions; i++) {
+            values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+          }
+          convertedRecords[idx++] = new IntermediateRecord(new Key(keys), new Record(values), null);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
+          mergedKeys++;
+        }
+        intermediateRecords = Arrays.asList(convertedRecords);
+      } else {
+        // empty segment result
+        intermediateRecords = new ArrayList<>();
+      }
+    }
+
+    // in-place partition segment results
+    RadixPartitionedIntermediateRecords partitionedRecords =
+        new RadixPartitionedIntermediateRecords(_queryContext.getGroupByPartitionNumRadixBits(), operatorId,
+            intermediateRecords);
+    return partitionedRecords;
   }
 
   /**
