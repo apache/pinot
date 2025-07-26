@@ -733,6 +733,18 @@ public class PinotTenantRestletResource {
               + "it will be excluded). Example: table1_REALTIME, table2_REALTIME",
           example = "")
       @QueryParam("excludeTables") String excludeTables,
+      @ApiParam(value =
+          "Comma separated list of tables with type that are allowed to be rebalanced in parallel. Leaving blank "
+              + "defaults to "
+              + "allow all included tables to run in parallel.",
+          example = "")
+      @QueryParam("parallelWhitelist") String parallelWhitelist,
+      @ApiParam(value =
+          "Comma separated list of tables with type that are restricted to be rebalanced in single thread. These "
+              + "tables will be removed from parallelWhitelist (that said, if a table appears in both list, "
+              + "it will be run in single thread).",
+          example = "")
+      @QueryParam("parallelBlacklist") String parallelBlacklist,
       @ApiParam(value = "Show full rebalance results of each table in the response", example = "false")
       @QueryParam("verboseResult") Boolean verboseResult,
       @ApiParam(name = "rebalanceConfig", value = "The rebalance config applied to run every table", required = true)
@@ -756,17 +768,15 @@ public class PinotTenantRestletResource {
           .map(s -> s.strip().replaceAll("^\"|\"$", ""))
           .collect(Collectors.toSet()));
     }
-    boolean isParallelListSet = !config.getParallelBlacklist().isEmpty() || !config.getParallelWhitelist().isEmpty();
-
-    boolean isIncludeExcludeListSet = !config.getExcludeTables().isEmpty() || !config.getIncludeTables().isEmpty();
-
-    // Setting both parallel and include/exclude lists is not allowed. The rebalancer use the old logic if
-    // parallel white/blacklist is set, otherwise use the new logic (see DefaultTenantRebalancer). Setting both is a
-    // bad use.
-    if (isParallelListSet && isIncludeExcludeListSet) {
-      throw new ControllerApplicationException(LOGGER,
-          "Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist at the same time.",
-          Response.Status.BAD_REQUEST);
+    if (parallelBlacklist != null) {
+      config.setParallelBlacklist(Arrays.stream(StringUtil.split(parallelBlacklist, ',', 0))
+          .map(s -> s.strip().replaceAll("^\"|\"$", ""))
+          .collect(Collectors.toSet()));
+    }
+    if (parallelWhitelist != null) {
+      config.setParallelWhitelist(Arrays.stream(StringUtil.split(parallelWhitelist, ',', 0))
+          .map(s -> s.strip().replaceAll("^\"|\"$", ""))
+          .collect(Collectors.toSet()));
     }
     return _tenantRebalancer.rebalance(config);
   }
