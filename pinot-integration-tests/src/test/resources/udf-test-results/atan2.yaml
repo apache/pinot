@@ -22,29 +22,34 @@
 
 ---
 Ingestion time transformer:
-  '(radians: double) -> double':
+  '(y: double, x: double) -> double':
     entries:
-      degrees(0):
+      atan2(-1, 0):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      atan2(0, 1):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      atan2(1, 0):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: 1.5707963267948966
+      null both:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
+        expectedResult: null
+      null x:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: null
+      null y:
         actualResult: null
         equivalence: "EQUAL"
         error: null
@@ -52,29 +57,34 @@ Ingestion time transformer:
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(radians: double) -> double':
+  '(y: double, x: double) -> double':
     entries:
-      degrees(0):
+      atan2(-1, 0):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      atan2(0, 1):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      atan2(1, 0):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: 1.5707963267948966
+      null both:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
+        expectedResult: null
+      null x:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: null
+      null y:
         actualResult: null
         equivalence: "EQUAL"
         error: null
@@ -82,59 +92,69 @@ MSE intermediate stage (with null handling):
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(radians: double) -> double':
+  '(y: double, x: double) -> double':
     entries:
-      degrees(0):
+      atan2(-1, 0):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      atan2(0, 1):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      atan2(1, 0):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: 1.5707963267948966
+      null both:
+        actualResult: 0.0
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
+        expectedResult: 0.0
+      null x:
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 90.0
-      null input:
-        actualResult: null
+        expectedResult: 1.5707963267948966
+      null y:
+        actualResult: 0.0
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: 0.0
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(radians: double) -> double':
+  '(y: double, x: double) -> double':
     entries:
-      degrees(0):
+      atan2(-1, 0):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      atan2(0, 1):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
+      atan2(1, 0):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI/2):
+      null both:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      null input:
+      null x:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      null y:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -142,29 +162,34 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(radians: double) -> double':
+  '(y: double, x: double) -> double':
     entries:
-      degrees(0):
+      atan2(-1, 0):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      atan2(0, 1):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
+      atan2(1, 0):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI/2):
+      null both:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      null input:
+      null x:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      null y:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -172,29 +197,34 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(radians: double) -> double':
+  '(y: double, x: double) -> double':
     entries:
-      degrees(0):
+      atan2(-1, 0):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      atan2(0, 1):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      atan2(1, 0):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: 1.5707963267948966
+      null both:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
+        expectedResult: null
+      null x:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: null
+      null y:
         actualResult: null
         equivalence: "EQUAL"
         error: null
@@ -202,29 +232,34 @@ SSE projection (with null handling):
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(radians: double) -> double':
+  '(y: double, x: double) -> double':
     entries:
-      degrees(0):
+      atan2(-1, 0):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      atan2(0, 1):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      atan2(1, 0):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: 1.5707963267948966
+      null both:
+        actualResult: 0.0
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
+        expectedResult: 0.0
+      null x:
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: 1.5707963267948966
+      null y:
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null

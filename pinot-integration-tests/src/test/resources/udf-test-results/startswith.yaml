@@ -22,119 +22,119 @@
 
 ---
 Ingestion time transformer:
-  '(radians: double) -> double':
+  '(input: string, prefix: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      both null:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: null
+      negative:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: false
       null input:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      null prefix:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      positive:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(radians: double) -> double':
+  '(input: string, prefix: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      both null:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: null
+      negative:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: false
       null input:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      null prefix:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      positive:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(radians: double) -> double':
+  '(input: string, prefix: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      both null:
+        actualResult: true
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: true
+      negative:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: false
       null input:
-        actualResult: null
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: false
+      null prefix:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      positive:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(radians: double) -> double':
+  '(input: string, prefix: string) -> boolean':
     entries:
-      degrees(0):
+      both null:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI/2):
+      negative:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
       null input:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      null prefix:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      positive:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -142,29 +142,29 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(radians: double) -> double':
+  '(input: string, prefix: string) -> boolean':
     entries:
-      degrees(0):
+      both null:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI/2):
+      negative:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
       null input:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      null prefix:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      positive:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -172,62 +172,62 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(radians: double) -> double':
+  '(input: string, prefix: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      both null:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: null
+      negative:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: false
       null input:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      null prefix:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      positive:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(radians: double) -> double':
+  '(input: string, prefix: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      both null:
+        actualResult: true
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: true
+      negative:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: false
       null input:
-        actualResult: 0.0
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
+        expectedResult: false
+      null prefix:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      positive:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null

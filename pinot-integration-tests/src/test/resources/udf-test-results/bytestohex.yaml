@@ -22,28 +22,23 @@
 
 ---
 Ingestion time transformer:
-  '(radians: double) -> double':
+  '(bytes: bytes) -> string':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      CAFEBABE:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: "cafebabe"
+      cafebabe:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: "cafebabe"
+      f012be3c:
+        actualResult: "f012be3c"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: "f012be3c"
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -52,28 +47,23 @@ Ingestion time transformer:
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(radians: double) -> double':
+  '(bytes: bytes) -> string':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      CAFEBABE:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: "cafebabe"
+      cafebabe:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: "cafebabe"
+      f012be3c:
+        actualResult: "f012be3c"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: "f012be3c"
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -82,54 +72,44 @@ MSE intermediate stage (with null handling):
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(radians: double) -> double':
+  '(bytes: bytes) -> string':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      CAFEBABE:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: "cafebabe"
+      cafebabe:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: "cafebabe"
+      f012be3c:
+        actualResult: "f012be3c"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: "f012be3c"
       null input:
-        actualResult: null
+        actualResult: ""
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: ""
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(radians: double) -> double':
+  '(bytes: bytes) -> string':
     entries:
-      degrees(0):
+      CAFEBABE:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      cafebabe:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI/2):
+      f012be3c:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -142,24 +122,19 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(radians: double) -> double':
+  '(bytes: bytes) -> string':
     entries:
-      degrees(0):
+      CAFEBABE:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      cafebabe:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI/2):
+      f012be3c:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -172,28 +147,23 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(radians: double) -> double':
+  '(bytes: bytes) -> string':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      CAFEBABE:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: "cafebabe"
+      cafebabe:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: "cafebabe"
+      f012be3c:
+        actualResult: "f012be3c"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: "f012be3c"
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -202,32 +172,27 @@ SSE projection (with null handling):
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(radians: double) -> double':
+  '(bytes: bytes) -> string':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      CAFEBABE:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: "cafebabe"
+      cafebabe:
+        actualResult: "cafebabe"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: "cafebabe"
+      f012be3c:
+        actualResult: "f012be3c"
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: "f012be3c"
       null input:
-        actualResult: 0.0
+        actualResult: ""
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
+        expectedResult: ""
     error: false
     errorMessage: null

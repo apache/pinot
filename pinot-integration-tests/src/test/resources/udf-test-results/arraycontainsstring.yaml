@@ -22,119 +22,139 @@
 
 ---
 Ingestion time transformer:
-  '(radians: double) -> double':
+  '(array: ARRAY(string), value: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      empty array:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: false
+      null array:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: null
       null input:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      null value:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      value absent:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      value present:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(string), value: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      empty array:
+        actualResult: null
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: false
+      null array:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: null
       null input:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      null value:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      value absent:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      value present:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(string), value: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      empty array:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: false
+      null array:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: false
       null input:
-        actualResult: null
+        actualResult: true
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: false
+      null value:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: false
+      value absent:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      value present:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(string), value: string) -> boolean':
     entries:
-      degrees(0):
+      empty array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI/2):
+      null array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
       null input:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      null value:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      value absent:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      value present:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -142,29 +162,34 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(string), value: string) -> boolean':
     entries:
-      degrees(0):
+      empty array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI):
-        actualResult: true
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: true
-      degrees(PI/2):
+      null array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
       null input:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      null value:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      value absent:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      value present:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -172,62 +197,72 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(string), value: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      empty array:
+        actualResult: null
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: false
+      null array:
+        actualResult: null
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: null
       null input:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      null value:
+        actualResult: null
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: null
+      value absent:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      value present:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(string), value: string) -> boolean':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      empty array:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: false
+      null array:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
+        expectedResult: false
       null input:
-        actualResult: 0.0
+        actualResult: true
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: false
+      null value:
+        actualResult: false
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
+        expectedResult: false
+      value absent:
+        actualResult: false
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: false
+      value present:
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
     error: false
     errorMessage: null

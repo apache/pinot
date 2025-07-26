@@ -22,119 +22,119 @@
 
 ---
 Ingestion time transformer:
-  '(radians: double) -> double':
+  '(array: ARRAY(long)) -> long':
     entries:
-      degrees(0):
-        actualResult: 0.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
+      null array:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      sum array:
+        actualResult: 6
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 6
+      sum array with negatives:
+        actualResult: -2
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -2
+      sum empty array:
+        actualResult: 0
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 0
+      sum single element:
+        actualResult: 42
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 42
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(long)) -> long':
     entries:
-      degrees(0):
-        actualResult: 0.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
+      null array:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      sum array:
+        actualResult: 6
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 6
+      sum array with negatives:
+        actualResult: -2
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -2
+      sum empty array:
+        actualResult: null
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: 0
+      sum single element:
+        actualResult: 42
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 42
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(long)) -> long':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      null array:
+        actualResult: -9223372036854775808
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: 0
+      sum array:
+        actualResult: 6
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: 6
+      sum array with negatives:
+        actualResult: -2
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: -2
+      sum empty array:
+        actualResult: -9223372036854775808
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: 0
+      sum single element:
+        actualResult: 42
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
+        expectedResult: 42
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(long)) -> long':
     entries:
-      degrees(0):
+      null array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      sum array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
+      sum array with negatives:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI/2):
+      sum empty array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      null input:
+      sum single element:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -142,29 +142,29 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(long)) -> long':
     entries:
-      degrees(0):
+      null array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      sum array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
+      sum array with negatives:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI/2):
+      sum empty array:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      null input:
+      sum single element:
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -172,62 +172,62 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(long)) -> long':
     entries:
-      degrees(0):
-        actualResult: 0.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
+      null array:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      sum array:
+        actualResult: 6
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 6
+      sum array with negatives:
+        actualResult: -2
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -2
+      sum empty array:
+        actualResult: null
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: 0
+      sum single element:
+        actualResult: 42
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: 42
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(radians: double) -> double':
+  '(array: ARRAY(long)) -> long':
     entries:
-      degrees(0):
-        actualResult: 0.0
+      null array:
+        actualResult: -9223372036854775808
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: 0
+      sum array:
+        actualResult: 6
         equivalence: "EQUAL"
         error: null
-        expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+        expectedResult: 6
+      sum array with negatives:
+        actualResult: -2
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
+        expectedResult: -2
+      sum empty array:
+        actualResult: -9223372036854775808
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: 0
+      sum single element:
+        actualResult: 42
         equivalence: "EQUAL"
         error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
-        actualResult: 0.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 0.0
+        expectedResult: 42
     error: false
     errorMessage: null

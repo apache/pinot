@@ -128,8 +128,12 @@ public class BigDecimalUtils {
     return valueBytes;
   }
 
-  /**
-   * Deserializes a big decimal from a byte array.
+   /**
+    * Deserializes a `BigDecimal` from a byte array.
+    * The expected format is:
+    * - First 2 bytes: scale (big-endian, unsigned short)
+    * - Remaining bytes: unscaled value (big-endian two's complement, as per `BigInteger.toByteArray()`)
+    * This matches the serialization format used in `serialize(BigDecimal value)`.
    */
   public static BigDecimal deserialize(byte[] bytes) {
     int scale = (short) ((bytes[0] & 0xFF) << 8) | (bytes[1] & 0xFF);

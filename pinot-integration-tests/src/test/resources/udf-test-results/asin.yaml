@@ -22,119 +22,139 @@
 
 ---
 Ingestion time transformer:
-  '(radians: double) -> double':
+  '(value: double) -> double':
     entries:
-      degrees(0):
+      asin(-1):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      asin(0):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      asin(1):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: 1.5707963267948966
+      null value:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      out of range (negative):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
+      out of range (positive):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
     error: false
     errorMessage: null
 MSE intermediate stage (with null handling):
-  '(radians: double) -> double':
+  '(value: double) -> double':
     entries:
-      degrees(0):
+      asin(-1):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      asin(0):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      asin(1):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: 1.5707963267948966
+      null value:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      out of range (negative):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
+      out of range (positive):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
     error: false
     errorMessage: null
 MSE intermediate stage (without null handling):
-  '(radians: double) -> double':
+  '(value: double) -> double':
     entries:
-      degrees(0):
+      asin(-1):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      asin(0):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      asin(1):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: 1.5707963267948966
+      null value:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      out of range (negative):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
+      out of range (positive):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
     error: false
     errorMessage: null
 SSE predicate (with null handling):
-  '(radians: double) -> double':
+  '(value: double) -> double':
     entries:
-      degrees(0):
+      asin(-1):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      asin(0):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
+      asin(1):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI/2):
+      null value:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      null input:
+      out of range (negative):
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      out of range (positive):
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -142,29 +162,34 @@ SSE predicate (with null handling):
     error: false
     errorMessage: null
 SSE predicate (without null handling):
-  '(radians: double) -> double':
+  '(value: double) -> double':
     entries:
-      degrees(0):
+      asin(-1):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(2*PI):
+      asin(0):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI):
+      asin(1):
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      degrees(PI/2):
+      null value:
         actualResult: true
         equivalence: "EQUAL"
         error: null
         expectedResult: true
-      null input:
+      out of range (negative):
+        actualResult: true
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: true
+      out of range (positive):
         actualResult: true
         equivalence: "EQUAL"
         error: null
@@ -172,62 +197,72 @@ SSE predicate (without null handling):
     error: false
     errorMessage: null
 SSE projection (with null handling):
-  '(radians: double) -> double':
+  '(value: double) -> double':
     entries:
-      degrees(0):
+      asin(-1):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      asin(0):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      asin(1):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: 1.5707963267948966
+      null value:
         actualResult: null
         equivalence: "EQUAL"
         error: null
         expectedResult: null
+      out of range (negative):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
+      out of range (positive):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
     error: false
     errorMessage: null
 SSE projection (without null handling):
-  '(radians: double) -> double':
+  '(value: double) -> double':
     entries:
-      degrees(0):
+      asin(-1):
+        actualResult: -1.5707963267948966
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: -1.5707963267948966
+      asin(0):
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
-      degrees(2*PI):
-        actualResult: 360.0
+      asin(1):
+        actualResult: 1.5707963267948966
         equivalence: "EQUAL"
         error: null
-        expectedResult: 360.0
-      degrees(PI):
-        actualResult: 180.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 180.0
-      degrees(PI/2):
-        actualResult: 90.0
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: 90.0
-      null input:
+        expectedResult: 1.5707963267948966
+      null value:
         actualResult: 0.0
         equivalence: "EQUAL"
         error: null
         expectedResult: 0.0
+      out of range (negative):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
+      out of range (positive):
+        actualResult: NaN
+        equivalence: "EQUAL"
+        error: null
+        expectedResult: NaN
     error: false
     errorMessage: null
