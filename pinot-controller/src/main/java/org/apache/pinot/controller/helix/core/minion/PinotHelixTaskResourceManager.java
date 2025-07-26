@@ -794,8 +794,8 @@ public class PinotHelixTaskResourceManager {
    *
    * @param taskType           Pinot taskType / Helix JobQueue
    * @param state              State(s) to filter by. Can be single state or comma-separated multiple states
-   *                           (waiting, running, error, completed, dropped, timedOut, aborted, unknown, total).
-   *                           Can be null to skip state filtering.
+   *                           (NOT_STARTED, IN_PROGRESS, STOPPED, STOPPING, FAILED, COMPLETED, ABORTED, TIMED_OUT,
+   *                           TIMING_OUT, FAILING). Can be null to skip state filtering.
    * @param tableNameWithType  Table name with type to filter by. Only tasks that have subtasks for this table
    *                           will be returned. Can be null to skip table filtering.
    * @return Map of Pinot Task Name to TaskCount containing only tasks that match the specified filters
@@ -807,16 +807,22 @@ public class PinotHelixTaskResourceManager {
     }
 
     // Parse and validate comma-separated states if provided
-    Set<String> requestedStates = null;
+    Set<TaskState> requestedStates = null;
     if (state != null) {
       String[] stateArray = state.trim().split(",");
       requestedStates = new HashSet<>();
       for (String s : stateArray) {
-        String normalizedState = s.trim().toLowerCase();
+        String normalizedState = s.trim().toUpperCase();
         // Validate each state upfront
-        validateState(normalizedState);
-        requestedStates.add(normalizedState);
+        TaskState taskState = validateAndParseTaskState(normalizedState);
+        requestedStates.add(taskState);
       }
+    }
+
+    // Get all task states if we need to filter by state
+    Map<String, TaskState> taskStates = null;
+    if (requestedStates != null) {
+      taskStates = getTaskStates(taskType);
     }
 
     Map<String, TaskCount> taskCounts = new TreeMap<>();
@@ -824,8 +830,11 @@ public class PinotHelixTaskResourceManager {
       TaskCount taskCount = getTaskCount(taskName);
 
       // Apply state filtering if specified
-      if (requestedStates != null && !hasTasksInAnyState(taskCount, requestedStates)) {
-        continue;
+      if (requestedStates != null) {
+        TaskState currentTaskState = taskStates.get(taskName);
+        if (currentTaskState == null || !requestedStates.contains(currentTaskState)) {
+          continue;
+        }
       }
 
       // Apply table filtering if specified
@@ -839,81 +848,18 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
-   * Validates that a state is valid.
+   * Validates and parses a task state string into TaskState enum.
    *
-   * @param state State to validate (should be lowercase)
+   * @param state State string to validate (should be uppercase)
    * @throws IllegalArgumentException if the state is invalid
+   * @return TaskState enum value
    */
-  private void validateState(String state) {
-    switch (state) {
-      case "waiting":
-      case "running":
-      case "error":
-      case "completed":
-      case "dropped":
-      case "timedout":
-      case "aborted":
-      case "unknown":
-      case "total":
-        // Valid state
-        break;
-      default:
-        throw new IllegalArgumentException("Invalid state: " + state + ". Valid states are: waiting, running, "
-            + "error, completed, dropped, timedOut, aborted, unknown, total");
-    }
-  }
-
-  /**
-   * Helper method to check if a TaskCount has any tasks in any of the specified states.
-   *
-   * @param taskCount TaskCount to check
-   * @param states    Set of states to check for (already normalized to lowercase and validated)
-   * @return true if the TaskCount has > 0 tasks in any of the specified states
-   */
-  private boolean hasTasksInAnyState(TaskCount taskCount, Set<String> states) {
-    if (states == null || states.isEmpty()) {
-      return true;
-    }
-
-    for (String state : states) {
-      if (hasTasksInSingleState(taskCount, state)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * Helper method to check if a TaskCount has any tasks in a single specified state.
-   *
-   * @param taskCount TaskCount to check
-   * @param state     State to check for (should be lowercase and validated)
-   * @return true if the TaskCount has > 0 tasks in the specified state
-   */
-  private boolean hasTasksInSingleState(TaskCount taskCount, String state) {
-    switch (state) {
-      case "waiting":
-        return taskCount.getWaiting() > 0;
-      case "running":
-        return taskCount.getRunning() > 0;
-      case "error":
-        return taskCount.getError() > 0;
-      case "completed":
-        return taskCount.getCompleted() > 0;
-      case "dropped":
-        return taskCount.getDropped() > 0;
-      case "timedout":
-        return taskCount.getTimedOut() > 0;
-      case "aborted":
-        return taskCount.getAborted() > 0;
-      case "unknown":
-        return taskCount.getUnknown() > 0;
-      case "total":
-        return taskCount.getTotal() > 0;
-      default:
-        // This should never happen if validateState was called
-        throw new IllegalArgumentException("Invalid state: " + state + ". Valid states are: waiting, running, "
-            + "error, completed, dropped, timedOut, aborted, unknown, total");
+  private TaskState validateAndParseTaskState(String state) {
+    try {
+      return TaskState.valueOf(state);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Invalid state: " + state + ". Valid states are: "
+          + Arrays.toString(TaskState.values()));
     }
   }
 
