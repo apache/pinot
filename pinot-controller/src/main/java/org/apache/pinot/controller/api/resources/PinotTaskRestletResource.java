@@ -272,8 +272,8 @@ public class PinotTaskRestletResource {
   public Map<String, PinotHelixTaskResourceManager.TaskCount> getTaskCounts(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Task state(s) to filter by. Can be single state or comma-separated multiple states "
-          + "(waiting, running, error, completed, dropped, timedOut, aborted, unknown, total). "
-          + "Example: 'running' or 'running,error,waiting'")
+          + "(NOT_STARTED, IN_PROGRESS, STOPPED, STOPPING, FAILED, COMPLETED, ABORTED, TIMED_OUT, TIMING_OUT, "
+          + "FAILING). Example: 'IN_PROGRESS' or 'IN_PROGRESS,FAILED,STOPPING'")
       @QueryParam("state") @Nullable String state,
       @ApiParam(value = "Table name with type (e.g., 'myTable_OFFLINE') to filter tasks by table. "
           + "Only tasks that have subtasks for this table will be returned.")

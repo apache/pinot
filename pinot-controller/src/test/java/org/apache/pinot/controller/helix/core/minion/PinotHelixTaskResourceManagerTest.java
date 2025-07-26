@@ -53,12 +53,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.fail;
+import static org.testng.Assert.*;
 
 
 public class PinotHelixTaskResourceManagerTest {
@@ -685,55 +680,34 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
     when(spyMgr.getTasks(taskType)).thenReturn(tasks);
 
-    // Mock JobConfig and JobContext for first task (has running tasks)
-    String helixJobName1 = PinotHelixTaskResourceManager.getHelixJobName(taskName1);
-    JobConfig jobConfig1 = mock(JobConfig.class);
-    when(taskDriver.getJobConfig(helixJobName1)).thenReturn(jobConfig1);
-    Map<String, TaskConfig> taskConfigMap1 = new HashMap<>();
-    taskConfigMap1.put("taskId0", new TaskConfig("", new HashMap<>()));
-    taskConfigMap1.put("taskId1", new TaskConfig("", new HashMap<>()));
-    when(jobConfig1.getTaskConfigMap()).thenReturn(taskConfigMap1);
-    JobContext jobContext1 = mock(JobContext.class);
-    when(taskDriver.getJobContext(helixJobName1)).thenReturn(jobContext1);
-    Map<String, Integer> taskIdPartitionMap1 = new HashMap<>();
-    taskIdPartitionMap1.put("taskId0", 0);
-    taskIdPartitionMap1.put("taskId1", 1);
-    when(jobContext1.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap1);
-    when(jobContext1.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
-    when(jobContext1.getPartitionState(1)).thenReturn(TaskPartitionState.COMPLETED);
+    // Mock getTaskStates to return task states
+    Map<String, TaskState> taskStates = new HashMap<>();
+    taskStates.put(taskName1, TaskState.IN_PROGRESS);
+    taskStates.put(taskName2, TaskState.COMPLETED);
+    when(spyMgr.getTaskStates(taskType)).thenReturn(taskStates);
 
-    // Mock JobConfig and JobContext for second task (has only completed tasks)
-    String helixJobName2 = PinotHelixTaskResourceManager.getHelixJobName(taskName2);
-    JobConfig jobConfig2 = mock(JobConfig.class);
-    when(taskDriver.getJobConfig(helixJobName2)).thenReturn(jobConfig2);
-    Map<String, TaskConfig> taskConfigMap2 = new HashMap<>();
-    taskConfigMap2.put("taskId0", new TaskConfig("", new HashMap<>()));
-    taskConfigMap2.put("taskId1", new TaskConfig("", new HashMap<>()));
-    when(jobConfig2.getTaskConfigMap()).thenReturn(taskConfigMap2);
-    JobContext jobContext2 = mock(JobContext.class);
-    when(taskDriver.getJobContext(helixJobName2)).thenReturn(jobContext2);
-    Map<String, Integer> taskIdPartitionMap2 = new HashMap<>();
-    taskIdPartitionMap2.put("taskId0", 0);
-    taskIdPartitionMap2.put("taskId1", 1);
-    when(jobContext2.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap2);
-    when(jobContext2.getPartitionState(0)).thenReturn(TaskPartitionState.COMPLETED);
-    when(jobContext2.getPartitionState(1)).thenReturn(TaskPartitionState.COMPLETED);
+    // Mock JobConfig and JobContext for both tasks
+    mockTaskJobConfigAndContext(taskDriver, taskName1, TaskPartitionState.RUNNING);
+    mockTaskJobConfigAndContext(taskDriver, taskName2, TaskPartitionState.COMPLETED);
 
-    // Test filter by "running" - should only return taskName1
-    Map<String, PinotHelixTaskResourceManager.TaskCount> runningTasks = spyMgr.getTaskCounts(taskType, "running");
-    assertEquals(runningTasks.size(), 1);
-    assertTrue(runningTasks.containsKey(taskName1));
-    assertFalse(runningTasks.containsKey(taskName2));
+    // Test filter by "IN_PROGRESS" - should only return taskName1
+    Map<String, PinotHelixTaskResourceManager.TaskCount> inProgressTasks =
+        spyMgr.getTaskCounts(taskType, "IN_PROGRESS", null);
+    assertEquals(inProgressTasks.size(), 1);
+    assertTrue(inProgressTasks.containsKey(taskName1));
+    assertFalse(inProgressTasks.containsKey(taskName2));
 
-    // Test filter by "completed" - should return both tasks
-    Map<String, PinotHelixTaskResourceManager.TaskCount> completedTasks = spyMgr.getTaskCounts(taskType, "completed");
-    assertEquals(completedTasks.size(), 2);
-    assertTrue(completedTasks.containsKey(taskName1));
+    // Test filter by "COMPLETED" - should only return taskName2
+    Map<String, PinotHelixTaskResourceManager.TaskCount> completedTasks =
+        spyMgr.getTaskCounts(taskType, "COMPLETED", null);
+    assertEquals(completedTasks.size(), 1);
+    assertFalse(completedTasks.containsKey(taskName1));
     assertTrue(completedTasks.containsKey(taskName2));
 
-    // Test filter by "error" - should return no tasks
-    Map<String, PinotHelixTaskResourceManager.TaskCount> errorTasks = spyMgr.getTaskCounts(taskType, "error");
-    assertEquals(errorTasks.size(), 0);
+    // Test filter by "FAILED" - should return no tasks
+    Map<String, PinotHelixTaskResourceManager.TaskCount> failedTasks =
+        spyMgr.getTaskCounts(taskType, "FAILED", null);
+    assertEquals(failedTasks.size(), 0);
   }
 
   @Test
@@ -755,72 +729,42 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
     when(spyMgr.getTasks(taskType)).thenReturn(tasks);
 
-    // Mock JobConfig and JobContext for first task (has running tasks)
-    String helixJobName1 = PinotHelixTaskResourceManager.getHelixJobName(taskName1);
-    JobConfig jobConfig1 = mock(JobConfig.class);
-    when(taskDriver.getJobConfig(helixJobName1)).thenReturn(jobConfig1);
-    Map<String, TaskConfig> taskConfigMap1 = new HashMap<>();
-    taskConfigMap1.put("taskId0", new TaskConfig("", new HashMap<>()));
-    when(jobConfig1.getTaskConfigMap()).thenReturn(taskConfigMap1);
-    JobContext jobContext1 = mock(JobContext.class);
-    when(taskDriver.getJobContext(helixJobName1)).thenReturn(jobContext1);
-    Map<String, Integer> taskIdPartitionMap1 = new HashMap<>();
-    taskIdPartitionMap1.put("taskId0", 0);
-    when(jobContext1.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap1);
-    when(jobContext1.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
+    // Mock getTaskStates to return different task states
+    Map<String, TaskState> taskStates = new HashMap<>();
+    taskStates.put(taskName1, TaskState.IN_PROGRESS);
+    taskStates.put(taskName2, TaskState.FAILED);
+    taskStates.put(taskName3, TaskState.COMPLETED);
+    when(spyMgr.getTaskStates(taskType)).thenReturn(taskStates);
 
-    // Mock JobConfig and JobContext for second task (has error tasks)
-    String helixJobName2 = PinotHelixTaskResourceManager.getHelixJobName(taskName2);
-    JobConfig jobConfig2 = mock(JobConfig.class);
-    when(taskDriver.getJobConfig(helixJobName2)).thenReturn(jobConfig2);
-    Map<String, TaskConfig> taskConfigMap2 = new HashMap<>();
-    taskConfigMap2.put("taskId0", new TaskConfig("", new HashMap<>()));
-    when(jobConfig2.getTaskConfigMap()).thenReturn(taskConfigMap2);
-    JobContext jobContext2 = mock(JobContext.class);
-    when(taskDriver.getJobContext(helixJobName2)).thenReturn(jobContext2);
-    Map<String, Integer> taskIdPartitionMap2 = new HashMap<>();
-    taskIdPartitionMap2.put("taskId0", 0);
-    when(jobContext2.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap2);
-    when(jobContext2.getPartitionState(0)).thenReturn(TaskPartitionState.TASK_ERROR);
+    // Mock JobConfig and JobContext for all tasks
+    mockTaskJobConfigAndContext(taskDriver, taskName1, TaskPartitionState.RUNNING);
+    mockTaskJobConfigAndContext(taskDriver, taskName2, TaskPartitionState.TASK_ERROR);
+    mockTaskJobConfigAndContext(taskDriver, taskName3, TaskPartitionState.COMPLETED);
 
-    // Mock JobConfig and JobContext for third task (has only completed tasks)
-    String helixJobName3 = PinotHelixTaskResourceManager.getHelixJobName(taskName3);
-    JobConfig jobConfig3 = mock(JobConfig.class);
-    when(taskDriver.getJobConfig(helixJobName3)).thenReturn(jobConfig3);
-    Map<String, TaskConfig> taskConfigMap3 = new HashMap<>();
-    taskConfigMap3.put("taskId0", new TaskConfig("", new HashMap<>()));
-    when(jobConfig3.getTaskConfigMap()).thenReturn(taskConfigMap3);
-    JobContext jobContext3 = mock(JobContext.class);
-    when(taskDriver.getJobContext(helixJobName3)).thenReturn(jobContext3);
-    Map<String, Integer> taskIdPartitionMap3 = new HashMap<>();
-    taskIdPartitionMap3.put("taskId0", 0);
-    when(jobContext3.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap3);
-    when(jobContext3.getPartitionState(0)).thenReturn(TaskPartitionState.COMPLETED);
+    // Test filter by "IN_PROGRESS,FAILED" - should return taskName1 and taskName2
+    Map<String, PinotHelixTaskResourceManager.TaskCount> inProgressOrFailedTasks =
+        spyMgr.getTaskCounts(taskType, "IN_PROGRESS,FAILED", null);
+    assertEquals(inProgressOrFailedTasks.size(), 2);
+    assertTrue(inProgressOrFailedTasks.containsKey(taskName1));
+    assertTrue(inProgressOrFailedTasks.containsKey(taskName2));
+    assertFalse(inProgressOrFailedTasks.containsKey(taskName3));
 
-    // Test filter by "running,error" - should return taskName1 and taskName2
-    Map<String, PinotHelixTaskResourceManager.TaskCount> runningOrErrorTasks =
-        spyMgr.getTaskCounts(taskType, "running,error");
-    assertEquals(runningOrErrorTasks.size(), 2);
-    assertTrue(runningOrErrorTasks.containsKey(taskName1));
-    assertTrue(runningOrErrorTasks.containsKey(taskName2));
-    assertFalse(runningOrErrorTasks.containsKey(taskName3));
+    // Test filter by "COMPLETED,IN_PROGRESS" - should return taskName1 and taskName3
+    Map<String, PinotHelixTaskResourceManager.TaskCount> completedOrInProgressTasks =
+        spyMgr.getTaskCounts(taskType, "COMPLETED,IN_PROGRESS", null);
+    assertEquals(completedOrInProgressTasks.size(), 2);
+    assertTrue(completedOrInProgressTasks.containsKey(taskName1));
+    assertFalse(completedOrInProgressTasks.containsKey(taskName2));
+    assertTrue(completedOrInProgressTasks.containsKey(taskName3));
 
-    // Test filter by "completed,running" - should return taskName1 and taskName3
-    Map<String, PinotHelixTaskResourceManager.TaskCount> completedOrRunningTasks =
-        spyMgr.getTaskCounts(taskType, "completed,running");
-    assertEquals(completedOrRunningTasks.size(), 2);
-    assertTrue(completedOrRunningTasks.containsKey(taskName1));
-    assertFalse(completedOrRunningTasks.containsKey(taskName2));
-    assertTrue(completedOrRunningTasks.containsKey(taskName3));
+    // Test filter by "NOT_STARTED,STOPPED" - should return no tasks
+    Map<String, PinotHelixTaskResourceManager.TaskCount> notStartedOrStoppedTasks =
+        spyMgr.getTaskCounts(taskType, "NOT_STARTED,STOPPED", null);
+    assertEquals(notStartedOrStoppedTasks.size(), 0);
 
-    // Test filter by "waiting,dropped" - should return no tasks
-    Map<String, PinotHelixTaskResourceManager.TaskCount> waitingOrDroppedTasks =
-        spyMgr.getTaskCounts(taskType, "waiting,dropped");
-    assertEquals(waitingOrDroppedTasks.size(), 0);
-
-    // Test filter with spaces "running, error, completed" - should return all three
+    // Test filter with spaces "IN_PROGRESS, FAILED, COMPLETED" - should return all three
     Map<String, PinotHelixTaskResourceManager.TaskCount> allTasks =
-        spyMgr.getTaskCounts(taskType, "running, error, completed");
+        spyMgr.getTaskCounts(taskType, "IN_PROGRESS, FAILED, COMPLETED", null);
     assertEquals(allTasks.size(), 3);
     assertTrue(allTasks.containsKey(taskName1));
     assertTrue(allTasks.containsKey(taskName2));
@@ -843,33 +787,22 @@ public class PinotHelixTaskResourceManagerTest {
     when(spyMgr.getTasks(taskType)).thenReturn(tasks);
 
     // Mock JobConfig and JobContext for the task
-    String helixJobName1 = PinotHelixTaskResourceManager.getHelixJobName(taskName1);
-    JobConfig jobConfig1 = mock(JobConfig.class);
-    when(taskDriver.getJobConfig(helixJobName1)).thenReturn(jobConfig1);
-    Map<String, TaskConfig> taskConfigMap1 = new HashMap<>();
-    taskConfigMap1.put("taskId0", new TaskConfig("", new HashMap<>()));
-    when(jobConfig1.getTaskConfigMap()).thenReturn(taskConfigMap1);
-    JobContext jobContext1 = mock(JobContext.class);
-    when(taskDriver.getJobContext(helixJobName1)).thenReturn(jobContext1);
-    Map<String, Integer> taskIdPartitionMap1 = new HashMap<>();
-    taskIdPartitionMap1.put("taskId0", 0);
-    when(jobContext1.getTaskIdPartitionMap()).thenReturn(taskIdPartitionMap1);
-    when(jobContext1.getPartitionState(0)).thenReturn(TaskPartitionState.RUNNING);
+    mockTaskJobConfigAndContext(taskDriver, taskName1, TaskPartitionState.RUNNING);
 
     // Test with invalid single state
     try {
-      spyMgr.getTaskCounts(taskType, "invalid_state");
+      spyMgr.getTaskCounts(taskType, "INVALID_STATE", null);
       fail("Expected IllegalArgumentException for invalid state");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Invalid state: invalid_state"));
+      assertTrue(e.getMessage().contains("Invalid state: INVALID_STATE"));
     }
 
     // Test with mixed valid and invalid states
     try {
-      spyMgr.getTaskCounts(taskType, "running,invalid_state,completed");
+      spyMgr.getTaskCounts(taskType, "IN_PROGRESS,INVALID_STATE,COMPLETED", null);
       fail("Expected IllegalArgumentException for invalid state in multiple states");
     } catch (IllegalArgumentException e) {
-      assertTrue(e.getMessage().contains("Invalid state: invalid_state"));
+      assertTrue(e.getMessage().contains("Invalid state: INVALID_STATE"));
     }
   }
 
@@ -950,6 +883,13 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
     when(spyMgr.getTasks(taskType)).thenReturn(tasks);
 
+    // Mock getTaskStates to return different task states
+    Map<String, TaskState> taskStates = new HashMap<>();
+    taskStates.put(taskName1, TaskState.IN_PROGRESS);  // table1
+    taskStates.put(taskName2, TaskState.COMPLETED);    // table1
+    taskStates.put(taskName3, TaskState.IN_PROGRESS);  // table2
+    when(spyMgr.getTaskStates(taskType)).thenReturn(taskStates);
+
     // Mock JobConfig and JobContext - different states for each task
     mockTaskJobConfigAndContext(taskDriver, taskName1, TaskPartitionState.RUNNING);   // table1
     mockTaskJobConfigAndContext(taskDriver, taskName2, TaskPartitionState.COMPLETED); // table1
@@ -976,7 +916,7 @@ public class PinotHelixTaskResourceManagerTest {
 
     // Test filter by running state and table1 - should only return taskName1
     Map<String, PinotHelixTaskResourceManager.TaskCount> runningTable1Tasks =
-        spyMgr.getTaskCounts(taskType, "running", table1);
+        spyMgr.getTaskCounts(taskType, "IN_PROGRESS", table1);
     assertEquals(runningTable1Tasks.size(), 1);
     assertTrue(runningTable1Tasks.containsKey(taskName1));
     assertFalse(runningTable1Tasks.containsKey(taskName2));
@@ -984,7 +924,7 @@ public class PinotHelixTaskResourceManagerTest {
 
     // Test filter by completed state and table1 - should only return taskName2
     Map<String, PinotHelixTaskResourceManager.TaskCount> completedTable1Tasks =
-        spyMgr.getTaskCounts(taskType, "completed", table1);
+        spyMgr.getTaskCounts(taskType, "COMPLETED", table1);
     assertEquals(completedTable1Tasks.size(), 1);
     assertFalse(completedTable1Tasks.containsKey(taskName1));
     assertTrue(completedTable1Tasks.containsKey(taskName2));
@@ -992,7 +932,7 @@ public class PinotHelixTaskResourceManagerTest {
 
     // Test filter by running state and table2 - should only return taskName3
     Map<String, PinotHelixTaskResourceManager.TaskCount> runningTable2Tasks =
-        spyMgr.getTaskCounts(taskType, "running", table2);
+        spyMgr.getTaskCounts(taskType, "IN_PROGRESS", table2);
     assertEquals(runningTable2Tasks.size(), 1);
     assertFalse(runningTable2Tasks.containsKey(taskName1));
     assertFalse(runningTable2Tasks.containsKey(taskName2));
@@ -1000,12 +940,12 @@ public class PinotHelixTaskResourceManagerTest {
 
     // Test filter by completed state and table2 - should return no tasks
     Map<String, PinotHelixTaskResourceManager.TaskCount> completedTable2Tasks =
-        spyMgr.getTaskCounts(taskType, "completed", table2);
+        spyMgr.getTaskCounts(taskType, "COMPLETED", table2);
     assertEquals(completedTable2Tasks.size(), 0);
 
     // Test filter by multiple states and table1 - should return taskName1 and taskName2
     Map<String, PinotHelixTaskResourceManager.TaskCount> multiStateTable1Tasks =
-        spyMgr.getTaskCounts(taskType, "running,completed", table1);
+        spyMgr.getTaskCounts(taskType, "IN_PROGRESS,COMPLETED", table1);
     assertEquals(multiStateTable1Tasks.size(), 2);
     assertTrue(multiStateTable1Tasks.containsKey(taskName1));
     assertTrue(multiStateTable1Tasks.containsKey(taskName2));
