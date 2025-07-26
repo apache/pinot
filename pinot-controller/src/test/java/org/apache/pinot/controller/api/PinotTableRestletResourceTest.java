@@ -1165,6 +1165,10 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder()
         .forResumeMinionTaskQueue(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE));
 
+    // Explicitly delete the stopped task to ensure it's completely cleaned up
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forDeleteMinionTask(taskName)
+        + "?forceDelete=true");
+
     // Delete table - should succeed and clean up tasks
     String deleteResponse = sendDeleteRequest(
         DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableDelete(tableName));
