@@ -151,7 +151,18 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
     }
     return set;
   }
+//
+//  @Override
+//  public Collection<Record> values() {
+//    List<Record>[] payloads = new List[_numPartitions];
+//    int idx = 0;
+//    for (TwoLevelLinearProbingRecordHashMap map : _maps) {
+//      payloads[idx++] = map.getPayloads();
+//    }
+//    return new FlatViewList<>(payloads);
+//  }
 
+  // TODO: investigate why reduce time increased, even doubled
   @Override
   public Collection<Record> values() {
     List<Record> list = new ArrayList<>(_size);

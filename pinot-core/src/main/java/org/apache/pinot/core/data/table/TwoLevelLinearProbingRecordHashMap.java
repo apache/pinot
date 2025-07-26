@@ -298,12 +298,13 @@ public class TwoLevelLinearProbingRecordHashMap {
   }
 
   public List<Record> values() {
-    List<Record> values = new ArrayList<>(_size);
+    Record[] values = new Record[_size];
     Iterator<IntermediateRecord> it = iterator();
+    int idx = 0;
     while (it.hasNext()) {
-      values.add(it.next()._record);
+      values[idx++] = it.next()._record;
     }
-    return values;
+    return Arrays.asList(values);
   }
 
   public List<Key> keys() {

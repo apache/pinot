@@ -93,13 +93,13 @@ public class BenchmarkPartitionedCombineGroupBy {
   }
 
   @Param({"20", "50"})
-//  @Param({"20"})
+//  @Param({"200"})
   private int _numSegments;
   @Param({"1000", "10000"})
-//  @Param({"1000"})
+//  @Param({"10000"})
   private int _numRecordsPerSegment;
   @Param({"500", "1000000000"})
-//  @Param({"500"})
+//  @Param({"1000000000"})
   private int _limit;
 
   //  @Param({"3", "4"})
@@ -239,9 +239,9 @@ public class BenchmarkPartitionedCombineGroupBy {
   // ----------------
   // curr approach
 
-  @Benchmark
-  @BenchmarkMode(Mode.AverageTime)
-  @OutputTimeUnit(TimeUnit.MICROSECONDS)
+//  @Benchmark
+//  @BenchmarkMode(Mode.AverageTime)
+//  @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void partitionedCombineGroupBy(Blackhole blackhole)
       throws InterruptedException, ExecutionException, TimeoutException {
     final AtomicInteger nextSegmentId = new AtomicInteger(0);
