@@ -19,6 +19,7 @@
 package org.apache.pinot.controller;
 
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.commons.configuration2.Configuration;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
@@ -37,6 +39,7 @@ import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
+import org.apache.pinot.tsdb.spi.PinotTimeSeriesConfiguration;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_CONTROLLER_METRICS_PREFIX;
 import static org.apache.pinot.spi.utils.CommonConstants.Controller.CONFIG_OF_INSTANCE_ID;
@@ -1332,5 +1335,20 @@ public class ControllerConf extends PinotConfiguration {
 
   public int getMaxForceCommitZkJobs() {
     return getProperty(CONFIG_OF_MAX_FORCE_COMMIT_JOBS_IN_ZK, ControllerJob.DEFAULT_MAXIMUM_CONTROLLER_JOBS_IN_ZK);
+  }
+
+  /**
+   * Get the configured timeseries languages from controller configuration.
+   * @return List of enabled timeseries languages
+   */
+  public List<String> getTimeseriesLanguages() {
+    String languagesConfig = getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey());
+    if (languagesConfig == null) {
+      return new ArrayList<>();
+    }
+    return Arrays.stream(languagesConfig.split(","))
+        .map(String::trim)
+        .filter(lang -> !lang.isEmpty())
+        .collect(Collectors.toList());
   }
 }
