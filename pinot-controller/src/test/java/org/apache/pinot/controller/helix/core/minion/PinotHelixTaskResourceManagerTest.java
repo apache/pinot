@@ -32,10 +32,12 @@ import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.JobContext;
+import org.apache.helix.task.JobDag;
 import org.apache.helix.task.TaskConfig;
 import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskPartitionState;
 import org.apache.helix.task.TaskState;
+import org.apache.helix.task.WorkflowConfig;
 import org.apache.helix.task.WorkflowContext;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
@@ -680,11 +682,24 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
     when(spyMgr.getTasks(taskType)).thenReturn(tasks);
 
-    // Mock getTaskStates to return task states
-    Map<String, TaskState> taskStates = new HashMap<>();
-    taskStates.put(taskName1, TaskState.IN_PROGRESS);
-    taskStates.put(taskName2, TaskState.COMPLETED);
-    when(spyMgr.getTaskStates(taskType)).thenReturn(taskStates);
+    // Mock workflow-level components for getTaskStates
+    String helixJobQueueName = "TaskQueue_" + taskType;
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig(helixJobQueueName)).thenReturn(workflowConfig);
+
+    JobDag jobDag = mock(JobDag.class);
+    Set<String> helixJobs = new HashSet<>();
+    helixJobs.add(PinotHelixTaskResourceManager.getHelixJobName(taskName1));
+    helixJobs.add(PinotHelixTaskResourceManager.getHelixJobName(taskName2));
+    when(jobDag.getAllNodes()).thenReturn(helixJobs);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+    Map<String, TaskState> jobStatesMap = new HashMap<>();
+    jobStatesMap.put(PinotHelixTaskResourceManager.getHelixJobName(taskName1), TaskState.IN_PROGRESS);
+    jobStatesMap.put(PinotHelixTaskResourceManager.getHelixJobName(taskName2), TaskState.COMPLETED);
+    when(workflowContext.getJobStates()).thenReturn(jobStatesMap);
 
     // Mock JobConfig and JobContext for both tasks
     mockTaskJobConfigAndContext(taskDriver, taskName1, TaskPartitionState.RUNNING);
@@ -729,12 +744,26 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
     when(spyMgr.getTasks(taskType)).thenReturn(tasks);
 
-    // Mock getTaskStates to return different task states
-    Map<String, TaskState> taskStates = new HashMap<>();
-    taskStates.put(taskName1, TaskState.IN_PROGRESS);
-    taskStates.put(taskName2, TaskState.FAILED);
-    taskStates.put(taskName3, TaskState.COMPLETED);
-    when(spyMgr.getTaskStates(taskType)).thenReturn(taskStates);
+    // Mock workflow-level components for getTaskStates
+    String helixJobQueueName = "TaskQueue_" + taskType;
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig(helixJobQueueName)).thenReturn(workflowConfig);
+
+    JobDag jobDag = mock(JobDag.class);
+    Set<String> helixJobs = new HashSet<>();
+    helixJobs.add(PinotHelixTaskResourceManager.getHelixJobName(taskName1));
+    helixJobs.add(PinotHelixTaskResourceManager.getHelixJobName(taskName2));
+    helixJobs.add(PinotHelixTaskResourceManager.getHelixJobName(taskName3));
+    when(jobDag.getAllNodes()).thenReturn(helixJobs);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+    Map<String, TaskState> jobStatesMap = new HashMap<>();
+    jobStatesMap.put(PinotHelixTaskResourceManager.getHelixJobName(taskName1), TaskState.IN_PROGRESS);
+    jobStatesMap.put(PinotHelixTaskResourceManager.getHelixJobName(taskName2), TaskState.FAILED);
+    jobStatesMap.put(PinotHelixTaskResourceManager.getHelixJobName(taskName3), TaskState.COMPLETED);
+    when(workflowContext.getJobStates()).thenReturn(jobStatesMap);
 
     // Mock JobConfig and JobContext for all tasks
     mockTaskJobConfigAndContext(taskDriver, taskName1, TaskPartitionState.RUNNING);
@@ -883,12 +912,26 @@ public class PinotHelixTaskResourceManagerTest {
     PinotHelixTaskResourceManager spyMgr = Mockito.spy(mgr);
     when(spyMgr.getTasks(taskType)).thenReturn(tasks);
 
-    // Mock getTaskStates to return different task states
-    Map<String, TaskState> taskStates = new HashMap<>();
-    taskStates.put(taskName1, TaskState.IN_PROGRESS);  // table1
-    taskStates.put(taskName2, TaskState.COMPLETED);    // table1
-    taskStates.put(taskName3, TaskState.IN_PROGRESS);  // table2
-    when(spyMgr.getTaskStates(taskType)).thenReturn(taskStates);
+    // Mock workflow-level components for getTaskStates
+    String helixJobQueueName = "TaskQueue_" + taskType;
+    WorkflowConfig workflowConfig = mock(WorkflowConfig.class);
+    when(taskDriver.getWorkflowConfig(helixJobQueueName)).thenReturn(workflowConfig);
+
+    JobDag jobDag = mock(JobDag.class);
+    Set<String> helixJobs = new HashSet<>();
+    helixJobs.add(PinotHelixTaskResourceManager.getHelixJobName(taskName1));
+    helixJobs.add(PinotHelixTaskResourceManager.getHelixJobName(taskName2));
+    helixJobs.add(PinotHelixTaskResourceManager.getHelixJobName(taskName3));
+    when(jobDag.getAllNodes()).thenReturn(helixJobs);
+    when(workflowConfig.getJobDag()).thenReturn(jobDag);
+
+    WorkflowContext workflowContext = mock(WorkflowContext.class);
+    when(taskDriver.getWorkflowContext(helixJobQueueName)).thenReturn(workflowContext);
+    Map<String, TaskState> jobStatesMap = new HashMap<>();
+    jobStatesMap.put(PinotHelixTaskResourceManager.getHelixJobName(taskName1), TaskState.IN_PROGRESS); // table1
+    jobStatesMap.put(PinotHelixTaskResourceManager.getHelixJobName(taskName2), TaskState.COMPLETED);   // table1
+    jobStatesMap.put(PinotHelixTaskResourceManager.getHelixJobName(taskName3), TaskState.IN_PROGRESS); // table2
+    when(workflowContext.getJobStates()).thenReturn(jobStatesMap);
 
     // Mock JobConfig and JobContext - different states for each task
     mockTaskJobConfigAndContext(taskDriver, taskName1, TaskPartitionState.RUNNING);   // table1
