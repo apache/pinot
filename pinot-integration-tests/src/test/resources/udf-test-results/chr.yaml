@@ -101,13 +101,13 @@ SSE predicate (with null handling):
     entries: null
     error: true
     errorMessage: "\"Caught exception while doing operator: class org.apache.pinot.core.operator.query.SelectionOnlyOperator\
-      \ on segment udf_test_%: Not a valid Unicode code point: 0x12345678\""
+      \ on segment udf_test_%: Not a valid Unicode code point: 0xFFFFFFFD\""
 SSE predicate (without null handling):
   '(codePoint: int) -> string':
     entries: null
     error: true
     errorMessage: "\"Caught exception while doing operator: class org.apache.pinot.core.operator.query.SelectionOnlyOperator\
-      \ on segment udf_test_%: Not a valid Unicode code point: 0x12345678\""
+      \ on segment udf_test_%: Not a valid Unicode code point: 0xFFFFFFFD\""
 SSE projection (with null handling):
   '(codePoint: int) -> string':
     entries:
