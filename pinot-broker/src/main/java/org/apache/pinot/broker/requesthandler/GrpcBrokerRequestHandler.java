@@ -42,6 +42,7 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.transport.TableRouteInfo;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.query.QueryThreadContext;
@@ -64,8 +65,8 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   // TODO: Support TLS
   public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
-      FailureDetector failureDetector) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
+      FailureDetector failureDetector, ThreadResourceUsageAccountant accountant) {
+    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
     _streamingReduceService = new StreamingReduceService(config);
     _streamingQueryClient = new PinotServerStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
     _failureDetector = failureDetector;
@@ -142,7 +143,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
             streamingResponse);
       } catch (Exception e) {
         LOGGER.warn("Failed to send request {} to server: {}", requestId, serverInstance.getInstanceId(), e);
-        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId(), serverInstance.getHostname());
       }
     }
   }

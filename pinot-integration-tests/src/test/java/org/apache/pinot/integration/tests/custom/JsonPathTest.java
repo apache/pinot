@@ -212,7 +212,7 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
       Assert.assertEquals(k4.get("k4-k1"), "value-k4-k1-" + i);
       Assert.assertEquals(k4.get("k4-k2"), "value-k4-k2-" + i);
       Assert.assertEquals(k4.get("k4-k3"), "value-k4-k3-" + i);
-      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), (double) i);
+      Assert.assertEquals(Double.parseDouble(k4.get("met").toString()), i);
     }
 
     //Filter Query
@@ -367,5 +367,229 @@ public class JsonPathTest extends CustomDataQueryClusterIntegrationTest {
     Cache cache = CacheProvider.getCache();
     Assert.assertTrue(cache instanceof JsonPathCache);
     Assert.assertTrue(((JsonPathCache) cache).size() > 0);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonKeysQueries(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+    String query = "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1') FROM " + getTableName() + " LIMIT 1";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    // JsonPath returns keys in JsonPath format like "$['key']"
+    JsonNode keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() > 0);
+
+    query = "SELECT jsonExtractKey(complexMapStr, '$.*', 'maxDepth=2') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() > 0);
+
+    query = "SELECT jsonExtractKey(complexMapStr, '$.*', 'maxDepth=3') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() > 0);
+  }
+
+  @Test(dataProvider = "useBothQueryEngines")
+  public void testJsonKeysQueriesWithDotNotation(boolean useMultiStageQueryEngine)
+      throws Exception {
+    setUseMultiStageQueryEngine(useMultiStageQueryEngine);
+
+    // Test optional parameter jsonExtractKey with dotNotation=true (simple JSON)
+    String query =
+        "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1; dotNotation=true') FROM " + getTableName() + " LIMIT 1";
+    JsonNode pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    JsonNode rows = pinotResponse.get("resultTable").get("rows");
+    Assert.assertEquals(rows.size(), 1);
+    JsonNode row = rows.get(0);
+    Assert.assertEquals(row.size(), 1);
+    JsonNode keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertEquals(keys.size(), 2); // k1, k2
+    // Should contain simple key names, not JsonPath format
+    List<String> keyList = new ArrayList<>();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    Assert.assertTrue(keyList.contains("k1"));
+    Assert.assertTrue(keyList.contains("k2"));
+    // Should NOT contain JsonPath format like "$['k1']"
+    Assert.assertFalse(keyList.contains("$['k1']"));
+    Assert.assertFalse(keyList.contains("$['k2']"));
+
+    // Test optional parameter jsonExtractKey with dotNotation=false (JsonPath format)
+    query =
+        "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1; dotNotation=false') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertEquals(keys.size(), 2);
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain JsonPath format
+    Assert.assertTrue(keyList.contains("$['k1']"));
+    Assert.assertTrue(keyList.contains("$['k2']"));
+
+    // Test recursive key extraction with dot notation on complex JSON
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=2; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() >= 4); // At least k1, k2, k3, k4
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain top-level keys in dot notation
+    Assert.assertTrue(keyList.contains("k1"));
+    Assert.assertTrue(keyList.contains("k2"));
+    Assert.assertTrue(keyList.contains("k3"));
+    Assert.assertTrue(keyList.contains("k4"));
+
+    // Test recursive key extraction with JsonPath format
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=2; dotNotation=false') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain JsonPath format
+    Assert.assertTrue(keyList.contains("$['k1']"));
+    Assert.assertTrue(keyList.contains("$['k2']"));
+    Assert.assertTrue(keyList.contains("$['k3']"));
+    Assert.assertTrue(keyList.contains("$['k4']"));
+
+    // Test deeper recursive extraction with dot notation
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=3; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertTrue(keys.size() > 4); // Should include nested keys
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain nested keys in dot notation
+    Assert.assertTrue(keyList.contains("k4.k4-k1"));
+    Assert.assertTrue(keyList.contains("k4.k4-k2"));
+    Assert.assertTrue(keyList.contains("k4.k4-k3"));
+    Assert.assertTrue(keyList.contains("k4.met"));
+    // Should contain array indices in dot notation
+    Assert.assertTrue(keyList.contains("k3.0"));
+    Assert.assertTrue(keyList.contains("k3.1"));
+    Assert.assertTrue(keyList.contains("k3.2"));
+
+    // Test deeper recursive extraction with JsonPath format
+    query = "SELECT jsonExtractKey(complexMapStr, '$..**', 'maxDepth=3; dotNotation=false') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain nested keys in JsonPath format
+    Assert.assertTrue(keyList.contains("$['k4']['k4-k1']"));
+    Assert.assertTrue(keyList.contains("$['k4']['k4-k2']"));
+    Assert.assertTrue(keyList.contains("$['k4']['k4-k3']"));
+    Assert.assertTrue(keyList.contains("$['k4']['met']"));
+    // Should contain array indices in JsonPath format
+    Assert.assertTrue(keyList.contains("$['k3'][0]"));
+    Assert.assertTrue(keyList.contains("$['k3'][1]"));
+    Assert.assertTrue(keyList.contains("$['k3'][2]"));
+
+    // Test specific path extraction with dot notation
+    query = "SELECT jsonExtractKey(complexMapStr, '$.k4.*', 'maxDepth=2; dotNotation=true') FROM " + getTableName()
+        + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    Assert.assertEquals(keys.size(), 4); // k4-k1, k4-k2, k4-k3, met
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should contain nested keys in dot notation format
+    Assert.assertTrue(keyList.contains("k4.k4-k1"));
+    Assert.assertTrue(keyList.contains("k4.k4-k2"));
+    Assert.assertTrue(keyList.contains("k4.k4-k3"));
+    Assert.assertTrue(keyList.contains("k4.met"));
+
+    // Test backward compatibility - 2-parameter version should default to JsonPath format
+    query = "SELECT jsonExtractKey(myMapStr, '$.*') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should default to JsonPath format
+    Assert.assertTrue(keyList.contains("$['k1']"));
+    Assert.assertTrue(keyList.contains("$['k2']"));
+
+    // Test backward compatibility - no dotNotation should default to JsonPath format
+    query = "SELECT jsonExtractKey(myMapStr, '$.*', 'maxDepth=1') FROM " + getTableName() + " LIMIT 1";
+    pinotResponse = postQuery(query);
+    Assert.assertEquals(pinotResponse.get("exceptions").size(), 0);
+    rows = pinotResponse.get("resultTable").get("rows");
+    row = rows.get(0);
+    keys = row.get(0);
+    Assert.assertTrue(keys.isArray());
+    keyList.clear();
+    for (JsonNode key : keys) {
+      keyList.add(key.asText());
+    }
+    // Should default to JsonPath format
+    Assert.assertTrue(keyList.contains("$['k1']"));
+    Assert.assertTrue(keyList.contains("$['k2']"));
   }
 }

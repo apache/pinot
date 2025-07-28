@@ -32,6 +32,7 @@ import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +83,7 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.StringUtil;
 import org.slf4j.Logger;
@@ -799,5 +801,18 @@ public class PinotTenantRestletResource {
     tenantRebalanceJobStatusResponse.setTenantRebalanceProgressStats(tenantRebalanceProgressStats);
     tenantRebalanceJobStatusResponse.setTimeElapsedSinceStartInSeconds(timeSinceStartInSecs);
     return tenantRebalanceJobStatusResponse;
+  }
+
+  @GET
+  @Path("/tenants/{tenantName}/rebalanceJobs")
+  @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.GET_REBALANCE_STATUS)
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get list of rebalance jobs for this tenant",
+      notes = "Get list of rebalance jobs for this tenant")
+  public Map<String, Map<String, String>> getControllerJobs(
+      @ApiParam(value = "Name of the tenant", required = true) @PathParam("tenantName") String tenantName) {
+    return _pinotHelixResourceManager.getAllJobs(Collections.singleton(ControllerJobTypes.TENANT_REBALANCE),
+        jobMetadata -> jobMetadata.get(CommonConstants.ControllerJob.TENANT_NAME)
+            .equals(tenantName));
   }
 }
