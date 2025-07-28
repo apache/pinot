@@ -332,7 +332,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
           httpHeaders, accessControl);
     } finally {
-      Tracing.ThreadAccountantOps.clear();
+      _resourceUsageAccountant.clear();
     }
   }
 
@@ -401,7 +401,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs());
     // Accounts for resource usage of the compilation phase, since compilation for some queries can be expensive.
-    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
 
     // Second-stage table-level access control
     // TODO: Modify AccessControl interface to directly take PinotQuery
@@ -442,7 +442,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);
       // Accounts for resource usage of the authorization phase.
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
 
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
@@ -693,7 +693,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         routingEndTimeNs - routingStartTimeNs);
     // Account the resource used for routing phase, since for single stage queries with multiple segments, routing
     // can be expensive.
-    Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
 
     // Set timeout in the requests
     long timeSpentMs = TimeUnit.NANOSECONDS.toMillis(routingEndTimeNs - compilationStartTimeNs);
