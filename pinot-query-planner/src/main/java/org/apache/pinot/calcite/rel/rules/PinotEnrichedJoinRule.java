@@ -35,7 +35,7 @@ import org.immutables.value.Value;
 
 
 /**
- * Rules for fusing operators into enriched joins.
+ * Rules for fusing filter, projection, and limit operators into join and enriched joins.
  * This collection of rules will be fired bottom-up and fuse operators into the enriched join greedily.
  */
 @Value.Enclosing
