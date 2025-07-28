@@ -117,4 +117,11 @@ public interface RoutingManager {
    */
   @Nullable
   Set<String> getServingInstances(String tableNameWithType);
+
+  /**
+   * Returns the query timeout in milliseconds for the given table.
+   * Returns {@code null} if the table does not have a query timeout set.
+   */
+  @Nullable
+  Long getQueryTimeoutMs(String tableNameWithType);
 }
