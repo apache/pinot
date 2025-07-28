@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -132,27 +133,24 @@ public class TableMetadataReader {
    * This api takes in list of segments for which we need the metadata.
    * This calls the server to get the metadata for all segments instead of making a call per segment.
    */
-  public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, Set<String> segments,
-      int timeoutMs)
+  public JsonNode getSegmentsMetadata(String tableNameWithType, @Nullable List<String> columns,
+      @Nullable Set<String> segments, int timeoutMs)
       throws InvalidConfigException, IOException {
     return getSegmentsMetadataInternal(tableNameWithType, columns, segments, timeoutMs);
   }
 
   /**
-   *   Common helper used by both the new (server-level) and legacy (segment-level) endpoints.
+   * Common helper used by both the new (server-level) and legacy (segment-level) endpoints.
    */
-  private JsonNode fetchAndAggregateMetadata(List<String> urls,
-      BiMap<String, String> endpoints,
-      boolean perSegmentJson,
-      String tableNameWithType,
-      int timeoutMs)
+  private JsonNode fetchAndAggregateMetadata(List<String> urls, BiMap<String, String> endpoints, boolean perSegmentJson,
+      String tableNameWithType, int timeoutMs)
       throws InvalidConfigException, IOException {
     CompletionServiceHelper cs = new CompletionServiceHelper(_executor, _connectionManager, endpoints);
     CompletionServiceHelper.CompletionServiceResponse resp =
         cs.doMultiGetRequest(urls, tableNameWithType, perSegmentJson, timeoutMs);
     // all requests will fail if new server endpoint is not available
-    if (resp._failedResponseCount == urls.size()) {
-      throw new InvalidConfigException("All requests to server instances failed.");
+    if (resp._failedResponseCount > 0) {
+      throw new RuntimeException("All requests to server instances failed.");
     }
 
     ObjectMapper mapper = new ObjectMapper();
@@ -170,12 +168,8 @@ public class TableMetadataReader {
     return aggregatedNode;
   }
 
-  private List<String> buildTableLevelUrls(Map<String, List<String>> serverToSegs,
-      BiMap<String, String> endpoints,
-      String tableNameWithType,
-      List<String> columns,
-      Set<String> segmentsFilter,
-      ServerSegmentMetadataReader reader) {
+  private List<String> buildTableLevelUrls(Map<String, List<String>> serverToSegs, BiMap<String, String> endpoints,
+      String tableNameWithType, List<String> columns, Set<String> segmentsFilter, ServerSegmentMetadataReader reader) {
     List<String> urls = new ArrayList<>(serverToSegs.size());
     for (String server : serverToSegs.keySet()) {
       urls.add(reader.generateTableMetadataServerURL(
@@ -184,12 +178,8 @@ public class TableMetadataReader {
     return urls;
   }
 
-  private List<String> buildSegmentLevelUrls(Map<String, List<String>> serverToSegs,
-      BiMap<String, String> endpoints,
-      String tableNameWithType,
-      List<String> columns,
-      Set<String> segmentsFilter,
-      ServerSegmentMetadataReader reader) {
+  private List<String> buildSegmentLevelUrls(Map<String, List<String>> serverToSegs, BiMap<String, String> endpoints,
+      String tableNameWithType, List<String> columns, Set<String> segmentsFilter, ServerSegmentMetadataReader reader) {
     List<String> urls = new ArrayList<>();
     for (Map.Entry<String, List<String>> e : serverToSegs.entrySet()) {
       for (String segment : e.getValue()) {
@@ -203,8 +193,8 @@ public class TableMetadataReader {
     return urls;
   }
 
-  private JsonNode getSegmentsMetadataInternal(String tableNameWithType, List<String> columns,
-      Set<String> segments, int timeoutMs)
+  private JsonNode getSegmentsMetadataInternal(String tableNameWithType, @Nullable List<String> columns,
+      @Nullable Set<String> segments, int timeoutMs)
       throws InvalidConfigException, IOException {
     Map<String, List<String>> serverToSegs =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -219,7 +209,7 @@ public class TableMetadataReader {
           tableNameWithType, columns, segments, reader);
       return fetchAndAggregateMetadata(tableUrls, endpoints, /*perSegmentJson=*/false,
           tableNameWithType, timeoutMs);
-    } catch (InvalidConfigException ignore) {
+    } catch (RuntimeException ignore) {
       // fall through to legacy
     }
 

@@ -919,7 +919,6 @@ public class PinotSegmentRestletResource {
 
   @GET
   @Path("segments/{tableName}/metadata")
-  @Encoded
   @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_METADATA)
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get the server metadata for all table segments",
@@ -927,9 +926,9 @@ public class PinotSegmentRestletResource {
   public String getServerMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @ApiParam(value = "Segments name", allowMultiple = true) @QueryParam("segments")
+      @Encoded @ApiParam(value = "Segments to include", allowMultiple = true) @QueryParam("segments")
       @Nullable Set<String> segments,
-      @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns")
+      @Encoded @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns")
       @Nullable List<String> columns, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
@@ -1162,8 +1161,8 @@ public class PinotSegmentRestletResource {
    * @param segments name of the segments to include in metadata
    * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
    */
-  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, List<String> columns,
-      Set<String> segments)
+  private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, @Nullable List<String> columns,
+      @Nullable Set<String> segments)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
