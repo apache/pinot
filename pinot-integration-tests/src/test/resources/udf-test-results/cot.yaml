@@ -31,8 +31,8 @@ Ingestion time transformer:
         expectedResult: 0.6420926159343306
       cot(PI/4):
         actualResult: 1.0000000000000002
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "NUMBER_AS_DOUBLE"
+        error: null
         expectedResult: 1.0
       null input:
         actualResult: null
@@ -51,8 +51,8 @@ MSE intermediate stage (with null handling):
         expectedResult: 0.6420926159343306
       cot(PI/4):
         actualResult: 1.0000000000000002
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "NUMBER_AS_DOUBLE"
+        error: null
         expectedResult: 1.0
       null input:
         actualResult: null
@@ -71,8 +71,8 @@ MSE intermediate stage (without null handling):
         expectedResult: 0.6420926159343306
       cot(PI/4):
         actualResult: 1.0000000000000002
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "NUMBER_AS_DOUBLE"
+        error: null
         expectedResult: 1.0
       null input:
         actualResult: null
@@ -131,8 +131,8 @@ SSE projection (with null handling):
         expectedResult: 0.6420926159343306
       cot(PI/4):
         actualResult: 1.0000000000000002
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "NUMBER_AS_DOUBLE"
+        error: null
         expectedResult: 1.0
       null input:
         actualResult: null
@@ -151,8 +151,8 @@ SSE projection (without null handling):
         expectedResult: 0.6420926159343306
       cot(PI/4):
         actualResult: 1.0000000000000002
-        equivalence: null
-        error: "Unexpected value"
+        equivalence: "NUMBER_AS_DOUBLE"
+        error: null
         expectedResult: 1.0
       null input:
         actualResult: Infinity

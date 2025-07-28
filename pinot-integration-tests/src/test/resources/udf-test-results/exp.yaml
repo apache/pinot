@@ -30,10 +30,10 @@ Ingestion time transformer:
         error: null
         expectedResult: 1.0
       exp(1):
-        actualResult: 2.7182818284590455
+        actualResult: 2.718281828459045
         equivalence: "EQUAL"
         error: null
-        expectedResult: 2.7182818284590455
+        expectedResult: 2.718281828459045
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -50,10 +50,10 @@ MSE intermediate stage (with null handling):
         error: null
         expectedResult: 1.0
       exp(1):
-        actualResult: 2.7182818284590455
+        actualResult: 2.718281828459045
         equivalence: "EQUAL"
         error: null
-        expectedResult: 2.7182818284590455
+        expectedResult: 2.718281828459045
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -70,10 +70,10 @@ MSE intermediate stage (without null handling):
         error: null
         expectedResult: 1.0
       exp(1):
-        actualResult: 2.7182818284590455
+        actualResult: 2.718281828459045
         equivalence: "EQUAL"
         error: null
-        expectedResult: 2.7182818284590455
+        expectedResult: 2.718281828459045
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -130,10 +130,10 @@ SSE projection (with null handling):
         error: null
         expectedResult: 1.0
       exp(1):
-        actualResult: 2.7182818284590455
+        actualResult: 2.718281828459045
         equivalence: "EQUAL"
         error: null
-        expectedResult: 2.7182818284590455
+        expectedResult: 2.718281828459045
       null input:
         actualResult: null
         equivalence: "EQUAL"
@@ -150,10 +150,10 @@ SSE projection (without null handling):
         error: null
         expectedResult: 1.0
       exp(1):
-        actualResult: 2.7182818284590455
+        actualResult: 2.718281828459045
         equivalence: "EQUAL"
         error: null
-        expectedResult: 2.7182818284590455
+        expectedResult: 2.718281828459045
       null input:
         actualResult: 1.0
         equivalence: "EQUAL"
