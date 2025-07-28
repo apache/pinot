@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +43,7 @@ public class TenantRebalanceProgressStats {
   }
 
   public TenantRebalanceProgressStats(Set<String> tables) {
+    Preconditions.checkState(tables != null && !tables.isEmpty(), "List of tables to observe is empty.");
     _tableStatusMap = tables.stream()
         .collect(Collectors.toMap(Function.identity(), k -> TableStatus.UNPROCESSED.name()));
     _totalTables = tables.size();
