@@ -206,7 +206,7 @@ arraytostring:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.arrayToString,\
     \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.arrayToString]}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayToStringUdf"
 arrayunionint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionInt}"
   transform: null
