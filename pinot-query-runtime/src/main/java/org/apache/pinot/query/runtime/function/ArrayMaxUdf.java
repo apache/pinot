@@ -44,8 +44,7 @@ public class ArrayMaxUdf extends Udf {
 
   @Override
   public String getDescription() {
-    return "Given an array with numeric values, this function returns the maximum value in the array. "
-        + "* asdf ";
+    return "Given an array with numeric values, this function returns the maximum value in the array.";
   }
 
   @Override
