@@ -32,6 +32,7 @@ import org.apache.pinot.core.operator.combine.GroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.MinMaxValueBasedSelectionOrderByCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOnlyCombineOperator;
 import org.apache.pinot.core.operator.combine.SelectionOrderByCombineOperator;
+import org.apache.pinot.core.operator.combine.SingleThreadedSortedGroupByCombineOperator;
 import org.apache.pinot.core.operator.combine.SortedGroupByCombineOperator;
 import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOperator;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
@@ -137,6 +138,9 @@ public class CombinePlanNode implements PlanNode {
         } else {
           // Sorted aggregation group-by, when safeTrim and limit is not too large
           if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
+            if (operators.size() <= _queryContext.getSortAggregateSingleThreadedNumSegmentsThreshold()) {
+              return new SingleThreadedSortedGroupByCombineOperator(operators, _queryContext, _executorService);
+            }
             return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
           }
           // Aggregation group-by

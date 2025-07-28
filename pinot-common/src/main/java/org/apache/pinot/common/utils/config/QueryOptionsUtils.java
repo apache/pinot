@@ -396,6 +396,14 @@ public class QueryOptionsUtils {
   }
 
   @Nullable
+  public static Integer getSortAggregateSingleThreadedNumSegmentsThreshold(Map<String, String> queryOptions) {
+    String sortAggregateSingleThreadedNumSegmentsThreshold =
+        queryOptions.get(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD);
+    return checkedParseIntPositive(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD,
+        sortAggregateSingleThreadedNumSegmentsThreshold);
+  }
+
+  @Nullable
   public static Integer getMaxStreamingPendingBlocks(Map<String, String> queryOptions) {
     String maxStreamingPendingBlocks = queryOptions.get(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS);
     return checkedParseIntPositive(QueryOptionKey.MAX_STREAMING_PENDING_BLOCKS, maxStreamingPendingBlocks);

@@ -134,6 +134,9 @@ public class QueryContext {
   private int _chunkSizeExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
   // Threshold to use sort aggregate for safeTrim case when LIMIT is below this
   private int _sortAggregateLimitThreshold = Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
+  // Threshold of number of segments to combine to use single-threaded sequential combine instead pair-wise
+  private int _sortAggregateSingleThreadedNumSegmentsThreshold =
+      Server.DEFAULT_SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -505,6 +508,14 @@ public class QueryContext {
     return _sortAggregateLimitThreshold;
   }
 
+  public void setSortAggregateSingleThreadedNumSegmentsThreshold(int sortAggregateSingleThreadedNumSegmentsThreshold) {
+    _sortAggregateSingleThreadedNumSegmentsThreshold = sortAggregateSingleThreadedNumSegmentsThreshold;
+  }
+
+  public int getSortAggregateSingleThreadedNumSegmentsThreshold() {
+    return _sortAggregateSingleThreadedNumSegmentsThreshold;
+  }
+
   /**
    * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared within
    * the scope of a query.
@@ -671,6 +682,12 @@ public class QueryContext {
       Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
       if (sortAggregateLimitThreshold != null) {
         queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
+      }
+      Integer sortAggregateSingleThreadedNumSegmentsThreshold =
+          QueryOptionsUtils.getSortAggregateSingleThreadedNumSegmentsThreshold(_queryOptions);
+      if (sortAggregateSingleThreadedNumSegmentsThreshold != null) {
+        queryContext.setSortAggregateSingleThreadedNumSegmentsThreshold(
+            sortAggregateSingleThreadedNumSegmentsThreshold);
       }
 
       return queryContext;
