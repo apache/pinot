@@ -369,6 +369,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
             if ((segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING))
                 && isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
               numEVReplicasUp++;
+            } else {
+              LOGGER.warn("Segment {} in table {} has instance {} in state {} and is unavailable",
+                  segment, tableNameWithType, serverInstanceId, segmentState);
             }
             if (segmentState.equals(SegmentStateModel.ERROR)) {
               errorSegments.add(Pair.of(segment, entry.getKey()));
