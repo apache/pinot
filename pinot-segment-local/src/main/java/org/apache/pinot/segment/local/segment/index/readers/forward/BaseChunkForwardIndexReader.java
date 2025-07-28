@@ -217,7 +217,16 @@ public abstract class BaseChunkForwardIndexReader implements ForwardIndexReader<
     decompressedBuffer.clear();
 
     try {
-      _chunkDecompressor.decompress(_dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize), decompressedBuffer);
+      if (_compressionType == ChunkCompressionType.DELTA || _compressionType == ChunkCompressionType.DELTADELTA) {
+        // For delta and deltaOfDelta compression, we need to read the number of integers first
+        ByteBuffer compressedBuffer = _dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize);
+        int numValues = compressedBuffer.getInt();
+        int bytesPerValue = _storedType == DataType.LONG ? Long.BYTES : Integer.BYTES;
+        decompressedBuffer = ByteBuffer.allocateDirect(numValues * bytesPerValue);
+        _chunkDecompressor.decompress(compressedBuffer, decompressedBuffer);
+      } else {
+        _chunkDecompressor.decompress(_dataBuffer.toDirectByteBuffer(chunkPosition, chunkSize), decompressedBuffer);
+      }
     } catch (IOException e) {
       LOGGER.error("Exception caught while decompressing data chunk", e);
       throw new RuntimeException(e);
