@@ -827,9 +827,7 @@ public class PinotHelixTaskResourceManager {
 
     Map<String, TaskCount> taskCounts = new TreeMap<>();
     for (String taskName : tasks) {
-      TaskCount taskCount = getTaskCount(taskName);
-
-      // Apply state filtering if specified
+      // Apply state filtering first (less expensive)
       if (requestedStates != null) {
         TaskState currentTaskState = taskStates.get(taskName);
         if (currentTaskState == null || !requestedStates.contains(currentTaskState)) {
@@ -837,11 +835,13 @@ public class PinotHelixTaskResourceManager {
         }
       }
 
-      // Apply table filtering if specified
+      // Apply table filtering next (also less expensive than getting task count)
       if (tableNameWithType != null && !hasTasksForTable(taskName, tableNameWithType)) {
         continue;
       }
 
+      // Only collect TaskCount after passing all filters (expensive operation)
+      TaskCount taskCount = getTaskCount(taskName);
       taskCounts.put(taskName, taskCount);
     }
     return taskCounts;
