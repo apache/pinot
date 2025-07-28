@@ -800,7 +800,8 @@ public class PinotHelixTaskResourceManager {
    *                           will be returned. Can be null to skip table filtering.
    * @return Map of Pinot Task Name to TaskCount containing only tasks that match the specified filters
    */
-  public synchronized Map<String, TaskCount> getTaskCounts(String taskType, String state, String tableNameWithType) {
+  public synchronized Map<String, TaskCount> getTaskCounts(String taskType, @Nullable String state,
+      @Nullable String tableNameWithType) {
     Set<String> tasks = getTasks(taskType);
     if (tasks == null) {
       return Collections.emptyMap();
@@ -808,7 +809,7 @@ public class PinotHelixTaskResourceManager {
 
     // Parse and validate comma-separated states if provided
     Set<TaskState> requestedStates = null;
-    if (state != null) {
+    if (StringUtils.isNotEmpty(state)) {
       String[] stateArray = state.trim().split(",");
       requestedStates = new HashSet<>();
       for (String s : stateArray) {
@@ -836,7 +837,7 @@ public class PinotHelixTaskResourceManager {
       }
 
       // Apply table filtering next (also less expensive than getting task count)
-      if (tableNameWithType != null && !hasTasksForTable(taskName, tableNameWithType)) {
+      if (StringUtils.isNotEmpty(tableNameWithType) && !hasTasksForTable(taskName, tableNameWithType)) {
         continue;
       }
 

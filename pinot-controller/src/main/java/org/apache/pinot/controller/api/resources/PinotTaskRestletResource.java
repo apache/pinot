@@ -280,7 +280,7 @@ public class PinotTaskRestletResource {
       @QueryParam("table") @Nullable String table, @Context HttpHeaders headers) {
     String tableNameWithType = table != null ? DatabaseUtils.translateTableName(table, headers) : null;
 
-    if (state != null || tableNameWithType != null) {
+    if (StringUtils.isNotEmpty(state) || StringUtils.isNotEmpty(tableNameWithType)) {
       return _pinotHelixTaskResourceManager.getTaskCounts(taskType, state, tableNameWithType);
     } else {
       return _pinotHelixTaskResourceManager.getTaskCounts(taskType);
