@@ -42,7 +42,6 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
-import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.SortedRecordTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -242,23 +241,28 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
     blackhole.consume(table);
   }
 
+  // multi-threaded approach
   // ---
   // single threaded approach
+
   @Benchmark
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void sequentialCombineGroupBy(Blackhole blackhole) {
-    int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit());
-    SimpleIndexedTable table = new SimpleIndexedTable(_dataSchema, false, _queryContext, trimSize, trimSize,
-        Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD,
-        Server.DEFAULT_QUERY_EXECUTOR_MIN_INITIAL_INDEXED_TABLE_CAPACITY, _executorService);
-    for (int i = 0; i < _numSegments; i++) {
-      for (IntermediateRecord record : _segmentIntermediateRecords.get(i)) {
-        table.upsert(record._key, record._record);
+    SortedRecordTable waitingTable = null;
+    for (int segmentId = 0; segmentId < _numSegments; segmentId++) {
+      if (waitingTable == null) {
+        waitingTable = getAndPopulateSortedRecordTable(segmentId);
+        continue;
       }
+      GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema,
+          _segmentIntermediateRecords.get(segmentId), _queryContext);
+      waitingTable = mergeBlocks(waitingTable, resultsBlock);
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
     }
-    table.finish(false);
-    blackhole.consume(table);
+
+    waitingTable.finish(true);
+    blackhole.consume(waitingTable);
   }
 
   public void processSortedGroupByCombine(AtomicInteger nextSegmentId) {
