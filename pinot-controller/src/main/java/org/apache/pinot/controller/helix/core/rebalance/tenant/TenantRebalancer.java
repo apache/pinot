@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+
 public interface TenantRebalancer {
   TenantRebalanceResult rebalance(TenantRebalanceConfig config);
 
@@ -35,7 +39,9 @@ public interface TenantRebalancer {
      * @param withDowntime Whether the rebalance should be done with downtime or minAvailableReplicas=0.
      * @return The result of the rebalance operation.
      */
-    public TenantTableRebalanceJobContext(String tableName, String jobId, boolean withDowntime) {
+    @JsonCreator
+    public TenantTableRebalanceJobContext(@JsonProperty("tableName") String tableName,
+        @JsonProperty("jobId") String jobId, @JsonProperty("withDowntime") boolean withDowntime) {
       _tableName = tableName;
       _jobId = jobId;
       _withDowntime = withDowntime;
@@ -49,6 +55,7 @@ public interface TenantRebalancer {
       return _tableName;
     }
 
+    @JsonProperty("withDowntime")
     public boolean shouldRebalanceWithDowntime() {
       return _withDowntime;
     }
