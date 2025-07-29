@@ -332,7 +332,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       if (heapUsageBytes > config.getPanicLevel()) {
         if (_cancelSentQueries.add(queryId)) {
-          logTerminatedQuery(maxResourceUsageQuery, heapUsageBytes, false, true);
+          logTerminatedQuery(maxResourceUsageQuery, heapUsageBytes, false);
         }
         return true;
       }
@@ -340,7 +340,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       if (heapUsageBytes > config.getCriticalLevel() && maxResourceUsageQuery != null
           && maxResourceUsageQuery.getQueryId().equals(queryId)) {
         if (_cancelSentQueries.add(queryId)) {
-          logTerminatedQuery(maxResourceUsageQuery, heapUsageBytes, false, true);
+          logTerminatedQuery(maxResourceUsageQuery, heapUsageBytes, false);
         }
         return true;
       }
@@ -604,16 +604,15 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         } else {
           queryResourceTracker.getAnchorThread().interrupt();
         }
-        logTerminatedQuery(queryResourceTracker, _watcherTask.getHeapUsageBytes(), callback != null, false);
+        logTerminatedQuery(queryResourceTracker, _watcherTask.getHeapUsageBytes(), callback != null);
       }
     }
 
     protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage,
-        boolean hasCallback, boolean isSelfTerminated) {
-      LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}. Used Callback: {}."
-              + " Self Terminated: {}",
+        boolean hasCallback) {
+      LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}. Used Callback: {}.",
           queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
-          queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage, hasCallback, isSelfTerminated);
+          queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage, hasCallback);
     }
 
     @Override
@@ -962,7 +961,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           // Log the killed queries
           for (AggregatedStats stats : aggregatedStatsMap.values()) {
             MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(stats.getQueryId());
-            logTerminatedQuery(stats, _usedBytes, callback != null, false);
+            logTerminatedQuery(stats, _usedBytes, callback != null);
             if (callback != null) {
               _queryCancelCallbacks.invalidate(stats.getQueryId());
             }
@@ -1023,7 +1022,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
               _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
             }
-            logTerminatedQuery(value, _usedBytes, hasCallBack, false);
+            logTerminatedQuery(value, _usedBytes, hasCallBack);
           }
         }
         logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
