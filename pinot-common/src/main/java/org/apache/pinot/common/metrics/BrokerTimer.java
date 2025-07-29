@@ -30,6 +30,7 @@ public enum BrokerTimer implements AbstractMetrics.Timer {
   CLUSTER_CHANGE_QUEUE_TIME(true), // metric tracking the freshness lag for consuming segments
   FRESHNESS_LAG_MS(false),
   QUERY_TOTAL_TIME_MS(true),
+  MULTI_STAGE_QUERY_TOTAL_TIME_MS(true),
 
   SECONDARY_WORKLOAD_QUERY_TOTAL_TIME_MS(true),
 

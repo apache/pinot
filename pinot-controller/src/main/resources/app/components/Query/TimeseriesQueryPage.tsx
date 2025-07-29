@@ -28,7 +28,9 @@ import {
   makeStyles,
   Button,
   Input,
-  FormControlLabel
+  FormControlLabel,
+  ButtonGroup,
+  Box
 } from '@material-ui/core';
 import Alert from '@material-ui/lab/Alert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
@@ -36,11 +38,47 @@ import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
-import { getTimeSeriesQueryResult } from '../../requests';
+import { getTimeSeriesQueryResult, getTimeSeriesLanguages } from '../../requests';
 import { useHistory, useLocation } from 'react-router';
 import TableToolbar from '../TableToolbar';
 import { Resizable } from 're-resizable';
 import SimpleAccordion from '../SimpleAccordion';
+import TimeseriesChart from './TimeseriesChart';
+import MetricStatsTable from './MetricStatsTable';
+import { parseTimeseriesResponse, isPrometheusFormat } from '../../utils/TimeseriesUtils';
+import { ChartSeries } from 'Models';
+import { MAX_SERIES_LIMIT } from '../../utils/ChartConstants';
+
+// Define proper types
+interface TimeseriesQueryResponse {
+  error: string;
+  data: {
+    resultType: string;
+    result: Array<{
+      metric: Record<string, string>;
+      values: [number, number][];
+    }>;
+  };
+}
+
+interface CodeMirrorEditor {
+  getValue: () => string;
+  setValue: (value: string) => void;
+}
+
+interface CodeMirrorChangeData {
+  from: { line: number; ch: number };
+  to: { line: number; ch: number };
+  text: string[];
+  removed: string[];
+  origin: string;
+}
+
+interface KeyboardEvent {
+  keyCode: number;
+  metaKey: boolean;
+  ctrlKey: boolean;
+}
 
 const useStyles = makeStyles((theme) => ({
   rightPanel: {},
@@ -106,7 +144,74 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1),
     minWidth: 0,
   },
+
 }));
+
+// Extract warning component
+const TruncationWarning: React.FC<{ totalSeries: number; truncatedSeries: number }> = ({
+  totalSeries,
+  truncatedSeries
+}) => {
+  if (totalSeries <= truncatedSeries) return null;
+
+  return (
+    <Alert severity="warning" style={{ marginBottom: '16px' }}>
+      <Typography variant="body2">
+        Large dataset detected: Showing first {truncatedSeries} of {totalSeries} series for visualization.
+        Switch to JSON view to see the complete dataset.
+      </Typography>
+    </Alert>
+  );
+};
+
+// Extract view toggle component
+const ViewToggle: React.FC<{
+  viewType: 'json' | 'chart';
+  onViewChange: (view: 'json' | 'chart') => void;
+  isChartDisabled: boolean;
+  onCopy: () => void;
+  copyMsg: boolean;
+  classes: ReturnType<typeof useStyles>;
+}> = ({ viewType, onViewChange, isChartDisabled, onCopy, copyMsg, classes }) => (
+  <Grid container className={classes.actionBtns} alignItems="center" justify="space-between">
+    <Grid item>
+      <ButtonGroup color="primary" size="small">
+        <Button
+          onClick={() => onViewChange('chart')}
+          variant={viewType === 'chart' ? "contained" : "outlined"}
+          disabled={isChartDisabled}
+        >
+          Chart
+        </Button>
+        <Button
+          onClick={() => onViewChange('json')}
+          variant={viewType === 'json' ? "contained" : "outlined"}
+        >
+          JSON
+        </Button>
+      </ButtonGroup>
+    </Grid>
+    <Grid item>
+      <Button
+        variant="contained"
+        color="primary"
+        size="small"
+        className={classes.btn}
+        onClick={onCopy}
+      >
+        Copy
+      </Button>
+      {copyMsg && (
+        <Alert
+          icon={<FileCopyIcon fontSize="inherit" />}
+          severity="info"
+        >
+          Copied results to Clipboard
+        </Alert>
+      )}
+    </Grid>
+  </Grid>
+);
 
 const jsonoptions = {
   lineNumbers: true,
@@ -118,10 +223,6 @@ const jsonoptions = {
   lineWrapping: true,
   wordWrap: 'break-word',
 };
-
-const SUPPORTED_QUERY_LANGUAGES = [
-  { value: 'm3ql', label: 'M3QL' },
-];
 
 interface TimeseriesQueryConfig {
   queryLanguage: string;
@@ -147,12 +248,39 @@ const TimeseriesQueryPage = () => {
     timeout: 60000,
   });
 
+  const [supportedLanguages, setSupportedLanguages] = useState<Array<string>>([]);
+  const [languagesLoading, setLanguagesLoading] = useState(true);
+
   const [rawOutput, setRawOutput] = useState<string>('');
-  const [rawData, setRawData] = useState<any>(null);
+  const [rawData, setRawData] = useState<TimeseriesQueryResponse | null>(null);
+  const [chartSeries, setChartSeries] = useState<ChartSeries[]>([]);
+  const [truncatedChartSeries, setTruncatedChartSeries] = useState<ChartSeries[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [shouldAutoExecute, setShouldAutoExecute] = useState<boolean>(false);
   const [copyMsg, showCopyMsg] = React.useState(false);
+  const [viewType, setViewType] = useState<'json' | 'chart'>('chart');
+  const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+
+
+  // Fetch supported languages from controller configuration
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      try {
+        setLanguagesLoading(true);
+        const response = await getTimeSeriesLanguages();
+        const languages = response.data || [];
+
+        setSupportedLanguages(languages);
+      } catch (error) {
+        console.error('Error fetching timeseries languages:', error);
+        setSupportedLanguages([]);
+      } finally {
+        setLanguagesLoading(false);
+      }
+    };
+    fetchLanguages();
+  }, []);
 
   // Update config when URL parameters change
   useEffect(() => {
@@ -198,15 +326,15 @@ const TimeseriesQueryPage = () => {
     });
   }, [history, location.pathname]);
 
-  const handleConfigChange = (field: keyof TimeseriesQueryConfig, value: any) => {
+  const handleConfigChange = (field: keyof TimeseriesQueryConfig, value: string | number | boolean) => {
     setConfig(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleQueryChange = (editor: any, data: any, value: string) => {
+  const handleQueryChange = (editor: CodeMirrorEditor, data: CodeMirrorChangeData, value: string) => {
     setConfig(prev => ({ ...prev, query: value }));
   };
 
-  const handleQueryInterfaceKeyDown = (editor: any, event: any) => {
+  const handleQueryInterfaceKeyDown = (editor: CodeMirrorEditor, event: KeyboardEvent) => {
     const modifiedEnabled = event.metaKey == true || event.ctrlKey == true;
 
     // Map (Cmd/Ctrl) + Enter KeyPress to executing the query
@@ -220,6 +348,33 @@ const TimeseriesQueryPage = () => {
   useEffect(() => {
     handleQueryInterfaceKeyDownRef.current = handleQueryInterfaceKeyDown;
   }, [handleQueryInterfaceKeyDown]);
+
+  // Extract data processing logic
+  const processQueryResponse = useCallback((parsedData: TimeseriesQueryResponse) => {
+    setRawData(parsedData);
+    setRawOutput(JSON.stringify(parsedData, null, 2));
+
+    // Check if this is an error response
+    if (parsedData.error != null && parsedData.error !== '') {
+      setError(parsedData.error);
+      setChartSeries([]);
+      setTruncatedChartSeries([]);
+      return;
+    }
+
+    // Parse timeseries data for chart and stats
+    if (isPrometheusFormat(parsedData)) {
+      const series = parseTimeseriesResponse(parsedData);
+      setChartSeries(series);
+
+      // Create truncated series for visualization (limit to MAX_SERIES_LIMIT)
+      const truncatedSeries = series.slice(0, MAX_SERIES_LIMIT);
+      setTruncatedChartSeries(truncatedSeries);
+    } else {
+      setChartSeries([]);
+      setTruncatedChartSeries([]);
+    }
+  }, []);
 
   const handleExecuteQuery = useCallback(async () => {
     if (!config.query.trim()) {
@@ -250,8 +405,7 @@ const TimeseriesQueryPage = () => {
         ? JSON.parse(response.data)
         : response.data;
 
-      setRawData(parsedData);
-      setRawOutput(JSON.stringify(parsedData, null, 2));
+      processQueryResponse(parsedData);
     } catch (error) {
       console.error('Error executing timeseries query:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Unknown error occurred';
@@ -259,7 +413,7 @@ const TimeseriesQueryPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [config, updateURL]);
+  }, [config, updateURL, processQueryResponse]);
 
   const copyToClipboard = () => {
     const aux = document.createElement('input');
@@ -274,6 +428,15 @@ const TimeseriesQueryPage = () => {
 
   return (
     <Grid container>
+      {/* Banner for no enabled languages */}
+      {!languagesLoading && supportedLanguages.length === 0 && (
+        <Grid item xs={12}>
+          <Alert severity="warning" style={{ marginBottom: '16px' }}>
+            <strong>No timeseries languages enabled.</strong> Please configure timeseries languages in your controller, broker and server configurations using the <code>pinot.timeseries.languages</code> property.
+          </Alert>
+        </Grid>
+      )}
+
       <Grid item xs={12} className={classes.rightPanel}>
         <Resizable
           defaultSize={{ width: '100%', height: 148 }}
@@ -298,6 +461,7 @@ const TimeseriesQueryPage = () => {
                 lineWrapping: true,
                 indentWithTabs: true,
                 smartIndent: true,
+                readOnly: supportedLanguages.length === 0,
               }}
               className={classes.codeMirror}
               autoCursor={false}
@@ -312,11 +476,12 @@ const TimeseriesQueryPage = () => {
               <InputLabel>Query Language</InputLabel>
               <Select
                 value={config.queryLanguage}
-                onChange={(e) => handleConfigChange('queryLanguage', e.target.value)}
+                onChange={(e) => handleConfigChange('queryLanguage', e.target.value as string)}
+                disabled={languagesLoading || supportedLanguages.length === 0}
               >
-                {SUPPORTED_QUERY_LANGUAGES.map((lang) => (
-                  <MenuItem key={lang.value} value={lang.value}>
-                    {lang.label}
+                {supportedLanguages.map((lang) => (
+                  <MenuItem key={lang} value={lang}>
+                    {lang}
                   </MenuItem>
                 ))}
               </Select>
@@ -329,8 +494,9 @@ const TimeseriesQueryPage = () => {
               <Input
                 type="text"
                 value={config.startTime}
-                onChange={(e) => handleConfigChange('startTime', e.target.value)}
+                onChange={(e) => handleConfigChange('startTime', e.target.value as string)}
                 placeholder={getOneMinuteAgoTimestamp()}
+                disabled={supportedLanguages.length === 0}
               />
             </FormControl>
           </Grid>
@@ -341,8 +507,9 @@ const TimeseriesQueryPage = () => {
               <Input
                 type="text"
                 value={config.endTime}
-                onChange={(e) => handleConfigChange('endTime', e.target.value)}
+                onChange={(e) => handleConfigChange('endTime', e.target.value as string)}
                 placeholder={getCurrentTimestamp()}
+                disabled={supportedLanguages.length === 0}
               />
             </FormControl>
           </Grid>
@@ -353,7 +520,8 @@ const TimeseriesQueryPage = () => {
               <Input
                 type="text"
                 value={config.timeout}
-                onChange={(e) => handleConfigChange('timeout', parseInt(e.target.value) || 60000)}
+                onChange={(e) => handleConfigChange('timeout', parseInt(e.target.value as string) || 60000)}
+                disabled={supportedLanguages.length === 0}
               />
             </FormControl>
           </Grid>
@@ -363,7 +531,7 @@ const TimeseriesQueryPage = () => {
               variant="contained"
               color="primary"
               onClick={handleExecuteQuery}
-              disabled={isLoading || !config.query.trim()}
+              disabled={isLoading || !config.query.trim() || supportedLanguages.length === 0}
               endIcon={<span style={{fontSize: '0.8em', lineHeight: 1}}>{navigator.platform.includes('Mac') ? '⌘↵' : 'Ctrl+↵'}</span>}
             >
               {isLoading ? 'Running Query...' : 'Run Query'}
@@ -371,44 +539,73 @@ const TimeseriesQueryPage = () => {
           </Grid>
         </Grid>
 
-        {error && (
-          <Alert severity="error" className={classes.sqlError}>
-            {error}
-          </Alert>
-        )}
-
         {rawOutput && (
           <Grid item xs style={{ backgroundColor: 'white' }}>
-            <Grid container className={classes.actionBtns}>
-              <Button
-                variant="contained"
-                color="primary"
-                size="small"
-                className={classes.btn}
-                onClick={copyToClipboard}
-              >
-                Copy
-              </Button>
-              {copyMsg && (
-                <Alert
-                  icon={<FileCopyIcon fontSize="inherit" />}
-                  severity="info"
-                >
-                  Copied results to Clipboard
+                         <ViewToggle
+               viewType={viewType}
+               onViewChange={setViewType}
+               isChartDisabled={truncatedChartSeries.length === 0}
+               onCopy={copyToClipboard}
+               copyMsg={copyMsg}
+               classes={classes}
+             />
+
+              {error && (
+                <Alert severity="error" className={classes.sqlError}>
+                  {error}
                 </Alert>
               )}
-            </Grid>
-            <SimpleAccordion
-              headerTitle="Query Result (JSON Format)"
-              showSearchBox={false}
-            >
-              <CodeMirror
-                options={jsonoptions}
-                value={rawOutput}
-                className={classes.queryOutput}
-                autoCursor={false}
-              />
-            </SimpleAccordion>
+
+                                    {viewType === 'chart' && (
+              <SimpleAccordion
+                headerTitle="Timeseries Chart & Statistics"
+                showSearchBox={false}
+              >
+                {truncatedChartSeries.length > 0 ? (
+                  <>
+                    <TruncationWarning
+                      totalSeries={chartSeries.length}
+                      truncatedSeries={truncatedChartSeries.length}
+                    />
+                    <TimeseriesChart
+                      series={truncatedChartSeries}
+                      height={500}
+                      selectedMetric={selectedMetric}
+                    />
+                    <MetricStatsTable
+                      series={truncatedChartSeries}
+                      selectedMetric={selectedMetric}
+                      onMetricSelect={setSelectedMetric}
+                    />
+                  </>
+                ) : (
+                  <Box p={3} textAlign="center">
+                    <Typography variant="h6" color="textSecondary" gutterBottom>
+                      No Chart Data Available
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      The query response is not in Prometheus-compatible format or contains no timeseries data.
+                      <br />
+                      Switch to JSON view to see the raw response.
+                    </Typography>
+                  </Box>
+                )}
+              </SimpleAccordion>
+            )}
+
+            {viewType === 'json' && (
+              <SimpleAccordion
+                headerTitle="Query Result (JSON Format)"
+                showSearchBox={false}
+              >
+                <CodeMirror
+                  options={jsonoptions}
+                  value={rawOutput}
+                  className={classes.queryOutput}
+                  autoCursor={false}
+                />
+              </SimpleAccordion>
+            )}
           </Grid>
         )}
       </Grid>

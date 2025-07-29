@@ -90,7 +90,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     private static final String ACCOUNTANT_TASK_NAME = "CPUMemThreadAccountant";
     private static final int ACCOUNTANT_PRIORITY = 4;
-    private static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(1, r -> {
+    private final ExecutorService _executorService = Executors.newFixedThreadPool(1, r -> {
       Thread thread = new Thread(r);
       thread.setPriority(ACCOUNTANT_PRIORITY);
       thread.setDaemon(true);
@@ -213,6 +213,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       return new WatcherTask();
     }
 
+    public QueryMonitorConfig getQueryMonitorConfig() {
+      return _watcherTask.getQueryMonitorConfig();
+    }
+
     @Override
     public Collection<? extends ThreadResourceTracker> getThreadResources() {
       return _threadEntriesMap.values();
@@ -309,6 +313,16 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         return context.getAnchorThread().isInterrupted();
       }
 
+      return false;
+    }
+
+    @Override
+    public boolean isQueryTerminated() {
+      QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
+      if (config.isThreadSelfTerminate() && _watcherTask.getHeapUsageBytes() > config.getPanicLevel()) {
+        logSelfTerminatedQuery(_threadLocalEntry.get().getQueryId(), Thread.currentThread());
+        return true;
+      }
       return false;
     }
 
@@ -431,7 +445,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     @Override
     public void startWatcherTask() {
-      EXECUTOR_SERVICE.submit(_watcherTask);
+      _executorService.submit(_watcherTask);
+    }
+
+    @Override
+    public void stopWatcherTask() {
+      _executorService.shutdownNow();
     }
 
     @Override
@@ -570,6 +589,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}. Used Callback: {}",
           queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
           queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage, hasCallback);
+    }
+
+    protected void logSelfTerminatedQuery(String queryId, Thread queryThread) {
+      if (!_cancelSentQueries.contains(queryId)) {
+        LOGGER.warn("{} self-terminated. Heap Usage: {}. Query Thread: {}",
+            queryId, _watcherTask.getHeapUsageBytes(), queryThread.getName());
+        _cancelSentQueries.add(queryId);
+      }
     }
 
     @Override
@@ -756,7 +783,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       @Override
       public void run() {
-        while (true) {
+        while (!Thread.currentThread().isInterrupted()) {
           try {
             runOnce();
           } finally {
@@ -905,8 +932,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
       /**
        * Kill the query with the highest cost (memory footprint/cpu time/...)
-       * Will trigger gc when killing a consecutive number of queries
-       * use XX:+ExplicitGCInvokesConcurrent to avoid a full gc when system.gc is triggered
        */
       private void killMostExpensiveQuery() {
         if (!_isThreadMemorySamplingEnabled) {

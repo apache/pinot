@@ -197,12 +197,13 @@ public class ConsistentDataPushUtils {
     if (uriToLineageEntryIdMap != null) {
       LOGGER.error("Exception when pushing segments. Marking segment lineage entry to 'REVERTED'.", exception);
       String rawTableName = spec.getTableSpec().getTableName();
+      AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
       for (Map.Entry<URI, String> entry : uriToLineageEntryIdMap.entrySet()) {
         String segmentLineageEntryId = entry.getValue();
         try {
           URI uri = FileUploadDownloadClient.getRevertReplaceSegmentsURI(entry.getKey(), rawTableName,
               TableType.OFFLINE.name(), segmentLineageEntryId, true);
-          SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.revertReplaceSegments(uri);
+          SimpleHttpResponse response = FILE_UPLOAD_DOWNLOAD_CLIENT.revertReplaceSegments(uri, authProvider);
           LOGGER.info("Got response {}: {} while sending revert replace segment request for table: {}, uploadURI: {}",
               response.getStatusCode(), response.getResponse(), rawTableName, entry.getKey());
         } catch (URISyntaxException | HttpErrorStatusException | IOException e) {

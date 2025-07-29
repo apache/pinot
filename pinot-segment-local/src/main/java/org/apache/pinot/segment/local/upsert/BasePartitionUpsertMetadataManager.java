@@ -358,7 +358,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     long startTimeMs = System.currentTimeMillis();
     if (!_enableSnapshot) {
-      segment.deleteValidDocIdsSnapshot();
+      deleteSnapshot(segment);
     }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
@@ -953,6 +953,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
             + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
+  }
+
+  protected void deleteSnapshot(ImmutableSegmentImpl segment) {
+    segment.deleteValidDocIdsSnapshot();
   }
 
   protected File getWatermarkFile() {

@@ -36,6 +36,8 @@ import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+
 
 public class MutableSegmentImplAggregateMetricsTest {
   private static final String DIMENSION_1 = "dim1";
@@ -46,6 +48,7 @@ public class MutableSegmentImplAggregateMetricsTest {
   private static final String TIME_COLUMN2 = "time2";
   private static final String KEY_SEPARATOR = "\t\t";
   private static final int NUM_ROWS = 10001;
+  private static final StreamMessageMetadata METADATA = mock(StreamMessageMetadata.class);
 
   @Test
   public void testAggregateMetrics()
@@ -99,7 +102,6 @@ public class MutableSegmentImplAggregateMetricsTest {
 
     Map<String, Long> expectedValues = new HashMap<>();
     Map<String, Float> expectedValuesFloat = new HashMap<>();
-    StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
     for (int i = 0; i < NUM_ROWS; i++) {
       int hoursSinceEpoch = random.nextInt(10);
       int daysSinceEpoch = random.nextInt(5);
@@ -114,7 +116,7 @@ public class MutableSegmentImplAggregateMetricsTest {
       float metricValueFloat = floatValues[random.nextInt(floatValues.length)];
       row.putValue(METRIC_2, metricValueFloat);
 
-      mutableSegmentImpl.index(row, defaultMetadata);
+      mutableSegmentImpl.index(row, METADATA);
 
       // Update expected values
       String key = buildKey(row);

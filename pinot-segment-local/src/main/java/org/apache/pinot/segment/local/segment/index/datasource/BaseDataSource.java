@@ -112,6 +112,12 @@ public abstract class BaseDataSource implements DataSource {
 
   @Nullable
   @Override
+  public TextIndexReader getIFSTIndex() {
+    return getIndex(StandardIndexes.ifst());
+  }
+
+  @Nullable
+  @Override
   public JsonIndexReader getJsonIndex() {
     return getIndex(StandardIndexes.json());
   }

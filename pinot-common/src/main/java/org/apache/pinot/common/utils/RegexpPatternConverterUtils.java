@@ -20,6 +20,8 @@ package org.apache.pinot.common.utils;
 
 
 import com.google.common.primitives.Chars;
+import org.apache.commons.lang3.StringUtils;
+
 
 /**
  * Utility for converting regex patterns.
@@ -34,8 +36,38 @@ public class RegexpPatternConverterUtils {
    * So it is handled separately in the conversion logic.
    */
   public static final char[] REGEXP_METACHARACTERS = new char[]{
-          '^', '$', '.', '{', '}', '[', ']', '(', ')', '*', '+', '?', '|', '<', '>', '-', '&', '/'};
+      '^', '$', '.', '{', '}', '[', ']', '(', ')', '*', '+', '?', '|', '<', '>', '-', '&', '/'
+  };
   public static final char BACK_SLASH = '\\';
+
+  /**
+   * Validates and converts a single character match parameter to case sensitivity.
+   * Only 'i'/'I' (case-insensitive) and 'c'/'C' (case-sensitive) are supported.
+   *
+   * @param matchParameter the match parameter string
+   * @return true if case-insensitive, false if case-sensitive
+   * @throws IllegalArgumentException if the parameter is invalid
+   */
+  public static boolean isCaseInsensitive(String matchParameter) {
+    if (StringUtils.isEmpty(matchParameter)) {
+      return false;
+    }
+
+    if (matchParameter.length() != 1) {
+      throw new IllegalArgumentException(
+          "Match parameter must be exactly one character. Got: '" + matchParameter + "'");
+    }
+
+    char matchChar = Character.toLowerCase(matchParameter.charAt(0));
+    if (matchChar == 'i') {
+      return true;
+    } else if (matchChar == 'c') {
+      return false;
+    } else {
+      throw new IllegalArgumentException("Unsupported match parameter: '" + matchParameter.charAt(0)
+          + "'. Only 'i'/'I' (case-insensitive) and 'c'/'C' (case-sensitive) are supported.");
+    }
+  }
 
   /**
    * Converts a LIKE pattern into REGEXP_LIKE pattern.

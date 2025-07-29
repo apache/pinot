@@ -1618,7 +1618,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     TenantConfig tenantConfig = new TenantConfig(getBrokerTenant(), getServerTenant(), null);
     tableConfig.setTenantConfig(tenantConfig);
     addTableConfig(tableConfig);
-    createAndUploadSegmentFromFile(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
+    createAndUploadSegmentFromClasspath(tableConfig, lookupTableSchema, DIM_TABLE_DATA_PATH, FileFormat.CSV,
         DIM_NUMBER_OF_RECORDS, 60_000);
 
     // Compare total rows in the primary table with number of rows in the result of the join with lookup table

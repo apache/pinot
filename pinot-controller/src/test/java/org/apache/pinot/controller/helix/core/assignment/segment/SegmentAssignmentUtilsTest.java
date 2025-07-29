@@ -22,8 +22,11 @@ import it.unimi.dsi.fastutil.ints.IntIntPair;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
@@ -443,5 +446,114 @@ public class SegmentAssignmentUtilsTest {
       assertEquals(numSegmentsToMovePerInstance.get(newInstanceNamePrefix + i), IntIntPair.of(30, 0));
       assertEquals(numSegmentsToMovePerInstance.get(INSTANCE_NAME_PREFIX + i), IntIntPair.of(0, 30));
     }
+  }
+
+  @Test
+  public void testCompletedConsumingOfflineSegmentAssignment() {
+    // Test case 1: No committing segments
+    Map<String, Map<String, String>> segmentAssignment = new TreeMap<>();
+
+    // Add completed segments (at least one instance ONLINE)
+    segmentAssignment.put("online_and_online", SegmentAssignmentUtils.getInstanceStateMap(
+        Arrays.asList("instance_1", "instance_2"), SegmentStateModel.ONLINE));
+    segmentAssignment.put("online_only", SegmentAssignmentUtils.getInstanceStateMap(
+        List.of("instance_1"), SegmentStateModel.ONLINE));
+
+    // Add consuming segments (at least one instance CONSUMING, no ONLINE)
+    segmentAssignment.put("consuming_and_consuming", SegmentAssignmentUtils.getInstanceStateMap(
+        Arrays.asList("instance_1", "instance_2"), SegmentStateModel.CONSUMING));
+    segmentAssignment.put("consuming_only", SegmentAssignmentUtils.getInstanceStateMap(
+        List.of("instance_3"), SegmentStateModel.CONSUMING));
+
+    // Add offline segments (all instances OFFLINE)
+    segmentAssignment.put("offline_and_offline", SegmentAssignmentUtils.getInstanceStateMap(
+        Arrays.asList("instance_1", "instance_2"), SegmentStateModel.OFFLINE));
+    segmentAssignment.put("offline_only", SegmentAssignmentUtils.getInstanceStateMap(
+        List.of("instance_4"), SegmentStateModel.OFFLINE));
+
+    // Add mixed state segments (should be classified as completed if any ONLINE)
+    Map<String, String> mixedStateMap1 = new HashMap<>();
+    mixedStateMap1.put("instance_1", SegmentStateModel.ONLINE);
+    mixedStateMap1.put("instance_2", SegmentStateModel.CONSUMING);
+    segmentAssignment.put("online_and_consuming", mixedStateMap1);
+
+    Map<String, String> mixedStateMap2 = new HashMap<>();
+    mixedStateMap2.put("instance_1", SegmentStateModel.ONLINE);
+    mixedStateMap2.put("instance_2", SegmentStateModel.OFFLINE);
+    segmentAssignment.put("online_and_offline", mixedStateMap2);
+
+    Map<String, String> mixedStateMap3 = new HashMap<>();
+    mixedStateMap3.put("instance_1", SegmentStateModel.ONLINE);
+    mixedStateMap3.put("instance_2", SegmentStateModel.CONSUMING);
+    mixedStateMap3.put("instance_3", SegmentStateModel.OFFLINE);
+    segmentAssignment.put("online_consuming_offline", mixedStateMap3);
+
+    Map<String, String> mixedStateMap4 = new HashMap<>();
+    mixedStateMap4.put("instance_1", SegmentStateModel.CONSUMING);
+    mixedStateMap4.put("instance_2", SegmentStateModel.OFFLINE);
+    segmentAssignment.put("consuming_and_offline", mixedStateMap4);
+
+    // Test without committing segments
+    SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment assignment1 =
+        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(segmentAssignment, null);
+
+    assertEquals(assignment1.getCompletedSegmentAssignment().size(), 5);
+    assertTrue(assignment1.getCompletedSegmentAssignment().containsKey("online_and_online"));
+    assertTrue(assignment1.getCompletedSegmentAssignment().containsKey("online_only"));
+    assertTrue(assignment1.getCompletedSegmentAssignment().containsKey("online_and_consuming"));
+    assertTrue(assignment1.getCompletedSegmentAssignment().containsKey("online_and_offline"));
+    assertTrue(assignment1.getCompletedSegmentAssignment().containsKey("online_consuming_offline"));
+
+    assertEquals(assignment1.getConsumingSegmentAssignment().size(), 3);
+    assertTrue(assignment1.getConsumingSegmentAssignment().containsKey("consuming_and_consuming"));
+    assertTrue(assignment1.getConsumingSegmentAssignment().containsKey("consuming_and_offline"));
+    assertTrue(assignment1.getConsumingSegmentAssignment().containsKey("consuming_only"));
+
+    assertEquals(assignment1.getOfflineSegmentAssignment().size(), 2);
+    assertTrue(assignment1.getOfflineSegmentAssignment().containsKey("offline_and_offline"));
+    assertTrue(assignment1.getOfflineSegmentAssignment().containsKey("offline_only"));
+
+    // Test case 2: With committing segments
+    Set<String> committingSegments = new HashSet<>(Arrays.asList("online_and_online", "online_and_consuming"));
+
+    SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment assignment2 =
+        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(segmentAssignment, committingSegments);
+
+    assertEquals(assignment2.getCompletedSegmentAssignment().size(), 3);
+    assertTrue(assignment2.getCompletedSegmentAssignment().containsKey("online_only"));
+    assertTrue(assignment2.getCompletedSegmentAssignment().containsKey("online_and_offline"));
+    assertTrue(assignment2.getCompletedSegmentAssignment().containsKey("online_consuming_offline"));
+
+    assertEquals(assignment2.getConsumingSegmentAssignment().size(), 5);
+    assertTrue(assignment2.getConsumingSegmentAssignment().containsKey("online_and_online")); // ONLINE but COMMITTING
+    assertTrue(
+        assignment2.getConsumingSegmentAssignment().containsKey("online_and_consuming")); // ONLINE but COMMITTING
+    assertTrue(assignment2.getConsumingSegmentAssignment().containsKey("consuming_and_consuming"));
+    assertTrue(assignment2.getConsumingSegmentAssignment().containsKey("consuming_and_offline"));
+    assertTrue(assignment2.getConsumingSegmentAssignment().containsKey("consuming_only"));
+
+    assertEquals(assignment2.getOfflineSegmentAssignment().size(), 2);
+    assertTrue(assignment2.getOfflineSegmentAssignment().containsKey("offline_and_offline"));
+    assertTrue(assignment2.getOfflineSegmentAssignment().containsKey("offline_only"));
+
+    // Test case 3: Empty segment assignment
+    Map<String, Map<String, String>> emptyAssignment = new TreeMap<>();
+    SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment assignment3 =
+        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(emptyAssignment, null);
+
+    assertEquals(assignment3.getCompletedSegmentAssignment().size(), 0);
+    assertEquals(assignment3.getConsumingSegmentAssignment().size(), 0);
+    assertEquals(assignment3.getOfflineSegmentAssignment().size(), 0);
+
+    // Test case 4: Empty committing segments set
+    Set<String> emptyCommittingSegments = new HashSet<>();
+    SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment assignment4 =
+        new SegmentAssignmentUtils.CompletedConsumingOfflineSegmentAssignment(
+            segmentAssignment, emptyCommittingSegments);
+
+    // Should behave the same as null committing segments
+    assertEquals(assignment4.getCompletedSegmentAssignment().size(), 5);
+    assertEquals(assignment4.getConsumingSegmentAssignment().size(), 3);
+    assertEquals(assignment4.getOfflineSegmentAssignment().size(), 2);
   }
 }
