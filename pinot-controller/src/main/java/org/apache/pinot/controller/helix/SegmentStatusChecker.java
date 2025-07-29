@@ -367,18 +367,14 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
             String serverInstanceId = entry.getKey();
             String segmentState = entry.getValue();
             if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
-              if (segmentState.equals(SegmentStateModel.ONLINE)
-                  || segmentState.equals(SegmentStateModel.CONSUMING)) {
+              if (segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING)) {
                 numEVReplicasUp++;
               } else {
-                LOGGER.warn("Segment {} in table {} has state {} on instance {}"
-                        + "Marking it as unavailable",
+                LOGGER.warn("Segment {} in table {} has state {} on instance {}. Marking it as unavailable",
                     segment, tableNameWithType, segmentState, serverInstanceId);
               }
             } else {
-              // If the server is not queryable, we skip the segment and do not count it as an EV replica
-              LOGGER.warn("Segment {} in table {} has state {} on instance {} which is not queryable. "
-                      + "Marking it as unavailable",
+              LOGGER.warn("Segment {} in table {} has state {} on unavailable instance {}. Marking it as unavailable",
                   segment, tableNameWithType, segmentState, serverInstanceId);
             }
             if (segmentState.equals(SegmentStateModel.ERROR)) {
