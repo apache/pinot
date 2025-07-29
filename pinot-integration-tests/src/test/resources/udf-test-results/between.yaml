@@ -695,8 +695,7 @@ SSE predicate (with null handling):
   '(value: string, lower: string, upper: string) -> boolean':
     entries: null
     error: true
-    errorMessage: "\"Caught exception while doing operator: class org.apache.pinot.core.operator.query.SelectionOnlyOperator\
-      \ on segment udf_test_%: For input string: \\\"null\\\"\""
+    errorMessage: "Operator execution error"
 SSE predicate (without null handling):
   '(value: big_decimal, lower: big_decimal, upper: big_decimal) -> boolean':
     entries:
@@ -846,8 +845,7 @@ SSE predicate (without null handling):
   '(value: string, lower: string, upper: string) -> boolean':
     entries: null
     error: true
-    errorMessage: "\"Caught exception while doing operator: class org.apache.pinot.core.operator.query.SelectionOnlyOperator\
-      \ on segment udf_test_%: For input string: \\\"null\\\"\""
+    errorMessage: "Operator execution error"
 SSE projection (with null handling):
   '(value: big_decimal, lower: big_decimal, upper: big_decimal) -> boolean':
     entries:
@@ -997,8 +995,7 @@ SSE projection (with null handling):
   '(value: string, lower: string, upper: string) -> boolean':
     entries: null
     error: true
-    errorMessage: "\"Caught exception while doing operator: class org.apache.pinot.core.operator.query.SelectionOnlyOperator\
-      \ on segment udf_test_%: For input string: \\\"b\\\"\""
+    errorMessage: "Operator execution error"
 SSE projection (without null handling):
   '(value: big_decimal, lower: big_decimal, upper: big_decimal) -> boolean':
     entries:
@@ -1148,5 +1145,4 @@ SSE projection (without null handling):
   '(value: string, lower: string, upper: string) -> boolean':
     entries: null
     error: true
-    errorMessage: "\"Caught exception while doing operator: class org.apache.pinot.core.operator.query.SelectionOnlyOperator\
-      \ on segment udf_test_%: For input string: \\\"b\\\"\""
+    errorMessage: "Operator execution error"

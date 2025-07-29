@@ -100,14 +100,12 @@ SSE predicate (with null handling):
   '(input: string) -> int':
     entries: null
     error: true
-    errorMessage: "\"Caught exception while doing operator: class org.apache.pinot.core.operator.query.SelectionOnlyOperator\
-      \ on segment udf_test_%: Index 0 out of bounds for length 0\""
+    errorMessage: "Operator execution error"
 SSE predicate (without null handling):
   '(input: string) -> int':
     entries: null
     error: true
-    errorMessage: "\"Caught exception while doing operator: class org.apache.pinot.core.operator.query.SelectionOnlyOperator\
-      \ on segment udf_test_%: Index 0 out of bounds for length 0\""
+    errorMessage: "Operator execution error"
 SSE projection (with null handling):
   '(input: string) -> int':
     entries:
