@@ -20,14 +20,11 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.Executor;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -37,7 +34,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
-import org.apache.pinot.controller.validation.UtilizationChecker;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -60,17 +56,16 @@ import org.slf4j.LoggerFactory;
  */
 public class TenantRebalanceChecker extends BasePeriodicTask {
   private final static String TASK_NAME = TenantRebalanceChecker.class.getSimpleName();
-  public final static Integer DEFAULT_FREQUENCY_IN_SECONDS = 300;
-  public final static Integer DEFAULT_INITIAL_DELAY = 300;
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantRebalanceChecker.class);
   private static final double RETRY_DELAY_SCALE_FACTOR = 2.0;
   private final TenantRebalancer _tenantRebalancer;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
-  public TenantRebalanceChecker(ControllerConf config, PoolingHttpClientConnectionManager connectionManager,
-      ControllerMetrics controllerMetrics, List<UtilizationChecker> utilizationCheckers, Executor executor,
+  public TenantRebalanceChecker(ControllerConf config,
+      ControllerMetrics controllerMetrics,
       PinotHelixResourceManager pinotHelixResourceManager, TenantRebalancer tenantRebalancer) {
-    super(TASK_NAME, DEFAULT_FREQUENCY_IN_SECONDS, DEFAULT_INITIAL_DELAY);
+    super(TASK_NAME, config.getTenantRebalanceCheckerFrequencyInSeconds(),
+        config.getTenantRebalanceCheckerInitialDelayInSeconds());
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _tenantRebalancer = tenantRebalancer;
   }
@@ -89,12 +84,19 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
 
       try {
         // Check if the tenant rebalance job is stuck
+        String tenantRebalanceContextStr =
+            jobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT);
+        String tenantRebalanceProgressStatsStr =
+            jobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
+        if (StringUtils.isEmpty(tenantRebalanceContextStr) || StringUtils.isEmpty(tenantRebalanceProgressStatsStr)) {
+          // Skip rebalance job: {} as it has no job context or progress stats
+          LOGGER.info("Skip checking tenant rebalance job: {} as it has no job context or progress stats", jobId);
+          continue;
+        }
         DefaultTenantRebalanceContext tenantRebalanceContext =
-            JsonUtils.stringToObject(jobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT),
-                DefaultTenantRebalanceContext.class);
+            JsonUtils.stringToObject(tenantRebalanceContextStr, DefaultTenantRebalanceContext.class);
         TenantRebalanceProgressStats progressStats =
-            JsonUtils.stringToObject(jobZKMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS),
-                TenantRebalanceProgressStats.class);
+            JsonUtils.stringToObject(tenantRebalanceProgressStatsStr, TenantRebalanceProgressStats.class);
         long statsUpdatedAt = Long.parseLong(jobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
 
         if (isTenantRebalanceJobStuck(tenantRebalanceContext, statsUpdatedAt)) {

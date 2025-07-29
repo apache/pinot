@@ -1,7 +1,6 @@
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -75,15 +74,12 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     _executorService = Executors.newFixedThreadPool(2);
 
     // Setup default mock behaviors
-    when(_mockControllerConf.getRebalanceCheckerFrequencyInSeconds()).thenReturn(300);
-    when(_mockControllerConf.getRebalanceCheckerInitialDelayInSeconds()).thenReturn(300L);
+    when(_mockControllerConf.getTenantRebalanceCheckerFrequencyInSeconds()).thenReturn(300);
+    when(_mockControllerConf.getTenantRebalanceCheckerInitialDelayInSeconds()).thenReturn(300L);
 
     _tenantRebalanceChecker = new TenantRebalanceChecker(
         _mockControllerConf,
-        _mockConnectionManager,
         _mockControllerMetrics,
-        new ArrayList<>(),
-        _executorService,
         _mockPinotHelixResourceManager,
         _mockTenantRebalancer
     );
