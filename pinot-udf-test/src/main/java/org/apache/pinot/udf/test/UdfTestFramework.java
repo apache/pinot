@@ -180,6 +180,9 @@ public class UdfTestFramework {
       if (e.getCause().getMessage().contains("Unsupported function")) {
         return new ResultByExample.Failure("Unsupported");
       }
+      if (e.getCause().getMessage().contains("Caught exception while doing operator")) {
+        return new ResultByExample.Failure("Operator execution error");
+      }
       return new ResultByExample.Failure(e.getCause().getMessage());
     }
   }
