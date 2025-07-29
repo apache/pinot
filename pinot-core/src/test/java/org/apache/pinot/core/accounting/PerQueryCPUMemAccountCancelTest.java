@@ -19,6 +19,7 @@
 package org.apache.pinot.core.accounting;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -115,6 +116,9 @@ public class PerQueryCPUMemAccountCancelTest {
           evalTriggers();
           reapFinishedTasks();
           _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
+          _maxHeapUsageQuery.set(_aggregatedUsagePerActiveQuery.values().stream()
+              .filter(stats -> !_cancelSentQueries.contains(stats.getQueryId()))
+              .max(Comparator.comparing(AggregatedStats::getAllocatedBytes)).orElse(null));
           triggeredActions();
         } catch (Exception e) {
           LOGGER.error("Caught exception while executing stats aggregation and query kill", e);
