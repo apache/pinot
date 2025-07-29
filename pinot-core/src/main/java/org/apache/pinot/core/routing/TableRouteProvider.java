@@ -16,12 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.routing.table;
+package org.apache.pinot.core.routing;
 
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.routing.RoutingManager;
-import org.apache.pinot.core.transport.TableRouteInfo;
 
 
 /**
