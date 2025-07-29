@@ -154,7 +154,22 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
       final String queryId = "0";
       PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant perQueryAccountant =
           (PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant) _accountant;
-      perQueryAccountant.cancelQuery(queryId, null);
+      perQueryAccountant.cancelQuery(new QueryResourceTracker() {
+        @Override
+        public String getQueryId() {
+          return queryId;
+        }
+
+        @Override
+        public long getAllocatedBytes() {
+          return 0;
+        }
+
+        @Override
+        public long getCpuTimeNs() {
+          return 0;
+        }
+      }, null);
       assertTrue(perQueryAccountant.getCancelSentQueries().contains(queryId));
       latch.countDown();
     }

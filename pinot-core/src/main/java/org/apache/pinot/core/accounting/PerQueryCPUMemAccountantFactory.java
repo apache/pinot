@@ -541,7 +541,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
     }
 
-    public void cancelQuery(AggregatedStats queryResourceTracker) {
+    public void cancelQuery(QueryResourceTracker queryResourceTracker, Thread anchorThread) {
       String queryId = queryResourceTracker.getQueryId();
       if (_cancelSentQueries.add(queryId)) {
         MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(queryId);
@@ -549,7 +549,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           callback.cancelQuery(Long.parseLong(queryId));
           _queryCancelCallbacks.invalidate(queryId);
         } else {
-          queryResourceTracker.getAnchorThread().interrupt();
+          anchorThread.interrupt();
         }
         logTerminatedQuery(queryResourceTracker, _watcherTask.getHeapUsageBytes(), callback != null);
       }
@@ -936,7 +936,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
                 String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                     maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
-            cancelQuery(maxUsageTuple);
+            cancelQuery(maxUsageTuple, maxUsageTuple.getAnchorThread());
             if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
               _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
             }
@@ -964,7 +964,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                         + "CPU time exceeding limit of %d ns CPU time", value._queryId, _instanceType, _instanceId,
                     value.getCpuTimeNs(), config.getCpuTimeBasedKillingThresholdNS())));
             boolean hasCallBack = _queryCancelCallbacks.getIfPresent(value.getQueryId()) != null;
-            cancelQuery(value);
+            cancelQuery(value, value.getAnchorThread());
             if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
               _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
             }
