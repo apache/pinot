@@ -551,7 +551,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         } else {
           queryResourceTracker.getAnchorThread().interrupt();
         }
-        logTerminatedQuery(queryResourceTracker, _watcherTask.getHeapUsageBytes(),callback != null, false);
+        logTerminatedQuery(queryResourceTracker, _watcherTask.getHeapUsageBytes(), callback != null, false);
       }
     }
 
