@@ -25,6 +25,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SortedRecordTable;
+import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -77,6 +78,40 @@ public class SingleThreadedSortedGroupByCombineOperator extends BaseSingleBlockC
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  /**
+   * Executes query on one sorted segment in a worker thread and merges the results into the sorted record table.
+   */
+  @Override
+  protected void processSegments() {
+    int operatorId;
+    while (_processingException.get() == null && (operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+      Operator operator = _operators.get(operatorId);
+      try {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
+        }
+        GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
+        if (resultsBlock.isGroupsTrimmed()) {
+          _groupsTrimmed = true;
+        }
+        // Set groups limit reached flag.
+        if (resultsBlock.isNumGroupsLimitReached()) {
+          _numGroupsLimitReached = true;
+        }
+        if (resultsBlock.isNumGroupsWarningLimitReached()) {
+          _numGroupsWarningLimitReached = true;
+        }
+        _blockingQueue.offer(resultsBlock);
+      } catch (RuntimeException e) {
+        throw wrapOperatorException(operator, e);
+      } finally {
+        if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
+          ((AcquireReleaseColumnsSegmentOperator) operator).release();
+        }
+      }
+    }
   }
 
   @Override
