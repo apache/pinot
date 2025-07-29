@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
-import java.util.LinkedList;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.Queue;
 
@@ -28,12 +28,12 @@ import java.util.Queue;
  * for managing tenant rebalance operations.
  */
 public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
-  private final ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> _parallelQueue;
+  private final ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> _parallelQueue;
   private final Queue<TenantRebalancer.TenantTableRebalanceJobContext> _sequentialQueue;
   private final ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> _ongoingJobsQueue;
 
   public DefaultTenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId,
-      boolean allowRetries, ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
+      boolean allowRetries, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
       ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
     super(originalJobId, config, attemptId, allowRetries);
@@ -43,21 +43,21 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
   }
 
   public static DefaultTenantRebalanceContext forInitialRebalance(String originalJobId, TenantRebalanceConfig config,
-      boolean allowRetries, ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
+      boolean allowRetries, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue) {
     return new DefaultTenantRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID, allowRetries,
         parallelQueue, sequentialQueue, new ConcurrentLinkedQueue<>());
   }
 
   public static DefaultTenantRebalanceContext forRetry(String originalJobId, TenantRebalanceConfig config,
-      int attemptId, ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
+      int attemptId, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
       ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
     return new DefaultTenantRebalanceContext(originalJobId, config, attemptId, true,
         parallelQueue, sequentialQueue, ongoingJobsQueue);
   }
 
-  public ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> getParallelQueue() {
+  public ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> getParallelQueue() {
     return _parallelQueue;
   }
 

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -94,10 +95,10 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     // and put in the queue for the consuming threads to pick up and run the rebalance operation
 
     String tenantRebalanceJobId = createUniqueRebalanceJobIdentifier();
-    Pair<ConcurrentLinkedQueue<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>> queues =
+    Pair<ConcurrentLinkedDeque<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>> queues =
         createParallelAndSequentialQueues(config, dryRunResults, config.getParallelWhitelist(),
             config.getParallelBlacklist());
-    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
+    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
     Queue<TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
     DefaultTenantRebalanceContext tenantRebalanceContext =
         DefaultTenantRebalanceContext.forInitialRebalance(tenantRebalanceJobId, config, false, parallelQueue,
@@ -139,7 +140,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   public void rebalanceWithContext(DefaultTenantRebalanceContext tenantRebalanceContext,
       ZkBasedTenantRebalanceObserver observer) {
     TenantRebalanceConfig config = tenantRebalanceContext.getConfig();
-    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> parallelQueue = tenantRebalanceContext.getParallelQueue();
+    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = tenantRebalanceContext.getParallelQueue();
     Queue<TenantTableRebalanceJobContext> sequentialQueue = tenantRebalanceContext.getSequentialQueue();
     ConcurrentLinkedQueue<TenantTableRebalanceJobContext> ongoingJobs = tenantRebalanceContext.getOngoingJobsQueue();
 
@@ -269,7 +270,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   }
 
   @VisibleForTesting
-  Pair<ConcurrentLinkedQueue<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>>
+  Pair<ConcurrentLinkedDeque<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>>
   createParallelAndSequentialQueues(
       TenantRebalanceConfig config, Map<String, RebalanceResult> dryRunResults, @Nullable Set<String> parallelWhitelist,
       @Nullable Set<String> parallelBlacklist) {
@@ -283,14 +284,14 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         sequentialTableDryRunResults.put(table, result);
       }
     });
-    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> parallelQueue =
+    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue =
         createTableQueue(config, parallelTableDryRunResults);
     Queue<TenantTableRebalanceJobContext> sequentialQueue = createTableQueue(config, sequentialTableDryRunResults);
     return Pair.of(parallelQueue, sequentialQueue);
   }
 
   @VisibleForTesting
-  ConcurrentLinkedQueue<TenantTableRebalanceJobContext> createTableQueue(TenantRebalanceConfig config,
+  ConcurrentLinkedDeque<TenantTableRebalanceJobContext> createTableQueue(TenantRebalanceConfig config,
       Map<String, RebalanceResult> dryRunResults) {
     Queue<TenantTableRebalanceJobContext> firstQueue = new LinkedList<>();
     Queue<TenantTableRebalanceJobContext> queue = new LinkedList<>();
@@ -324,7 +325,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         queue.add(jobContext);
       }
     });
-    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> tableQueue = new ConcurrentLinkedQueue<>();
+    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> tableQueue = new ConcurrentLinkedDeque<>();
     tableQueue.addAll(firstQueue);
     tableQueue.addAll(queue);
     tableQueue.addAll(lastQueue);
