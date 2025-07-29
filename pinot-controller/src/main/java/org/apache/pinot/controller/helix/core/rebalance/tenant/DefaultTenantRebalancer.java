@@ -145,12 +145,6 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     ConcurrentLinkedQueue<TenantTableRebalanceJobContext> ongoingJobs = tenantRebalanceContext.getOngoingJobsQueue();
 
     observer.onTrigger(TenantRebalanceObserver.Trigger.START_TRIGGER, null, null);
-    try {
-      Thread.sleep(30_000);
-    } catch (InterruptedException e) {
-      LOGGER.warn("Interrupted while waiting for the rebalance to start", e);
-      Thread.currentThread().interrupt();
-    }
 
     // ensure atleast 1 thread is created to run the sequential table rebalance operations
     int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
