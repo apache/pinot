@@ -67,7 +67,7 @@ public class Tracing {
 
   private static final class Holder {
     static final Tracer TRACER = TRACER_REGISTRATION.get() == null ? createDefaultTracer() : TRACER_REGISTRATION.get();
-    static final ThreadResourceUsageAccountant ACCOUNTANT =
+    static ThreadResourceUsageAccountant _accountant =
         ACCOUNTANT_REGISTRATION.get() == null ? createDefaultThreadAccountant() : ACCOUNTANT_REGISTRATION.get();
   }
 
@@ -88,7 +88,12 @@ public class Tracing {
    * @return true if the registration was successful.
    */
   public static boolean register(ThreadResourceUsageAccountant threadResourceUsageAccountant) {
-    return ACCOUNTANT_REGISTRATION.compareAndSet(null, threadResourceUsageAccountant);
+    if (ACCOUNTANT_REGISTRATION.compareAndSet(null, threadResourceUsageAccountant)) {
+      Holder._accountant = threadResourceUsageAccountant;
+      LOGGER.info("Registered thread accountant: {}", threadResourceUsageAccountant.getClass().getName());
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -109,7 +114,7 @@ public class Tracing {
    * @return the registered threadAccountant.
    */
   public static ThreadResourceUsageAccountant getThreadAccountant() {
-    return Holder.ACCOUNTANT;
+    return Holder._accountant;
   }
 
   /**
@@ -138,7 +143,23 @@ public class Tracing {
    */
   private static DefaultThreadResourceUsageAccountant createDefaultThreadAccountant() {
     LOGGER.info("Using default thread accountant");
-    return new DefaultThreadResourceUsageAccountant();
+    DefaultThreadResourceUsageAccountant accountant = new DefaultThreadResourceUsageAccountant();
+    Holder._accountant = accountant;
+    ACCOUNTANT_REGISTRATION.set(accountant);
+    return accountant;
+  }
+
+  /**
+   * Unregisters the thread accountant. This is only used in tests when a custom thread accountant is required.
+   * This will reset the thread accountant to null, so that the next call to initializeThreadAccountant or
+   * createThreadAccountant will register the new thread accountant.
+   */
+  public static void unregisterThreadAccountant() {
+    if (Holder._accountant != null) {
+      Holder._accountant.stopWatcherTask();
+    }
+    Holder._accountant = null;
+    ACCOUNTANT_REGISTRATION.set(null);
   }
 
   /**
@@ -323,30 +344,44 @@ public class Tracing {
 
     public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
-      String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
+      createThreadAccountant(config, instanceId, instanceType);
+    }
+
+    public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
+        InstanceType instanceType) {
       _workloadBudgetManager = new WorkloadBudgetManager(config);
-      if (factoryName == null) {
-        LOGGER.warn("No thread accountant factory provided, using default implementation");
-      } else {
+      String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
+      ThreadResourceUsageAccountant accountant = null;
+      if (factoryName != null) {
         LOGGER.info("Config-specified accountant factory name {}", factoryName);
         try {
           ThreadAccountantFactory threadAccountantFactory =
               (ThreadAccountantFactory) Class.forName(factoryName).getDeclaredConstructor().newInstance();
-          boolean registered = Tracing.register(threadAccountantFactory.init(config, instanceId, instanceType));
           LOGGER.info("Using accountant provided by {}", factoryName);
+          accountant = threadAccountantFactory.init(config, instanceId, instanceType);
+          boolean registered = register(accountant);
           if (!registered) {
-            LOGGER.warn("ThreadAccountant {} register unsuccessful, as it is already registered.", factoryName);
+            LOGGER.warn("ThreadAccountant register unsuccessful, as it is already registered.");
           }
         } catch (Exception exception) {
           LOGGER.warn("Using default implementation of thread accountant, "
               + "due to invalid thread accountant factory {} provided, exception:", factoryName, exception);
         }
       }
+      // If no factory is specified or the factory creation failed, use the default implementation
+      if (accountant == null) {
+        accountant = createDefaultThreadAccountant();
+      }
+      return accountant;
+    }
+
+    public static void startThreadAccountant() {
       Tracing.getThreadAccountant().startWatcherTask();
     }
 
     public static boolean isInterrupted() {
-      return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted();
+      return Thread.interrupted() || Tracing.getThreadAccountant().isAnchorThreadInterrupted()
+          || Tracing.getThreadAccountant().isQueryTerminated();
     }
 
     public static void sampleAndCheckInterruption() {

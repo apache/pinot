@@ -126,6 +126,7 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
     _protoBufRecordExtractor.init(fieldsToRead, null);
   }
 
+  @Nullable
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
@@ -140,9 +141,13 @@ public class KafkaConfluentSchemaRegistryProtoBufMessageDecoder implements Strea
     }
   }
 
+  @Nullable
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+    if (offset != 0 || payload.length > length) {
+      payload = Arrays.copyOfRange(payload, offset, offset + length);
+    }
+    return decode(payload, destination);
   }
 
   /**

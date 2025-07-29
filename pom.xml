@@ -60,6 +60,7 @@
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
     <module>pinot-timeseries</module>
+    <module>pinot-udf-test</module>
   </modules>
 
   <licenses>
@@ -144,32 +145,32 @@
     <hive.version>2.8.1</hive.version>
     <helix.version>1.3.2</helix.version>
     <zkclient.version>0.11</zkclient.version>
-    <jackson.version>2.19.1</jackson.version>
+    <jackson.version>2.19.2</jackson.version>
     <zookeeper.version>3.9.3</zookeeper.version>
     <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.47</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.25.3</swagger-ui.version>
+    <swagger-ui.version>5.26.2</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.2</jsonsmart.version>
     <quartz.version>2.5.0</quartz.version>
     <calcite.version>1.40.0</calcite.version>
-    <immutables.version>2.11.0</immutables.version>
+    <immutables.version>2.11.1</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
-    <dynatrace.hash4j.version>0.23.1</dynatrace.hash4j.version>
+    <dynatrace.hash4j.version>0.25.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.33</dropwizard-metrics.version>
-    <snappy-java.version>1.1.10.7</snappy-java.version>
+    <snappy-java.version>1.1.10.8</snappy-java.version>
     <zstd-jni.version>1.5.7-4</zstd-jni.version>
     <lz4-java.version>1.8.0</lz4-java.version>
     <libthrift.verion>0.22.0</libthrift.verion>
-    <log4j.version>2.25.0</log4j.version>
+    <log4j.version>2.25.1</log4j.version>
     <slf4j.version>2.0.17</slf4j.version>
-    <netty.version>4.1.119.Final</netty.version>
+    <netty.version>4.1.122.Final</netty.version>
     <reactivestreams.version>1.0.4</reactivestreams.version>
     <jts.version>1.20.0</jts.version>
     <h3.version>4.1.1</h3.version>
@@ -177,9 +178,9 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.31.78</aws.sdk.version>
+    <aws.sdk.version>2.32.8</aws.sdk.version>
     <azure.sdk.version>1.2.36</azure.sdk.version>
-    <azure.msal4j.version>1.21.0</azure.msal4j.version>
+    <azure.msal4j.version>1.22.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
     <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
@@ -190,7 +191,7 @@
     <s3mock.version>2.17.0</s3mock.version>
     <localstack-utils.version>0.2.23</localstack-utils.version>
     <protobuf-dynamic.version>1.0.1</protobuf-dynamic.version>
-    <enforcer-api.version>3.6.0</enforcer-api.version>
+    <enforcer-api.version>3.6.1</enforcer-api.version>
 
     <spark2.version>2.4.8</spark2.version>
     <spark3.version>3.5.6</spark3.version>
@@ -203,14 +204,14 @@
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.18.0</commons-lang3.version>
     <commons-collections4.version>4.5.0</commons-collections4.version>
-    <commons-text.version>1.13.1</commons-text.version>
+    <commons-text.version>1.14.0</commons-text.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.14.0</commons-csv.version>
     <commons-configuration2.version>2.12.0</commons-configuration2.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
-    <commons-io.version>2.19.0</commons-io.version>
-    <commons-codec.version>1.18.0</commons-codec.version>
+    <commons-io.version>2.20.0</commons-io.version>
+    <commons-codec.version>1.19.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.10.0</commons-validator.version>
@@ -239,10 +240,10 @@
     <!-- Google Libraries -->
     <protobuf.version>3.25.8</protobuf.version>
     <grpc.version>1.73.0</grpc.version>
-    <google.cloud.libraries.version>26.63.0</google.cloud.libraries.version>
+    <google.cloud.libraries.version>26.64.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
-    <google.errorprone.version>2.40.0</google.errorprone.version>
+    <google.errorprone.version>2.41.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -256,11 +257,11 @@
     <jline.version>3.30.4</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>10.3.1</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.4</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.1</woodstox.version>
-    <curator.version>5.8.0</curator.version>
+    <curator.version>5.9.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
@@ -295,9 +296,9 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea57</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea62</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
-    <maven.version>3.9.10</maven.version>
+    <maven.version>3.9.11</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
     <plexus-utils.version>3.6.0</plexus-utils.version>
 
@@ -626,6 +627,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-timeseries-m3ql</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-udf-test</artifactId>
         <version>${project.version}</version>
       </dependency>
 
@@ -2156,7 +2162,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.45.0</version>
+          <version>2.46.1</version>
           <executions>
             <execution>
               <goals>

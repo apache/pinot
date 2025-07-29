@@ -79,7 +79,7 @@ public class JsonUtils {
   public static final String ARRAY_INDEX_KEY = ".$index";
   public static final String SKIPPED_VALUE_REPLACEMENT = "$SKIPPED$";
   public static final int MAX_COMBINATIONS = 100_000;
-  private static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
+  public static final List<Map<String, String>> SKIPPED_FLATTENED_RECORD =
       Collections.singletonList(Collections.singletonMap(VALUE_KEY, SKIPPED_VALUE_REPLACEMENT));
 
   // For querying
@@ -221,6 +221,11 @@ public class JsonUtils {
   public static JsonNode bytesToJsonNode(byte[] jsonBytes)
       throws IOException {
     return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes));
+  }
+
+  public static JsonNode bytesToJsonNode(byte[] jsonBytes, int offset, int length)
+      throws IOException {
+    return DEFAULT_READER.readTree(new ByteArrayInputStream(jsonBytes, offset, length));
   }
 
   public static <T> T jsonNodeToObject(JsonNode jsonNode, Class<T> valueType)
@@ -736,14 +741,14 @@ public class JsonUtils {
     JsonNode jsonNode;
     try {
       jsonNode = JsonUtils.stringToJsonNode(jsonString);
-    } catch (JsonProcessingException e) {
+      return JsonUtils.flatten(jsonNode, jsonIndexConfig);
+    } catch (Exception e) {
       if (jsonIndexConfig.getSkipInvalidJson()) {
         return SKIPPED_FLATTENED_RECORD;
       } else {
         throw e;
       }
     }
-    return JsonUtils.flatten(jsonNode, jsonIndexConfig);
   }
 
   /**

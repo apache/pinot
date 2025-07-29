@@ -358,7 +358,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     }
     long startTimeMs = System.currentTimeMillis();
     if (!_enableSnapshot) {
-      segment.deleteValidDocIdsSnapshot();
+      deleteSnapshot(segment);
     }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
@@ -955,6 +955,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
 
+  protected void deleteSnapshot(ImmutableSegmentImpl segment) {
+    segment.deleteValidDocIdsSnapshot();
+  }
+
   protected File getWatermarkFile() {
     return new File(_tableIndexDir, V1Constants.TTL_WATERMARK_TABLE_PARTITION + _partitionId);
   }
@@ -1101,7 +1105,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     trackUpdatedSegmentsSinceLastSnapshot(segment);
   }
 
-  private void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
+  protected void trackUpdatedSegmentsSinceLastSnapshot(IndexSegment segment) {
     if (_enableSnapshot && segment instanceof ImmutableSegment) {
       _updatedSegmentsSinceLastSnapshot.add(segment);
     }

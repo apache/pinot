@@ -52,7 +52,6 @@ public class KinesisMessageBatchTest {
       byte[] value = streamMessage.getValue();
       assertEquals(new String(value, StandardCharsets.UTF_8), "value-" + i);
       StreamMessageMetadata metadata = streamMessage.getMetadata();
-      assertNotNull(metadata);
       assertEquals(metadata.getRecordIngestionTimeMs(), baseTimeMs + i);
       StreamPartitionMsgOffset offset = metadata.getOffset();
       assertTrue(offset instanceof KinesisPartitionGroupOffset);

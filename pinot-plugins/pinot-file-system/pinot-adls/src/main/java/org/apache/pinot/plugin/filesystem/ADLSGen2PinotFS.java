@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.filesystem;
 
+import com.azure.core.credential.AzureSasCredential;
 import com.azure.core.http.ProxyOptions;
 import com.azure.core.http.netty.NettyAsyncHttpClientBuilder;
 import com.azure.core.http.rest.PagedIterable;
@@ -74,7 +75,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   private static final Logger LOGGER = LoggerFactory.getLogger(ADLSGen2PinotFS.class);
 
   private enum AuthenticationType {
-    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, ANONYMOUS_ACCESS, DEFAULT
+    ACCESS_KEY, AZURE_AD, AZURE_AD_WITH_PROXY, ANONYMOUS_ACCESS, DEFAULT, SAS_TOKEN
   }
 
   private static final String AUTHENTICATION_TYPE = "authenticationType";
@@ -91,6 +92,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
   private static final String PROXY_PORT = "proxyPort";
   private static final String PROXY_USERNAME = "proxyUsername";
   private static final String PROXY_PASSWORD = "proxyPassword";
+  private static final String SAS_TOKEN = "sasToken";
 
   private static final String HTTPS_URL_PREFIX = "https://";
 
@@ -140,6 +142,7 @@ public class ADLSGen2PinotFS extends BasePinotFS {
     String proxyUsername = config.getProperty(PROXY_USERNAME);
     String proxyPassword = config.getProperty(PROXY_PASSWORD);
     String proxyPort = config.getProperty(PROXY_PORT);
+    String sasToken = config.getProperty(SAS_TOKEN);
 
     String dfsServiceEndpointUrl = HTTPS_URL_PREFIX + accountName + AZURE_STORAGE_DNS_SUFFIX;
 
@@ -154,6 +157,15 @@ public class ADLSGen2PinotFS extends BasePinotFS {
 
         StorageSharedKeyCredential sharedKeyCredential = new StorageSharedKeyCredential(accountName, accessKey);
         dataLakeServiceClientBuilder.credential(sharedKeyCredential);
+        break;
+      }
+      case SAS_TOKEN: {
+        LOGGER.info("Authenticating using the sas token for the account.");
+        Preconditions.checkNotNull(accountName, "Account Name cannot be null");
+        Preconditions.checkNotNull(sasToken, "SAS Token cannot be null");
+
+        AzureSasCredential azureSasCredential = new AzureSasCredential(sasToken);
+        dataLakeServiceClientBuilder.credential(azureSasCredential);
         break;
       }
       case AZURE_AD: {
