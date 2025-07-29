@@ -33,11 +33,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -68,6 +70,7 @@ public abstract class QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartBase.class);
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
+  private static final Random RANDOM = new Random();
 
   protected static final String[] DEFAULT_OFFLINE_TABLE_DIRECTORIES = new String[]{
       "examples/batch/clickstreamFunnel",
@@ -403,7 +406,15 @@ public abstract class QuickStartBase {
 
   protected void startKafka() {
     printStatus(Quickstart.Color.CYAN, "***** Starting Kafka *****");
-    _zookeeperInstance = ZkStarter.startLocalZkServer();
+
+    // Randomly choose between SSL and non-SSL ZooKeeper (50% chance each)
+    boolean useSSL = RANDOM.nextBoolean();
+    if (useSSL) {
+      _zookeeperInstance = startSSLZooKeeper();
+    } else {
+      _zookeeperInstance = ZkStarter.startLocalZkServer();
+    }
+
     try {
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
           KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
@@ -423,6 +434,30 @@ public abstract class QuickStartBase {
     }));
 
     printStatus(Quickstart.Color.CYAN, "***** Kafka Started *****");
+  }
+
+  private ZkStarter.ZookeeperInstance startSSLZooKeeper() {
+    try {
+      // Create temporary SSL certificates for testing
+      File tempDir = new File(FileUtils.getTempDirectory(), "quickstart-ssl-" + System.currentTimeMillis());
+      tempDir.mkdirs();
+
+      String keystorePath = new File(tempDir, "test-keystore.jks").getAbsolutePath();
+      String truststorePath = new File(tempDir, "test-truststore.jks").getAbsolutePath();
+      String password = "test-ssl-" + System.currentTimeMillis();
+
+      ZkStarter.SSLConfig sslConfig = ZkStarter.createTestSSLConfig(keystorePath, truststorePath, password);
+      ZkStarter.ZookeeperInstance zkInstance = ZkStarter.startLocalZkServerWithSSL(sslConfig);
+
+      // Configure SSL for all clients in this quickstart
+      ZkSSLUtils.configureSSL(sslConfig.getClientSSLProperties());
+
+      return zkInstance;
+    } catch (Exception e) {
+      // If SSL setup fails, fall back to non-SSL
+      System.err.println("Failed to setup SSL ZooKeeper, falling back to non-SSL: " + e.getMessage());
+      return ZkStarter.startLocalZkServer();
+    }
   }
 
   public void startAllDataStreams(StreamDataServerStartable kafkaStarter, File quickstartTmpDir)

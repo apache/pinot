@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 import org.apache.pinot.client.grpc.GrpcConnection;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 
 
 /**
@@ -53,6 +54,11 @@ public class ConnectionFactory {
    */
   public static Connection fromZookeeper(String zkUrl, PinotClientTransport transport) {
     try {
+      // Check if ZooKeeper SSL is enabled via system properties
+      Properties systemProps = System.getProperties();
+      if (ZkSSLUtils.isSSLEnabled(systemProps)) {
+        ZkSSLUtils.configureSSL(systemProps);
+      }
       return fromZookeeper(new DynamicBrokerSelector(zkUrl), transport);
     } catch (Exception e) {
       throw new PinotClientException(e);
@@ -68,6 +74,8 @@ public class ConnectionFactory {
    */
   public static Connection fromZookeeper(Properties properties, String zkUrl) {
     try {
+      // Configure ZooKeeper SSL if enabled in properties
+      ZkSSLUtils.configureSSL(properties);
       return fromZookeeper(properties, new DynamicBrokerSelector(zkUrl), getDefault(properties));
     } catch (Exception e) {
       throw new PinotClientException(e);
