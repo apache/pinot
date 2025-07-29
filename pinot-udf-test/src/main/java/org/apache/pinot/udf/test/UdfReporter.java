@@ -74,15 +74,21 @@ public class UdfReporter {
 
   private static void reportScenarios(Udf udf, UdfTestResult.ByScenario byScenario, PrintWriter report,
       TreeSet<UdfTestScenario> scenarios) {
-    report.append("### Scenarios\n\n");
 
-    // This is used to create a collapsed section in the markdown report
-    report.append("<details>\n"
-        + "\n"
-        + "<summary>Click to open</summary>\n\n");
+    if (byScenario.getMap().values().stream()
+        .flatMap(bySignature -> bySignature.getMap().values().stream())
+        .noneMatch(UdfReporter::requiresScenarioForSignature)) {
+      return ;
+    }
+
+    report.append("### Scenarios\n\n");
 
     for (UdfTestScenario scenario : scenarios) {
       UdfTestResult.BySignature bySignature = byScenario.getMap().get(scenario);
+
+      if (bySignature.getMap().values().stream().noneMatch(UdfReporter::requiresScenarioForSignature)) {
+        continue;
+      }
 
       report.append("#### ").append(scenario.getTitle()).append("\n\n");
 
@@ -106,8 +112,25 @@ public class UdfReporter {
       }
       report.append("\n");
     }
-    // Close the collapsed section
-    report.append("\n</details>\n\n");
+  }
+
+  private static boolean requiresScenarioForSignature(ResultByExample resultByExample) {
+    if (!(resultByExample instanceof ResultByExample.Partial)) {
+      return true;
+    }
+    ResultByExample.Partial partial = (ResultByExample.Partial) resultByExample;
+    for (Map.Entry<UdfExample, UdfExampleResult> exampleEntry : partial.getResultsByExample().entrySet()) {
+      UdfExample example = exampleEntry.getKey();
+      String error = partial.getErrorsByExample().get(example);
+      if (error != null) {
+        return true;
+      }
+      UdfTestFramework.EquivalenceLevel comparison = partial.getEquivalenceByExample().get(example);
+      if (comparison != UdfTestFramework.EquivalenceLevel.EQUAL) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static void reportScenarioForSignature(Udf udf, PrintWriter report, ResultByExample resultByExample) {
@@ -122,6 +145,15 @@ public class UdfReporter {
       for (Map.Entry<UdfExample, UdfExampleResult> exampleEntry : entries) {
         UdfExample example = exampleEntry.getKey();
         UdfExampleResult testResult = exampleEntry.getValue();
+
+        // Skip examples whose result is the expected one
+        String error = partial.getErrorsByExample().get(example);
+        UdfTestFramework.EquivalenceLevel comparison = error == null
+            ? partial.getEquivalenceByExample().get(example)
+            : null;
+        if (comparison == UdfTestFramework.EquivalenceLevel.EQUAL) {
+          continue;
+        }
 
         // Signature column
         report.append("| ")
@@ -140,11 +172,9 @@ public class UdfReporter {
             .append(valueFormatter.apply(actual)).append(" | ");
 
         // Comparison or Error
-        String error = partial.getErrorsByExample().get(example);
         if (error != null) {
           report.append("❌ ").append(error.replace("\n", " ")).append(" |\n");
         } else {
-          UdfTestFramework.EquivalenceLevel comparison = partial.getEquivalenceByExample().get(example);
           report.append(comparison != null ? comparison.name() : "").append(" |\n");
         }
       }
@@ -213,13 +243,26 @@ public class UdfReporter {
         .min(Comparator.comparing(UdfSignature::toString))
         .ifPresent(udfSignature -> {
 
-          report.append("| Call | Result (with null handling) | Result (without null handling) |\n");
-          report.append("|------|-----------------------------|--------------------------------|\n");
+          report.append("| Call | Result (with null handling) | Result (without null handling) | |\n");
+          report.append("|------|-----------------------------|--------------------------------|-|\n");
 
           for (UdfExample example : udf.getExamples().get(udfSignature)) {
             // Expected result
             Object withNull = example.getResult(UdfExample.NullHandling.ENABLED);
             Object withoutNull = example.getResult(UdfExample.NullHandling.DISABLED);
+
+            boolean someFail = byScenario.getMap().values().stream()
+                .anyMatch(bySignature ->
+                  bySignature.getMap().values().stream()
+                      .anyMatch(result -> {
+                        if (result instanceof ResultByExample.Failure) {
+                          return true;
+                        }
+                        ResultByExample.Partial partial = (ResultByExample.Partial) result;
+                        UdfTestFramework.EquivalenceLevel equivalence = partial.getEquivalenceByExample().get(example);
+                        return equivalence != UdfTestFramework.EquivalenceLevel.EQUAL;
+                      })
+                );
 
             // Call column
             report.append("| ")
@@ -228,6 +271,8 @@ public class UdfReporter {
                 .append(valueToString(withNull))
                 .append(" | ")
                 .append(valueToString(withoutNull))
+                .append(" | ")
+                .append(someFail ? "⚠" : "✅")
                 .append(" |\n");
           }
           report.append("\n");
