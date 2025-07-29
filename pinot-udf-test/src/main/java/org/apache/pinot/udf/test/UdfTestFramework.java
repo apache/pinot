@@ -19,6 +19,7 @@
 package org.apache.pinot.udf.test;
 
 import com.google.common.collect.Maps;
+import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -214,7 +215,7 @@ public class UdfTestFramework {
       switch (this) {
         case EQUAL:
           if (expected instanceof Double && actual instanceof Double
-            && doubleCompare((Double) expected, (Double) actual) != 0) {
+            && !doubleEquals((Double) expected, (Double) actual)) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
           if (!Objects.equals(expected, actual)) {
@@ -240,7 +241,7 @@ public class UdfTestFramework {
                 + "comparison, but got: expected=" + expected + "(of type " + expectedClass + ")"
                 + ", actual=" + actual + "(of type " + actualClass + ")");
           }
-          if (doubleCompare(((Number) expected).doubleValue(), ((Number) actual).doubleValue()) != 0) {
+          if (!doubleEquals(((Number) expected).doubleValue(), ((Number) actual).doubleValue())) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
           break;
@@ -301,22 +302,8 @@ public class UdfTestFramework {
     }
   }
 
-  private static int doubleCompare(double d1, double d2) {
+  private static boolean doubleEquals(double d1, double d2) {
     double epsilon = 0.0001d;
-    if (d1 > d2) {
-      if (d1 * (1 - epsilon) > d2) {
-        return 1;
-      } else {
-        return 0;
-      }
-    }
-    if (d2 > d1) {
-      if (d2 * (1 - epsilon) > d1) {
-        return -1;
-      } else {
-        return 0;
-      }
-    }
-    return 0;
+    return DoubleMath.fuzzyEquals(d1, d2, epsilon);
   }
 }
