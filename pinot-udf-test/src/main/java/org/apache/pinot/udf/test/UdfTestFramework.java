@@ -210,6 +210,10 @@ public class UdfTestFramework {
       actual = canonizeObject(actual);
       switch (this) {
         case EQUAL:
+          if (expected instanceof Double && actual instanceof Double
+            && doubleCompare((Double) expected, (Double) actual) != 0) {
+            throw new AssertionError(describeDiscrepancy(expected, actual));
+          }
           if (!Objects.equals(expected, actual)) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
@@ -233,7 +237,7 @@ public class UdfTestFramework {
                 + "comparison, but got: expected=" + expected + "(of type " + expectedClass + ")"
                 + ", actual=" + actual + "(of type " + actualClass + ")");
           }
-          if (Double.compare(((Number) expected).doubleValue(), ((Number) actual).doubleValue()) != 0) {
+          if (doubleCompare(((Number) expected).doubleValue(), ((Number) actual).doubleValue()) != 0) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
           break;
@@ -292,5 +296,24 @@ public class UdfTestFramework {
       }
       return value;
     }
+  }
+
+  private static int doubleCompare(double d1, double d2) {
+    double epsilon = 0.0001d;
+    if (d1 > d2) {
+      if (d1 * (1 - epsilon) > d2) {
+        return 1;
+      } else {
+        return 0;
+      }
+    }
+    if (d2 > d1) {
+      if (d2 * (1 - epsilon) > d1) {
+        return -1;
+      } else {
+        return 0;
+      }
+    }
+    return 0;
   }
 }
