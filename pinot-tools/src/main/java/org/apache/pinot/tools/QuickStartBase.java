@@ -33,11 +33,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Random;
 import java.util.zip.GZIPInputStream;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.LineIterator;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamDataProducer;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -68,6 +70,7 @@ public abstract class QuickStartBase {
   private static final Logger LOGGER = LoggerFactory.getLogger(QuickStartBase.class);
   private static final String TAB = "\t\t";
   private static final String NEW_LINE = "\n";
+  private static final Random RANDOM = new Random();
 
   protected static final String[] DEFAULT_OFFLINE_TABLE_DIRECTORIES = new String[]{
       "examples/batch/clickstreamFunnel",
@@ -403,10 +406,12 @@ public abstract class QuickStartBase {
 
   protected void startKafka() {
     printStatus(Quickstart.Color.CYAN, "***** Starting Kafka *****");
+    ZkSSLUtils.clearSystemPropertiesForSSL();
     _zookeeperInstance = ZkStarter.startLocalZkServer();
+
     try {
       _kafkaStarter = StreamDataProvider.getServerDataStartable(KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME,
-          KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance));
+          KafkaStarterUtils.getDefaultKafkaConfiguration());
     } catch (Exception e) {
       throw new RuntimeException("Failed to start " + KafkaStarterUtils.KAFKA_SERVER_STARTABLE_CLASS_NAME, e);
     }

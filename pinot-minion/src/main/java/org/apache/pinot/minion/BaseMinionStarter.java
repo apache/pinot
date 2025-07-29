@@ -48,6 +48,7 @@ import org.apache.pinot.common.utils.ClientSSLContextGenerator;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
@@ -103,6 +104,9 @@ public abstract class BaseMinionStarter implements ServiceStartable {
   @Override
   public void init(PinotConfiguration config)
       throws Exception {
+    // Configure ZooKeeper SSL as early as possible in the startup process
+    ZkSSLUtils.configureSSL(config);
+
     _config = new MinionConf(config.toMap());
     String zkAddress = _config.getZkAddress();
     String helixClusterName = _config.getHelixClusterName();
@@ -298,7 +302,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
     _helixManager.connect();
     updateInstanceConfigIfNeeded();
     minionMetrics.setOrUpdateGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
-            () -> _helixManager.isConnected() ? 1L : 0L);
+        () -> _helixManager.isConnected() ? 1L : 0L);
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
     minionContext.setHelixManager(_helixManager);
     LOGGER.info("Starting minion admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));

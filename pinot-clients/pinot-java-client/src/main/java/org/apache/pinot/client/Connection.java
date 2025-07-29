@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +53,7 @@ public class Connection {
   }
 
   Connection(Properties properties, BrokerSelector brokerSelector, PinotClientTransport<?> transport) {
+    ZkSSLUtils.configureSSL(properties);
     _brokerSelector = brokerSelector;
     _transport = transport;
 

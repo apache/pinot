@@ -74,6 +74,7 @@ import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.helix.IdealStateGroupCommit;
@@ -222,6 +223,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   @Override
   public void init(PinotConfiguration pinotConfiguration)
       throws Exception {
+    // Configure ZooKeeper SSL as early as possible in the startup process
+    ZkSSLUtils.configureSSL(pinotConfiguration);
+
     _config = new ControllerConf(pinotConfiguration.toMap());
     _helixZkURL = HelixConfig.getAbsoluteZkPathForHelix(_config.getZkStr());
     _helixClusterName = _config.getHelixClusterName();
@@ -551,7 +555,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _connectionManager = PoolingHttpClientConnectionManagerHelper.createWithSocketFactory();
     _connectionManager.setDefaultSocketConfig(
         SocketConfig.custom()
-            .setSoTimeout(Timeout.of(_config.getServerAdminRequestTimeoutSeconds() * 1000, TimeUnit.MILLISECONDS))
+            .setSoTimeout(Timeout.of(_config.getServerAdminRequestTimeoutSeconds() * 1000L, TimeUnit.MILLISECONDS))
             .build());
     _tableSizeReader =
         new TableSizeReader(_executorService, _connectionManager, _controllerMetrics, _helixResourceManager,
@@ -925,12 +929,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Creating TaskManager with class: {}", taskManagerClass);
     try {
       return PluginManager.get().createInstance(taskManagerClass,
-          new Class[]{PinotHelixTaskResourceManager.class, PinotHelixResourceManager.class, LeadControllerManager.class,
+          new Class[]{
+              PinotHelixTaskResourceManager.class, PinotHelixResourceManager.class, LeadControllerManager.class,
               ControllerConf.class, ControllerMetrics.class, TaskManagerStatusCache.class,
-              Executor.class, PoolingHttpClientConnectionManager.class, ResourceUtilizationManager.class},
-          new Object[]{_helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
+              Executor.class, PoolingHttpClientConnectionManager.class, ResourceUtilizationManager.class
+          },
+          new Object[]{
+              _helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
               _config, _controllerMetrics, _taskManagerStatusCache, _executorService,
-              _connectionManager, _resourceUtilizationManager});
+              _connectionManager, _resourceUtilizationManager
+          });
     } catch (Exception e) {
       LOGGER.error("Failed to create task manager with class: {}", taskManagerClass, e);
       throw new RuntimeException("Failed to create task manager with class: " + taskManagerClass, e);

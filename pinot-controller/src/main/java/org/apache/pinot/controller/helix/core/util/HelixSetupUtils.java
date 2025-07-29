@@ -43,6 +43,7 @@ import org.apache.helix.model.builder.FullAutoModeISBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
 import org.apache.helix.zookeeper.datamodel.serializer.ZNRecordSerializer;
 import org.apache.helix.zookeeper.impl.client.ZkClient;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.common.utils.helix.LeadControllerUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -134,6 +135,9 @@ public class HelixSetupUtils {
 
   public static void setupPinotCluster(String helixClusterName, String zkPath, boolean isUpdateStateModel,
       boolean enableBatchMessageMode, ControllerConf controllerConf) {
+    // Configure ZooKeeper SSL if enabled
+    ZkSSLUtils.configureSSL(controllerConf);
+
     ZkClient zkClient = null;
     int zkClientSessionConfig =
         controllerConf.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,

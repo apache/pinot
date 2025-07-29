@@ -39,6 +39,7 @@ import org.apache.pinot.client.SimpleBrokerSelector;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.grpc.BrokerGrpcQueryClient;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -63,6 +64,7 @@ public class GrpcConnection implements AutoCloseable {
   }
 
   public GrpcConnection(Properties properties, BrokerSelector brokerSelector) {
+    ZkSSLUtils.configureSSL(properties);
     _brokerSelector = brokerSelector;
     // Convert Properties properties to a Map
     Map<String, Object> propertiesMap = new HashMap<>();

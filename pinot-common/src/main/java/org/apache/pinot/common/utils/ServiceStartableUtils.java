@@ -55,6 +55,9 @@ public class ServiceStartableUtils {
    */
   public static void applyClusterConfig(PinotConfiguration instanceConfig, String zkAddress, String clusterName,
       ServiceRole serviceRole) {
+    // Configure ZooKeeper SSL if enabled
+    ZkSSLUtils.configureSSL(instanceConfig);
+
     int zkClientSessionConfig =
         instanceConfig.getProperty(CommonConstants.Helix.ZkClient.ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG,
             CommonConstants.Helix.ZkClient.DEFAULT_SESSION_TIMEOUT_MS);

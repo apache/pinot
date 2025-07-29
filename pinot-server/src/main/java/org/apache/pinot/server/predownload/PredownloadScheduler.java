@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.starter.helix.HelixInstanceDataManagerConfig;
@@ -87,6 +88,10 @@ public class PredownloadScheduler {
     _zkAddress = properties.getString(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _instanceId = properties.getString(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
     _pinotConfig = new PinotConfiguration(properties);
+
+    // Configure ZooKeeper SSL if enabled
+    ZkSSLUtils.configureSSL(_pinotConfig);
+
     _instanceDataManagerConfig =
         new HelixInstanceDataManagerConfig(new ServerConf(_pinotConfig).getInstanceDataManagerConfig());
     // Get the number of available processors (vCPUs)
