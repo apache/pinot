@@ -136,17 +136,11 @@ public class ArrayFunctions {
 
   @ScalarFunction
   public static int[] arraySliceInt(int[] values, int start, int end) {
-    if (start < 0 || end > values.length || start >= end) {
-      return new int[0];
-    }
     return Arrays.copyOfRange(values, start, end);
   }
 
   @ScalarFunction
   public static String[] arraySliceString(String[] values, int start, int end) {
-    if (start < 0 || end > values.length || start >= end) {
-      return new String[0];
-    }
     return Arrays.copyOfRange(values, start, end);
   }
 
