@@ -18,19 +18,33 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+
 /**
- * Abstract class for tracking job configs and attempt numbers as part of the job ZK metadata to retry failed tenant rebalance.
+ * Abstract class for tracking job configs and attempt numbers as part of the job ZK metadata to retry failed tenant
+ * rebalance.
  */
 public abstract class TenantRebalanceContext {
   protected static final int INITIAL_ATTEMPT_ID = 1;
+  @JsonProperty("jobId")
   private final String _jobId;
+  @JsonProperty("originalJobId")
   private final String _originalJobId;
+  @JsonProperty("config")
   private final TenantRebalanceConfig _config;
+  @JsonProperty("attemptId")
   private final int _attemptId;
   // Default to true for all user initiated rebalances, so that they can be retried if they fail or get stuck.
+  @JsonProperty("allowRetries")
   private final boolean _allowRetries;
 
-  protected TenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId, boolean allowRetries) {
+  public TenantRebalanceContext() {
+    this(null, null, INITIAL_ATTEMPT_ID, true);
+  }
+
+  protected TenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId,
+      boolean allowRetries) {
     _jobId = createAttemptJobId(originalJobId, attemptId);
     _originalJobId = originalJobId;
     _config = config;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import java.util.LinkedList;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.Queue;
@@ -31,6 +32,13 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
   private final ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> _parallelQueue;
   private final Queue<TenantRebalancer.TenantTableRebalanceJobContext> _sequentialQueue;
   private final ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> _ongoingJobsQueue;
+
+  public DefaultTenantRebalanceContext() {
+    super();
+    _parallelQueue = new ConcurrentLinkedDeque<>();
+    _sequentialQueue = new LinkedList<>();
+    _ongoingJobsQueue = new ConcurrentLinkedQueue<>();
+  }
 
   public DefaultTenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId,
       boolean allowRetries, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
