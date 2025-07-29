@@ -926,7 +926,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
         QueryMonitorConfig config = _queryMonitorConfig.get();
         if (config.isThreadSelfTerminate()) {
-          LOGGER.warn("Query self-termination is enabled, skipping killing most expensive query");
           return;
         }
         AggregatedStats maxUsageTuple = _maxHeapUsageQuery.get();
