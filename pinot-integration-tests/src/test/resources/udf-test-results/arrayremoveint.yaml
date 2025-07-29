@@ -72,9 +72,9 @@ MSE intermediate stage (with null handling):
   '(array: ARRAY(int), value: int) -> ARRAY(int)':
     entries:
       null array:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
+        actualResult: []
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: null
       null default value:
         actualResult: []
@@ -82,9 +82,9 @@ MSE intermediate stage (with null handling):
         error: null
         expectedResult: []
       null value:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
+        actualResult: []
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: null
       remove absent value:
         actualResult:
@@ -119,10 +119,11 @@ MSE intermediate stage (without null handling):
   '(array: ARRAY(int), value: int) -> ARRAY(int)':
     entries:
       null array:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
+        actualResult:
+        - -2147483648
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: []
       null default value:
         actualResult:
         - 1
@@ -135,10 +136,16 @@ MSE intermediate stage (without null handling):
         - 2
         - 3
       null value:
-        actualResult: null
+        actualResult:
+        - 1
+        - 2
+        - 3
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult:
+        - 1
+        - 2
+        - 3
       remove absent value:
         actualResult:
         - 1

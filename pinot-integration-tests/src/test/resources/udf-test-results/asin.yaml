@@ -110,10 +110,10 @@ MSE intermediate stage (without null handling):
         error: null
         expectedResult: 1.5707963267948966
       null value:
-        actualResult: null
+        actualResult: 0.0
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: 0.0
       out of range (negative):
         actualResult: NaN
         equivalence: "EQUAL"

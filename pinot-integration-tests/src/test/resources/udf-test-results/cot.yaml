@@ -75,10 +75,10 @@ MSE intermediate stage (without null handling):
         error: null
         expectedResult: 1.0
       null input:
-        actualResult: null
+        actualResult: Infinity
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: Infinity
     error: false
     errorMessage: null
 SSE predicate (with null handling):

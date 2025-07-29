@@ -79,10 +79,10 @@ MSE intermediate stage (without null handling):
         error: "Unexpected value"
         expectedResult: !!binary ""
       null input:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
+        actualResult: ""
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: !!binary ""
     error: false
     errorMessage: null
 SSE predicate (with null handling):

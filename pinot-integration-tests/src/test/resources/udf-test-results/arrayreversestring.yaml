@@ -71,9 +71,9 @@ MSE intermediate stage (with null handling):
   '(array: ARRAY(string)) -> ARRAY(string)':
     entries:
       null array:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
+        actualResult: []
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: null
       reverse array:
         actualResult:
@@ -117,10 +117,11 @@ MSE intermediate stage (without null handling):
   '(array: ARRAY(string)) -> ARRAY(string)':
     entries:
       null array:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
+        actualResult:
+        - "null"
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: []
       reverse array:
         actualResult:
         - "c"

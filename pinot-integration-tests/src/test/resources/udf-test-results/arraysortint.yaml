@@ -82,9 +82,9 @@ MSE intermediate stage (with null handling):
   '(array: ARRAY(int)) -> ARRAY(int)':
     entries:
       null array:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
+        actualResult: []
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: null
       sort already sorted:
         actualResult:
@@ -139,10 +139,11 @@ MSE intermediate stage (without null handling):
   '(array: ARRAY(int)) -> ARRAY(int)':
     entries:
       null array:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
+        actualResult:
+        - -2147483648
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: []
       sort already sorted:
         actualResult:
         - 1

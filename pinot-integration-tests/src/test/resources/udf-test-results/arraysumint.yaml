@@ -85,10 +85,10 @@ MSE intermediate stage (without null handling):
   '(array: ARRAY(int)) -> int':
     entries:
       null array:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
-        expectedResult: null
+        actualResult: -2147483648
+        equivalence: null
+        error: "Unexpected value"
+        expectedResult: 0
       sum array:
         actualResult: 6
         equivalence: "EQUAL"

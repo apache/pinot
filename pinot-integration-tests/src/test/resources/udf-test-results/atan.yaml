@@ -90,10 +90,10 @@ MSE intermediate stage (without null handling):
         error: null
         expectedResult: 0.7853981633974483
       null value:
-        actualResult: null
+        actualResult: 0.0
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: 0.0
     error: false
     errorMessage: null
 SSE predicate (with null handling):

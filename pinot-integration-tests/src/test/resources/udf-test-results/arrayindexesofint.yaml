@@ -90,9 +90,9 @@ MSE intermediate stage (with null handling):
         error: null
         expectedResult: []
       null array:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
+        actualResult: []
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: null
       null input:
         actualResult: []
@@ -100,9 +100,9 @@ MSE intermediate stage (with null handling):
         error: "Unexpected value"
         expectedResult: null
       null value:
-        actualResult: null
-        equivalence: "EQUAL"
-        error: null
+        actualResult: []
+        equivalence: null
+        error: "Unexpected value"
         expectedResult: null
       single match:
         actualResult:
@@ -136,20 +136,20 @@ MSE intermediate stage (without null handling):
         error: null
         expectedResult: []
       null array:
-        actualResult: null
+        actualResult: []
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: []
       null input:
         actualResult: []
         equivalence: "EQUAL"
         error: null
         expectedResult: []
       null value:
-        actualResult: null
+        actualResult: []
         equivalence: "EQUAL"
         error: null
-        expectedResult: null
+        expectedResult: []
       single match:
         actualResult:
         - 1
