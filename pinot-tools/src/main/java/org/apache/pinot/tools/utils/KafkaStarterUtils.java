@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 import java.util.ServiceLoader;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamDataProvider;
@@ -145,6 +146,25 @@ public class KafkaStarterUtils {
   public static Properties getDefaultKafkaConfiguration(ZkStarter.ZookeeperInstance zookeeperInstance) {
     Properties kafkaConfiguration = getDefaultKafkaConfiguration();
     kafkaConfiguration.put(ZOOKEEPER_CONNECT, zookeeperInstance.getZkUrl() + "/kafka");
+
+    // Configure Kafka's ZooKeeper SSL settings if ZooKeeper is SSL-enabled
+    if (zookeeperInstance.isSSLEnabled()) {
+      ZkStarter.SSLConfig sslConfig = zookeeperInstance.getSSLConfig();
+
+      // Apply ZooKeeper SSL system properties for Kafka
+      ZkSSLUtils.configureSSL(sslConfig.getClientSSLProperties());
+
+      // Configure Kafka-specific ZooKeeper SSL properties
+      kafkaConfiguration.put("zookeeper.ssl.client.enable", "true");
+      kafkaConfiguration.put("zookeeper.clientCnxnSocket", "org.apache.zookeeper.ClientCnxnSocketNetty");
+      kafkaConfiguration.put("zookeeper.ssl.keystore.location", sslConfig.getKeyStorePath());
+      kafkaConfiguration.put("zookeeper.ssl.keystore.password", sslConfig.getKeyStorePassword());
+      kafkaConfiguration.put("zookeeper.ssl.keystore.type", "JKS");
+      kafkaConfiguration.put("zookeeper.ssl.truststore.location", sslConfig.getTrustStorePath());
+      kafkaConfiguration.put("zookeeper.ssl.truststore.password", sslConfig.getTrustStorePassword());
+      kafkaConfiguration.put("zookeeper.ssl.truststore.type", "JKS");
+    }
+
     return kafkaConfiguration;
   }
 }

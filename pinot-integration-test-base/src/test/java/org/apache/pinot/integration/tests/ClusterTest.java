@@ -194,6 +194,10 @@ public abstract class ClusterTest extends ControllerTest {
     }
     _nextBrokerGrpcPort = brokerGrpcPort + 1;
     overrideBrokerConf(brokerConf);
+
+    // Add SSL properties if ZooKeeper is SSL-enabled
+    addSSLPropertiesToConfig(brokerConf);
+
     return brokerConf;
   }
 
@@ -205,6 +209,9 @@ public abstract class ClusterTest extends ControllerTest {
   protected void startBrokers(int numBrokers)
       throws Exception {
     runWithHelixMock(() -> {
+      // Ensure SSL configuration is applied if ZooKeeper is SSL-enabled
+      ensureSSLConfigured();
+
       for (int i = 0; i < numBrokers; i++) {
         BaseBrokerStarter brokerStarter = startOneBroker(i);
         _brokerStarters.add(brokerStarter);
@@ -268,6 +275,10 @@ public abstract class ClusterTest extends ControllerTest {
     serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
     serverConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideServerConf(serverConf);
+
+    // Add SSL properties if ZooKeeper is SSL-enabled
+    addSSLPropertiesToConfig(serverConf);
+
     return serverConf;
   }
 
@@ -279,6 +290,9 @@ public abstract class ClusterTest extends ControllerTest {
   protected void startServers(int numServers)
       throws Exception {
     runWithHelixMock(() -> {
+      // Ensure SSL configuration is applied if ZooKeeper is SSL-enabled
+      ensureSSLConfigured();
+
       FileUtils.deleteQuietly(new File(TEMP_SERVER_DIR));
       for (int i = 0; i < numServers; i++) {
         _serverStarters.add(startOneServer(i));
@@ -327,6 +341,10 @@ public abstract class ClusterTest extends ControllerTest {
     minionConf.setProperty(Helix.Instance.DATA_DIR_KEY, TEMP_MINION_DIR + File.separator + "dataDir");
     minionConf.setProperty(CommonConstants.CONFIG_OF_TIMEZONE, "UTC");
     overrideMinionConf(minionConf);
+
+    // Add SSL properties if ZooKeeper is SSL-enabled
+    addSSLPropertiesToConfig(minionConf);
+
     return minionConf;
   }
 
@@ -334,6 +352,9 @@ public abstract class ClusterTest extends ControllerTest {
   //       to manage the instance level configs
   protected void startMinion()
       throws Exception {
+    // Ensure SSL configuration is applied if ZooKeeper is SSL-enabled
+    ensureSSLConfigured();
+
     FileUtils.deleteQuietly(new File(TEMP_MINION_DIR));
     _minionStarter = createMinionStarter();
     _minionStarter.init(getMinionConf());
@@ -444,7 +465,7 @@ public abstract class ClusterTest extends ControllerTest {
         if (System.currentTimeMillis() % 2 == 0) {
           assertEquals(
               fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), segmentTarFile,
-                getSegmentUploadAuthHeaders(), tableName, tableType).getStatusCode(), HttpStatus.SC_OK);
+                  getSegmentUploadAuthHeaders(), tableName, tableType).getStatusCode(), HttpStatus.SC_OK);
         } else {
           assertEquals(
               uploadSegmentWithOnlyMetadata(tableName, tableType, uploadSegmentHttpURI, fileUploadDownloadClient,
@@ -478,10 +499,10 @@ public abstract class ClusterTest extends ControllerTest {
       FileUploadDownloadClient fileUploadDownloadClient, File segmentTarFile)
       throws IOException, HttpErrorStatusException {
     List<Header> headers = new ArrayList<>(List.of(new BasicHeader(FileUploadDownloadClient.CustomHeaders.DOWNLOAD_URI,
-        "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
-          + URIUtils.encode(segmentTarFile.getName())),
-      new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
-        FileUploadDownloadClient.FileUploadType.METADATA.toString())));
+            "file://" + segmentTarFile.getParentFile().getAbsolutePath() + "/"
+                + URIUtils.encode(segmentTarFile.getName())),
+        new BasicHeader(FileUploadDownloadClient.CustomHeaders.UPLOAD_TYPE,
+            FileUploadDownloadClient.FileUploadType.METADATA.toString())));
     headers.addAll(getSegmentUploadAuthHeaders());
     // Add table name and table type as request parameters
     NameValuePair tableNameValuePair =
@@ -571,7 +592,7 @@ public abstract class ClusterTest extends ControllerTest {
       Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
-        String.valueOf(startTime), "end", String.valueOf(endTime));
+          String.valueOf(startTime), "end", String.valueOf(endTime));
       String url = buildQueryUrl(getTimeSeriesQueryApiUrl(baseUrl), queryParams);
       JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);
