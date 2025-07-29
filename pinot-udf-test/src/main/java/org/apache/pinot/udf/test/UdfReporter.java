@@ -213,8 +213,8 @@ public class UdfReporter {
         .min(Comparator.comparing(UdfSignature::toString))
         .ifPresent(udfSignature -> {
 
-          report.append("|Call | Result (with null handling) | Result (without null handling)\n");
-          report.append("|-----|-----------------------------|------------------------------|\n");
+          report.append("| Call | Result (with null handling) | Result (without null handling) |\n");
+          report.append("|------|-----------------------------|--------------------------------|\n");
 
           for (UdfExample example : udf.getExamples().get(udfSignature)) {
             // Expected result
