@@ -131,6 +131,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     protected Set<String> _cancelSentQueries;
 
+    protected AtomicReference<String> _maxResourceUsageQueryId = new AtomicReference<>(null);
+
     // the periodical task that aggregates and preempts queries
     protected final WatcherTask _watcherTask;
 
@@ -148,7 +150,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _inactiveQuery = inactiveQuery;
       _instanceId = instanceId;
       _instanceType = instanceType;
-      _cancelSentQueries = new HashSet<>();
+      _cancelSentQueries = ConcurrentHashMap.newKeySet();
       _watcherTask = createWatcherTask();
       _queryCancelCallbacks = CacheBuilder.newBuilder().build();
     }
@@ -242,7 +244,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         }
       }
 
-      // if triggered, accumulate stats of finished tasks of each active query
+      // Accumulate stats of finished tasks of each active query
       for (Map.Entry<String, AggregatedStats> queryIdResult : ret.entrySet()) {
         String activeQueryId = queryIdResult.getKey();
         long accumulatedCPUValue =
@@ -293,9 +295,25 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @Override
     public boolean isQueryTerminated() {
       QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
-      if (config.isThreadSelfTerminate() && _watcherTask.getHeapUsageBytes() > config.getPanicLevel()) {
-        logSelfTerminatedQuery(_threadLocalEntry.get().getQueryId(), Thread.currentThread());
-        return true;
+      String queryId = _threadLocalEntry.get().getQueryId();
+      String maxResourceUsageQueryId = _maxResourceUsageQueryId.get();
+
+      if (config.isThreadSelfTerminate()) {
+        if (_watcherTask.getHeapUsageBytes() > config.getPanicLevel()) {
+          if (_cancelSentQueries.add(queryId)) {
+            logQueryResourceUsage(getQueryResourcesImpl());
+            logSelfTerminatedQuery(_threadLocalEntry.get().getQueryId(), Thread.currentThread());
+          }
+          return true;
+        }
+
+        if (maxResourceUsageQueryId != null && maxResourceUsageQueryId.equals(queryId)) {
+          if (_cancelSentQueries.add(queryId)) {
+            logQueryResourceUsage(getQueryResourcesImpl());
+            logSelfTerminatedQuery(_threadLocalEntry.get().getQueryId(), Thread.currentThread());
+          }
+          return true;
+        }
       }
       return false;
     }
@@ -519,15 +537,18 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
     }
 
-    public void cancelQuery(String queryId, Thread anchorThread) {
-      MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(queryId);
-      if (callback != null) {
-        callback.cancelQuery(Long.parseLong(queryId));
-        _queryCancelCallbacks.invalidate(queryId);
-      } else {
-        anchorThread.interrupt();
+    public void cancelQuery(AggregatedStats queryResourceTracker) {
+      String queryId = queryResourceTracker.getQueryId();
+      if (_cancelSentQueries.add(queryId)) {
+        MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(queryId);
+        if (callback != null) {
+          callback.cancelQuery(Long.parseLong(queryId));
+          _queryCancelCallbacks.invalidate(queryId);
+        } else {
+          queryResourceTracker.getAnchorThread().interrupt();
+        }
+        logTerminatedQuery(queryResourceTracker, _watcherTask.getHeapUsageBytes(),callback != null);
       }
-      _cancelSentQueries.add(queryId);
     }
 
     protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage,
@@ -538,11 +559,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     protected void logSelfTerminatedQuery(String queryId, Thread queryThread) {
-      if (!_cancelSentQueries.contains(queryId)) {
-        LOGGER.warn("{} self-terminated. Heap Usage: {}. Query Thread: {}",
-            queryId, _watcherTask.getHeapUsageBytes(), queryThread.getName());
-        _cancelSentQueries.add(queryId);
-      }
+      LOGGER.warn("{} self-terminated. Heap Usage: {}. Query Thread: {}", queryId, _watcherTask.getHeapUsageBytes(),
+          queryThread.getName());
     }
 
     @Override
@@ -860,18 +878,36 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       void killAllQueries() {
         QueryMonitorConfig config = _queryMonitorConfig.get();
 
-        if (config.isOomKillQueryEnabled()) {
+        if (config.isOomKillQueryEnabled() && !config.isThreadSelfTerminate()) {
           int killedCount = 0;
           for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
             CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
             CPUMemThreadLevelAccountingObjects.TaskEntry taskEntry = threadEntry.getCurrentThreadTaskStatus();
-            if (taskEntry != null && !_cancelSentQueries.contains(taskEntry.getQueryId())) {
-              cancelQuery(taskEntry.getQueryId(), taskEntry.getAnchorThread());
+            if (taskEntry != null && _cancelSentQueries.add(taskEntry.getQueryId())) {
+              String queryId = taskEntry.getQueryId();
+              // The cache will be invalidated after the termination is logged.
+              MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(queryId);
+              if (callback != null) {
+                callback.cancelQuery(Long.parseLong(queryId));
+              } else {
+                taskEntry.getAnchorThread().interrupt();
+              }
               killedCount += 1;
             }
           }
+          // Now that the queries are killed, we can log the resource usage
           if (config.isQueryKilledMetricEnabled()) {
             _metrics.addMeteredGlobalValue(_queryKilledMeter, killedCount);
+          }
+          _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
+          logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
+          // Log the killed queries
+          for (AggregatedStats stats : _aggregatedUsagePerActiveQuery.values()) {
+            MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(stats.getQueryId());
+            logTerminatedQuery(stats, _usedBytes, callback != null);
+            if (callback != null) {
+              _queryCancelCallbacks.invalidate(stats.getQueryId());
+            }
           }
         }
       }
@@ -885,6 +921,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           return;
         }
         QueryMonitorConfig config = _queryMonitorConfig.get();
+        if (config.isThreadSelfTerminate()) {
+          LOGGER.warn("Query self-termination is enabled, skipping killing most expensive query");
+          return;
+        }
         // Critical heap memory usage while no queries running
         if (_aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()) {
           AggregatedStats maxUsageTuple;
@@ -899,7 +939,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                   String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
                       maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
               boolean hasCallBack = _queryCancelCallbacks.getIfPresent(maxUsageTuple.getQueryId()) != null;
-              terminateQuery(maxUsageTuple);
+              cancelQuery(maxUsageTuple);
+              if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
+                _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
+              }
               logTerminatedQuery(maxUsageTuple, _usedBytes, hasCallBack);
             } else if (!config.isOomKillQueryEnabled()) {
               LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
@@ -928,18 +971,14 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
                         + "CPU time exceeding limit of %d ns CPU time", value._queryId, _instanceType, _instanceId,
                     value.getCpuTimeNs(), config.getCpuTimeBasedKillingThresholdNS())));
             boolean hasCallBack = _queryCancelCallbacks.getIfPresent(value.getQueryId()) != null;
-            terminateQuery(value);
+            cancelQuery(value);
+            if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
+              _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
+            }
             logTerminatedQuery(value, _usedBytes, hasCallBack);
           }
         }
         logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
-      }
-
-      private void terminateQuery(AggregatedStats queryResourceTracker) {
-        cancelQuery(queryResourceTracker.getQueryId(), queryResourceTracker.getAnchorThread());
-        if (_queryMonitorConfig.get().isQueryKilledMetricEnabled()) {
-          _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
-        }
       }
     }
   }
