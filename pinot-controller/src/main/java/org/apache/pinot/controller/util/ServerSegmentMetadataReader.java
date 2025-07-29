@@ -434,12 +434,19 @@ public class ServerSegmentMetadataReader {
     return String.format("%s/tables/%s/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
-  private String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, List<String> columns,
+  public String generateSegmentMetadataServerURL(String tableNameWithType, String segmentName, List<String> columns,
       String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
     String paramsStr = generateColumnsParam(columns);
     return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
+  }
+
+  public String generateTableMetadataServerURL(String tableNameWithType, List<String> columns,
+      Set<String> segmentsToInclude, String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    String paramsStr = generateColumnsParam(columns) + generateSegmentsParam(segmentsToInclude);
+    return String.format("%s/tables/%s/segments/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
   private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {
@@ -504,6 +511,19 @@ public class ServerSegmentMetadataReader {
   private String generateStaleSegmentsServerURL(String tableNameWithType, String endpoint) {
     tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
     return String.format("%s/tables/%s/segments/isStale", endpoint, tableNameWithType);
+  }
+
+  private String generateSegmentsParam(Set<String> values) {
+    String paramsStr = "";
+    if (values == null || values.isEmpty()) {
+      return paramsStr;
+    }
+    List<String> params = new ArrayList<>(values.size());
+    for (String value : values) {
+      params.add(String.format("segments=%s", value));
+    }
+    paramsStr = String.join("&", params);
+    return paramsStr;
   }
 
   public class TableReloadResponse {
