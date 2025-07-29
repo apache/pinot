@@ -201,7 +201,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
           for (String field : _fieldsToUnnest) {
             unnestedRecords = unnestCollection(unnestedRecords, field);
           }
-          unnestedRecords.forEach(unnestedRecord -> unnestedRecord.getFieldToValueMap().putAll(originalValues));
+          unnestedRecords.forEach(unnestedRecord -> {
+            Map<String, Object> unnestedFieldValues = unnestedRecord.getFieldToValueMap();
+            for (Map.Entry<String, Object> entry : originalValues.entrySet()) {
+              if (!unnestedFieldValues.containsKey(entry.getKey())) {
+                unnestedFieldValues.put(entry.getKey(), entry.getValue());
+              }
+            }
+          });
           if (record.isIncomplete()) {
             unnestedRecords.forEach(GenericRow::markIncomplete);
           }
