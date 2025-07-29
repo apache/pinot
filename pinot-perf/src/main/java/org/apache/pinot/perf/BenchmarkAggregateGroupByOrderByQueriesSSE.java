@@ -91,7 +91,7 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
 @Warmup(iterations = 3, time = 1)
-@Measurement(iterations = 3, time = 1)
+@Measurement(iterations = 3, time = 5)
 @State(Scope.Benchmark)
 public class BenchmarkAggregateGroupByOrderByQueriesSSE {
 
@@ -110,10 +110,12 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
   private int _numSegments;
   @Param({"150", "1500", "15000"})
   private int _numRows;
-  @Param({"EXP(0.001)", "EXP(0.5)", "EXP(0.999)"})
+  @Param({"EXP(0.001)", "EXP(0.5)"})
   String _scenario;
-  @Param({"100", "1000", "9999"})
+  @Param({"100", "1000", "10000"})
   private int _limit;
+  @Param({"1", "1000000"})
+  private String _singleThreadedThreshold;
 
   // sortAggregate is used when LIMIT is below this threshold
   private String _limitThreshold = "100001";
@@ -137,6 +139,7 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
   public BrokerResponseNative query() {
     Map<String, String> queryOptions = new HashMap<>();
     queryOptions.put("sortAggregateLimitThreshold", _limitThreshold);
+    queryOptions.put("sortAggregateSingleThreadedNumSegmentsThreshold", _singleThreadedThreshold);
     return getBrokerResponse(_query + " LIMIT " + _limit, queryOptions);
   }
 
