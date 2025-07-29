@@ -101,7 +101,19 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
   private final int _globalGroupIdUpperBound;
   private final RawKeyHolder _rawKeyHolder;
+  private final HolderType _usedHolderType;
 
+  enum HolderType {
+    ARRAY_MAP,
+    INT,
+    LONG,
+    ARRAY
+  }
+
+  /**
+   * Make sure {@link this#clearAndTrimHolder()} is called to clear thread-local map used
+   * before calling this constructor
+   */
   public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
       @Nullable Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates) {
@@ -147,27 +159,18 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
          cardinalityProduct = Math.min(optimizedCardinality.getRight(), cardinalityProduct);
        }
     }
-    // TODO: Clear the holder after processing the query instead of before
     if (longOverflow) {
       // ArrayMapBasedHolder
       _globalGroupIdUpperBound = numGroupsLimit;
       Object2IntOpenHashMap<IntArray> groupIdMap = THREAD_LOCAL_INT_ARRAY_MAP.get();
-      int size = groupIdMap.size();
-      groupIdMap.clear();
-      if (size > MAX_CACHING_MAP_SIZE) {
-        groupIdMap.trim();
-      }
+      _usedHolderType = HolderType.ARRAY_MAP;
       _rawKeyHolder = new ArrayMapBasedHolder(groupIdMap);
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
         // LongMapBasedHolder
         _globalGroupIdUpperBound = numGroupsLimit;
         Long2IntOpenHashMap groupIdMap = THREAD_LOCAL_LONG_MAP.get();
-        int size = groupIdMap.size();
-        groupIdMap.clear();
-        if (size > MAX_CACHING_MAP_SIZE) {
-          groupIdMap.trim();
-        }
+        _usedHolderType = HolderType.LONG;
         _rawKeyHolder = new LongMapBasedHolder(groupIdMap);
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
@@ -176,12 +179,46 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         if (cardinalityProduct > arrayBasedThreshold || numGroupsLimit < cardinalityProduct) {
           // IntMapBasedHolder
           IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
-          groupIdMap.clearAndTrim();
+          _usedHolderType = HolderType.INT;
           _rawKeyHolder = new IntMapBasedHolder(groupIdMap);
         } else {
+          _usedHolderType = HolderType.ARRAY;
           _rawKeyHolder = new ArrayBasedHolder();
         }
       }
+    }
+  }
+
+  @VisibleForTesting
+  HolderType getUsedHolderType() {
+    return _usedHolderType;
+  }
+
+  /// clear and trim used thread local map after use
+  public void clearAndTrimHolder() {
+    switch (_usedHolderType) {
+      case ARRAY_MAP:
+        Object2IntOpenHashMap<IntArray> groupIdMapIntArray = THREAD_LOCAL_INT_ARRAY_MAP.get();
+        int size = groupIdMapIntArray.size();
+        groupIdMapIntArray.clear();
+        if (size > MAX_CACHING_MAP_SIZE) {
+          groupIdMapIntArray.trim();
+        }
+        break;
+      case INT:
+        IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
+        groupIdMap.clearAndTrim();
+        break;
+      case LONG:
+        Long2IntOpenHashMap groupIdMapLong = THREAD_LOCAL_LONG_MAP.get();
+        int size1 = groupIdMapLong.size();
+        groupIdMapLong.clear();
+        if (size1 > MAX_CACHING_MAP_SIZE) {
+          groupIdMapLong.trim();
+        }
+        break;
+      case ARRAY:
+      default:
     }
   }
 
