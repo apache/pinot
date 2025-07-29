@@ -79,14 +79,9 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
 
   @Override
   public String toString() {
-    return "DefaultTenantRebalanceContext{" +
-        "jobId='" + getJobId() + '\'' +
-        ", originalJobId='" + getOriginalJobId() + '\'' +
-        ", attemptId=" + getAttemptId() +
-        ", allowRetries=" + getAllowRetries() +
-        ", parallelQueueSize=" + getParallelQueue().size() +
-        ", sequentialQueueSize=" + getSequentialQueue().size() +
-        ", ongoingJobsQueueSize=" + getOngoingJobsQueue().size() +
-        '}';
+    return "DefaultTenantRebalanceContext{" + "jobId='" + getJobId() + '\'' + ", originalJobId='" + getOriginalJobId()
+        + '\'' + ", attemptId=" + getAttemptId() + ", allowRetries=" + getAllowRetries() + ", parallelQueueSize="
+        + getParallelQueue().size() + ", sequentialQueueSize=" + getSequentialQueue().size() + ", ongoingJobsQueueSize="
+        + getOngoingJobsQueue().size() + '}';
   }
 }
