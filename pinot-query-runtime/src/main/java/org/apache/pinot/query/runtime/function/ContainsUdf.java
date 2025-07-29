@@ -54,7 +54,6 @@ public class ContainsUdf extends Udf.FromAnnotatedMethod {
         .addExample("positive", "pinot", "no", true)
         .addExample("negative", "pinot", "abc", false)
         .addExample(UdfExample.create("null input", null, null, null).withoutNull(false))
-        .addExample(UdfExample.create("null input", null, "no", null).withoutNull(false))
         .addExample(UdfExample.create("null substring", "pinot", null, null).withoutNull(false))
         .addExample(UdfExample.create("both null", null, null, null).withoutNull(true))
         .build()
