@@ -1130,7 +1130,7 @@ public class ControllerConf extends PinotConfiguration {
 
 
   public boolean isAutoResetErrorSegmentsOnValidationEnabled() {
-    return getProperty(ControllerPeriodicTasksConf.AUTO_RESET_ERROR_SEGMENTS_VALIDATION, false);
+    return getProperty(ControllerPeriodicTasksConf.AUTO_RESET_ERROR_SEGMENTS_VALIDATION, true);
   }
 
   public long getStatusCheckerInitialDelayInSeconds() {
