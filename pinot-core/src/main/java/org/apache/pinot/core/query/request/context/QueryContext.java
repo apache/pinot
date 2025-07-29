@@ -491,6 +491,11 @@ public class QueryContext {
     return _groupByPartitionNumRadixBits;
   }
 
+  public void setGroupByPartitionNumRadixBits(int groupByPartitionNumRadixBits) {
+    _groupByPartitionNumRadixBits = groupByPartitionNumRadixBits;
+    _groupByNumPartitions = 1 << groupByPartitionNumRadixBits;
+  }
+
   public int getGroupByNumPartitions() {
     assert (_groupByNumPartitions == 1 << _groupByPartitionNumRadixBits);
     return _groupByNumPartitions;

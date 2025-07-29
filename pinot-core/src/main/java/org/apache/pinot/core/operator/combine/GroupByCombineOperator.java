@@ -25,8 +25,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.common.utils.DataSchema;
@@ -70,8 +70,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private final int _numGroupByExpressions;
   private final int _numColumns;
   private final CountDownLatch _operatorLatch;
+  private final int _numPartitions;
 
-  private DataSchema _dataSchema;
+  private volatile DataSchema _dataSchema;
   private volatile IndexedTable _indexedTable;
   private final CompletableFuture<RadixPartitionedIntermediateRecords>[] _partitionedRecordsFutures;
 
@@ -80,6 +81,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
+
+  private final LinkedBlockingQueue<List<IntermediateRecord>>[] _queues;
 
   public GroupByCombineOperator(List<Operator> operators, QueryContext queryContext, ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -97,7 +100,17 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       _partitionedRecordsFutures[i] = new CompletableFuture<>();
     }
 
-    _mergedIndexedTables = new TwoLevelHashMapIndexedTable[_queryContext.getGroupByNumPartitions()];
+    _numPartitions = _numTasks;
+    _queryContext.setGroupByPartitionNumRadixBits(31 - Integer.numberOfLeadingZeros(_numPartitions));
+//    System.out.println("numPartitions: " + _numPartitions
+//    + ", numRadixBits: " + _queryContext.getGroupByPartitionNumRadixBits());
+
+//    _numPartitions = _queryContext.getGroupByNumPartitions();
+    _mergedIndexedTables = new TwoLevelHashMapIndexedTable[_numPartitions];
+    _queues = new LinkedBlockingQueue[_numPartitions];
+    for (int i = 0; i < _queues.length; i++) {
+      _queues[i] = new LinkedBlockingQueue<>();
+    }
   }
 
   /**
@@ -118,6 +131,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   }
 
   /**
+   * producer-consumer version of partition-merge
    * <p>
    * Two-phase Partitioned GroupBy Execution.
    * </p><p>
@@ -138,18 +152,64 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
    * </p><p>
    * </p>
    */
-  protected void processPartitionedGroupBy() {
-    // phase 1 partition
-    int operatorId;
-    while (_processingException.get() == null && (operatorId = _nextOperatorId.getAndIncrement()) < _numOperators) {
+  protected void processPartitionedGroupByStreaming() {
+    int partitionId = _nextPartitionId.getAndIncrement();
+    int progress = 0;
+    int operatorId = -1;
+    List<IntermediateRecord> localPendingPartition = null;
+    TwoLevelHashMapIndexedTable table = null;
+    LinkedBlockingQueue<List<IntermediateRecord>> queue = _queues[partitionId];
+
+    while (true) {
+      // merge
+      if (localPendingPartition != null) {
+        for (IntermediateRecord record : localPendingPartition) {
+          table.upsert(record);
+        }
+        localPendingPartition = null;
+        if (++progress == _numOperators) {
+          _mergedIndexedTables[partitionId] = table;
+          return;
+        }
+      }
+
+      try {
+        while (!queue.isEmpty() || operatorId >= _numOperators) {
+          long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
+          List<IntermediateRecord> partition = queue.poll(timeoutMs, TimeUnit.MILLISECONDS);
+          assert (partition != null);
+          if (table == null) {
+            table = GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService);
+          }
+          for (IntermediateRecord record : partition) {
+            table.upsert(record);
+          }
+          if (++progress == _numOperators) {
+            _mergedIndexedTables[partitionId] = table;
+            return;
+          }
+        }
+      } catch (Exception e) {
+        throw wrapOperatorException(this, new RuntimeException(e));
+      }
+
+      // partition
+      operatorId = _nextOperatorId.getAndIncrement();
+      if (operatorId >= _numOperators) {
+        continue;
+      }
       Operator operator = _operators.get(operatorId);
       try {
         if (operator instanceof AcquireReleaseColumnsSegmentOperator) {
           ((AcquireReleaseColumnsSegmentOperator) operator).acquire();
         }
+
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
         if (_dataSchema == null) {
           _dataSchema = resultsBlock.getDataSchema();
+        }
+        if (table == null) {
+          table = GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService);
         }
 
         if (resultsBlock.isGroupsTrimmed()) {
@@ -165,7 +225,13 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
         RadixPartitionedIntermediateRecords partitionedRecords =
             getRadixPartitionedIntermediateRecords(resultsBlock, operatorId);
 
-        _partitionedRecordsFutures[operatorId].complete(partitionedRecords);
+        for (int i = 0; i < _numPartitions; i++) {
+          if (i == partitionId) {
+            localPendingPartition = partitionedRecords.getPartition(i);
+            continue;
+          }
+          _queues[i].offer(partitionedRecords.getPartition(i));
+        }
       } catch (RuntimeException e) {
         throw wrapOperatorException(operator, e);
       } finally {
@@ -173,45 +239,6 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           ((AcquireReleaseColumnsSegmentOperator) operator).release();
         }
       }
-    }
-    // phase 2 merge, only start when no more segments to be processed by this thread
-    int partitionId;
-    while (_processingException.get() == null
-        && (partitionId = _nextPartitionId.getAndIncrement()) < _queryContext.getGroupByNumPartitions()) {
-      try {
-        TwoLevelHashMapIndexedTable table =
-            GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService);
-
-        mergePartitionForAllSegments(partitionId, table);
-
-        // sort and trim per-segment result if needed
-        table.finish(false);
-        if (table.isTrimmed() && _queryContext.isUnsafeTrim()) {
-          _groupsTrimmed = true;
-        }
-        _mergedIndexedTables[partitionId] = table;
-      } catch (Exception e) {
-        throw wrapOperatorException(this, new RuntimeException(e));
-      }
-    }
-  }
-
-  /// merge a partition for all segments, wait for phase 1 futures and merge them
-  private void mergePartitionForAllSegments(int partitionId, TwoLevelHashMapIndexedTable table)
-      throws InterruptedException, ExecutionException {
-    CompletableFuture[] buf = new CompletableFuture[_numOperators];
-    System.arraycopy(_partitionedRecordsFutures, 0, buf, 0, _numOperators);
-
-    int completed = 0;
-    while (completed < _numOperators) {
-      CompletableFuture fut = CompletableFuture.anyOf(buf);
-      RadixPartitionedIntermediateRecords partition = (RadixPartitionedIntermediateRecords) fut.get();
-      for (IntermediateRecord record : partition.getPartition(partitionId)) {
-        table.upsert(record);
-      }
-      int processedSegmentId = partition.getSegmentId();
-      buf[processedSegmentId] = buf[processedSegmentId].newIncompleteFuture();
-      completed++;
     }
   }
 
@@ -263,7 +290,8 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
   protected void processSegments() {
     if (GroupByUtils.shouldPartitionGroupBy(_queryContext)) {
       // partition segment results
-      processPartitionedGroupBy();
+      processPartitionedGroupByStreaming();
+//      processPartitionedGroupBy();
       return;
     }
     int operatorId;
@@ -361,6 +389,9 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     int resizeNum = 0;
     long resizeTimeMs = 0;
     for (TwoLevelHashMapIndexedTable table : _mergedIndexedTables) {
+      if (table.isTrimmed()) {
+        _groupsTrimmed = true;
+      }
       lookupMaps[idx++] = table.getLookupMap();
       resizeNum += table.getNumResizes();
       resizeTimeMs = Math.max(resizeTimeMs, table.getResizeTimeMs());
