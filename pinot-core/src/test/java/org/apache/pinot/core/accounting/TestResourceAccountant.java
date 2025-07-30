@@ -20,15 +20,9 @@ package org.apache.pinot.core.accounting;
 
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
@@ -134,48 +128,6 @@ class TestResourceAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPU
     // Enable self-termination of the thread
     config.setProperty(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE, true);
     return config;
-  }
-
-  static void getQueryThreadEntries(String queryId, CountDownLatch sampleLatch, AtomicInteger terminationCount,
-      List<Integer> threadMemoryAllocationSamples) {
-    Thread anchorThread = new Thread(() -> {
-      try {
-        Tracing.ThreadAccountantOps.setupRunner(queryId, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
-        ThreadExecutionContext taskExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-        int taskId = 0;
-        for (Integer memoryAllocationSample : threadMemoryAllocationSamples) {
-          createTaskThread(taskExecutionContext, terminationCount, sampleLatch, taskId++, memoryAllocationSample);
-        }
-
-        sampleLatch.await();
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      } catch (EarlyTerminationException e) {
-        terminationCount.incrementAndGet();
-      }
-    });
-    anchorThread.start();
-  }
-
-  private static void createTaskThread(ThreadExecutionContext parentContext, AtomicInteger terminationCount,
-      CountDownLatch sampleLatch, int taskId, long memoryAllocationSampleBytes) {
-    Thread workerThread = new Thread(() -> {
-      try {
-        Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
-        CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry =
-            ((TestResourceAccountant) Tracing.getThreadAccountant()).getThreadEntry();
-        threadEntry._currentThreadMemoryAllocationSampleBytes = memoryAllocationSampleBytes;
-
-        sampleLatch.await();
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      } catch (EarlyTerminationException e) {
-        terminationCount.incrementAndGet();
-      }
-    });
-    workerThread.start();
   }
 
   public TaskThread getTaskThread(String queryId, int taskId) {

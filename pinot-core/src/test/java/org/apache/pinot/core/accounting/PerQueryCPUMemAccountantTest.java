@@ -27,7 +27,6 @@ import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -35,13 +34,7 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class PerQueryCPUMemAccountantTest {
-  @AfterMethod
-  void resetAccountant() {
-    Tracing.unregisterThreadAccountant();
-  }
-
-
+public class PerQueryCPUMemAccountantTest extends BasePerQueryCPUMemAccountantTest {
   @Test
   void testQueryAggregation() {
     CountDownLatch threadLatch = new CountDownLatch(1);
@@ -50,13 +43,10 @@ public class PerQueryCPUMemAccountantTest {
 
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, terminationCount, List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, threadLatch, terminationCount, List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 1 && queryResourceTrackerMap.containsKey(queryId)
-          && queryResourceTrackerMap.get(queryId).getAllocatedBytes() == 5500;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
     assertEquals(queryResourceTrackerMap.size(), 1);
@@ -80,13 +70,10 @@ public class PerQueryCPUMemAccountantTest {
     String queryId = "testQueryAggregationCreateNewTask";
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 1 && queryResourceTrackerMap.containsKey(queryId)
-          && queryResourceTrackerMap.get(queryId).getAllocatedBytes() == 5500;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     TestResourceAccountant.TaskThread anchorThread =
         accountant.getTaskThread(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID);
@@ -121,13 +108,10 @@ public class PerQueryCPUMemAccountantTest {
     String queryId = "testQueryAggregationSetToIdle";
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 1 && queryResourceTrackerMap.containsKey(queryId)
-          && queryResourceTrackerMap.get(queryId).getAllocatedBytes() == 5500;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     TestResourceAccountant.TaskThread anchorThread =
         accountant.getTaskThread(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID);
@@ -162,13 +146,10 @@ public class PerQueryCPUMemAccountantTest {
     String queryId = "testQueryAggregationReapAndCreateNewTask";
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 1 && queryResourceTrackerMap.containsKey(queryId)
-          && queryResourceTrackerMap.get(queryId).getAllocatedBytes() == 5500;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     accountant.reapFinishedTasks();
 
@@ -208,13 +189,10 @@ public class PerQueryCPUMemAccountantTest {
     String queryId = "testQueryAggregationReapAndSetToIdle";
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 1 && queryResourceTrackerMap.containsKey(queryId)
-          && queryResourceTrackerMap.get(queryId).getAllocatedBytes() == 5500;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     accountant.reapFinishedTasks();
 
@@ -251,13 +229,10 @@ public class PerQueryCPUMemAccountantTest {
 
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 1 && queryResourceTrackerMap.containsKey(queryId)
-          && queryResourceTrackerMap.get(queryId).getAllocatedBytes() == 5500;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
     assertTrue(accountant.getInactiveQueries().isEmpty());
@@ -303,27 +278,20 @@ public class PerQueryCPUMemAccountantTest {
     AtomicInteger terminatedCount = new AtomicInteger(0);
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, terminatedCount, List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, threadLatch, terminatedCount, List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 1 && queryResourceTrackerMap.containsKey(queryId)
-          && queryResourceTrackerMap.get(queryId).getAllocatedBytes() == 5500;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     accountant.reapFinishedTasks();
 
     // Start a new query.
     CountDownLatch newQueryThreadLatch = new CountDownLatch(1);
     String newQueryId = "newQuery";
-    TestResourceAccountant.getQueryThreadEntries(newQueryId, newQueryThreadLatch, terminatedCount,
-        List.of(1000, 2000, 2500));
+    startQueryThreads(newQueryId, newQueryThreadLatch, terminatedCount, List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 2 && queryResourceTrackerMap.containsKey(newQueryId)
-          && queryResourceTrackerMap.get(queryId).getAllocatedBytes() == 5500;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, newQueryId, 5500);
 
     // Create a new task for newQuery
     TestResourceAccountant.TaskThread anchorThread =

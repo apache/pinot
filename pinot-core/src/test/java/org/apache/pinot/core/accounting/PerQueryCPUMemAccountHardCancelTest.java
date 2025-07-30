@@ -25,19 +25,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.util.TestUtils;
-import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 
 
-public class PerQueryCPUMemAccountHardCancelTest {
-  @AfterMethod
-  void resetAccountant() {
-    Tracing.unregisterThreadAccountant();
-  }
-
+public class PerQueryCPUMemAccountHardCancelTest extends BasePerQueryCPUMemAccountantTest {
   @Test
   void testHardCancelOfSingleQueryCriticalLevel() {
     CountDownLatch sampleLatch = new CountDownLatch(1);
@@ -46,12 +40,9 @@ public class PerQueryCPUMemAccountHardCancelTest {
 
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(queryId, sampleLatch, terminationCount, List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, sampleLatch, terminationCount, List.of(1000, 2000, 2500));
 
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 1 && queryResourceTrackerMap.containsKey(queryId);
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     // Ensure the Accountant state is correctly initialized
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
@@ -86,18 +77,12 @@ public class PerQueryCPUMemAccountHardCancelTest {
 
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(expensiveQueryId, sampleLatch, terminationCount,
-        List.of(1000, 2000, 2500));
-    TestResourceAccountant.getQueryThreadEntries(cheapQueryId, sampleLatch, terminationCount, List.of(100, 200, 250));
+    startQueryThreads(expensiveQueryId, sampleLatch, terminationCount, List.of(1000, 2000, 2500));
+    startQueryThreads(cheapQueryId, sampleLatch, terminationCount, List.of(100, 200, 250));
 
     // Ensure the Accountant state is correctly initialized
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 2 && queryResourceTrackerMap.containsKey(expensiveQueryId)
-          && queryResourceTrackerMap.containsKey(cheapQueryId)
-          && queryResourceTrackerMap.get(expensiveQueryId).getAllocatedBytes() == 5500
-          && queryResourceTrackerMap.get(cheapQueryId).getAllocatedBytes() == 550;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    waitForQueryResourceTracker(accountant, expensiveQueryId, 5500);
+    waitForQueryResourceTracker(accountant, cheapQueryId, 550);
 
     // Set the critical level heap usage ratio to a value that will trigger hard cancellation
     accountant.setCriticalLevelHeapUsageRatio(10000, 0.5);
@@ -126,18 +111,12 @@ public class PerQueryCPUMemAccountHardCancelTest {
 
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    TestResourceAccountant.getQueryThreadEntries(expensiveQueryId, sampleLatch, terminationCount,
-        List.of(1000, 2000, 2500));
-    TestResourceAccountant.getQueryThreadEntries(cheapQueryId, sampleLatch, terminationCount, List.of(100, 200, 250));
+    startQueryThreads(expensiveQueryId, sampleLatch, terminationCount, List.of(1000, 2000, 2500));
+    startQueryThreads(cheapQueryId, sampleLatch, terminationCount, List.of(100, 200, 250));
 
     // Ensure the Accountant state is correctly initialized
-    TestUtils.waitForCondition(aVoid -> {
-      Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-      return queryResourceTrackerMap.size() == 2 && queryResourceTrackerMap.containsKey(expensiveQueryId)
-          && queryResourceTrackerMap.containsKey(cheapQueryId)
-          && queryResourceTrackerMap.get(expensiveQueryId).getAllocatedBytes() == 5500
-          && queryResourceTrackerMap.get(cheapQueryId).getAllocatedBytes() == 550;
-    }, 100L, 5000L, "Waiting for query resource tracker to be initialized");
+    waitForQueryResourceTracker(accountant, expensiveQueryId, 5500);
+    waitForQueryResourceTracker(accountant, cheapQueryId, 550);
 
     // Set the critical level heap usage ratio to a value that will trigger hard cancellation
     accountant.setPanicLevelHeapUsageRatio(10000, 0.5);
