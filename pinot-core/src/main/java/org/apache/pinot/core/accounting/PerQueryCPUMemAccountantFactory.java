@@ -557,7 +557,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage,
         boolean hasCallback) {
-      LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}. Used Callback: {}.",
+      LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}. Used Callback: {}",
           queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
           queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage, hasCallback);
     }
