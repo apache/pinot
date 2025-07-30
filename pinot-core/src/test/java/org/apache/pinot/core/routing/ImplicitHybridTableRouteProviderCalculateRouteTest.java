@@ -266,7 +266,7 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
   /**
    * Checks if two table routes are the same. A expected routingTable is a Map<String, Set<String>> where the key is the
    * server name and the value is a set of segments. This is compared to the routing table
-   * Map<ServerInstance, ServerRouteInfo>
+   * Map<ServerInstance, SegmentsToQuery>
    * @param tableName
    * @param expectedOfflineRoutingTable
    * @param expectedRealtimeRoutingTable

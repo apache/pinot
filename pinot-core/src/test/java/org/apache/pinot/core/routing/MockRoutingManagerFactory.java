@@ -106,7 +106,7 @@ public class MockRoutingManagerFactory {
     for (Map.Entry<String, Map<String, List<ServerInstance>>> entry : _tableSegmentServersMap.entrySet()) {
       String tableNameWithType = entry.getKey();
       Map<String, List<ServerInstance>> segmentServersMap = entry.getValue();
-      Map<ServerInstance, SegmentsToQuery> serverRouteInfoMap = new HashMap<>();
+      Map<ServerInstance, SegmentsToQuery> segmentsToQueryMap = new HashMap<>();
       for (Map.Entry<String, List<ServerInstance>> segmentServersEntry : segmentServersMap.entrySet()) {
         String segment = segmentServersEntry.getKey();
         List<ServerInstance> servers = segmentServersEntry.getValue();
@@ -118,11 +118,11 @@ public class MockRoutingManagerFactory {
           server = servers.get(serverId % numServers);
           serverId++;
         }
-        serverRouteInfoMap.computeIfAbsent(server, k -> new SegmentsToQuery(new ArrayList<>(), null))
+        segmentsToQueryMap.computeIfAbsent(server, k -> new SegmentsToQuery(new ArrayList<>(), null))
             .getSegments()
             .add(segment);
       }
-      routingTableMap.put(tableNameWithType, new RoutingTable(serverRouteInfoMap, List.of(), 0));
+      routingTableMap.put(tableNameWithType, new RoutingTable(segmentsToQueryMap, List.of(), 0));
       tableSegmentsMap.put(tableNameWithType, new ArrayList<>(segmentServersMap.keySet()));
     }
     Map<String, TablePartitionInfo> tablePartitionInfoMap = null;

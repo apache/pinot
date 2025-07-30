@@ -28,7 +28,7 @@ public class SegmentsToQuery {
   private final List<String> _optionalSegments;
 
   /**
-   * Constructor for ServerRouteInfo.
+   * Constructor for SegmentsToQuery.
    *
    * @param segments List of segments assigned to the server.
    * @param optionalSegments List of optional segments assigned to the server.

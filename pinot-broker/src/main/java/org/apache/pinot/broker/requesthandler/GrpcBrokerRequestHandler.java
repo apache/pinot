@@ -92,7 +92,7 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
       throws Exception {
     BrokerRequest offlineBrokerRequest = route.getOfflineBrokerRequest();
     BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
-    // TODO: Routing bases on Map<ServerInstance, ServerRouteInfo> cannot be supported for logical tables.
+    // TODO: Routing bases on Map<ServerInstance, SegmentsToQuery> cannot be supported for logical tables.
     // The routing will be replaces to support table to segment list map in the future.
     Map<ServerInstance, SegmentsToQuery> offlineRoutingTable = route.getOfflineRoutingTable();
     Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable = route.getRealtimeRoutingTable();
