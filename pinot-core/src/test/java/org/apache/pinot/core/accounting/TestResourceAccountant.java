@@ -18,59 +18,164 @@
  */
 package org.apache.pinot.core.accounting;
 
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 class TestResourceAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
-  TestResourceAccountant(Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries) {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TestResourceAccountant.class);
+  private long _heapUsageBytes = 0;
+
+  TestResourceAccountant() {
     super(new PinotConfiguration(), false, true, true, new HashSet<>(), "test", InstanceType.SERVER);
-    _threadEntriesMap.putAll(threadEntries);
   }
 
-  static void getQueryThreadEntries(String queryId, CountDownLatch threadLatch,
-      Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries) {
-    TaskThread
-        anchorThread = getTaskThread(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, threadLatch, null);
-    threadEntries.put(anchorThread._workerThread, anchorThread._threadEntry);
-    anchorThread._threadEntry._currentThreadMemoryAllocationSampleBytes = 1000;
-
-    CPUMemThreadLevelAccountingObjects.ThreadEntry anchorEntry = new CPUMemThreadLevelAccountingObjects.ThreadEntry();
-    anchorEntry._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID,
-            ThreadExecutionContext.TaskType.SSE, anchorThread._workerThread,
-            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
-    anchorEntry._currentThreadMemoryAllocationSampleBytes = 1000;
-    threadEntries.put(anchorThread._workerThread, anchorEntry);
-
-    TaskThread taskThread2 = getTaskThread(queryId, 2, threadLatch, anchorThread._workerThread);
-    threadEntries.put(taskThread2._workerThread, taskThread2._threadEntry);
-    taskThread2._threadEntry._currentThreadMemoryAllocationSampleBytes = 2000;
-
-    TaskThread taskThread3 = getTaskThread(queryId, 3, threadLatch, anchorThread._workerThread);
-    threadEntries.put(taskThread3._workerThread, taskThread3._threadEntry);
-    taskThread3._threadEntry._currentThreadMemoryAllocationSampleBytes = 2500;
+  public void setHeapUsageBytes(long heapUsageBytes) {
+    _heapUsageBytes = heapUsageBytes;
   }
 
-  private static TaskThread getTaskThread(String queryId, int taskId, CountDownLatch threadLatch, Thread anchorThread) {
-    CPUMemThreadLevelAccountingObjects.ThreadEntry worker1 = new CPUMemThreadLevelAccountingObjects.ThreadEntry();
-    worker1._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, taskId, ThreadExecutionContext.TaskType.SSE,
-            anchorThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
-    Thread workerThread1 = new Thread(() -> {
+  @Override
+  public WatcherTask createWatcherTask() {
+    return new TestResourceWatcherTask();
+  }
+
+  class TestResourceWatcherTask extends WatcherTask {
+    TestResourceWatcherTask() {
+      PinotConfiguration config = getPinotConfiguration();
+      QueryMonitorConfig queryMonitorConfig = new QueryMonitorConfig(config, 1000);
+      _queryMonitorConfig.set(queryMonitorConfig);
+    }
+
+    @Override
+    public void runOnce() {
+      _aggregatedUsagePerActiveQuery = null;
+      _triggeringLevel = TriggeringLevel.Normal;
       try {
-        threadLatch.await();
+        evalTriggers();
+        reapFinishedTasks();
+        _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
+        _maxHeapUsageQuery.set(_aggregatedUsagePerActiveQuery.values().stream()
+            .filter(stats -> !_cancelSentQueries.contains(stats.getQueryId()))
+            .max(Comparator.comparing(AggregatedStats::getAllocatedBytes)).orElse(null));
+        triggeredActions();
+      } catch (Exception e) {
+        LOGGER.error("Caught exception while executing stats aggregation and query kill", e);
+      } finally {
+        // Clean inactive query stats
+        cleanInactive();
+      }
+    }
+
+    @Override
+    public long getHeapUsageBytes() {
+      return _heapUsageBytes;
+    }
+  }
+
+  void setCriticalLevelHeapUsageRatio(long maxHeapSize, double ratio) {
+    PinotConfiguration config = getPinotConfiguration();
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO, ratio);
+    _watcherTask._queryMonitorConfig.set(new QueryMonitorConfig(config, maxHeapSize));
+  }
+
+  void setPanicLevelHeapUsageRatio(long maxHeapSize, double ratio) {
+    PinotConfiguration config = getPinotConfiguration();
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO, ratio);
+    _watcherTask._queryMonitorConfig.set(new QueryMonitorConfig(config, maxHeapSize));
+  }
+
+  private static @NotNull PinotConfiguration getPinotConfiguration() {
+    PinotConfiguration config = new PinotConfiguration();
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.01);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
+        CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO,
+        CommonConstants.Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO,
+        CommonConstants.Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS,
+        CommonConstants.Accounting.DEFAULT_SLEEP_TIME_MS);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR,
+        CommonConstants.Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE,
+        CommonConstants.Accounting.DEFAULT_PUBLISHING_JVM_USAGE);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED,
+        CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS,
+        CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS);
+
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
+        CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
+
+    // Enable self-termination of the thread
+    config.setProperty(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE, true);
+    return config;
+  }
+
+  static void getQueryThreadEntries(String queryId, CountDownLatch sampleLatch, AtomicInteger terminationCount,
+      List<Integer> threadMemoryAllocationSamples) {
+    Thread anchorThread = new Thread(() -> {
+      try {
+        Tracing.ThreadAccountantOps.setupRunner(queryId, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
+        ThreadExecutionContext taskExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
+        int taskId = 0;
+        for (Integer memoryAllocationSample : threadMemoryAllocationSamples) {
+          createTaskThread(taskExecutionContext, terminationCount, sampleLatch, taskId++, memoryAllocationSample);
+        }
+
+        sampleLatch.await();
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+      } catch (EarlyTerminationException e) {
+        terminationCount.incrementAndGet();
       }
     });
-    workerThread1.start();
-    return new TaskThread(worker1, workerThread1);
+    anchorThread.start();
+  }
+
+  private static void createTaskThread(ThreadExecutionContext parentContext, AtomicInteger terminationCount,
+      CountDownLatch sampleLatch, int taskId, long memoryAllocationSampleBytes) {
+    Thread workerThread = new Thread(() -> {
+      try {
+        Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
+        CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry =
+            ((TestResourceAccountant) Tracing.getThreadAccountant()).getThreadEntry();
+        threadEntry._currentThreadMemoryAllocationSampleBytes = memoryAllocationSampleBytes;
+
+        sampleLatch.await();
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      } catch (EarlyTerminationException e) {
+        terminationCount.incrementAndGet();
+      }
+    });
+    workerThread.start();
   }
 
   public TaskThread getTaskThread(String queryId, int taskId) {

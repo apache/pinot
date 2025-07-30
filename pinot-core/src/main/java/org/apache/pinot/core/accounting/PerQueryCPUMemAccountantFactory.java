@@ -296,8 +296,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     @Override
     public boolean isQueryTerminated() {
       QueryMonitorConfig config = _watcherTask.getQueryMonitorConfig();
+      // if self-termination is not enabled, no need to check resource usage
       if (!config.isThreadSelfTerminate()) {
-        // if self-termination is not enabled, no need to check resource usage
         return false;
       }
 
@@ -839,10 +839,10 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           _triggeringLevel = TriggeringLevel.CPUTimeBasedKilling;
         }
 
-        if (_usedBytes > config.getCriticalLevel()) {
+        if (getHeapUsageBytes() > config.getCriticalLevel()) {
           _triggeringLevel = TriggeringLevel.HeapMemoryCritical;
           _metrics.addMeteredGlobalValue(_heapMemoryCriticalExceededMeter, 1);
-        } else if (_usedBytes > config.getAlarmingLevel()) {
+        } else if (getHeapUsageBytes() > config.getAlarmingLevel()) {
           _sleepTime = config.getAlarmingSleepTime();
           // For debugging
           _triggeringLevel = (IS_DEBUG_MODE_ENABLED && _triggeringLevel == TriggeringLevel.Normal)
@@ -856,7 +856,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       protected void triggeredActions() {
         switch (_triggeringLevel) {
           case HeapMemoryCritical:
-            LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes,
+            LOGGER.warn("Heap used bytes {} exceeds critical level {}", getHeapUsageBytes(),
                 _queryMonitorConfig.get().getCriticalLevel());
             killMostExpensiveQuery();
             break;
