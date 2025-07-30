@@ -202,11 +202,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
             unnestedRecords = unnestCollection(unnestedRecords, field);
           }
           unnestedRecords.forEach(unnestedRecord -> {
-            Map<String, Object> unnestedFieldValues = unnestedRecord.getFieldToValueMap();
+            Map<String, Object> values = unnestedRecord.getFieldToValueMap();
             for (Map.Entry<String, Object> entry : originalValues.entrySet()) {
-              if (!unnestedFieldValues.containsKey(entry.getKey())) {
-                unnestedFieldValues.put(entry.getKey(), entry.getValue());
-              }
+              values.putIfAbsent(entry.getKey(), entry.getValue());
             }
           });
           if (record.isIncomplete()) {
@@ -253,6 +251,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
         // use the record itself
         list.add(record);
       } else {
+        // Remove the value before flattening since we are going to add the flattened items
+        record.removeValue(column);
         for (Object obj : (Collection) value) {
           GenericRow copy = flattenCollectionItem(record, obj, column);
           list.add(copy);
@@ -263,6 +263,8 @@ public class ComplexTypeTransformer implements RecordTransformer {
         // use the record itself
         list.add(record);
       } else {
+        // Remove the value before flattening since we are going to add the flattened items
+        record.removeValue(column);
         for (Object obj : (Object[]) value) {
           GenericRow copy = flattenCollectionItem(record, obj, column);
           list.add(copy);
