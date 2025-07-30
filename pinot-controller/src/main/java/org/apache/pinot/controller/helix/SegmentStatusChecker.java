@@ -313,11 +313,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> partialOnlineSegments = new ArrayList<>();
     List<String> segmentsInvalidStartTime = new ArrayList<>();
     List<String> segmentsInvalidEndTime = new ArrayList<>();
-    
+
     // Track unavailable segments by reason for batched logging
     List<String> unavailableSegmentsByState = new ArrayList<>();
     List<String> unavailableSegmentsByInstance = new ArrayList<>();
-    
+
     for (String segment : segments) {
       // Number of replicas in ideal state that is in ONLINE/CONSUMING state
       int numISReplicasUp = 0;
@@ -375,7 +375,8 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
               if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
                 numEVReplicasUp++;
               } else {
-                unavailableSegmentsByInstance.add(segment + " (state: " + segmentState + " on unavailable " + serverInstanceId + ")");
+                unavailableSegmentsByInstance.add(segment
+                    + " (state: " + segmentState + " on unavailable " + serverInstanceId + ")");
               }
             } else {
               unavailableSegmentsByState.add(segment + " (state: " + segmentState + " on " + serverInstanceId + ")");
@@ -403,11 +404,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
 
     // Log unavailable segments in batches
     if (!unavailableSegmentsByState.isEmpty()) {
-      LOGGER.warn("Table {} has {} segments marked unavailable due to non-ONLINE/CONSUMING states: {}", 
+      LOGGER.warn("Table {} has {} segments marked unavailable due to non-ONLINE/CONSUMING states: {}",
           tableNameWithType, unavailableSegmentsByState.size(), logSegments(unavailableSegmentsByState));
     }
     if (!unavailableSegmentsByInstance.isEmpty()) {
-      LOGGER.warn("Table {} has {} segments marked unavailable due to unavailable instances: {}", 
+      LOGGER.warn("Table {} has {} segments marked unavailable due to unavailable instances: {}",
           tableNameWithType, unavailableSegmentsByInstance.size(), logSegments(unavailableSegmentsByInstance));
     }
 
