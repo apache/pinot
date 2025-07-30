@@ -296,7 +296,7 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea64</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea65</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.11</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
