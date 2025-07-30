@@ -48,7 +48,7 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler extends RealtimeOffset
   /**
    * Trigger the job to backfill the skipped interval due to offset auto reset.
    * It is expected to backfill the [fromOffset, toOffset) interval.
-   * @return if successfully started the backfill job and its ingestion
+   * @return true if successfully started the backfill job and its ingestion
    */
   @Override
   public boolean triggerBackfillJob(
