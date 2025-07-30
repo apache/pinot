@@ -286,6 +286,9 @@ public class QueryEnvironmentTestBase {
         // Verify type coercion in standard functions
         new Object[]{"SELECT DATEADD('DAY', 1, col7) FROM a"},
         new Object[]{"SELECT TIMESTAMPADD(DAY, 10, NOW() - 100) FROM a"},
+        // Verify custom non-reserved keywords (not in Calcite parser config)
+        new Object[]{"SELECT col1 AS UUID FROM a"},
+        new Object[]{"SELECT col1 AS VARIANT FROM a"}
     };
   }
 
