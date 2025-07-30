@@ -57,13 +57,18 @@ public class WorkloadBudgetManager {
    * This is fixed budget allocated during host startup and used across all secondary queries.
    */
   private void initSecondaryWorkloadBudget(PinotConfiguration config) {
-    String secondaryWorkloadName = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
-        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
-
     double secondaryCpuPercentage = config.getProperty(
         CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE,
         CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
+
+    // Don't create a secondary workload if cpu percentage is non-zero.
+    if (secondaryCpuPercentage <= 0.0) {
+      return;
+    }
+
+    String secondaryWorkloadName = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
+        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
 
     // The Secondary CPU budget is based on the CPU percentage allocated for secondary workload.
     // The memory budget is set to Long.MAX_VALUE for now, since we do not have a specific memory budget for
