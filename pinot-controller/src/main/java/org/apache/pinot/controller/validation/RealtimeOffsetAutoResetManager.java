@@ -67,7 +67,12 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
   @Override
   protected RealtimeOffsetAutoResetManager.Context preprocess(Properties periodicTaskProperties) {
     RealtimeOffsetAutoResetManager.Context context = new RealtimeOffsetAutoResetManager.Context();
-    // Fill offset back fill job required info
+    // Fill offset backfill job required info
+    // Examples of properties:
+    //   resetOffsetTopicName=topicName
+    //   resetOffsetTopicPartition=0
+    //   resetOffsetFrom=0
+    //   resetOffsetTo=1000
     if (periodicTaskProperties.containsKey(context._backfillJobPropertyKeys.toArray()[0])) {
       context._shouldTriggerBackfillJobs = true;
       for (String key : context._backfillJobPropertyKeys) {
@@ -109,12 +114,17 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
           .findFirst().orElseThrow(() -> new RuntimeException("No matching topic found"));
       LOGGER.info("Trigger backfill jobs with StreamConfig {}, topicName {}, properties {}",
           topicStreamConfig, topicName, context._backfillJobProperties);
-      _tableToHandler.get(tableNameWithType).triggerBackfillJob(tableNameWithType,
-          topicStreamConfig,
-          topicName,
-          Integer.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_PARTITION)),
-          Long.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_FROM)),
-          Long.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_TO)));
+      try {
+        _tableToHandler.get(tableNameWithType).triggerBackfillJob(tableNameWithType,
+            topicStreamConfig,
+            topicName,
+            Integer.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_PARTITION)),
+            Long.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_FROM)),
+            Long.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_TO)));
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid backfill job properties for table: {}, properties: {}, error: {}",
+            tableNameWithType, context._backfillJobProperties, e.getMessage(), e);
+      }
     }
 
     ensureBackfillJobsRunning(tableNameWithType);
@@ -154,7 +164,7 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     RealtimeOffsetAutoResetHandler handler = getOrConstructHandler(tableConfig);
     Collection<String> cleanedUpTopics = handler.cleanupCompletedBackfillJobs(
         tableNameWithType, _tableEphemeralTopics.get(tableNameWithType));
-    if (cleanedUpTopics.size() >= _tableEphemeralTopics.get(tableNameWithType).size()) {
+    if (cleanedUpTopics.containsAll(_tableEphemeralTopics.get(tableNameWithType))) {
       _tableTopicsUnderBackfill.remove(tableNameWithType);
       _tableEphemeralTopics.remove(tableNameWithType);
       if (_tableToHandler.get(tableNameWithType) != null) {
@@ -184,13 +194,13 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     }
     if (tableConfig.getIngestionConfig() == null
         || tableConfig.getIngestionConfig().getStreamIngestionConfig() == null) {
-      LOGGER.info("Table {} config is in the legacy mode, cannot do auto reset", tableConfig.getTableName());
+      LOGGER.debug("Table {} config is in the legacy mode, cannot do auto reset", tableConfig.getTableName());
       return null;
     }
     String className = tableConfig.getIngestionConfig().getStreamIngestionConfig()
         .getRealtimeOffsetAutoResetHandlerClass();
     if (className == null) {
-      LOGGER.error("RealtimeOffsetAutoResetHandlerClass is not specified for table {}", tableConfig.getTableName());
+      LOGGER.debug("RealtimeOffsetAutoResetHandlerClass is not specified for table {}", tableConfig.getTableName());
       return null;
     }
     try {
@@ -200,8 +210,6 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
             + RealtimeOffsetAutoResetHandler.class.getCanonicalName();
         throw new ReflectiveOperationException(exceptionMessage);
       }
-
-      // Return a new instance of custom lucene analyzer class
       handler = (RealtimeOffsetAutoResetHandler) clazz.getConstructor(
           PinotLLCRealtimeSegmentManager.class, PinotHelixResourceManager.class).newInstance(
           _llcRealtimeSegmentManager, _pinotHelixResourceManager);

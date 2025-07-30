@@ -42,6 +42,9 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
 
   public LLCSegmentName(String segmentName) {
     String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
+    // Validate the segment name format should have 4 or 5 parts:
+    // e.g. tableName__partitionGroupId__sequenceNumber__creationTime
+    // or tableName__topicName__partitionGroupId__sequenceNumber__creationTime
     Preconditions.checkArgument(
         parts.length >= 4 && parts.length <= 5, "Invalid LLC segment name: %s", segmentName);
     _tableName = parts[0];

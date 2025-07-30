@@ -124,7 +124,7 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler extends RealtimeOffset
 
   private void removeTopicFromTableConfig(String tableNameWithType, String topicName, TableConfig tableConfig) {
     List<Map<String, String>> streamConfigMaps = IngestionConfigUtils.getStreamConfigMaps(tableConfig);
-    for (int i = 0; i < streamConfigMaps.size(); i++) {
+    for (int i = streamConfigMaps.size() - 1; i >= 0; i--) {
       StreamConfig config = new StreamConfig(tableNameWithType, streamConfigMaps.get(i));
       if (config.isEphemeralBackfillTopic() && topicName.equals(config.getTopicName())) {
         streamConfigMaps.remove(i);
