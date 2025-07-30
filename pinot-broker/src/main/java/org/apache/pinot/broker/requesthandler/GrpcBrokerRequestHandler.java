@@ -38,7 +38,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
 import org.apache.pinot.common.utils.grpc.ServerGrpcRequestBuilder;
 import org.apache.pinot.core.query.reduce.StreamingReduceService;
-import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
@@ -94,8 +94,8 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
     BrokerRequest realtimeBrokerRequest = route.getRealtimeBrokerRequest();
     // TODO: Routing bases on Map<ServerInstance, ServerRouteInfo> cannot be supported for logical tables.
     // The routing will be replaces to support table to segment list map in the future.
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = route.getOfflineRoutingTable();
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = route.getRealtimeRoutingTable();
+    Map<ServerInstance, SegmentsToQuery> offlineRoutingTable = route.getOfflineRoutingTable();
+    Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable = route.getRealtimeRoutingTable();
 
     // TODO: Add servers queried/responded stats
     assert offlineBrokerRequest != null || realtimeBrokerRequest != null;
@@ -121,9 +121,9 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
    * Query pinot server for data table.
    */
   private void sendRequest(long requestId, TableType tableType, BrokerRequest brokerRequest,
-      Map<ServerInstance, ServerRouteInfo> routingTable,
+      Map<ServerInstance, SegmentsToQuery> routingTable,
       Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> responseMap, boolean trace) {
-    for (Map.Entry<ServerInstance, ServerRouteInfo> routingEntry : routingTable.entrySet()) {
+    for (Map.Entry<ServerInstance, SegmentsToQuery> routingEntry : routingTable.entrySet()) {
       ServerInstance serverInstance = routingEntry.getKey();
       // TODO: support optional segments for GrpcQueryServer.
       List<String> segments = routingEntry.getValue().getSegments();

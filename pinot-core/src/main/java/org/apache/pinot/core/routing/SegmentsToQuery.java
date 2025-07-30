@@ -21,10 +21,9 @@ package org.apache.pinot.core.routing;
 import java.util.List;
 
 /**
- * Class representing the route information for a server.
- * It contains the list of segments and optional segments assigned to the server.
+ * Wrapper class around the list of segments and optional segments that need to be queried on a particular server.
  */
-public class ServerRouteInfo {
+public class SegmentsToQuery {
   private final List<String> _segments;
   private final List<String> _optionalSegments;
 
@@ -34,7 +33,7 @@ public class ServerRouteInfo {
    * @param segments List of segments assigned to the server.
    * @param optionalSegments List of optional segments assigned to the server.
    */
-  public ServerRouteInfo(List<String> segments, List<String> optionalSegments) {
+  public SegmentsToQuery(List<String> segments, List<String> optionalSegments) {
     _segments = segments;
     _optionalSegments = optionalSegments;
   }

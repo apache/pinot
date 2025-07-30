@@ -142,16 +142,16 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
   private static class GetTableRouteResult {
     public final BrokerRequest _offlineBrokerRequest;
     public final BrokerRequest _realtimeBrokerRequest;
-    public final Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
-    public final Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable;
+    public final Map<ServerInstance, SegmentsToQuery> _offlineRoutingTable;
+    public final Map<ServerInstance, SegmentsToQuery> _realtimeRoutingTable;
     public final List<String> _unavailableSegments;
     public final int _numPrunedSegmentsTotal;
     public final boolean _offlineTableDisabled;
     public final boolean _realtimeTableDisabled;
 
     public GetTableRouteResult(BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest,
-        Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-        Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, List<String> unavailableSegments,
+        Map<ServerInstance, SegmentsToQuery> offlineRoutingTable,
+        Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable, List<String> unavailableSegments,
         int numPrunedSegmentsTotal, boolean offlineTableDisabled, boolean realtimeTableDisabled) {
       _offlineBrokerRequest = offlineBrokerRequest;
       _realtimeBrokerRequest = realtimeBrokerRequest;
@@ -202,8 +202,8 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
       }
     }
 
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
+    Map<ServerInstance, SegmentsToQuery> offlineRoutingTable = null;
+    Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable = null;
     BrokerRequestPair brokerRequestPair =
         getBrokerRequestPair(tableName, offlineTableName != null, realtimeTableName != null, offlineTableName,
             realtimeTableName);
@@ -224,7 +224,7 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
       }
       if (routingTable != null) {
         unavailableSegments.addAll(routingTable.getUnavailableSegments());
-        Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
+        Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           offlineRoutingTable = serverInstanceToSegmentsMap;
@@ -245,7 +245,7 @@ public class ImplicitHybridTableRouteProviderCalculateRouteTest extends BaseTabl
       }
       if (routingTable != null) {
         unavailableSegments.addAll(routingTable.getUnavailableSegments());
-        Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
+        Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           realtimeRoutingTable = serverInstanceToSegmentsMap;

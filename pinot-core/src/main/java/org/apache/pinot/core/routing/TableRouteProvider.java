@@ -27,8 +27,7 @@ import org.apache.pinot.common.request.BrokerRequest;
  * of the metadata are table config, broker routing information and the broker request.
  */
 public interface TableRouteProvider {
-  TableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache,
-      RoutingManager routingManager);
+  TableRouteInfo getTableRouteInfo(String tableName, TableCache tableCache, RoutingManager routingManager);
 
   /**
    * Calculate the Routing Table for a query. The routing table consists of the server name and list of segments that
