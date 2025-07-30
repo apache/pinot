@@ -60,6 +60,7 @@
     <module>pinot-query-planner</module>
     <module>pinot-query-runtime</module>
     <module>pinot-timeseries</module>
+    <module>pinot-udf-test</module>
   </modules>
 
   <licenses>
@@ -150,7 +151,7 @@
     <jersey.version>2.47</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.26.2</swagger-ui.version>
+    <swagger-ui.version>5.27.0</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.5.2</jsonsmart.version>
@@ -177,7 +178,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.32.4</aws.sdk.version>
+    <aws.sdk.version>2.32.10</aws.sdk.version>
     <azure.sdk.version>1.2.36</azure.sdk.version>
     <azure.msal4j.version>1.22.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -203,14 +204,14 @@
     <!-- Apache Commons Libraries -->
     <commons-lang3.version>3.18.0</commons-lang3.version>
     <commons-collections4.version>4.5.0</commons-collections4.version>
-    <commons-text.version>1.13.1</commons-text.version>
+    <commons-text.version>1.14.0</commons-text.version>
     <commons-compress.version>1.27.1</commons-compress.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-csv.version>1.14.0</commons-csv.version>
     <commons-configuration2.version>2.12.0</commons-configuration2.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-io.version>2.20.0</commons-io.version>
-    <commons-codec.version>1.18.0</commons-codec.version>
+    <commons-codec.version>1.19.0</commons-codec.version>
     <commons-cli.version>1.9.0</commons-cli.version>
     <commons-net.version>3.11.1</commons-net.version>
     <commons-validator.version>1.10.0</commons-validator.version>
@@ -238,11 +239,11 @@
 
     <!-- Google Libraries -->
     <protobuf.version>3.25.8</protobuf.version>
-    <grpc.version>1.73.0</grpc.version>
+    <grpc.version>1.74.0</grpc.version>
     <google.cloud.libraries.version>26.64.0</google.cloud.libraries.version>
     <google.auto-service.version>1.1.1</google.auto-service.version>
     <google.re2j.version>1.8</google.re2j.version>
-    <google.errorprone.version>2.40.0</google.errorprone.version>
+    <google.errorprone.version>2.41.0</google.errorprone.version>
     <google.j2objc.version>3.0.0</google.j2objc.version>
     <google.jsr305.version>3.0.2</google.jsr305.version>
 
@@ -260,7 +261,7 @@
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.1</woodstox.version>
-    <curator.version>5.8.0</curator.version>
+    <curator.version>5.9.0</curator.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <bouncycastle.version>1.78.1</bouncycastle.version>
     <aircompressor.version>0.27</aircompressor.version>
@@ -295,7 +296,7 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea60</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea64</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.11</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
@@ -626,6 +627,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-timeseries-m3ql</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-udf-test</artifactId>
         <version>${project.version}</version>
       </dependency>
 
@@ -2156,7 +2162,7 @@
         <plugin>
           <groupId>com.diffplug.spotless</groupId>
           <artifactId>spotless-maven-plugin</artifactId>
-          <version>2.46.0</version>
+          <version>2.46.1</version>
           <executions>
             <execution>
               <goals>

@@ -519,6 +519,13 @@ public class FileUploadDownloadClient implements AutoCloseable {
     return requestBuilder.build();
   }
 
+  private static ClassicHttpRequest getRevertReplaceSegmentRequest(URI uri, @Nullable AuthProvider authProvider) {
+    ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.post(uri).setVersion(HttpVersion.HTTP_1_1)
+        .setHeader(HttpHeaders.CONTENT_TYPE, HttpClient.JSON_CONTENT_TYPE);
+    AuthProviderUtils.toRequestHeaders(authProvider).forEach(requestBuilder::addHeader);
+    return requestBuilder.build();
+  }
+
   private static ClassicHttpRequest getSegmentCompletionProtocolRequest(URI uri, @Nullable List<Header> headers,
       @Nullable List<NameValuePair> parameters) {
     ClassicRequestBuilder requestBuilder = ClassicRequestBuilder.get(uri).setVersion(HttpVersion.HTTP_1_1);
@@ -1176,7 +1183,22 @@ public class FileUploadDownloadClient implements AutoCloseable {
    */
   public SimpleHttpResponse revertReplaceSegments(URI uri)
       throws IOException, HttpErrorStatusException {
-    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(getRevertReplaceSegmentRequest(uri)));
+    return revertReplaceSegments(uri, null);
+  }
+
+  /**
+   * Revert replace segments with default settings.
+   *
+   * @param uri URI
+   * @param authProvider auth provider
+   * @return Response
+   * @throws IOException
+   * @throws HttpErrorStatusException
+   */
+  public SimpleHttpResponse revertReplaceSegments(URI uri, @Nullable AuthProvider authProvider)
+      throws IOException, HttpErrorStatusException {
+    return HttpClient.wrapAndThrowHttpException(_httpClient.sendRequest(
+        getRevertReplaceSegmentRequest(uri, authProvider)));
   }
 
   /**

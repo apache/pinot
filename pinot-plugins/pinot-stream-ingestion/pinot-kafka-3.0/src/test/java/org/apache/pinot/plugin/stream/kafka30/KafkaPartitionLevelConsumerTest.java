@@ -48,7 +48,6 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -278,7 +277,6 @@ public class KafkaPartitionLevelConsumerTest {
         StreamMessage streamMessage = messageBatch.getStreamMessage(i);
         assertEquals(new String((byte[]) streamMessage.getValue()), "sample_msg_" + i);
         StreamMessageMetadata metadata = streamMessage.getMetadata();
-        assertNotNull(metadata);
         assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + i);
         StreamPartitionMsgOffset offset = metadata.getOffset();
         assertTrue(offset instanceof LongMsgOffset);
@@ -300,7 +298,6 @@ public class KafkaPartitionLevelConsumerTest {
         StreamMessage streamMessage = messageBatch.getStreamMessage(i);
         assertEquals(new String((byte[]) streamMessage.getValue()), "sample_msg_" + (500 + i));
         StreamMessageMetadata metadata = streamMessage.getMetadata();
-        assertNotNull(metadata);
         assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + 500 + i);
         StreamPartitionMsgOffset offset = metadata.getOffset();
         assertTrue(offset instanceof LongMsgOffset);
@@ -322,7 +319,6 @@ public class KafkaPartitionLevelConsumerTest {
         StreamMessage streamMessage = messageBatch.getStreamMessage(i);
         assertEquals(new String((byte[]) streamMessage.getValue()), "sample_msg_" + (10 + i));
         StreamMessageMetadata metadata = streamMessage.getMetadata();
-        assertNotNull(metadata);
         assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + 10 + i);
         StreamPartitionMsgOffset offset = metadata.getOffset();
         assertTrue(offset instanceof LongMsgOffset);
@@ -344,7 +340,6 @@ public class KafkaPartitionLevelConsumerTest {
         StreamMessage streamMessage = messageBatch.getStreamMessage(i);
         assertEquals(new String((byte[]) streamMessage.getValue()), "sample_msg_" + (610 + i));
         StreamMessageMetadata metadata = streamMessage.getMetadata();
-        assertNotNull(metadata);
         assertEquals(metadata.getRecordIngestionTimeMs(), TIMESTAMP + 610 + i);
         StreamPartitionMsgOffset offset = metadata.getOffset();
         assertTrue(offset instanceof LongMsgOffset);

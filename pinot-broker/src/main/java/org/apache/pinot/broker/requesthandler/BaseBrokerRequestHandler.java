@@ -53,6 +53,7 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -89,6 +90,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final QueryLogger _queryLogger;
   @Nullable
   protected final String _enableNullHandling;
+  protected final ThreadResourceUsageAccountant _resourceUsageAccountant;
+
   /**
    * Maps broker-generated query id to the query string.
    */
@@ -99,7 +102,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final Map<Long, String> _clientQueryIds;
 
   public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadResourceUsageAccountant resourceUsageAccountant) {
     _config = config;
     _brokerId = brokerId;
     _routingManager = routingManager;
@@ -125,6 +129,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _queriesById = null;
       _clientQueryIds = null;
     }
+    _resourceUsageAccountant = resourceUsageAccountant;
   }
 
   @Override

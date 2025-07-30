@@ -36,14 +36,15 @@ import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
 import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.trace.RequestContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.util.TestUtils;
@@ -182,7 +183,8 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
         new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", routingManager,
-            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache) {
+            new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
+            new Tracing.DefaultThreadResourceUsageAccountant()) {
           @Override
           public void start() {
           }
