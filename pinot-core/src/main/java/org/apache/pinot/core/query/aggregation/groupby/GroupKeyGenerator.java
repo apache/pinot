@@ -76,6 +76,12 @@ public interface GroupKeyGenerator {
   int getNumKeys();
 
   /**
+   * Clear and trim used thread-local map if needed
+   */
+  default void clearAndTrimHolder() {
+  }
+
+  /**
    * This class encapsulates the integer group id and the group keys.
    */
   class GroupKey {

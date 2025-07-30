@@ -112,7 +112,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
   /**
    * Make sure {@link this#clearAndTrimHolder()} is called to clear thread-local map used
-   * before calling this constructor
+   * before calling this constructor.
    */
   public DictionaryBasedGroupKeyGenerator(BaseProjectOperator<?> projectOperator,
       ExpressionContext[] groupByExpressions, int numGroupsLimit, int arrayBasedThreshold,
@@ -195,6 +195,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   }
 
   /// clear and trim used thread local map after use
+  @Override
   public void clearAndTrimHolder() {
     switch (_usedHolderType) {
       case ARRAY_MAP:

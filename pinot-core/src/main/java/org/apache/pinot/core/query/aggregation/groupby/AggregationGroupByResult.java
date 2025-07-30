@@ -56,7 +56,7 @@ public class AggregationGroupByResult {
    */
   public void clearAndTrimGroupKeyGenerator() {
     if (_groupKeyGenerator instanceof DictionaryBasedGroupKeyGenerator) {
-      ((DictionaryBasedGroupKeyGenerator) _groupKeyGenerator).clearAndTrimHolder();
+      _groupKeyGenerator.clearAndTrimHolder();
     }
   }
 
