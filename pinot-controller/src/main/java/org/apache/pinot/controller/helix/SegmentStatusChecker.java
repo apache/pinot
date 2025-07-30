@@ -386,7 +386,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
 
       minEVReplicasUp = Math.min(minEVReplicasUp, numEVReplicasUp);
-      minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasUp);
+      // Use max replicas up from IS and EV to ensure availability does not go above 100%
+      int maxReplicasUp = Math.max(numISReplicasUp, numEVReplicasUp);
+      minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / maxReplicasUp);
     }
 
     if (maxISReplicasUp == Integer.MIN_VALUE) {
