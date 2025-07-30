@@ -19,9 +19,9 @@
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import java.util.LinkedList;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.Queue;
 
 
 /**
