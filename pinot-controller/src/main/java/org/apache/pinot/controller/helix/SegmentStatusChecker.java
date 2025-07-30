@@ -313,6 +313,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> partialOnlineSegments = new ArrayList<>();
     List<String> segmentsInvalidStartTime = new ArrayList<>();
     List<String> segmentsInvalidEndTime = new ArrayList<>();
+
+    // Track unavailable segments by reason for batched logging
+    List<String> unavailableSegmentsByState = new ArrayList<>();
+    List<String> unavailableSegmentsByInstance = new ArrayList<>();
+
     for (String segment : segments) {
       // Number of replicas in ideal state that is in ONLINE/CONSUMING state
       int numISReplicasUp = 0;
@@ -366,16 +371,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String serverInstanceId = entry.getKey();
             String segmentState = entry.getValue();
-            if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
-              if (segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING)) {
+            if (segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING)) {
+              if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
                 numEVReplicasUp++;
               } else {
-                LOGGER.warn("Segment {} in table {} has state {} on instance {}. Marking it as unavailable",
-                    segment, tableNameWithType, segmentState, serverInstanceId);
+                unavailableSegmentsByInstance.add(segment
+                    + " (state: " + segmentState + " on unavailable " + serverInstanceId + ")");
               }
             } else {
-              LOGGER.warn("Segment {} in table {} has state {} on unavailable instance {}. Marking it as unavailable",
-                  segment, tableNameWithType, segmentState, serverInstanceId);
+              unavailableSegmentsByState.add(segment + " (state: " + segmentState + " on " + serverInstanceId + ")");
             }
             if (segmentState.equals(SegmentStateModel.ERROR)) {
               errorSegments.add(Pair.of(segment, entry.getKey()));
@@ -396,6 +400,16 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       // Total number of replicas in ideal state (including ERROR/OFFLINE states)
       int numISReplicasTotal = Math.max(idealState.getInstanceStateMap(segment).entrySet().size(), 1);
       minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
+    }
+
+    // Log unavailable segments in batches
+    if (!unavailableSegmentsByState.isEmpty()) {
+      LOGGER.warn("Table {} has {} segments marked unavailable due to non-ONLINE/CONSUMING states: {}",
+          tableNameWithType, unavailableSegmentsByState.size(), logSegments(unavailableSegmentsByState));
+    }
+    if (!unavailableSegmentsByInstance.isEmpty()) {
+      LOGGER.warn("Table {} has {} segments marked unavailable due to unavailable instances: {}",
+          tableNameWithType, unavailableSegmentsByInstance.size(), logSegments(unavailableSegmentsByInstance));
     }
 
     if (maxISReplicasUp == Integer.MIN_VALUE) {
