@@ -253,6 +253,10 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
+    public static final String CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS =
+        "pinot.multistage.engine.channel.auth.factory.class";
+    public static final String DEFAULT_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS =
+        "org.apache.pinot.query.access.AllowAllQueryAccessControlFactory";
 
     // This is a "beta" config and can be changed or even removed in future releases.
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS =

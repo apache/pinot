@@ -44,6 +44,8 @@ import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.MseWorkerThreadContext;
+import org.apache.pinot.query.access.AuthorizationInterceptor;
+import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -79,6 +81,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private final QueryRunner _queryRunner;
   @Nullable
   private final TlsConfig _tlsConfig;
+  @Nullable
+  private final QueryAccessControlFactory _accessControlFactory;
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
   //   directly return from submission response observer.
@@ -101,7 +105,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @VisibleForTesting
   public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
-    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration());
+    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration(), null);
   }
 
   public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
@@ -110,10 +114,20 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
       PinotConfiguration config) {
+    this(instanceId, port, queryRunner, tlsConfig, config, null);
+  }
+
+  public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
+      PinotConfiguration config, @Nullable QueryAccessControlFactory accessControlFactory) {
     _instanceId = instanceId;
     _port = port;
     _queryRunner = queryRunner;
     _tlsConfig = tlsConfig;
+    if (accessControlFactory == null) {
+      _accessControlFactory = QueryAccessControlFactory.fromConfig(config);
+    } else {
+      _accessControlFactory = accessControlFactory;
+    }
 
     ExecutorService baseExecutorService = ExecutorServiceUtils.create(config,
         CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
@@ -163,6 +177,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     return builder
          // By using directExecutor, GRPC doesn't need to manage its own thread pool
         .directExecutor()
+        .intercept(new AuthorizationInterceptor(_accessControlFactory))
         .addService(this)
         .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE)
         .build();
