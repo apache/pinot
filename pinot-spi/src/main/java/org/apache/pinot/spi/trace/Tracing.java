@@ -391,6 +391,13 @@ public class Tracing {
       sample();
     }
 
+    public static void sampleAndCheckInterruption(ThreadResourceUsageAccountant accountant) {
+      if (Thread.interrupted() || accountant.isAnchorThreadInterrupted() || accountant.isQueryTerminated()) {
+        throw new EarlyTerminationException("Interrupted while merging records");
+      }
+      accountant.sampleUsage();
+    }
+
     @Deprecated
     public static void updateQueryUsageConcurrently(String queryId) {
     }
