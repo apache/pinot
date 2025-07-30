@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
+import org.apache.pinot.core.accounting.DefaultWorkloadBudgetManager;
 import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
@@ -344,12 +345,17 @@ public class Tracing {
 
     public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
-      createThreadAccountant(config, instanceId, instanceType);
+      createThreadAccountant(config, instanceId, instanceType, new DefaultWorkloadBudgetManager(config));
     }
 
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
         InstanceType instanceType) {
-      _workloadBudgetManager = new WorkloadBudgetManager(config);
+      return createThreadAccountant(config, instanceId, instanceType, new DefaultWorkloadBudgetManager(config));
+    }
+
+    public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
+        InstanceType instanceType, WorkloadBudgetManager workloadBudgetManager) {
+      _workloadBudgetManager = workloadBudgetManager;
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
       ThreadResourceUsageAccountant accountant = null;
       if (factoryName != null) {

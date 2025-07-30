@@ -77,6 +77,8 @@ import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.core.accounting.DefaultWorkloadBudgetManager;
+import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
@@ -672,9 +674,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Initialize the thread accountant for query killing
+    PinotConfiguration threadAccountantConfigs = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
+    // This allows for custom implementations of WorkloadBudgetManager.
+    WorkloadBudgetManager workloadBudgetManager = createWorkloadBudgetManager(threadAccountantConfigs);
     _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+        org.apache.pinot.spi.config.instance.InstanceType.SERVER, workloadBudgetManager);
     Preconditions.checkNotNull(_resourceUsageAccountant);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
@@ -899,6 +904,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
    */
   protected void preServeQueries() {
     _segmentOperationsThrottler.startServingQueries();
+  }
+
+  /**
+   * Can be overridden to create a custom WorkloadBudgetManager.
+   */
+  protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration config) {
+    return new DefaultWorkloadBudgetManager(config);
   }
 
   @Override
