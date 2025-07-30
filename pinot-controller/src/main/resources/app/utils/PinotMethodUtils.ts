@@ -737,16 +737,25 @@ const getZookeeperData = (path, count) => {
     isLeafNode: false,
     hasChildRendered: true
   }];
-  return getNodeData(path).then((obj)=>{
+
+  return getNodeData(path).then((obj) => {
     const { currentNodeData, currentNodeMetadata, currentNodeListStat } = obj;
-    const pathNames = Object.keys(currentNodeListStat);
-    pathNames.map((pathName)=>{
+    const pathNames = Object.keys(currentNodeListStat || {});
+
+    pathNames.forEach((pathName) => {
+      const nodeStat = currentNodeListStat[pathName];
+
+      // Skip if nodeStat is null or undefined
+      if (!nodeStat) {
+        console.warn(`Skipping null node for path: ${pathName}`);
+        return;
+      }
       newTreeData[0].child.push({
         nodeId: `${counter++}`,
         label: pathName,
-        fullPath: path === '/' ? path+pathName : `${path}/${pathName}`,
+        fullPath: path === '/' ? path + pathName : `${path}/${pathName}`,
         child: [],
-        isLeafNode: currentNodeListStat[pathName].numChildren === 0,
+        isLeafNode: nodeStat.numChildren === 0,
         hasChildRendered: false
       });
     });

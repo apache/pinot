@@ -36,17 +36,15 @@ public class QueryMonitorConfigTest {
   private static final double EXPECTED_MIN_MEMORY_FOOTPRINT_FOR_KILL = 0.05;
   private static final double EXPECTED_PANIC_LEVEL = 0.9f;
   private static final double EXPECTED_CRITICAL_LEVEL = 0.95f;
-  private static final double EXPECTED_CRITICAL_LEVEL_AFTER_GC = 0.05f;
-  private static final int EXPECTED_GC_BACKOFF_COUNT = 3;
   private static final double EXPECTED_ALARMING_LEVEL = 0.8f;
   private static final int EXPECTED_NORMAL_SLEEP_TIME = 50;
-  private static final int EXPECTED_GC_WAIT_TIME = 1000;
   private static final int EXPECTED_ALARMING_SLEEP_TIME_DENOMINATOR = 2;
   private static final boolean EXPECTED_OOM_KILL_QUERY_ENABLED = true;
   private static final boolean EXPECTED_PUBLISH_HEAP_USAGE_METRIC = true;
   private static final boolean EXPECTED_IS_CPU_TIME_BASED_KILLING_ENABLED = true;
   private static final long EXPECTED_CPU_TIME_BASED_KILLING_THRESHOLD_NS = 1000;
   private static final boolean EXPECTED_IS_QUERY_KILLED_METRIC_ENABLED = true;
+  private static final boolean EXPECTED_IS_THREAD_SELF_TERMINATE_IN_PANIC_MODE = true;
   private static final Map<String, String> CLUSTER_CONFIGS = new HashMap<>();
 
   private static String getFullyQualifiedConfigName(String config) {
@@ -70,9 +68,6 @@ public class QueryMonitorConfigTest {
     CLUSTER_CONFIGS.put(
         getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO),
         Double.toString(EXPECTED_CRITICAL_LEVEL));
-    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(
-            CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC),
-        Double.toString(EXPECTED_CRITICAL_LEVEL_AFTER_GC));
     CLUSTER_CONFIGS.put(
         getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO),
         Double.toString(EXPECTED_ALARMING_LEVEL));
@@ -83,12 +78,11 @@ public class QueryMonitorConfigTest {
     CLUSTER_CONFIGS.put(
         getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO),
         Double.toString(EXPECTED_MIN_MEMORY_FOOTPRINT_FOR_KILL));
-    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_GC_BACKOFF_COUNT),
-        Integer.toString(EXPECTED_GC_BACKOFF_COUNT));
-    CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_GC_WAIT_TIME_MS),
-        Integer.toString(EXPECTED_GC_WAIT_TIME));
     CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED),
         Boolean.toString(EXPECTED_IS_QUERY_KILLED_METRIC_ENABLED));
+    CLUSTER_CONFIGS.put(
+        getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE),
+        Boolean.toString(EXPECTED_IS_THREAD_SELF_TERMINATE_IN_PANIC_MODE));
   }
 
   @Test
@@ -178,23 +172,6 @@ public class QueryMonitorConfigTest {
   }
 
   @Test
-  void testCriticalLevelHeapUsageRatioDeltaAfterGCConfigChange() {
-    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
-        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
-            InstanceType.SERVER);
-
-    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getCriticalLevelAfterGC(),
-        accountant.getWatcherTask().getQueryMonitorConfig().getCriticalLevel()
-            - CommonConstants.Accounting.DEFAULT_CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC
-            * accountant.getWatcherTask().getQueryMonitorConfig().getMaxHeapSize());
-    accountant.getWatcherTask().onChange(Set.of(getFullyQualifiedConfigName(
-        CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC)), CLUSTER_CONFIGS);
-    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getCriticalLevelAfterGC(),
-        accountant.getWatcherTask().getQueryMonitorConfig().getCriticalLevel()
-            - EXPECTED_CRITICAL_LEVEL_AFTER_GC * accountant.getWatcherTask().getQueryMonitorConfig().getMaxHeapSize());
-  }
-
-  @Test
   void testAlarmingLevelHeapUsageRatioConfigChange() {
     PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
@@ -259,34 +236,6 @@ public class QueryMonitorConfigTest {
   }
 
   @Test
-  void testGCBackoffCountConfigChange() {
-    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
-        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
-            InstanceType.SERVER);
-
-    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getGcBackoffCount(),
-        CommonConstants.Accounting.DEFAULT_GC_BACKOFF_COUNT);
-    accountant.getWatcherTask()
-        .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_GC_BACKOFF_COUNT)),
-            CLUSTER_CONFIGS);
-    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getGcBackoffCount(), EXPECTED_GC_BACKOFF_COUNT);
-  }
-
-  @Test
-  void testGCWaitTimeConfigChange() {
-    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
-        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
-            InstanceType.SERVER);
-
-    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getGcWaitTime(),
-        CommonConstants.Accounting.DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS);
-    accountant.getWatcherTask()
-        .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_GC_WAIT_TIME_MS)),
-            CLUSTER_CONFIGS);
-    assertEquals(accountant.getWatcherTask().getQueryMonitorConfig().getGcWaitTime(), EXPECTED_GC_WAIT_TIME);
-  }
-
-  @Test
   void testQueryKilledMetricEnabledConfigChange() {
     PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
         new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
@@ -297,5 +246,18 @@ public class QueryMonitorConfigTest {
         .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED)),
             CLUSTER_CONFIGS);
     assertTrue(accountant.getWatcherTask().getQueryMonitorConfig().isQueryKilledMetricEnabled());
+  }
+
+  @Test
+  void testThreadSelfTerminateInPanicMode() {
+    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
+        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
+            InstanceType.SERVER);
+
+    assertFalse(accountant.getWatcherTask().getQueryMonitorConfig().isThreadSelfTerminate());
+    accountant.getWatcherTask().onChange(
+        Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE)),
+        CLUSTER_CONFIGS);
+    assertTrue(accountant.getWatcherTask().getQueryMonitorConfig().isThreadSelfTerminate());
   }
 }

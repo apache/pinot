@@ -27,9 +27,9 @@ public interface WorkloadBudgetManager {
   /**
    * Adds or updates budget for a workload (Thread-Safe).
    *
-   * @param workload           Logical workload identifier
+   * @param workload           Workload identifier
    * @param cpuBudgetNs        CPU budget for the enforcement window, in ns
-   * @param memoryBudgetBytes  Memory budget for the window, in bytes
+   * @param memoryBudgetBytes  Memory budget for the enforcement window, in bytes
    */
   void addOrUpdateWorkload(String workload, long cpuBudgetNs, long memoryBudgetBytes);
 
@@ -51,10 +51,7 @@ public interface WorkloadBudgetManager {
 
   /**
    * Collects workload stats for CPU and memory usage.
-   *
-   * @param workload        Workload identifier
-   * @param cpuUsedNs       CPU used by the workload, in ns
-   * @param memoryUsedBytes Memory used by the workload, in bytes
+   * Could be overridden for custom implementations
    */
   void collectWorkloadStats(String workload, long cpuUsedNs, long memoryUsedBytes);
 

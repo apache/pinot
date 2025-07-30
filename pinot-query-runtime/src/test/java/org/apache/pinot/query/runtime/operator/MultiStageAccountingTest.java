@@ -27,8 +27,6 @@ import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.accounting.DefaultWorkloadBudgetManager;
-import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.query.planner.logical.RexExpression;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.JoinNode;
@@ -93,10 +91,10 @@ public class MultiStageAccountingTest implements ITest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     // init accountant and start watcher task
-    PinotConfiguration pinotConfiguration = new PinotConfiguration(configs);
-    WorkloadBudgetManager workloadBudgetManager = new DefaultWorkloadBudgetManager(pinotConfiguration);
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotConfiguration, "testGroupBy",
-        InstanceType.SERVER, workloadBudgetManager);
+    Tracing.unregisterThreadAccountant();
+    Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(configs), "testGroupBy",
+        InstanceType.SERVER);
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     // Setup Thread Context
     Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);

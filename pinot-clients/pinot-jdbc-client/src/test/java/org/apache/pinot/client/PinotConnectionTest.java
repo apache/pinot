@@ -41,17 +41,21 @@ public class PinotConnectionTest {
   @Test
   public void createStatementTest()
       throws Exception {
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
-        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     Statement statement = pinotConnection.createStatement();
     Assert.assertNotNull(statement);
   }
 
   @Test
   public void getMetaDataTest()
-          throws Exception {
+      throws Exception {
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     try (PinotConnection pinotConnection =
-                 new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport)) {
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport)) {
       DatabaseMetaData metaData = pinotConnection.getMetaData();
       Assert.assertNotNull(metaData);
       Assert.assertTrue(metaData.getDatabaseMajorVersion() > 0);
@@ -64,9 +68,11 @@ public class PinotConnectionTest {
 
   @Test
   public void isClosedTest()
-          throws Exception {
+      throws Exception {
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
-                 new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", _dummyPinotControllerTransport);
     Assert.assertFalse(pinotConnection.isClosed());
     pinotConnection.close();
     Assert.assertTrue(pinotConnection.isClosed());
@@ -77,13 +83,15 @@ public class PinotConnectionTest {
       throws Exception {
     StringBuilder appId = new StringBuilder("appId-");
     for (int i = 0; i < 256; i++) {
-       appId.append(i);
+      appId.append(i);
     }
     DummyPinotControllerTransport userAgentPinotControllerTransport = DummyPinotControllerTransport
         .create(appId.toString());
 
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
-        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", userAgentPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", userAgentPinotControllerTransport);
     Statement statement = pinotConnection.createStatement();
     Assert.assertNotNull(statement);
   }
@@ -94,8 +102,10 @@ public class PinotConnectionTest {
     DummyPinotControllerTransport userAgentPinotControllerTransport = DummyPinotControllerTransport
         .create(null);
 
+    Properties props = new Properties();
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
-        new PinotConnection("dummy", _dummyPinotClientTransport, "dummy", userAgentPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy", userAgentPinotControllerTransport);
     Statement statement = pinotConnection.createStatement();
     Assert.assertNotNull(statement);
   }
@@ -107,9 +117,10 @@ public class PinotConnectionTest {
     props.put(CommonConstants.Broker.Request.QueryOptionKey.USE_MULTISTAGE_ENGINE, "true");
     props.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, 3000);
     props.put(CommonConstants.Broker.Request.QueryOptionKey.MAX_EXECUTION_THREADS, 20);
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
-            new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
-                    _dummyPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
+            _dummyPinotControllerTransport);
     Map<String, Object> queryOptions = pinotConnection.getQueryOptions();
     Assert.assertEquals(queryOptions.size(), 4);
     Assert.assertEquals(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING), true);
@@ -122,9 +133,10 @@ public class PinotConnectionTest {
   public void testInvalidQueryOptions() {
     Properties props = new Properties();
     props.put("unknown", "true");
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
-            new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
-                    _dummyPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
+            _dummyPinotControllerTransport);
     Map<String, Object> queryOptions = pinotConnection.getQueryOptions();
     Assert.assertEquals(queryOptions.size(), 0);
   }
@@ -137,9 +149,10 @@ public class PinotConnectionTest {
     props.put("enablenullhandling", "true");
     props.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS, 5000);
     props.put(CommonConstants.Broker.Request.QueryOptionKey.MAX_EXECUTION_THREADS, 30);
+    props.put(PinotConnection.BROKER_LIST, "dummy");
     PinotConnection pinotConnection =
-            new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
-                    _dummyPinotControllerTransport);
+        new PinotConnection(props, "dummy", _dummyPinotClientTransport, "dummy",
+            _dummyPinotControllerTransport);
     Map<String, Object> queryOptions = pinotConnection.getQueryOptions();
     Assert.assertEquals(queryOptions.size(), 3);
     Assert.assertEquals(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS), 5000);

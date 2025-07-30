@@ -49,6 +49,7 @@ import org.mockito.stubbing.Answer;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 
 
@@ -56,6 +57,7 @@ public class MutableSegmentEntriesAboveThresholdTest implements PinotBuffersAfte
   private static final File TEMP_DIR =
       new File(FileUtils.getTempDirectory(), MutableSegmentEntriesAboveThresholdTest.class.getSimpleName());
   private static final String AVRO_FILE = "data/test_data-mv.avro";
+  private static final StreamMessageMetadata METADATA = mock(StreamMessageMetadata.class);
   private Schema _schema;
 
   private File getAvroFile() {
@@ -85,12 +87,11 @@ public class MutableSegmentEntriesAboveThresholdTest implements PinotBuffersAfte
     File avroFile = getAvroFile();
     MutableSegmentImpl mutableSegment = getMutableSegment(avroFile);
     try {
-      StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
       try (RecordReader recordReader = RecordReaderFactory
           .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
         GenericRow reuse = new GenericRow();
         while (recordReader.hasNext()) {
-          mutableSegment.index(recordReader.next(reuse), defaultMetadata);
+          mutableSegment.index(recordReader.next(reuse), METADATA);
         }
       }
       assert mutableSegment.canAddMore();
@@ -105,7 +106,6 @@ public class MutableSegmentEntriesAboveThresholdTest implements PinotBuffersAfte
     File avroFile = getAvroFile();
     MutableSegmentImpl mutableSegment = getMutableSegment(avroFile);
     try {
-
       Field indexContainerMapField = MutableSegmentImpl.class.getDeclaredField("_indexContainerMap");
       indexContainerMapField.setAccessible(true);
       Map<String, Object> colVsIndexContainer = (Map<String, Object>) indexContainerMapField.get(mutableSegment);
@@ -129,12 +129,11 @@ public class MutableSegmentEntriesAboveThresholdTest implements PinotBuffersAfte
         indexTypeVsMutableIndex.put(new ForwardIndexPlugin().getIndexType(),
             new FakeMutableForwardIndex(mutableForwardIndex));
       }
-      StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
       try (RecordReader recordReader = RecordReaderFactory
           .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
         GenericRow reuse = new GenericRow();
         while (recordReader.hasNext()) {
-          mutableSegment.index(recordReader.next(reuse), defaultMetadata);
+          mutableSegment.index(recordReader.next(reuse), METADATA);
         }
       }
 
@@ -166,12 +165,11 @@ public class MutableSegmentEntriesAboveThresholdTest implements PinotBuffersAfte
           mutableDictinaryField.set(indexContainer, mockedDictionary);
         }
       }
-      StreamMessageMetadata defaultMetadata = new StreamMessageMetadata(System.currentTimeMillis(), new GenericRow());
       try (RecordReader recordReader = RecordReaderFactory
           .getRecordReader(FileFormat.AVRO, avroFile, _schema.getColumnNames(), null)) {
         GenericRow reuse = new GenericRow();
         while (recordReader.hasNext()) {
-          mutableSegment.index(recordReader.next(reuse), defaultMetadata);
+          mutableSegment.index(recordReader.next(reuse), METADATA);
         }
       }
 

@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.OptionalInt;
 import org.apache.pinot.common.request.context.predicate.Predicate;
+import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
@@ -106,13 +107,27 @@ public class FilterOperatorUtils {
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else if (predicateType == Predicate.Type.REGEXP_LIKE) {
-        if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()
-            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
-          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
-        }
-        if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null
-            && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
-          return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+        // Check if case-insensitive flag is present
+        RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicateEvaluator.getPredicate();
+        boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
+        if (caseInsensitive) {
+          if (dataSource.getIFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()
+              && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+            return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
+          if (dataSource.getIFSTIndex() != null && dataSource.getInvertedIndex() != null
+              && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
+            return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
+        } else {
+          if (dataSource.getFSTIndex() != null && dataSource.getDataSourceMetadata().isSorted()
+              && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
+            return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
+          if (dataSource.getFSTIndex() != null && dataSource.getInvertedIndex() != null
+              && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
+            return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          }
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else {

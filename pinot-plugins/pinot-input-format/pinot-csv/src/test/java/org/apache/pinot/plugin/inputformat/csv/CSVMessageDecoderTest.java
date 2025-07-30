@@ -73,7 +73,7 @@ public class CSVMessageDecoderTest {
     assertEquals(destination.getValue("subjects"), new String[]{"maths", "German", "history"});
   }
 
-  @Test(expectedExceptions = java.util.NoSuchElementException.class)
+  @Test(expectedExceptions = RuntimeException.class)
   public void testCommentMarker()
       throws Exception {
     Map<String, String> decoderProps = getStandardDecoderProps();

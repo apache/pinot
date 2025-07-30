@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -3099,11 +3100,13 @@ public class TableConfigUtilsTest {
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
     }
 
+    @Nullable
     @Override
     public GenericRow decode(byte[] payload, GenericRow destination) {
       return null;
     }
 
+    @Nullable
     @Override
     public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
       return null;

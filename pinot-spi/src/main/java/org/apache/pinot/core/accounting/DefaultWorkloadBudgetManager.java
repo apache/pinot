@@ -134,7 +134,7 @@ public class DefaultWorkloadBudgetManager implements WorkloadBudgetManager {
 
   @Override
   public void collectWorkloadStats(String workload, long cpuUsedNs, long memoryUsedBytes) {
-    // No-op implementation for collecting workload stats.
+    // No-op
   }
 
   /**

@@ -76,6 +76,7 @@ public class CPUMemThreadLevelAccountingObjects {
       _currentThreadCPUTimeSampleMS = 0;
       // clear memory usage
       _currentThreadMemoryAllocationSampleBytes = 0;
+      _errorStatus.set(null);
     }
 
     /**
