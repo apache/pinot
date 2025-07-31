@@ -233,7 +233,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
       if (versionStr.equals(PinotVersion.UNKNOWN)) {
         return true;
       }
-      return versionStr.equals(PinotVersion.VERSION);
+      return !versionStr.equals(PinotVersion.VERSION);
     }
   }
 }
