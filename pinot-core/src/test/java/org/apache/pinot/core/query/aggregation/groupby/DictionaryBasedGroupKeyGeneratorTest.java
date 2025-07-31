@@ -170,8 +170,6 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_valueBlock, SV_GROUP_KEY_BUFFER);
-    assertEquals(dictionaryBasedGroupKeyGenerator.getUsedHolderType(),
-        DictionaryBasedGroupKeyGenerator.HolderType.ARRAY);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), UNIQUE_ROWS, _errorMessage);
     compareSingleValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
@@ -193,13 +191,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_valueBlock, SV_GROUP_KEY_BUFFER);
-    assertEquals(dictionaryBasedGroupKeyGenerator.getUsedHolderType(), DictionaryBasedGroupKeyGenerator.HolderType.INT);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
 
     // Test clear and trim
-    dictionaryBasedGroupKeyGenerator.clearAndTrimHolder();
+    dictionaryBasedGroupKeyGenerator.close();
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_MAP.get().size(), 0);
   }
 
@@ -219,14 +216,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_valueBlock, SV_GROUP_KEY_BUFFER);
-    assertEquals(dictionaryBasedGroupKeyGenerator.getUsedHolderType(),
-        DictionaryBasedGroupKeyGenerator.HolderType.LONG);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
 
     // Test clear and trim
-    dictionaryBasedGroupKeyGenerator.clearAndTrimHolder();
+    dictionaryBasedGroupKeyGenerator.close();
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_LONG_MAP.get().size(), 0);
   }
 
@@ -246,14 +241,12 @@ public class DictionaryBasedGroupKeyGeneratorTest {
 
     // Test group key generation
     dictionaryBasedGroupKeyGenerator.generateKeysForBlock(_valueBlock, SV_GROUP_KEY_BUFFER);
-    assertEquals(dictionaryBasedGroupKeyGenerator.getUsedHolderType(),
-        DictionaryBasedGroupKeyGenerator.HolderType.ARRAY_MAP);
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
 
     // Test clear and trim
-    dictionaryBasedGroupKeyGenerator.clearAndTrimHolder();
+    dictionaryBasedGroupKeyGenerator.close();
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().size(), 0);
   }
 
@@ -314,7 +307,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
 
     // Test clear and trim
-    dictionaryBasedGroupKeyGenerator.clearAndTrimHolder();
+    dictionaryBasedGroupKeyGenerator.close();
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_MAP.get().size(), 0);
   }
 
@@ -341,7 +334,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
 
     // Test clear and trim
-    dictionaryBasedGroupKeyGenerator.clearAndTrimHolder();
+    dictionaryBasedGroupKeyGenerator.close();
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_LONG_MAP.get().size(), 0);
   }
 
@@ -367,7 +360,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
 
     // Test clear and trim
-    dictionaryBasedGroupKeyGenerator.clearAndTrimHolder();
+    dictionaryBasedGroupKeyGenerator.close();
     assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().size(), 0);
   }
 
@@ -403,7 +396,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
       assertEquals(MV_GROUP_KEY_BUFFER[i + 1], MV_GROUP_KEY_BUFFER[1], _errorMessage);
     }
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numGroupsLimit);
-    dictionaryBasedGroupKeyGenerator.clearAndTrimHolder();
+    dictionaryBasedGroupKeyGenerator.close();
   }
 
   private static ExpressionContext[] getExpressions(String[] columns) {

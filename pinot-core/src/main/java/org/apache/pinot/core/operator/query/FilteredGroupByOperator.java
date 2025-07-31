@@ -196,7 +196,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         Collection<IntermediateRecord> intermediateRecords =
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
         // trim groupKeyGenerator after getting intermediateRecords
-        groupKeyGenerator.clearAndTrimHolder();
+        groupKeyGenerator.close();
 
         ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
         boolean unsafeTrim = _queryContext.isUnsafeTrim(); // set trim flag only if it's not safe

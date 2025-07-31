@@ -54,10 +54,8 @@ public class AggregationGroupByResult {
   /**
    * Clear and trim DictionaryBasedGroupKeyGenerator after use
    */
-  public void clearAndTrimGroupKeyGenerator() {
-    if (_groupKeyGenerator instanceof DictionaryBasedGroupKeyGenerator) {
-      _groupKeyGenerator.clearAndTrimHolder();
-    }
+  public void closeGroupKeyGenerator() {
+    _groupKeyGenerator.close();
   }
 
   public Object getResultForGroupId(int index, int groupId) {

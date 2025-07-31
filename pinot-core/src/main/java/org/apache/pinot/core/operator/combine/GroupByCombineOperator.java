@@ -159,7 +159,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
               }
             } finally {
               // clear thread-local map used in DictionaryBasedGroupKeyGenerator
-              aggregationGroupByResult.clearAndTrimGroupKeyGenerator();
+              aggregationGroupByResult.closeGroupKeyGenerator();
             }
           }
         } else {
