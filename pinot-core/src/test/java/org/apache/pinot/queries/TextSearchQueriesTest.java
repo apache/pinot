@@ -2028,7 +2028,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
 
     String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
+        + ", 'realtime streaming system*', 'parser=PREFIX') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     List<Object[]> expected1 = new ArrayList<>();

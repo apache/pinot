@@ -19,6 +19,8 @@
 package org.apache.pinot.segment.local.utils;
 
 import java.util.Map;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
@@ -27,6 +29,7 @@ import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.PrefixQuery;
+import org.apache.lucene.search.Query;
 import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.WildcardQuery;
@@ -201,5 +204,56 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertEquals(options.getTimeZone(), "EST");
     Assert.assertEquals(options.getPhraseSlop(), 2);
     Assert.assertEquals(options.getMaxDeterminizedStates(), 5000);
+  }
+
+  @Test
+  public void testPrefixPhraseQueryParser()
+      throws Exception {
+    // Test the new PREFIX parser functionality
+    String optionsString = "parser=PREFIX,defaultOperator=AND";
+    LuceneTextIndexUtils.LuceneTextIndexOptions options =
+        new LuceneTextIndexUtils.LuceneTextIndexOptions(optionsString);
+
+    // Create a simple analyzer for testing
+    Analyzer analyzer = new WhitespaceAnalyzer();
+    String column = "testColumn";
+
+    // Test positive case: "java realtime streaming"
+    String query = "java realtime streaming";
+
+    Query result = LuceneTextIndexUtils.createQueryParserWithOptions(query, options, column, analyzer);
+    Assert.assertNotNull(result);
+    Assert.assertTrue(result instanceof SpanNearQuery);
+
+    // Test positive case: "realtime stream*"
+    query = "realtime stream*";
+    result = LuceneTextIndexUtils.createQueryParserWithOptions(query, options, column, analyzer);
+    Assert.assertNotNull(result);
+    Assert.assertTrue(result instanceof SpanNearQuery);
+
+    // Test positive case: "stream*" - single term should return SpanMultiTermQueryWrapper
+    query = "stream*";
+    result = LuceneTextIndexUtils.createQueryParserWithOptions(query, options, column, analyzer);
+    Assert.assertNotNull(result);
+    Assert.assertTrue(result instanceof SpanMultiTermQueryWrapper);
+
+    // Test edge case: empty string ""
+    query = "";
+    try {
+      LuceneTextIndexUtils.createQueryParserWithOptions(query, options, column, analyzer);
+      Assert.fail("Expected exception for empty query");
+    } catch (RuntimeException e) {
+      // The method wraps ParseException in RuntimeException via reflection
+      Assert.assertTrue(e.getCause() instanceof java.lang.reflect.InvocationTargetException);
+    }
+
+    // Test edge case: null query
+    try {
+      LuceneTextIndexUtils.createQueryParserWithOptions(null, options, column, analyzer);
+      Assert.fail("Expected exception for null query");
+    } catch (RuntimeException e) {
+      // The method wraps ParseException in RuntimeException via reflection
+      Assert.assertTrue(e.getCause() instanceof java.lang.reflect.InvocationTargetException);
+    }
   }
 }
