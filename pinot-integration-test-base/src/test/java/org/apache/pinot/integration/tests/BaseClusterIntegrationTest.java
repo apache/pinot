@@ -558,7 +558,7 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     }
     if (_pinotConnection == null) {
       JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory()
-        .withConnectionProperties(getPinotConnectionProperties());
+          .withConnectionProperties(getPinotConnectionProperties());
       factory.setHeaders(getPinotClientTransportHeaders());
       _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
           factory.buildTransport());
@@ -663,7 +663,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void createAndUploadSegmentFromClasspath(TableConfig tableConfig, Schema schema, String dataFilePath,
-      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs)
+      throws Exception {
     URL dataPathUrl = getClass().getClassLoader().getResource(dataFilePath);
     assert dataPathUrl != null;
     File file = new File(dataPathUrl.getFile());
@@ -675,12 +676,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /// dataFilePath on the classpath
   @Deprecated
   protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
-      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs)
+      throws Exception {
     createAndUploadSegmentFromClasspath(tableConfig, schema, dataFilePath, fileFormat, expectedNoOfDocs, timeoutMs);
   }
 
   protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, File file,
-      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs)
+      throws Exception {
 
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
     ClusterIntegrationTestUtils.buildSegmentFromFile(file, tableConfig, schema, "%", _segmentDir, _tarDir, fileFormat);
@@ -732,8 +735,20 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   protected void startKafkaWithoutTopic(int port) {
+    // Ensure SSL configuration is applied if ZooKeeper is SSL-enabled
+    ensureSSLConfigured();
+
+    Properties kafkaConfiguration;
+    if (_zookeeperInstance != null && _zookeeperInstance.isSSLEnabled()) {
+      // Use SSL-aware Kafka configuration for SSL-enabled ZooKeeper
+      kafkaConfiguration = KafkaStarterUtils.getDefaultKafkaConfiguration(_zookeeperInstance);
+    } else {
+      // Use standard Kafka configuration for non-SSL ZooKeeper
+      kafkaConfiguration = KafkaStarterUtils.getDefaultKafkaConfiguration();
+    }
+
     _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(),
-        KafkaStarterUtils.getDefaultKafkaConfiguration());
+        kafkaConfiguration);
   }
 
   protected void createKafkaTopic(String topic) {
@@ -877,9 +892,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       ValidDocIdsType validDocIdsType)
       throws Exception {
 
-    StringBuilder urlBuilder = new StringBuilder(
+    String responseString = sendGetRequest(
         _controllerRequestURLBuilder.forValidDocIdsMetadata(tableNameWithType, validDocIdsType.toString()));
-    String responseString = sendGetRequest(urlBuilder.toString());
-    return JsonUtils.stringToObject(responseString, new TypeReference<>() { });
+    return JsonUtils.stringToObject(responseString, new TypeReference<>() {
+    });
   }
 }

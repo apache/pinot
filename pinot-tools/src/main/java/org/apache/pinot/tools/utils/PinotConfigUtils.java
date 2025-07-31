@@ -156,7 +156,7 @@ public class PinotConfigUtils {
       throws SocketException, UnknownHostException {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkAddress);
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_HOSTNAME,
         !StringUtils.isEmpty(brokerHost) ? brokerHost : NetUtils.getHostAddress());
     properties.put(CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT, brokerPort != 0 ? brokerPort : getAvailablePort());
@@ -186,7 +186,7 @@ public class PinotConfigUtils {
     }
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkAddress);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, serverHost);
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT, serverPort);
     properties.put(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, serverMultiStageServerPort != 0
@@ -209,7 +209,7 @@ public class PinotConfigUtils {
     }
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkAddress);
     properties.put(CommonConstants.Helix.KEY_OF_MINION_HOST, minionHost);
     properties.put(CommonConstants.Helix.KEY_OF_MINION_PORT, minionPort != 0 ? minionPort : getAvailablePort());
 

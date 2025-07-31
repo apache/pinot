@@ -71,6 +71,7 @@ import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.utils.PinotAppConfigs;
 import org.apache.pinot.common.utils.ServiceStartableUtils;
 import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.common.utils.ZkSSLUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
@@ -159,9 +160,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   @Override
   public void init(PinotConfiguration brokerConf)
       throws Exception {
+    // Configure ZooKeeper SSL as early as possible in the startup process
+    ZkSSLUtils.configureSSL(brokerConf);
+
     _brokerConf = brokerConf;
     // Remove all white-spaces from the list of zkServers (if any).
-    _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
+    _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
     applyCustomConfigs(brokerConf);
@@ -572,7 +576,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       if (StringUtils.isNotEmpty(instanceTagsConfig)) {
         for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
           Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-                  instanceTag);
+              instanceTag);
           instanceConfig.addTag(instanceTag);
         }
         shouldUpdateBrokerResource = true;

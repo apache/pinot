@@ -76,6 +76,7 @@ public class CommonConstants {
     public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
     public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;
   }
+
   public static final String JFR = "pinot.jfr";
 
   public static final String RLS_FILTERS = "rlsFilters";
@@ -241,7 +242,57 @@ public class CommonConstants {
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
-    public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
+    public static final String CONFIG_OF_ZOOKEEPER_SERVER = "pinot.zk.server";
+
+    // ZooKeeper SSL configuration constants
+    public static final String ZOOKEEPER_SSL_PREFIX = "pinot.zk.ssl";
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_ENABLED = ZOOKEEPER_SSL_PREFIX + ".enabled";
+    public static final boolean DEFAULT_ZOOKEEPER_SSL_ENABLED = false;
+
+    // Client connection type - must use Netty for SSL
+    public static final String CONFIG_OF_ZOOKEEPER_CLIENT_CNXN_SOCKET = "pinot.zk.client.cnxn.socket";
+    public static final String DEFAULT_ZOOKEEPER_CLIENT_CNXN_SOCKET = "org.apache.zookeeper.ClientCnxnSocket";
+    public static final String ZOOKEEPER_NETTY_CLIENT_CNXN_SOCKET = "org.apache.zookeeper.ClientCnxnSocketNetty";
+
+    // KeyStore configuration
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_KEYSTORE_LOCATION = ZOOKEEPER_SSL_PREFIX + ".keyStore.location";
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_KEYSTORE_PASSWORD = ZOOKEEPER_SSL_PREFIX + ".keyStore.password";
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_KEYSTORE_TYPE = ZOOKEEPER_SSL_PREFIX + ".keyStore.type";
+    public static final String DEFAULT_ZOOKEEPER_SSL_KEYSTORE_TYPE = "JKS";
+
+    // TrustStore configuration
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_TRUSTSTORE_LOCATION =
+        ZOOKEEPER_SSL_PREFIX + ".trustStore.location";
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_TRUSTSTORE_PASSWORD =
+        ZOOKEEPER_SSL_PREFIX + ".trustStore.password";
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_TRUSTSTORE_TYPE = ZOOKEEPER_SSL_PREFIX + ".trustStore.type";
+    public static final String DEFAULT_ZOOKEEPER_SSL_TRUSTSTORE_TYPE = "JKS";
+
+    // SSL Protocol configuration
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_PROTOCOL = ZOOKEEPER_SSL_PREFIX + ".protocol";
+    public static final String DEFAULT_ZOOKEEPER_SSL_PROTOCOL = "TLSv1.2";
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_ENABLED_PROTOCOLS = ZOOKEEPER_SSL_PREFIX + ".enabledProtocols";
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_CIPHER_SUITES = ZOOKEEPER_SSL_PREFIX + ".ciphersuites";
+
+    // SSL Context configuration
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_CONTEXT_SUPPLIER_CLASS =
+        ZOOKEEPER_SSL_PREFIX + ".context.supplier.class";
+
+    // SSL verification configuration
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_HOSTNAME_VERIFICATION =
+        ZOOKEEPER_SSL_PREFIX + ".hostnameVerification";
+    public static final boolean DEFAULT_ZOOKEEPER_SSL_HOSTNAME_VERIFICATION = true;
+
+    // Certificate revocation configuration
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_CRL = ZOOKEEPER_SSL_PREFIX + ".crl";
+    public static final boolean DEFAULT_ZOOKEEPER_SSL_CRL = false;
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_OCSP = ZOOKEEPER_SSL_PREFIX + ".ocsp";
+    public static final boolean DEFAULT_ZOOKEEPER_SSL_OCSP = false;
+
+    // SSL handshake timeout configuration
+    public static final String CONFIG_OF_ZOOKEEPER_SSL_HANDSHAKE_DETECTION_TIMEOUT_MS =
+        ZOOKEEPER_SSL_PREFIX + ".handshakeDetectionTimeoutMillis";
+    public static final long DEFAULT_ZOOKEEPER_SSL_HANDSHAKE_DETECTION_TIMEOUT_MS = 5000L;
 
     public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
     public static final String CONFIG_OF_PINOT_BROKER_STARTABLE_CLASS = "pinot.broker.startable.class";
@@ -1619,7 +1670,7 @@ public class CommonConstants {
       public enum Status {
         IN_PROGRESS, // The segment is still consuming data
         COMMITTING, // This state will only be utilised by pauseless ingestion when the segment has been consumed but
-                    // is yet to be build and uploaded by the server.
+        // is yet to be build and uploaded by the server.
         DONE, // The segment has finished consumption and has been committed to the segment store
         UPLOADED; // The segment is uploaded by an external party
 
