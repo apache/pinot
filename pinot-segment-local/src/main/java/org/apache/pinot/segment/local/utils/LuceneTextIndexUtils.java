@@ -77,6 +77,9 @@ public class LuceneTextIndexUtils {
     public static final String TIME_ZONE = "timeZone";
     public static final String PHRASE_SLOP = "phraseSlop";
     public static final String MAX_DETERMINIZED_STATES = "maxDeterminizedStates";
+    public static final String SLOP = "slop";
+    public static final String IN_ORDER = "inOrder";
+    public static final String ENABLE_PREFIX_MATCH = "enablePrefixMatch";
   }
 
   // Parser class names
@@ -337,6 +340,18 @@ public class LuceneTextIndexUtils {
 
     public int getMaxDeterminizedStates() {
       return Integer.parseInt(_options.getOrDefault(OptionKey.MAX_DETERMINIZED_STATES, "10000"));
+    }
+
+    public int getSlop() {
+      return Integer.parseInt(_options.getOrDefault(OptionKey.SLOP, "0"));
+    }
+
+    public boolean isInOrder() {
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.IN_ORDER, "true"));
+    }
+
+    public boolean isEnablePrefixMatch() {
+      return Boolean.parseBoolean(_options.getOrDefault(OptionKey.ENABLE_PREFIX_MATCH, "false"));
     }
   }
 
