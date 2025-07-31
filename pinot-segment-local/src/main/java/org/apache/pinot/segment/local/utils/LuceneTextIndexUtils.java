@@ -48,7 +48,7 @@ public class LuceneTextIndexUtils {
   public static final String PARSER_CLASSIC = "CLASSIC";
   public static final String PARSER_STANDARD = "STANDARD";
   public static final String PARSER_COMPLEX = "COMPLEX";
-  public static final String PARSER_PREFIX = "PREFIX";
+  public static final String PARSER_MATCHPHRASE = "MATCHPHRASE";
 
   // Default operator constants
   public static final String DEFAULT_OPERATOR_AND = "AND";
@@ -88,7 +88,7 @@ public class LuceneTextIndexUtils {
   public static final String COMPLEX_PHRASE_QUERY_PARSER_CLASS =
       "org.apache.lucene.queryparser.complexPhrase.ComplexPhraseQueryParser";
   public static final String CLASSIC_QUERY_PARSER = "org.apache.lucene.queryparser.classic.QueryParser";
-  public static final String PREFIX_PHRASE_QUERY_PARSER_CLASS =
+  public static final String MATCHPHRASE_QUERY_PARSER_CLASS =
       "org.apache.pinot.segment.local.segment.index.text.lucene.parsers.PrefixPhraseQueryParser";
 
   private LuceneTextIndexUtils() {
@@ -153,8 +153,8 @@ public class LuceneTextIndexUtils {
       case PARSER_COMPLEX:
         parserClassName = COMPLEX_PHRASE_QUERY_PARSER_CLASS;
         break;
-      case PARSER_PREFIX:
-        parserClassName = PREFIX_PHRASE_QUERY_PARSER_CLASS;
+      case PARSER_MATCHPHRASE:
+        parserClassName = MATCHPHRASE_QUERY_PARSER_CLASS;
         break;
       default:
         parserClassName = CLASSIC_QUERY_PARSER;
@@ -233,7 +233,7 @@ public class LuceneTextIndexUtils {
         Method parseMethod = parser.getClass().getMethod("parse", String.class, String.class);
         query = (Query) parseMethod.invoke(parser, actualQuery, column);
       } else {
-        // Other parsers (CLASSIC, COMPLEX, PREFIX) use parse(String)
+        // Other parsers (CLASSIC, COMPLEX, MATCHPHRASE) use parse(String)
         Method parseMethod = parser.getClass().getMethod("parse", String.class);
         query = (Query) parseMethod.invoke(parser, actualQuery);
       }

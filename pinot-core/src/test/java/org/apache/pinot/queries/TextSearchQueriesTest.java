@@ -2028,11 +2028,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
 
     String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", 'realtime streaming system', 'parser=PREFIX') LIMIT 50000";
+        + ", 'realtime streaming system', 'parser=MATCHPHRASE') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, 0, false, expected);
 
     query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", 'realtime streaming system', 'parser=PREFIX,enablePrefixMatch=true') LIMIT 50000";
+        + ", 'realtime streaming system', 'parser=MATCHPHRASE,enablePrefixMatch=true') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     List<Object[]> expected1 = new ArrayList<>();
@@ -2087,7 +2087,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void testPrefixPhraseQueryParser()
+  public void testMatchPhraseQueryParser()
       throws Exception {
     // Test case 1: "Tensor flow" - should match 3 documents
     List<Object[]> expectedTensorFlow = new ArrayList<>();
@@ -2106,7 +2106,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     // Test exact phrase "Tensor flow" with default settings (slop=0, inOrder=true)
     String queryExactPhrase =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'Tensor flow', 'parser=PREFIX,enablePrefixMatch=true') LIMIT 50000";
+            + ", 'Tensor flow', 'parser=MATCHPHRASE,enablePrefixMatch=true') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryExactPhrase, 3, false, expectedTensorFlow);
 
     // Test "Tensor database" with slop=1 (should allow one position gap)
@@ -2118,19 +2118,19 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     String querySlop1 =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'Tensor database', 'parser=PREFIX,enablePrefixMatch=true,slop=1') LIMIT 50000";
+            + ", 'Tensor database', 'parser=MATCHPHRASE,enablePrefixMatch=true,slop=1') LIMIT 50000";
     testTextSearchSelectQueryHelper(querySlop1, 1, false, expectedTensorDatabase);
 
     // Test "Tensor flow" with inOrder=false (should allow any order)
     String queryInOrderFalse =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'Tensor flow', 'parser=PREFIX,enablePrefixMatch=true,inOrder=false') LIMIT 50000";
+            + ", 'Tensor flow', 'parser=MATCHPHRASE,enablePrefixMatch=true,inOrder=false') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryInOrderFalse, 3, false, expectedTensorFlow);
 
     // Test "Tensor flow" with both slop=1 and inOrder=false
     String querySlopAndInOrder =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'flow Tensor', 'parser=PREFIX,enablePrefixMatch=true,inOrder=false') LIMIT 50000";
+            + ", 'flow Tensor', 'parser=MATCHPHRASE,enablePrefixMatch=true,inOrder=false') LIMIT 50000";
     testTextSearchSelectQueryHelper(querySlopAndInOrder, 3, false, expectedTensorFlow);
   }
 

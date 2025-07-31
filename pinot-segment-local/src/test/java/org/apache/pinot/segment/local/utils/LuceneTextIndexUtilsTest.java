@@ -209,10 +209,10 @@ public class LuceneTextIndexUtilsTest {
   }
 
   @Test
-  public void testPrefixPhraseQueryParser()
+  public void testMatchPhraseQueryParser()
       throws Exception {
-    // Test the new PREFIX parser functionality
-    String optionsString = "parser=PREFIX,enablePrefixMatch=true";
+    // Test the new MATCHPHRASE parser functionality
+    String optionsString = "parser=MATCHPHRASE,enablePrefixMatch=true";
     LuceneTextIndexUtils.LuceneTextIndexOptions options =
         new LuceneTextIndexUtils.LuceneTextIndexOptions(optionsString);
 
@@ -290,7 +290,7 @@ public class LuceneTextIndexUtilsTest {
 
     // Test slop and inOrder with createQueryParserWithOptions
     LuceneTextIndexUtils.LuceneTextIndexOptions slopOptions =
-        LuceneTextIndexUtils.createOptions("parser=PREFIX,enablePrefixMatch=true");
+        LuceneTextIndexUtils.createOptions("parser=MATCHPHRASE,enablePrefixMatch=true");
 
     // Test default slop and inOrder behavior
     Query defaultSlopResult = LuceneTextIndexUtils.createQueryParserWithOptions(
@@ -299,7 +299,7 @@ public class LuceneTextIndexUtilsTest {
 
     // Test custom slop and inOrder settings
     LuceneTextIndexUtils.LuceneTextIndexOptions customSlopOptions =
-        LuceneTextIndexUtils.createOptions("parser=PREFIX,enablePrefixMatch=true");
+        LuceneTextIndexUtils.createOptions("parser=MATCHPHRASE,enablePrefixMatch=true");
 
     // Create a parser instance to test slop and inOrder settings
     PrefixPhraseQueryParser customParser = new PrefixPhraseQueryParser(column, analyzer);
@@ -322,7 +322,8 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertTrue(inOrderTrueResult instanceof SpanNearQuery);
 
     // Test default behavior using createOptions
-    LuceneTextIndexUtils.LuceneTextIndexOptions defaultOptions = LuceneTextIndexUtils.createOptions("parser=PREFIX");
+    LuceneTextIndexUtils.LuceneTextIndexOptions defaultOptions =
+        LuceneTextIndexUtils.createOptions("parser=MATCHPHRASE");
 
     // Test single term with default behavior (prefix match disabled)
     Query defaultSingleTermQuery =
