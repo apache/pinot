@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.timeboundary;
+package org.apache.pinot.core.routing.timeboundary;
 
 import java.util.Map;
 import java.util.ServiceLoader;

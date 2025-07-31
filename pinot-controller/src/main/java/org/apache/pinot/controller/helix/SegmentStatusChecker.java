@@ -313,6 +313,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> partialOnlineSegments = new ArrayList<>();
     List<String> segmentsInvalidStartTime = new ArrayList<>();
     List<String> segmentsInvalidEndTime = new ArrayList<>();
+
+    // Track unavailable segments by reason for batched logging
+    List<String> unavailableSegmentsByState = new ArrayList<>();
+    List<String> unavailableSegmentsByInstance = new ArrayList<>();
+
     for (String segment : segments) {
       // Number of replicas in ideal state that is in ONLINE/CONSUMING state
       int numISReplicasUp = 0;
@@ -366,9 +371,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String serverInstanceId = entry.getKey();
             String segmentState = entry.getValue();
-            if ((segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING))
-                && isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
-              numEVReplicasUp++;
+            if (segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING)) {
+              if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
+                numEVReplicasUp++;
+              } else {
+                unavailableSegmentsByInstance.add(segment
+                    + " (state: " + segmentState + " on unavailable " + serverInstanceId + ")");
+              }
+            } else {
+              unavailableSegmentsByState.add(segment + " (state: " + segmentState + " on " + serverInstanceId + ")");
             }
             if (segmentState.equals(SegmentStateModel.ERROR)) {
               errorSegments.add(Pair.of(segment, entry.getKey()));
@@ -389,6 +400,16 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       // Use max replicas up from IS and EV to ensure availability does not go above 100%
       int maxReplicasUp = Math.max(numISReplicasUp, numEVReplicasUp);
       minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / maxReplicasUp);
+    }
+
+    // Log unavailable segments in batches
+    if (!unavailableSegmentsByState.isEmpty()) {
+      LOGGER.warn("Table {} has {} segments marked unavailable due to non-ONLINE/CONSUMING states: {}",
+          tableNameWithType, unavailableSegmentsByState.size(), logSegments(unavailableSegmentsByState));
+    }
+    if (!unavailableSegmentsByInstance.isEmpty()) {
+      LOGGER.warn("Table {} has {} segments marked unavailable due to unavailable instances: {}",
+          tableNameWithType, unavailableSegmentsByInstance.size(), logSegments(unavailableSegmentsByInstance));
     }
 
     if (maxISReplicasUp == Integer.MIN_VALUE) {
