@@ -21,8 +21,6 @@ package org.apache.pinot.core.accounting;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
@@ -57,6 +55,7 @@ import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,11 +77,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
   }
 
   public static class PerQueryCPUMemResourceUsageAccountant implements ThreadResourceUsageAccountant {
-
-    /**
-     * MemoryMXBean to get total heap used memory
-     */
-    static final MemoryMXBean MEMORY_MX_BEAN = ManagementFactory.getMemoryMXBean();
     private static final Logger LOGGER = LoggerFactory.getLogger(PerQueryCPUMemResourceUsageAccountant.class);
     private static final boolean IS_DEBUG_MODE_ENABLED = LOGGER.isDebugEnabled();
     /**
@@ -327,22 +321,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    @Deprecated
-    public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-        @Nullable ThreadExecutionContext parentContext) {
-    }
-
-    @Override
-    @Deprecated
-    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-    }
-
-    @Override
-    @Deprecated
-    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes) {
-    }
-
-    @Override
     public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long memoryAllocatedBytes,
                                              TrackingScope trackingScope) {
       if (trackingScope != TrackingScope.QUERY) {
@@ -357,11 +335,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         _concurrentTaskMemStatsAggregator.compute(queryId,
             (key, value) -> (value == null) ? memoryAllocatedBytes : (value + memoryAllocatedBytes));
       }
-    }
-
-    @Override
-    @Deprecated
-    public void updateQueryUsageConcurrently(String queryId) {
     }
 
     /**
@@ -385,13 +358,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
         _threadLocalEntry.get().updateMemorySnapshot();
       }
     }
-
-    @Deprecated
-    @Override
-    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
-      setupRunner(queryId, taskId, taskType, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
-    }
-
 
     @Override
     public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
@@ -559,8 +525,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
         Thread thread = entry.getKey();
         if (!thread.isAlive()) {
+          LOGGER.debug("Thread: {} is no longer alive, removing it from _threadEntriesMap", thread.getName());
           _threadEntriesMap.remove(thread);
-          LOGGER.debug("Removing thread from _threadLocalEntry: {}", thread.getName());
         }
       }
       _cancelSentQueries = cancellingQueries;
@@ -701,7 +667,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       private final AbstractMetrics.Gauge _memoryUsageGauge;
 
       WatcherTask() {
-        _queryMonitorConfig.set(new QueryMonitorConfig(_config, MEMORY_MX_BEAN.getHeapMemoryUsage().getMax()));
+        _queryMonitorConfig.set(new QueryMonitorConfig(_config, ResourceUsageUtils.getMaxHeapSize()));
         logQueryMonitorConfig();
 
         switch (_instanceType) {
@@ -835,7 +801,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       }
 
       private void collectTriggerMetrics() {
-        _usedBytes = MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
+        _usedBytes = ResourceUsageUtils.getUsedHeapSize();
         LOGGER.debug("Heap used bytes {}", _usedBytes);
       }
 
