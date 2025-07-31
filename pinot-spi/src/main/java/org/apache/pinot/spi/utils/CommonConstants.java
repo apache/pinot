@@ -1288,6 +1288,12 @@ public class CommonConstants {
         "pinot.server.messagesCount.refreshIntervalSeconds";
     public static final int DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS = 30;
 
+    public static final String COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS =
+            "complex.type.transformation.remove.unnestedFields";
+    public static final String CONFIG_OF_COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS =
+            INSTANCE_DATA_MANAGER_CONFIG_PREFIX + "." + COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS;
+    public static final boolean DEFAULT_COMPLEX_TYPE_TRANSFORMATION_REMOVE_UNNESTED_FIELDS = false;
+
     public static class SegmentCompletionProtocol {
       public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
