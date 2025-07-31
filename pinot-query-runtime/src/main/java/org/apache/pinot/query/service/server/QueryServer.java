@@ -108,8 +108,14 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration(), null);
   }
 
+  @VisibleForTesting
+  public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
+      QueryAccessControlFactory accessControlFactory) {
+    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration(), accessControlFactory);
+  }
+
   public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
-    this(instanceId, port, queryRunner, tlsConfig, new PinotConfiguration());
+    this(instanceId, port, queryRunner, tlsConfig, new PinotConfiguration(), null);
   }
 
   public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,

@@ -33,7 +33,7 @@ public abstract class QueryAccessControlFactory {
   void init(PinotConfiguration configuration) {
   }
 
-  abstract QueryAccessControl create();
+  public abstract QueryAccessControl create();
 
   public static QueryAccessControlFactory fromConfig(PinotConfiguration configuration) {
     String configuredClass = configuration.getProperty(CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS,
