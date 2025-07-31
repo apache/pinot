@@ -132,6 +132,8 @@ public class QueryContext {
   private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
   // Parallel chunk size for final reduce
   private int _chunkSizeExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
+  // Threshold to use sort aggregate for safeTrim case when LIMIT is below this
+  private int _sortAggregateLimitThreshold = Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -283,12 +285,10 @@ public class QueryContext {
    * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
    * <p>
    * This is just an alias on top of {@link #getExplain() != ExplainMode.NONE}
-   *
    */
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
   }
-
 
   public boolean isAccurateGroupByWithoutOrderBy() {
     return _accurateGroupByWithoutOrderBy;
@@ -314,7 +314,8 @@ public class QueryContext {
   }
 
   /**
-   * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any aggregation.
+   * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any
+   * aggregation.
    */
   @Nullable
   public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
@@ -496,14 +497,23 @@ public class QueryContext {
     _serverReturnFinalResultKeyUnpartitioned = serverReturnFinalResultKeyUnpartitioned;
   }
 
+  public void setSortAggregateLimitThreshold(int sortAggregateLimitThreshold) {
+    _sortAggregateLimitThreshold = sortAggregateLimitThreshold;
+  }
+
+  public int getSortAggregateLimitThreshold() {
+    return _sortAggregateLimitThreshold;
+  }
+
   /**
-   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
-   * within the scope of a query.
-   * @param type the type of the value produced, guarantees type pollution is impossible.
-   * @param key the key used to determine if the value has already been computed.
+   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared within
+   * the scope of a query.
+   *
+   * @param type   the type of the value produced, guarantees type pollution is impossible.
+   * @param key    the key used to determine if the value has already been computed.
    * @param mapper A function to apply the first time a key is encountered to construct the value.
-   * @param <K> the key type
-   * @param <V> the value type
+   * @param <K>    the key type
+   * @param <V>    the value type
    * @return the shared value
    */
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
@@ -657,6 +667,11 @@ public class QueryContext {
 
       queryContext._isUnsafeTrim =
           !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+
+      Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
+      if (sortAggregateLimitThreshold != null) {
+        queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
+      }
 
       return queryContext;
     }
