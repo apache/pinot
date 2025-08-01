@@ -456,6 +456,45 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
     assertTrue((int) columnMetadataForT.getMaxValue() < 2020092000);
   }
 
+  @Test
+  public void testValidateCRCForInputSegments() {
+    RealtimeToOfflineSegmentsTaskExecutor executor = new RealtimeToOfflineSegmentsTaskExecutor(null, null);
+
+    // Test valid CRC validation
+    SegmentMetadataImpl segment1 = Mockito.mock(SegmentMetadataImpl.class);
+    SegmentMetadataImpl segment2 = Mockito.mock(SegmentMetadataImpl.class);
+
+    Mockito.when(segment1.getCrc()).thenReturn("1000");
+    Mockito.when(segment1.getName()).thenReturn("segment1");
+    Mockito.when(segment2.getCrc()).thenReturn("2000");
+    Mockito.when(segment2.getName()).thenReturn("segment2");
+
+    List<SegmentMetadataImpl> segmentMetadataList = List.of(segment1, segment2);
+    List<String> expectedCRCList = List.of("1000", "2000");
+
+    // Should not throw any exception
+    executor.validateCRCForInputSegments(segmentMetadataList, expectedCRCList);
+  }
+
+  @Test(expectedExceptions = IllegalStateException.class)
+  public void testValidateCRCForInputSegmentsWithMismatch() {
+    RealtimeToOfflineSegmentsTaskExecutor executor = new RealtimeToOfflineSegmentsTaskExecutor(null, null);
+
+    SegmentMetadataImpl segment1 = Mockito.mock(SegmentMetadataImpl.class);
+    SegmentMetadataImpl segment2 = Mockito.mock(SegmentMetadataImpl.class);
+
+    Mockito.when(segment1.getCrc()).thenReturn("1000");
+    Mockito.when(segment1.getName()).thenReturn("segment1");
+    Mockito.when(segment2.getCrc()).thenReturn("3000"); // Mismatched CRC
+    Mockito.when(segment2.getName()).thenReturn("segment2");
+
+    List<SegmentMetadataImpl> segmentMetadataList = List.of(segment1, segment2);
+    List<String> expectedCRCList = List.of("1000", "2000");
+
+    // Should throw IllegalStateException due to CRC mismatch
+    executor.validateCRCForInputSegments(segmentMetadataList, expectedCRCList);
+  }
+
   @AfterClass
   public void tearDown()
       throws Exception {
