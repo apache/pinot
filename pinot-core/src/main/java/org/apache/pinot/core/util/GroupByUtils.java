@@ -26,9 +26,16 @@ import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.DeterministicConcurrentIndexedTable;
 import org.apache.pinot.core.data.table.IndexedTable;
+import org.apache.pinot.core.data.table.Key;
+import org.apache.pinot.core.data.table.PartitionedIndexedTable;
+import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
+import org.apache.pinot.core.data.table.TwoLevelHashMapIndexedTable;
+import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashMap;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
+import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -41,17 +48,17 @@ public final class GroupByUtils {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns {@code max(limit * 5, 5000)} to
+   * ensure the result accuracy.
    */
   public static int getTableCapacity(int limit) {
     return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
-   * Returns the capacity of the table required by the given query.
-   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and
-   * result accuracy.
+   * Returns the capacity of the table required by the given query. NOTE: It returns
+   * {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and result
+   * accuracy.
    */
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
@@ -89,6 +96,136 @@ public final class GroupByUtils {
       return upperBound;
     }
     return Math.max(minCapacity, lowerBound);
+  }
+
+  /**
+   * whether we should do partitionedGroupBy, currently only handle safeTrim
+   * case for backward compatible results
+   * TODO: handle unsafeTrim case using sort-aggregate separately
+   * TODO: add conditions checking for number of threads available
+   */
+  public static boolean shouldPartitionGroupBy(QueryContext queryContext) {
+    return queryContext.isUnsafeTrim() && queryContext.getOrderByExpressions() != null;
+  }
+
+  /**
+   * Partition function used for both {@link org.apache.pinot.core.data.table.RadixPartitionedIntermediateRecords}
+   * and {@link TwoLevelLinearProbingRecordHashMap} on the partitioned group-by
+   * combine execution path.
+   * This hash is CACHED in {@link org.apache.pinot.core.data.table.IntermediateRecord} and is expected to be stable
+   */
+  public static int hashForPartition(Key key) {
+    return key.hashCode() & 0x7fffffff;
+  }
+
+  private static Record updateRecord(Record existingRecord, Record newRecord,
+      AggregationFunction[] aggregationFunctions, int numKeyColumns) {
+    Object[] existingValues = existingRecord.getValues();
+    Object[] newValues = newRecord.getValues();
+    int numAggregations = aggregationFunctions.length;
+    int index = numKeyColumns;
+    for (int i = 0; i < numAggregations; i++, index++) {
+      existingValues[index] = aggregationFunctions[i].merge(existingValues[index], newValues[index]);
+    }
+    return existingRecord;
+  }
+
+  /**
+   * Creates an indexed table for partitioned group by combining
+   */
+  public static IndexedTable createPartitionedIndexedTableForCombineOperator(DataSchema dataSchema,
+      QueryContext queryContext, RadixPartitionedHashMap map, ExecutorService executorService) {
+    // single worker thread merges single partition number
+    int limit = queryContext.getLimit();
+    boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
+    boolean hasHaving = queryContext.getHavingFilter() != null;
+    int minTrimSize =
+        queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
+
+    // Disable trim when min trim size is non-positive
+    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
+
+    // When there is no ORDER BY, trim is not required because the indexed table stops accepting new groups once the
+    // result size is reached
+    if (!hasOrderBy) {
+      int resultSize;
+      if (hasHaving) {
+        // Keep more groups when there is HAVING clause
+        resultSize = trimSize;
+      } else {
+        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
+        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
+        resultSize = limit;
+      }
+      return new PartitionedIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, map, executorService);
+    }
+
+    int resultSize;
+    if (queryContext.isServerReturnFinalResult() && !hasHaving) {
+      // When server is asked to return final result and there is no HAVING clause, return only LIMIT groups
+      resultSize = limit;
+    } else {
+      resultSize = trimSize;
+    }
+    int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
+    if (trimThreshold == Integer.MAX_VALUE) {
+      return new PartitionedIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, map, executorService);
+    } else {
+      return new PartitionedIndexedTable(dataSchema, false, queryContext, resultSize, trimSize,
+          trimThreshold, map, executorService);
+    }
+  }
+
+  /**
+   * Creates an indexed table for the worker thread local combine of
+   * partitioned segment results
+   */
+  public static TwoLevelHashMapIndexedTable createIndexedTableForPartitionMerge(
+      DataSchema dataSchema, QueryContext queryContext,
+      ExecutorService executorService) {
+    // single worker thread merges single partition number
+    int limit = queryContext.getLimit();
+    boolean hasOrderBy = queryContext.getOrderByExpressions() != null;
+    boolean hasHaving = queryContext.getHavingFilter() != null;
+    int minTrimSize =
+        queryContext.getMinServerGroupTrimSize(); // it's minBrokerGroupTrimSize in broker
+
+    // Disable trim when min trim size is non-positive
+    int trimSize = minTrimSize > 0 ? getTableCapacity(limit, minTrimSize) : Integer.MAX_VALUE;
+
+    // When there is no ORDER BY, trim is not required because the indexed table stops accepting new groups once the
+    // result size is reached
+    if (!hasOrderBy) {
+      int resultSize;
+      if (hasHaving) {
+        // Keep more groups when there is HAVING clause
+        resultSize = trimSize;
+      } else {
+        // TODO: Keeping only 'LIMIT' groups can cause inaccurate result because the groups are randomly selected
+        //       without ordering. Consider ordering on group-by columns if no ordering is specified.
+        resultSize = limit;
+      }
+      return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, executorService);
+    }
+
+    int resultSize;
+    if (queryContext.isServerReturnFinalResult() && !hasHaving) {
+      // When server is asked to return final result and there is no HAVING clause, return only LIMIT groups
+      resultSize = limit;
+    } else {
+      resultSize = trimSize;
+    }
+    int trimThreshold = getIndexedTableTrimThreshold(trimSize, queryContext.getGroupTrimThreshold());
+    if (trimThreshold == Integer.MAX_VALUE) {
+      return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, Integer.MAX_VALUE,
+          Integer.MAX_VALUE, executorService);
+    } else {
+      return new TwoLevelHashMapIndexedTable(dataSchema, false, queryContext, resultSize, trimSize,
+          trimThreshold, executorService);
+    }
   }
 
   /**
