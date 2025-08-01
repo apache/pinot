@@ -24,8 +24,9 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 /**
  * Interface for generating group keys.
+ * It extends AutoCloseable for thread-local maps to be cleared
  */
-public interface GroupKeyGenerator {
+public interface GroupKeyGenerator extends AutoCloseable {
   char DELIMITER = '\0';
   int INVALID_ID = -1;
 
@@ -74,6 +75,10 @@ public interface GroupKeyGenerator {
    * Return current number of unique keys
    */
   int getNumKeys();
+
+  @Override
+  default void close() {
+  }
 
   /**
    * This class encapsulates the integer group id and the group keys.

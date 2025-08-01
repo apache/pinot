@@ -140,34 +140,23 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
       _isSingleValueColumn[i] = columnContext.isSingleValue();
     }
     if (groupByExpressionSizesFromPredicates != null) {
-       Pair<Boolean, Long> optimizedCardinality = getOptimizedGroupByCardinality(groupByExpressionSizesFromPredicates,
-           cardinalityMap);
-       if (optimizedCardinality.getLeft() && optimizedCardinality.getRight() != null) {
-         longOverflow = false;
-         cardinalityProduct = Math.min(optimizedCardinality.getRight(), cardinalityProduct);
-       }
+      Pair<Boolean, Long> optimizedCardinality = getOptimizedGroupByCardinality(groupByExpressionSizesFromPredicates,
+          cardinalityMap);
+      if (optimizedCardinality.getLeft() && optimizedCardinality.getRight() != null) {
+        longOverflow = false;
+        cardinalityProduct = Math.min(optimizedCardinality.getRight(), cardinalityProduct);
+      }
     }
-    // TODO: Clear the holder after processing the query instead of before
     if (longOverflow) {
       // ArrayMapBasedHolder
       _globalGroupIdUpperBound = numGroupsLimit;
       Object2IntOpenHashMap<IntArray> groupIdMap = THREAD_LOCAL_INT_ARRAY_MAP.get();
-      int size = groupIdMap.size();
-      groupIdMap.clear();
-      if (size > MAX_CACHING_MAP_SIZE) {
-        groupIdMap.trim();
-      }
       _rawKeyHolder = new ArrayMapBasedHolder(groupIdMap);
     } else {
       if (cardinalityProduct > Integer.MAX_VALUE) {
         // LongMapBasedHolder
         _globalGroupIdUpperBound = numGroupsLimit;
         Long2IntOpenHashMap groupIdMap = THREAD_LOCAL_LONG_MAP.get();
-        int size = groupIdMap.size();
-        groupIdMap.clear();
-        if (size > MAX_CACHING_MAP_SIZE) {
-          groupIdMap.trim();
-        }
         _rawKeyHolder = new LongMapBasedHolder(groupIdMap);
       } else {
         _globalGroupIdUpperBound = Math.min((int) cardinalityProduct, numGroupsLimit);
@@ -176,7 +165,6 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
         if (cardinalityProduct > arrayBasedThreshold || numGroupsLimit < cardinalityProduct) {
           // IntMapBasedHolder
           IntGroupIdMap groupIdMap = THREAD_LOCAL_INT_MAP.get();
-          groupIdMap.clearAndTrim();
           _rawKeyHolder = new IntMapBasedHolder(groupIdMap);
         } else {
           _rawKeyHolder = new ArrayBasedHolder();
@@ -245,7 +233,17 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return _rawKeyHolder.getNumKeys();
   }
 
-  private interface RawKeyHolder {
+  /// clear and trim thread-local map of _rawKeyHolder
+  @Override
+  public void close() {
+    try {
+      _rawKeyHolder.close();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private interface RawKeyHolder extends AutoCloseable {
 
     /**
      * Process a block of documents for all single-valued group-by columns case.
@@ -285,6 +283,10 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   private class ArrayBasedHolder implements RawKeyHolder {
     private final boolean[] _flags = new boolean[_globalGroupIdUpperBound];
     private int _numKeys = 0;
+
+    @Override
+    public void close() {
+    }
 
     @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
@@ -415,6 +417,11 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
   private class IntMapBasedHolder implements RawKeyHolder {
     private final IntGroupIdMap _groupIdMap;
+
+    @Override
+    public void close() {
+      _groupIdMap.clearAndTrim();
+    }
 
     public IntMapBasedHolder(IntGroupIdMap groupIdMap) {
       _groupIdMap = groupIdMap;
@@ -634,6 +641,15 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     }
 
     @Override
+    public void close() {
+      int size = _groupIdMap.size();
+      _groupIdMap.clear();
+      if (size > MAX_CACHING_MAP_SIZE) {
+        _groupIdMap.trim();
+      }
+    }
+
+    @Override
     public void processSingleValue(int numDocs, int[] outGroupIds) {
       for (int i = 0; i < numDocs; i++) {
         long rawKey = 0L;
@@ -811,6 +827,15 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
 
     public ArrayMapBasedHolder(Object2IntOpenHashMap<IntArray> groupIdMap) {
       _groupIdMap = groupIdMap;
+    }
+
+    @Override
+    public void close() {
+      int size = _groupIdMap.size();
+      _groupIdMap.clear();
+      if (size > MAX_CACHING_MAP_SIZE) {
+        _groupIdMap.trim();
+      }
     }
 
     @Override
