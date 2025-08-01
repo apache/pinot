@@ -71,6 +71,10 @@ public interface UdfExampleBuilder {
       Preconditions.checkArgument(example.getInputValues().size() == _signature.getArity(),
           "Expected %s input values for signature %s, but got %s",
           _signature.getArity(), _signature, example.getInputValues().size());
+      if (_examples.stream().anyMatch(e -> e.getId().equals(example.getId()))) {
+        throw new IllegalArgumentException(
+            "Example with id '" + example.getId() + "' already exists for signature " + _signature);
+      }
       _examples.add(example);
       return this;
     }
