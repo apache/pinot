@@ -2028,7 +2028,11 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
     });
 
     String query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-        + ", '*ealtime streaming system*', 'parser=CLASSIC,allowLeadingWildcard=true,defaultOperator=AND') LIMIT 50000";
+        + ", 'realtime streaming system', 'parser=MATCHPHRASE') LIMIT 50000";
+    testTextSearchSelectQueryHelper(query, 0, false, expected);
+
+    query = "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+        + ", 'realtime streaming system', 'parser=MATCHPHRASE,enablePrefixMatch=true') LIMIT 50000";
     testTextSearchSelectQueryHelper(query, expected.size(), false, expected);
 
     List<Object[]> expected1 = new ArrayList<>();
@@ -2080,6 +2084,54 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         + ", '*ealtime streaming system*', 'parser=STANDARD,allowLeadingWildcard=true,defaultOperator=AND') LIMIT "
         + "50000";
     testTextSearchSelectQueryHelper(query8, expected.size(), false, expected);
+  }
+
+  @Test
+  public void testMatchPhraseQueryParser()
+      throws Exception {
+    // Test case 1: "Tensor flow" - should match 3 documents
+    List<Object[]> expectedTensorFlow = new ArrayList<>();
+    expectedTensorFlow.add(new Object[]{
+        1004, "Machine learning, Tensor flow, Java, Stanford university,"
+    });
+    expectedTensorFlow.add(new Object[]{
+        1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
+        + "large scale systems, Machine learning"
+    });
+    expectedTensorFlow.add(new Object[]{
+        1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
+        + " high performance scalable systems"
+    });
+
+    // Test exact phrase "Tensor flow" with default settings (slop=0, inOrder=true)
+    String queryExactPhrase =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Tensor flow', 'parser=MATCHPHRASE,enablePrefixMatch=true') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryExactPhrase, 3, false, expectedTensorFlow);
+
+    // Test "Tensor database" with slop=1 (should allow one position gap)
+    List<Object[]> expectedTensorDatabase = new ArrayList<>();
+    expectedTensorDatabase.add(new Object[]{
+        1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
+        + "large scale systems, Machine learning"
+    });
+
+    String querySlop1 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Tensor database', 'parser=MATCHPHRASE,enablePrefixMatch=true,slop=1') LIMIT 50000";
+    testTextSearchSelectQueryHelper(querySlop1, 1, false, expectedTensorDatabase);
+
+    // Test "Tensor flow" with inOrder=false (should allow any order)
+    String queryInOrderFalse =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Tensor flow', 'parser=MATCHPHRASE,enablePrefixMatch=true,inOrder=false') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryInOrderFalse, 3, false, expectedTensorFlow);
+
+    // Test "Tensor flow" with both slop=1 and inOrder=false
+    String querySlopAndInOrder =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'flow Tensor', 'parser=MATCHPHRASE,enablePrefixMatch=true,inOrder=false') LIMIT 50000";
+    testTextSearchSelectQueryHelper(querySlopAndInOrder, 3, false, expectedTensorFlow);
   }
 
   // ===== TEST CASES FOR AND/OR FILTER OPERATORS =====
