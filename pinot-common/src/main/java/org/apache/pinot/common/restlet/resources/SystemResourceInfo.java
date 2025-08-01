@@ -20,11 +20,10 @@ package org.apache.pinot.common.restlet.resources;
 
 import com.google.common.collect.ImmutableMap;
 import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
-import java.lang.management.MemoryUsage;
 import java.lang.management.OperatingSystemMXBean;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
 
 /**
@@ -58,9 +57,7 @@ public class SystemResourceInfo {
       _totalMemoryMB = runtime.totalMemory() / MEGA_BYTES;
     }
 
-    MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
-    MemoryUsage heapMemoryUsage = memoryMXBean.getHeapMemoryUsage();
-    _maxHeapSizeMB = heapMemoryUsage.getMax() / MEGA_BYTES;
+    _maxHeapSizeMB = ResourceUsageUtils.getMaxHeapSize() / MEGA_BYTES;
   }
 
   /**

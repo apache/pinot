@@ -30,7 +30,6 @@ import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -42,9 +41,11 @@ import static org.testng.Assert.fail;
 
 public class ThrottleOnCriticalHeapUsageExecutorTest {
   @Test
-  void testThrottle() throws Exception {
+  void testThrottle()
+      throws Exception {
     ThreadResourceUsageAccountant accountant = new ThreadResourceUsageAccountant() {
       final AtomicLong _numCalls = new AtomicLong(0);
+
       @Override
       public void clear() {
       }
@@ -52,15 +53,6 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       @Override
       public boolean isAnchorThreadInterrupted() {
         return false;
-      }
-
-      @Override
-      public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-          @Nullable ThreadExecutionContext parentContext) {
-      }
-
-      @Override
-      public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
       }
 
       @Override
@@ -80,10 +72,6 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       }
 
       @Override
-      public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-      }
-
-      @Override
       public void sampleUsage() {
       }
 
@@ -94,14 +82,6 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       @Override
       public boolean throttleQuerySubmission() {
         return _numCalls.getAndIncrement() > 1;
-      }
-
-      @Override
-      public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes) {
-      }
-
-      @Override
-      public void updateQueryUsageConcurrently(String queryId) {
       }
 
       @Override
@@ -129,8 +109,8 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       }
     };
 
-    ThrottleOnCriticalHeapUsageExecutor executor = new ThrottleOnCriticalHeapUsageExecutor(
-        Executors.newCachedThreadPool(), accountant);
+    ThrottleOnCriticalHeapUsageExecutor executor =
+        new ThrottleOnCriticalHeapUsageExecutor(Executors.newCachedThreadPool(), accountant);
 
     CyclicBarrier barrier = new CyclicBarrier(2);
 
