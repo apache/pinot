@@ -142,7 +142,7 @@
     <avro.version>1.11.4</avro.version>
     <parquet.version>1.15.2</parquet.version>
     <orc.version>1.9.7</orc.version>
-    <hive.version>2.8.1</hive.version>
+    <hive.version>4.1.0</hive.version>
     <helix.version>1.3.2</helix.version>
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.19.2</jackson.version>
