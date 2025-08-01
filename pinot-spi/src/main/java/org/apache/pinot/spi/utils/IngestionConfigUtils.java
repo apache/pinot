@@ -55,6 +55,8 @@ public final class IngestionConfigUtils {
   // For partition from different topics, we pad then with an offset to avoid collision. The offset is far higher
   // than the normal max number of partitions on stream (e.g. 512).
   public static final int PARTITION_PADDING_OFFSET = 10000;
+  // For runtime generated ephemeral topics, we pad with additional offset.
+  public static final int EPHEMERAL_TOPIC_PARTITION_PADDING_OFFSET = 10_000_000;
 
   /**
    * Fetches the streamConfig from the given realtime table.
@@ -122,6 +124,25 @@ public final class IngestionConfigUtils {
    */
   public static int getStreamConfigIndexFromPinotPartitionId(int partitionId) {
     return partitionId / PARTITION_PADDING_OFFSET;
+  }
+
+  /**
+   * Getting the StreamConfig from StreamConfigs list based on topicName and partitionId.
+   * @param partitionId the segment partition id on Pinot
+   */
+  public static StreamConfig getStreamConfigFromStreamConfigList(
+      int partitionId, String topicName, List<StreamConfig> streamConfigs) {
+    int rawTopicIndex = getStreamConfigIndexFromPinotPartitionId(partitionId);
+    if (topicName != null && !topicName.isEmpty()) {
+      return streamConfigs.stream().filter(c -> topicName.equals(c.getTopicName()))
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException("No matching StreamConfig found for topic: " + topicName));
+    } else {
+      return streamConfigs.stream()
+          .filter(c -> !c.isEphemeralBackfillTopic()).skip(rawTopicIndex)
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException("Not enough non-ephemeral StreamConfigs"));
+    }
   }
 
   /**

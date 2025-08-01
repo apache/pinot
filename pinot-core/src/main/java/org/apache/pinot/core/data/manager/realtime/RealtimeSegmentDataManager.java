@@ -1663,17 +1663,18 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
     } else {
       // Multiple streams
       _streamPartitionId = IngestionConfigUtils.getStreamPartitionIdFromPinotPartitionId(_partitionGroupId);
-      int index = IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(_partitionGroupId);
-      Preconditions.checkState(numStreams > index, "Cannot find stream config of index: %s for table: %s", index,
-          _tableNameWithType);
-      _streamConfig = new StreamConfig(_tableNameWithType, streamConfigMaps.get(index));
+      _streamConfig = new StreamConfig(_tableNameWithType,
+          IngestionConfigUtils.getStreamConfigFromStreamConfigList(
+              _partitionGroupId, _llcSegmentName.getTopicName(), IngestionConfigUtils.getStreamConfigs(_tableConfig))
+              .getStreamConfigsMap());
     }
     _streamConsumerFactory = StreamConsumerFactoryProvider.create(_streamConfig);
     _streamPartitionMsgOffsetFactory = _streamConsumerFactory.createStreamMsgOffsetFactory();
     String streamTopic = _streamConfig.getTopicName();
     _segmentNameStr = _segmentZKMetadata.getSegmentName();
     _partitionGroupConsumptionStatus =
-        new PartitionGroupConsumptionStatus(_partitionGroupId, llcSegmentName.getSequenceNumber(),
+        new PartitionGroupConsumptionStatus(llcSegmentName.getTopicName(), _partitionGroupId, _streamPartitionId,
+            llcSegmentName.getSequenceNumber(),
             _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getStartOffset()),
             _segmentZKMetadata.getEndOffset() == null ? null
                 : _streamPartitionMsgOffsetFactory.create(_segmentZKMetadata.getEndOffset()),
@@ -1787,7 +1788,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
           "Failed to initialize segment data manager", t));
       _segmentLogger.warn(
           "Scheduling task to call controller to mark the segment as OFFLINE in Ideal State due"
-           + " to initialization error: '{}'",
+              + " to initialization error: '{}'",
           t.getMessage());
       // Since we are going to throw exception from this thread (helix execution thread), the externalview
       // entry for this segment will be ERROR. We allow time for Helix to make this transition, and then
