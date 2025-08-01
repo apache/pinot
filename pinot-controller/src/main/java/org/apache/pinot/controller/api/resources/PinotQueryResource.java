@@ -136,7 +136,7 @@ public class PinotQueryResource {
   }
 
   @GET
-  @Path("timeseries/api/v1/query_range")
+  @Path("/timeseries/api/v1/query_range")
   @ManualAuthorization
   @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
   public StreamingOutput handleTimeSeriesQueryRange(@QueryParam("language") String language,
