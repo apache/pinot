@@ -260,7 +260,7 @@ public class ControllerPeriodicTasksIntegrationTest extends BaseClusterIntegrati
       externalView = _helixResourceManager.getTableExternalView(tableNameWithType);
       //noinspection PointlessArithmeticExpression
       if (!checkSegmentStatusCheckerMetrics(tableNameWithType, idealState, externalView, NUM_REPLICAS - 1,
-          100 * (NUM_REPLICAS - 1) / NUM_REPLICAS, 0, 100)) {
+          100, 0, 100)) {
         return false;
       }
       tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(getTableName());

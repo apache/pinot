@@ -241,7 +241,7 @@ public class SegmentStatusCheckerTest {
     when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
 
     runSegmentStatusChecker(resourceManager, 0);
-    verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 2, 66, 0, 100, 0, 0);
+    verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 2, 100, 0, 100, 0, 0);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
         ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
   }
@@ -307,7 +307,7 @@ public class SegmentStatusCheckerTest {
     when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
 
     runSegmentStatusChecker(resourceManager, 0);
-    verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 3, 75, 0, 100, 0, 0);
+    verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 3, 100, 0, 100, 0, 0);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
         ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
   }
@@ -380,7 +380,7 @@ public class SegmentStatusCheckerTest {
     when(propertyStore.get(anyString(), any(), anyInt())).thenReturn(znRecord);
 
     runSegmentStatusChecker(resourceManager, 0);
-    verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 1, 25, 0, 100, 3, 0);
+    verifyControllerMetrics(REALTIME_TABLE_NAME, 3, 3, 3, 1, 33, 0, 100, 3, 0);
     assertEquals(MetricValueUtils.getTableGaugeValue(_controllerMetrics, REALTIME_TABLE_NAME,
         ControllerGauge.MISSING_CONSUMING_SEGMENT_TOTAL_COUNT), 2);
   }

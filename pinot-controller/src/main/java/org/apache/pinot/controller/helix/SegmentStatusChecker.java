@@ -397,9 +397,9 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       }
 
       minEVReplicasUp = Math.min(minEVReplicasUp, numEVReplicasUp);
-      // Total number of replicas in ideal state (including ERROR/OFFLINE states)
-      int numISReplicasTotal = Math.max(idealState.getInstanceStateMap(segment).entrySet().size(), 1);
-      minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
+      // Use max replicas up from IS and EV to ensure availability does not go above 100%
+      int maxReplicasUp = Math.max(numISReplicasUp, numEVReplicasUp);
+      minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / maxReplicasUp);
     }
 
     // Log unavailable segments in batches
