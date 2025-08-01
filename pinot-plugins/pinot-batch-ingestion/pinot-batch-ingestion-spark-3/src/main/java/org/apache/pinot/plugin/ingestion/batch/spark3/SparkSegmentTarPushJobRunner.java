@@ -36,8 +36,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.VoidFunction;
 
 public class SparkSegmentTarPushJobRunner extends BaseSparkSegmentTarPushJobRunner {
-  private SegmentGenerationJobSpec _spec;
-
+  
   public SparkSegmentTarPushJobRunner() {
     super();
   }
