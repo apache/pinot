@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -442,7 +442,7 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
 
     // set table B in parallel blacklist, so that it ends up in sequential queue, and table A in parallel queue
-    Pair<ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext>,
+    Pair<ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext>,
         Queue<TenantRebalancer.TenantTableRebalanceJobContext>>
         queues =
         tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(), null,
