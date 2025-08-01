@@ -417,7 +417,7 @@ public class NoDictionarySingleColumnGroupKeyGenerator implements GroupKeyGenera
 
   @Override
   public int getNumKeys() {
-    return _groupKeyMap.size();
+    return _groupKeyMap.size() + (_groupIdForNullValue == null ? 0 : 1);
   }
 
   private int getKeyForValue(int value) {
