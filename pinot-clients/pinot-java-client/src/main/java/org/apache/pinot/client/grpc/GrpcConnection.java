@@ -32,10 +32,10 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.client.BrokerResponse;
 import org.apache.pinot.client.BrokerSelector;
-import org.apache.pinot.client.Connection;
 import org.apache.pinot.client.PinotClientException;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.client.SimpleBrokerSelector;
+import org.apache.pinot.client.TableNameExtractor;
 import org.apache.pinot.common.config.GrpcConfig;
 import org.apache.pinot.common.proto.Broker;
 import org.apache.pinot.common.utils.DataSchema;
@@ -233,7 +233,7 @@ public class GrpcConnection implements AutoCloseable {
    */
   public Iterator<Broker.BrokerResponse> executeWithIterator(String query, Map<String, String> metadata)
       throws PinotClientException {
-    String[] tableNames = Connection.resolveTableName(query);
+    String[] tableNames = TableNameExtractor.resolveTableName(query);
     String brokerHostPort = _brokerSelector.selectBroker(tableNames);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query " + ((tableNames == null) ? "with no tables"
