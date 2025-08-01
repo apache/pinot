@@ -20,7 +20,6 @@ package org.apache.pinot.segment.local.realtime.converter;
 
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -70,7 +69,7 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  public void build(@Nullable SegmentVersion segmentVersion, @Nullable ServerMetrics serverMetrics)
+  public void build(SegmentVersion segmentVersion, ServerMetrics serverMetrics)
       throws Exception {
     SegmentGeneratorConfig genConfig = new SegmentGeneratorConfig(_tableConfig, _dataSchema, true);
 
@@ -198,7 +197,18 @@ public class RealtimeSegmentConverter {
     if (_tableConfig.getUpsertConfig() == null) {
       return false;
     }
-    return _tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
+
+    boolean commitTimeCompactionEnabled = _tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
+
+    // Validation: Commit-time compaction is currently only supported when column major build is disabled
+    if (commitTimeCompactionEnabled && _enableColumnMajor) {
+      throw new IllegalStateException(
+          "Commit-time compaction is not supported when column major segment builder is enabled. "
+              + "Please disable column major segment builder (set columnMajorSegmentBuilderEnabled=false) "
+              + "to use commit-time compaction for table: " + _tableName);
+    }
+
+    return commitTimeCompactionEnabled;
   }
 
   /**

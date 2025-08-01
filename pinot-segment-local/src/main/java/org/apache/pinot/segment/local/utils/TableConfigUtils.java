@@ -754,6 +754,24 @@ public final class TableConfigUtils {
                 deleteRecordColumn));
       }
 
+      // Validate commit-time compaction compatibility with column major segment builder
+      // todo: Remove this after commit time compaction is supported with column major build
+      if (upsertConfig.isEnableCommitTimeCompaction()) {
+        boolean isColumnMajorEnabled = false;
+        if (tableConfig.getIngestionConfig() != null
+            && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+          isColumnMajorEnabled =
+              tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
+        } else {
+          isColumnMajorEnabled = tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
+        }
+
+        Preconditions.checkState(!isColumnMajorEnabled,
+            "Commit-time compaction is not supported when column major segment builder is enabled. "
+                + "Please disable column major segment builder (set columnMajorSegmentBuilderEnabled=false) "
+                + "to use commit-time compaction");
+      }
+
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       if (outOfOrderRecordColumn != null) {
         Preconditions.checkState(!Boolean.TRUE.equals(upsertConfig.isDropOutOfOrderRecord()),

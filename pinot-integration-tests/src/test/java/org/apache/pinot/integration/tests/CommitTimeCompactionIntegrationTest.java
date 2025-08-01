@@ -40,6 +40,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.AssertJUnit.fail;
 
 
 /**
@@ -569,6 +570,44 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     dropRealtimeTable(tableNameWithoutCompaction);
     deleteSchema(tableNameWithCompaction);
     deleteSchema(tableNameWithoutCompaction);
+  }
+
+  @Test
+  public void testCommitTimeCompactionNotAllowedWithColumnMajorValidation()
+      throws Exception {
+    // Test that enabling commit-time compaction with column major segment builder is rejected
+    String kafkaTopicName = getKafkaTopic() + "-validation-test";
+    createKafkaTopic(kafkaTopicName);
+
+    String tableName = "validationTestTable";
+    UpsertConfig upsertConfig = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfig.setEnableCommitTimeCompaction(true);
+
+    Schema schema = createSchema();
+    schema.setSchemaName(tableName);
+    addSchema(schema);
+
+    Map<String, String> csvDecoderProperties = getCSVDecoderProperties(CSV_DELIMITER, CSV_SCHEMA_HEADER);
+    TableConfig tableConfig =
+        createCSVUpsertTableConfig(tableName, kafkaTopicName, getNumKafkaPartitions(), csvDecoderProperties,
+            upsertConfig, PRIMARY_KEY_COL);
+
+    // Enable column major segment builder - this should cause validation to fail
+    tableConfig.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(true);
+
+    try {
+      addTableConfig(tableConfig);
+      fail(
+          "Expected table creation to fail when both commit-time compaction and column major segment builder are "
+              + "enabled");
+    } catch (Exception e) {
+      assertTrue(e.getMessage()
+              .contains("Commit-time compaction is not supported when column major segment builder is enabled"),
+          "Expected error message about commit-time compaction compatibility, but got: " + e.getMessage());
+    }
+
+    // Clean up - delete the schema since table creation failed
+    deleteSchema(tableName);
   }
 
   @Test
