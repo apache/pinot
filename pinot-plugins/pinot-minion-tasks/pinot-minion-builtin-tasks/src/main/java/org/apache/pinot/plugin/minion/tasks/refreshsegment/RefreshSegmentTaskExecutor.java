@@ -34,6 +34,7 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -44,6 +45,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.Obfuscator;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,18 +144,39 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
           .build();
     }
 
+    // Check if column-major building is enabled
+    boolean enableColumnMajorBuild = Boolean.parseBoolean(
+        configs.get(MinionConstants.RefreshSegmentTask.ENABLE_COLUMN_MAJOR_BUILD_KEY));
+
     // Refresh the segment. Segment reload is achieved by generating a new segment from scratch using the updated schema
     // and table configs.
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      recordReader.init(indexDir, null, null);
-      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
-          getSchema(tableNameWithType));
-      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader);
-      driver.build();
-      _eventObserver.notifyProgress(pinotTaskConfig,
-          "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
-              + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
+    if (enableColumnMajorBuild) {
+      LOGGER.info("Using column-major segment building for segment: {}", segmentName);
+
+      // Load the immutable segment for column-major building
+      ImmutableSegment immutableSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+      try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+        recordReader.init(indexDir, null, null);
+        SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
+                getSchema(tableNameWithType));
+        SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+        driver.init(config, recordReader);
+        driver.buildByColumn(immutableSegment);
+      } finally {
+        immutableSegment.destroy();
+      }
+    } else {
+      try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+        recordReader.init(indexDir, null, null);
+        SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
+                getSchema(tableNameWithType));
+        SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+        driver.init(config, recordReader);
+        driver.build();
+        _eventObserver.notifyProgress(pinotTaskConfig,
+                "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
+                        + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
+      }
     }
 
     File refreshedSegmentFile = new File(workingDir, segmentName);

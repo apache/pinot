@@ -198,6 +198,9 @@ public class MinionConstants {
 
     // Maximum number of tasks to create per table per run.
     public static final int MAX_NUM_TASKS_PER_TABLE = 20;
+
+    // Enable column-major segment building (similar to realtime segment conversion)
+    public static final String ENABLE_COLUMN_MAJOR_BUILD_KEY = "enableColumnMajorBuild";
   }
 
   public static class UpsertCompactionTask {
