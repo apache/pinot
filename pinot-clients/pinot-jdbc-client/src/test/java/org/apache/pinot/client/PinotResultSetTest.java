@@ -46,8 +46,30 @@ public class PinotResultSetTest {
   private DummyJsonTransport _dummyJsonTransport = new DummyJsonTransport();
 
   @Test
-  public void testFetchValues()
-      throws Exception {
+  public void testFromJsonExceptionBranch() {
+    // Pass a JSON string that will cause JsonUtils.stringToJsonNode to throw
+    // (e.g., a string with invalid encoding or control characters)
+    String badJson = "\u0000\u0001\u0002";
+    PinotResultSet rs = PinotResultSet.fromJson(badJson);
+    Assert.assertNotNull(rs);
+    Assert.assertFalse(rs.next());
+  }
+
+  @Test
+  public void testNegativeColumnIndexThrows() throws Exception {
+    ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
+    ResultSet resultSet = resultSetGroup.getResultSet(0);
+    PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
+    try {
+      pinotResultSet.getInt(-1);
+      Assert.fail("Expected SQLException for negative column index");
+    } catch (SQLException e) {
+      // expected
+    }
+  }
+
+  @Test
+  public void testFetchValues() throws Exception {
     ResultSetGroup resultSetGroup = getResultSet(TEST_RESULT_SET_RESOURCE);
     ResultSet resultSet = resultSetGroup.getResultSet(0);
     PinotResultSet pinotResultSet = new PinotResultSet(resultSet);
