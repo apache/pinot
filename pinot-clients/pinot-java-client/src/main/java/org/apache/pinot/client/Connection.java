@@ -21,12 +21,8 @@ package org.apache.pinot.client;
 import com.google.common.collect.Iterables;
 import java.util.List;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.utils.request.RequestUtils;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
-import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +104,7 @@ public class Connection {
   public ResultSetGroup execute(@Nullable Iterable<String> tableNames, String query)
       throws PinotClientException {
     String[] resultTableNames =
-        (tableNames == null) ? resolveTableName(query) : Iterables.toArray(tableNames, String.class);
+        (tableNames == null) ? TableNameExtractor.resolveTableName(query) : Iterables.toArray(tableNames, String.class);
     String brokerHostPort = _brokerSelector.selectBroker(resultTableNames);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query " + ((tableNames == null) ? "with no tables"
@@ -157,32 +153,12 @@ public class Connection {
   public CompletableFuture<ResultSetGroup> executeAsync(@Nullable Iterable<String> tableNames, String query)
       throws PinotClientException {
     String[] resultTableNames =
-        (tableNames == null) ? resolveTableName(query) : Iterables.toArray(tableNames, String.class);
+        (tableNames == null) ? TableNameExtractor.resolveTableName(query) : Iterables.toArray(tableNames, String.class);
     String brokerHostPort = _brokerSelector.selectBroker(resultTableNames);
     if (brokerHostPort == null) {
       throw new PinotClientException("Could not find broker to query for statement: " + query);
     }
     return _transport.executeQueryAsync(brokerHostPort, query).thenApply(ResultSetGroup::new);
-  }
-
-  /**
-   * Returns the name of all the tables used in a sql query.
-   *
-   * @return name of all the tables used in a sql query.
-   */
-  @Nullable
-  public static String[] resolveTableName(String query) {
-    try {
-      SqlNodeAndOptions sqlNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(query);
-      Set<String> tableNames =
-          RequestUtils.getTableNames(CalciteSqlParser.compileSqlNodeToPinotQuery(sqlNodeAndOptions.getSqlNode()));
-      if (tableNames != null) {
-        return tableNames.toArray(new String[0]);
-      }
-    } catch (Exception e) {
-      LOGGER.error("Cannot parse table name from query: {}. Fallback to broker selector default.", query, e);
-    }
-    return null;
   }
 
   /**
