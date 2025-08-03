@@ -299,13 +299,22 @@ public class RealtimeOffsetAutoResetManagerTest {
   /**
    * Test implementation of RealtimeOffsetAutoResetHandler for testing purposes
    */
-  public static class TestRealtimeOffsetAutoResetHandler extends RealtimeOffsetAutoResetHandler {
+  public static class TestRealtimeOffsetAutoResetHandler implements RealtimeOffsetAutoResetHandler {
 
+    public PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
+    public PinotHelixResourceManager _pinotHelixResourceManager;
     public boolean _triggedBackfillJob = false;
 
     public TestRealtimeOffsetAutoResetHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
         PinotHelixResourceManager pinotHelixResourceManager) {
-      super(llcRealtimeSegmentManager, pinotHelixResourceManager);
+      init(llcRealtimeSegmentManager, pinotHelixResourceManager);
+    }
+
+    @Override
+    public void init(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
+        PinotHelixResourceManager pinotHelixResourceManager) {
+      _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
+      _pinotHelixResourceManager = pinotHelixResourceManager;
     }
 
     @Override

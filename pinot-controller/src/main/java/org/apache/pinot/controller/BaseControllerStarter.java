@@ -886,9 +886,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
             _pinotLLCRealtimeSegmentManager, _validationMetrics, _controllerMetrics, _storageQuotaChecker,
             _resourceUtilizationManager);
     periodicTasks.add(_realtimeSegmentValidationManager);
-    _realtimeOffsetAutoResetManager =
-        new RealtimeOffsetAutoResetManager(_config, _helixResourceManager, _leadControllerManager,
-            _pinotLLCRealtimeSegmentManager, _controllerMetrics);
+    initRealtimeOffsetAutoResetManager(periodicTasks);
     _brokerResourceValidationManager =
         new BrokerResourceValidationManager(_config, _helixResourceManager, _leadControllerManager, _controllerMetrics);
     periodicTasks.add(_brokerResourceValidationManager);
@@ -923,6 +921,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(resourceUtilizationChecker);
 
     return periodicTasks;
+  }
+
+  private void initRealtimeOffsetAutoResetManager(List<PeriodicTask> periodicTasks) {
+    if (!_config.isRealtimeOffsetAutoResetEnabled()) {
+      LOGGER.info("Realtime offset auto reset is disabled, skipping initialization");
+      return;
+    }
+    _realtimeOffsetAutoResetManager =
+        new RealtimeOffsetAutoResetManager(_config, _helixResourceManager, _leadControllerManager,
+            _pinotLLCRealtimeSegmentManager, _controllerMetrics);
+    periodicTasks.add(_realtimeOffsetAutoResetManager);
   }
 
   /**

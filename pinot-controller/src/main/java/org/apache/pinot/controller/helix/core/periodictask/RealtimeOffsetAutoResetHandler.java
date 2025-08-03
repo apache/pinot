@@ -24,15 +24,14 @@ import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentMa
 import org.apache.pinot.spi.stream.StreamConfig;
 
 
-public abstract class RealtimeOffsetAutoResetHandler {
-  protected PinotLLCRealtimeSegmentManager _llcRealtimeSegmentManager;
-  protected PinotHelixResourceManager _pinotHelixResourceManager;
+public interface RealtimeOffsetAutoResetHandler {
 
-  public RealtimeOffsetAutoResetHandler(PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager,
-      PinotHelixResourceManager pinotHelixResourceManager) {
-    _llcRealtimeSegmentManager = llcRealtimeSegmentManager;
-    _pinotHelixResourceManager = pinotHelixResourceManager;
-  }
+  /**
+   * Initialize the handler with the PinotLLCRealtimeSegmentManager and PinotHelixResourceManager.
+   * This is called once in constructor.
+   */
+  public abstract void init(
+      PinotLLCRealtimeSegmentManager llcRealtimeSegmentManager, PinotHelixResourceManager pinotHelixResourceManager);
 
   /**
    * Trigger the job to backfill the skipped interval due to offset auto reset.

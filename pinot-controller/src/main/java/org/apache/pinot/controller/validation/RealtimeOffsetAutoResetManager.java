@@ -73,7 +73,7 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
     //   resetOffsetTopicPartition=0
     //   resetOffsetFrom=0
     //   resetOffsetTo=1000
-    if (periodicTaskProperties.containsKey(context._backfillJobPropertyKeys.toArray()[0])) {
+    if (periodicTaskProperties.keySet().containsAll(context._backfillJobPropertyKeys)) {
       context._shouldTriggerBackfillJobs = true;
       for (String key : context._backfillJobPropertyKeys) {
         context._backfillJobProperties.put(key, periodicTaskProperties.getProperty(key));
@@ -115,12 +115,13 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
       LOGGER.info("Trigger backfill jobs with StreamConfig {}, topicName {}, properties {}",
           topicStreamConfig, topicName, context._backfillJobProperties);
       try {
+        // TODO: use the returned boolean value to ensure at least once delivery of the backfill job
         _tableToHandler.get(tableNameWithType).triggerBackfillJob(tableNameWithType,
             topicStreamConfig,
             topicName,
-            Integer.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_PARTITION)),
-            Long.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_FROM)),
-            Long.valueOf(context._backfillJobProperties.get(Constants.RESET_OFFSET_TO)));
+            Integer.parseInt(context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_PARTITION)),
+            Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_FROM)),
+            Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_TO)));
       } catch (NumberFormatException e) {
         LOGGER.error("Invalid backfill job properties for table: {}, properties: {}, error: {}",
             tableNameWithType, context._backfillJobProperties, e.getMessage(), e);

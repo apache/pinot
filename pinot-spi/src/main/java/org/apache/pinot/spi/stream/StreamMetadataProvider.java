@@ -30,6 +30,8 @@ import java.util.concurrent.TimeoutException;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
+import javax.annotation.Nullable;
+
 
 /**
  * Interface for provider of stream metadata such as partition count, partition offsets
@@ -127,6 +129,7 @@ public interface StreamMetadataProvider extends Closeable {
     return result;
   }
 
+  @Nullable
   default StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis) {
     return null;
   }
