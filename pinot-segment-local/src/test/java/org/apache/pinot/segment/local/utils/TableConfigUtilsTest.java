@@ -1441,6 +1441,7 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
         .addSingleValueDimension("intCol", FieldSpec.DataType.INT)
+        .addSingleValueDimension("bigDecimalCol", FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension("multiValCol", FieldSpec.DataType.STRING)
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1708,11 +1709,16 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setVarLengthDictionaryColumns(Arrays.asList("myCol", "bytesCol", "bigDecimalCol", "multiValCol"))
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setVarLengthDictionaryColumns(Arrays.asList("intCol"))
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for Var length dictionary defined for non string/bytes column");
+      fail("Should fail for Var length dictionary defined for fixed-width column");
     } catch (Exception e) {
       // expected
     }

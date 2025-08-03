@@ -25,7 +25,6 @@ import java.util.Map;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
-import org.apache.pinot.core.transport.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -108,13 +107,12 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
 
   @Override
   public void calculateRoutes(TableRouteInfo tableRouteInfo, RoutingManager routingManager,
-      BrokerRequest offlineBrokerRequest,
-      BrokerRequest realtimeBrokerRequest, long requestId) {
+      BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest, long requestId) {
     assert (tableRouteInfo.isExists());
     String offlineTableName = tableRouteInfo.getOfflineTableName();
     String realtimeTableName = tableRouteInfo.getRealtimeTableName();
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
+    Map<ServerInstance, SegmentsToQuery> offlineRoutingTable = null;
+    Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable = null;
     List<String> unavailableSegments = new ArrayList<>();
     int numPrunedSegmentsTotal = 0;
 
@@ -128,7 +126,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
       }
       if (routingTable != null) {
         unavailableSegments.addAll(routingTable.getUnavailableSegments());
-        Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
+        Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           offlineRoutingTable = serverInstanceToSegmentsMap;
@@ -150,7 +148,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
       }
       if (routingTable != null) {
         unavailableSegments.addAll(routingTable.getUnavailableSegments());
-        Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
+        Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           realtimeRoutingTable = serverInstanceToSegmentsMap;

@@ -66,7 +66,7 @@ public class LogicalTableRouteProviderCalculateRouteTest extends BaseTableRouteT
     if (isOfflineExpected) {
       assertNotNull(logicalTableRouteInfo.getOfflineTables());
       assertEquals(logicalTableRouteInfo.getOfflineTables().size(), 1);
-      Map<ServerInstance, ServerRouteInfo> offlineRoutingTable =
+      Map<ServerInstance, SegmentsToQuery> offlineRoutingTable =
           logicalTableRouteInfo.getOfflineTables().get(0).getOfflineRoutingTable();
       assertNotNull(offlineRoutingTable);
       assertRoutingTableEqual(offlineRoutingTable, expectedOfflineRoutingTable);
@@ -77,7 +77,7 @@ public class LogicalTableRouteProviderCalculateRouteTest extends BaseTableRouteT
     if (isRealtimeExpected) {
       assertNotNull(logicalTableRouteInfo.getRealtimeTables());
       assertEquals(logicalTableRouteInfo.getRealtimeTables().size(), 1);
-      Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable =
+      Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable =
           logicalTableRouteInfo.getRealtimeTables().get(0).getRealtimeRoutingTable();
       assertNotNull(realtimeRoutingTable);
       assertRoutingTableEqual(realtimeRoutingTable, expectedRealtimeRoutingTable);

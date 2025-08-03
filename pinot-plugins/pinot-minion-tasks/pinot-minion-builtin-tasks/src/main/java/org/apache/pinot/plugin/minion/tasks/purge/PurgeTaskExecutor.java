@@ -19,8 +19,6 @@
 package org.apache.pinot.plugin.minion.tasks.purge;
 
 import java.io.File;
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadMXBean;
 import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -32,21 +30,18 @@ import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.core.minion.SegmentPurger;
 import org.apache.pinot.plugin.minion.tasks.BaseSingleSegmentConversionExecutor;
 import org.apache.pinot.plugin.minion.tasks.SegmentConversionResult;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
-  private static final Logger LOGGER = LoggerFactory.getLogger(PurgeTaskExecutor.class);
   protected final MinionMetrics _minionMetrics = MinionMetrics.get();
   public static final String RECORD_PURGER_KEY = "recordPurger";
   public static final String RECORD_MODIFIER_KEY = "recordModifier";
   public static final String NUM_RECORDS_PURGED_KEY = "numRecordsPurged";
   public static final String NUM_RECORDS_MODIFIED_KEY = "numRecordsModified";
-  private static final ThreadMXBean MX_BEAN = ManagementFactory.getThreadMXBean();
 
   @Override
   protected SegmentConversionResult convert(PinotTaskConfig pinotTaskConfig, File indexDir, File workingDir)
@@ -68,9 +63,9 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     _eventObserver.notifyProgress(pinotTaskConfig, "Purging segment: " + indexDir);
     SegmentPurger segmentPurger =
         new SegmentPurger(indexDir, workingDir, tableConfig, schema, recordPurger, recordModifier, null);
-    long purgeTaskStartTimeNs = MX_BEAN.getCurrentThreadCpuTime();
+    long purgeTaskStartTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
     File purgedSegmentFile = segmentPurger.purgeSegment();
-    long purgeTaskEndTimeNs = MX_BEAN.getCurrentThreadCpuTime();
+    long purgeTaskEndTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
     _minionMetrics.addTimedTableValue(tableNameWithType, taskType, MinionTimer.TASK_THREAD_CPU_TIME_NS,
         purgeTaskEndTimeNs - purgeTaskStartTimeNs, TimeUnit.NANOSECONDS);
     if (purgedSegmentFile == null) {

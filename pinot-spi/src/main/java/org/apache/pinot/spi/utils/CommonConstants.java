@@ -1600,6 +1600,11 @@ public class CommonConstants {
     public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
 
     public static final String DEFAULT_WORKLOAD_NAME = "default";
+    public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
+    public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
+    public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
+        "accounting.secondary.workload.cpu.percentage";
+    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
   }
 
   public static class ExecutorService {

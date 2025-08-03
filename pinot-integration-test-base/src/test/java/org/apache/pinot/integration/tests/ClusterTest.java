@@ -560,10 +560,19 @@ public abstract class ClusterTest extends ControllerTest {
    * This is used for testing timeseries queries.
    */
   public JsonNode getTimeseriesQuery(String query, long startTime, long endTime, Map<String, String> headers) {
+    return getTimeseriesQuery(getBrokerBaseApiUrl(), query, startTime, endTime, headers);
+  }
+
+  /**
+   * Queries the timeseries query endpoint (/timeseries/api/v1/query_range) of the given base URL.
+   * This is used for testing timeseries queries.
+   */
+  public JsonNode getTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
+      Map<String, String> headers) {
     try {
       Map<String, String> queryParams = Map.of("language", "m3ql", "query", query, "start",
         String.valueOf(startTime), "end", String.valueOf(endTime));
-      String url = buildQueryUrl(getTimeSeriesQueryApiUrl(getBrokerBaseApiUrl()), queryParams);
+      String url = buildQueryUrl(getTimeSeriesQueryApiUrl(baseUrl), queryParams);
       JsonNode responseJsonNode = JsonUtils.stringToJsonNode(sendGetRequest(url, headers));
       return sanitizeResponse(responseJsonNode);
     } catch (Exception e) {
