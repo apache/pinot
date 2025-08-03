@@ -21,9 +21,11 @@ import React, { useEffect, useState } from 'react';
 import { TableData } from 'Models';
 import CustomizedTables from './Table';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 export default function useTaskListing(props) {
   const { taskType, tableName } = props;
+  const { currentTimezone } = useTimezone();
   const [fetching, setFetching] = useState(true);
   const [tasks, setTasks] = useState<TableData>({ records: [], columns: [] });
 
@@ -36,7 +38,7 @@ export default function useTaskListing(props) {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentTimezone]);
 
   return {
     tasks,

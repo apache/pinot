@@ -171,7 +171,7 @@ const getAllInstances = () => {
       [InstanceType.SERVER]: [],
       [InstanceType.MINION]: []
     };
-    
+
     data.instances.forEach((instance) => {
       const instanceType =  instance.split('_')[0].toUpperCase();
       instanceTypeToInstancesMap[instanceType].push(instance);
@@ -319,7 +319,7 @@ const getQueryResults = (params) => {
     }
     if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
       exceptions = queryResponse.exceptions as SqlException[];
-    } 
+    }
     if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
       columnList = queryResponse.resultTable.dataSchema.columnNames;
       dataArray = queryResponse.resultTable.rows;
@@ -571,16 +571,16 @@ const getExternalViewObj = (tableName) => {
   return getExternalView(tableName).then((result) => {
     return result.data.OFFLINE || result.data.REALTIME;
   });
-}; 
+};
 
 const fetchServerToSegmentsCountData = (tableName, tableType) => {
   return getServerToSegmentsCount(tableName, tableType).then((results) => {
-    const segmentsArray = results.data; 
+    const segmentsArray = results.data;
     return {
       records: segmentsArray.flatMap((server) =>
-        Object.entries(server.serverToSegmentsCountMap).map(([serverName, segmentsCount]) => [ 
-          serverName,       
-          segmentsCount    
+        Object.entries(server.serverToSegmentsCountMap).map(([serverName, segmentsCount]) => [
+          serverName,
+          segmentsCount
         ])
       )
     };
@@ -932,6 +932,7 @@ const getElapsedTime = (startTime) => {
 }
 
 const getTasksList = async (tableName, taskType) => {
+  const { formatTimeInTimezone } = await import('./TimezoneUtils');
   const finalResponse = {
     columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Num of Sub Tasks'],
     records: []
@@ -944,8 +945,8 @@ const getTasksList = async (tableName, taskType) => {
         finalResponse.records.push([
           taskID,
           status,
-          get(debugData, 'data.startTime', ''),
-          get(debugData, 'data.finishTime', ''),
+          get(debugData, 'data.startTime') ? formatTimeInTimezone(get(debugData, 'data.startTime'), 'MMMM Do YYYY, HH:mm:ss z') : '',
+          get(debugData, 'data.finishTime') ? formatTimeInTimezone(get(debugData, 'data.finishTime'), 'MMMM Do YYYY, HH:mm:ss z') : '',
           get(debugData, 'data.subtaskCount.total', 0)
         ]);
       };
@@ -961,7 +962,7 @@ const getTasksList = async (tableName, taskType) => {
 
 const getTaskRuntimeConfigData = async (taskName: string) => {
   const response = await getTaskRuntimeConfig(taskName);
-  
+
   return response.data;
 }
 
@@ -1013,7 +1014,7 @@ const deleteSegmentOp = (tableName, segmentName) => {
 
 const fetchTableJobs = async (tableName: string, jobTypes?: string) => {
   const response = await getTableJobs(tableName, jobTypes);
-  
+
   return response.data;
 }
 
@@ -1031,7 +1032,7 @@ const fetchRebalanceTableJobs = async (tableName: string): Promise<RebalanceTabl
 
 const fetchSegmentReloadStatus = async (jobId: string) => {
   const response = await getSegmentReloadStatus(jobId);
-  
+
   return response.data;
 }
 
@@ -1142,7 +1143,7 @@ const verifyAuth = (authToken) => {
 const getAccessTokenFromHashParams = () => {
   let accessToken = '';
   const hashParam = removeAllLeadingForwardSlash(location.hash.substring(1));
-  
+
   const urlSearchParams = new URLSearchParams(hashParam);
   if (urlSearchParams.has('access_token')) {
     accessToken = urlSearchParams.get('access_token') as string;
@@ -1181,7 +1182,7 @@ const validateRedirectPath = (path: string): boolean => {
 
   const knownAppRoutes = RouterData.map((data) => data.path);
   const routeMatches = matchPath(pathName, {path: knownAppRoutes, exact: true});
-  
+
   if(!routeMatches) {
     return false;
   }
@@ -1218,7 +1219,7 @@ const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
     if(urlSearchParams.toString()){
       urlParams.unshift(urlSearchParams.toString());
     }
-    
+
     url = urlParams.join('&');
 
     if(!validateRedirectPath(url)) {
