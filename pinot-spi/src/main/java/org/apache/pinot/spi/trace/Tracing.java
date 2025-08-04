@@ -207,10 +207,6 @@ public class Tracing {
     }
 
     @Override
-    public void sampleUsageMSE() {
-    }
-
-    @Override
     public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes,
         TrackingScope trackingScope) {
       // No-op for default accountant
@@ -301,11 +297,6 @@ public class Tracing {
 
     public static void clear() {
       Tracing.getThreadAccountant().clear();
-    }
-
-    public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
-        InstanceType instanceType) {
-      createThreadAccountant(config, instanceId, instanceType);
     }
 
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
