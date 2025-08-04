@@ -72,7 +72,7 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
       if (otherMax == null) {
         // If the other max is null, we set the value directly
         aggregationResultHolder.setValue(max);
-      } else if (max.compareTo(otherMax) < 0) {
+      } else if (max.compareTo(otherMax) > 0) {
         aggregationResultHolder.setValue(max);
       }
     }
