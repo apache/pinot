@@ -291,10 +291,6 @@ public class Tracing {
       Tracing.getThreadAccountant().sampleUsage();
     }
 
-    public static void sampleMSE() {
-      Tracing.getThreadAccountant().sampleUsageMSE();
-    }
-
     public static void clear() {
       Tracing.getThreadAccountant().clear();
     }
