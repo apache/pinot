@@ -210,6 +210,11 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   SEGMENT_REINGESTION_FAILURE("segments", false),
 
   /**
+   * Number of invalid json rows at the time of index close.
+   */
+  INVALID_JSON_ROWS("rows", false),
+
+  /**
    * Approximate heap bytes used by the mutable JSON index at the time of index close.
    */
   MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),

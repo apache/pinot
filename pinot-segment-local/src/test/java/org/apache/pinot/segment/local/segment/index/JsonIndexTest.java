@@ -1035,6 +1035,24 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         eq(35L)); // bytes(.anotherKey) + bytes(.anotherKey\u0000anotherValue)
   }
 
+  @Test
+  public void testMutableJsonIndexInvalidRowsMetric() {
+    JsonIndexConfig jsonIndexConfig = new JsonIndexConfig();
+    jsonIndexConfig.setSkipInvalidJson(true);
+    try (MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table1__0__1", "col")) {
+      mutableIndex.add("{\"key\":\"value\"}");
+      mutableIndex.add("{\"key\":\"value2\"}");
+      mutableIndex.add("{\"key\":\"va\"");
+      mutableIndex.add("another invalid json");
+    } catch (IOException e) {
+      fail("Should not throw IOException when skipInvalidJson is true", e);
+    }
+
+    verify(_serverMetrics, times(1)).addMeteredTableValue(eq("table1"), eq("col"),
+        eq(ServerMeter.INVALID_JSON_ROWS),
+        eq(2L));
+  }
+
   public static class ConfTest extends AbstractSerdeIndexContract {
 
     @Test
