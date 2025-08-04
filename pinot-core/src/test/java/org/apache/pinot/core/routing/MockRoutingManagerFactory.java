@@ -269,12 +269,6 @@ public class MockRoutingManagerFactory {
       return _serverInstances.keySet();
     }
 
-    @Nullable
-    @Override
-    public Long getQueryTimeoutMs(String tableNameWithType) {
-      return 1000L;
-    }
-
     @Override
     public boolean isTableDisabled(String tableNameWithType) {
       return _disabledTables.contains(tableNameWithType);
