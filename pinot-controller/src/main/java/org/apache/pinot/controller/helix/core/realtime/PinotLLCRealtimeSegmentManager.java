@@ -796,9 +796,10 @@ public class PinotLLCRealtimeSegmentManager {
         //  segment. For tables with pauseless mode enabled, this size is unavailable at this step because the
         //  segment has not yet been built.
 
-        createNewSegmentZKMetadata(tableConfig, streamConfigs.get(0), newLLCSegment, newSegmentCreationTimeMs,
+        createNewSegmentZKMetadataWithOffsetAutoReset(tableConfig, streamConfigs.get(0), newLLCSegment,
+            newSegmentCreationTimeMs,
             committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
-            numReplicas);
+            numReplicas, false);
         newConsumingSegmentName = newLLCSegment.getSegmentName();
         LOGGER.info("Created new segment metadata for segment: {} with status: {}.", newConsumingSegmentName,
             Status.IN_PROGRESS);
@@ -928,10 +929,9 @@ public class PinotLLCRealtimeSegmentManager {
   private void createNewSegmentZKMetadata(TableConfig tableConfig, StreamConfig streamConfig,
       LLCSegmentName newLLCSegmentName, long creationTimeMs, CommittingSegmentDescriptor committingSegmentDescriptor,
       @Nullable SegmentZKMetadata committingSegmentZKMetadata, InstancePartitions instancePartitions, int numPartitions,
-      int numReplicas) {
+      int numReplicas, String startOffset) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
-    String startOffset = committingSegmentDescriptor.getNextOffset();
 
     LOGGER.info(
         "Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
@@ -960,6 +960,72 @@ public class PinotLLCRealtimeSegmentManager {
         getMaxNumPartitionsPerInstance(instancePartitions, numPartitions, numReplicas));
 
     persistSegmentZKMetadata(realtimeTableName, newSegmentZKMetadata, -1);
+  }
+
+  /**
+   * Creates and persists segment ZK metadata for the new CONSUMING segment.
+   */
+  private void createNewSegmentZKMetadataWithOffsetAutoReset(TableConfig tableConfig, StreamConfig streamConfig,
+      LLCSegmentName newLLCSegmentName, long creationTimeMs, CommittingSegmentDescriptor committingSegmentDescriptor,
+      @Nullable SegmentZKMetadata committingSegmentZKMetadata, InstancePartitions instancePartitions, int numPartitions,
+      int numReplicas, boolean skipAutoReset) {
+    String oldStartOffset = committingSegmentDescriptor.getNextOffset();
+    String startOffset = skipAutoReset ? oldStartOffset : computeStartOffset(
+        oldStartOffset, streamConfig, newLLCSegmentName.getPartitionGroupId());
+    createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
+        committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, numPartitions, numReplicas,
+        startOffset);
+  }
+
+  private String computeStartOffset(
+      String nextOffset, StreamConfig streamConfig, int partitionId) {
+    long timeThreshold = streamConfig.getOffsetAutoResetTimeSecThreshold();
+    int offsetThreshold = streamConfig.getOffsetAutoResetOffsetThreshold();
+    if (timeThreshold <= 0 && offsetThreshold <= 0) {
+      return nextOffset;
+    }
+    String clientId =
+        PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
+            + streamConfig.getTopicName();
+    StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    StreamPartitionMsgOffset offsetAtSLA;
+    StreamPartitionMsgOffset latestOffset;
+    try (StreamMetadataProvider metadataProvider = consumerFactory.createPartitionMetadataProvider(
+        clientId, partitionId)) {
+      // Fetching timestamp from an offset is an expensive operation which requires reading the data,
+      // while fetching offset from timestamp is lightweight and only needs to read metadata.
+      // Hence, instead of checking if latestOffset's time - nextOffset's time < SLA, we would check
+      // (CurrentTime - SLA)'s offset > nextOffset.
+      // TODO: it is relying on System.currentTimeMillis() which might be affected by time drift. If we are able to
+      // get nextOffset's time, we should instead check (nextOffset's time + SLA)'s offset < latestOffset
+      latestOffset = metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
+      LOGGER.info("Latest offset of topic {} and partition {} is {}",
+          streamConfig.getTopicName(), partitionId, latestOffset);
+      offsetAtSLA = metadataProvider.getOffsetAtTimestamp(
+          partitionId, System.currentTimeMillis() - timeThreshold * 1000);
+      LOGGER.info("Offset at SLA of topic {} and partition {} is {}",
+          streamConfig.getTopicName(), partitionId, offsetAtSLA);
+    } catch (Exception e) {
+      LOGGER.warn("Not able to fetch the offset metadata, skip auto resetting offsets", e);
+      return nextOffset;
+    }
+    try {
+      if (timeThreshold > 0 && offsetAtSLA != null
+          && Long.valueOf(offsetAtSLA.toString()) > Long.valueOf(nextOffset)) {
+        LOGGER.info("Auto reset offset from {} to {} on partition {} because time threshold reached",
+            nextOffset, latestOffset, partitionId);
+        return latestOffset.toString();
+      }
+      if (offsetThreshold > 0
+          && Long.valueOf(latestOffset.toString()) - Long.valueOf(nextOffset) > offsetThreshold) {
+        LOGGER.info("Auto reset offset from {} to {} on partition {} because number of offsets threshold reached",
+            nextOffset, latestOffset, partitionId);
+        return latestOffset.toString();
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Not able to convert the offset to LONG type, skip auto resetting offsets", e);
+    }
+    return nextOffset;
   }
 
   @Nullable
@@ -1585,8 +1651,10 @@ public class PinotLLCRealtimeSegmentManager {
               CommittingSegmentDescriptor committingSegmentDescriptor =
                   new CommittingSegmentDescriptor(latestSegmentName,
                       (offsetFactory.create(latestSegmentZKMetadata.getEndOffset()).toString()), 0);
-              createNewSegmentZKMetadata(tableConfig, streamConfigs.get(0), newLLCSegmentName, currentTimeMs,
-                  committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
+              createNewSegmentZKMetadataWithOffsetAutoReset(tableConfig, streamConfigs.get(0), newLLCSegmentName,
+                  currentTimeMs,
+                  committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas,
+                  false);
               updateInstanceStatesForNewConsumingSegment(instanceStatesMap, latestSegmentName, newSegmentName,
                   segmentAssignment, instancePartitionsMap);
             } else { // partition group reached end of life
@@ -1711,8 +1779,8 @@ public class PinotLLCRealtimeSegmentManager {
     LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(latestSegmentZKMetadata.getSegmentName(), startOffset.toString(), 0);
-    createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs, committingSegmentDescriptor,
-        latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
+    createNewSegmentZKMetadataWithOffsetAutoReset(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
+        committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas, false);
     String newSegmentName = newLLCSegmentName.getSegmentName();
     updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
         instancePartitionsMap);
@@ -1790,8 +1858,8 @@ public class PinotLLCRealtimeSegmentManager {
     String newSegmentName = newLLCSegmentName.getSegmentName();
 
     CommittingSegmentDescriptor committingSegmentDescriptor = new CommittingSegmentDescriptor(null, startOffset, 0);
-    createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
-        committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas);
+    createNewSegmentZKMetadataWithOffsetAutoReset(tableConfig, streamConfig, newLLCSegmentName, creationTimeMs,
+        committingSegmentDescriptor, null, instancePartitions, numPartitions, numReplicas, true);
 
     return newSegmentName;
   }
