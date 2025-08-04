@@ -217,14 +217,14 @@ public class AggregationFunctionFactory {
           case MIN2: {
             ExpressionContext dataTypeExp = arguments.get(1);
             Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
-                "MIN expects the 2rd argument to be literal, got: %s. The function can be used as "
+                "MIN expects the 2nd argument to be literal, got: %s. The function can be used as "
                     + "min(dataColumn, 'dataType')", dataTypeExp.getType());
             DataType dataType;
+            String typeLiteral = dataTypeExp.getLiteral().getStringValue().toUpperCase();
             try {
-              String upperCase = dataTypeExp.getLiteral().getStringValue().toUpperCase();
-              dataType = DataType.valueOf(upperCase);
+              dataType = DataType.valueOf(typeLiteral);
             } catch (IllegalArgumentException e) {
-              throw new IllegalArgumentException("Unsupported data type for MIN: " + upperCaseFunctionName);
+              throw new IllegalArgumentException("Unsupported data type for MIN: " + typeLiteral);
             }
             switch (dataType) {
               case INT:
@@ -243,14 +243,14 @@ public class AggregationFunctionFactory {
           case MAX2: {
             ExpressionContext dataTypeExp = arguments.get(1);
             Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
-                "MAX expects the 2rd argument to be literal, got: %s. The function can be used as "
+                "MAX expects the 2nd argument to be literal, got: %s. The function can be used as "
                     + "max(dataColumn, 'dataType')", dataTypeExp.getType());
             DataType dataType;
+            String typeLiteral = dataTypeExp.getLiteral().getStringValue().toUpperCase();
             try {
-              String upperCase = dataTypeExp.getLiteral().getStringValue().toUpperCase();
-              dataType = DataType.valueOf(upperCase);
+              dataType = DataType.valueOf(typeLiteral);
             } catch (IllegalArgumentException e) {
-              throw new IllegalArgumentException("Unsupported data type for MAX: " + upperCaseFunctionName);
+              throw new IllegalArgumentException("Unsupported data type for MAX: " + typeLiteral);
             }
             switch (dataType) {
               case INT:
