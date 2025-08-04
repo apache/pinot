@@ -106,7 +106,7 @@ public class BenchmarkAggregateGroupByOrderByQueriesSSE {
   protected static final ExecutorService EXECUTOR_SERVICE = Executors.newFixedThreadPool(8);
 
   // params
-  @Param({"2", "50", "200", "1000"})
+  @Param({"2", "50", "200", "300", "400", "1000"})
   private int _numSegments;
   @Param({"150", "1500", "15000"})
   private int _numRows;

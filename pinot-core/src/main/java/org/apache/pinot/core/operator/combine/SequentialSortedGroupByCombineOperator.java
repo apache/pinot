@@ -40,9 +40,9 @@ import org.slf4j.LoggerFactory;
  * Combine operator for group-by queries.
  */
 @SuppressWarnings("rawtypes")
-public class SingleThreadedSortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
+public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(SingleThreadedSortedGroupByCombineOperator.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SequentialSortedGroupByCombineOperator.class);
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
@@ -54,7 +54,7 @@ public class SingleThreadedSortedGroupByCombineOperator extends BaseSingleBlockC
   private SortedRecordTable _table = null;
   private final Comparator<Record> _recordKeyComparator;
 
-  public SingleThreadedSortedGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
+  public SequentialSortedGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
