@@ -111,6 +111,7 @@ public class InstanceSelectorTest {
   private final static List<String> SEGMENTS =
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
+  private final static InstanceSelectorConfig INSTANCE_SELECTOR_CONFIG = new InstanceSelectorConfig(false, 300, false);
 
   private void createSegments(List<Pair<String, Long>> segmentCreationTimeMsPairs) {
     List<String> segmentZKMetadataPaths = new ArrayList<>();
@@ -236,14 +237,14 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
-            300);
+        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null,
+                Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
-            300);
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null,
+                Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null,
+                Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -764,8 +765,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
-            300);
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null,
+                Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -847,8 +848,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
-            300);
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null,
+                Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -930,8 +931,8 @@ public class InstanceSelectorTest {
     when(pinotQuery.getQueryOptions()).thenReturn(queryOptions);
 
     ReplicaGroupInstanceSelector replicaGroupInstanceSelector =
-        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
-            300);
+        new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null,
+                Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -991,12 +992,12 @@ public class InstanceSelectorTest {
     ZkHelixPropertyStore<ZNRecord> propertyStore = mock(ZkHelixPropertyStore.class);
     BrokerMetrics brokerMetrics = mock(BrokerMetrics.class);
     BalancedInstanceSelector balancedInstanceSelector =
-        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(), false,
-            300);
+        new BalancedInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null,
+                Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
     // ReplicaGroupInstanceSelector has the same behavior as BalancedInstanceSelector for the unavailable segments
     StrictReplicaGroupInstanceSelector strictReplicaGroupInstanceSelector =
-        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+        new StrictReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, null,
+                Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
 
     Set<String> enabledInstances = new HashSet<>();
     IdealState idealState = new IdealState(offlineTableName);
@@ -1860,7 +1861,7 @@ public class InstanceSelectorTest {
     HybridSelector hybridSelector = mock(HybridSelector.class);
     ReplicaGroupInstanceSelector instanceSelector =
         new ReplicaGroupInstanceSelector(offlineTableName, propertyStore, brokerMetrics, hybridSelector,
-            Clock.systemUTC(), false, 300);
+            Clock.systemUTC(), INSTANCE_SELECTOR_CONFIG);
 
     // Define instances and segments
     String instance0 = "instance0";
