@@ -543,6 +543,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION = "pinot.broker.multistage.default.hash.function";
     public static final String DEFAULT_BROKER_DEFAULT_HASH_FUNCTION = "absHashCode";
 
+    // Config for default single pool segments metric
+    public static final String CONFIG_OF_BROKER_ENABLE_SINGLE_POOL_SEGMENTS_METRIC =
+        "pinot.broker.enable.single.pool.segments.metric";
+    public static final boolean DEFAULT_ENABLE_SINGLE_POOL_SEGMENTS_METRIC = false;
+
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
     // would set the pool to -1 in the routing table for that server.
     public static final int FALLBACK_POOL_ID = -1;

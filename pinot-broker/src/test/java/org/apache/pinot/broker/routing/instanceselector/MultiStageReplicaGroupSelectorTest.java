@@ -212,7 +212,7 @@ public class MultiStageReplicaGroupSelectorTest {
   private MultiStageReplicaGroupSelector createMultiStageSelector(InstancePartitions instancePartitions) {
     MultiStageReplicaGroupSelector multiStageSelector =
         new MultiStageReplicaGroupSelector(TABLE_NAME, _propertyStore, _brokerMetrics, null, Clock.systemUTC(),
-            false, 300);
+            new InstanceSelectorConfig(false, 300, false));
     multiStageSelector = spy(multiStageSelector);
     doReturn(instancePartitions).when(multiStageSelector).getInstancePartitions();
     return multiStageSelector;
