@@ -241,6 +241,8 @@ public class CommonConstants {
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
+    public static final String CONFIG_OF_ZOOKEEPER_SERVER = "pinot.zk.server";
+    @Deprecated(since = "1.5.0", forRemoval = true)
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
 
     public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";

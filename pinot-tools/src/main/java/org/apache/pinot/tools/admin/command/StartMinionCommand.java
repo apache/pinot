@@ -136,7 +136,7 @@ public class StartMinionCommand extends AbstractBaseAdminCommand implements Comm
       properties.putAll(PinotConfigUtils.readConfigFromFile(_configFileName));
       // Override the zkAddress and clusterName to ensure ServiceManager is connecting to the right Zookeeper and
       // Cluster.
-      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+      _zkAddress = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
       _clusterName = MapUtils.getString(properties, CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
     } else {
       properties.putAll(PinotConfigUtils.generateMinionConf(_clusterName, _zkAddress, _minionHost, _minionPort));

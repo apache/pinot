@@ -179,7 +179,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
-    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
     applyCustomConfigs(_serverConf);
