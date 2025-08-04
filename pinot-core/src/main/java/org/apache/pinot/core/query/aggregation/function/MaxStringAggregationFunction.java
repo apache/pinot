@@ -70,7 +70,7 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     updateAggregationResultHolder(aggregationResultHolder, max);
   }
 
-  protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, String  max) {
+  protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, String max) {
     if (max != null) {
       if (_nullHandlingEnabled) {
         String otherMax = aggregationResultHolder.getResult();
