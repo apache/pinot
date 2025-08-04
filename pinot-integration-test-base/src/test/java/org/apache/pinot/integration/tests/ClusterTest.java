@@ -173,7 +173,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected PinotConfiguration getBrokerConf(int brokerId) {
     PinotConfiguration brokerConf = new PinotConfiguration();
-    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     brokerConf.setProperty(Broker.CONFIG_OF_BROKER_HOSTNAME, LOCAL_HOST);
     int brokerPort = NetUtils.findOpenPort(_nextBrokerPort);
@@ -240,7 +240,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected PinotConfiguration getServerConf(int serverId) {
     PinotConfiguration serverConf = new PinotConfiguration();
-    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_HOST, LOCAL_HOST);
     serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR,
@@ -315,7 +315,7 @@ public abstract class ClusterTest extends ControllerTest {
 
   protected PinotConfiguration getMinionConf() {
     PinotConfiguration minionConf = new PinotConfiguration();
-    minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    minionConf.setProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     minionConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     minionConf.setProperty(Helix.KEY_OF_MINION_HOST, LOCAL_HOST);
     int minionPort = NetUtils.findOpenPort(_nextMinionPort);
