@@ -214,8 +214,56 @@ public class AggregationFunctionFactory {
             return new CountAggregationFunction(arguments, nullHandlingEnabled);
           case MIN:
             return new MinAggregationFunction(arguments, nullHandlingEnabled);
+          case MIN2: {
+            ExpressionContext dataTypeExp = arguments.get(1);
+            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
+                "MIN expects the 2rd argument to be literal, got: %s. The function can be used as "
+                    + "min(dataColumn, 'dataType')", dataTypeExp.getType());
+            DataType dataType;
+            try {
+              String upperCase = dataTypeExp.getLiteral().getStringValue().toUpperCase();
+              dataType = DataType.valueOf(upperCase);
+            } catch (IllegalArgumentException e) {
+              throw new IllegalArgumentException("Unsupported data type for MIN: " + upperCaseFunctionName);
+            }
+            switch (dataType) {
+              case INT:
+              case LONG:
+              case FLOAT:
+              case DOUBLE:
+                return new MinAggregationFunction(firstArgument, nullHandlingEnabled);
+              case STRING:
+                return new MinStringAggregationFunction(firstArgument, nullHandlingEnabled);
+              default:
+                throw new IllegalArgumentException("Unsupported data type for MIN: " + dataType);
+            }
+          }
           case MAX:
             return new MaxAggregationFunction(arguments, nullHandlingEnabled);
+          case MAX2: {
+            ExpressionContext dataTypeExp = arguments.get(1);
+            Preconditions.checkArgument(dataTypeExp.getType() == ExpressionContext.Type.LITERAL,
+                "MAX expects the 2rd argument to be literal, got: %s. The function can be used as "
+                    + "max(dataColumn, 'dataType')", dataTypeExp.getType());
+            DataType dataType;
+            try {
+              String upperCase = dataTypeExp.getLiteral().getStringValue().toUpperCase();
+              dataType = DataType.valueOf(upperCase);
+            } catch (IllegalArgumentException e) {
+              throw new IllegalArgumentException("Unsupported data type for MAX: " + upperCaseFunctionName);
+            }
+            switch (dataType) {
+              case INT:
+              case LONG:
+              case FLOAT:
+              case DOUBLE:
+                return new MaxAggregationFunction(firstArgument, nullHandlingEnabled);
+              case STRING:
+                return new MaxStringAggregationFunction(firstArgument, nullHandlingEnabled);
+              default:
+                throw new IllegalArgumentException("Unsupported data type for MAX: " + dataType);
+            }
+          }
           case SUM:
           case SUM0:
             return new SumAggregationFunction(arguments, nullHandlingEnabled);

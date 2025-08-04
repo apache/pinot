@@ -44,7 +44,8 @@
       {
         "psql": "4.2.7",
         "description": "aggregations on string column",
-        "sql": "SELECT count(string_col), count(distinct(string_col)), count(*) FROM {tbl}"
+        "sql": "SELECT min2(string_col, 'STRING'), max2(string_col, 'STRING'), count(string_col), count(distinct(string_col)), count(*) FROM {tbl}",
+        "h2Sql": "SELECT min(string_col), max(string_col), count(string_col), count(distinct(string_col)), count(*) FROM {tbl}"
       },
       {
         "psql": "4.2.7",
