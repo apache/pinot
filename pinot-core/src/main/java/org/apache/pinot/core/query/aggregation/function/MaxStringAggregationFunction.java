@@ -67,23 +67,13 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
       return accum == null ? innerMax : innerMax.compareTo(accum) < 0 ? accum : innerMax;
     });
 
-    updateAggregationResultHolder(aggregationResultHolder, max);
-  }
-
-  protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, String max) {
     if (max != null) {
-      if (_nullHandlingEnabled) {
-        String otherMax = aggregationResultHolder.getResult();
-        if (otherMax == null) {
-          // If the other max is null, we set the value directly
-          aggregationResultHolder.setValue(max);
-        } else {
-          // Compare and set the maximum value
-          aggregationResultHolder.setValue(max.compareTo(otherMax) < 0 ? otherMax : max);
-        }
-      } else {
-        String otherMax = aggregationResultHolder.getResult();
-        aggregationResultHolder.setValue(max.compareTo(otherMax) < 0 ? otherMax : max);
+      String otherMax = aggregationResultHolder.getResult();
+      if (otherMax == null) {
+        // If the other max is null, we set the value directly
+        aggregationResultHolder.setValue(max);
+      } else if (max.compareTo(otherMax) < 0) {
+        aggregationResultHolder.setValue(max);
       }
     }
   }

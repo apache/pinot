@@ -67,23 +67,13 @@ public class MinStringAggregationFunction extends NullableSingleInputAggregation
       return accum == null ? innerMin : innerMin.compareTo(accum) > 0 ? accum : innerMin;
     });
 
-    updateAggregationResultHolder(aggregationResultHolder, min);
-  }
-
-  protected void updateAggregationResultHolder(AggregationResultHolder aggregationResultHolder, String min) {
     if (min != null) {
-      if (_nullHandlingEnabled) {
-        String otherMin = aggregationResultHolder.getResult();
-        if (otherMin == null) {
-          // If the other min is null, we set the value directly
-          aggregationResultHolder.setValue(min);
-        } else {
-          // Compare and set the minimum value
-          aggregationResultHolder.setValue(min.compareTo(otherMin) > 0 ? otherMin : min);
-        }
-      } else {
-        String otherMin = aggregationResultHolder.getResult();
-        aggregationResultHolder.setValue(min.compareTo(otherMin) > 0 ? otherMin : min);
+      String otherMax = aggregationResultHolder.getResult();
+      if (otherMax == null) {
+        // If the other max is null, we set the value directly
+        aggregationResultHolder.setValue(min);
+      } else if (min.compareTo(otherMax) < 0) {
+        aggregationResultHolder.setValue(min);
       }
     }
   }
