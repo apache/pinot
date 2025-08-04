@@ -95,23 +95,21 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     String[] valueArray = blockValSet.getStringValuesSV();
 
     if (_nullHandlingEnabled) {
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          String value = valueArray[i];
-          int groupKey = groupKeyArray[i];
-          String result = groupByResultHolder.getResult(groupKey);
-          if (result == null || value.compareTo(result) > 0) {
-            groupByResultHolder.setValueForKey(groupKey, value);
-          }
-        }
-      });
+      forEachNotNull(length, blockValSet, (from, to) ->
+          aggregateBySV(valueArray, groupKeyArray, groupByResultHolder, from, to));
     } else {
-      for (int i = 0; i < length; i++) {
-        String value = valueArray[i];
-        int groupKey = groupKeyArray[i];
-        if (value.compareTo(groupByResultHolder.getResult(groupKey)) > 0) {
-          groupByResultHolder.setValueForKey(groupKey, value);
-        }
+      aggregateBySV(valueArray, groupKeyArray, groupByResultHolder, 0, length);
+    }
+  }
+
+  private void aggregateBySV(
+      String[] valueArray, int[] groupKeyArray, GroupByResultHolder groupByResultHolder, int from, int to) {
+    for (int i = from; i < to; i++) {
+      String value = valueArray[i];
+      int groupKey = groupKeyArray[i];
+      String result = groupByResultHolder.getResult(groupKey);
+      if (result == null || value.compareTo(result) > 0) {
+        groupByResultHolder.setValueForKey(groupKey, value);
       }
     }
   }
@@ -123,24 +121,21 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     String[] valueArray = blockValSet.getStringValuesSV();
 
     if (_nullHandlingEnabled) {
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          String value = valueArray[i];
-          for (int groupKey : groupKeysArray[i]) {
-            String result = groupByResultHolder.getResult(groupKey);
-            if (result == null || value.compareTo(result) > 0) {
-              groupByResultHolder.setValueForKey(groupKey, value);
-            }
-          }
-        }
-      });
+      forEachNotNull(length, blockValSet, (from, to) ->
+        aggregateByMV(groupKeysArray, groupByResultHolder, valueArray, from, to));
     } else {
-      for (int i = 0; i < length; i++) {
-        String value = valueArray[i];
-        for (int groupKey : groupKeysArray[i]) {
-          if (value.compareTo(groupByResultHolder.getResult(groupKey)) > 0) {
-            groupByResultHolder.setValueForKey(groupKey, value);
-          }
+      aggregateByMV(groupKeysArray, groupByResultHolder, valueArray, 0, length);
+    }
+  }
+
+  private static void aggregateByMV(
+      int[][] groupKeysArray, GroupByResultHolder groupByResultHolder, String[] valueArray, int from, int to) {
+    for (int i = from; i < to; i++) {
+      String value = valueArray[i];
+      for (int groupKey : groupKeysArray[i]) {
+        String result = groupByResultHolder.getResult(groupKey);
+        if (result == null || value.compareTo(result) > 0) {
+          groupByResultHolder.setValueForKey(groupKey, value);
         }
       }
     }
