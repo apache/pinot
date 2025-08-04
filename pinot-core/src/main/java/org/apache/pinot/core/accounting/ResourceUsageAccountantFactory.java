@@ -82,9 +82,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     // track memory usage
     private final boolean _isThreadMemorySamplingEnabled;
 
-    // is sampling allowed for MSE queries
-    private final boolean _isThreadSamplingEnabledForMSE;
-
     private final WatcherTask _watcherTask;
 
     private final EnumMap<TrackingScope, ResourceAggregator> _resourceAggregators;
@@ -109,11 +106,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
       LOGGER.info("_isThreadCPUSamplingEnabled: {}, _isThreadMemorySamplingEnabled: {}", _isThreadCPUSamplingEnabled,
           _isThreadMemorySamplingEnabled);
 
-      _isThreadSamplingEnabledForMSE =
-          config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
-              CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
-      LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
-
       _watcherTask = new WatcherTask();
 
       _resourceAggregators = new EnumMap<>(TrackingScope.class);
@@ -136,14 +128,6 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     public void sampleUsage() {
       sampleThreadBytesAllocated();
       sampleThreadCPUTime();
-    }
-
-    @Override
-    public void sampleUsageMSE() {
-      if (_isThreadSamplingEnabledForMSE) {
-        sampleThreadBytesAllocated();
-        sampleThreadCPUTime();
-      }
     }
 
     @Override
