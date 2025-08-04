@@ -132,6 +132,15 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     protected Set<String> _cancelSentQueries;
 
+    /**
+     * Tracks the query that has the maximum heap usage. The value is updated periodically by the watcher task
+     * iff the heap usage exceeds the critical level. It is null if jvm heap usage is below the critical level.
+     * Only the watcher task updates this field. It is potentially read by every query task thread when it calls
+     * {@link org.apache.pinot.spi.trace.Tracing.ThreadAccountantOps.isInterrupted()}.
+     * If the reference is not null and the query task thread is running a task with the same query id as the
+     * max heap usage query, it will terminate itself.
+     *
+     */
     protected AtomicReference<AggregatedStats> _maxHeapUsageQuery = new AtomicReference<>(null);
 
     // the periodical task that aggregates and preempts queries
