@@ -1513,7 +1513,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._numPartitions = 2;
 
     // Test empty ideal state
-    Set<Integer> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState);
+    Set<String> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
     partitionIds.clear();
 
