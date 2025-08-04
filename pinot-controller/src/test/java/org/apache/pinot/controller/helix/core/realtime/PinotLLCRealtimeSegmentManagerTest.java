@@ -122,6 +122,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   static final String CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
   static final SegmentVersion SEGMENT_VERSION = RANDOM.nextBoolean() ? SegmentVersion.v1 : SegmentVersion.v3;
   static final int NUM_DOCS = RANDOM.nextInt(Integer.MAX_VALUE) + 1;
+  static final long LATEST_OFFSET = PARTITION_OFFSET.getOffset() * 2 + NUM_DOCS;
   static final int SEGMENT_SIZE_IN_BYTES = 100000000;
   @AfterClass
   public void tearDown()
@@ -1372,7 +1373,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     segmentManager._numPartitions = 2;
 
     // Test empty ideal state
-    Set<Integer> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState);
+    Set<String> partitionIds = segmentManager.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
     partitionIds.clear();
 
@@ -1722,6 +1723,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _tableConfig =
           new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(_numReplicas)
               .setStreamConfigs(streamConfigs).build();
+      _streamConfigs = IngestionConfigUtils.getStreamConfigs(_tableConfig);
+    }
+
+    void makeTableConfig(Map<String, String> streamConfigMap) {
+      _tableConfig =
+          new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(_numReplicas)
+              .setStreamConfigs(streamConfigMap).build();
       _streamConfigs = IngestionConfigUtils.getStreamConfigs(_tableConfig);
     }
 
