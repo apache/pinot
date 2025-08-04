@@ -70,7 +70,7 @@ public class MinStringAggregationFunction extends NullableSingleInputAggregation
     if (min != null) {
       String otherMax = aggregationResultHolder.getResult();
       if (otherMax == null) {
-        // If the other max is null, we set the value directly
+        // If the other min is null, we set the value directly
         aggregationResultHolder.setValue(min);
       } else if (min.compareTo(otherMax) < 0) {
         aggregationResultHolder.setValue(min);
