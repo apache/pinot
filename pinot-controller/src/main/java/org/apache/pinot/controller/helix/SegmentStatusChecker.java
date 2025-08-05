@@ -366,9 +366,16 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String serverInstanceId = entry.getKey();
             String segmentState = entry.getValue();
-            if ((segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING))
-                && isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
-              numEVReplicasUp++;
+            if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
+              if (segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING)) {
+                numEVReplicasUp++;
+              } else {
+                LOGGER.warn("Segment {} in table {} has state {} on instance {}. Marking it as unavailable",
+                    segment, tableNameWithType, segmentState, serverInstanceId);
+              }
+            } else {
+              LOGGER.warn("Segment {} in table {} has state {} on unavailable instance {}. Marking it as unavailable",
+                  segment, tableNameWithType, segmentState, serverInstanceId);
             }
             if (segmentState.equals(SegmentStateModel.ERROR)) {
               errorSegments.add(Pair.of(segment, entry.getKey()));

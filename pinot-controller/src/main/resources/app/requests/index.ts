@@ -238,6 +238,9 @@ export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>
 export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
   transformApi.get(`/timeseries/api/v1/query_range`, { params });
 
+export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
+  baseApi.get('/timeseries/languages');
+
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');
 

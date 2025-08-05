@@ -978,7 +978,6 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected void deleteSnapshot(ImmutableSegmentImpl segment) {
     segment.deleteValidDocIdsSnapshot();
-    segment.deleteQueryableDocIdsSnapshot();
   }
 
   protected File getWatermarkFile() {

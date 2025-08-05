@@ -58,6 +58,7 @@ public class V1Constants {
     public static final String LUCENE_V99_FST_INDEX_FILE_EXTENSION = ".lucene.v99.fst";
     public static final String LUCENE_V99_TEXT_INDEX_FILE_EXTENSION = ".lucene.v99.index";
     public static final String LUCENE_V912_FST_INDEX_FILE_EXTENSION = ".lucene.v912.fst";
+    public static final String LUCENE_V912_IFST_INDEX_FILE_EXTENSION = ".lucene.v912.ifst";
     public static final String LUCENE_V912_TEXT_INDEX_FILE_EXTENSION = ".lucene.v912.index";
     public static final String LUCENE_TEXT_INDEX_PROPERTIES_FILE = "lucene.properties";
     public static final String VECTOR_INDEX_FILE_EXTENSION = ".vector.index";

@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import javax.annotation.Nullable;
 import org.apache.lucene.store.OutputStreamDataOutput;
 import org.apache.lucene.util.fst.FST;
 import org.apache.pinot.segment.local.segment.index.fst.FstIndexType;
@@ -42,12 +43,14 @@ import org.slf4j.LoggerFactory;
  */
 public class LuceneFSTIndexCreator implements FSTIndexCreator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexCreator.class);
+
   private final File _fstIndexFile;
   private final String _columnName;
   private final String _tableNameWithType;
   private final boolean _continueOnError;
   private final FSTBuilder _fstBuilder;
-  Integer _dictId;
+
+  private int _dictId;
 
   /**
    * This index requires values of the column be added in sorted order. Sorted entries could be passed in through
@@ -62,34 +65,33 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
    * @throws IOException
    */
   public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
-      String[] sortedEntries)
+      @Nullable String[] sortedEntries)
       throws IOException {
     this(indexDir, columnName, tableNameWithType, continueOnError, sortedEntries, new FSTBuilder());
   }
 
   @VisibleForTesting
   public LuceneFSTIndexCreator(File indexDir, String columnName, String tableNameWithType, boolean continueOnError,
-      String[] sortedEntries, FSTBuilder fstBuilder)
+      @Nullable String[] sortedEntries, FSTBuilder fstBuilder)
       throws IOException {
+    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
     _columnName = columnName;
     _tableNameWithType = tableNameWithType;
     _continueOnError = continueOnError;
-    _fstIndexFile = new File(indexDir, columnName + V1Constants.Indexes.LUCENE_V912_FST_INDEX_FILE_EXTENSION);
-
     _fstBuilder = fstBuilder;
-    _dictId = 0;
+
     if (sortedEntries != null) {
       for (_dictId = 0; _dictId < sortedEntries.length; _dictId++) {
         try {
           _fstBuilder.addEntry(sortedEntries[_dictId], _dictId);
-        } catch (Exception ex) {
+        } catch (Exception e) {
           if (_continueOnError) {
             // Caught exception while trying to add, update metric and skip the document
             MetricUtils.updateIndexingErrorMetric(_tableNameWithType, FstIndexType.INDEX_DISPLAY_NAME);
           } else {
             LOGGER.error("Caught exception while trying to add to FST index for table: {}, column: {}",
-                tableNameWithType, columnName, ex);
-            throw ex;
+                tableNameWithType, columnName, e);
+            throw e;
           }
         }
       }
@@ -108,14 +110,14 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
       throws IOException {
     try {
       _fstBuilder.addEntry(document, _dictId);
-    } catch (Exception ex) {
+    } catch (Exception e) {
       if (_continueOnError) {
         // Caught exception while trying to add, update metric and skip the document
         MetricUtils.updateIndexingErrorMetric(_tableNameWithType, FstIndexType.INDEX_DISPLAY_NAME);
       } else {
-        LOGGER.error("Caught exception while trying to add to FST index for table: {}, column: {}",
-            _tableNameWithType, _columnName, ex);
-        throw ex;
+        LOGGER.error("Caught exception while trying to add to FST index for table: {}, column: {}", _tableNameWithType,
+            _columnName, e);
+        throw e;
       }
     }
     _dictId++;
@@ -130,16 +132,10 @@ public class LuceneFSTIndexCreator implements FSTIndexCreator {
   public void seal()
       throws IOException {
     LOGGER.info("Sealing FST index: {}", _fstIndexFile.getAbsolutePath());
-    FileOutputStream fileOutputStream = null;
-    try {
-      fileOutputStream = new FileOutputStream(_fstIndexFile);
-      FST<Long> fst = _fstBuilder.done();
-      OutputStreamDataOutput d = new OutputStreamDataOutput(fileOutputStream);
-      fst.save(d, d);
-    } finally {
-      if (fileOutputStream != null) {
-        fileOutputStream.close();
-      }
+    FST<Long> fst = _fstBuilder.done();
+    try (FileOutputStream outputStream = new FileOutputStream(_fstIndexFile);
+        OutputStreamDataOutput dataOutput = new OutputStreamDataOutput(outputStream)) {
+      fst.save(dataOutput, dataOutput);
     }
   }
 
