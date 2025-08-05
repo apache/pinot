@@ -32,6 +32,8 @@ public class TlsSpec implements Serializable {
   private String _trustStorePath;
   private String _trustStorePassword;
   private String _keyStoreType;
+  private int _connectTimeout = 5000;
+  private int _readTimeout = 5000;
 
   public String getKeyStorePath() {
     return _keyStorePath;
@@ -79,5 +81,21 @@ public class TlsSpec implements Serializable {
 
   public void setKeyStoreType(String keyStoreType) {
     _keyStoreType = keyStoreType;
+  }
+
+  public int getConnectTimeout() {
+    return _connectTimeout;
+  }
+
+  public void setConnectTimeout(int connectTimeout) {
+    _connectTimeout = connectTimeout;
+  }
+
+  public int getReadTimeout() {
+    return _readTimeout;
+  }
+
+  public void setReadTimeout(int readTimeout) {
+    _readTimeout = readTimeout;
   }
 }

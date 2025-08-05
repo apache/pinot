@@ -91,7 +91,8 @@ public class MultistageResourceUsageAccountingTest implements ITest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
     // init accountant and start watcher task
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
+    Tracing.unregisterThreadAccountant();
+    Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     // Setup Thread Context

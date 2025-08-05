@@ -172,13 +172,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
   private ScheduledExecutorService _helixMessageCountScheduler;
+  protected ThreadResourceUsageAccountant _resourceUsageAccountant;
 
   @Override
   public void init(PinotConfiguration serverConf)
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
-    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
     applyCustomConfigs(_serverConf);
@@ -243,14 +244,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Initialize the data buffer factory
     PinotDataBuffer.loadDefaultFactory(serverConf);
 
-    // Enable/disable thread CPU time measurement through instance config.
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
-        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
-            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
-    // Enable/disable thread memory allocation tracking through instance config
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
-        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
-            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Set data table version send to broker.
     int dataTableVersion =
         _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, DataTableBuilderFactory.DEFAULT_VERSION);
@@ -670,16 +663,24 @@ public abstract class BaseServerStarter implements ServiceStartable {
               segmentDownloadThrottler, segmentMultiColTextIndexPreprocessThrottler);
     }
 
+    // Enable/disable thread CPU time measurement through instance config.
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+    // Enable/disable thread memory allocation tracking through instance config
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
+            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Initialize the thread accountant for query killing
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(
+    _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
-    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
+    Preconditions.checkNotNull(_resourceUsageAccountant);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-        sendStatsPredicate, threadAccountant);
+        sendStatsPredicate, _resourceUsageAccountant);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -784,7 +785,8 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     // Start the thread accountant
     Tracing.ThreadAccountantOps.startThreadAccountant();
-    PinotClusterConfigChangeListener threadAccountantListener = threadAccountant.getClusterConfigChangeListener();
+    PinotClusterConfigChangeListener threadAccountantListener =
+        _resourceUsageAccountant.getClusterConfigChangeListener();
     if (threadAccountantListener != null) {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
     }
@@ -1148,5 +1150,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } catch (Exception e) {
       LOGGER.warn("Failed to refresh Helix message count", e);
     }
+  }
+
+  public ThreadResourceUsageAccountant getResourceUsageAccountant() {
+    return _resourceUsageAccountant;
   }
 }

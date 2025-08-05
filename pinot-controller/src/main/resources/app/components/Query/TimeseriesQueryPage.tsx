@@ -38,7 +38,7 @@ import { UnControlled as CodeMirror } from 'react-codemirror2';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/material.css';
 import 'codemirror/mode/javascript/javascript';
-import { getTimeSeriesQueryResult } from '../../requests';
+import { getTimeSeriesQueryResult, getTimeSeriesLanguages } from '../../requests';
 import { useHistory, useLocation } from 'react-router';
 import TableToolbar from '../TableToolbar';
 import { Resizable } from 're-resizable';
@@ -51,6 +51,7 @@ import { MAX_SERIES_LIMIT } from '../../utils/ChartConstants';
 
 // Define proper types
 interface TimeseriesQueryResponse {
+  error: string;
   data: {
     resultType: string;
     result: Array<{
@@ -223,10 +224,6 @@ const jsonoptions = {
   wordWrap: 'break-word',
 };
 
-const SUPPORTED_QUERY_LANGUAGES = [
-  { value: 'm3ql', label: 'M3QL' },
-];
-
 interface TimeseriesQueryConfig {
   queryLanguage: string;
   query: string;
@@ -251,6 +248,9 @@ const TimeseriesQueryPage = () => {
     timeout: 60000,
   });
 
+  const [supportedLanguages, setSupportedLanguages] = useState<Array<string>>([]);
+  const [languagesLoading, setLanguagesLoading] = useState(true);
+
   const [rawOutput, setRawOutput] = useState<string>('');
   const [rawData, setRawData] = useState<TimeseriesQueryResponse | null>(null);
   const [chartSeries, setChartSeries] = useState<ChartSeries[]>([]);
@@ -262,6 +262,25 @@ const TimeseriesQueryPage = () => {
   const [viewType, setViewType] = useState<'json' | 'chart'>('chart');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
 
+
+  // Fetch supported languages from controller configuration
+  useEffect(() => {
+    const fetchLanguages = async () => {
+      try {
+        setLanguagesLoading(true);
+        const response = await getTimeSeriesLanguages();
+        const languages = response.data || [];
+
+        setSupportedLanguages(languages);
+      } catch (error) {
+        console.error('Error fetching timeseries languages:', error);
+        setSupportedLanguages([]);
+      } finally {
+        setLanguagesLoading(false);
+      }
+    };
+    fetchLanguages();
+  }, []);
 
   // Update config when URL parameters change
   useEffect(() => {
@@ -335,6 +354,14 @@ const TimeseriesQueryPage = () => {
     setRawData(parsedData);
     setRawOutput(JSON.stringify(parsedData, null, 2));
 
+    // Check if this is an error response
+    if (parsedData.error != null && parsedData.error !== '') {
+      setError(parsedData.error);
+      setChartSeries([]);
+      setTruncatedChartSeries([]);
+      return;
+    }
+
     // Parse timeseries data for chart and stats
     if (isPrometheusFormat(parsedData)) {
       const series = parseTimeseriesResponse(parsedData);
@@ -401,6 +428,15 @@ const TimeseriesQueryPage = () => {
 
   return (
     <Grid container>
+      {/* Banner for no enabled languages */}
+      {!languagesLoading && supportedLanguages.length === 0 && (
+        <Grid item xs={12}>
+          <Alert severity="warning" style={{ marginBottom: '16px' }}>
+            <strong>No timeseries languages enabled.</strong> Please configure timeseries languages in your controller, broker and server configurations using the <code>pinot.timeseries.languages</code> property.
+          </Alert>
+        </Grid>
+      )}
+
       <Grid item xs={12} className={classes.rightPanel}>
         <Resizable
           defaultSize={{ width: '100%', height: 148 }}
@@ -425,6 +461,7 @@ const TimeseriesQueryPage = () => {
                 lineWrapping: true,
                 indentWithTabs: true,
                 smartIndent: true,
+                readOnly: supportedLanguages.length === 0,
               }}
               className={classes.codeMirror}
               autoCursor={false}
@@ -440,10 +477,11 @@ const TimeseriesQueryPage = () => {
               <Select
                 value={config.queryLanguage}
                 onChange={(e) => handleConfigChange('queryLanguage', e.target.value as string)}
+                disabled={languagesLoading || supportedLanguages.length === 0}
               >
-                {SUPPORTED_QUERY_LANGUAGES.map((lang) => (
-                  <MenuItem key={lang.value} value={lang.value}>
-                    {lang.label}
+                {supportedLanguages.map((lang) => (
+                  <MenuItem key={lang} value={lang}>
+                    {lang}
                   </MenuItem>
                 ))}
               </Select>
@@ -458,6 +496,7 @@ const TimeseriesQueryPage = () => {
                 value={config.startTime}
                 onChange={(e) => handleConfigChange('startTime', e.target.value as string)}
                 placeholder={getOneMinuteAgoTimestamp()}
+                disabled={supportedLanguages.length === 0}
               />
             </FormControl>
           </Grid>
@@ -470,6 +509,7 @@ const TimeseriesQueryPage = () => {
                 value={config.endTime}
                 onChange={(e) => handleConfigChange('endTime', e.target.value as string)}
                 placeholder={getCurrentTimestamp()}
+                disabled={supportedLanguages.length === 0}
               />
             </FormControl>
           </Grid>
@@ -481,6 +521,7 @@ const TimeseriesQueryPage = () => {
                 type="text"
                 value={config.timeout}
                 onChange={(e) => handleConfigChange('timeout', parseInt(e.target.value as string) || 60000)}
+                disabled={supportedLanguages.length === 0}
               />
             </FormControl>
           </Grid>
@@ -490,19 +531,13 @@ const TimeseriesQueryPage = () => {
               variant="contained"
               color="primary"
               onClick={handleExecuteQuery}
-              disabled={isLoading || !config.query.trim()}
+              disabled={isLoading || !config.query.trim() || supportedLanguages.length === 0}
               endIcon={<span style={{fontSize: '0.8em', lineHeight: 1}}>{navigator.platform.includes('Mac') ? '⌘↵' : 'Ctrl+↵'}</span>}
             >
               {isLoading ? 'Running Query...' : 'Run Query'}
             </Button>
           </Grid>
         </Grid>
-
-        {error && (
-          <Alert severity="error" className={classes.sqlError}>
-            {error}
-          </Alert>
-        )}
 
         {rawOutput && (
           <Grid item xs style={{ backgroundColor: 'white' }}>
@@ -514,6 +549,12 @@ const TimeseriesQueryPage = () => {
                copyMsg={copyMsg}
                classes={classes}
              />
+
+              {error && (
+                <Alert severity="error" className={classes.sqlError}>
+                  {error}
+                </Alert>
+              )}
 
                                     {viewType === 'chart' && (
               <SimpleAccordion

@@ -37,21 +37,21 @@ import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.rules.ImmutableTableOptions;
 import org.apache.pinot.calcite.rel.rules.TableOptions;
 import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.core.routing.LogicalTableRouteInfo;
+import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.TableRouteInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.physical.DispatchablePlanContext;
 import org.apache.pinot.query.planner.physical.DispatchablePlanMetadata;
 import org.apache.pinot.query.planner.plannode.MailboxSendNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
-import org.apache.pinot.query.routing.table.LogicalTableRouteInfo;
-import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -472,8 +472,8 @@ public class WorkerManager {
       String tableType = routingEntry.getKey();
       RoutingTable routingTable = routingEntry.getValue();
       // for each server instance, attach all table types and their associated segment list.
-      Map<ServerInstance, ServerRouteInfo> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
-      for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
+      Map<ServerInstance, SegmentsToQuery> segmentsMap = routingTable.getServerInstanceToSegmentsMap();
+      for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : segmentsMap.entrySet()) {
         Map<String, List<String>> tableTypeToSegmentListMap =
             serverInstanceToSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
         // TODO: support optional segments for multi-stage engine.
@@ -656,9 +656,9 @@ public class WorkerManager {
   }
 
   private static void transferToServerInstanceLogicalSegmentsMap(String physicalTableName,
-      Map<ServerInstance, ServerRouteInfo> segmentsMap,
+      Map<ServerInstance, SegmentsToQuery> segmentsMap,
       Map<ServerInstance, Map<String, List<String>>> serverInstanceToLogicalSegmentsMap) {
-    for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : segmentsMap.entrySet()) {
+    for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : segmentsMap.entrySet()) {
       Map<String, List<String>> tableNameToSegmentsMap =
           serverInstanceToLogicalSegmentsMap.computeIfAbsent(serverEntry.getKey(), k -> new HashMap<>());
       // TODO: support optional segments for multi-stage engine.

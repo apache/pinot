@@ -42,7 +42,6 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -53,6 +52,8 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -76,7 +77,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
   protected final PinotConfiguration _config;
   protected final String _brokerId;
-  protected final BrokerRoutingManager _routingManager;
+  protected final RoutingManager _routingManager;
   protected final AccessControlFactory _accessControlFactory;
   protected final QueryQuotaManager _queryQuotaManager;
   protected final TableCache _tableCache;
@@ -89,6 +90,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected final QueryLogger _queryLogger;
   @Nullable
   protected final String _enableNullHandling;
+  protected final ThreadResourceUsageAccountant _resourceUsageAccountant;
+
   /**
    * Maps broker-generated query id to the query string.
    */
@@ -98,8 +101,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   protected final Map<Long, String> _clientQueryIds;
 
-  public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
-      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache) {
+  public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadResourceUsageAccountant resourceUsageAccountant) {
     _config = config;
     _brokerId = brokerId;
     _routingManager = routingManager;
@@ -125,6 +129,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _queriesById = null;
       _clientQueryIds = null;
     }
+    _resourceUsageAccountant = resourceUsageAccountant;
   }
 
   @Override

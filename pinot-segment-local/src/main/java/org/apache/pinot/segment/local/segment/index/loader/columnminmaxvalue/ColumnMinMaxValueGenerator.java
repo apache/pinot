@@ -204,7 +204,8 @@ public class ColumnMinMaxValueGenerator {
     DataType storedType = dataType.getStoredType();
     boolean isSingleValue = columnMetadata.isSingleValue();
     PinotDataBuffer rawIndexBuffer = _segmentWriter.getIndexFor(columnName, StandardIndexes.forward());
-    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(rawIndexBuffer, storedType,
+    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
+        .createRawIndexReader(rawIndexBuffer, storedType,
         isSingleValue); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       int numDocs = columnMetadata.getTotalDocs();
       Object minValue;
