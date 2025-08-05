@@ -208,10 +208,10 @@ const HomePage = () => {
       </Grid>
       <Box mb={3} />
       <TenantsListing />
-      <Instances 
-        liveInstanceNames={liveInstanceNames} 
-        instances={instances} 
-        clusterName={clusterName} 
+      <Instances
+        liveInstanceNames={liveInstanceNames}
+        instances={instances}
+        clusterName={clusterName}
       />
       {taskTypesTable}
       <ClusterConfig />

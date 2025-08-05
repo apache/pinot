@@ -124,7 +124,7 @@ export default function AddTableComponent({
             onChange={(e)=> changeHandler('tableName', e.target.value)}
           />
         </FormControl>
-        
+
         <FormControl className={classes.selectFormControl}>
           <InputLabel htmlFor="tableType">Table Type {requiredAstrix}</InputLabel>
           <Select

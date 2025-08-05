@@ -33,6 +33,7 @@ import {
 import Loading from '../components/Loading';
 import moment from "moment";
 import {RebalanceServerOption} from "../components/Homepage/Operations/RebalanceServer/RebalanceServerOptions";
+import { formatTimeInTimezone } from './TimezoneUtils';
 
 const getRebalanceConfigValue = (
     rebalanceConfig: { [optionName: string]: string | boolean | number },
@@ -434,7 +435,7 @@ export const getDisplaySegmentStatus = (idealState, externalView): DISPLAY_SEGME
     return DISPLAY_SEGMENT_STATUS.UPDATING;
   }
 
-  // does not match any condition -> assume PARTIAL state as we are waiting for segments to converge 
+  // does not match any condition -> assume PARTIAL state as we are waiting for segments to converge
   return DISPLAY_SEGMENT_STATUS.UPDATING;
 }
 
@@ -476,7 +477,7 @@ const getLoadingTableData = (columns: string[]): TableData => {
 }
 
 const formatTime = (time: number, format?: string): string => {
-  return moment(time).format(format ?? "MMMM Do YYYY, HH:mm:ss")
+  return formatTimeInTimezone(time, format);
 }
 
 export default {
