@@ -1735,4 +1735,11 @@ public final class TableConfigUtils {
     }
     return relevantTags;
   }
+
+  public static boolean isRelevantToTenant(TableConfig tableConfig, String tenantName) {
+    Set<String> relevantTenants =
+        getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(
+            Collectors.toSet());
+    return relevantTenants.contains(tenantName);
+  }
 }
