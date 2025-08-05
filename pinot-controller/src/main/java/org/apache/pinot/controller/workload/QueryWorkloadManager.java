@@ -197,7 +197,7 @@ public class QueryWorkloadManager {
 
   private Set<String> resolveInstances(NodeConfig nodeConfig) {
     PropagationScheme propagationScheme =
-            _propagationSchemeProvider.getPropagationScheme(nodeConfig.getPropagationScheme().getPropagationType());
+        _propagationSchemeProvider.getPropagationScheme(nodeConfig.getPropagationScheme().getPropagationType());
     return propagationScheme.resolveInstances(nodeConfig);
   }
 }

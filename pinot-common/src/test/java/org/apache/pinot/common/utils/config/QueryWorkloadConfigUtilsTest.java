@@ -58,13 +58,13 @@ public class QueryWorkloadConfigUtilsTest {
 
     // Server node
     PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
-        List.of("value1", "value2"));
+        List.of("value1", "value2"), null);
     NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
         serverPropagationScheme);
 
     // Broker node
     PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
-        List.of("value3", "value4"));
+        List.of("value3", "value4"), null);
     NodeConfig brokerNodeConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, validEnforcementProfile,
         brokerPropagationScheme);
 
@@ -126,12 +126,12 @@ public class QueryWorkloadConfigUtilsTest {
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
     // Server scheme
     PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
-        List.of("value1", "value2"));
+        List.of("value1", "value2"), null);
     NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
         serverPropagationScheme);
     // Broker scheme
     PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
-        List.of("value3", "value4"));
+        List.of("value3", "value4"), null);
     NodeConfig brokerNodeConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, validEnforcementProfile,
         brokerPropagationScheme);
     List<NodeConfig> nodeConfigs = List.of(serverNodeConfig, brokerNodeConfig);

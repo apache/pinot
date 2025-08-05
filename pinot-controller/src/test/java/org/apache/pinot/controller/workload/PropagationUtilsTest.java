@@ -150,14 +150,14 @@ public class PropagationUtilsTest {
     public void getQueryWorkloadConfigsForTagsTest() {
         // Create a list of query workload configurations
         QueryWorkloadConfig workloadConfig1 = createQueryWorkloadConfig("workload1",
-            new PropagationScheme(PropagationScheme.Type.TABLE, List.of("table1", "table2")),
-            new PropagationScheme(PropagationScheme.Type.TABLE, List.of("table1", "table2")));
+            new PropagationScheme(PropagationScheme.Type.TABLE, List.of("table1", "table2"), null),
+            new PropagationScheme(PropagationScheme.Type.TABLE, List.of("table1", "table2"), null));
         QueryWorkloadConfig workloadConfig2 = createQueryWorkloadConfig("workload2",
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("serverTag1")),
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("brokerTenant1_BROKER")));
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("serverTag1"), null),
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("brokerTenant1_BROKER"), null));
         QueryWorkloadConfig workloadConfig3 = createQueryWorkloadConfig("workload3",
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("serverTag2_REALTIME")),
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("brokerTenant2")));
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("serverTag2_REALTIME"), null),
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("brokerTenant2"), null));
         List<QueryWorkloadConfig> queryWorkloadConfigs = List.of(workloadConfig1, workloadConfig2, workloadConfig3);
         // Create TableConfig for the workload
         List<TableConfig> tableConfigs = List.of(
