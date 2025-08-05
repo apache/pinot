@@ -187,10 +187,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
         continue;
       }
-      Set<String> relevantTenants =
-          TableConfigUtils.getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(
-              Collectors.toSet());
-      if (relevantTenants.contains(tenantName)) {
+      if (TableConfigUtils.isRelevantToTenant(tableConfig, tenantName)) {
         tables.add(table);
       }
     }

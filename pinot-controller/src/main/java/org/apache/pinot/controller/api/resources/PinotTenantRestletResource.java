@@ -409,11 +409,7 @@ public class PinotTenantRestletResource {
         LOGGER.error("Unable to retrieve table config for table: {}", tableNameWithType);
         continue;
       }
-      Set<String> relevantTenants = TableConfigUtils.getRelevantTags(tableConfig)
-          .stream()
-          .map(TagNameUtils::getTenantFromTag)
-          .collect(Collectors.toSet());
-      if (relevantTenants.contains(tenantName)) {
+      if (TableConfigUtils.isRelevantToTenant(tableConfig, tenantName)) {
         tables.add(tableNameWithType);
         if (withTableProperties) {
           IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);
