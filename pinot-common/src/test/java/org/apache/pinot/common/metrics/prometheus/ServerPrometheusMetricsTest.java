@@ -53,7 +53,7 @@ public abstract class ServerPrometheusMetricsTest extends PinotPrometheusMetrics
           ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS);
 
   private static final List<ServerGauge> GAUGES_ACCEPTING_PARTITION =
-      List.of(ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT,
+      List.of(ServerGauge.UPSERT_SNAPSHOT_COUNT, ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT,
           ServerGauge.REALTIME_INGESTION_OFFSET_LAG, ServerGauge.REALTIME_INGESTION_DELAY_MS,
           ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
           ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET,

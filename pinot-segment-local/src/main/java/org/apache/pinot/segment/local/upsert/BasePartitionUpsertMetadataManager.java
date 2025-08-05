@@ -359,6 +359,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     long startTimeMs = System.currentTimeMillis();
     if (!_enableSnapshot) {
       segment.deleteValidDocIdsSnapshot();
+      segment.deleteQueryableDocIdsSnapshot();
     }
     try (UpsertUtils.RecordInfoReader recordInfoReader = new UpsertUtils.RecordInfoReader(segment, _primaryKeyColumns,
         _comparisonColumns, _deleteRecordColumn)) {
@@ -848,16 +849,20 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doTakeSnapshot() {
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
+    long numQueryableKeysInSnapshot = 0L;
     _logger.info("Taking snapshot for {} segments", numTrackedSegments);
     long startTimeMs = System.currentTimeMillis();
 
     int numImmutableSegments = 0;
     int numConsumingSegments = 0;
     int numUnchangedSegments = 0;
-    // The segments without validDocIds snapshots should take their snapshots at last. So that when there is failure
+    // The segments without validDocIds & queryable docId snapshots should take their snapshots at last. So that when there is failure
     // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
     // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
+    // We wouldn't be using queryableDocIds anywhere currently during preload - storing them so we could better extend the functionality
+    // Best case scenario, if both validDocs and queryableDocs are not persisted, we will be considering that segment is
+    // not storing updated bitmap copies on disk
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     TableDataManager tableDataManager = _context.getTableDataManager();
     Preconditions.checkNotNull(tableDataManager, "Taking snapshot requires tableDataManager");
@@ -886,21 +891,28 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // already acquired the snapshot WLock when reaching here, and if it has to wait for segmentLock, it may
         // enter deadlock with the Helix task threads waiting for snapshot RLock.
         // If we can't get the segmentLock, we'd better skip taking snapshot for this tracked segment, because its
-        // validDocIds might become stale or wrong when the segment is being processed by another thread right now.
+        // validDocIds/queryableDocIds might become stale or wrong when the segment is being processed by another thread right now.
         _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
         isSegmentSkipped = true;
         continue;
       }
       try {
         ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-        if (!immutableSegment.hasValidDocIdsSnapshotFile()) {
+        if (!immutableSegment.hasValidDocIdsSnapshotFile() && (_deleteRecordColumn != null && !immutableSegment.hasQueryableDocIdsSnapshotFile())) {
           segmentsWithoutSnapshot.add(immutableSegment);
           continue;
         }
         immutableSegment.persistValidDocIdsSnapshot();
+        if (_deleteRecordColumn != null) {
+          immutableSegment.persistQueryableDocIdsSnapshot();
+        }
         _updatedSegmentsSinceLastSnapshot.remove(segment);
         numImmutableSegments++;
         numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+        if (_deleteRecordColumn != null) {
+          numQueryableKeysInSnapshot +=
+              immutableSegment.getQueryableDocIds().getMutableRoaringBitmap().getCardinality();
+        }
       } catch (Exception e) {
         _logger.warn("Caught exception while taking snapshot for segment: {}, skipping", segmentName, e);
         isSegmentSkipped = true;
@@ -909,7 +921,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
     // If we have skipped any segments in the previous for-loop, we should skip the next for-loop, basically to not
-    // add new snapshot files on disk. This ensures all the validDocIds snapshots kept on disk are still disjoint
+    // add new snapshot files on disk. This ensures all the validDocIds & queryable docIds snapshots kept on disk are still disjoint
     // with each other, although some of them may have become stale, i.e. tracking more valid docs than expected.
     if (!isSegmentSkipped) {
       for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
@@ -923,9 +935,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         }
         try {
           segment.persistValidDocIdsSnapshot();
+          if (_deleteRecordColumn != null) {
+            segment.persistQueryableDocIdsSnapshot();
+          }
           _updatedSegmentsSinceLastSnapshot.remove(segment);
           numImmutableSegments++;
           numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+          if (_deleteRecordColumn != null) {
+            numQueryableKeysInSnapshot += segment.getQueryableDocIds().getMutableRoaringBitmap().getCardinality();
+          }
         } catch (Exception e) {
           _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
         } finally {
@@ -941,18 +959,26 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
-        ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
+        ServerGauge.UPSERT_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
+    if (_deleteRecordColumn != null) {
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
+          ServerGauge.UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT, numQueryableKeysInSnapshot);
+    }
     int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments - numUnchangedSegments;
     if (numMissedSegments > 0) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
-          ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
+          ServerMeter.UPSERT_MISSED_SNAPSHOT_COUNT, numMissedSegments);
       _logger.warn("Missed taking snapshot for {} immutable segments", numMissedSegments);
     }
     _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
             + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
         numConsumingSegments, System.currentTimeMillis() - startTimeMs);
+  }
+
+  protected void deleteSnapshot(ImmutableSegmentImpl segment) {
+    segment.deleteValidDocIdsSnapshot();
   }
 
   protected File getWatermarkFile() {
