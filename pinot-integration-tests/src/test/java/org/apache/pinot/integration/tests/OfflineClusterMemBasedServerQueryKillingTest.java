@@ -109,7 +109,8 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
    */
   public static class TestAccountantFactory extends PerQueryCPUMemAccountantFactory {
     @Override
-    public PerQueryCPUMemResourceUsageAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+    public PerQueryCPUMemResourceUsageAccountant init(PinotConfiguration config, String instanceId,
+        InstanceType instanceType) {
       return new TestAccountant(config, instanceId, instanceType);
     }
 
