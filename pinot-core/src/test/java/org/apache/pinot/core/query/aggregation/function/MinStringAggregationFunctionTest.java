@@ -19,16 +19,26 @@
 package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.queries.FluentQueryTest;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.testng.annotations.Test;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 
 public class MinStringAggregationFunctionTest extends AbstractAggregationFunctionTest {
@@ -46,6 +56,45 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
                 .setEnableColumnBasedNullHandling(enableColumnBasedNullHandling)
                 .addSingleValueDimension("myField", FieldSpec.DataType.STRING)
                 .build(), SINGLE_FIELD_TABLE_CONFIG);
+  }
+
+  @Test
+  public void testNumericColumnException() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+        false);
+
+    AggregationResultHolder resultHolder = function.createAggregationResultHolder();
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    blockValSetMap.put(expression, mockBlockValSet);
+
+    // Test exception in aggregate method
+    try {
+      function.aggregate(10, resultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute MINSTRING for numeric column"));
+    }
+
+    // Test exception in aggregateGroupBySV method
+    try {
+      function.aggregateGroupBySV(10, new int[10], groupByResultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute MINSTRING for numeric column"));
+    }
+
+    // Test exception in aggregateGroupByMV method
+    try {
+      function.aggregateGroupByMV(10, new int[10][], groupByResultHolder, blockValSetMap);
+      fail("Should throw BadQueryRequestException");
+    } catch (BadQueryRequestException e) {
+      assertTrue(e.getMessage().contains("Cannot compute MINSTRING for numeric column"));
+    }
   }
 
   @Test
