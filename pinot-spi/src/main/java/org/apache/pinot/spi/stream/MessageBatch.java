@@ -99,39 +99,4 @@ public interface MessageBatch<T> {
   default long getSizeInBytes() {
     return -1;
   }
-
-  @Deprecated
-  default T getMessageAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default byte[] getMessageBytesAtIndex(int index) {
-    return (byte[]) getMessageAtIndex(index);
-  }
-
-  @Deprecated
-  default int getMessageLengthAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default int getMessageOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default RowMetadata getMetadataAtIndex(int index) {
-    return null;
-  }
-
-  @Deprecated
-  default long getNextStreamMessageOffsetAtIndex(int index) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Deprecated
-  default StreamPartitionMsgOffset getNextStreamPartitionMsgOffsetAtIndex(int index) {
-    return new LongMsgOffset(getNextStreamMessageOffsetAtIndex(index));
-  }
 }
