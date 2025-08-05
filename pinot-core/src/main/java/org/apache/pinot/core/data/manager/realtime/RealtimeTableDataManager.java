@@ -143,7 +143,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   private IngestionDelayTracker _ingestionDelayTracker;
 
   private TableDedupMetadataManager _tableDedupMetadataManager;
-  private TableUpsertMetadataManager _tableUpsertMetadataManager;
   private BooleanSupplier _isTableReadyToConsumeData;
   private boolean _enforceConsumptionInOrder = false;
 
@@ -207,15 +206,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     TableConfig tableConfig = tableConfigAndSchema.getLeft();
     Schema schema = tableConfigAndSchema.getRight();
     if (tableConfig.isDedupEnabled()) {
+      Preconditions.checkState(_tableUpsertMetadataManager == null,
+          "Dedup and upsert cannot be both enabled for table: %s", _tableNameWithType);
       _tableDedupMetadataManager =
           TableDedupMetadataManagerFactory.create(_instanceDataManagerConfig.getDedupConfig(), tableConfig, schema,
-              this, _segmentOperationsThrottler);
-    }
-    if (tableConfig.isUpsertEnabled()) {
-      Preconditions.checkState(_tableDedupMetadataManager == null,
-          "Dedup and upsert cannot be both enabled for table: %s", _tableNameWithType);
-      _tableUpsertMetadataManager =
-          TableUpsertMetadataManagerFactory.create(_instanceDataManagerConfig.getUpsertConfig(), tableConfig, schema,
               this, _segmentOperationsThrottler);
     }
 
@@ -398,9 +392,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return _tableDedupMetadataManager != null;
   }
 
-  public boolean isUpsertEnabled() {
-    return _tableUpsertMetadataManager != null;
-  }
 
   public boolean isPartialUpsertEnabled() {
     return _tableUpsertMetadataManager != null
@@ -729,77 +720,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     }
   }
 
-  private void handleUpsert(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
-    String segmentName = immutableSegment.getSegmentName();
-    _logger.info("Adding immutable segment: {} with upsert enabled", segmentName);
-
-    // Set the ZK creation time so that same creation time can be used to break the comparison ties across replicas,
-    // to ensure data consistency of replica.
-    setZkCreationTimeIfAvailable(immutableSegment, zkMetadata);
-
-    Integer partitionId = SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
-    Preconditions.checkNotNull(partitionId, "Failed to get partition id for segment: " + segmentName
-        + " (upsert-enabled table: " + _tableNameWithType + ")");
-    PartitionUpsertMetadataManager partitionUpsertMetadataManager =
-        _tableUpsertMetadataManager.getOrCreatePartitionManager(partitionId);
-
-    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.DOCUMENT_COUNT,
-        immutableSegment.getSegmentMetadata().getTotalDocs());
-    _serverMetrics.addValueToTableGauge(_tableNameWithType, ServerGauge.SEGMENT_COUNT, 1L);
-    ImmutableSegmentDataManager newSegmentManager = new ImmutableSegmentDataManager(immutableSegment);
-    if (partitionUpsertMetadataManager.isPreloading()) {
-      // Register segment after it is preloaded and has initialized its validDocIds. The order of preloading and
-      // registering segment doesn't matter much as preloading happens before table partition is ready for queries.
-      partitionUpsertMetadataManager.preloadSegment(immutableSegment);
-      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
-      _logger.info("Preloaded immutable segment: {} with upsert enabled", segmentName);
-      return;
-    }
-    SegmentDataManager oldSegmentManager = _segmentDataManagerMap.get(segmentName);
-    if (oldSegmentManager == null) {
-      // When adding a new segment, we should register it 'before' it is fully initialized by
-      // partitionUpsertMetadataManager. Because when processing docs in the new segment, the docs in the other
-      // segments may be invalidated, making the queries see less valid docs than expected. We should let query
-      // access the new segment asap even though its validDocId bitmap is still being filled by
-      // partitionUpsertMetadataManager.
-      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
-      partitionUpsertMetadataManager.trackNewlyAddedSegment(segmentName);
-      partitionUpsertMetadataManager.addSegment(immutableSegment);
-      _logger.info("Added new immutable segment: {} with upsert enabled", segmentName);
-    } else {
-      replaceUpsertSegment(segmentName, oldSegmentManager, newSegmentManager, partitionUpsertMetadataManager);
-    }
-  }
-
-  private void replaceUpsertSegment(String segmentName, SegmentDataManager oldSegmentManager,
-      ImmutableSegmentDataManager newSegmentManager, PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
-    // When replacing a segment, we should register the new segment 'after' it is fully initialized by
-    // partitionUpsertMetadataManager to fill up its validDocId bitmap. Otherwise, the queries will lose the access
-    // to the valid docs in the old segment immediately, but the validDocId bitmap of the new segment is still
-    // being filled by partitionUpsertMetadataManager, making the queries see less valid docs than expected.
-    IndexSegment oldSegment = oldSegmentManager.getSegment();
-    ImmutableSegment immutableSegment = newSegmentManager.getSegment();
-    UpsertConfig.ConsistencyMode consistencyMode = _tableUpsertMetadataManager.getContext().getConsistencyMode();
-    if (consistencyMode == UpsertConfig.ConsistencyMode.NONE) {
-      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
-      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
-    } else {
-      // By default, when replacing a segment, the old segment is kept intact and visible to query until the new
-      // segment is registered as in the if-branch above. But the newly ingested records will invalidate valid
-      // docs in the new segment as the upsert metadata gets updated during replacement, so the query will miss the
-      // new updates in the new segment, until it's registered after the replacement is done.
-      // For consistent data view, we make both old and new segment visible to the query and update both in place
-      // when segment replacement and new data ingestion are happening in parallel.
-      SegmentDataManager duoSegmentDataManager = new DuoSegmentDataManager(newSegmentManager, oldSegmentManager);
-      registerSegment(segmentName, duoSegmentDataManager, partitionUpsertMetadataManager);
-      partitionUpsertMetadataManager.replaceSegment(immutableSegment, oldSegment);
-      registerSegment(segmentName, newSegmentManager, partitionUpsertMetadataManager);
-    }
-    _logger.info("Replaced {} segment: {} with upsert enabled and consistency mode: {}",
-        oldSegment instanceof ImmutableSegment ? "immutable" : "mutable", segmentName, consistencyMode);
-    oldSegmentManager.offload();
-    releaseSegment(oldSegmentManager);
-  }
 
   private void registerSegment(String segmentName, SegmentDataManager segmentDataManager,
       @Nullable PartitionUpsertMetadataManager partitionUpsertMetadataManager) {
@@ -811,21 +731,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     registerSegment(segmentName, segmentDataManager);
   }
 
-  /**
-   * Sets the ZK creation time in the segment metadata if available, to ensure consistent
-   * creation times across replicas for upsert operations.
-   */
-  private void setZkCreationTimeIfAvailable(ImmutableSegment segment, @Nullable SegmentZKMetadata zkMetadata) {
-    if (zkMetadata != null && zkMetadata.getCreationTime() > 0) {
-      SegmentMetadata segmentMetadata = segment.getSegmentMetadata();
-      if (segmentMetadata instanceof SegmentMetadataImpl) {
-        SegmentMetadataImpl segmentMetadataImpl = (SegmentMetadataImpl) segmentMetadata;
-        segmentMetadataImpl.setZkCreationTime(zkMetadata.getCreationTime());
-        _logger.info("Set ZK creation time {} for segment: {} in upsert table", zkMetadata.getCreationTime(),
-            zkMetadata.getSegmentName());
-      }
-    }
-  }
 
   /**
    * Replaces the CONSUMING segment with a downloaded committed one.

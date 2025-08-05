@@ -18,11 +18,18 @@
  */
 package org.apache.pinot.core.data.manager.offline;
 
+import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
+import org.apache.pinot.segment.local.upsert.TableUpsertMetadataManagerFactory;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.Schema;
 
 
 /**
@@ -33,6 +40,17 @@ public class OfflineTableDataManager extends BaseTableDataManager {
 
   @Override
   protected void doInit() {
+    // Set up dedup/upsert metadata manager
+    // NOTE: Dedup/upsert has to be set up when starting the server. Changing the table config without restarting the
+    //       server won't enable/disable them on the fly.
+    Pair<TableConfig, Schema> tableConfigAndSchema = getCachedTableConfigAndSchema();
+    TableConfig tableConfig = tableConfigAndSchema.getLeft();
+    Schema schema = tableConfigAndSchema.getRight();
+    if (tableConfig.isUpsertEnabled()) {
+      _tableUpsertMetadataManager =
+          TableUpsertMetadataManagerFactory.create(_instanceDataManagerConfig.getUpsertConfig(), tableConfig, schema,
+              this, _segmentOperationsThrottler);
+    }
   }
 
   @Override
@@ -42,6 +60,15 @@ public class OfflineTableDataManager extends BaseTableDataManager {
   @Override
   protected void doShutdown() {
     releaseAndRemoveAllSegments();
+  }
+
+  @Override
+  public void addSegment(ImmutableSegment immutableSegment, @Nullable SegmentZKMetadata zkMetadata) {
+    if (isUpsertEnabled()) {
+      handleUpsert(immutableSegment, zkMetadata);
+      return;
+    }
+    super.addSegment(immutableSegment, zkMetadata);
   }
 
   protected void doAddOnlineSegment(String segmentName)
