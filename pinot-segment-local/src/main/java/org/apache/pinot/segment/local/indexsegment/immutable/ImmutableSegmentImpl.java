@@ -222,7 +222,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public void persistQueryableDocIdsSnapshot() {
     File queryableDocIdsSnapshotFile = getQueryableDocIdsSnapshotFile();
     try {
-      File tmpFile = new File(SegmentDirectoryPaths.findSegmentDirectory(getSegmentMetadata().getIndexDir()),
+      File tmpFile = new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
           V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp");
       if (tmpFile.exists()) {
         LOGGER.warn("Previous queryableDocIds snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
