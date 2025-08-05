@@ -518,7 +518,7 @@ public class RecordTransformerTest {
 
     // Get the list of transformers.
     List<RecordTransformer> transformers = RecordTransformerUtils.getDefaultTransformers(tableConfig, schema);
-    assertEquals(transformers.size(), 8);
+    assertEquals(transformers.size(), 9);
     assertTrue(transformers.get(0) instanceof ExpressionTransformer);
     assertTrue(transformers.get(1) instanceof FilterTransformer);
     assertTrue(transformers.get(2) instanceof SchemaConformingTransformer);
@@ -527,6 +527,7 @@ public class RecordTransformerTest {
     assertTrue(transformers.get(5) instanceof SpecialValueTransformer);
     assertTrue(transformers.get(6) instanceof NullValueTransformer);
     assertTrue(transformers.get(7) instanceof SanitizationTransformer);
+    assertTrue(transformers.get(8) instanceof SchemaColumnConformingTransformer);
   }
 
   @Test
