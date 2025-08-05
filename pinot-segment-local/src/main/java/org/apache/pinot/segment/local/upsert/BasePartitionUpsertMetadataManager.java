@@ -855,11 +855,13 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     int numImmutableSegments = 0;
     int numConsumingSegments = 0;
     int numUnchangedSegments = 0;
-    // The segments without validDocIds & queryable docId snapshots should take their snapshots at last. So that when there is failure
+    // The segments without validDocIds & queryable docId snapshots should take their snapshots at last. So that when
+    // there is failure
     // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
     // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
     // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
-    // We wouldn't be using queryableDocIds anywhere currently during preload - storing them so we could better extend the functionality
+    // We wouldn't be using queryableDocIds anywhere currently during preload - storing them so we could better
+    // extend the functionality
     // Best case scenario, if both validDocs and queryableDocs are not persisted, we will be considering that segment is
     // not storing updated bitmap copies on disk
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
@@ -890,14 +892,16 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         // already acquired the snapshot WLock when reaching here, and if it has to wait for segmentLock, it may
         // enter deadlock with the Helix task threads waiting for snapshot RLock.
         // If we can't get the segmentLock, we'd better skip taking snapshot for this tracked segment, because its
-        // validDocIds/queryableDocIds might become stale or wrong when the segment is being processed by another thread right now.
+        // validDocIds/queryableDocIds might become stale or wrong when the segment is being processed by another
+        // thread right now.
         _logger.warn("Could not get segmentLock to take snapshot for segment: {}, skipping", segmentName);
         isSegmentSkipped = true;
         continue;
       }
       try {
         ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-        if (!immutableSegment.hasValidDocIdsSnapshotFile() && (_deleteRecordColumn != null && !immutableSegment.hasQueryableDocIdsSnapshotFile())) {
+        if (!immutableSegment.hasValidDocIdsSnapshotFile() && (_deleteRecordColumn != null
+            && !immutableSegment.hasQueryableDocIdsSnapshotFile())) {
           segmentsWithoutSnapshot.add(immutableSegment);
           continue;
         }
@@ -920,7 +924,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
     }
     // If we have skipped any segments in the previous for-loop, we should skip the next for-loop, basically to not
-    // add new snapshot files on disk. This ensures all the validDocIds & queryable docIds snapshots kept on disk are still disjoint
+    // add new snapshot files on disk. This ensures all the validDocIds & queryable docIds snapshots kept on disk are
+    // still disjoint
     // with each other, although some of them may have become stale, i.e. tracking more valid docs than expected.
     if (!isSegmentSkipped) {
       for (ImmutableSegmentImpl segment : segmentsWithoutSnapshot) {
@@ -957,8 +962,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (isTTLEnabled()) {
       WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
     }
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
-        ServerGauge.UPSERT_SNAPSHOT_COUNT, numImmutableSegments);
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_SNAPSHOT_COUNT,
+        numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
     if (_deleteRecordColumn != null) {
