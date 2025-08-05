@@ -42,7 +42,7 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
     if (rawValue instanceof byte[]) {
       return deserializeAggregatedValue((byte[]) rawValue);
     } else {
-      return new AvgPair(((Number) rawValue).doubleValue(), 1L);
+      return new AvgPair(ValueAggregatorUtils.toDouble(rawValue), 1L);
     }
   }
 
@@ -51,7 +51,7 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
     if (rawValue instanceof byte[]) {
       value.apply(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      value.apply(((Number) rawValue).doubleValue(), 1L);
+      value.apply(ValueAggregatorUtils.toDouble(rawValue), 1L);
     }
     return value;
   }
