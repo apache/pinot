@@ -69,7 +69,7 @@ public class MinStringAggregationFunction extends NullableSingleInputAggregation
           continue;
         }
         String currentMin = aggregationResultHolder.getResult();
-        // Update the currentMax if a larger string value is found
+        // Update the currentMin if a smaller string value is found
         if (currentMin == null || value.compareTo(currentMin) < 0) {
           aggregationResultHolder.setValue(value);
         }
