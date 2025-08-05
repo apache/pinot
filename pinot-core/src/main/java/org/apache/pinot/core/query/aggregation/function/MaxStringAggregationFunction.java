@@ -30,143 +30,144 @@ import org.apache.pinot.core.query.aggregation.groupby.ObjectGroupByResultHolder
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 
+
 public class MaxStringAggregationFunction extends NullableSingleInputAggregationFunction<String, String> {
 
-    public MaxStringAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
-        super(verifySingleArgument(arguments, "MAXSTRING"), nullHandlingEnabled);
-    }
+  public MaxStringAggregationFunction(List<ExpressionContext> arguments, boolean nullHandlingEnabled) {
+    super(verifySingleArgument(arguments, "MAXSTRING"), nullHandlingEnabled);
+  }
 
-    @Override
-    public AggregationFunctionType getType() {
-        return AggregationFunctionType.MAXSTRING;
-    }
+  @Override
+  public AggregationFunctionType getType() {
+    return AggregationFunctionType.MAXSTRING;
+  }
 
-    @Override
-    public AggregationResultHolder createAggregationResultHolder() {
-        return new ObjectAggregationResultHolder();
-    }
+  @Override
+  public AggregationResultHolder createAggregationResultHolder() {
+    return new ObjectAggregationResultHolder();
+  }
 
-    @Override
-    public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
-        return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
-    }
+  @Override
+  public GroupByResultHolder createGroupByResultHolder(int initialCapacity, int maxCapacity) {
+    return new ObjectGroupByResultHolder(initialCapacity, maxCapacity);
+  }
 
-    @Override
-    public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
-                          Map<ExpressionContext, BlockValSet> blockValSetMap) {
-        BlockValSet blockValSet = blockValSetMap.get(_expression);
-        if (blockValSet.getValueType().isNumeric()) {
-            throw new BadQueryRequestException("Cannot compute MAXSTRING for numeric column: "
-                    + blockValSet.getValueType());
+  @Override
+  public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.getValueType().isNumeric()) {
+      throw new BadQueryRequestException("Cannot compute MAXSTRING for numeric column: "
+          + blockValSet.getValueType());
+    }
+    String[] stringValues = blockValSet.getStringValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        String value = stringValues[i];
+        // Ignore null and "null" string literals
+        if (value == null || "null".equals(value)) {
+          continue;
         }
-        String[] stringValues = blockValSet.getStringValuesSV();
-        forEachNotNull(length, blockValSet, (from, to) -> {
-            for (int i = from; i < to; i++) {
-                String value = stringValues[i];
-                // Ignore null and "null" string literals
-                if (value == null || "null".equals(value)) {
-                    continue;
-                }
-                String currentMax = aggregationResultHolder.getResult();
-                // Update the currentMax if a larger string value is found
-                if (currentMax == null || value.compareTo(currentMax) > 0) {
-                    aggregationResultHolder.setValue(value);
-                }
-            }
-        });
-    }
-
-    @Override
-    public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
-                                   Map<ExpressionContext, BlockValSet> blockValSetMap) {
-        BlockValSet blockValSet = blockValSetMap.get(_expression);
-        if (blockValSet.getValueType().isNumeric()) {
-            throw new BadQueryRequestException("Cannot compute MAXSTRING for numeric column: "
-                    + blockValSet.getValueType());
+        String currentMax = aggregationResultHolder.getResult();
+        // Update the currentMax if a larger string value is found
+        if (currentMax == null || value.compareTo(currentMax) > 0) {
+          aggregationResultHolder.setValue(value);
         }
-        String[] stringValues = blockValSet.getStringValuesSV();
-        forEachNotNull(length, blockValSet, (from, to) -> {
-            for (int i = from; i < to; i++) {
-                String value = stringValues[i];
-                // For SV, "null" as a string literal can exist and needs to be handled
-                if (value == null || "null".equals(value)) {
-                    continue;
-                }
-                int groupKey = groupKeyArray[i];
-                String currentMax = groupByResultHolder.getResult(groupKey);
-                if (currentMax == null || "null".equals(currentMax) || value.compareTo(currentMax) > 0) {
-                    groupByResultHolder.setValueForKey(groupKey, value);
-                }
-            }
-        });
-    }
+      }
+    });
+  }
 
-    @Override
-    public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
-                                   Map<ExpressionContext, BlockValSet> blockValSetMap) {
-        BlockValSet blockValSet = blockValSetMap.get(_expression);
-        if (blockValSet.getValueType().isNumeric()) {
-            throw new BadQueryRequestException("Cannot compute MAXSTRING for numeric column: "
-                    + blockValSet.getValueType());
+  @Override
+  public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.getValueType().isNumeric()) {
+      throw new BadQueryRequestException("Cannot compute MAXSTRING for numeric column: "
+          + blockValSet.getValueType());
+    }
+    String[] stringValues = blockValSet.getStringValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        String value = stringValues[i];
+        // For SV, "null" as a string literal can exist and needs to be handled
+        if (value == null || "null".equals(value)) {
+          continue;
         }
-        String[] stringValues = blockValSet.getStringValuesSV();
-        forEachNotNull(length, blockValSet, (from, to) -> {
-            for (int i = from; i < to; i++) {
-                String value = stringValues[i];
-                // For MV, "null" as a string literal can exist and needs to be handled
-                if (value == null || "null".equals(value)) {
-                    continue;
-                }
-                for (int groupKey : groupKeysArray[i]) {
-                    String currentMax = groupByResultHolder.getResult(groupKey);
-                    if (currentMax == null || "null".equals(currentMax) || value.compareTo(currentMax) > 0) {
-                        groupByResultHolder.setValueForKey(groupKey, value);
-                    }
-                }
-            }
-        });
-    }
-
-    @Override
-    public String extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-        String result = aggregationResultHolder.getResult();
-        return result != null ? result : "null";
-    }
-
-    @Override
-    public String extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-        String result = groupByResultHolder.getResult(groupKey);
-        return result != null ? result : "null";
-    }
-
-    @Override
-    public String merge(String intermediateResult1, String intermediateResult2) {
-        if (intermediateResult1 == null || "null".equals(intermediateResult1)) {
-            return intermediateResult2;
+        int groupKey = groupKeyArray[i];
+        String currentMax = groupByResultHolder.getResult(groupKey);
+        if (currentMax == null || "null".equals(currentMax) || value.compareTo(currentMax) > 0) {
+          groupByResultHolder.setValueForKey(groupKey, value);
         }
-        if (intermediateResult2 == null || "null".equals(intermediateResult2)) {
-            return intermediateResult1;
+      }
+    });
+  }
+
+  @Override
+  public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
+      Map<ExpressionContext, BlockValSet> blockValSetMap) {
+    BlockValSet blockValSet = blockValSetMap.get(_expression);
+    if (blockValSet.getValueType().isNumeric()) {
+      throw new BadQueryRequestException("Cannot compute MAXSTRING for numeric column: "
+          + blockValSet.getValueType());
+    }
+    String[] stringValues = blockValSet.getStringValuesSV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        String value = stringValues[i];
+        // For MV, "null" as a string literal can exist and needs to be handled
+        if (value == null || "null".equals(value)) {
+          continue;
         }
-        return intermediateResult1.compareTo(intermediateResult2) > 0 ? intermediateResult1 : intermediateResult2;
-    }
+        for (int groupKey : groupKeysArray[i]) {
+          String currentMax = groupByResultHolder.getResult(groupKey);
+          if (currentMax == null || "null".equals(currentMax) || value.compareTo(currentMax) > 0) {
+            groupByResultHolder.setValueForKey(groupKey, value);
+          }
+        }
+      }
+    });
+  }
 
-    @Override
-    public ColumnDataType getIntermediateResultColumnType() {
-        return ColumnDataType.STRING;
-    }
+  @Override
+  public String extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
+    String result = aggregationResultHolder.getResult();
+    return result != null ? result : "null";
+  }
 
-    @Override
-    public ColumnDataType getFinalResultColumnType() {
-        return ColumnDataType.STRING;
-    }
+  @Override
+  public String extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
+    String result = groupByResultHolder.getResult(groupKey);
+    return result != null ? result : "null";
+  }
 
-    @Override
-    public String extractFinalResult(String intermediateResult) {
-        return intermediateResult != null ? intermediateResult : "null";
+  @Override
+  public String merge(String intermediateResult1, String intermediateResult2) {
+    if (intermediateResult1 == null || "null".equals(intermediateResult1)) {
+      return intermediateResult2;
     }
+    if (intermediateResult2 == null || "null".equals(intermediateResult2)) {
+      return intermediateResult1;
+    }
+    return intermediateResult1.compareTo(intermediateResult2) > 0 ? intermediateResult1 : intermediateResult2;
+  }
 
-    @Override
-    public String mergeFinalResult(String finalResult1, String finalResult2) {
-        return merge(finalResult1, finalResult2);
-    }
+  @Override
+  public ColumnDataType getIntermediateResultColumnType() {
+    return ColumnDataType.STRING;
+  }
+
+  @Override
+  public ColumnDataType getFinalResultColumnType() {
+    return ColumnDataType.STRING;
+  }
+
+  @Override
+  public String extractFinalResult(String intermediateResult) {
+    return intermediateResult != null ? intermediateResult : "null";
+  }
+
+  @Override
+  public String mergeFinalResult(String finalResult1, String finalResult2) {
+    return merge(finalResult1, finalResult2);
+  }
 }
