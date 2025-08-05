@@ -103,6 +103,10 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     return NUM_SERVERS;
   }
 
+  /**
+   * Keeps track of metadata of queries that have been terminated due to OOM.
+   * This is used to verify that the query was killed and the method used to kill the query.
+   */
   public static class TestAccountantFactory extends PerQueryCPUMemAccountantFactory {
     @Override
     public PerQueryCPUMemResourceUsageAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
