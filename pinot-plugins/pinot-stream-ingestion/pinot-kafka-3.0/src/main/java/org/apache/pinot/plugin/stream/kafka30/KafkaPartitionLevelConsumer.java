@@ -71,6 +71,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
     long firstOffset = -1;
     long offsetOfNextBatch = startOffset;
     StreamMessageMetadata lastMessageMetadata = null;
+    long messageBatchSizeInBytes = 0;
     if (!records.isEmpty()) {
       firstOffset = records.get(0).offset();
       _lastFetchedOffset = records.get(records.size() - 1).offset();
@@ -82,6 +83,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
           String key = record.key();
           byte[] keyBytes = key != null ? key.getBytes(StandardCharsets.UTF_8) : null;
           filteredRecords.add(new BytesStreamMessage(keyBytes, message.get(), messageMetadata));
+          messageBatchSizeInBytes += messageMetadata.getRecordSerializedSize();
         } else if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Tombstone message at offset: {}", record.offset());
         }
@@ -98,7 +100,7 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
       hasDataLoss = firstOffset > startOffset;
     }
     return new KafkaMessageBatch(filteredRecords, records.size(), offsetOfNextBatch, firstOffset, lastMessageMetadata,
-        hasDataLoss);
+        hasDataLoss, messageBatchSizeInBytes);
   }
 
   private StreamMessageMetadata extractMessageMetadata(ConsumerRecord<String, Bytes> record) {

@@ -38,6 +38,7 @@ import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactory;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -89,24 +90,32 @@ public class RealtimeConsumptionRateManager {
   }
 
   public ConsumptionRateLimiter createServerRateLimiter(PinotConfiguration serverConfig, ServerMetrics serverMetrics) {
-    double serverRateLimit =
-        serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+    double messageRateLimit = serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
+    double byteRateLimit =
+        serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
             CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
-    createOrUpdateServerRateLimiter(serverRateLimit, serverMetrics);
+
+    double serverRateLimit;
+    ThrottlingStrategy throttlingStrategy;
+    if (byteRateLimit > 0) {
+      serverRateLimit = byteRateLimit;
+      throttlingStrategy = ByteCountThrottlingStrategy.INSTANCE;
+    } else {
+      serverRateLimit = messageRateLimit;
+      throttlingStrategy = MessageCountThrottlingStrategy.INSTANCE;
+    }
+
+    createOrUpdateServerRateLimiter(serverRateLimit, serverMetrics, throttlingStrategy);
     return _serverRateLimiter;
   }
 
-  private void createOrUpdateServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics) {
+  private void createOrUpdateServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics,
+      ThrottlingStrategy throttlingStrategy) {
     LOGGER.info("Setting up ServerRateLimiter with rate limit: {}", serverRateLimit);
     ConsumptionRateLimiter currentRateLimiter = _serverRateLimiter;
-    if (serverRateLimit > 0) {
-      if (currentRateLimiter instanceof ServerRateLimiter) {
-        ((ServerRateLimiter) currentRateLimiter).updateRateLimit(serverRateLimit);
-      } else {
-        _serverRateLimiter =
-            new ServerRateLimiter(serverRateLimit, serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME);
-      }
-    } else {
+
+    if (serverRateLimit <= 0) {
       if (currentRateLimiter instanceof ServerRateLimiter) {
         ((ServerRateLimiter) currentRateLimiter).close();
         _serverRateLimiter = NOOP_RATE_LIMITER;
@@ -115,12 +124,25 @@ public class RealtimeConsumptionRateManager {
         // result of it, But the metric related to throttling won't be emitted since as a result of here above the
         // AsyncMetricEmitter will be closed. It's recommended to forceCommit segments to avoid this.
       }
+      return;
     }
+
+    if (currentRateLimiter instanceof ServerRateLimiter) {
+      ServerRateLimiter existingLimiter = (ServerRateLimiter) _serverRateLimiter;
+      if (existingLimiter.getThrottlingStrategy().equals(throttlingStrategy)) {
+        existingLimiter.updateRateLimit(serverRateLimit);
+        return;
+      }
+    }
+
+    _serverRateLimiter = new ServerRateLimiter(serverRateLimit, serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME,
+        throttlingStrategy);
   }
 
-  public void updateServerRateLimiter(double newRateLimit, ServerMetrics serverMetrics) {
+  public void updateServerRateLimiter(double newRateLimit, ServerMetrics serverMetrics,
+      ThrottlingStrategy throttlingStrategy) {
     LOGGER.info("Updating serverRateLimiter from: {} to: {}", _serverRateLimiter, newRateLimit);
-    createOrUpdateServerRateLimiter(newRateLimit, serverMetrics);
+    createOrUpdateServerRateLimiter(newRateLimit, serverMetrics, throttlingStrategy);
   }
 
   public ConsumptionRateLimiter getServerRateLimiter() {
@@ -231,7 +253,36 @@ public class RealtimeConsumptionRateManager {
 
   @FunctionalInterface
   public interface ConsumptionRateLimiter {
-    void throttle(int numMsgs);
+    void throttle(MessageBatch messageBatch);
+  }
+
+  public interface ThrottlingStrategy {
+    int getUnits(MessageBatch messageBatch);
+  }
+
+  static final class MessageCountThrottlingStrategy implements ThrottlingStrategy {
+    public static final MessageCountThrottlingStrategy INSTANCE = new MessageCountThrottlingStrategy();
+
+    private MessageCountThrottlingStrategy() {
+    }
+
+    @Override
+    public int getUnits(MessageBatch messageBatch) {
+      return messageBatch.getMessageCount();
+    }
+  }
+
+
+  static class ByteCountThrottlingStrategy implements ThrottlingStrategy {
+    public static final ByteCountThrottlingStrategy INSTANCE = new ByteCountThrottlingStrategy();
+
+    private ByteCountThrottlingStrategy() {
+    }
+
+    @Override
+    public int getUnits(MessageBatch messageBatch) {
+      return (int) messageBatch.getSizeInBytes();
+    }
   }
 
   @VisibleForTesting
@@ -258,14 +309,15 @@ public class RealtimeConsumptionRateManager {
     }
 
     @Override
-    public void throttle(int numMsgs) {
+    public void throttle(MessageBatch messageBatch) {
       if (InstanceHolder.INSTANCE._isThrottlingAllowed) {
+        int units = messageBatch.getMessageCount();
         // Only emit metrics when throttling is allowed. Throttling is not enabled.
         // until the server has passed startup checks. Otherwise, we will see
         // consumption well over 100% during startup.
-        _quotaUtilizationTracker.update(numMsgs, _rate, Clock.systemUTC().instant());
-        if (numMsgs > 0) {
-          _rateLimiter.acquire(numMsgs);
+        _quotaUtilizationTracker.update(units, _rate, Clock.systemUTC().instant());
+        if (units > 0) {
+          _rateLimiter.acquire(units);
         }
       }
     }
@@ -299,25 +351,31 @@ public class RealtimeConsumptionRateManager {
   static class ServerRateLimiter implements ConsumptionRateLimiter {
     private final RateLimiter _rateLimiter;
     private final AsyncMetricEmitter _metricEmitter;
+    private final ThrottlingStrategy _throttlingStrategy;
 
-    public ServerRateLimiter(double initialRateLimit, ServerMetrics serverMetrics, String metricKeyName) {
+    public ServerRateLimiter(double initialRateLimit, ServerMetrics serverMetrics, String metricKeyName,
+        ThrottlingStrategy throttlingStrategy) {
       _rateLimiter = RateLimiter.create(initialRateLimit);
       _metricEmitter = new AsyncMetricEmitter(serverMetrics, metricKeyName, initialRateLimit);
+      _throttlingStrategy = throttlingStrategy;
       _metricEmitter.start(); // start background emission
     }
 
-    public void throttle(int numMsgsConsumed) {
-      if (InstanceHolder.INSTANCE._isThrottlingAllowed) {
-        _metricEmitter.record(numMsgsConsumed); // just incrementing counter (non-blocking)
-        if (numMsgsConsumed > 0) {
-          _rateLimiter.acquire(numMsgsConsumed); // blocks if needed
-        }
+    public void throttle(MessageBatch messageBatch) {
+      int units = _throttlingStrategy.getUnits(messageBatch);
+      _metricEmitter.record(units); // just incrementing counter (non-blocking)
+      if (units > 0) {
+        _rateLimiter.acquire(units); // blocks if needed
       }
     }
 
     public void updateRateLimit(double newRateLimit) {
       _rateLimiter.setRate(newRateLimit);
       _metricEmitter.updateRateLimit(newRateLimit);
+    }
+
+    public ThrottlingStrategy getThrottlingStrategy() {
+      return _throttlingStrategy;
     }
 
     public void close() {
@@ -339,6 +397,7 @@ public class RealtimeConsumptionRateManager {
       return "ServerRateLimiter{"
           + "_rateLimiter=" + _rateLimiter
           + ", _metricEmitter=" + _metricEmitter
+          + ", _throttlingStrategy=" + _throttlingStrategy
           + '}';
     }
   }

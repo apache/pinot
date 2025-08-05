@@ -27,7 +27,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -111,10 +113,12 @@ public class ServerRateLimitConfigChangeListenerTest {
 
   private void simulateThrottling(AtomicReference<Throwable> errorRef) {
     // A helper method to test side effects of throttling during serverRateLimit config change.
+    MessageBatch messageBatch = Mockito.mock(MessageBatch.class);
+    when(messageBatch.getMessageCount()).thenReturn(100);
     for (int i = 0; i < 10; i++) {
       CompletableFuture.runAsync(() -> {
         try {
-          RealtimeConsumptionRateManager.getInstance().getServerRateLimiter().throttle(100);
+          RealtimeConsumptionRateManager.getInstance().getServerRateLimiter().throttle(messageBatch);
         } catch (Throwable throwable) {
           errorRef.set(throwable);
         }

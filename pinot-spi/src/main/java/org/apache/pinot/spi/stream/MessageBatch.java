@@ -104,6 +104,10 @@ public interface MessageBatch<T> {
     return false;
   }
 
+  default long getSizeInBytes() {
+    return -1;
+  }
+
   @Deprecated
   default T getMessageAtIndex(int index) {
     throw new UnsupportedOperationException();
