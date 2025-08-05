@@ -320,7 +320,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   public SegmentMetadataImpl getSegmentMetadata() {
     return _segmentMetadata;
   }
-  
+
   @Override
   public DataSource getDataSource(String column, Schema schema) {
     DataSource dataSource = getDataSourceNullable(column);
