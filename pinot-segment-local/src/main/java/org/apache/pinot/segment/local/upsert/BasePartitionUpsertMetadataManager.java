@@ -848,7 +848,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected void doTakeSnapshot() {
     int numTrackedSegments = _trackedSegments.size();
     long numPrimaryKeysInSnapshot = 0L;
-    long numQueryableKeysInSnapshot = 0L;
+    long numQueryableDocIdsInSnapshot = 0L;
     _logger.info("Taking snapshot for {} segments", numTrackedSegments);
     long startTimeMs = System.currentTimeMillis();
 
@@ -900,8 +900,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       try {
         ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-        if (!immutableSegment.hasValidDocIdsSnapshotFile() && (_deleteRecordColumn != null
-            && !immutableSegment.hasQueryableDocIdsSnapshotFile())) {
+        if (!immutableSegment.hasValidDocIdsSnapshotFile()
+            || _deleteRecordColumn != null && !immutableSegment.hasQueryableDocIdsSnapshotFile()) {
           segmentsWithoutSnapshot.add(immutableSegment);
           continue;
         }
@@ -913,7 +913,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         numImmutableSegments++;
         numPrimaryKeysInSnapshot += immutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
         if (_deleteRecordColumn != null) {
-          numQueryableKeysInSnapshot +=
+          numQueryableDocIdsInSnapshot +=
               immutableSegment.getQueryableDocIds().getMutableRoaringBitmap().getCardinality();
         }
       } catch (Exception e) {
@@ -946,7 +946,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           numImmutableSegments++;
           numPrimaryKeysInSnapshot += segment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
           if (_deleteRecordColumn != null) {
-            numQueryableKeysInSnapshot += segment.getQueryableDocIds().getMutableRoaringBitmap().getCardinality();
+            numQueryableDocIdsInSnapshot += segment.getQueryableDocIds().getMutableRoaringBitmap().getCardinality();
           }
         } catch (Exception e) {
           _logger.warn("Caught exception while taking snapshot for segment: {} w/o snapshot, skipping", segmentName, e);
@@ -968,7 +968,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
     if (_deleteRecordColumn != null) {
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
-          ServerGauge.UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT, numQueryableKeysInSnapshot);
+          ServerGauge.UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT, numQueryableDocIdsInSnapshot);
     }
     int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments - numUnchangedSegments;
     if (numMissedSegments > 0) {
