@@ -126,6 +126,7 @@ public class RecordTransformerTest {
     record.putValue("bigDecimalZero", new BigDecimal("0"));
     record.putValue("bigDecimalZeroWithPoint", new BigDecimal("0.0"));
     record.putValue("bigDecimalZeroWithExponent", new BigDecimal("0E-18"));
+    record.putValue("extraFieldNotInSchema", "sample");
     return record;
   }
 
@@ -488,6 +489,44 @@ public class RecordTransformerTest {
   }
 
   @Test
+  public void testSchemaColumnConformingTransformer() {
+    RecordTransformer transformer = new SchemaColumnConformingTransformer(SCHEMA);
+    GenericRow record = getRecord();
+    for (int i = 0; i < NUM_ROUNDS; i++) {
+      transformer.transform(record);
+      assertEquals(record.getValue("svInt"), (byte) 123);
+      assertEquals(record.getValue("svLong"), (char) 123);
+      assertEquals(record.getValue("svFloat"), Collections.singletonList((short) 123));
+      assertEquals(record.getValue("svDouble"), new String[]{"123"});
+      assertEquals(record.getValue("svBoolean"), "true");
+      assertEquals(record.getValue("svTimestamp"), "2020-02-02 22:22:22.222");
+      assertEquals(record.getValue("svBytes"), "7b7b"/*new byte[]{123, 123}*/);
+      assertEquals(record.getValue("svJson"), "{\"first\": \"daffy\", \"last\": \"duck\"}");
+      assertEquals(record.getValue("mvInt"), new Object[]{123L});
+      assertEquals(record.getValue("mvLong"), Collections.singletonList(123f));
+      assertEquals(record.getValue("mvFloat"), new Double[]{123d});
+      assertEquals(record.getValue("mvDouble"), Collections.singletonMap("key", 123));
+      assertEquals(record.getValue("svStringWithNullCharacters"), "1\0002\0003");
+      assertEquals(record.getValue("svStringWithLengthLimit"), "123");
+      assertEquals(record.getValue("mvString1"), new Object[]{"123", 123, 123L, 123f, 123.0});
+      assertEquals(record.getValue("mvString2"), new Object[]{123, 123L, 123f, 123.0, "123"});
+      assertNull(record.getValue("svNullString"));
+      assertEquals(record.getValue("svFloatNegativeZero"), -0.00f);
+      assertEquals(record.getValue("svDoubleNegativeZero"), -0.00d);
+      assertEquals(record.getValue("mvFloatNegativeZero"), new Float[]{-0.0f, 1.0f, 0.0f, 3.0f});
+      assertEquals(record.getValue("mvDoubleNegativeZero"), new Double[]{-0.0d, 1.0d, 0.0d, 3.0d});
+      assertEquals(record.getValue("svFloatNaN"), Float.NaN);
+      assertEquals(record.getValue("svDoubleNaN"), Double.NaN);
+      assertEquals(record.getValue("mvFloatNaN"), new Float[]{-0.0f, Float.NaN, 2.0f});
+      assertEquals(record.getValue("mvDoubleNaN"), new Double[]{-0.0d, Double.NaN, 2.0d});
+      assertEquals(record.getValue("bigDecimalZero"), new BigDecimal("0"));
+      assertEquals(record.getValue("bigDecimalZeroWithPoint"), new BigDecimal("0.0"));
+      assertEquals(record.getValue("bigDecimalZeroWithExponent"), new BigDecimal("0E-18"));
+      assertNull(record.getValue("extraFieldNotInSchema"));
+    }
+  }
+
+  @Test
   public void testOrderForTransformers() {
     // This test checks that the specified order is maintained for different transformers.
 
@@ -776,6 +815,7 @@ public class RecordTransformerTest {
       assertEquals(record.getValue("svDoubleNaN"), FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_DOUBLE);
       assertEquals(record.getValue("mvFloatNaN"), new Float[]{0.0f, 2.0f});
       assertEquals(record.getValue("mvDoubleNaN"), new Double[]{0.0d, 2.0d});
+      assertNull(record.getValue("extraFieldNotInSchema"));
       assertEquals(new ArrayList<>(record.getNullValueFields()),
           new ArrayList<>(Arrays.asList("svFloatNaN", "svDoubleNaN")));
     }
