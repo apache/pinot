@@ -85,7 +85,8 @@ public class PinotLogicalEnrichedJoin extends Join {
 
   public PinotLogicalEnrichedJoin withNewProject(FilterProjectRexNode project, RelDataType outputRowType,
       Set<CorrelationId> projectVariableSet) {
-    List<FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>(_filterProjectRexNodes);
+    List<FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>(_filterProjectRexNodes.size() + 1);
+    filterProjectRexNodes.addAll(_filterProjectRexNodes);
     filterProjectRexNodes.add(project);
     return new PinotLogicalEnrichedJoin(getCluster(), getTraitSet(), getHints(), left, right,
         getCondition(), getVariablesSet(), getJoinType(),
