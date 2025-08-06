@@ -138,7 +138,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // - There are more groups than the trim size
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
-    int trimSize = _queryContext.getGroupByTrimSize();
+    int trimSize = _queryContext.getEffectiveSegmentGroupTrimSize();
     if (trimSize > 0) {
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);

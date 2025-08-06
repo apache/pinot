@@ -134,7 +134,7 @@ public class QueryContext {
   // Parallel chunk size for final reduce
   private int _chunkSizeExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
   // Segment trim size for group by operator
-  private int _groupByTrimSize;
+  private int _effectiveSegmentGroupTrimSize;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -513,8 +513,8 @@ public class QueryContext {
     return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
   }
 
-  public int getGroupByTrimSize() {
-    return _groupByTrimSize;
+  public int getEffectiveSegmentGroupTrimSize() {
+    return _effectiveSegmentGroupTrimSize;
   }
 
   /**
@@ -666,12 +666,14 @@ public class QueryContext {
           !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
 
       // Pre-calculate group by trim size
-      queryContext._groupByTrimSize = getGroupByTrimSize(queryContext);
+      if (queryContext.getGroupByExpressions() != null) {
+        queryContext._effectiveSegmentGroupTrimSize = getEffectiveSegmentGroupTrimSize(queryContext);
+      }
 
       return queryContext;
     }
 
-    private int getGroupByTrimSize(QueryContext queryContext) {
+    private int getEffectiveSegmentGroupTrimSize(QueryContext queryContext) {
       int minGroupTrimSize = queryContext.getMinSegmentGroupTrimSize();
       List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
       if (!queryContext.isUnsafeTrim() && !queryContext.hasFilteredAggregations()) {
