@@ -26,7 +26,6 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 
 
 public class EnrichedJoinNode extends JoinNode {
-  // TODO: add filter, project, sort, limit info here
   private final List<FilterProjectRex> _filterProjectRexes;
   // output schema of the join
   private final DataSchema _joinResultSchema;

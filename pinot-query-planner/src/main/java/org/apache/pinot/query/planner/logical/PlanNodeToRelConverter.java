@@ -192,13 +192,10 @@ public final class PlanNodeToRelConverter {
         }
 
         if (node.getJoinType() == JoinRelType.ASOF || node.getJoinType() == JoinRelType.LEFT_ASOF) {
-          RexNode matchCondition = RexExpressionUtils.toRexNode(_builder, node.getMatchCondition());
-          // TODO: figure out a way to pass filter project sort info to RelBuilder
           _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedASOFJoin", Collections.emptyMap(),
               node.getDataSchema(), readAlreadyPushedChildren(node)));
         } else {
           Map<String, Plan.ExplainNode.AttributeValue> attributes = new HashMap<>();
-          // TODO: figure out a way to pass filter project sort info to RelBuilder
           _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedJoin", attributes,
               node.getDataSchema(), readAlreadyPushedChildren(node)));
         }

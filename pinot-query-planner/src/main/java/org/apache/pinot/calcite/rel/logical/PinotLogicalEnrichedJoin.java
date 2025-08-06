@@ -65,7 +65,6 @@ public class PinotLogicalEnrichedJoin extends Join {
     _filterProjectRexNodes = filterProjectRexNodes;
     _squashedProjects = squashProjects();
     _joinRowType = getJoinRowType();
-    // TODO: make sure this aligns with filterProjectRexNodes
     // if there's projection, getRowType() should return the final projected row type as output row type
     //   otherwise it's the same as _joinRowType
     _outputRowType = outputRowType == null ? _joinRowType : outputRowType;
