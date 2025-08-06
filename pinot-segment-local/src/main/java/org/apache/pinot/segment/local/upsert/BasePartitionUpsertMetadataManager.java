@@ -1002,7 +1002,9 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
 
   protected void deleteSnapshot(ImmutableSegmentImpl segment) {
     segment.deleteSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
-    segment.deleteSnapshotFile(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+    if (_deleteRecordColumn != null) {
+      segment.deleteSnapshotFile(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+    }
   }
 
   protected File getWatermarkFile() {
