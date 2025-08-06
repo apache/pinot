@@ -95,7 +95,8 @@ public class PinotLogicalEnrichedJoin extends Join {
   }
 
   public PinotLogicalEnrichedJoin withNewFilter(FilterProjectRexNode filter) {
-    List<FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>(_filterProjectRexNodes);
+    List<FilterProjectRexNode> filterProjectRexNodes = new ArrayList<>(_filterProjectRexNodes.size() + 1);
+    filterProjectRexNodes.addAll(_filterProjectRexNodes);
     filterProjectRexNodes.add(filter);
     return new PinotLogicalEnrichedJoin(getCluster(), getTraitSet(), getHints(), left, right,
         getCondition(), getVariablesSet(), getJoinType(),
@@ -149,7 +150,7 @@ public class PinotLogicalEnrichedJoin extends Join {
   }
 
   /** adopted from @link{RelOptUtil.pushPastProject} */
-  private List<RexNode> combineProjects(List<RexNode> upper, List<RexNode> lower) {
+  private static List<RexNode> combineProjects(List<RexNode> upper, List<RexNode> lower) {
     return new RexShuttle() {
       @Override
       public RexNode visitInputRef(RexInputRef ref) {
