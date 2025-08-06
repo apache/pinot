@@ -18,6 +18,8 @@
  */
 
  import { AuthWorkflow } from "Models";
+import { DEFAULT_TIMEZONE_FALLBACK } from './utils/TimezoneUtils';
+
 class app_state {
   queryConsoleOnlyView: boolean;
   authWorkflow: AuthWorkflow;
@@ -26,6 +28,7 @@ class app_state {
   hideQueryConsoleTab: boolean;
   username: string;
   role: string;
+  timezone: string = DEFAULT_TIMEZONE_FALLBACK;
 }
 
 export default new app_state();

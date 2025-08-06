@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.accounting;
+package org.apache.pinot.spi.accounting;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -47,8 +47,39 @@ public class WorkloadBudgetManager {
     }
     _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
+    initSecondaryWorkloadBudget(config);
     startBudgetResetTask();
     LOGGER.info("WorkloadBudgetManager initialized with enforcement window: {}ms", _enforcementWindowMs);
+  }
+
+  /**
+   * This budget is primarily meant to be used for queries that need to be issued in a low priority manner.
+   * This is fixed budget allocated during host startup and used across all secondary queries.
+   */
+  private void initSecondaryWorkloadBudget(PinotConfiguration config) {
+    double secondaryCpuPercentage = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE,
+        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
+
+    // Don't create a secondary workload if cpu percentage is non-zero.
+    if (secondaryCpuPercentage <= 0.0) {
+      return;
+    }
+
+    String secondaryWorkloadName = config.getProperty(
+        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
+        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
+
+    // The Secondary CPU budget is based on the CPU percentage allocated for secondary workload.
+    // The memory budget is set to Long.MAX_VALUE for now, since we do not have a specific memory budget for
+    // secondary queries.
+    int availableProcessors = Runtime.getRuntime().availableProcessors();
+    // Total CPU capacity available in one enforcement window:
+    // window(ms) × 1_000_000 (ns per ms) × number of logical processors
+    long totalCpuCapacityNs = _enforcementWindowMs * 1_000_000L * availableProcessors;
+    long secondaryCpuBudget = (long) (secondaryCpuPercentage * totalCpuCapacityNs);
+    // TODO: Add memory budget for secondary workload queries
+    addOrUpdateWorkload(secondaryWorkloadName, secondaryCpuBudget, Long.MAX_VALUE);
   }
 
   public void shutdown() {
@@ -143,6 +174,37 @@ public class WorkloadBudgetManager {
         budget.reset();
       });
     }, _enforcementWindowMs, _enforcementWindowMs, TimeUnit.MILLISECONDS);
+  }
+
+  /**
+   * Determines whether a query for the given workload can be admitted under CPU-only budgets.
+   *
+   * <p>Admission rules:
+   * <ol>
+   *   <li>If the manager is disabled or no budget exists for the workload, always admit.</li>
+   *   <li>If CPU budget remains above zero, admit immediately.</li>
+   *   <li>Otherwise, reject (return false).</li>
+   * </ol>
+   *
+   * <p>Note: This method currently uses a strict check, where CPU and memory budgets must be above zero.
+   * This may be relaxed in the future to allow for a percentage of other remaining budget to be used. At that point,
+   * we can have different admission policies like: Strict, Stealing, etc.
+   *
+   * @param workload the workload identifier to check budget for
+   * @return true if the query may be accepted; false if budget is insufficient
+   */
+  public boolean canAdmitQuery(String workload) {
+    // If disabled or no budget configured, always admit
+    if (!_isEnabled) {
+      return true;
+    }
+    Budget budget = _workloadBudgets.get(workload);
+    if (budget == null) {
+      LOGGER.debug("No budget found for workload: {}", workload);
+      return true;
+    }
+    BudgetStats stats = budget.getStats();
+    return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
   }
 
   /**

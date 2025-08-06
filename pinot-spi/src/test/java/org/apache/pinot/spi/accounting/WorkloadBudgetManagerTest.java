@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.accounting;
+package org.apache.pinot.spi.accounting;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -26,7 +26,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 
 public class WorkloadBudgetManagerTest {
@@ -114,5 +116,31 @@ public class WorkloadBudgetManagerTest {
         "CPU budget mismatch after concurrent updates");
     assertEquals(initialMemBudget - totalMemCharged, remaining._memoryRemaining,
         "Memory budget mismatch after concurrent updates");
+  }
+
+  @Test
+  void testCanAdmitQuery() {
+    WorkloadBudgetManager manager = new WorkloadBudgetManager(_config);
+    // Scenario 1: No budget configured -> should admit
+    assertTrue(manager.canAdmitQuery("unconfigured-workload"),
+        "Workload without budget should be admitted");
+
+    // Scenario 2: Budget configured with non-zero remaining -> should admit
+    String activeWorkload = "active-workload";
+    manager.addOrUpdateWorkload(activeWorkload, 100L, 200L);
+    assertTrue(manager.canAdmitQuery(activeWorkload), "Workload with available budget should be admitted");
+
+    // Scenario 3: Budget depleted -> should reject
+    String depletedWorkload = "depleted-workload";
+    manager.addOrUpdateWorkload(depletedWorkload, 50L, 50L);
+    manager.tryCharge(depletedWorkload, 50L, 50L); // deplete
+    assertFalse(manager.canAdmitQuery(depletedWorkload),
+        "Workload with depleted budget should be rejected");
+
+    // Scenario 4: Budget configured with zero cpu remaining -> should reject
+    String zeroCpuWorkload = "zero-cpu-workload";
+    manager.addOrUpdateWorkload(zeroCpuWorkload, 0L, 100L);
+    assertFalse(manager.canAdmitQuery(zeroCpuWorkload),
+        "Workload with zero CPU budget should be rejected");
   }
 }

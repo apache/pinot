@@ -28,7 +28,6 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 
 
 public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegrationTest {
@@ -61,40 +60,6 @@ public class TenantRebalanceIntegrationTest extends BaseHybridClusterIntegration
     assertNotNull(result);
     assertTrue(result.getRebalanceTableResults().containsKey(table1));
     assertTrue(result.getRebalanceTableResults().containsKey(table2));
-  }
-
-  @Test
-  public void testParallelWhitelistAndIncludeTablesConflict()
-      throws Exception {
-    TenantRebalanceConfig config = new TenantRebalanceConfig();
-    config.setTenantName(getServerTenant());
-    config.setDryRun(true);
-    String table1 = getTableName() + "_OFFLINE";
-    config.getParallelWhitelist().add(table1);
-    config.getIncludeTables().add(table1);
-
-    // Test conflict when both are set in the body
-    try {
-      sendPostRequest(getRebalanceUrl(), JsonUtils.objectToString(config));
-      fail("Expected error when both parallelWhitelist and includeTables are set in body");
-    } catch (Exception e) {
-      assertTrue(e.getMessage()
-          .contains("Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist"));
-    }
-
-    // Test conflict when parallelWhitelist is set in body and includeTables is set as query param
-    TenantRebalanceConfig config2 = new TenantRebalanceConfig();
-    config2.setTenantName(getServerTenant());
-    config2.setDryRun(true);
-    config2.getParallelWhitelist().add(table1);
-    String urlWithQuery = getRebalanceUrl() + "?includeTables=" + table1;
-    try {
-      sendPostRequest(urlWithQuery, JsonUtils.objectToString(config2));
-      fail("Expected error when parallelWhitelist is set in body and includeTables in query param");
-    } catch (Exception e) {
-      assertTrue(e.getMessage()
-          .contains("Bad usage by specifying both include/excludeTables and parallelWhitelist/Blacklist"));
-    }
   }
 
   @Test

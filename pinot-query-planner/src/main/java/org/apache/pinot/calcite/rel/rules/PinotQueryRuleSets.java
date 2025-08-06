@@ -183,6 +183,8 @@ public class PinotQueryRuleSets {
           .withDescription(PlannerRuleNames.AGGREGATE_PROJECT_MERGE).toRule(),
       ProjectMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_MERGE).toRule(),
+      ProjectRemoveRule.Config.DEFAULT
+          .withDescription(PlannerRuleNames.PROJECT_REMOVE).toRule(),
       FilterMergeRule.Config.DEFAULT
           .withDescription(PlannerRuleNames.FILTER_MERGE).toRule(),
       AggregateRemoveRule.Config.DEFAULT
