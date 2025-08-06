@@ -280,6 +280,40 @@ public class PinotClientRequest {
     }
   }
 
+  @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/timeseries")
+  @ApiOperation(value = "Query Pinot using the Time Series Engine")
+  @ManualAuthorization
+  public void processTimeSeriesQueryEngine(String query, @Suspended AsyncResponse asyncResponse,
+      @Context org.glassfish.grizzly.http.server.Request requestCtx, @Context HttpHeaders httpHeaders) {
+    try {
+      JsonNode requestJson = JsonUtils.stringToJsonNode(query);
+      if (!requestJson.has("query")) {
+        throw new IllegalStateException("Payload is missing the query string field 'sql'");
+      }
+      String language = requestJson.get(Request.LANGUAGE).asText();
+      String queryString = requestJson.get("query").asText();
+      try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString,
+            JsonUtils.jsonNodeToStringMap(requestJson), requestContext,
+          makeHttpIdentity(requestCtx), httpHeaders);
+        if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
+          asyncResponse.resume(Response.serverError().entity(response).build());
+          return;
+        }
+        asyncResponse.resume(response.toBrokerResponse());
+      }
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing POST request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      asyncResponse.resume(Response.serverError().entity(
+              new PinotBrokerTimeSeriesResponse("error", null, e.getClass().getSimpleName(), e.getMessage()))
+          .build());
+    }
+  }
+
   @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
@@ -293,7 +327,7 @@ public class PinotClientRequest {
     try {
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         String queryString = requestCtx.getQueryString();
-        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString, requestContext,
+        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString, Map.of(), requestContext,
           makeHttpIdentity(requestCtx), httpHeaders);
         if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
           asyncResponse.resume(Response.serverError().entity(response).build());
@@ -538,9 +572,10 @@ public class PinotClientRequest {
   }
 
   private PinotBrokerTimeSeriesResponse executeTimeSeriesQuery(String language, String queryString,
-    RequestContext requestContext, RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
-    return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext, requesterIdentity,
-      httpHeaders);
+      Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
+      HttpHeaders httpHeaders) {
+    return _requestHandler.handleTimeSeriesRequest(language, queryString, queryParams, requestContext,
+        requesterIdentity, httpHeaders);
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {
