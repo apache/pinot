@@ -441,6 +441,7 @@ public class QueryContext {
 
   public void setMinSegmentGroupTrimSize(int minSegmentGroupTrimSize) {
     _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
+    _effectiveSegmentGroupTrimSize = calculateEffectiveSegmentGroupTrimSize();
   }
 
   public int getMinServerGroupTrimSize() {
@@ -515,6 +516,20 @@ public class QueryContext {
 
   public int getEffectiveSegmentGroupTrimSize() {
     return _effectiveSegmentGroupTrimSize;
+  }
+
+  private int calculateEffectiveSegmentGroupTrimSize() {
+    int minGroupTrimSize = getMinSegmentGroupTrimSize();
+    List<OrderByExpressionContext> orderByExpressions = getOrderByExpressions();
+    if (!isUnsafeTrim() && !hasFilteredAggregations()) {
+      // if orderby key is groupby key, and there's no having clause, and there's no filtered aggr,
+      // keep at most `limit` rows only
+      return getLimit();
+    } else if (orderByExpressions != null && minGroupTrimSize > 0) {
+      // otherwise trim to max(minSegmentGroupTrimSize, 5 * LIMIT)
+      return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
+    }
+    return -1;
   }
 
   /**
@@ -667,24 +682,10 @@ public class QueryContext {
 
       // Pre-calculate group by trim size
       if (queryContext.getGroupByExpressions() != null) {
-        queryContext._effectiveSegmentGroupTrimSize = getEffectiveSegmentGroupTrimSize(queryContext);
+        queryContext._effectiveSegmentGroupTrimSize = queryContext.calculateEffectiveSegmentGroupTrimSize();
       }
 
       return queryContext;
-    }
-
-    private int getEffectiveSegmentGroupTrimSize(QueryContext queryContext) {
-      int minGroupTrimSize = queryContext.getMinSegmentGroupTrimSize();
-      List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
-      if (!queryContext.isUnsafeTrim() && !queryContext.hasFilteredAggregations()) {
-        // if orderby key is groupby key, and there's no having clause, and there's no filtered aggr,
-        // keep at most `limit` rows only
-        return queryContext.getLimit();
-      } else if (orderByExpressions != null && minGroupTrimSize > 0) {
-        // otherwise trim to max(minSegmentGroupTrimSize, 5 * LIMIT)
-        return GroupByUtils.getTableCapacity(queryContext.getLimit(), minGroupTrimSize);
-      }
-      return -1;
     }
 
     /**
