@@ -16,35 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.startree.v2;
+package org.apache.pinot.segment.local.aggregator;
 
-import java.util.Random;
-import org.apache.pinot.segment.local.aggregator.MinValueAggregator;
-import org.apache.pinot.segment.local.aggregator.ValueAggregator;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
-
-import static org.testng.Assert.assertEquals;
-
-
-public class MinStarTreeV2Test extends BaseStarTreeV2Test<Object, Double> {
-
-  @Override
-  ValueAggregator<Object, Double> getValueAggregator() {
-    return new MinValueAggregator();
+public class ValueAggregatorUtils {
+  private ValueAggregatorUtils() {
   }
 
-  @Override
-  DataType getRawValueType() {
-    return DataType.FLOAT;
-  }
-
-  @Override
-  Object getRandomRawValue(Random random) {
-    return random.nextFloat();
-  }
-
-  @Override
-  protected void assertAggregatedValue(Double starTreeResult, Double nonStarTreeResult) {
-    assertEquals(starTreeResult, nonStarTreeResult, 1e-5);
+  /// Tries to convert the given value to a double.
+  /// We need this for [ValueAggregator] because the raw value might not be converted to the desired data type yet if it
+  /// is not specified in the schema.
+  /// TODO: Provide a way to specify the desired data type for the raw value.
+  public static double toDouble(Object value) {
+    if (value instanceof Number) {
+      return ((Number) value).doubleValue();
+    } else {
+      return Double.parseDouble(value.toString());
+    }
   }
 }

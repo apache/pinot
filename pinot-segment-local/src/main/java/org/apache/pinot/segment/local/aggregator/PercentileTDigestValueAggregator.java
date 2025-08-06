@@ -61,7 +61,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
       initialValue = TDigest.createMergingDigest(_compressionFactor);
-      initialValue.add(((Number) rawValue).doubleValue());
+      initialValue.add(ValueAggregatorUtils.toDouble(rawValue));
       _maxByteSize = Math.max(_maxByteSize, initialValue.byteSize());
     }
     return initialValue;
@@ -72,7 +72,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     if (rawValue instanceof byte[]) {
       value.add(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      value.add(((Number) rawValue).doubleValue());
+      value.add(ValueAggregatorUtils.toDouble(rawValue));
     }
     _maxByteSize = Math.max(_maxByteSize, value.byteSize());
     return value;
