@@ -165,14 +165,15 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
         return resultsBlock;
       }
+      // if sort-aggregate, sort the array even if it's smaller than trimSize
+      // to benefit combining. This is not very large overhead since the
+      // limit threshold of sort-aggregate is small
       if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
-        // if sort-aggregate, sort the array even if it's smaller than trimSize
-        // to benefit combining. This is not very large overhead since the
-        // limit threshold of sort-aggregate is small
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         List<IntermediateRecord> intermediateRecords =
             tableResizer.sortInSegmentResults(groupByExecutor.getGroupKeyGenerator(),
                 groupByExecutor.getGroupByResultHolders(), trimSize);
+        groupByExecutor.getGroupKeyGenerator().close();
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setGroupsTrimmed(false);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);

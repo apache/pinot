@@ -72,7 +72,7 @@ public class SortedRecordTable extends BaseTable {
     _nextIdx = 0;
   }
 
-  ///  only used when creating SortedRecordTable from unique, sorted segment groupby results
+  /// Only used when creating SortedRecordTable from unique, sorted segment groupby results
   @Override
   public boolean upsert(Record record) {
     if (_nextIdx == _resultSize) {
@@ -92,7 +92,7 @@ public class SortedRecordTable extends BaseTable {
     return _numMergedBlocks == _desiredNumMergedBlocks;
   }
 
-  // merge another SortedRecordTable into self
+  /// Merge another SortedRecordTable into self
   public SortedRecordTable mergeSortedRecordTable(SortedRecordTable that) {
     assert (that._resultSize == _resultSize);
     if (that.size() == 0) {
@@ -108,7 +108,7 @@ public class SortedRecordTable extends BaseTable {
     return this;
   }
 
-  // merge a segment result into self, saving an allocation of SortedRecordTable
+  /// Merge a segment result into self, saving an allocation of SortedRecordTable
   public SortedRecordTable mergeSortedGroupByResultBlock(GroupByResultsBlock block) {
     List<IntermediateRecord> segmentRecords = block.getIntermediateRecords();
     if (segmentRecords.isEmpty() || size() == 0) {
@@ -121,7 +121,7 @@ public class SortedRecordTable extends BaseTable {
     return this;
   }
 
-  ///  merge in that._records, update _records _curIdx
+  /// Merge in that._records, update _records _curIdx
   private void mergeSortedRecords(Record[] records2, int mj) {
     Record[] newRecords = new Record[_resultSize];
     int newNextIdx = 0;
@@ -172,7 +172,7 @@ public class SortedRecordTable extends BaseTable {
     _nextIdx = newIdx;
   }
 
-  ///  merge in that._records, update _records _curIdx
+  /// Merge in that._records, update _records _curIdx
   private void mergeSegmentRecords(List<IntermediateRecord> records2, int mj) {
     Record[] newRecords = new Record[_resultSize];
     int newNextIdx = 0;

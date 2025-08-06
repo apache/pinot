@@ -217,6 +217,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         List<IntermediateRecord> intermediateRecords =
             tableResizer.sortInSegmentResults(groupKeyGenerator,
                 groupByResultHolders, trimSize);
+        groupKeyGenerator.close();
         GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
         resultsBlock.setGroupsTrimmed(false);
         resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
