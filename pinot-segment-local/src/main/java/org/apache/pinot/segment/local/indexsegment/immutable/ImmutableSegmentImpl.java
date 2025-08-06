@@ -44,7 +44,6 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -194,7 +193,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     return new File(SegmentDirectoryPaths.findSegmentDirectory(getSegmentMetadata().getIndexDir()), fileName);
   }
 
-  public boolean hasDocIdsSnapshotFile(String fileName) {
+  public boolean hasSnapshotFile(String fileName) {
     return getSnapshotFile(fileName).exists();
   }
 

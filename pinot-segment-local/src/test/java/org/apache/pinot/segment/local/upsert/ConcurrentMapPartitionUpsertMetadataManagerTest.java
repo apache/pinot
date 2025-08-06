@@ -867,7 +867,8 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     if (snapshot != null) {
       when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
     } else {
-      when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(validDocIds.getMutableRoaringBitmap());
+      when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(
+          validDocIds.getMutableRoaringBitmap());
     }
     return segment;
   }
