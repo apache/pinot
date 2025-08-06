@@ -233,7 +233,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
     return _rawKeyHolder.getNumKeys();
   }
 
-  /// clear and trim thread-local map of _rawKeyHolder
+  /// Clear and trim thread-local map of _rawKeyHolder
   @Override
   public void close() {
     try {
