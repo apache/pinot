@@ -978,8 +978,10 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       long numQueryableDocIdsInSnapshot, int numTrackedSegments, int numConsumingSegments, int numUnchangedSegments) {
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
-        ServerGauge.UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT, numImmutableSegments);
+    if (_deleteRecordColumn != null) {
+      _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
+          ServerGauge.UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT, numImmutableSegments);
+    }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
     if (_deleteRecordColumn != null) {
