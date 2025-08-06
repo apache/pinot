@@ -158,7 +158,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
                 mergedKeys++;
               }
             } finally {
-              // clear thread-local map used in DictionaryBasedGroupKeyGenerator
+              // Release the resources used by the group key generator
               aggregationGroupByResult.closeGroupKeyGenerator();
             }
           }

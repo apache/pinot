@@ -195,7 +195,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords =
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
-        // trim groupKeyGenerator after getting intermediateRecords
+        // Release the resources used by the group key generator
         groupKeyGenerator.close();
 
         ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
