@@ -56,7 +56,7 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       }
 
       @Override
-      public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+      public void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType,
           String workloadName) {
       }
 

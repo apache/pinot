@@ -41,6 +41,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.MseWorkerThreadContext;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
@@ -283,7 +284,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// (normally cancelling other already started workers and sending the error through GRPC)
   private CompletableFuture<Void> submitWorker(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> reqMetadata) {
-    String workloadName = reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.WORKLOAD_NAME);
+    String workloadName = QueryOptionsUtils.getWorkloadName(reqMetadata);
     //TODO: Verify if this matches with what OOM protection expects. This method will not block for the query to
     // finish, so it may be breaking some of the OOM protection assumptions.
     Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.MSE,

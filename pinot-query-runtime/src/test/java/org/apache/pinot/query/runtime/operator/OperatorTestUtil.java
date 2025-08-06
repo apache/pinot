@@ -109,7 +109,7 @@ public class OperatorTestUtil {
 
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
       StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, deadlineMs, Map.of(), stageMetadata,
+    return new OpChainExecutionContext(mailboxService, 0, deadlineMs, deadlineMs, Map.of(), stageMetadata,
         stageMetadata.getWorkerMetadataList().get(0), null, null, true);
   }
 
@@ -133,12 +133,10 @@ public class OperatorTestUtil {
     StageMetadata stageMetadata =
         new StageMetadata(0, List.of(workerMetadata), Map.of(DispatchablePlanFragment.TABLE_NAME_KEY, "testTable"));
     OpChainExecutionContext opChainExecutionContext =
-        new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, opChainMetadata, stageMetadata,
-            workerMetadata, null, null, true);
-
-    StagePlan stagePlan = new StagePlan(null, stageMetadata);
-
-    opChainExecutionContext.setLeafStageContext(new ServerPlanRequestContext(stagePlan, null, null, null));
+        new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, Long.MAX_VALUE, opChainMetadata,
+            stageMetadata, workerMetadata, null, null, true);
+    opChainExecutionContext.setLeafStageContext(
+        new ServerPlanRequestContext(new StagePlan(null, stageMetadata), null, null, null));
     return opChainExecutionContext;
   }
 
