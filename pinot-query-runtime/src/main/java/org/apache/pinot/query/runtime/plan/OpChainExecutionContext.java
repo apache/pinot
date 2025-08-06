@@ -39,7 +39,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
  *  This information is then used by the OpChain to create the Operators for a query.
  */
 public class OpChainExecutionContext {
-
   private final MailboxService _mailboxService;
   private final long _requestId;
   private final long _activeDeadlineMs;
@@ -58,20 +57,10 @@ public class OpChainExecutionContext {
   private ServerPlanRequestContext _leafStageContext;
   private final boolean _sendStats;
 
-  @Deprecated
-  public OpChainExecutionContext(MailboxService mailboxService, long requestId, long deadlineMs,
-      Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
-      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext,
-      boolean sendStats) {
-    this(mailboxService, requestId, deadlineMs, deadlineMs, opChainMetadata, stageMetadata, workerMetadata,
-        pipelineBreakerResult, parentContext, sendStats);
-  }
-
-  public OpChainExecutionContext(MailboxService mailboxService, long requestId,
-      long activeDeadlineMs, long passiveDeadlineMs,
-      Map<String, String> opChainMetadata, StageMetadata stageMetadata, WorkerMetadata workerMetadata,
-      @Nullable PipelineBreakerResult pipelineBreakerResult, @Nullable ThreadExecutionContext parentContext,
-      boolean sendStats) {
+  public OpChainExecutionContext(MailboxService mailboxService, long requestId, long activeDeadlineMs,
+      long passiveDeadlineMs, Map<String, String> opChainMetadata, StageMetadata stageMetadata,
+      WorkerMetadata workerMetadata, @Nullable PipelineBreakerResult pipelineBreakerResult,
+      @Nullable ThreadExecutionContext parentContext, boolean sendStats) {
     _mailboxService = mailboxService;
     _requestId = requestId;
     _activeDeadlineMs = activeDeadlineMs;
