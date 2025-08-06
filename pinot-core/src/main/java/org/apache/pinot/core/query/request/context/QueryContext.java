@@ -135,8 +135,8 @@ public class QueryContext {
   // Threshold to use sort aggregate for safeTrim case when LIMIT is below this
   private int _sortAggregateLimitThreshold = Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
   // Threshold of number of segments to combine to use single-threaded sequential combine instead pair-wise
-  private int _sortAggregateSingleThreadedNumSegmentsThreshold =
-      Server.DEFAULT_SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD;
+  // This is defaulted to number of available cores
+  private int _sortAggregateSingleThreadedNumSegmentsThreshold = Runtime.getRuntime().availableProcessors();
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -683,6 +683,10 @@ public class QueryContext {
       if (sortAggregateLimitThreshold != null) {
         queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
       }
+
+      // sortAggregateSingleThreadedNumSegmentsThreshold is defaulted to hardware concurrency
+      // if not specified. this allows one more parallel thread (the main thread) to do only combine
+      // while other worker threads process segments
       Integer sortAggregateSingleThreadedNumSegmentsThreshold =
           QueryOptionsUtils.getSortAggregateSingleThreadedNumSegmentsThreshold(_queryOptions);
       if (sortAggregateSingleThreadedNumSegmentsThreshold != null) {

@@ -138,7 +138,7 @@ public class CombinePlanNode implements PlanNode {
         } else {
           // Sorted aggregation group-by, when safeTrim and limit is not too large
           if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
-            if (operators.size() <= _queryContext.getSortAggregateSingleThreadedNumSegmentsThreshold()) {
+            if (operators.size() < _queryContext.getSortAggregateSingleThreadedNumSegmentsThreshold()) {
               return new SequentialSortedGroupByCombineOperator(operators, _queryContext, _executorService);
             }
             return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);
