@@ -934,7 +934,7 @@ const getElapsedTime = (startTime) => {
 const getTasksList = async (tableName, taskType) => {
   const { formatTimeInTimezone } = await import('./TimezoneUtils');
   const finalResponse = {
-    columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Num of Sub Tasks'],
+    columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Sub Tasks (Total/Completed/Running/Waiting/Error/Other)'],
     records: []
   }
   await new Promise((resolve, reject) => {
@@ -942,12 +942,24 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
+        const subtaskCount = get(debugData, 'data.subtaskCount', {});
+        const total = get(subtaskCount, 'total', 0);
+        const completed = get(subtaskCount, 'completed', 0);
+        const running = get(subtaskCount, 'running', 0);
+        const waiting = get(subtaskCount, 'waiting', 0);
+        const error = get(subtaskCount, 'error', 0);
+        const unknown = get(subtaskCount, 'unknown', 0);
+        const dropped = get(subtaskCount, 'dropped', 0);
+        const timedOut = get(subtaskCount, 'timedOut', 0);
+        const aborted = get(subtaskCount, 'aborted', 0);
+        const other = unknown + dropped + timedOut + aborted;
+
         finalResponse.records.push([
           taskID,
           status,
           get(debugData, 'data.startTime') ? formatTimeInTimezone(get(debugData, 'data.startTime'), 'MMMM Do YYYY, HH:mm:ss z') : '',
           get(debugData, 'data.finishTime') ? formatTimeInTimezone(get(debugData, 'data.finishTime'), 'MMMM Do YYYY, HH:mm:ss z') : '',
-          get(debugData, 'data.subtaskCount.total', 0)
+          `${total}/${completed}/${running}/${waiting}/${error}/${other}`
         ]);
       };
       each(response.data, async (val, key) => {
