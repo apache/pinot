@@ -75,6 +75,7 @@ public class StreamConfig {
 
   private final double _topicConsumptionRateLimit;
 
+  private final boolean _enableOffsetAutoReset;
   private final int _offsetAutoResetOffsetThreshold;
   private final long _offsetAutoResetTimeSecThreshold;
 
@@ -202,6 +203,7 @@ public class StreamConfig {
     String rate = streamConfigMap.get(StreamConfigProperties.TOPIC_CONSUMPTION_RATE_LIMIT);
     _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
 
+    _enableOffsetAutoReset = Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.ENABLE_OFFSET_AUTO_RESET));
     String offsetThreshold = streamConfigMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY);
     _offsetAutoResetOffsetThreshold = offsetThreshold != null ? Integer.valueOf(offsetThreshold) : -1;
     String timeSecThreshold = streamConfigMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY);
@@ -391,6 +393,10 @@ public class StreamConfig {
         : Optional.of(_topicConsumptionRateLimit);
   }
 
+  public boolean isEnableOffsetAutoReset() {
+    return _enableOffsetAutoReset;
+  }
+
   public int getOffsetAutoResetOffsetThreshold() {
     return _offsetAutoResetOffsetThreshold;
   }
@@ -447,6 +453,7 @@ public class StreamConfig {
         that._decoderClass) && Objects.equals(_decoderProperties, that._decoderProperties) && Objects.equals(_groupId,
         that._groupId) && Objects.equals(_streamConfigMap, that._streamConfigMap) && Objects.equals(_offsetCriteria,
         that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction)
+        && _enableOffsetAutoReset == that._enableOffsetAutoReset
         && _offsetAutoResetOffsetThreshold == that._offsetAutoResetOffsetThreshold
         && _offsetAutoResetTimeSecThreshold == that._offsetAutoResetTimeSecThreshold;
   }
@@ -458,6 +465,6 @@ public class StreamConfig {
         _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
         _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
         _serverUploadToDeepStore, _flushThresholdVarianceFraction, _offsetAutoResetOffsetThreshold,
-        _offsetAutoResetTimeSecThreshold);
+        _enableOffsetAutoReset, _offsetAutoResetTimeSecThreshold);
   }
 }

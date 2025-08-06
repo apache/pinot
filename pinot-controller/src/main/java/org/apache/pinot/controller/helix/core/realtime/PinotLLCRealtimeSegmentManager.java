@@ -977,11 +977,16 @@ public class PinotLLCRealtimeSegmentManager {
         startOffset);
   }
 
-  private String computeStartOffset(
-      String nextOffset, StreamConfig streamConfig, int partitionId) {
+  private String computeStartOffset(String nextOffset, StreamConfig streamConfig, int partitionId) {
+    if (!streamConfig.isEnableOffsetAutoReset()) {
+      return nextOffset;
+    }
     long timeThreshold = streamConfig.getOffsetAutoResetTimeSecThreshold();
     int offsetThreshold = streamConfig.getOffsetAutoResetOffsetThreshold();
     if (timeThreshold <= 0 && offsetThreshold <= 0) {
+      LOGGER.warn("Invalid offset auto reset configuration for table: {}, topic: {}. "
+              + "timeThreshold: {}, offsetThreshold: {}",
+          streamConfig.getTableNameWithType(), streamConfig.getTopicName(), timeThreshold, offsetThreshold);
       return nextOffset;
     }
     String clientId =
@@ -990,8 +995,8 @@ public class PinotLLCRealtimeSegmentManager {
     StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     StreamPartitionMsgOffset offsetAtSLA;
     StreamPartitionMsgOffset latestOffset;
-    try (StreamMetadataProvider metadataProvider = consumerFactory.createPartitionMetadataProvider(
-        clientId, partitionId)) {
+    try (StreamMetadataProvider metadataProvider = consumerFactory.createPartitionMetadataProvider(clientId,
+        partitionId)) {
       // Fetching timestamp from an offset is an expensive operation which requires reading the data,
       // while fetching offset from timestamp is lightweight and only needs to read metadata.
       // Hence, instead of checking if latestOffset's time - nextOffset's time < SLA, we would check
@@ -999,31 +1004,29 @@ public class PinotLLCRealtimeSegmentManager {
       // TODO: it is relying on System.currentTimeMillis() which might be affected by time drift. If we are able to
       // get nextOffset's time, we should instead check (nextOffset's time + SLA)'s offset < latestOffset
       latestOffset = metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, 5000);
-      LOGGER.info("Latest offset of topic {} and partition {} is {}",
-          streamConfig.getTopicName(), partitionId, latestOffset);
-      offsetAtSLA = metadataProvider.getOffsetAtTimestamp(
-          partitionId, System.currentTimeMillis() - timeThreshold * 1000);
-      LOGGER.info("Offset at SLA of topic {} and partition {} is {}",
-          streamConfig.getTopicName(), partitionId, offsetAtSLA);
+      LOGGER.info("Latest offset of topic {} and partition {} is {}", streamConfig.getTopicName(), partitionId,
+          latestOffset);
+      offsetAtSLA =
+          metadataProvider.getOffsetAtTimestamp(partitionId, System.currentTimeMillis() - timeThreshold * 1000);
+      LOGGER.info("Offset at SLA of topic {} and partition {} is {}", streamConfig.getTopicName(), partitionId,
+          offsetAtSLA);
     } catch (Exception e) {
       LOGGER.warn("Not able to fetch the offset metadata, skip auto resetting offsets", e);
       return nextOffset;
     }
     try {
-      if (timeThreshold > 0 && offsetAtSLA != null
-          && Long.valueOf(offsetAtSLA.toString()) > Long.valueOf(nextOffset)) {
-        LOGGER.info("Auto reset offset from {} to {} on partition {} because time threshold reached",
-            nextOffset, latestOffset, partitionId);
+      if (timeThreshold > 0 && offsetAtSLA != null && Long.valueOf(offsetAtSLA.toString()) > Long.valueOf(nextOffset)) {
+        LOGGER.info("Auto reset offset from {} to {} on partition {} because time threshold reached", nextOffset,
+            latestOffset, partitionId);
         return latestOffset.toString();
       }
-      if (offsetThreshold > 0
-          && Long.valueOf(latestOffset.toString()) - Long.valueOf(nextOffset) > offsetThreshold) {
+      if (offsetThreshold > 0 && Long.valueOf(latestOffset.toString()) - Long.valueOf(nextOffset) > offsetThreshold) {
         LOGGER.info("Auto reset offset from {} to {} on partition {} because number of offsets threshold reached",
             nextOffset, latestOffset, partitionId);
         return latestOffset.toString();
       }
     } catch (Exception e) {
-      LOGGER.warn("Not able to convert the offset to LONG type, skip auto resetting offsets", e);
+      LOGGER.warn("Not able to compare the offsets, skip auto resetting offsets", e);
     }
     return nextOffset;
   }

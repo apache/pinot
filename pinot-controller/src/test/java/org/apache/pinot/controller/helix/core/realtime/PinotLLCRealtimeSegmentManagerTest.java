@@ -333,7 +333,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
-  public void testCommitSegmentWithOffsetAutoReset() throws Exception {
+  public void testCommitSegmentWithOffsetAutoReset()
+      throws Exception {
     // Set up a new table with 2 replicas, 5 instances, 4 partition
     PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
     FakePinotLLCRealtimeSegmentManager segmentManager =
@@ -341,19 +342,16 @@ public class PinotLLCRealtimeSegmentManagerTest {
     setUpNewTable(segmentManager, 2, 5, 4);
     Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
     Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(segmentManager._tableConfig).get(0);
-    streamConfigMap.put(
-        StreamConfigProperties.OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY, "100"
-    );
+    streamConfigMap.put(StreamConfigProperties.ENABLE_OFFSET_AUTO_RESET, String.valueOf(true));
+    streamConfigMap.put(StreamConfigProperties.OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY, "100");
     segmentManager.makeTableConfig(streamConfigMap);
 
     StreamConsumerFactory mockConsumerFactory = mock(StreamConsumerFactory.class);
     StreamMetadataProvider mockMetadataProvider = mock(StreamMetadataProvider.class);
-    when(mockConsumerFactory.createPartitionMetadataProvider(anyString(), anyInt()))
-        .thenReturn(mockMetadataProvider);
-    when(mockMetadataProvider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA), anyLong()))
-        .thenReturn(new LongMsgOffset(LATEST_OFFSET));
-    when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong()))
-        .thenReturn(PARTITION_OFFSET);
+    when(mockConsumerFactory.createPartitionMetadataProvider(anyString(), anyInt())).thenReturn(mockMetadataProvider);
+    when(mockMetadataProvider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA),
+        anyLong())).thenReturn(new LongMsgOffset(LATEST_OFFSET));
+    when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong())).thenReturn(PARTITION_OFFSET);
 
     try (MockedStatic<StreamConsumerFactoryProvider> mockedStaticProvider = mockStatic(
         StreamConsumerFactoryProvider.class)) {
