@@ -18,31 +18,70 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
-import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
-import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Union operator for UNION ALL queries.
+ * Union operator for UNION queries. Unlike {@link UnionAllOperator}, this operator removes duplicate rows and only
+ * returns distinct rows.
  */
 public class UnionOperator extends SetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnionOperator.class);
   private static final String EXPLAIN_NAME = "UNION";
-  @Nullable
-  private MultiStageQueryStats _queryStats = null;
-  private int _finishedChildren = 0;
 
-  public UnionOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
-      DataSchema dataSchema) {
+  public UnionOperator(OpChainExecutionContext opChainExecutionContext,
+      List<MultiStageOperator> inputOperators, DataSchema dataSchema) {
     super(opChainExecutionContext, inputOperators, dataSchema);
+  }
+
+  @Override
+  protected MseBlock processRightOperator() {
+    MseBlock block = _rightChildOperator.nextBlock();
+    while (block.isData()) {
+      MseBlock.Data dataBlock = (MseBlock.Data) block;
+      List<Object[]> rows = new ArrayList<>();
+      for (Object[] row : dataBlock.asRowHeap().getRows()) {
+        if (!_rightRowSet.contains(new Record(row))) {
+          rows.add(row);
+          _rightRowSet.add(new Record(row));
+        }
+      }
+      sampleAndCheckInterruption();
+      // If we have collected some rows, return them as a new block.
+      if (!rows.isEmpty()) {
+        return new RowHeapDataBlock(rows, _dataSchema);
+      } else {
+        block = _rightChildOperator.nextBlock();
+      }
+    }
+    MseBlock.Eos eosBlock = (MseBlock.Eos) block;
+    // If it's a regular EOS block, we continue to process the left child operator. If it's an error block, we
+    // short-circuit the operator and return the error block.
+    if (eosBlock.isError()) {
+      _eos = eosBlock;
+    }
+    _isRightChildOperatorProcessed = true;
+    // Finished processing the right operator.
+    return null;
+  }
+
+  @Override
+  protected boolean handleRowMatched(Object[] row) {
+    if (!_rightRowSet.contains(new Record(row))) {
+      _rightRowSet.add(new Record(row));
+      return true; // Row is unique, add it to the result.
+    } else {
+      return false; // Row is a duplicate, skip it.
+    }
   }
 
   @Override
@@ -55,41 +94,9 @@ public class UnionOperator extends SetOperator {
     return Type.UNION;
   }
 
+  @Nullable
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
-  }
-
-  @Override
-  protected MseBlock getNextBlock() {
-    if (_eos != null) {
-      return _eos;
-    }
-    List<MultiStageOperator> childOperators = getChildOperators();
-    for (int i = _finishedChildren; i < childOperators.size(); i++) {
-      MultiStageOperator upstreamOperator = childOperators.get(i);
-      MseBlock block = upstreamOperator.nextBlock();
-      if (block.isData()) {
-        return block;
-      }
-      MseBlock.Eos eosBlock = (MseBlock.Eos) block;
-      if (eosBlock.isSuccess()) {
-        _finishedChildren++;
-      } else {
-        _eos = eosBlock;
-        return block;
-      }
-    }
-    return SuccessMseBlock.INSTANCE;
-  }
-
-  @Override
-  protected StatMap<?> copyStatMaps() {
-    return new StatMap<>(_statMap);
-  }
-
-  @Override
-  protected boolean handleRowMatched(Object[] row) {
-    throw new UnsupportedOperationException("Union operator does not support row matching");
   }
 }

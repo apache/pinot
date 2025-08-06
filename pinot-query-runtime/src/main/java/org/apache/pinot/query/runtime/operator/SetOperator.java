@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import java.util.ArrayList;
@@ -43,12 +44,11 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public abstract class SetOperator extends MultiStageOperator {
   protected final Multiset<Record> _rightRowSet;
 
-  private final List<MultiStageOperator> _inputOperators;
-  private final MultiStageOperator _leftChildOperator;
-  private final MultiStageOperator _rightChildOperator;
-  private final DataSchema _dataSchema;
+  protected final MultiStageOperator _leftChildOperator;
+  protected final MultiStageOperator _rightChildOperator;
+  protected final DataSchema _dataSchema;
 
-  private boolean _isRightSetBuilt;
+  protected boolean _isRightChildOperatorProcessed;
   protected MseBlock.Eos _eos;
   protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
@@ -56,11 +56,11 @@ public abstract class SetOperator extends MultiStageOperator {
       DataSchema dataSchema) {
     super(opChainExecutionContext);
     _dataSchema = dataSchema;
-    _inputOperators = inputOperators;
-    _leftChildOperator = getChildOperators().get(0);
-    _rightChildOperator = getChildOperators().get(1);
+    Preconditions.checkState(inputOperators.size() == 2, "Set operator should have 2 child operators");
+    _leftChildOperator = inputOperators.get(0);
+    _rightChildOperator = inputOperators.get(1);
     _rightRowSet = HashMultiset.create();
-    _isRightSetBuilt = false;
+    _isRightChildOperatorProcessed = false;
   }
 
   @Override
@@ -71,7 +71,7 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return _inputOperators;
+    return List.of(_leftChildOperator, _rightChildOperator);
   }
 
   @Override
@@ -96,17 +96,35 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
-    if (!_isRightSetBuilt) {
-      // construct a SET with all the right side rows.
-      constructRightBlockSet();
+    if (!_isRightChildOperatorProcessed) {
+      MseBlock mseBlock = null;
+
+      while (mseBlock == null && !_isRightChildOperatorProcessed) {
+        mseBlock = processRightOperator();
+      }
+
+      if (mseBlock != null) {
+        return mseBlock;
+      }
     }
+
     if (_eos != null) {
       return _eos;
     }
-    return constructResultBlockSet();
+
+    return processLeftOperator();
   }
 
-  protected void constructRightBlockSet() {
+  /**
+   * Processes the right child operator to build the set of rows that can be used to filter the left child.
+   * This method can be overridden to also be able to return blocks while processing the right operator.
+   * <p>
+   * {@link #_isRightChildOperatorProcessed} should be set to true when the right operator is fully processed.
+   *
+   * @return null if no blocks are returned from processing the right operator, or a block if there are rows to be
+   * returned.
+   */
+  protected MseBlock processRightOperator() {
     MseBlock block = _rightChildOperator.nextBlock();
     while (block.isData()) {
       MseBlock.Data dataBlock = (MseBlock.Data) block;
@@ -119,12 +137,18 @@ public abstract class SetOperator extends MultiStageOperator {
     MseBlock.Eos eosBlock = (MseBlock.Eos) block;
     if (eosBlock.isError()) {
       _eos = eosBlock;
-    } else {
-      _isRightSetBuilt = true;
     }
+    _isRightChildOperatorProcessed = true;
+    // The default implementation returns null because blocks are only returned while processing the left operator after
+    // the right operator is fully processed. This behavior can be overridden in subclasses if needed.
+    return null;
   }
 
-  protected MseBlock constructResultBlockSet() {
+  /**
+   * Processes the left child operator and return blocks of rows that match the criteria defined by the set operation.
+   * @return block containing matched rows or EOS, never {@code null}.
+   */
+  protected MseBlock processLeftOperator() {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
@@ -154,9 +178,9 @@ public abstract class SetOperator extends MultiStageOperator {
   }
 
   /**
-   * Returns true if the row is matched.
-   * Also updates the right row set based on the Operator.
-   * @param row
+   * Returns true if the row is matched. Also updates the right row set based on the Operator.
+   *
+   * @param row the row to be checked for matching.
    * @return true if the row is matched.
    */
   protected abstract boolean handleRowMatched(Object[] row);
