@@ -39,6 +39,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -132,6 +133,8 @@ public class QueryContext {
   private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
   // Parallel chunk size for final reduce
   private int _chunkSizeExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_CHUNK_SIZE_EXTRACT_FINAL_RESULT;
+  // Segment trim size for group by operator
+  private int _groupByTrimSize;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -510,6 +513,10 @@ public class QueryContext {
     return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
   }
 
+  public int getGroupByTrimSize() {
+    return _groupByTrimSize;
+  }
+
   /**
    * NOTE: For debugging only.
    */
@@ -658,7 +665,24 @@ public class QueryContext {
       queryContext._isUnsafeTrim =
           !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
 
+      // Pre-calculate group by trim size
+      queryContext._groupByTrimSize = getGroupByTrimSize(queryContext);
+
       return queryContext;
+    }
+
+    private int getGroupByTrimSize(QueryContext queryContext) {
+      int minGroupTrimSize = queryContext.getMinSegmentGroupTrimSize();
+      List<OrderByExpressionContext> orderByExpressions = queryContext.getOrderByExpressions();
+      if (!queryContext.isUnsafeTrim() && !queryContext.hasFilteredAggregations()) {
+        // if orderby key is groupby key, and there's no having clause, and there's no filtered aggr,
+        // keep at most `limit` rows only
+        return queryContext.getLimit();
+      } else if (orderByExpressions != null && minGroupTrimSize > 0) {
+        // otherwise trim to max(minSegmentGroupTrimSize, 5 * LIMIT)
+        return GroupByUtils.getTableCapacity(queryContext.getLimit(), minGroupTrimSize);
+      }
+      return -1;
     }
 
     /**
