@@ -339,7 +339,6 @@ public class PinotEnrichedJoinRule {
 
   /**
    * Temporarily disable conversion of lookup join and non-equijoin to EnrichedJoin
-   * TODO: enable them after more EnrichedJoin operators are implemented
    */
   private static boolean canConvertJoin(LogicalJoin join) {
     // Disable lookup join for now
