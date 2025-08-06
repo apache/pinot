@@ -122,7 +122,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
     _clock = clock;
     _useFixedReplica = config.isUseFixedReplica();
     _newSegmentExpirationTimeInSeconds = config.getNewSegmentExpirationTimeInSeconds();
-    _emitSinglePoolSegmentsMetric = config.shouldEmitSinglePoolSegments();
+    _emitSinglePoolSegmentsMetric = config.shouldEmitSinglePoolSegmentsMetrics();
     // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
     // instance
     // Math.abs(Integer.MIN_VALUE) = Integer.MIN_VALUE, so we use & 0x7FFFFFFF to get a positive value
@@ -305,8 +305,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           _oldSegmentCandidatesMap.put(segment, candidates);
         }
       }
-      pools.clear();
       if (_emitSinglePoolSegmentsMetric) {
+        pools.clear();
         for (String instance : idealStateInstanceStateMap.keySet()) {
           pools.add(getPool(instance));
         }

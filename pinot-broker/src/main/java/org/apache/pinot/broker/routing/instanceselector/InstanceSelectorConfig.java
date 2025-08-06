@@ -21,13 +21,13 @@ package org.apache.pinot.broker.routing.instanceselector;
 public class InstanceSelectorConfig {
   private final boolean _useFixedReplica;
   private final long _newSegmentExpirationTimeInSeconds;
-  private final boolean _emitSinglePoolSegments;
+  private final boolean _emitSinglePoolSegmentsMetrics;
 
   public InstanceSelectorConfig(boolean useFixedReplica, long newSegmentExpirationTimeInSeconds,
-      boolean emitSinglePoolSegments) {
+      boolean emitSinglePoolSegmentsMetrics) {
     _useFixedReplica = useFixedReplica;
     _newSegmentExpirationTimeInSeconds = newSegmentExpirationTimeInSeconds;
-    _emitSinglePoolSegments = emitSinglePoolSegments;
+    _emitSinglePoolSegmentsMetrics = emitSinglePoolSegmentsMetrics;
   }
 
   public boolean isUseFixedReplica() {
@@ -38,7 +38,7 @@ public class InstanceSelectorConfig {
     return _newSegmentExpirationTimeInSeconds;
   }
 
-  public boolean shouldEmitSinglePoolSegments() {
-    return _emitSinglePoolSegments;
+  public boolean shouldEmitSinglePoolSegmentsMetrics() {
+    return _emitSinglePoolSegmentsMetrics;
   }
 }
