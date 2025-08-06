@@ -38,15 +38,15 @@ import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
  * {@link org.apache.calcite.rel.logical.LogicalProject} on top of a Semi join
  * {@link org.apache.calcite.rel.core.Join} to ensure the correctness of the query.
  */
-public class PinotSeminJoinDistinctProjectRule extends RelOptRule {
-  public static final PinotSeminJoinDistinctProjectRule INSTANCE =
-      new PinotSeminJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
+public class PinotSemiJoinDistinctProjectRule extends RelOptRule {
+  public static final PinotSemiJoinDistinctProjectRule INSTANCE =
+      new PinotSemiJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, null);
 
-  public static PinotSeminJoinDistinctProjectRule instanceWithDescription(String description) {
-      return new PinotSeminJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, description);
+  public static PinotSemiJoinDistinctProjectRule instanceWithDescription(String description) {
+      return new PinotSemiJoinDistinctProjectRule(PinotRuleUtils.PINOT_REL_FACTORY, description);
   }
 
-  public PinotSeminJoinDistinctProjectRule(RelBuilderFactory factory, @Nullable String description) {
+  public PinotSemiJoinDistinctProjectRule(RelBuilderFactory factory, @Nullable String description) {
     super(operand(LogicalJoin.class, operand(AbstractRelNode.class, any()), operand(LogicalProject.class, any())),
         factory, description);
   }
