@@ -209,7 +209,6 @@ public class ServerPlanRequestVisitor implements PlanNodeVisitor<Void, ServerPla
         ServerPlanRequestUtils.attachDynamicFilter(context.getPinotQuery(), node.getLeftKeys(), node.getRightKeys(),
             resultDataContainer, dataSchema);
 
-        // TODO: check whether this, when multiple filter and projects are present, is correct
         PinotQuery pinotQuery = context.getPinotQuery();
         for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
           if (rex.getType() == EnrichedJoinNode.FilterProjectRexType.FILTER) {
