@@ -201,11 +201,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Nullable
-  public MutableRoaringBitmap loadQueryableDocIdsFromSnapshot() {
-    File queryablDocIdsSnapshotFile = getQueryableDocIdsSnapshotFile();
-    if (queryablDocIdsSnapshotFile.exists()) {
+  public MutableRoaringBitmap loadDocIdsFromSnapshot(String fileName) {
+    File docIdsSnapshotFile = getSnapshotFile(fileName);
+    if (docIdsSnapshotFile.exists()) {
       try {
-        byte[] bytes = FileUtils.readFileToByteArray(queryablDocIdsSnapshotFile);
+        byte[] bytes = FileUtils.readFileToByteArray(docIdsSnapshotFile);
         MutableRoaringBitmap queryableDocIds =
             new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
         LOGGER.info("Loaded queryableDocIds for segment: {} with: {} queryable docs", getSegmentName(),
@@ -213,59 +213,55 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         return queryableDocIds;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while loading queryableDocIds from snapshot file: {}, ignoring the snapshot",
-            queryablDocIdsSnapshotFile);
+            docIdsSnapshotFile);
       }
     }
     return null;
   }
 
-  public void persistQueryableDocIdsSnapshot() {
-    File queryableDocIdsSnapshotFile = getQueryableDocIdsSnapshotFile();
+  public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap docIds) {
+    File docIdsSnapshotFile = getSnapshotFile(fileName);
     try {
-      File tmpFile = new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
-          V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp");
+      File tmpFile =
+          new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()), fileName + "_tmp");
       if (tmpFile.exists()) {
-        LOGGER.warn("Previous queryableDocIds snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
+        LOGGER.warn("Previous snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
         FileUtils.deleteQuietly(tmpFile);
       }
-      MutableRoaringBitmap queryableDocIdsSnapshot = _queryableDocIds.getMutableRoaringBitmap();
+      MutableRoaringBitmap docIdsSnapshot = docIds.getMutableRoaringBitmap();
       try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(tmpFile))) {
-        queryableDocIdsSnapshot.serialize(dataOutputStream);
+        docIdsSnapshot.serialize(dataOutputStream);
       }
-      Preconditions.checkState(tmpFile.renameTo(queryableDocIdsSnapshotFile),
-          "Failed to rename tmp queryableDocIds snapshot file: %s to queryableDocIds snapshot file: %s", tmpFile,
-          queryableDocIdsSnapshotFile);
-      LOGGER.info("Persisted queryableDocIds for segment: {} with: {} queryable docs", getSegmentName(),
-          queryableDocIdsSnapshot.getCardinality());
+      Preconditions.checkState(tmpFile.renameTo(docIdsSnapshotFile),
+          "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, docIdsSnapshotFile);
+      LOGGER.info("Persisted docIds for segment: {} with: {}", getSegmentName(), docIdsSnapshot.getCardinality());
     } catch (Exception e) {
       LOGGER.warn("Caught exception while persisting queryableDocIds to snapshot file: {}, skipping",
-          queryableDocIdsSnapshotFile, e);
+          docIdsSnapshotFile, e);
     }
   }
 
-  public void deleteQueryableDocIdsSnapshot() {
-    File queryableDocIdsSnapshotFile = getQueryableDocIdsSnapshotFile();
-    if (queryableDocIdsSnapshotFile.exists()) {
+  public void deleteSnapshotFile(String fileName) {
+    File snapshotFile = getSnapshotFile(fileName);
+    if (snapshotFile.exists()) {
       try {
-        if (!FileUtils.deleteQuietly(queryableDocIdsSnapshotFile)) {
-          LOGGER.warn("Cannot delete old queryableDocIds snapshot file: {}, skipping", queryableDocIdsSnapshotFile);
+        if (!FileUtils.deleteQuietly(snapshotFile)) {
+          LOGGER.warn("Cannot delete old snapshot file: {}, skipping", snapshotFile);
           return;
         }
-        LOGGER.info("Deleted queryableDocIds snapshot for segment: {}", getSegmentName());
+        LOGGER.info("Deleted snapshot for segment: {}", getSegmentName());
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while deleting queryableDocIds snapshot file: {}, skipping",
-            queryableDocIdsSnapshotFile);
+        LOGGER.warn("Caught exception while deleting snapshot file: {}, skipping", snapshotFile);
       }
     }
   }
 
-  private File getQueryableDocIdsSnapshotFile() {
-    return new File(SegmentDirectoryPaths.findSegmentDirectory(getSegmentMetadata().getIndexDir()),
-        V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+  private File getSnapshotFile(String fileName) {
+    return new File(SegmentDirectoryPaths.findSegmentDirectory(getSegmentMetadata().getIndexDir()), fileName);
   }
 
-  public boolean hasQueryableDocIdsSnapshotFile() {
-    return getQueryableDocIdsSnapshotFile().exists();
+  public boolean hasDocIdsSnapshotFile(String fileName) {
+    return getSnapshotFile(fileName).exists();
   }
 
   /**

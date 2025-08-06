@@ -900,14 +900,17 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       }
       try {
         ImmutableSegmentImpl immutableSegment = (ImmutableSegmentImpl) segment;
-        if (!immutableSegment.hasValidDocIdsSnapshotFile()
-            || _deleteRecordColumn != null && !immutableSegment.hasQueryableDocIdsSnapshotFile()) {
+        if (!immutableSegment.hasDocIdsSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME) || (
+            _deleteRecordColumn != null && !immutableSegment.hasDocIdsSnapshotFile(
+                V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME))) {
           segmentsWithoutSnapshot.add(immutableSegment);
           continue;
         }
-        immutableSegment.persistValidDocIdsSnapshot();
+        immutableSegment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME,
+            immutableSegment.getValidDocIds());
         if (_deleteRecordColumn != null) {
-          immutableSegment.persistQueryableDocIdsSnapshot();
+          immutableSegment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME,
+              immutableSegment.getQueryableDocIds());
         }
         _updatedSegmentsSinceLastSnapshot.remove(segment);
         numImmutableSegments++;
@@ -938,9 +941,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
           continue;
         }
         try {
-          segment.persistValidDocIdsSnapshot();
+          segment.persistDocIdsSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME,
+              segment.getValidDocIds());
           if (_deleteRecordColumn != null) {
-            segment.persistQueryableDocIdsSnapshot();
+            segment.persistDocIdsSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME,
+                segment.getQueryableDocIds());
           }
           _updatedSegmentsSinceLastSnapshot.remove(segment);
           numImmutableSegments++;
@@ -962,7 +967,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (isTTLEnabled()) {
       WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
     }
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_SNAPSHOT_COUNT,
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT,
         numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
@@ -973,7 +978,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments - numUnchangedSegments;
     if (numMissedSegments > 0) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
-          ServerMeter.UPSERT_MISSED_SNAPSHOT_COUNT, numMissedSegments);
+          ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
       _logger.warn("Missed taking snapshot for {} immutable segments", numMissedSegments);
     }
     _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
@@ -982,8 +987,8 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   }
 
   protected void deleteSnapshot(ImmutableSegmentImpl segment) {
-    segment.deleteValidDocIdsSnapshot();
-    segment.deleteQueryableDocIdsSnapshot();
+    segment.deleteSnapshotFile(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+    segment.deleteSnapshotFile(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
   }
 
   protected File getWatermarkFile() {

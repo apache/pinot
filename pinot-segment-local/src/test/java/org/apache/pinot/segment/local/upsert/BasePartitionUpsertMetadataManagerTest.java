@@ -230,13 +230,13 @@ public class BasePartitionUpsertMetadataManagerTest {
       assertEquals(segmentsTakenSnapshot.size(), 3);
       assertTrue(segDir01.exists());
       assertEquals(seg01.loadValidDocIdsFromSnapshot().getCardinality(), 4);
-      assertEquals(seg01.loadQueryableDocIdsFromSnapshot().getCardinality(), 3);
+      assertEquals(seg01.loadDocIdsFromSnapshot(false).getCardinality(), 3);
       assertTrue(segDir02.exists());
       assertEquals(seg02.loadValidDocIdsFromSnapshot().getCardinality(), 6);
-      assertEquals(seg01.loadQueryableDocIdsFromSnapshot().getCardinality(), 5);
+      assertEquals(seg02.loadDocIdsFromSnapshot(false).getCardinality(), 5);
       assertTrue(segDir03.exists());
       assertEquals(seg03.loadValidDocIdsFromSnapshot().getCardinality(), 3);
-      assertEquals(seg01.loadQueryableDocIdsFromSnapshot().getCardinality(), 2);
+      assertEquals(seg03.loadDocIdsFromSnapshot(false).getCardinality(), 2);
     } finally {
       executor.shutdownNow();
     }
