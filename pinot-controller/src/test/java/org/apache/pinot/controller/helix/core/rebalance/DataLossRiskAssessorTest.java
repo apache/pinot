@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.rebalance;
 
 import java.util.Collections;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -46,6 +47,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
@@ -75,32 +77,17 @@ public class DataLossRiskAssessorTest extends ControllerTest {
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
     assertThrows(IllegalStateException.class,
-        () -> new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 2,
+        () -> new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig,
             _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
 
     assertThrows(IllegalStateException.class,
-        () -> new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0,
+        () -> new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig,
             _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
 
     TableRebalancer.NoOpRiskAssessor noOpRiskAssessor = new TableRebalancer.NoOpRiskAssessor();
-    assertFalse(noOpRiskAssessor.assessDataLossRisk("randomSegmentName").getLeft());
-  }
-
-  @Test
-  public void testDataLossRiskAssessorPeerDownloadEnabledMinAvailableReplicasNot0() {
-    TableConfig tableConfig =
-        new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(NUM_REPLICAS).build();
-    tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
-
-    assertThrows(IllegalStateException.class,
-        () -> new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 2,
-            _helixManager, _helixResourceManager.getRealtimeSegmentManager()));
-
-    // This will also return false since SegmentZkMetadata will be null
-    TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-        new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, _helixManager,
-            _helixResourceManager.getRealtimeSegmentManager());
-    assertFalse(dataLossRiskAssessor.assessDataLossRisk("randomSegmentName").getLeft());
+    Pair<Boolean, String> dataLossRiskResult = noOpRiskAssessor.assessDataLossRisk("randomSegmentName");
+    assertFalse(dataLossRiskResult.getLeft());
+    assertNull(dataLossRiskResult.getRight());
   }
 
   @Test
@@ -124,9 +111,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
 
     try (MockedStatic<ZKMetadataProvider> zkMetadataProviderMockedStatic = mockStatic(ZKMetadataProvider.class)) {
@@ -143,9 +132,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertTrue(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertTrue(dataLossRiskResult.getLeft());
+      assertTrue(dataLossRiskResult.getRight().contains("as the download URL is empty"));
     }
 
     // Enable dedup on the table, this should return the same results with it disabled
@@ -167,9 +158,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
 
     try (MockedStatic<ZKMetadataProvider> zkMetadataProviderMockedStatic = mockStatic(ZKMetadataProvider.class)) {
@@ -186,9 +179,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertTrue(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertTrue(dataLossRiskResult.getLeft());
+      assertTrue(dataLossRiskResult.getRight().contains("as the download URL is empty"));
     }
 
     // Enable upsert in PARTIAL mode on the table, this should return the same results with it disabled
@@ -211,9 +206,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
 
     try (MockedStatic<ZKMetadataProvider> zkMetadataProviderMockedStatic = mockStatic(ZKMetadataProvider.class)) {
@@ -230,9 +227,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertTrue(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertTrue(dataLossRiskResult.getLeft());
+      assertTrue(dataLossRiskResult.getRight().contains("as the download URL is empty"));
     }
 
     // Enable pauseless, disable upsert and dedup, results should be the same as without pauseless enabled
@@ -259,9 +258,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
 
     try (MockedStatic<ZKMetadataProvider> zkMetadataProviderMockedStatic = mockStatic(ZKMetadataProvider.class)) {
@@ -278,9 +279,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertTrue(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertTrue(dataLossRiskResult.getLeft());
+      assertTrue(dataLossRiskResult.getRight().contains("as the download URL is empty"));
     }
   }
 
@@ -306,9 +309,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
 
     // Enable dedup on the table, this should return the same results with it disabled
@@ -331,9 +336,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
 
     // Enable upsert in PARTIAL mode on the table, this should return the same results with it disabled
@@ -357,9 +364,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
 
     // Enable pauseless, disable dedup and upsert, this should return the same results as with it disabled
@@ -387,9 +396,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
   }
 
@@ -423,9 +434,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
 
     // Enable dedup on the table, this should return true
@@ -447,9 +460,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertTrue(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertTrue(dataLossRiskResult.getLeft());
+      assertTrue(dataLossRiskResult.getRight().contains("as it is in COMMITING state"));
     }
 
     // Enable upsert on the table in PARTIAL mode, this should return true
@@ -472,9 +487,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertTrue(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertTrue(dataLossRiskResult.getLeft());
+      assertTrue(dataLossRiskResult.getRight().contains("as it is in COMMITING state"));
     }
 
     // Enable upsert on the table in FULL mode, this should return false
@@ -496,9 +513,11 @@ public class DataLossRiskAssessorTest extends ControllerTest {
       when(helixManager.getHelixPropertyStore()).thenReturn(propertyStore);
 
       TableRebalancer.PeerDownloadTableDataLossRiskAssessor dataLossRiskAssessor =
-          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, 0, helixManager,
+          new TableRebalancer.PeerDownloadTableDataLossRiskAssessor(REALTIME_TABLE_NAME, tableConfig, helixManager,
               _helixResourceManager.getRealtimeSegmentManager());
-      assertFalse(dataLossRiskAssessor.assessDataLossRisk(segmentName).getLeft());
+      Pair<Boolean, String> dataLossRiskResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+      assertFalse(dataLossRiskResult.getLeft());
+      assertNull(dataLossRiskResult.getRight());
     }
   }
 }

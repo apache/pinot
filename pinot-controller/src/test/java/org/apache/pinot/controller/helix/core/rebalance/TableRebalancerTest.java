@@ -572,7 +572,6 @@ public class TableRebalancerTest {
       numSegmentsToOffloadMap.merge(targetInstance, -1, Integer::sum);
     }
     Map<Pair<Set<String>, Set<String>>, Set<String>> assignmentMap = new HashMap<>();
-    // Just use a dummy segmentName for now. If needed, can modify this function to take the segmentName as input
     return TableRebalancer.getNextSingleSegmentAssignment(currentInstanceStateMap, targetInstanceStateMap,
         minAvailableReplicas, lowDiskMode, numSegmentsToOffloadMap, assignmentMap);
   }

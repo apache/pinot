@@ -696,8 +696,6 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
             SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i),
             CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
       }
-      Map<String, Map<String, String>> oldSegmentAssignment =
-          _helixResourceManager.getTableIdealState(REALTIME_TABLE_NAME).getRecord().getMapFields();
 
       // Rebalance should return NO_OP status
       RebalanceConfig rebalanceConfig = new RebalanceConfig();

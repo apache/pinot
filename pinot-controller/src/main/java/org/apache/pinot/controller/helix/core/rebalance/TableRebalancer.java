@@ -421,20 +421,20 @@ public class TableRebalancer {
       // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
       // for a table. Skip this step if allowPeerDownloadDataLoss = true
       if (peerSegmentDownloadScheme != null && !allowPeerDownloadDataLoss) {
-        // Setting minAvailableReplicas to 0 since that is what's equivalent to downtime=true
         DataLossRiskAssessor dataLossRiskAssessor = new PeerDownloadTableDataLossRiskAssessor(tableNameWithType,
-            tableConfig, 0, _helixManager, _pinotLLCRealtimeSegmentManager);
+            tableConfig, _helixManager, _pinotLLCRealtimeSegmentManager);
         for (Map.Entry<String, Map<String, String>> segmentToAssignment : currentAssignment.entrySet()) {
           String segmentName = segmentToAssignment.getKey();
           Map<String, String> assignment = segmentToAssignment.getValue();
-          Pair<Boolean, String> dataLossResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
-          if (!assignment.equals(targetAssignment.get(segmentName))
-              && dataLossResult.getLeft()) {
-            // Fail the rebalance if a segment with the potential for data loss is found
-            String errorMsg = dataLossResult.getRight();
-            onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
-            return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
-                tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+          if (!assignment.equals(targetAssignment.get(segmentName))) {
+            Pair<Boolean, String> dataLossResult = dataLossRiskAssessor.assessDataLossRisk(segmentName);
+            if (dataLossResult.getLeft()) {
+              // Fail the rebalance if a segment with the potential for data loss is found
+              String errorMsg = dataLossResult.getRight();
+              onReturnFailure(errorMsg, new IllegalStateException(errorMsg), tableRebalanceLogger);
+              return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, instancePartitionsMap,
+                  tierToInstancePartitionsMap, targetAssignment, preChecksResult, summaryResult);
+            }
           }
         }
       }
@@ -521,8 +521,8 @@ public class TableRebalancer {
     if (minAvailableReplicas == 0 && peerSegmentDownloadScheme != null && !allowPeerDownloadDataLoss) {
       // Create the DataLossRiskAssessor which is used to check for data loss scenarios if peer-download is enabled
       // for a table
-      dataLossRiskAssessor = new PeerDownloadTableDataLossRiskAssessor(tableNameWithType, tableConfig,
-          minAvailableReplicas, _helixManager, _pinotLLCRealtimeSegmentManager);
+      dataLossRiskAssessor = new PeerDownloadTableDataLossRiskAssessor(tableNameWithType, tableConfig, _helixManager,
+          _pinotLLCRealtimeSegmentManager);
     } else {
       // If peer-download is disabled or minAvailableReplicas > 0, there is no data loss risk so create a no-op
       // assessor. If allowPeerDownloadDataLoss = true, then also skip checking for data loss since the caller's
@@ -1883,6 +1883,8 @@ public class TableRebalancer {
   @VisibleForTesting
   @FunctionalInterface
   interface DataLossRiskAssessor {
+    Pair<Boolean, String> NO_DATA_LOSS_RISK_RESULT = Pair.of(false, null);
+
     /**
      * Assess the risk of data loss for the given segment.
      *
@@ -1904,7 +1906,7 @@ public class TableRebalancer {
 
     @Override
     public Pair<Boolean, String> assessDataLossRisk(String segmentName) {
-      return Pair.of(false, "");
+      return NO_DATA_LOSS_RISK_RESULT;
     }
   }
 
@@ -1920,12 +1922,10 @@ public class TableRebalancer {
     private final boolean _isPauselessEnabled;
 
     @VisibleForTesting
-    PeerDownloadTableDataLossRiskAssessor(String tableNameWithType, TableConfig tableConfig,
-        int minAvailableReplicas, HelixManager helixManager,
+    PeerDownloadTableDataLossRiskAssessor(String tableNameWithType, TableConfig tableConfig, HelixManager helixManager,
         PinotLLCRealtimeSegmentManager pinotLLCRealtimeSegmentManager) {
       // Should only be created for peer-download enabled tables with minAvailableReplicas = 0
-      Preconditions.checkState(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null
-          && minAvailableReplicas == 0);
+      Preconditions.checkState(tableConfig.getValidationConfig().getPeerSegmentDownloadScheme() != null);
       _tableNameWithType = tableNameWithType;
       _tableConfig = tableConfig;
       _helixManager = helixManager;
@@ -1938,13 +1938,13 @@ public class TableRebalancer {
       SegmentZKMetadata segmentZKMetadata = ZKMetadataProvider
           .getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), _tableNameWithType, segmentName);
       if (segmentZKMetadata == null) {
-        return Pair.of(false, "");
+        return NO_DATA_LOSS_RISK_RESULT;
       }
 
       // If the segment state is COMPLETED and the download URL is empty, there is a data loss risk
       if (segmentZKMetadata.getStatus().isCompleted() && CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD.equals(
           segmentZKMetadata.getDownloadUrl())) {
-        return Pair.of(true, generateDataLossRiskMessage(segmentName));
+        return Pair.of(true, generateDataLossRiskMessage(segmentName, true));
       }
 
       // If the segment is not yet completed, then the following scenarios are possible:
@@ -1960,16 +1960,21 @@ public class TableRebalancer {
       //       state
       if (_isPauselessEnabled && segmentZKMetadata.getStatus() == CommonConstants.Segment.Realtime.Status.COMMITTING
           && !_pinotLLCRealtimeSegmentManager.allowRepairOfErrorSegments(false, _tableConfig)) {
-        return Pair.of(true, generateDataLossRiskMessage(segmentName));
+        return Pair.of(true, generateDataLossRiskMessage(segmentName, false));
       }
-      return Pair.of(false, "");
+      return NO_DATA_LOSS_RISK_RESULT;
     }
 
-    private static String generateDataLossRiskMessage(String segmentName) {
-      return "Moving segment " + segmentName + " as part of rebalance is risky for peer-download "
-          + "enabled tables, ensure the deep store has a copy of the segment and if upsert / dedup enabled "
-          + "that it is completed and try again. It is recommended to forceCommit and pause ingestion prior to "
-          + "rebalancing";
+    private static String generateDataLossRiskMessage(String segmentName, boolean isCompletedSegment) {
+      if (isCompletedSegment) {
+        return "Moving segment " + segmentName + " as part of rebalance is risky for peer-download enabled tables, "
+            + "as the download URL is empty. Ensure that the deep store has a copy of the segment. It is recommended "
+            + "to forceCommit and pause ingestion prior to trying to rebalance such tables with downtime";
+      }
+      return "Moving segment " + segmentName + " as part of rebalance is risky for peer-download enabled tables "
+          + "as it is in COMMITING state and repair is not allowed (it may be an upsert / dedup enabled table). It "
+          + "is recommended to forceCommit and pause ingestion prior to trying to rebalance such tables with "
+          + "downtime";
     }
   }
 

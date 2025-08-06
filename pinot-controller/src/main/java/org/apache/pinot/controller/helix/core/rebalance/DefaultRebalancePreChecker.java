@@ -370,7 +370,7 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
 
     // Peer download enabled tables may have data loss during rebalance, when downtime=true or minAvailableReplicas=0.
     // The scenario plays out as follows:
-    // 1. If the newly built consuming segment is cannot be uploaded to deep store, it may set up the download URI
+    // 1. If the newly built consuming segment cannot be uploaded to deep store, it may set up the download URI
     //    as an empty string: ""
     // 2. When this happens, other servers expect to download the segment from a peer server that built the segment or
     //    has a copy of the segment

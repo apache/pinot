@@ -2552,6 +2552,12 @@ public class PinotLLCRealtimeSegmentManager {
     }
   }
 
+  /**
+   * Whether to allow repairing the ERROR segment or not
+   * @param repairErrorSegmentsForPartialUpsertOrDedup API context flag, if true then always allow repair
+   * @param tableConfig tableConfig
+   * @return Returns true if repair is allowed for ERROR segments or not
+   */
   public boolean allowRepairOfErrorSegments(boolean repairErrorSegmentsForPartialUpsertOrDedup,
       TableConfig tableConfig) {
     if (repairErrorSegmentsForPartialUpsertOrDedup) {
