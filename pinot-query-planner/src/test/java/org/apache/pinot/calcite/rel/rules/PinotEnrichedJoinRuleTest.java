@@ -36,6 +36,7 @@ import org.apache.calcite.rel.logical.LogicalProject;
 import org.apache.calcite.rel.logical.LogicalSort;
 import org.apache.calcite.rel.logical.LogicalValues;
 import org.apache.calcite.rel.metadata.DefaultRelMetadataProvider;
+import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -577,6 +578,58 @@ public class PinotEnrichedJoinRuleTest {
     assertEquals(enrichedJoin.getCondition(), joinCondition);
     assertNull(enrichedJoin.getOffset());
     assertNull(enrichedJoin.getFetch());
+  }
+
+  @Test
+  public void testRuleWithPlannerProjectJoinAfterProjectPushdownCase() {
+    HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
+    // add projection pushdown rule
+    hepProgramBuilder.addRuleInstance(CoreRules.PROJECT_JOIN_TRANSPOSE);
+    // add enriched join rule
+    hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
+    hepProgramBuilder.addMatchOrder(HepMatchOrder.BOTTOM_UP);
+    HepPlanner planner = new HepPlanner(hepProgramBuilder.build());
+    RelOptCluster cluster = RelOptCluster.create(planner, REX_BUILDER);
+    cluster.setMetadataProvider(DefaultRelMetadataProvider.INSTANCE);
+
+    RelDataType intType = TYPE_FACTORY.builder()
+        .add("col1", SqlTypeName.INTEGER)
+        .add("col2", SqlTypeName.INTEGER)
+        .add("col3", SqlTypeName.INTEGER)
+        .build();
+
+    // join condition col1 = col1
+    RexNode joinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS, REX_BUILDER.makeInputRef(intType, 0),
+        REX_BUILDER.makeInputRef(intType, 3));
+    LogicalJoin originalJoin =
+        LogicalJoin.create(_input, _input, Collections.emptyList(), joinCondition, Collections.emptySet(),
+            JoinRelType.INNER);
+    // project that touches both left and right relations
+    List<RexNode> projects = List.of(REX_BUILDER.makeCall(SqlStdOperatorTable.PLUS,
+        REX_BUILDER.makeInputRef(intType, 1), REX_BUILDER.makeInputRef(intType, 4)));
+    LogicalProject project =
+        LogicalProject.create(originalJoin, Collections.emptyList(), projects, List.of("projectCol1"));
+
+    planner.setRoot(project);
+    RelNode newRoot = planner.findBestExp();
+
+    assert (newRoot instanceof PinotLogicalEnrichedJoin);
+    PinotLogicalEnrichedJoin enrichedJoin = (PinotLogicalEnrichedJoin) newRoot;
+    // projection pushdown should trim both inputs to first two cols only
+    assert (newRoot.getInput(0) instanceof LogicalProject);
+    assert (newRoot.getInput(1) instanceof LogicalProject);
+    LogicalProject leftChild = (LogicalProject) newRoot.getInput(0);
+    LogicalProject rightChild = (LogicalProject) newRoot.getInput(1);
+    assertEquals(leftChild.getProjects().size(), 2);
+    assertEquals(rightChild.getProjects().size(), 2);
+    // join output layout [t1.col1, t1.col2, t2.col1, t2.col2]
+    List<RexNode> expectedProjects = List.of(REX_BUILDER.makeCall(SqlStdOperatorTable.PLUS,
+        REX_BUILDER.makeInputRef(intType, 1), REX_BUILDER.makeInputRef(intType, 3)));
+    assertEquals(enrichedJoin.getProjects(), expectedProjects);
+    // join condition col1 = col1
+    RexNode expectedJoinCondition = REX_BUILDER.makeCall(SqlStdOperatorTable.EQUALS,
+        REX_BUILDER.makeInputRef(intType, 0), REX_BUILDER.makeInputRef(intType, 2));
+    assertEquals(enrichedJoin.getCondition(), expectedJoinCondition);
   }
 
   private static RexNode literal(int i) {
