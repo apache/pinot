@@ -142,11 +142,11 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
         byte[] bytes = FileUtils.readFileToByteArray(docIdsSnapshotFile);
         MutableRoaringBitmap queryableDocIds =
             new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
-        LOGGER.info("Loaded queryableDocIds for segment: {} with: {} queryable docs", getSegmentName(),
+        LOGGER.info("Loaded docIds from snapshot for segment: {} with: {} docs", getSegmentName(),
             queryableDocIds.getCardinality());
         return queryableDocIds;
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while loading queryableDocIds from snapshot file: {}, ignoring the snapshot",
+        LOGGER.warn("Caught exception while loading docIds from snapshot file: {}, ignoring the snapshot",
             docIdsSnapshotFile);
       }
     }
@@ -170,7 +170,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
           "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, docIdsSnapshotFile);
       LOGGER.info("Persisted docIds for segment: {} with: {}", getSegmentName(), docIdsSnapshot.getCardinality());
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while persisting queryableDocIds to snapshot file: {}, skipping",
+      LOGGER.warn("Caught exception while persisting docIds to snapshot file: {}, skipping",
           docIdsSnapshotFile, e);
     }
   }
