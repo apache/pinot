@@ -865,9 +865,9 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
     }});
     when(columnMetadata.getMaxValue()).thenReturn(endTime);
     if (snapshot != null) {
-      when(segment.loadValidDocIdsFromSnapshot()).thenReturn(snapshot);
+      when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
     } else {
-      when(segment.loadValidDocIdsFromSnapshot()).thenReturn(validDocIds.getMutableRoaringBitmap());
+      when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(validDocIds.getMutableRoaringBitmap());
     }
     return segment;
   }
@@ -877,7 +877,7 @@ public class ConcurrentMapPartitionUpsertMetadataManagerTest {
       List<PrimaryKey> primaryKeys, SegmentMetadataImpl segmentMetadata, MutableRoaringBitmap snapshot) {
     ImmutableSegmentImpl segment = mockImmutableSegment(sequenceNumber, validDocIds, queryableDocIds, primaryKeys);
     when(segment.getSegmentMetadata()).thenReturn(segmentMetadata);
-    when(segment.loadValidDocIdsFromSnapshot()).thenReturn(snapshot);
+    when(segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME)).thenReturn(snapshot);
     return segment;
   }
 

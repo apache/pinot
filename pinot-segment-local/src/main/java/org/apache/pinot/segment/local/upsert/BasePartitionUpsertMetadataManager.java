@@ -323,7 +323,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
   protected boolean skipAddSegmentOutOfTTL(ImmutableSegmentImpl segment) {
     String segmentName = segment.getSegmentName();
     _logger.info("Skip adding segment: {} because it's out of TTL", segmentName);
-    MutableRoaringBitmap validDocIdsSnapshot = segment.loadValidDocIdsFromSnapshot();
+    MutableRoaringBitmap validDocIdsSnapshot = segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
     if (validDocIdsSnapshot != null) {
       MutableRoaringBitmap queryableDocIds = getQueryableDocIds(segment, validDocIdsSnapshot);
       segment.enableUpsert(this, new ThreadSafeMutableRoaringBitmap(validDocIdsSnapshot),
@@ -415,7 +415,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     _logger.info("Preloading segment: {}, current primary key count: {}", segmentName, getNumPrimaryKeys());
     long startTimeMs = System.currentTimeMillis();
 
-    MutableRoaringBitmap validDocIds = segment.loadValidDocIdsFromSnapshot();
+    MutableRoaringBitmap validDocIds = segment.loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
     Preconditions.checkState(validDocIds != null,
         "Snapshot of validDocIds is required to preload segment: %s, table: %s", segmentName, _tableNameWithType);
     if (validDocIds.isEmpty()) {
@@ -967,8 +967,19 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     if (isTTLEnabled()) {
       WatermarkUtils.persistWatermark(_largestSeenComparisonValue.get(), getWatermarkFile());
     }
-    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId, ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT,
-        numImmutableSegments);
+    updateSnapshotMetrics(numImmutableSegments, numPrimaryKeysInSnapshot, numQueryableDocIdsInSnapshot, numTrackedSegments,
+        numConsumingSegments, numUnchangedSegments);
+    _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
+            + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
+        numConsumingSegments, System.currentTimeMillis() - startTimeMs);
+  }
+
+  private void updateSnapshotMetrics(int numImmutableSegments, long numPrimaryKeysInSnapshot,
+      long numQueryableDocIdsInSnapshot, int numTrackedSegments, int numConsumingSegments, int numUnchangedSegments) {
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
+        ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
+    _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
+        ServerGauge.UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT, numImmutableSegments);
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
     if (_deleteRecordColumn != null) {
@@ -980,10 +991,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
           ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
       _logger.warn("Missed taking snapshot for {} immutable segments", numMissedSegments);
+      if (_deleteRecordColumn != null) {
+        _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
+            ServerMeter.UPSERT_MISSED_QUERYABLE_DOCS_SNAPSHOT_COUNT, numMissedSegments);
+      }
     }
-    _logger.info("Finished taking snapshot for {} immutable segments with {} primary keys (out of {} total segments, "
-            + "{} are consuming segments) in {} ms", numImmutableSegments, numPrimaryKeysInSnapshot, numTrackedSegments,
-        numConsumingSegments, System.currentTimeMillis() - startTimeMs);
   }
 
   protected void deleteSnapshot(ImmutableSegmentImpl segment) {
