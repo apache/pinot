@@ -23,10 +23,21 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.pinot.spi.config.BaseJsonConfig;
+import org.apache.pinot.spi.config.table.task.TableTaskTypeConfig;
+import org.apache.pinot.spi.config.table.task.TaskType;
 
 
 public class TableTaskConfig extends BaseJsonConfig {
+
+  // A structured representation of task configs. It will contain few task types and their configs.
+  // Eventually, this will replace _taskTypeConfigsMap.
+  private final Map<TaskType, TableTaskTypeConfig> _taskTypeConfigs;
+
+  // A map of task type to its configs.
+  // This is primarily used for backward compatibility until all taskTypes use _taskTypeConfigs
+  // This map will contain all configs for each task type, including those that are defined in _taskTypeConfigs.
   private final Map<String, Map<String, String>> _taskTypeConfigsMap;
+
   public final static String MINION_ALLOW_DOWNLOAD_FROM_SERVER = "allowDownloadFromServer";
   public final static boolean DEFAULT_MINION_ALLOW_DOWNLOAD_FROM_SERVER = false;
 
@@ -35,6 +46,13 @@ public class TableTaskConfig extends BaseJsonConfig {
       Map<String, Map<String, String>> taskTypeConfigsMap) {
     Preconditions.checkArgument(taskTypeConfigsMap != null, "'taskTypeConfigsMap' must be configured");
     _taskTypeConfigsMap = taskTypeConfigsMap;
+
+    // populate _taskTypeConfigs from _taskTypeConfigsMap if the key is a valid TaskType
+    _taskTypeConfigs = taskTypeConfigsMap.entrySet().stream()
+        .filter(entry -> TaskType.isValidTaskType(entry.getKey()))
+        .collect(java.util.stream.Collectors.toMap(
+            entry -> TaskType.valueOf(entry.getKey()),
+            entry -> TaskType.createTaskTypeConfig(entry.getKey(), entry.getValue())));
   }
 
   @JsonProperty
@@ -48,5 +66,9 @@ public class TableTaskConfig extends BaseJsonConfig {
 
   public Map<String, String> getConfigsForTaskType(String taskType) {
     return _taskTypeConfigsMap.get(taskType);
+  }
+
+  public TableTaskTypeConfig getTaskConfig(TaskType taskType) {
+    return _taskTypeConfigs.get(taskType);
   }
 }
