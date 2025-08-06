@@ -236,11 +236,7 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
   /// Clear and trim thread-local map of _rawKeyHolder
   @Override
   public void close() {
-    try {
-      _rawKeyHolder.close();
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    _rawKeyHolder.close();
   }
 
   private interface RawKeyHolder extends AutoCloseable {
@@ -277,6 +273,9 @@ public class DictionaryBasedGroupKeyGenerator implements GroupKeyGenerator {
      * Returns current number of unique keys
      */
     int getNumKeys();
+
+    @Override
+    void close();
   }
 
   // This holder works only if it can fit all results, otherwise it fails on AIOOBE or produces too many group keys
