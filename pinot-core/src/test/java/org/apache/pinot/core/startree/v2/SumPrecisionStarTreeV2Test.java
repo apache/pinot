@@ -41,7 +41,7 @@ public class SumPrecisionStarTreeV2Test extends BaseStarTreeV2Test<Object, BigDe
   }
 
   @Override
-  Double getRandomRawValue(Random random) {
+  Object getRandomRawValue(Random random) {
     return random.nextDouble();
   }
 
