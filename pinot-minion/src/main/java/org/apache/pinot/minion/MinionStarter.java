@@ -41,7 +41,7 @@ public class MinionStarter extends BaseMinionStarter {
   private static PinotConfiguration applyMinionConfigs(PinotConfiguration minionConfig, String clusterName,
       String zkServers) {
     minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
-    minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkServers);
+    minionConfig.setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkServers);
     return minionConfig;
   }
 

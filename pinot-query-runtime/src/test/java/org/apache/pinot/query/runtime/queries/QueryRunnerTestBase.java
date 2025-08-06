@@ -595,6 +595,8 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
       public boolean _keepOutputRowOrder;
       @JsonProperty("expectedNumSegments")
       public Integer _expectedNumSegments;
+      @JsonProperty("ignoreV2Optimizer")
+      public Boolean _ignoreV2Optimizer = false;
     }
 
     public static class ColumnAndType {

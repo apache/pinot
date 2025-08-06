@@ -352,7 +352,7 @@ public class QueryDispatcher {
       } catch (Throwable t) {
         LOGGER.warn("Caught exception while dispatching query to server: {}", serverInstance, t);
         callbackConsumer.accept(new AsyncResponse<>(serverInstance, null, t));
-        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId());
+        _failureDetector.markServerUnhealthy(serverInstance.getInstanceId(), serverInstance.getHostname());
       }
     }
     return dispatchCallbacks;
@@ -372,7 +372,10 @@ public class QueryDispatcher {
           // subsequent query failures
           if (getOrCreateDispatchClient(resp.getServerInstance()).getChannel().getState(false)
               != ConnectivityState.READY) {
-            _failureDetector.markServerUnhealthy(resp.getServerInstance().getInstanceId());
+            _failureDetector.markServerUnhealthy(
+                resp.getServerInstance().getInstanceId(),
+                resp.getServerInstance().getHostname()
+            );
           }
           throw new RuntimeException(
               String.format("Error dispatching query: %d to server: %s", requestId, resp.getServerInstance()),

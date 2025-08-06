@@ -51,9 +51,9 @@ import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TablePartitionInfo;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.logical.LeafStageToPinotQuery;
@@ -158,8 +158,8 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       String tableType = routingEntry.getKey();
       RoutingTable routingTable = routingEntry.getValue();
       Map<String, List<String>> currentSegmentsMap = new HashMap<>();
-      Map<ServerInstance, ServerRouteInfo> tmp = routingTable.getServerInstanceToSegmentsMap();
-      for (Map.Entry<ServerInstance, ServerRouteInfo> serverEntry : tmp.entrySet()) {
+      Map<ServerInstance, SegmentsToQuery> tmp = routingTable.getServerInstanceToSegmentsMap();
+      for (Map.Entry<ServerInstance, SegmentsToQuery> serverEntry : tmp.entrySet()) {
         // TODO: Optional segments are not supported yet by the MSE.
         String instanceId = serverEntry.getKey().getInstanceId();
         Preconditions.checkState(currentSegmentsMap.put(instanceId, serverEntry.getValue().getSegments()) == null,

@@ -35,8 +35,8 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.VoidFunction;
 
+
 public class SparkSegmentTarPushJobRunner extends BaseSparkSegmentTarPushJobRunner {
-  private SegmentGenerationJobSpec _spec;
 
   public SparkSegmentTarPushJobRunner() {
     super();
@@ -46,8 +46,8 @@ public class SparkSegmentTarPushJobRunner extends BaseSparkSegmentTarPushJobRunn
     super(spec);
   }
 
-  public void parallelizeTarPushJob(List<PinotFSSpec> pinotFSSpecs,
-      List<String> segmentUris, int pushParallelism, URI outputDirURI) {
+  public void parallelizeTarPushJob(List<PinotFSSpec> pinotFSSpecs, List<String> segmentUris, int pushParallelism,
+      URI outputDirURI) {
     JavaSparkContext sparkContext = JavaSparkContext.fromSparkContext(SparkContext.getOrCreate());
     JavaRDD<String> pathRDD = sparkContext.parallelize(segmentUris, pushParallelism);
     URI finalOutputDirURI = outputDirURI;
@@ -59,8 +59,8 @@ public class SparkSegmentTarPushJobRunner extends BaseSparkSegmentTarPushJobRunn
           throws Exception {
         PluginManager.get().init();
         for (PinotFSSpec pinotFSSpec : pinotFSSpecs) {
-          PinotFSFactory
-              .register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(), new PinotConfiguration(pinotFSSpec));
+          PinotFSFactory.register(pinotFSSpec.getScheme(), pinotFSSpec.getClassName(),
+              new PinotConfiguration(pinotFSSpec));
         }
         try {
           SegmentPushUtils.pushSegments(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),

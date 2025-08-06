@@ -67,6 +67,11 @@ public class QuerySchedulerFactoryTest {
     config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY, TestQueryScheduler.class.getName());
     queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime, accountant);
     assertTrue(queryScheduler instanceof TestQueryScheduler);
+
+    config.setProperty(QuerySchedulerFactory.ALGORITHM_NAME_CONFIG_KEY,
+        QuerySchedulerFactory.WORKLOAD_SCHEDULER_ALGORITHM);
+    queryScheduler = QuerySchedulerFactory.create(config, queryExecutor, serverMetrics, latestQueryTime, accountant);
+    assertTrue(queryScheduler instanceof WorkloadScheduler);
   }
 
   public static final class TestQueryScheduler extends QueryScheduler {

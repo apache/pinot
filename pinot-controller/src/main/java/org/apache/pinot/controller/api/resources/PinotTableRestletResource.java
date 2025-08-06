@@ -72,6 +72,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.AccessOption;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.RebalanceInProgressException;
@@ -207,8 +208,10 @@ public class PinotTableRestletResource {
   @ManualAuthorization // performed after parsing table configs
   public ConfigSuccessResponse addTable(String tableConfigStr,
       @ApiParam(value = "comma separated list of validation type(s) to skip. supported types: (ALL|TASK|UPSERT)")
-      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip, @Context HttpHeaders httpHeaders,
-      @Context Request request) {
+      @QueryParam("validationTypesToSkip") @Nullable String typesToSkip,
+      @ApiParam(defaultValue = "false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
+      @Context HttpHeaders httpHeaders, @Context Request request)
+      throws IOException {
     // TODO introduce a table config ctor with json string.
     Pair<TableConfig, Map<String, Object>> tableConfigAndUnrecognizedProperties;
     TableConfig tableConfig;
@@ -246,6 +249,9 @@ public class PinotTableRestletResource {
       } catch (Exception e) {
         throw new InvalidTableConfigException(e);
       }
+      if (!ignoreActiveTasks) {
+        tableTasksValidation(tableConfig, _pinotHelixTaskResourceManager);
+      }
       _pinotHelixResourceManager.addTable(tableConfig);
       // TODO: validate that table was created successfully
       // (in realtime case, metadata might not have been created but would be created successfully in the next run of
@@ -260,6 +266,8 @@ public class PinotTableRestletResource {
         throw new ControllerApplicationException(LOGGER, errStr, Response.Status.BAD_REQUEST, e);
       } else if (e instanceof TableAlreadyExistsException) {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.CONFLICT, e);
+      } else if (e instanceof ControllerApplicationException) {
+        throw e;
       } else {
         throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
       }
@@ -426,6 +434,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Retention period for the table segments (e.g. 12h, 3d); If not set, the retention period "
           + "will default to the first config that's not null: the cluster setting, then '7d'. Using 0d or -1d will "
           + "instantly delete segments without retention") @QueryParam("retention") String retentionPeriod,
+      @ApiParam(defaultValue = "false") @QueryParam("ignoreActiveTasks") boolean ignoreActiveTasks,
       @Context HttpHeaders headers) {
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
@@ -435,21 +444,25 @@ public class PinotTableRestletResource {
       validateLogicalTableReference(tableName, tableType);
       boolean tableExist = false;
       if (verifyTableType(tableName, tableType, TableType.OFFLINE)) {
+        String tableWithType = TableNameBuilder.OFFLINE.tableNameWithType(tableName);
+        tableTasksCleanup(tableWithType, ignoreActiveTasks, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
         tableExist = _pinotHelixResourceManager.hasOfflineTable(tableName);
         // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
         // did not complete.
         _pinotHelixResourceManager.deleteOfflineTable(tableName, retentionPeriod);
         if (tableExist) {
-          tablesDeleted.add(TableNameBuilder.OFFLINE.tableNameWithType(tableName));
+          tablesDeleted.add(tableWithType);
         }
       }
       if (verifyTableType(tableName, tableType, TableType.REALTIME)) {
+        String tableWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+        tableTasksCleanup(tableWithType, ignoreActiveTasks, _pinotHelixResourceManager, _pinotHelixTaskResourceManager);
         tableExist = _pinotHelixResourceManager.hasRealtimeTable(tableName);
         // Even the table name does not exist, still go on to delete remaining table metadata in case a previous delete
         // did not complete.
         _pinotHelixResourceManager.deleteRealtimeTable(tableName, retentionPeriod);
         if (tableExist) {
-          tablesDeleted.add(TableNameBuilder.REALTIME.tableNameWithType(tableName));
+          tablesDeleted.add(tableWithType);
         }
       }
       if (!tablesDeleted.isEmpty()) {
@@ -461,6 +474,69 @@ public class PinotTableRestletResource {
     }
     throw new ControllerApplicationException(LOGGER,
         "Table '" + tableName + "' with type " + tableType + " does not exist", Response.Status.NOT_FOUND);
+  }
+
+  public static void tableTasksValidation(TableConfig tableConfig,
+      PinotHelixTaskResourceManager pinotHelixTaskResourceManager) {
+    if (tableConfig.getTaskConfig() == null) {
+      return;
+    }
+    String tableWithType = tableConfig.getTableName();
+    Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
+    for (String taskType : taskTypeConfigsMap.keySet()) {
+      Map<String, TaskState> taskStates;
+      try {
+        taskStates = pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableWithType);
+      } catch (IllegalArgumentException e) {
+        LOGGER.info(e.getMessage());
+        return;
+      }
+      if (!taskStates.isEmpty()) {
+        throw new ControllerApplicationException(LOGGER, "The table has dangling task data, try performing table "
+            + "delete operation in case the delete operation was not completed successfully, else delete the tasks "
+            + "manually through DELETE /tasks/task/{taskName} endpoint. Please try again once the dangling tasks are "
+            + "cleaned up", Response.Status.BAD_REQUEST);
+      }
+    }
+  }
+
+  public static void tableTasksCleanup(String tableWithType, boolean ignoreActiveTasks,
+      PinotHelixResourceManager pinotHelixResourceManager, PinotHelixTaskResourceManager pinotHelixTaskResourceManager)
+      throws IOException {
+    TableConfig tableConfig = pinotHelixResourceManager.getTableConfig(tableWithType);
+    if (tableConfig == null || tableConfig.getTaskConfig() == null) {
+      return;
+    }
+    Map<String, Map<String, String>> taskTypeConfigsMap = tableConfig.getTaskConfig().getTaskTypeConfigsMap();
+    Set<String> taskTypes = taskTypeConfigsMap.keySet();
+    for (String taskType : taskTypes) {
+      // remove the task schedules to avoid task being scheduled during table deletion
+      taskTypeConfigsMap.get(taskType).remove(PinotTaskManager.SCHEDULE_KEY);
+    }
+    pinotHelixResourceManager.updateTableConfig(tableConfig);
+    List<String> pendingTasks = new ArrayList<>();
+    for (String taskType : taskTypes) {
+      Map<String, TaskState> taskStates;
+      try {
+        taskStates = pinotHelixTaskResourceManager.getTaskStatesByTable(taskType, tableWithType);
+      } catch (IllegalArgumentException e) {
+        LOGGER.info(e.getMessage());
+        continue;
+      }
+      for (String taskName : taskStates.keySet()) {
+        if (TaskState.IN_PROGRESS.equals(taskStates.get(taskName))
+            && pinotHelixTaskResourceManager.getTaskCount(taskName).getRunning() > 0) {
+          pendingTasks.add(taskName);
+        } else {
+          pinotHelixTaskResourceManager.deleteTask(taskName, true);
+        }
+      }
+    }
+    if (!ignoreActiveTasks && !pendingTasks.isEmpty()) {
+      throw new ControllerApplicationException(LOGGER, "The table has " + pendingTasks.size() + " active running tasks "
+          + ": " + pendingTasks + ". The task schedules have been cleared, so new tasks should not be generated. "
+          + "Please try again once there are no more active tasks", Response.Status.BAD_REQUEST);
+    }
   }
 
   //   Return true iff the table is of the expectedType based on the given tableName and tableType. The truth table:

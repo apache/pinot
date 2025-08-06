@@ -39,7 +39,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.RangeIndexHandler;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -49,7 +48,11 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.compression.ChunkCompressionType;
 import org.apache.pinot.segment.spi.compression.DictIdCompressionType;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
+import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -1120,8 +1123,11 @@ public class ForwardIndexHandlerTest {
 
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-        ForwardIndexReader<?> forwardIndexReader =
-            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column));
+        IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+        ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+        ForwardIndexReader forwardIndexReader =
+            readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
         assertEquals(forwardIndexReader.getDictIdCompressionType(), DictIdCompressionType.MV_ENTRY_DICT);
@@ -1147,8 +1153,11 @@ public class ForwardIndexHandlerTest {
 
       try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
           SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
-        ForwardIndexReader<?> forwardIndexReader =
-            ForwardIndexType.read(reader, segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column));
+        IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+        ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+        FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+        ForwardIndexReader forwardIndexReader =
+            readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
         assertTrue(forwardIndexReader.isDictionaryEncoded());
         assertFalse(forwardIndexReader.isSingleValue());
         assertNull(forwardIndexReader.getDictIdCompressionType());
@@ -2019,12 +2028,14 @@ public class ForwardIndexHandlerTest {
     try (SegmentDirectory segmentDirectory = new SegmentLocalFSDirectory(INDEX_DIR, ReadMode.mmap);
         SegmentDirectory.Reader reader = segmentDirectory.createReader()) {
       validateForwardIndex(segmentDirectory, reader, columnName, expectedCompressionType, isSorted);
+    } catch (IndexReaderConstraintException e) {
+      throw new RuntimeException(e);
     }
   }
 
   private void validateForwardIndex(SegmentDirectory segmentDirectory, SegmentDirectory.Reader reader,
       String columnName, @Nullable CompressionCodec expectedCompressionType, boolean isSorted)
-      throws IOException {
+      throws IOException, IndexReaderConstraintException {
     ColumnMetadata columnMetadata = segmentDirectory.getSegmentMetadata().getColumnMetadataFor(columnName);
     boolean isSingleValue = columnMetadata.isSingleValue();
 
@@ -2036,7 +2047,9 @@ public class ForwardIndexHandlerTest {
     assertTrue(reader.hasIndexFor(columnName, StandardIndexes.forward()));
 
     // Check Compression type in header
-    ForwardIndexReader<?> fwdIndexReader = ForwardIndexType.read(reader, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    FieldIndexConfigs fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+    ForwardIndexReader<?> fwdIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs, columnMetadata);
     ChunkCompressionType fwdIndexCompressionType = fwdIndexReader.getCompressionType();
     if (expectedCompressionType != null) {
       assertNotNull(fwdIndexCompressionType);
@@ -2044,8 +2057,9 @@ public class ForwardIndexHandlerTest {
     } else {
       assertNull(fwdIndexCompressionType);
     }
-
-    try (ForwardIndexReader<?> forwardIndexReader = ForwardIndexType.read(reader, columnMetadata)) {
+    fieldIndexConfigs = createFieldIndexConfigsFromMetadata(columnMetadata);
+    try (ForwardIndexReader<?> forwardIndexReader = readerFactory.createIndexReader(reader, fieldIndexConfigs,
+        columnMetadata)) {
       Dictionary dictionary = null;
       if (columnMetadata.hasDictionary()) {
         dictionary = DictionaryIndexType.read(reader, columnMetadata);
@@ -2256,5 +2270,21 @@ public class ForwardIndexHandlerTest {
     assertEquals(columnMetadata.isAutoGenerated(), isAutoGenerated);
     assertEquals(columnMetadata.getMinValue(), minValue);
     assertEquals(columnMetadata.getMaxValue(), maxValue);
+  }
+
+  private FieldIndexConfigs createFieldIndexConfigsFromMetadata(ColumnMetadata columnMetadata) {
+    FieldIndexConfigs.Builder builder = new FieldIndexConfigs.Builder();
+
+    // Add forward index config
+    ForwardIndexConfig forwardIndexConfig = ForwardIndexConfig.getDefault();
+    builder.add(StandardIndexes.forward(), forwardIndexConfig);
+
+    // Add dictionary config if the column has dictionary
+    if (columnMetadata.hasDictionary()) {
+      DictionaryIndexConfig dictionaryConfig = DictionaryIndexConfig.DEFAULT;
+      builder.add(StandardIndexes.dictionary(), dictionaryConfig);
+    }
+
+    return builder.build();
   }
 }

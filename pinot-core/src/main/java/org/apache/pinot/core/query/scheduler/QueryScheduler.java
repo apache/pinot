@@ -144,7 +144,7 @@ public abstract class QueryScheduler {
     String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
-    Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId(), workloadName);
+    Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), workloadName);
 
     try {
       _latestQueryTime.accumulate(System.currentTimeMillis());

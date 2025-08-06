@@ -28,6 +28,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -81,6 +82,11 @@ import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
+import org.apache.pinot.tsdb.planner.TimeSeriesTableMetadataProvider;
+import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
+import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
+import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -136,7 +142,7 @@ public class PinotQueryResource {
   }
 
   @GET
-  @Path("timeseries/api/v1/query_range")
+  @Path("/timeseries/api/v1/query_range")
   @ManualAuthorization
   @ApiOperation(value = "Prometheus Compatible API for Pinot's Time Series Engine")
   public StreamingOutput handleTimeSeriesQueryRange(@QueryParam("language") String language,
@@ -495,17 +501,22 @@ public class PinotQueryResource {
     }
   }
 
+  private String retrieveBrokerForTimeSeriesQuery(String query, String language, String start, String end) {
+    TimeSeriesLogicalPlanner planner = TimeSeriesQueryEnvironment.buildLogicalPlanner(language, _controllerConf);
+    TimeSeriesLogicalPlanResult planResult = planner.plan(
+        new RangeTimeSeriesRequest(language, query, Integer.parseInt(start), Long.parseLong(end),
+            60L, Duration.ofMinutes(1), 100, 100, ""),
+        new TimeSeriesTableMetadataProvider(_pinotHelixResourceManager.getTableCache()));
+    String tableName = planner.getTableName(planResult);
+    String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+    List<String> instanceIds = _pinotHelixResourceManager.getBrokerInstancesFor(rawTableName);
+    return selectRandomInstanceId(instanceIds);
+  }
+
   private StreamingOutput executeTimeSeriesQuery(HttpHeaders httpHeaders, String language, String query,
-    String start, String end, String step) throws Exception {
+      String start, String end, String step) throws Exception {
     LOGGER.debug("Language: {}, Query: {}, Start: {}, End: {}, Step: {}", language, query, start, end, step);
-
-    // Get available broker instances for timeseries queries
-    List<String> instanceIds = _pinotHelixResourceManager.getAllBrokerInstances();
-    if (instanceIds.isEmpty()) {
-      throw QueryErrorCode.BROKER_INSTANCE_MISSING.asException("No online broker found for timeseries query");
-    }
-
-    String instanceId = selectRandomInstanceId(instanceIds);
+    String instanceId = retrieveBrokerForTimeSeriesQuery(query, language, start, end);
     return sendTimeSeriesRequestToBroker(language, query, start, end, step, instanceId, httpHeaders);
   }
 

@@ -42,19 +42,14 @@ import org.slf4j.LoggerFactory;
 public class LuceneFSTIndexReader implements TextIndexReader {
   public static final Logger LOGGER = LoggerFactory.getLogger(LuceneFSTIndexReader.class);
 
-  private final PinotDataBuffer _dataBuffer;
-  private final PinotBufferIndexInput _dataBufferIndexInput;
-  private final FST<Long> _readFST;
+  private final FST<Long> _fst;
 
   public LuceneFSTIndexReader(PinotDataBuffer pinotDataBuffer)
       throws IOException {
-    _dataBuffer = pinotDataBuffer;
-    _dataBufferIndexInput = new PinotBufferIndexInput(_dataBuffer, 0L, _dataBuffer.size());
-
-    FST.FSTMetadata<Long> metadata = FST.readMetadata(_dataBufferIndexInput, PositiveIntOutputs.getSingleton());
-    OffHeapFSTStore fstStore =
-        new OffHeapFSTStore(_dataBufferIndexInput, _dataBufferIndexInput.getFilePointer(), metadata);
-    _readFST = FST.fromFSTReader(metadata, fstStore);
+    PinotBufferIndexInput indexInput = new PinotBufferIndexInput(pinotDataBuffer, 0L, pinotDataBuffer.size());
+    FST.FSTMetadata<Long> metadata = FST.readMetadata(indexInput, PositiveIntOutputs.getSingleton());
+    OffHeapFSTStore fstStore = new OffHeapFSTStore(indexInput, indexInput.getFilePointer(), metadata);
+    _fst = FST.fromFSTReader(metadata, fstStore);
   }
 
   @Override
@@ -66,7 +61,7 @@ public class LuceneFSTIndexReader implements TextIndexReader {
   public ImmutableRoaringBitmap getDictIds(String searchQuery) {
     try {
       MutableRoaringBitmap dictIds = new MutableRoaringBitmap();
-      List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, _readFST);
+      List<Long> matchingIds = RegexpMatcher.regexMatch(searchQuery, _fst);
       for (Long matchingId : matchingIds) {
         dictIds.add(matchingId.intValue());
       }

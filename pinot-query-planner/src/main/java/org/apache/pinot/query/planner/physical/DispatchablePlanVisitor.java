@@ -24,6 +24,8 @@ import java.util.IdentityHashMap;
 import java.util.Set;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.core.routing.LogicalTableRouteInfo;
+import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
@@ -39,8 +41,6 @@ import org.apache.pinot.query.planner.plannode.SortNode;
 import org.apache.pinot.query.planner.plannode.TableScanNode;
 import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
-import org.apache.pinot.query.routing.table.LogicalTableRouteInfo;
-import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 
 
 public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, DispatchablePlanContext> {

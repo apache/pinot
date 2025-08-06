@@ -154,6 +154,8 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         // intermediateRecords is always sorted after trim
         List<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+        // trim groupKeyGenerator after getting intermediateRecords
+        groupByExecutor.getGroupKeyGenerator().close();
 
         ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
         boolean unsafeTrim = _queryContext.isUnsafeTrim(); // set trim flag only if it's not safe

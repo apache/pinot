@@ -95,6 +95,7 @@ import org.apache.pinot.controller.api.upload.SegmentUploadMetadata;
 import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -199,7 +200,19 @@ public class PinotSegmentUploadDownloadRestletResource {
             "Segment " + segmentName + " or table " + tableName + " not found in " + segmentFile.getAbsolutePath(),
             Response.Status.NOT_FOUND);
       }
-      builder.entity(segmentFile);
+      String rawTableName = TableNameBuilder.extractRawTableName(tableName);
+      long segmentSizeInBytes = segmentFile.length();
+      long downloadStartTimeMs = System.currentTimeMillis();
+      ResourceUtils.emitPreSegmentDownloadMetrics(_controllerMetrics, rawTableName, segmentSizeInBytes);
+      // Streaming the segment file directly from local FS to the output stream to ensure we can capture the metrics
+      builder.entity((StreamingOutput) output -> {
+        try {
+          Files.copy(segmentFile.toPath(), output);
+        } finally {
+          ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName, downloadStartTimeMs,
+              segmentSizeInBytes);
+        }
+      });
     } else {
       URI remoteSegmentFileURI = URIUtils.getUri(dataDirURI.toString(), tableName, URIUtils.encode(segmentName));
       PinotFS pinotFS = PinotFSFactory.create(dataDirURI.getScheme());
@@ -216,12 +229,12 @@ public class PinotSegmentUploadDownloadRestletResource {
               "Invalid segment name: %s", segmentName);
       String rawTableName = TableNameBuilder.extractRawTableName(tableName);
       // Emit metrics related to deep-store download operation
-      long deepStoreDownloadStartTimeMs = System.currentTimeMillis();
+      long downloadStartTimeMs = System.currentTimeMillis();
       long segmentSizeInBytes = segmentFile.length();
       ResourceUtils.emitPreSegmentDownloadMetrics(_controllerMetrics, rawTableName, segmentSizeInBytes);
       pinotFS.copyToLocalFile(remoteSegmentFileURI, segmentFile);
-      ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName,
-          System.currentTimeMillis() - deepStoreDownloadStartTimeMs, segmentSizeInBytes);
+      ResourceUtils.emitPostSegmentDownloadMetrics(_controllerMetrics, rawTableName, downloadStartTimeMs,
+          segmentSizeInBytes);
 
       // Streaming in the tmp file and delete it afterward.
       builder.entity((StreamingOutput) output -> {
@@ -1007,6 +1020,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
       @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
+      @ApiParam(value = "Trigger an immediate segment cleanup") @QueryParam("cleanup") @DefaultValue("false")
+      boolean cleanupSegments,
       @ApiParam(value = "Fields belonging to end replace segment request")
       EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -1022,6 +1037,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
       _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
           endReplaceSegmentsRequest);
+      if (cleanupSegments) {
+        _pinotHelixResourceManager.invokeControllerPeriodicTask(tableNameWithType, RetentionManager.TASK_NAME, null);
+      }
       return Response.ok().build();
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);

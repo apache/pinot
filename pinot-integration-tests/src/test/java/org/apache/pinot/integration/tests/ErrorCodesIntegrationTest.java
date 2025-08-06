@@ -138,7 +138,7 @@ public abstract class ErrorCodesIntegrationTest extends BaseClusterIntegrationTe
       throws Exception {
     // ArrTime expects a numeric type
     testQueryException("SELECT COUNT(*) FROM mytable where ArrTime = 'potato'",
-        useMultiStageQueryEngine() ? QueryErrorCode.QUERY_EXECUTION : QueryErrorCode.QUERY_VALIDATION);
+        useMultiStageQueryEngine() ? QueryErrorCode.QUERY_PLANNING : QueryErrorCode.QUERY_VALIDATION);
   }
 
   @Test
