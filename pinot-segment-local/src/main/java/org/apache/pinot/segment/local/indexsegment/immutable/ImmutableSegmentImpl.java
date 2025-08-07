@@ -139,11 +139,10 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     if (docIdsSnapshotFile.exists()) {
       try {
         byte[] bytes = FileUtils.readFileToByteArray(docIdsSnapshotFile);
-        MutableRoaringBitmap queryableDocIds =
-            new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
+        MutableRoaringBitmap docIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
         LOGGER.info("Loaded docIds from snapshot for segment: {} with: {} docs", getSegmentName(),
-            queryableDocIds.getCardinality());
-        return queryableDocIds;
+            docIds.getCardinality());
+        return docIds;
       } catch (Exception e) {
         LOGGER.warn("Caught exception while loading docIds from snapshot file: {}, ignoring the snapshot",
             docIdsSnapshotFile);
