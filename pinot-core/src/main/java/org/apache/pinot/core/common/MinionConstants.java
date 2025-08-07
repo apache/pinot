@@ -31,10 +31,14 @@ public class MinionConstants {
   public static final String TASK_TIME_SUFFIX = ".time";
 
   public static final String TABLE_NAME_KEY = "tableName";
+
+  // Input segment name(s) and download url(s) for those segments for the minion task.
+  // If there are multiple segments, they are separated by SEGMENT_NAME_SEPARATOR.
+  // The index of the segment name and download url is the same for the same segment.
   public static final String SEGMENT_NAME_KEY = "segmentName";
   public static final String DOWNLOAD_URL_KEY = "downloadURL";
+
   public static final String UPLOAD_URL_KEY = "uploadURL";
-  public static final String DOT_SEPARATOR = ".";
   public static final String URL_SEPARATOR = ",";
   public static final String SEGMENT_NAME_SEPARATOR = ",";
   public static final String AUTH_TOKEN = "authToken";
@@ -71,6 +75,11 @@ public class MinionConstants {
    * Job configs
    */
   public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
+
+  /**
+   * Segment download thread pool size to be set at task level.
+   */
+  public static final String SEGMENT_DOWNLOAD_PARALLELISM = "segmentDownloadParallelism";
 
   // Purges rows inside segment that match chosen criteria
   public static class PurgeTask {

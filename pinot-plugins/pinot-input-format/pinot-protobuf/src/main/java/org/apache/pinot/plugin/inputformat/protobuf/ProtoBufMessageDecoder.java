@@ -25,20 +25,15 @@ import com.google.protobuf.DynamicMessage;
 import com.google.protobuf.Message;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 //TODO: Add support for Schema Registry
 public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufMessageDecoder.class);
-
   public static final String DESCRIPTOR_FILE_PATH = "descriptorFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
 
@@ -79,22 +74,19 @@ public class ProtoBufMessageDecoder implements StreamMessageDecoder<byte[]> {
 
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
-    Message message;
-    try {
-      _builder.mergeFrom(payload);
-      message = _builder.build();
-    } catch (Exception e) {
-      LOGGER.error("Not able to decode protobuf message", e);
-      return destination;
-    } finally {
-      _builder.clear();
-    }
-    _recordExtractor.extract(message, destination);
-    return destination;
+    return decode(payload, 0, payload.length, destination);
   }
 
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+    Message message;
+    try {
+      message = _builder.mergeFrom(payload, offset, length).build();
+    } catch (Exception e) {
+      throw new RuntimeException("Caught exception while decoding protobuf message", e);
+    } finally {
+      _builder.clear();
+    }
+    return _recordExtractor.extract(message, destination);
   }
 }

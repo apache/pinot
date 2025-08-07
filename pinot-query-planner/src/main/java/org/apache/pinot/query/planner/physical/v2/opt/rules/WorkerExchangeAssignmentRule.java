@@ -37,6 +37,7 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.Values;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
@@ -334,10 +335,18 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     }
     Preconditions.checkState(relDistribution.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
         "Unexpected distribution constraint: %s", relDistribution.getType());
-    Preconditions.checkState(parent instanceof Join, "Expected parent to be join. Found: %s", parent);
-    Join parentJoin = (Join) parent;
-    // TODO(mse-physical): add support for sub-partitioning and coalescing exchange.
-    HashDistributionDesc hashDistToMatch = getLeftInputHashDistributionDesc(parentJoin).orElseThrow();
+    Preconditions.checkState(parent instanceof Join || parent instanceof SetOp,
+        "Expected parent to be Join/SetOp. Found: %s", parent);
+    HashDistributionDesc hashDistToMatch;
+    if (parent instanceof Join) {
+      Join join = (Join) parent.unwrap();
+      hashDistToMatch = getLeftInputHashDistributionDesc(join)
+          .orElseThrow(() -> new IllegalStateException("Join left input does not have hash distribution desc"));
+    } else {
+      SetOp setOp = (SetOp) parent.unwrap();
+      hashDistToMatch = getLeftInputHashDistributionDesc(setOp)
+          .orElseThrow(() -> new IllegalStateException("SetOp left input does not have hash distribution desc"));
+    }
     if (assumedDistribution.satisfies(relDistribution)) {
       if (parentDistribution.getWorkers().size() == assumedDistribution.getWorkers().size()) {
         List<Integer> distKeys = relDistribution.getKeys();
@@ -392,8 +401,15 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     List<Integer> leftKeys = join.analyzeCondition().leftKeys;
     PRelNode asPRelNode = (PRelNode) join;
     return asPRelNode.getPRelInput(0).getPinotDataDistributionOrThrow().getHashDistributionDesc().stream()
-        .filter(desc -> desc.getKeys().equals(leftKeys))
+        .filter(desc -> new HashSet<>(desc.getKeys()).equals(new HashSet<>(leftKeys)))
         .findFirst();
+  }
+
+  private Optional<HashDistributionDesc> getLeftInputHashDistributionDesc(SetOp setOp) {
+    PRelNode asPRelNode = (PRelNode) setOp;
+    int numExpectedKeys = setOp.getRowType().getFieldCount();
+    return asPRelNode.getPinotDataDistributionOrThrow().getHashDistributionDesc().stream()
+        .filter(desc -> desc.getKeys().size() == numExpectedKeys).findFirst();
   }
 
   /**

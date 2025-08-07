@@ -49,6 +49,7 @@ import org.apache.pinot.core.operator.filter.TextContainsFilterOperator;
 import org.apache.pinot.core.operator.filter.TextMatchFilterOperator;
 import org.apache.pinot.core.operator.filter.VectorSimilarityFilterOperator;
 import org.apache.pinot.core.operator.filter.predicate.FSTBasedRegexpPredicateEvaluatorFactory;
+import org.apache.pinot.core.operator.filter.predicate.IFSTBasedRegexpPredicateEvaluatorFactory;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluatorProvider;
 import org.apache.pinot.core.operator.transform.function.ItemTransformFunction;
@@ -296,22 +297,28 @@ public class FilterPlanNode implements PlanNode {
                 return new TextMatchFilterOperator(textIndexReader, (TextMatchPredicate) predicate, numDocs);
               }
             case REGEXP_LIKE:
-              // FST Index is available only for rolled out segments. So, we use different evaluator for rolled out and
-              // consuming segments.
-              //
-              // Rolled out segments (immutable): FST Index reader is available use FSTBasedEvaluator
-              // else use regular flow of getting predicate evaluator.
-              //
-              // Consuming segments: When FST is enabled, use AutomatonBasedEvaluator so that regexp matching logic is
-              // similar to that of FSTBasedEvaluator, else use regular flow of getting predicate evaluator.
-              if (dataSource.getFSTIndex() != null) {
-                predicateEvaluator =
-                    FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator((RegexpLikePredicate) predicate,
-                        dataSource.getFSTIndex(), dataSource.getDictionary());
+              // Check if case-insensitive flag is present
+              RegexpLikePredicate regexpLikePredicate = (RegexpLikePredicate) predicate;
+              boolean caseInsensitive = regexpLikePredicate.isCaseInsensitive();
+              if (caseInsensitive) {
+                if (dataSource.getIFSTIndex() != null) {
+                  predicateEvaluator =
+                      IFSTBasedRegexpPredicateEvaluatorFactory.newIFSTBasedEvaluator(regexpLikePredicate,
+                          dataSource.getIFSTIndex(), dataSource.getDictionary());
+                } else {
+                  predicateEvaluator =
+                      PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                          dataSource.getDataSourceMetadata().getDataType());
+                }
               } else {
-                predicateEvaluator =
-                    PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
-                        dataSource.getDataSourceMetadata().getDataType());
+                if (dataSource.getFSTIndex() != null) {
+                  predicateEvaluator = FSTBasedRegexpPredicateEvaluatorFactory.newFSTBasedEvaluator(regexpLikePredicate,
+                      dataSource.getFSTIndex(), dataSource.getDictionary());
+                } else {
+                  predicateEvaluator =
+                      PredicateEvaluatorProvider.getPredicateEvaluator(predicate, dataSource.getDictionary(),
+                          dataSource.getDataSourceMetadata().getDataType());
+                }
               }
               _predicateEvaluators.add(Pair.of(predicate, predicateEvaluator));
               return FilterOperatorUtils.getLeafFilterOperator(_queryContext, predicateEvaluator, dataSource, numDocs);

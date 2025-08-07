@@ -85,6 +85,7 @@ import org.apache.pinot.core.util.trace.ContinuousJfrStarter;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -153,13 +154,14 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   protected AbstractResponseStore _responseStore;
   protected BrokerGrpcServer _brokerGrpcServer;
   protected FailureDetector _failureDetector;
+  protected ThreadResourceUsageAccountant _resourceUsageAccountant;
 
   @Override
   public void init(PinotConfiguration brokerConf)
       throws Exception {
     _brokerConf = brokerConf;
     // Remove all white-spaces from the list of zkServers (if any).
-    _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER).replaceAll("\\s+", "");
+    _zkServers = brokerConf.getProperty(Helix.CONFIG_OF_ZOOKEEPER_SERVER).replaceAll("\\s+", "");
     _clusterName = brokerConf.getProperty(Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_brokerConf, _zkServers, _clusterName, ServiceRole.BROKER);
     applyCustomConfigs(brokerConf);
@@ -345,6 +347,19 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         instanceId -> _routingManager.excludeServerFromRouting(instanceId));
     _failureDetector.start();
 
+    // Enable/disable thread CPU time measurement through instance config.
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
+        _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+            CommonConstants.Broker.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+    // Enable/disable thread memory allocation tracking through instance config
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
+        _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
+            CommonConstants.Broker.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+    _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
+        _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
+        org.apache.pinot.spi.config.instance.InstanceType.BROKER);
+    Preconditions.checkNotNull(_resourceUsageAccountant);
+
     // Create Broker request handler.
     String brokerId = _brokerConf.getProperty(Broker.CONFIG_OF_BROKER_ID, getDefaultBrokerId());
     String brokerRequestHandlerType =
@@ -352,7 +367,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     BaseSingleStageBrokerRequestHandler singleStageBrokerRequestHandler;
     if (brokerRequestHandlerType.equalsIgnoreCase(Broker.GRPC_BROKER_REQUEST_HANDLER_TYPE)) {
       singleStageBrokerRequestHandler = new GrpcBrokerRequestHandler(_brokerConf, brokerId, _routingManager,
-          _accessControlFactory, _queryQuotaManager, tableCache, _failureDetector);
+          _accessControlFactory, _queryQuotaManager, tableCache, _failureDetector, _resourceUsageAccountant);
     } else {
       // Default request handler type, i.e. netty
       NettyConfig nettyDefaults = NettyConfig.extractNettyConfig(_brokerConf, Broker.BROKER_NETTY_PREFIX);
@@ -364,7 +379,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       singleStageBrokerRequestHandler =
           new SingleConnectionBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
               _queryQuotaManager, tableCache, nettyDefaults, tlsDefaults, _serverRoutingStatsManager,
-              _failureDetector);
+              _failureDetector, _resourceUsageAccountant);
     }
     MultiStageBrokerRequestHandler multiStageBrokerRequestHandler = null;
     QueryDispatcher queryDispatcher = null;
@@ -377,13 +392,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       queryDispatcher = createQueryDispatcher(_brokerConf);
       multiStageBrokerRequestHandler =
           new MultiStageBrokerRequestHandler(_brokerConf, brokerId, _routingManager, _accessControlFactory,
-              _queryQuotaManager, tableCache, _multiStageQueryThrottler, _failureDetector);
+              _queryQuotaManager, tableCache, _multiStageQueryThrottler, _failureDetector, _resourceUsageAccountant);
     }
     TimeSeriesRequestHandler timeSeriesRequestHandler = null;
     if (StringUtils.isNotBlank(_brokerConf.getProperty(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey()))) {
       Preconditions.checkNotNull(queryDispatcher, "Multistage Engine should be enabled to use time-series engine");
       timeSeriesRequestHandler = new TimeSeriesRequestHandler(_brokerConf, brokerId, _routingManager,
-          _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher);
+          _accessControlFactory, _queryQuotaManager, tableCache, queryDispatcher, _resourceUsageAccountant);
     }
 
     LOGGER.info("Initializing PinotFSFactory");
@@ -407,17 +422,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
             timeSeriesRequestHandler, _responseStore);
     _brokerRequestHandler.start();
 
-    // Enable/disable thread CPU time measurement through instance config.
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
-        _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
-            CommonConstants.Broker.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
-    // Enable/disable thread memory allocation tracking through instance config
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
-        _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
-            CommonConstants.Broker.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(
-        _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.BROKER);
+    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     String controllerUrl = _brokerConf.getProperty(Broker.CONTROLLER_URL);
     if (controllerUrl != null) {

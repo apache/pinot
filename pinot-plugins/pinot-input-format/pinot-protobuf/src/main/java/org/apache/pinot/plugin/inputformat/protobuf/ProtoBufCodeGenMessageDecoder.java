@@ -29,82 +29,73 @@ import java.net.URLClassLoader;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
-import javax.annotation.Nullable;
 import org.apache.pinot.plugin.inputformat.protobuf.codegen.MessageCodeGen;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
 import org.codehaus.janino.SimpleCompiler;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 
 public class ProtoBufCodeGenMessageDecoder implements StreamMessageDecoder<byte[]> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(ProtoBufCodeGenMessageDecoder.class);
-
   public static final String PROTOBUF_JAR_FILE_PATH = "jarFile";
   public static final String PROTO_CLASS_NAME = "protoClassName";
-  private Class _recordExtractor = ProtoBufMessageDecoder.class;
   private Method _decodeMethod;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
-    Preconditions.checkState(
-        props.containsKey(PROTOBUF_JAR_FILE_PATH),
+    Preconditions.checkState(props.containsKey(PROTOBUF_JAR_FILE_PATH),
         "Protocol Buffer schema jar file must be provided");
-    Preconditions.checkState(
-        props.containsKey(PROTO_CLASS_NAME),
+    Preconditions.checkState(props.containsKey(PROTO_CLASS_NAME),
         "Protocol Buffer Message class name must be provided");
     String protoClassName = props.getOrDefault(PROTO_CLASS_NAME, "");
     String jarPath = props.getOrDefault(PROTOBUF_JAR_FILE_PATH, "");
     ClassLoader protoMessageClsLoader = loadClass(jarPath);
     Descriptors.Descriptor descriptor = getDescriptorForProtoClass(protoMessageClsLoader, protoClassName);
     String codeGenCode = new MessageCodeGen().codegen(descriptor, fieldsToRead);
-    _recordExtractor = compileClass(
-        protoMessageClsLoader,
+    Class<?> recordExtractor = compileClass(protoMessageClsLoader,
         MessageCodeGen.EXTRACTOR_PACKAGE_NAME + "." + MessageCodeGen.EXTRACTOR_CLASS_NAME, codeGenCode);
-    _decodeMethod = _recordExtractor.getMethod(MessageCodeGen.EXTRACTOR_METHOD_NAME, byte[].class, GenericRow.class);
+    _decodeMethod = recordExtractor.getMethod(MessageCodeGen.EXTRACTOR_METHOD_NAME, byte[].class, GenericRow.class);
   }
 
-  @Nullable
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
     try {
       destination = (GenericRow) _decodeMethod.invoke(null, payload, destination);
     } catch (Exception e) {
-      throw new RuntimeException(e);
+      throw new RuntimeException("Caught exception while decoding protobuf message", e);
     }
     return destination;
   }
 
-  @Nullable
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
-    return decode(Arrays.copyOfRange(payload, offset, offset + length), destination);
+    if (offset != 0 || payload.length > length) {
+      payload = Arrays.copyOfRange(payload, offset, offset + length);
+    }
+    return decode(payload, destination);
   }
 
   public static ClassLoader loadClass(String jarFilePath) {
     try {
       File file = ProtoBufUtils.getFileCopiedToLocal(jarFilePath);
       URL url = file.toURI().toURL();
-      URL[] urls = new URL[] {url};
+      URL[] urls = new URL[]{url};
       return new URLClassLoader(urls);
     } catch (Exception e) {
       throw new RuntimeException("Error loading protobuf class", e);
     }
   }
 
-  public static Class compileClass(ClassLoader classloader, String className, String code)
+  public static Class<?> compileClass(ClassLoader classloader, String className, String code)
       throws ClassNotFoundException {
     SimpleCompiler simpleCompiler = new SimpleCompiler();
     simpleCompiler.setParentClassLoader(classloader);
     try {
       simpleCompiler.cook(code);
     } catch (Throwable t) {
-      throw new RuntimeException(
-          "Program cannot be compiled. This is a bug. Please file an issue.", t);
+      throw new RuntimeException("Program cannot be compiled. This is a bug. Please file an issue.", t);
     }
-    return simpleCompiler.getClassLoader()
-        .loadClass(className);
+    return simpleCompiler.getClassLoader().loadClass(className);
   }
 
   public static Descriptors.Descriptor getDescriptorForProtoClass(ClassLoader protoMessageClsLoader,

@@ -171,7 +171,7 @@ const getAllInstances = () => {
       [InstanceType.SERVER]: [],
       [InstanceType.MINION]: []
     };
-    
+
     data.instances.forEach((instance) => {
       const instanceType =  instance.split('_')[0].toUpperCase();
       instanceTypeToInstancesMap[instanceType].push(instance);
@@ -319,7 +319,7 @@ const getQueryResults = (params) => {
     }
     if (queryResponse && queryResponse.exceptions && queryResponse.exceptions.length) {
       exceptions = queryResponse.exceptions as SqlException[];
-    } 
+    }
     if (queryResponse.resultTable?.dataSchema?.columnNames?.length) {
       columnList = queryResponse.resultTable.dataSchema.columnNames;
       dataArray = queryResponse.resultTable.rows;
@@ -571,16 +571,16 @@ const getExternalViewObj = (tableName) => {
   return getExternalView(tableName).then((result) => {
     return result.data.OFFLINE || result.data.REALTIME;
   });
-}; 
+};
 
 const fetchServerToSegmentsCountData = (tableName, tableType) => {
   return getServerToSegmentsCount(tableName, tableType).then((results) => {
-    const segmentsArray = results.data; 
+    const segmentsArray = results.data;
     return {
       records: segmentsArray.flatMap((server) =>
-        Object.entries(server.serverToSegmentsCountMap).map(([serverName, segmentsCount]) => [ 
-          serverName,       
-          segmentsCount    
+        Object.entries(server.serverToSegmentsCountMap).map(([serverName, segmentsCount]) => [
+          serverName,
+          segmentsCount
         ])
       )
     };
@@ -737,16 +737,25 @@ const getZookeeperData = (path, count) => {
     isLeafNode: false,
     hasChildRendered: true
   }];
-  return getNodeData(path).then((obj)=>{
+
+  return getNodeData(path).then((obj) => {
     const { currentNodeData, currentNodeMetadata, currentNodeListStat } = obj;
-    const pathNames = Object.keys(currentNodeListStat);
-    pathNames.map((pathName)=>{
+    const pathNames = Object.keys(currentNodeListStat || {});
+
+    pathNames.forEach((pathName) => {
+      const nodeStat = currentNodeListStat[pathName];
+
+      // Skip if nodeStat is null or undefined
+      if (!nodeStat) {
+        console.warn(`Skipping null node for path: ${pathName}`);
+        return;
+      }
       newTreeData[0].child.push({
         nodeId: `${counter++}`,
         label: pathName,
-        fullPath: path === '/' ? path+pathName : `${path}/${pathName}`,
+        fullPath: path === '/' ? path + pathName : `${path}/${pathName}`,
         child: [],
-        isLeafNode: currentNodeListStat[pathName].numChildren === 0,
+        isLeafNode: nodeStat.numChildren === 0,
         hasChildRendered: false
       });
     });
@@ -923,8 +932,9 @@ const getElapsedTime = (startTime) => {
 }
 
 const getTasksList = async (tableName, taskType) => {
+  const { formatTimeInTimezone } = await import('./TimezoneUtils');
   const finalResponse = {
-    columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Num of Sub Tasks'],
+    columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Sub Tasks (Total/Completed/Running/Waiting/Error/Other)'],
     records: []
   }
   await new Promise((resolve, reject) => {
@@ -932,12 +942,24 @@ const getTasksList = async (tableName, taskType) => {
       const promiseArr = [];
       const fetchInfo = async (taskID, status) => {
         const debugData = await getTaskDebugData(taskID);
+        const subtaskCount = get(debugData, 'data.subtaskCount', {});
+        const total = get(subtaskCount, 'total', 0);
+        const completed = get(subtaskCount, 'completed', 0);
+        const running = get(subtaskCount, 'running', 0);
+        const waiting = get(subtaskCount, 'waiting', 0);
+        const error = get(subtaskCount, 'error', 0);
+        const unknown = get(subtaskCount, 'unknown', 0);
+        const dropped = get(subtaskCount, 'dropped', 0);
+        const timedOut = get(subtaskCount, 'timedOut', 0);
+        const aborted = get(subtaskCount, 'aborted', 0);
+        const other = unknown + dropped + timedOut + aborted;
+
         finalResponse.records.push([
           taskID,
           status,
-          get(debugData, 'data.startTime', ''),
-          get(debugData, 'data.finishTime', ''),
-          get(debugData, 'data.subtaskCount.total', 0)
+          get(debugData, 'data.startTime') ? formatTimeInTimezone(get(debugData, 'data.startTime'), 'MMMM Do YYYY, HH:mm:ss z') : '',
+          get(debugData, 'data.finishTime') ? formatTimeInTimezone(get(debugData, 'data.finishTime'), 'MMMM Do YYYY, HH:mm:ss z') : '',
+          `${total}/${completed}/${running}/${waiting}/${error}/${other}`
         ]);
       };
       each(response.data, async (val, key) => {
@@ -952,7 +974,7 @@ const getTasksList = async (tableName, taskType) => {
 
 const getTaskRuntimeConfigData = async (taskName: string) => {
   const response = await getTaskRuntimeConfig(taskName);
-  
+
   return response.data;
 }
 
@@ -1004,7 +1026,7 @@ const deleteSegmentOp = (tableName, segmentName) => {
 
 const fetchTableJobs = async (tableName: string, jobTypes?: string) => {
   const response = await getTableJobs(tableName, jobTypes);
-  
+
   return response.data;
 }
 
@@ -1022,7 +1044,7 @@ const fetchRebalanceTableJobs = async (tableName: string): Promise<RebalanceTabl
 
 const fetchSegmentReloadStatus = async (jobId: string) => {
   const response = await getSegmentReloadStatus(jobId);
-  
+
   return response.data;
 }
 
@@ -1133,7 +1155,7 @@ const verifyAuth = (authToken) => {
 const getAccessTokenFromHashParams = () => {
   let accessToken = '';
   const hashParam = removeAllLeadingForwardSlash(location.hash.substring(1));
-  
+
   const urlSearchParams = new URLSearchParams(hashParam);
   if (urlSearchParams.has('access_token')) {
     accessToken = urlSearchParams.get('access_token') as string;
@@ -1172,7 +1194,7 @@ const validateRedirectPath = (path: string): boolean => {
 
   const knownAppRoutes = RouterData.map((data) => data.path);
   const routeMatches = matchPath(pathName, {path: knownAppRoutes, exact: true});
-  
+
   if(!routeMatches) {
     return false;
   }
@@ -1209,7 +1231,7 @@ const getURLWithoutAccessToken = (fallbackUrl = '/'): string => {
     if(urlSearchParams.toString()){
       urlParams.unshift(urlSearchParams.toString());
     }
-    
+
     url = urlParams.join('&');
 
     if(!validateRedirectPath(url)) {

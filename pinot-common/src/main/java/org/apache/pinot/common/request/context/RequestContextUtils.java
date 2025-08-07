@@ -229,8 +229,17 @@ public class RequestContextUtils {
         return FilterContext.forPredicate(
             new RangePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
-        return FilterContext.forPredicate(
-            new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+        if (operands.size() == 2) {
+          return FilterContext.forPredicate(
+              new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
+        } else if (operands.size() == 3) {
+          return FilterContext.forPredicate(
+              new RegexpLikePredicate(getExpression(operands.get(0)), getStringValue(operands.get(1)),
+                  getStringValue(operands.get(2))));
+        } else {
+          throw new BadQueryRequestException("REGEXP_LIKE requires 2 or 3 arguments");
+        }
+
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(getExpression(operands.get(0)),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
@@ -397,7 +406,16 @@ public class RequestContextUtils {
       case RANGE:
         return FilterContext.forPredicate(new RangePredicate(operands.get(0), getStringValue(operands.get(1))));
       case REGEXP_LIKE:
-        return FilterContext.forPredicate(new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
+        if (operands.size() == 2) {
+          return FilterContext.forPredicate(
+              new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1))));
+        } else if (operands.size() == 3) {
+          return FilterContext.forPredicate(
+              new RegexpLikePredicate(operands.get(0), getStringValue(operands.get(1)),
+                  getStringValue(operands.get(2))));
+        } else {
+          throw new BadQueryRequestException("REGEXP_LIKE requires 2 or 3 arguments");
+        }
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(operands.get(0),
             RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));

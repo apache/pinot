@@ -102,6 +102,7 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
@@ -171,13 +172,14 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
   private ScheduledExecutorService _helixMessageCountScheduler;
+  protected ThreadResourceUsageAccountant _resourceUsageAccountant;
 
   @Override
   public void init(PinotConfiguration serverConf)
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
-    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
     applyCustomConfigs(_serverConf);
@@ -242,14 +244,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
     // Initialize the data buffer factory
     PinotDataBuffer.loadDefaultFactory(serverConf);
 
-    // Enable/disable thread CPU time measurement through instance config.
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
-        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
-            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
-    // Enable/disable thread memory allocation tracking through instance config
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
-        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
-            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Set data table version send to broker.
     int dataTableVersion =
         _serverConf.getProperty(Server.CONFIG_OF_CURRENT_DATA_TABLE_VERSION, DataTableBuilderFactory.DEFAULT_VERSION);
@@ -669,23 +663,34 @@ public abstract class BaseServerStarter implements ServiceStartable {
               segmentDownloadThrottler, segmentMultiColTextIndexPreprocessThrottler);
     }
 
-    // initialize the thread accountant for query killing
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(
+    // Enable/disable thread CPU time measurement through instance config.
+    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT,
+            Server.DEFAULT_ENABLE_THREAD_CPU_TIME_MEASUREMENT));
+    // Enable/disable thread memory allocation tracking through instance config
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
+        _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
+            Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+    // Initialize the thread accountant for query killing
+    _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
         org.apache.pinot.spi.config.instance.InstanceType.SERVER);
-    if (Tracing.getThreadAccountant().getClusterConfigChangeListener() != null) {
-      _clusterConfigChangeHandler.registerClusterConfigChangeListener(
-          Tracing.getThreadAccountant().getClusterConfigChangeListener());
-    }
+    Preconditions.checkNotNull(_resourceUsageAccountant);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     ServerConf serverConf = new ServerConf(_serverConf);
     _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-        sendStatsPredicate, Tracing.getThreadAccountant());
+        sendStatsPredicate, _resourceUsageAccountant);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
+
+    // Enable Server level realtime ingestion rate limier
+    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
+    PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
+        new ServerRateLimitConfigChangeListener(serverMetrics);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
 
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
@@ -778,11 +783,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     preServeQueries();
 
-    // Enable Server level realtime ingestion rate limier
-    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
-    PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
-        new ServerRateLimitConfigChangeListener(serverMetrics);
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
+    // Start the thread accountant
+    Tracing.ThreadAccountantOps.startThreadAccountant();
+    PinotClusterConfigChangeListener threadAccountantListener =
+        _resourceUsageAccountant.getClusterConfigChangeListener();
+    if (threadAccountantListener != null) {
+      _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
+    }
 
     // Start the query server after finishing the service status check. If the query server is started before all the
     // segments are loaded, broker might not have finished processing the callback of routing table update, and start
@@ -792,7 +799,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
     _isServerReadyToServeQueries = true;
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
-    RealtimeConsumptionRateManager.getInstance().enableThrottling();
+    RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
 
     LOGGER.info("Pinot server ready");
 
@@ -1143,5 +1150,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } catch (Exception e) {
       LOGGER.warn("Failed to refresh Helix message count", e);
     }
+  }
+
+  public ThreadResourceUsageAccountant getResourceUsageAccountant() {
+    return _resourceUsageAccountant;
   }
 }

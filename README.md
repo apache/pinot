@@ -145,27 +145,29 @@ More detailed instructions can be found at [Quick Demo](https://docs.pinot.apach
 
 If you're building Pinot on macOS and encounter issues with the gRPC Java plugin during the build process, you may need to configure the protobuf Maven plugin to use a specific executable path. This is a known issue on macOS ARM (Apple Silicon) systems.
 
-To resolve this, you can install the protobuf compiler and gRPC Java plugin globally:
+#### Automatic Profile Activation (macOS ARM64)
 
+Pinot's Maven build now includes dedicated profiles for Apple Silicon (ARM64) Macs to ensure reliable protobuf compilation with Homebrew-installed binaries:
+
+- **Primary profile:** Activates automatically if `/opt/homebrew/bin/protoc-gen-grpc-java` exists (default for Apple Silicon Macs).
+- **Fallback profile:** Activates if `/usr/local/bin/protoc-gen-grpc-java` exists and the primary path does not (for Intel Macs or custom Homebrew setups).
+
+You do **not** need to manually edit the `pom.xml` or set the plugin executable path. The correct profile will be selected based on your system and Homebrew installation.
+
+##### To install the required tools:
 ```bash
-# Install protobuf compiler
 brew install protobuf
 brew install protoc-gen-grpc-java
-sudo cp /opt/homebrew/bin/protoc-gen-grpc-java /usr/local/bin/protoc-gen-grpc-java
 ```
 
-Then add the following configuration to the `protobuf-maven-plugin` in the `pom.xml` file:
+If you installed Homebrew to a non-default location, ensure the `protoc-gen-grpc-java` binary is available in either `/opt/homebrew/bin/` or `/usr/local/bin/`.
 
-```xml
-<plugin>
-  <groupId>org.xolstice.maven.plugins</groupId>
-  <artifactId>protobuf-maven-plugin</artifactId>
-  <configuration>
-    ...
-    <pluginExecutable>/usr/local/bin/protoc-gen-grpc-java</pluginExecutable>
-  </configuration>
-</plugin>
+To verify which profile is active, run:
+```bash
+./mvnw help:active-profiles
 ```
+
+If you encounter issues, check that the `protoc-gen-grpc-java` binary is present in one of the expected locations and is executable.
 
 ## Deploying Pinot to Kubernetes
 Please refer to [Running Pinot on Kubernetes](https://docs.pinot.apache.org/basics/getting-started/kubernetes-quickstart) in our project documentation. Pinot also provides Kubernetes integrations with the interactive query engine, [Trino](https://docs.pinot.apache.org/integrations/trino) [Presto](https://docs.pinot.apache.org/integrations/presto), and the data visualization tool, [Apache Superset](helm/superset.yaml).

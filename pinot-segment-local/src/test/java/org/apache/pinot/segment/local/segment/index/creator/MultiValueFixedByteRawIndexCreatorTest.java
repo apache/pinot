@@ -171,7 +171,8 @@ public class MultiValueFixedByteRawIndexCreatorTest implements PinotBuffersAfter
     }
 
     try (PinotDataBuffer buffer = PinotDataBuffer.mapFile(file, true, 0, file.length(), ByteOrder.BIG_ENDIAN, "");
-        ForwardIndexReader reader = ForwardIndexReaderFactory.createRawIndexReader(buffer, dataType, false);
+        ForwardIndexReader reader = ForwardIndexReaderFactory.getInstance()
+            .createRawIndexReader(buffer, dataType, false);
         ForwardIndexReaderContext context = reader.createContext()) {
       T valueBuffer = constructor.apply(maxElements);
       for (int i = 0; i < numDocs; i++) {
