@@ -221,6 +221,10 @@ public final class GroupByUtils {
   /**
    * do sort aggregate when is safeTrim (order by group keys with no having clause)
    * and limit is smaller than threshold
+   * TODO: we also want to do sort aggregate under order by group key with having case,
+   *   in this case we can check if the calculated Server trimSize is < sortAggregateLimitThreshold
+   *   if so, we do sort aggregate and trim to trimSize during combine.
+   *   This requires extracting Server trimSize calculation logic into QueryContext as pre-req
    */
   public static boolean shouldSortAggregateUnderSafeTrim(QueryContext queryContext) {
     return !queryContext.isUnsafeTrim() && queryContext.getLimit() < queryContext.getSortAggregateLimitThreshold();
