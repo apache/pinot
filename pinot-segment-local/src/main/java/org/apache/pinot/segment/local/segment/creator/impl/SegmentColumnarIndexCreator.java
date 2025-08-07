@@ -36,6 +36,8 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.utils.FileUtils;
+import org.apache.pinot.core.common.Block;
+import org.apache.pinot.core.common.FrameReader;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
@@ -354,6 +356,49 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
     _docIdCounter++;
   }
+
+  @Override
+  public void index(FrameReader frameReader)
+      throws IOException {
+    int numDocs = frameReader.getNumRows();
+    if (numDocs == 0) {
+      return;
+    }
+    for (int docId = 0; docId < numDocs; docId++) {
+      for (Map.Entry<String, Map<IndexType<?, ?, ?>, IndexCreator>> byColEntry : _creatorsByColAndIndex.entrySet()) {
+        String columnName = byColEntry.getKey();
+        Block a = frameReader.getBlock(docId, columnName);
+        Object columnValueToIndex = a.get(0);
+        if (columnValueToIndex == null) {
+          throw new RuntimeException("Null value for column:" + columnName);
+        }
+
+        Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = byColEntry.getValue();
+
+        FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+        SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+        try {
+          if (fieldSpec.isSingleValueField()) {
+            indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+          } else {
+            indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+          }
+        } catch (JsonParseException jpe) {
+          throw new ColumnJsonParserException(columnName, jpe);
+        }
+      }
+
+      for (Map.Entry<String, NullValueVectorCreator> entry : _nullValueVectorCreatorMap.entrySet()) {
+        // If row has null value for given column name, add to null value vector
+        // TODO: support this in columnar fashion
+        //if (row.isNullValue(entry.getKey())) {
+        //  entry.getValue().setNull(_docIdCounter);
+        //}
+      }
+      _docIdCounter++;
+    }
+  }
+
 
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)

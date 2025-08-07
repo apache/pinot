@@ -60,6 +60,10 @@ public interface SegmentCreator extends Closeable, Serializable {
   void indexRow(GenericRow row)
       throws IOException;
 
+  void index(FrameReader frameReader)
+      throws IOException;
+
+
   /**
    * Adds a column to the index.
    *
