@@ -208,6 +208,13 @@ public class PinotSegmentRecordReader implements RecordReader {
     return _sortedDocIds;
   }
 
+  /**
+   * Expose the underlying index segment for column-major builders.
+   */
+  public IndexSegment getIndexSegment() {
+    return _indexSegment;
+  }
+
   @Override
   public boolean hasNext() {
     return _nextDocId < _numDocs;

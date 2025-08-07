@@ -241,6 +241,14 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
+    // If the record reader is backed by a Pinot segment, switch to column-major build path to avoid a
+    // second complete pass over the input rows.
+    if (_recordReader instanceof PinotSegmentRecordReader) {
+      PinotSegmentRecordReader psReader = (PinotSegmentRecordReader) _recordReader;
+      buildIndexesByColumn(psReader.getIndexSegment());
+      return;
+    }
+
     _incompleteRowsFound = 0;
     _skippedRowsFound = 0;
     _sanitizedRowsFound = 0;
@@ -329,29 +337,32 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
 
   public void buildByColumn(IndexSegment indexSegment)
       throws Exception {
-    // Count the number of documents and gather per-column statistics
-    LOGGER.debug("Start building StatsCollector!");
+    // Retain for external callers — performs its own stats collection before delegating.
     collectStatsAndIndexCreationInfo();
-    LOGGER.info("Finished building StatsCollector!");
-    LOGGER.info("Collected stats for {} documents", _totalDocs);
+    buildIndexesByColumn(indexSegment);
+  }
 
+  /**
+   * Internal helper that performs column-major index creation assuming stats have already been
+   * collected via {@link #collectStatsAndIndexCreationInfo()}.
+   */
+  private void buildIndexesByColumn(IndexSegment indexSegment)
+      throws Exception {
     try {
-      // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
-      //    removed from this code.
-      int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+      // Obtain sorted docIds if available for stable ordering
+      int[] sortedDocIds = null;
+      if (_recordReader instanceof PinotSegmentRecordReader) {
+        sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+      }
       int[] immutableToMutableIdMap = getImmutableToMutableIdMap(sortedDocIds);
 
-      // Initialize the index creation using the per-column statistics information
-      // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
-      //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
+      // Initialize the index creator using the per-column statistics information collected earlier.
       _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
           immutableToMutableIdMap);
 
-      // Build the indexes
+      // Build the indexes column by column.
       LOGGER.info("Start building Index by column");
-
       TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
-
       for (String col : columns) {
         _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
       }
@@ -359,17 +370,16 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _indexCreator.close();
       throw e;
     } finally {
-      // The record reader is created by the `init` method and needs to be closed and
-      // cleaned up even by the Column Mode builder.
+      // The record reader is created by the `init` method and needs to be closed, even in column mode.
       _recordReader.close();
     }
 
-    // TODO: Using column oriented, we can't catch incomplete records.  Does that matter?
-
     LOGGER.info("Finished records indexing by column in IndexCreator!");
 
+    // Finalise the segment – seal files, build secondary indexes, etc.
     handlePostCreation();
   }
+
 
   private void handlePostCreation()
       throws Exception {
