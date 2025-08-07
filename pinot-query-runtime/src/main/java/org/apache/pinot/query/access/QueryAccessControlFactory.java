@@ -18,10 +18,13 @@
  */
 package org.apache.pinot.query.access;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.plugin.PluginManager;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.DEFAULT_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS;
@@ -30,17 +33,31 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.DEFAULT_MULTI_STA
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public abstract class QueryAccessControlFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(QueryAccessControlFactory.class);
   void init(PinotConfiguration configuration) {
   }
 
   public abstract QueryAccessControl create();
 
-  public static QueryAccessControlFactory fromConfig(PinotConfiguration configuration) {
+  /**
+   * Build a QueryAccessControlFactory from a `PinotConfiguration`.
+   *
+   * @param configuration Populated PinotConfiguration
+   * @return Concrete QueryAccessControlFactory instance or null if there is an error
+   */
+  public static @Nullable QueryAccessControlFactory fromConfig(PinotConfiguration configuration) {
     String configuredClass = configuration.getProperty(CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS,
         DEFAULT_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS);
     try {
-      return PluginManager.get().createInstance(configuredClass);
+      QueryAccessControlFactory factory = PluginManager.get().createInstance(configuredClass);
+      LOGGER.info("Built QueryAccessControlFactory from configured class {}", configuredClass);
+      factory.init(configuration);
+      return factory;
     } catch (Exception ex) {
+      LOGGER.error("Caught exception attempting to load QueryAccessControlFactory {}", configuredClass, ex);
+      // TODO: Consider raising a RunTime error to capture if a user's provided AccessControlFactory is not able
+      //     to load. Returning null implies that we should not check access at all (failing open) but generally
+      //     users who configure this value would want us to fail closed (raising an exception)
       return null;
     }
   }
