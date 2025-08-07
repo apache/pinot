@@ -125,6 +125,8 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("DeleteCluster", new DeleteClusterCommand());
     SUBCOMMAND_MAP.put("ShowClusterInfo", new ShowClusterInfoCommand());
     SUBCOMMAND_MAP.put("AvroSchemaToPinotSchema", new AvroSchemaToPinotSchema());
+    SUBCOMMAND_MAP.put("ParquetSchemaToPinotSchema", new ParquetSchemaToPinotSchema());
+    SUBCOMMAND_MAP.put("InputSchemaToPinotSchema", new InputSchemaToPinotSchema());
     SUBCOMMAND_MAP.put("JsonToPinotSchema", new JsonToPinotSchema());
     SUBCOMMAND_MAP.put("RebalanceTable", new RebalanceTableCommand());
     SUBCOMMAND_MAP.put("ChangeNumReplicas", new ChangeNumReplicasCommand());
