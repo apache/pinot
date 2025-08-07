@@ -37,6 +37,8 @@ public class AuthorizationInterceptor implements ServerInterceptor {
       ServerCallHandler<T, R> next) {
     if (!_accessControlFactory.create().hasAccess(call.getAttributes(), headers)) {
       call.close(Status.PERMISSION_DENIED.withDescription("MSE Access Denied"), headers);
+      // Skip any future operations since we have closed the call
+      return new ServerCall.Listener<T>() {};
     }
     return next.startCall(call, headers);
   }
