@@ -61,20 +61,20 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
           + blockValSet.getValueType());
     }
     String[] stringValues = blockValSet.getStringValuesSV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        String value = stringValues[i];
-        // Ignore null and "null" string literals
-        if (value == null || "null".equals(value)) {
-          continue;
-        }
-        String currentMax = aggregationResultHolder.getResult();
-        // Update the currentMax if a larger string value is found
-        if (currentMax == null || value.compareTo(currentMax) > 0) {
-          aggregationResultHolder.setValue(value);
+    String maxValue = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+      String innerMax = stringValues[from];
+      for (int i = from + 1; i < to; i++) {
+        if (stringValues[i].compareTo(innerMax) > 0) {
+          innerMax = stringValues[i];
         }
       }
+      return acum == null ? innerMax : (acum.compareTo(innerMax) > 0 ? acum : innerMax);
     });
+
+    String currentMax = aggregationResultHolder.getResult();
+    if (currentMax == null || (maxValue != null && maxValue.compareTo(currentMax) > 0)) {
+      aggregationResultHolder.setValue(maxValue);
+    }
   }
 
   @Override
@@ -89,13 +89,9 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         String value = stringValues[i];
-        // For SV, "null" as a string literal can exist and needs to be handled
-        if (value == null || "null".equals(value)) {
-          continue;
-        }
         int groupKey = groupKeyArray[i];
         String currentMax = groupByResultHolder.getResult(groupKey);
-        if (currentMax == null || "null".equals(currentMax) || value.compareTo(currentMax) > 0) {
+        if (currentMax == null || value.compareTo(currentMax) > 0) {
           groupByResultHolder.setValueForKey(groupKey, value);
         }
       }
@@ -114,13 +110,9 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         String value = stringValues[i];
-        // For MV, "null" as a string literal can exist and needs to be handled
-        if (value == null || "null".equals(value)) {
-          continue;
-        }
         for (int groupKey : groupKeysArray[i]) {
           String currentMax = groupByResultHolder.getResult(groupKey);
-          if (currentMax == null || "null".equals(currentMax) || value.compareTo(currentMax) > 0) {
+          if (currentMax == null || value.compareTo(currentMax) > 0) {
             groupByResultHolder.setValueForKey(groupKey, value);
           }
         }
@@ -130,22 +122,20 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
 
   @Override
   public String extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    String result = aggregationResultHolder.getResult();
-    return result != null ? result : "null";
+    return aggregationResultHolder.getResult();
   }
 
   @Override
   public String extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    String result = groupByResultHolder.getResult(groupKey);
-    return result != null ? result : "null";
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
   public String merge(String intermediateResult1, String intermediateResult2) {
-    if (intermediateResult1 == null || "null".equals(intermediateResult1)) {
+    if (intermediateResult1 == null) {
       return intermediateResult2;
     }
-    if (intermediateResult2 == null || "null".equals(intermediateResult2)) {
+    if (intermediateResult2 == null) {
       return intermediateResult1;
     }
     return intermediateResult1.compareTo(intermediateResult2) > 0 ? intermediateResult1 : intermediateResult2;
@@ -163,7 +153,7 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
 
   @Override
   public String extractFinalResult(String intermediateResult) {
-    return intermediateResult != null ? intermediateResult : "null";
+    return intermediateResult;
   }
 
   @Override

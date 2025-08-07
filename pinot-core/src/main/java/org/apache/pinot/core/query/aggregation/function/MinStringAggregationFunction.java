@@ -61,20 +61,19 @@ public class MinStringAggregationFunction extends NullableSingleInputAggregation
           + blockValSet.getValueType());
     }
     String[] stringValues = blockValSet.getStringValuesSV();
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        String value = stringValues[i];
-        // Ignore null and "null" string literals
-        if (value == null || "null".equals(value)) {
-          continue;
-        }
-        String currentMin = aggregationResultHolder.getResult();
-        // Update the currentMin if a smaller string value is found
-        if (currentMin == null || value.compareTo(currentMin) < 0) {
-          aggregationResultHolder.setValue(value);
+    String minValue = foldNotNull(length, blockValSet, null, (acum, from, to) -> {
+      String innerMin = stringValues[from];
+      for (int i = from + 1; i < to; i++) {
+        if (stringValues[i].compareTo(innerMin) < 0) {
+          innerMin = stringValues[i];
         }
       }
+      return acum == null ? innerMin : (acum.compareTo(innerMin) < 0 ? acum : innerMin);
     });
+    String currentMin = aggregationResultHolder.getResult();
+    if (currentMin == null || (minValue != null && minValue.compareTo(currentMin) < 0)) {
+      aggregationResultHolder.setValue(minValue);
+    }
   }
 
   @Override
@@ -89,13 +88,9 @@ public class MinStringAggregationFunction extends NullableSingleInputAggregation
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         String value = stringValues[i];
-        // For SV, "null" as a string literal can exist and needs to be handled
-        if (value == null || "null".equals(value)) {
-          continue;
-        }
         int groupKey = groupKeyArray[i];
         String currentMin = groupByResultHolder.getResult(groupKey);
-        if (currentMin == null || "null".equals(currentMin) || value.compareTo(currentMin) < 0) {
+        if (currentMin == null || value.compareTo(currentMin) < 0) {
           groupByResultHolder.setValueForKey(groupKey, value);
         }
       }
@@ -114,13 +109,9 @@ public class MinStringAggregationFunction extends NullableSingleInputAggregation
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         String value = stringValues[i];
-        // For MV, "null" as a string literal can exist and needs to be handled
-        if (value == null || "null".equals(value)) {
-          continue;
-        }
         for (int groupKey : groupKeysArray[i]) {
           String currentMin = groupByResultHolder.getResult(groupKey);
-          if (currentMin == null || "null".equals(currentMin) || value.compareTo(currentMin) < 0) {
+          if (currentMin == null || value.compareTo(currentMin) < 0) {
             groupByResultHolder.setValueForKey(groupKey, value);
           }
         }
@@ -130,22 +121,20 @@ public class MinStringAggregationFunction extends NullableSingleInputAggregation
 
   @Override
   public String extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    String result = aggregationResultHolder.getResult();
-    return result != null ? result : "null";
+    return aggregationResultHolder.getResult();
   }
 
   @Override
   public String extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    String result = groupByResultHolder.getResult(groupKey);
-    return result != null ? result : "null";
+    return groupByResultHolder.getResult(groupKey);
   }
 
   @Override
   public String merge(String intermediateResult1, String intermediateResult2) {
-    if (intermediateResult1 == null || "null".equals(intermediateResult1)) {
+    if (intermediateResult1 == null) {
       return intermediateResult2;
     }
-    if (intermediateResult2 == null || "null".equals(intermediateResult2)) {
+    if (intermediateResult2 == null) {
       return intermediateResult1;
     }
     return intermediateResult1.compareTo(intermediateResult2) < 0 ? intermediateResult1 : intermediateResult2;
@@ -163,7 +152,7 @@ public class MinStringAggregationFunction extends NullableSingleInputAggregation
 
   @Override
   public String extractFinalResult(String intermediateResult) {
-    return intermediateResult != null ? intermediateResult : "null";
+    return intermediateResult;
   }
 
   @Override

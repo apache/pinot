@@ -59,36 +59,57 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
   }
 
   @Test
-  public void testNumericColumnException() {
+  public void testNumericColumnExceptioninAggregateMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
     MaxStringAggregationFunction function = new MaxStringAggregationFunction(Collections.singletonList(expression),
         false);
 
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
-    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
-
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     BlockValSet mockBlockValSet = mock(BlockValSet.class);
     when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
     blockValSetMap.put(expression, mockBlockValSet);
 
-    // Test exception in aggregate method
     try {
       function.aggregate(10, resultHolder, blockValSetMap);
       fail("Should throw BadQueryRequestException");
     } catch (BadQueryRequestException e) {
       assertTrue(e.getMessage().contains("Cannot compute MAXSTRING for numeric column"));
     }
+  }
 
-    // Test exception in aggregateGroupBySV method
+  @Test
+  public void testNumericColumnExceptioninAggregateGroupBySVMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MaxStringAggregationFunction function = new MaxStringAggregationFunction(Collections.singletonList(expression),
+        false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    blockValSetMap.put(expression, mockBlockValSet);
+
     try {
       function.aggregateGroupBySV(10, new int[10], groupByResultHolder, blockValSetMap);
       fail("Should throw BadQueryRequestException");
     } catch (BadQueryRequestException e) {
       assertTrue(e.getMessage().contains("Cannot compute MAXSTRING for numeric column"));
     }
+  }
 
-    // Test exception in aggregateGroupByMV method
+  @Test
+  public void testNumericColumnExceptioninAggregateGroupByMVMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MaxStringAggregationFunction function = new MaxStringAggregationFunction(Collections.singletonList(expression),
+        false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    blockValSetMap.put(expression, mockBlockValSet);
+
     try {
       function.aggregateGroupByMV(10, new int[10][], groupByResultHolder, blockValSetMap);
       fail("Should throw BadQueryRequestException");
@@ -116,6 +137,7 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
     assertEquals(function.merge("apple", null), "apple");
     assertEquals(function.merge(null, "apple"), "apple");
     assertNull(function.merge(null, null));
+    assertEquals(function.merge("apple", "null"), "null");
 
     // Test final result merging
     assertEquals(function.mergeFinalResult("apple", "banana"), "banana");
@@ -227,7 +249,8 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
             "beta",  // Grouped with 'literal'
             "null"   // Grouped with 'literal'
         ).whenQuery("select 'literal', maxstring(myField) from testTable group by 'literal'")
-        .thenResultIs("STRING | STRING", "literal | gamma"); // Max of {"alpha", "gamma", "beta"} is "gamma"
+        .thenResultIs("STRING | STRING",
+            "literal | \"null\""); // Max of {"alpha", null, "gamma", "beta"} is "null" when null handling is disabled
   }
 
   @Test
@@ -244,7 +267,7 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
             "null",  // Grouped with 'literal'
             "beta",  // Grouped with 'literal'
             "null"   // Grouped with 'literal'
-        ).whenQuery("select 'literal', maxstring(myField) from testTable group by 'literal'")
+        ).whenQueryWithNullHandlingEnabled("select 'literal', maxstring(myField) from testTable group by 'literal'")
         .thenResultIs("STRING | STRING", "literal | gamma"); // Max of {"alpha", "gamma", "beta"} is "gamma"
   }
 
@@ -271,8 +294,10 @@ public class MaxStringAggregationFunctionTest extends AbstractAggregationFunctio
         .thenResultIs(
             "STRING | STRING",
             "tag1    | banana", // Values for tag1: "banana", "apple". Max is "banana".
-            "tag2    | cherry",
-            "tag3    | cherry"  // Values for tag3: null, "cherry". Max is "cherry".
+            "tag2    | \"null\"",
+            // Values for tag2: "banana", "apple", null, "cherry". Max is "null" (nulls ignored). This is because
+            // when null handling is disabled, the null value is read as "null" and we need to honor that
+            "tag3    | \"null\""  // Values for tag3: null, "cherry". Max is "null".
         )
         // Query with explicit null handling enabled via query option
         .whenQueryWithNullHandlingEnabled("select tags, MAXSTRING(value) from testTable "

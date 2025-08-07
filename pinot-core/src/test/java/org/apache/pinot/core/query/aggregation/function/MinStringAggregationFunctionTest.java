@@ -59,36 +59,55 @@ public class MinStringAggregationFunctionTest extends AbstractAggregationFunctio
   }
 
   @Test
-  public void testNumericColumnException() {
+  public void testNumericColumnExceptioninAggregateMethod() {
     ExpressionContext expression = RequestContextUtils.getExpression("column");
     MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
         false);
 
     AggregationResultHolder resultHolder = function.createAggregationResultHolder();
-    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
-
     Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
     BlockValSet mockBlockValSet = mock(BlockValSet.class);
     when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
     blockValSetMap.put(expression, mockBlockValSet);
 
-    // Test exception in aggregate method
     try {
       function.aggregate(10, resultHolder, blockValSetMap);
       fail("Should throw BadQueryRequestException");
     } catch (BadQueryRequestException e) {
       assertTrue(e.getMessage().contains("Cannot compute MINSTRING for numeric column"));
     }
+  }
 
-    // Test exception in aggregateGroupBySV method
+  @Test
+  public void testNumericColumnExceptioninAggregateGroupBySVMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+        false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    blockValSetMap.put(expression, mockBlockValSet);
     try {
       function.aggregateGroupBySV(10, new int[10], groupByResultHolder, blockValSetMap);
       fail("Should throw BadQueryRequestException");
     } catch (BadQueryRequestException e) {
       assertTrue(e.getMessage().contains("Cannot compute MINSTRING for numeric column"));
     }
+  }
 
-    // Test exception in aggregateGroupByMV method
+  @Test
+  public void testNumericColumnExceptioninAggregateGroupByMVMethod() {
+    ExpressionContext expression = RequestContextUtils.getExpression("column");
+    MinStringAggregationFunction function = new MinStringAggregationFunction(Collections.singletonList(expression),
+        false);
+
+    GroupByResultHolder groupByResultHolder = function.createGroupByResultHolder(10, 20);
+    Map<ExpressionContext, BlockValSet> blockValSetMap = new HashMap<>();
+    BlockValSet mockBlockValSet = mock(BlockValSet.class);
+    when(mockBlockValSet.getValueType()).thenReturn(FieldSpec.DataType.INT);
+    blockValSetMap.put(expression, mockBlockValSet);
     try {
       function.aggregateGroupByMV(10, new int[10][], groupByResultHolder, blockValSetMap);
       fail("Should throw BadQueryRequestException");
