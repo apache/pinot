@@ -1969,12 +1969,11 @@ public class TableRebalancer {
       if (isCompletedSegment) {
         return "Moving segment " + segmentName + " as part of rebalance is risky for peer-download enabled tables, "
             + "as the download URL is empty. Ensure that the deep store has a copy of the segment. It is recommended "
-            + "to forceCommit and pause ingestion prior to trying to rebalance such tables with downtime";
+            + "to pause ingestion prior to trying to rebalance such tables with downtime";
       }
       return "Moving segment " + segmentName + " as part of rebalance is risky for peer-download enabled tables "
           + "as it is in COMMITING state and repair is not allowed (it may be an upsert / dedup enabled table). It "
-          + "is recommended to forceCommit and pause ingestion prior to trying to rebalance such tables with "
-          + "downtime";
+          + "is recommended to pause ingestion prior to trying to rebalance such tables with downtime";
     }
   }
 
