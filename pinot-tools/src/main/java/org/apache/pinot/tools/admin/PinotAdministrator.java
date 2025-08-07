@@ -29,7 +29,6 @@ import org.apache.pinot.tools.admin.command.AddSchemaCommand;
 import org.apache.pinot.tools.admin.command.AddTableCommand;
 import org.apache.pinot.tools.admin.command.AddTenantCommand;
 import org.apache.pinot.tools.admin.command.AnonymizeDataCommand;
-import org.apache.pinot.tools.admin.command.AvroSchemaToPinotSchema;
 import org.apache.pinot.tools.admin.command.BootstrapTableCommand;
 import org.apache.pinot.tools.admin.command.ChangeNumReplicasCommand;
 import org.apache.pinot.tools.admin.command.ChangeTableState;
@@ -52,6 +51,7 @@ import org.apache.pinot.tools.admin.command.PostQueryCommand;
 import org.apache.pinot.tools.admin.command.QuickStartCommand;
 import org.apache.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
 import org.apache.pinot.tools.admin.command.RebalanceTableCommand;
+import org.apache.pinot.tools.admin.command.SchemaFromAvroParquetCommand;
 import org.apache.pinot.tools.admin.command.SegmentProcessorFrameworkCommand;
 import org.apache.pinot.tools.admin.command.ShowClusterInfoCommand;
 import org.apache.pinot.tools.admin.command.StartBrokerCommand;
@@ -124,8 +124,9 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("StopProcess", new StopProcessCommand());
     SUBCOMMAND_MAP.put("DeleteCluster", new DeleteClusterCommand());
     SUBCOMMAND_MAP.put("ShowClusterInfo", new ShowClusterInfoCommand());
-    SUBCOMMAND_MAP.put("AvroSchemaToPinotSchema", new AvroSchemaToPinotSchema());
+
     SUBCOMMAND_MAP.put("JsonToPinotSchema", new JsonToPinotSchema());
+    SUBCOMMAND_MAP.put("SchemaFromAvroParquet", new SchemaFromAvroParquetCommand());
     SUBCOMMAND_MAP.put("RebalanceTable", new RebalanceTableCommand());
     SUBCOMMAND_MAP.put("ChangeNumReplicas", new ChangeNumReplicasCommand());
     SUBCOMMAND_MAP.put("ValidateConfig", new ValidateConfigCommand());

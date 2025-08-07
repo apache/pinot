@@ -269,4 +269,33 @@ public class AvroSchemaUtil {
     }
     return result;
   }
+
+  public static org.apache.pinot.spi.data.Schema createPinotSchema(Schema avroSchema) {
+    org.apache.pinot.spi.data.Schema.SchemaBuilder schemaBuilder =
+        new org.apache.pinot.spi.data.Schema.SchemaBuilder();
+    for (Schema.Field field : avroSchema.getFields()) {
+      String fieldName = field.name();
+      Schema fieldSchema = field.schema();
+      boolean isSingleValue = true;
+      if (fieldSchema.isUnion()) {
+        for (Schema type : fieldSchema.getTypes()) {
+          if (type.getType() == Schema.Type.NULL) {
+            continue;
+          }
+          fieldSchema = type;
+        }
+      }
+      if (fieldSchema.getType() == Schema.Type.ARRAY) {
+        isSingleValue = false;
+        fieldSchema = fieldSchema.getElementType();
+      }
+      DataType dataType = AvroSchemaUtil.valueOf(fieldSchema.getType());
+      if (isSingleValue) {
+        schemaBuilder.addSingleValueDimension(fieldName, dataType);
+      } else {
+        schemaBuilder.addMultiValueDimension(fieldName, dataType);
+      }
+    }
+    return schemaBuilder.build();
+  }
 }
