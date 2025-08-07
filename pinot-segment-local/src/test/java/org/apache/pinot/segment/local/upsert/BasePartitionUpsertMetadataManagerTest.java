@@ -578,8 +578,6 @@ public class BasePartitionUpsertMetadataManagerTest {
     assertNull(seg03.loadDocIdsFromSnapshot(V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
   }
 
-  // Losing segment is the one that lost all comparisons with docs from other segments, thus becomes empty of valid
-  // docs. Previously such segment was not tracked for snapshotting, but we should take snapshot of its empty bitmap.
   @Test
   public void testTakeQueryableDocIdsSnapshotWithLosingSegment()
       throws IOException {
