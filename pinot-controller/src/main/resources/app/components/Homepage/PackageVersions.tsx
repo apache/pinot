@@ -26,15 +26,27 @@ import PinotMethodUtils from '../../utils/PinotMethodUtils';
 const PackageVersions = () => {
 
   const [fetching, setFetching] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [tableData, setTableData] = useState<TableData>({
     columns: [],
     records: []
   });
 
   const fetchData = async () => {
-    const result = await PinotMethodUtils.getPackageVersionsData();
-    setTableData(result);
-    setFetching(false);
+    try {
+      const result = await PinotMethodUtils.getPackageVersionsData();
+      setTableData(result);
+      setError(null);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch package versions');
+      setTableData({
+        columns: ['Package', 'Version'],
+        records: [],
+        error: err?.message || 'Failed to fetch package versions'
+      });
+    } finally {
+      setFetching(false);
+    }
   };
   useEffect(() => {
     fetchData();

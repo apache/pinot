@@ -1357,8 +1357,7 @@ const getAuthUserEmailFromAccessToken = (
 // Expected Output: {columns: [], records: []}
 const getPackageVersionsData = () => {
   return getVersions().then(({ data }) => {
-    const versionData = getAsObject(data);
-    const records = Object.entries(versionData).map(([packageName, version]) => [
+    const records = Object.entries(data).map(([packageName, version]) => [
       packageName,
       String(version)
     ]);
