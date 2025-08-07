@@ -22,7 +22,7 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class SumValueAggregator implements ValueAggregator<Number, Double> {
+public class SumValueAggregator implements ValueAggregator<Object, Double> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.DOUBLE;
 
   @Override
@@ -36,13 +36,13 @@ public class SumValueAggregator implements ValueAggregator<Number, Double> {
   }
 
   @Override
-  public Double getInitialAggregatedValue(Number rawValue) {
-    return rawValue.doubleValue();
+  public Double getInitialAggregatedValue(Object rawValue) {
+    return ValueAggregatorUtils.toDouble(rawValue);
   }
 
   @Override
-  public Double applyRawValue(Double value, Number rawValue) {
-    return value + rawValue.doubleValue();
+  public Double applyRawValue(Double value, Object rawValue) {
+    return value + ValueAggregatorUtils.toDouble(rawValue);
   }
 
   @Override

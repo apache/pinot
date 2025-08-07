@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.core.transport;
+package org.apache.pinot.core.routing;
 
 import java.util.HashMap;
 import java.util.List;
@@ -26,17 +26,15 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
-import org.apache.pinot.core.routing.BaseTableRouteInfo;
-import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
+import org.apache.pinot.core.transport.ServerInstance;
+import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
-public class ImplicitHybridTableRouteInfo extends BaseTableRouteInfo {
+public class ImplicitHybridTableRouteInfo implements TableRouteInfo {
   private String _offlineTableName = null;
   private boolean _isOfflineRouteExists;
   private TableConfig _offlineTableConfig;
@@ -54,16 +52,16 @@ public class ImplicitHybridTableRouteInfo extends BaseTableRouteInfo {
 
   private BrokerRequest _offlineBrokerRequest;
   private BrokerRequest _realtimeBrokerRequest;
-  private Map<ServerInstance, ServerRouteInfo> _offlineRoutingTable;
-  private Map<ServerInstance, ServerRouteInfo> _realtimeRoutingTable;
+  private Map<ServerInstance, SegmentsToQuery> _offlineRoutingTable;
+  private Map<ServerInstance, SegmentsToQuery> _realtimeRoutingTable;
 
   public ImplicitHybridTableRouteInfo() {
   }
 
   public ImplicitHybridTableRouteInfo(@Nullable BrokerRequest offlineBrokerRequest,
       @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
-      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
+      @Nullable Map<ServerInstance, SegmentsToQuery> offlineRoutingTable,
+      @Nullable Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable) {
     _offlineBrokerRequest = offlineBrokerRequest;
     _realtimeBrokerRequest = realtimeBrokerRequest;
     _offlineRoutingTable = offlineRoutingTable;
@@ -156,21 +154,21 @@ public class ImplicitHybridTableRouteInfo extends BaseTableRouteInfo {
 
   @Nullable
   @Override
-  public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
+  public Map<ServerInstance, SegmentsToQuery> getOfflineRoutingTable() {
     return _offlineRoutingTable;
   }
 
-  public void setOfflineRoutingTable(Map<ServerInstance, ServerRouteInfo> offlineRoutingTable) {
+  public void setOfflineRoutingTable(Map<ServerInstance, SegmentsToQuery> offlineRoutingTable) {
     _offlineRoutingTable = offlineRoutingTable;
   }
 
   @Nullable
   @Override
-  public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
+  public Map<ServerInstance, SegmentsToQuery> getRealtimeRoutingTable() {
     return _realtimeRoutingTable;
   }
 
-  public void setRealtimeRoutingTable(Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable) {
+  public void setRealtimeRoutingTable(Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable) {
     _realtimeRoutingTable = realtimeRoutingTable;
   }
 
@@ -272,11 +270,11 @@ public class ImplicitHybridTableRouteInfo extends BaseTableRouteInfo {
     _numPrunedSegmentsTotal = numPrunedSegmentsTotal;
   }
 
-  protected static Map<ServerRoutingInstance, InstanceRequest> getRequestMapFromRoutingTable(TableType tableType,
-      Map<ServerInstance, ServerRouteInfo> routingTable, BrokerRequest brokerRequest, long requestId, String brokerId,
+  private Map<ServerRoutingInstance, InstanceRequest> getRequestMapFromRoutingTable(TableType tableType,
+      Map<ServerInstance, SegmentsToQuery> routingTable, BrokerRequest brokerRequest, long requestId, String brokerId,
       boolean preferTls) {
     Map<ServerRoutingInstance, InstanceRequest> requestMap = new HashMap<>();
-    for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routingTable.entrySet()) {
+    for (Map.Entry<ServerInstance, SegmentsToQuery> entry : routingTable.entrySet()) {
       ServerRoutingInstance serverRoutingInstance = entry.getKey().toServerRoutingInstance(tableType, preferTls);
       InstanceRequest instanceRequest = getInstanceRequest(requestId, brokerId, brokerRequest, entry.getValue());
       requestMap.put(serverRoutingInstance, instanceRequest);
@@ -284,18 +282,10 @@ public class ImplicitHybridTableRouteInfo extends BaseTableRouteInfo {
     return requestMap;
   }
 
-  protected static InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
-      ServerRouteInfo segments) {
-    InstanceRequest instanceRequest = new InstanceRequest();
-    instanceRequest.setRequestId(requestId);
-    instanceRequest.setCid(QueryThreadContext.getCid());
-    instanceRequest.setQuery(brokerRequest);
-    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
-    if (queryOptions != null) {
-      instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
-    }
+  private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
+      SegmentsToQuery segments) {
+    InstanceRequest instanceRequest = TableRouteInfo.createInstanceRequest(brokerRequest, brokerId, requestId);
     instanceRequest.setSearchSegments(segments.getSegments());
-    instanceRequest.setBrokerId(brokerId);
     if (CollectionUtils.isNotEmpty(segments.getOptionalSegments())) {
       // Don't set this field, i.e. leave it as null, if there is no optional segment at all, to be more backward
       // compatible, as there are places like in multi-stage query engine where this field is not set today when

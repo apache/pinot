@@ -63,11 +63,8 @@ public class ServerQueryInfoFetcher {
     boolean queriesDisabled = record.getBooleanField(CommonConstants.Helix.QUERIES_DISABLED, false);
     boolean shutdownInProgress = record.getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
 
-    ServerQueryInfo queryInfo = new ServerQueryInfo(
+    return new ServerQueryInfo(
         instanceId, tags, null, helixEnabled, queriesDisabled, shutdownInProgress);
-
-    LOGGER.info("Fetched ServerQueryInfo for instanceId {}: {}", instanceId, queryInfo);
-    return queryInfo;
   }
 
   public static class ServerQueryInfo {

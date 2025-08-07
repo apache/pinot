@@ -178,6 +178,26 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
     assertEquals(series.size(), 0);
   }
 
+  @Test
+  public void testControllerTimeseriesEndpoints()
+      throws Exception {
+    // Call /timeseries/api/v1/query_range.
+    String query = String.format(
+        "fetch{table=\"mytable_OFFLINE\",filter=\"\",ts_column=\"%s\",ts_unit=\"MILLISECONDS\",value=\"%s\"}"
+            + " | max{%s} | transformNull{0} | keepLastValue{}",
+        TS_COLUMN, TOTAL_TRIPS_COLUMN, DEVICE_OS_COLUMN
+    );
+    JsonNode result = getTimeseriesQuery(getControllerBaseApiUrl(), query, QUERY_START_TIME_SEC, QUERY_END_TIME_SEC,
+        getHeaders());
+    assertEquals(result.get("status").asText(), "success");
+
+    // Call /timeseries/languages.
+    var statusCodeAndResponse = sendGetRequestWithStatusCode(
+        getControllerBaseApiUrl() + "/timeseries/languages", getHeaders());
+    assertEquals(statusCodeAndResponse.getLeft(), 200);
+    assertEquals(statusCodeAndResponse.getRight(), "[\"m3ql\"]");
+  }
+
   protected Map<String, String> getHeaders() {
     return Collections.emptyMap();
   }
@@ -197,6 +217,15 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
         validator.validate(ts, val, row);
       }
     }
+  }
+
+  @Override
+  protected void overrideControllerConf(Map<String, Object> properties) {
+    properties.put(PinotTimeSeriesConfiguration.getEnabledLanguagesConfigKey(), "m3ql");
+    properties.put(PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey("m3ql"),
+        "org.apache.pinot.tsdb.m3ql.M3TimeSeriesPlanner");
+    properties.put(PinotTimeSeriesConfiguration.getSeriesBuilderFactoryConfigKey("m3ql"),
+        SimpleTimeSeriesBuilderFactory.class.getName());
   }
 
   @Override

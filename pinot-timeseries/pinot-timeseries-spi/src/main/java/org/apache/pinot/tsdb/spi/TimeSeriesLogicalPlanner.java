@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.tsdb.spi;
 
+import java.util.Stack;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.tsdb.spi.plan.BaseTimeSeriesPlanNode;
 import org.apache.pinot.tsdb.spi.plan.LeafTimeSeriesPlanNode;
@@ -35,4 +36,27 @@ public interface TimeSeriesLogicalPlanner {
   void init(PinotConfiguration pinotConfiguration);
 
   TimeSeriesLogicalPlanResult plan(RangeTimeSeriesRequest request, TimeSeriesMetadata metadata);
+
+  /**
+   * Returns the name of the table from the logical plan result by traversing the plan tree and extracting the
+   * table name from the first encountered {@link LeafTimeSeriesPlanNode}
+   * This method is recommended to be overriden by implementations for more efficient table name extraction.
+   */
+  default String getTableName(TimeSeriesLogicalPlanResult result) {
+    BaseTimeSeriesPlanNode node = result.getPlanNode();
+
+    Stack<BaseTimeSeriesPlanNode> nodeStack = new Stack<>();
+    nodeStack.push(node);
+
+    while (!nodeStack.isEmpty()) {
+      BaseTimeSeriesPlanNode currentNode = nodeStack.pop();
+      if (currentNode instanceof LeafTimeSeriesPlanNode) {
+        return ((LeafTimeSeriesPlanNode) currentNode).getTableName();
+      }
+      for (BaseTimeSeriesPlanNode child : currentNode.getInputs()) {
+        nodeStack.push(child);
+      }
+    }
+    throw new RuntimeException("No LeafTimeSeriesPlanNode found in the plan tree.");
+  }
 }

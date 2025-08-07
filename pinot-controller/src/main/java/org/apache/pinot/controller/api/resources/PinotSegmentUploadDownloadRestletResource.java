@@ -95,6 +95,7 @@ import org.apache.pinot.controller.api.upload.SegmentUploadMetadata;
 import org.apache.pinot.controller.api.upload.SegmentValidationUtils;
 import org.apache.pinot.controller.api.upload.ZKOperator;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.validation.StorageQuotaChecker;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
@@ -1019,6 +1020,8 @@ public class PinotSegmentUploadDownloadRestletResource {
       @ApiParam(value = "OFFLINE|REALTIME", required = true) @QueryParam("type") String tableTypeStr,
       @ApiParam(value = "Segment lineage entry id returned by startReplaceSegments API", required = true)
       @QueryParam("segmentLineageEntryId") String segmentLineageEntryId,
+      @ApiParam(value = "Trigger an immediate segment cleanup") @QueryParam("cleanup") @DefaultValue("false")
+      boolean cleanupSegments,
       @ApiParam(value = "Fields belonging to end replace segment request")
       EndReplaceSegmentsRequest endReplaceSegmentsRequest, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -1034,6 +1037,9 @@ public class PinotSegmentUploadDownloadRestletResource {
       Preconditions.checkNotNull(segmentLineageEntryId, "'segmentLineageEntryId' should not be null");
       _pinotHelixResourceManager.endReplaceSegments(tableNameWithType, segmentLineageEntryId,
           endReplaceSegmentsRequest);
+      if (cleanupSegments) {
+        _pinotHelixResourceManager.invokeControllerPeriodicTask(tableNameWithType, RetentionManager.TASK_NAME, null);
+      }
       return Response.ok().build();
     } catch (Exception e) {
       _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.NUMBER_END_REPLACE_FAILURE, 1);

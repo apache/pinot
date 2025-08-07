@@ -524,7 +524,8 @@ public class PinotTableRestletResource {
         continue;
       }
       for (String taskName : taskStates.keySet()) {
-        if (TaskState.IN_PROGRESS.equals(taskStates.get(taskName))) {
+        if (TaskState.IN_PROGRESS.equals(taskStates.get(taskName))
+            && pinotHelixTaskResourceManager.getTaskCount(taskName).getRunning() > 0) {
           pendingTasks.add(taskName);
         } else {
           pinotHelixTaskResourceManager.deleteTask(taskName, true);

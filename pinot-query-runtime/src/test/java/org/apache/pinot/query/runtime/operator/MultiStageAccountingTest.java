@@ -92,7 +92,7 @@ public class MultiStageAccountingTest implements ITest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     // init accountant and start watcher task
     Tracing.unregisterThreadAccountant();
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(configs), "testGroupBy",
+    Tracing.ThreadAccountantOps.createThreadAccountant(new PinotConfiguration(configs), "testGroupBy",
         InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 

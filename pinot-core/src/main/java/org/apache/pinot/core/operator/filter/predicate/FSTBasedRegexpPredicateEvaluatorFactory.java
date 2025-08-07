@@ -49,7 +49,7 @@ public class FSTBasedRegexpPredicateEvaluatorFactory {
   /**
    * Matches regexp query using FSTIndexReader.
    */
-  private static class FSTBasedRegexpPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  private static class FSTBasedRegexpPredicateEvaluator extends BaseDictIdBasedRegexpLikePredicateEvaluator {
     final ImmutableRoaringBitmap _matchingDictIdBitmap;
 
     public FSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate, TextIndexReader fstIndexReader,
