@@ -131,9 +131,8 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     return groupByResultHolder.getResult(groupKey);
   }
 
-  @Nullable
   @Override
-  public String merge(String intermediateResult1, String intermediateResult2) {
+  public String merge(@Nullable String intermediateResult1, @Nullable String intermediateResult2) {
     if (intermediateResult1 == null) {
       return intermediateResult2;
     }
