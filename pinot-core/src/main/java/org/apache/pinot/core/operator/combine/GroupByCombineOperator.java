@@ -253,23 +253,27 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
       // Merge aggregation group-by result.
       AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
       if (aggregationGroupByResult != null) {
-        IntermediateRecord[] convertedRecords = new IntermediateRecord[aggregationGroupByResult.getNumGroups()];
-        // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-        Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-        int idx = 0;
-        while (dicGroupKeyIterator.hasNext()) {
-          GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
-          Object[] keys = groupKey._keys;
-          Object[] values = Arrays.copyOf(keys, _numColumns);
-          int groupId = groupKey._groupId;
-          for (int i = 0; i < _numAggregationFunctions; i++) {
-            values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+        try {
+          IntermediateRecord[] convertedRecords = new IntermediateRecord[aggregationGroupByResult.getNumGroups()];
+          // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
+          Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+          int idx = 0;
+          while (dicGroupKeyIterator.hasNext()) {
+            GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+            Object[] keys = groupKey._keys;
+            Object[] values = Arrays.copyOf(keys, _numColumns);
+            int groupId = groupKey._groupId;
+            for (int i = 0; i < _numAggregationFunctions; i++) {
+              values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+            }
+            convertedRecords[idx++] = new IntermediateRecord(new Key(keys), new Record(values), null);
+            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
+            mergedKeys++;
           }
-          convertedRecords[idx++] = new IntermediateRecord(new Key(keys), new Record(values), null);
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-          mergedKeys++;
+          intermediateRecords = Arrays.asList(convertedRecords);
+        } finally {
+          aggregationGroupByResult.closeGroupKeyGenerator();
         }
-        intermediateRecords = Arrays.asList(convertedRecords);
       } else {
         // empty segment result
         intermediateRecords = new ArrayList<>();
