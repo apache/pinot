@@ -858,11 +858,11 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     int numUnchangedSegments = 0;
     // The segments without validDocIds & queryable docId snapshots should take their snapshots at last. So that when
     // there is failure to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of
-    // valid docs across segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less.
-    // That no overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
-    // We wouldn't be using queryableDocIds anywhere currently during preload - storing them so we could better extend
-    // the functionality. Best case scenario, if both validDocs and queryableDocs are not persisted, we will be considering
-    // that segment is not storing updated bitmap copies on disk
+    // valid docs across segments. Because the valid docs as tracked by the existing validDocIds snapshots can only
+    // get less. That no overlap of valid docs among segments with snapshots is required by the preloading to work
+    // correctly. We wouldn't be using queryableDocIds anywhere currently during preload - storing them so we
+    // could better extend the functionality. Best case scenario, if both validDocs and queryableDocs are not persisted,
+    // we will be considering that segment is not storing updated bitmap copies on disk
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     TableDataManager tableDataManager = _context.getTableDataManager();
     Preconditions.checkNotNull(tableDataManager, "Taking snapshot requires tableDataManager");
