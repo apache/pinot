@@ -17,15 +17,18 @@
  * under the License.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { get, each } from 'lodash';
-import { Grid, makeStyles } from '@material-ui/core';
+import { Grid, makeStyles, Box } from '@material-ui/core';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import CustomizedTables from '../components/Table';
+import TaskStatusFilter, { TaskStatus } from '../components/TaskStatusFilter';
 import { TaskRuntimeConfig } from 'Models';
 import AppLoader from '../components/AppLoader';
 import SimpleAccordion from '../components/SimpleAccordion';
 import CustomCodemirror from '../components/CustomCodemirror';
+import { formatTimeInTimezone } from '../utils/TimezoneUtils';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 const useStyles = makeStyles(() => ({
   gridContainer: {
@@ -68,17 +71,19 @@ const useStyles = makeStyles(() => ({
 
 const TaskDetail = (props) => {
   const classes = useStyles();
+  const { currentTimezone } = useTimezone();
   const { taskID, taskType, queueTableName } = props.match.params;
 
   const [fetching, setFetching] = useState(true);
   const [taskDebugData, setTaskDebugData] = useState({});
   const [subtaskTableData, setSubtaskTableData] = useState({ columns: ['Task ID', 'Status', 'Start Time', 'Finish Time', 'Minion Host Name'], records: [] });
   const [taskRuntimeConfig, setTaskRuntimeConfig] = useState<TaskRuntimeConfig | null>(null);
+  const [subtaskStatusFilter, setSubtaskStatusFilter] = useState<'ALL' | TaskStatus>('ALL');
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setFetching(true);
     const [debugRes, runtimeConfig] = await Promise.all([
-      PinotMethodUtils.getTaskDebugData(taskID), 
+      PinotMethodUtils.getTaskDebugData(taskID),
       PinotMethodUtils.getTaskRuntimeConfigData(taskID)
     ]);
     const subtaskTableRecords = [];
@@ -86,8 +91,8 @@ const TaskDetail = (props) => {
       subtaskTableRecords.push([
         get(subTask, 'taskId'),
         get(subTask, 'state'),
-        get(subTask, 'startTime'),
-        get(subTask, 'finishTime'),
+        get(subTask, 'startTime') ? formatTimeInTimezone(get(subTask, 'startTime'), 'MMMM Do YYYY, HH:mm:ss z') : '-',
+        get(subTask, 'finishTime') ? formatTimeInTimezone(get(subTask, 'finishTime'), 'MMMM Do YYYY, HH:mm:ss z') : '-',
         get(subTask, 'participant'),
       ])
     });
@@ -98,11 +103,46 @@ const TaskDetail = (props) => {
     setTaskRuntimeConfig(runtimeConfig)
 
     setFetching(false);
-  };
+  }, [taskID]);
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentTimezone, fetchData]);
+
+  const filteredSubtaskTableData = useMemo(() => {
+    if (subtaskStatusFilter === 'ALL') {
+      return subtaskTableData;
+    }
+
+    const filtered = subtaskTableData.records.filter(([_, status]) => {
+      const subtaskStatus = typeof status === 'object' && status !== null && 'value' in status
+        ? status.value as string
+        : status as string;
+      return subtaskStatus.toUpperCase() === subtaskStatusFilter;
+    });
+
+    return { ...subtaskTableData, records: filtered };
+  }, [subtaskTableData, subtaskStatusFilter]);
+
+  const subtaskStatusFilterOptions = [
+    { label: 'All', value: 'ALL' as const },
+    { label: 'Completed', value: 'COMPLETED' as const },
+    { label: 'Running', value: 'RUNNING' as const },
+    { label: 'Waiting', value: 'WAITING' as const },
+    { label: 'Error', value: 'ERROR' as const },
+    { label: 'Unknown', value: 'UNKNOWN' as const },
+    { label: 'Dropped', value: 'DROPPED' as const },
+    { label: 'Timed Out', value: 'TIMED_OUT' as const },
+    { label: 'Aborted', value: 'ABORTED' as const },
+  ];
+
+  const subtaskStatusFilterElement = (
+    <TaskStatusFilter
+      value={subtaskStatusFilter}
+      onChange={setSubtaskStatusFilter}
+      options={subtaskStatusFilterOptions}
+    />
+  );
 
   if(fetching) {
     return <AppLoader />
@@ -118,12 +158,16 @@ const TaskDetail = (props) => {
           <Grid item xs={12}>
             <strong>Status:</strong> {get(taskDebugData, 'taskState', '')}
           </Grid>
-          <Grid item xs={12}>
-            <strong>Start Time:</strong> {get(taskDebugData, 'startTime', '')}
-          </Grid>
-          <Grid item xs={12}>
-            <strong>Finish Time:</strong> {get(taskDebugData, 'finishTime', '')}
-          </Grid>
+          {get(taskDebugData, 'startTime') && (
+            <Grid item xs={12}>
+              <strong>Start Time:</strong> {formatTimeInTimezone(get(taskDebugData, 'startTime'), 'MMMM Do YYYY, HH:mm:ss z')}
+            </Grid>
+          )}
+          {get(taskDebugData, 'finishTime') && (
+            <Grid item xs={12}>
+              <strong>Finish Time:</strong> {formatTimeInTimezone(get(taskDebugData, 'finishTime'), 'MMMM Do YYYY, HH:mm:ss z')}
+            </Grid>
+          )}
           <Grid item xs={12}>
             <strong>Triggered By:</strong> {get(taskDebugData, 'triggeredBy', '')}
           </Grid>
@@ -145,16 +189,17 @@ const TaskDetail = (props) => {
             />
           </SimpleAccordion>
         </Grid>
-      
+
         {/* Sub task table */}
         <Grid item xs={12}>
           <CustomizedTables
             title="Sub Tasks"
-            data={subtaskTableData}
+            data={filteredSubtaskTableData}
             showSearchBox={true}
             inAccordionFormat={true}
             addLinks
             baseURL={`/task-queue/${taskType}/tables/${queueTableName}/task/${taskID}/sub-task/`}
+            additionalControls={<Box display="flex" alignItems="center">{subtaskStatusFilterElement}</Box>}
           />
         </Grid>
       </Grid>

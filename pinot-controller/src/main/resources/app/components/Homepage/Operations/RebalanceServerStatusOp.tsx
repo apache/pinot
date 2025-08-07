@@ -28,6 +28,8 @@ import {RebalanceServerResponseCard} from "./RebalanceServer/RebalanceServerResp
 import CustomizedTables from "../../Table";
 import Utils from "../../../utils/Utils";
 import PinotMethodUtils from "../../../utils/PinotMethodUtils";
+import { formatTimeInTimezone } from '../../../utils/TimezoneUtils';
+import { useTimezone } from '../../../contexts/TimezoneContext';
 import {RebalanceTableSegmentJob} from "Models";
 
 type RebalanceServerStatusOpProps = {
@@ -39,6 +41,7 @@ type RebalanceServerStatusOpProps = {
 export const RebalanceServerStatusOp = (
     { tableName, hideModal, initialJobId } : RebalanceServerStatusOpProps
 ) => {
+    const { currentTimezone } = useTimezone();
     const [rebalanceServerJobs, setRebalanceServerJobs] = React.useState<RebalanceTableSegmentJob[]>([])
     const [jobSelected, setJobSelected] = useState<string | null>(null);
     const [rebalanceContext, setRebalanceContext] = useState<{}>({});
@@ -183,8 +186,7 @@ export const RebalanceServerStatusOp = (
                                         rebalanceServerJob.jobId,
                                         rebalanceServerJob.tableName,
                                         progressStats.status,
-                                        Utils.formatTime(+rebalanceServerJob.submissionTimeMs),
-                                        progressStats.status === 'DONE' ? Utils.formatTime(+rebalanceServerJob.submissionTimeMs + (JSON.parse(rebalanceServerJob?.REBALANCE_PROGRESS_STATS || '{}').timeToFinishInSeconds * 1000)) : 'N/A'
+                                        formatTimeInTimezone(+rebalanceServerJob.submissionTimeMs + (JSON.parse(rebalanceServerJob?.REBALANCE_PROGRESS_STATS || '{}').timeToFinishInSeconds * 1000))
                                     ];
                                 }),
                                 columns: ['Job id', 'Table name', 'Status', 'Started at', 'Finished at']

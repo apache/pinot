@@ -126,6 +126,7 @@ public class FileUploadDownloadClient implements AutoCloseable {
   private static final String SEGMENT_LINEAGE_ENTRY_ID_PARAMETER = "&segmentLineageEntryId=";
   private static final String FORCE_REVERT_PARAMETER = "&forceRevert=";
   private static final String FORCE_CLEANUP_PARAMETER = "&forceCleanup=";
+  private static final String CLEANUP_PARAMETER = "&cleanup=";
 
   private static final String RETENTION_PARAMETER = "retention=";
 
@@ -391,11 +392,12 @@ public class FileUploadDownloadClient implements AutoCloseable {
   }
 
   public static URI getEndReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType,
-      String segmentLineageEntryId)
+      String segmentLineageEntryId, boolean cleanup)
       throws URISyntaxException {
     return getURI(controllerURI.getScheme(), controllerURI.getHost(), controllerURI.getPort(),
         OLD_SEGMENT_PATH + "/" + rawTableName + END_REPLACE_SEGMENTS_PATH,
-        TYPE_DELIMITER + tableType + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER + segmentLineageEntryId);
+        TYPE_DELIMITER + tableType
+            + SEGMENT_LINEAGE_ENTRY_ID_PARAMETER + segmentLineageEntryId + CLEANUP_PARAMETER + cleanup);
   }
 
   public static URI getRevertReplaceSegmentsURI(URI controllerURI, String rawTableName, String tableType,

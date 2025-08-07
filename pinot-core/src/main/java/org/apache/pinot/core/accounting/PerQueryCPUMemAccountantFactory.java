@@ -127,9 +127,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     // track memory usage
     protected final boolean _isThreadMemorySamplingEnabled;
 
-    // is sampling allowed for MSE queries
-    protected final boolean _isThreadSamplingEnabledForMSE;
-
     protected final Set<String> _inactiveQuery;
 
     protected Set<String> _cancelSentQueries;
@@ -148,7 +145,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _config = config;
       _isThreadCPUSamplingEnabled = isThreadCPUSamplingEnabled;
       _isThreadMemorySamplingEnabled = isThreadMemorySamplingEnabled;
-      _isThreadSamplingEnabledForMSE = isThreadSamplingEnabledForMSE;
       _inactiveQuery = inactiveQuery;
       _instanceId = instanceId;
       _instanceType = instanceType;
@@ -183,11 +179,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _isThreadMemorySamplingEnabled = memorySamplingConfig && threadMemoryMeasurementEnabled;
       LOGGER.info("_isThreadCPUSamplingEnabled: {}, _isThreadMemorySamplingEnabled: {}", _isThreadCPUSamplingEnabled,
           _isThreadMemorySamplingEnabled);
-
-      _isThreadSamplingEnabledForMSE =
-          config.getProperty(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE,
-              CommonConstants.Accounting.DEFAULT_ENABLE_THREAD_SAMPLING_MSE);
-      LOGGER.info("_isThreadSamplingEnabledForMSE: {}", _isThreadSamplingEnabledForMSE);
 
       _queryCancelCallbacks = CacheBuilder.newBuilder().maximumSize(
               config.getProperty(CommonConstants.Accounting.CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE,
@@ -272,17 +263,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     public void sampleUsage() {
       sampleThreadBytesAllocated();
       sampleThreadCPUTime();
-    }
-
-    /**
-     * Sample Usage for Multi-stage engine queries
-     */
-    @Override
-    public void sampleUsageMSE() {
-      if (_isThreadSamplingEnabledForMSE) {
-        sampleThreadBytesAllocated();
-        sampleThreadCPUTime();
-      }
     }
 
     @Override

@@ -84,7 +84,7 @@ public class RealtimeConsumptionRateManager {
     return InstanceHolder.INSTANCE;
   }
 
-  public void enableThrottling() {
+  public void enablePartitionRateLimiter() {
     _isThrottlingAllowed = true;
   }
 
@@ -307,11 +307,9 @@ public class RealtimeConsumptionRateManager {
     }
 
     public void throttle(int numMsgsConsumed) {
-      if (InstanceHolder.INSTANCE._isThrottlingAllowed) {
-        _metricEmitter.record(numMsgsConsumed); // just incrementing counter (non-blocking)
-        if (numMsgsConsumed > 0) {
-          _rateLimiter.acquire(numMsgsConsumed); // blocks if needed
-        }
+      _metricEmitter.record(numMsgsConsumed); // just incrementing counter (non-blocking)
+      if (numMsgsConsumed > 0) {
+        _rateLimiter.acquire(numMsgsConsumed); // blocks if needed
       }
     }
 

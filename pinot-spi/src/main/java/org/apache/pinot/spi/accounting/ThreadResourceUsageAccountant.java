@@ -75,11 +75,6 @@ public interface ThreadResourceUsageAccountant {
    */
   void sampleUsage();
 
-  /**
-   * Sample Usage for Multi-stage engine queries
-   */
-  void sampleUsageMSE();
-
   default boolean throttleQuerySubmission() {
     return false;
   }

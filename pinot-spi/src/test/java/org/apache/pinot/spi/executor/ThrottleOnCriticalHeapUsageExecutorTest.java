@@ -76,10 +76,6 @@ public class ThrottleOnCriticalHeapUsageExecutorTest {
       }
 
       @Override
-      public void sampleUsageMSE() {
-      }
-
-      @Override
       public boolean throttleQuerySubmission() {
         return _numCalls.getAndIncrement() > 1;
       }

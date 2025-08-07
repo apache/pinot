@@ -485,7 +485,7 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public void setZkStr(String zkStr) {
-    setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, zkStr);
+    setProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, zkStr);
   }
 
   public void setDimTableMaxSize(String size) {
@@ -565,8 +565,8 @@ public class ControllerConf extends PinotConfiguration {
   }
 
   public String getZkStr() {
-    String zkAddress = containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) ? getProperty(
-        CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER) : getProperty(ZK_STR);
+    String zkAddress = containsKey(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER) ? getProperty(
+        CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER) : getProperty(ZK_STR);
     Preconditions.checkState(zkAddress != null,
         "ZK address is not configured. Please configure it using the config: 'pinot.zk.server'");
     return zkAddress;
