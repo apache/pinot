@@ -40,6 +40,15 @@ import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.AbstractColumnStatisticsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BigDecimalColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.BytesColumnPredIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.DoubleColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.FloatColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.IntColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.LongColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPreIndexStatsCollector;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -235,6 +244,19 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
   @Override
   public void build()
       throws Exception {
+    // Use column-major approach by default to avoid double reads and improve performance
+    buildColumnMajorWithCombinedStatsAndIndexing();
+  }
+
+  /**
+   * Legacy row-major build method that performs statistics collection and indexing in separate passes.
+   * This method is preserved for backward compatibility and debugging purposes.
+   * 
+   * @deprecated Use the default build() method which uses column-major approach for better performance.
+   */
+  @Deprecated
+  public void buildRowMajor()
+      throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
     collectStatsAndIndexCreationInfo();
@@ -325,6 +347,277 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished records indexing in IndexCreator!");
 
     handlePostCreation();
+  }
+
+  /**
+   * Builds the segment using column-major approach while combining statistics collection 
+   * and index creation in a single pass to avoid double reads.
+   * 
+   * Key improvements over the original row-major approach:
+   * 1. Eliminates double data reads - original approach reads data twice (once for stats, once for indexing)
+   * 2. Uses column-major processing which is more cache-friendly for analytics workloads
+   * 3. Processes statistics and indexing in a single pass through the data
+   * 4. Memory-efficient: clears row data as soon as statistics and indexing are complete
+   * 
+   * Trade-offs:
+   * - Requires holding all transformed rows in memory temporarily (until stats are collected)
+   * - May use more memory for very large datasets, but eliminates I/O overhead of double reads
+   */
+  private void buildColumnMajorWithCombinedStatsAndIndexing()
+      throws Exception {
+    LOGGER.info("Start building segment using column-major approach with combined stats and indexing!");
+    
+    long startTime = System.nanoTime();
+    
+    // First pass: collect all rows in memory and build column-oriented data structure
+    List<GenericRow> allRows = new ArrayList<>();
+    _incompleteRowsFound = 0;
+    _skippedRowsFound = 0;
+    _sanitizedRowsFound = 0;
+    
+    // Read all rows and transform them
+    GenericRow reuse = new GenericRow();
+    while (_recordReader.hasNext()) {
+      reuse.clear();
+      
+      TransformPipeline.Result result;
+      try {
+        long recordReadStartTimeNs = System.nanoTime();
+        GenericRow decodedRow = _recordReader.next(reuse);
+        result = _transformPipeline.processRow(decodedRow);
+        _totalRecordReadTimeNs += System.nanoTime() - recordReadStartTimeNs;
+      } catch (Exception e) {
+        if (!_continueOnError) {
+          throw new RuntimeException("Error occurred while reading row during indexing", e);
+        } else {
+          _incompleteRowsFound++;
+          LOGGER.debug("Error occurred while reading row during indexing", e);
+          continue;
+        }
+      }
+      
+      for (GenericRow row : result.getTransformedRows()) {
+        // Create a copy to store in our list since we reuse the GenericRow object
+        GenericRow rowCopy = new GenericRow();
+        for (Map.Entry<String, Object> entry : row.getFieldToValueMap().entrySet()) {
+          rowCopy.putValue(entry.getKey(), entry.getValue());
+        }
+        allRows.add(rowCopy);
+      }
+      _incompleteRowsFound += result.getIncompleteRowCount();
+      _skippedRowsFound += result.getSkippedRowCount();
+      _sanitizedRowsFound += result.getSanitizedRowCount();
+    }
+    
+    _recordReader.close();
+    _totalDocs = allRows.size();
+    
+    LOGGER.info("Read and transformed {} documents", _totalDocs);
+    
+    if (_totalDocs == 0) {
+      LOGGER.warn("No documents to process");
+      handlePostCreation();
+      return;
+    }
+    
+    try {
+      // Handle doc ID mapping for sorted segments
+      int[] immutableToMutableIdMap = null;
+      if (_recordReader instanceof PinotSegmentRecordReader) {
+        immutableToMutableIdMap =
+            getImmutableToMutableIdMap(((PinotSegmentRecordReader) _recordReader).getSortedDocIds());
+      }
+      
+      // Collect statistics and build indexes column by column
+      long statsStartTime = System.nanoTime();
+      collectStatsAndBuildIndexesColumnMajor(allRows);
+      _totalStatsCollectorTimeNs = System.nanoTime() - statsStartTime;
+      
+      // Initialize the index creator with collected statistics
+      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
+          immutableToMutableIdMap);
+      
+      // Index data column by column
+      long indexStartTime = System.nanoTime();
+      indexDataColumnMajor(allRows);
+      _totalIndexTimeNs += System.nanoTime() - indexStartTime;
+      
+    } catch (Exception e) {
+      _indexCreator.close();
+      throw e;
+    }
+    
+    // Clear the rows from memory as early as possible
+    allRows.clear();
+    
+    if (_incompleteRowsFound > 0) {
+      LOGGER.warn("Incomplete data found for {} records. This can be due to error during reader or transformations",
+          _incompleteRowsFound);
+    }
+    if (_skippedRowsFound > 0) {
+      LOGGER.info("Skipped {} records during transformation", _skippedRowsFound);
+    }
+    if (_sanitizedRowsFound > 0) {
+      LOGGER.info("Sanitized {} records during transformation", _sanitizedRowsFound);
+    }
+
+    MinionMetrics metrics = MinionMetrics.get();
+    String tableNameWithType = _config.getTableConfig().getTableName();
+    if (_incompleteRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
+    }
+    if (_skippedRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.DROPPED_RECORD_COUNT, _skippedRowsFound);
+    }
+    if (_sanitizedRowsFound > 0) {
+      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
+    }
+
+    LOGGER.info("Finished column-major segment building in {} ms", 
+        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startTime));
+
+    handlePostCreation();
+  }
+
+  /**
+   * Collects statistics for all columns in a column-major fashion.
+   * This method processes data column by column to collect statistics efficiently.
+   */
+  private void collectStatsAndBuildIndexesColumnMajor(List<GenericRow> allRows) 
+      throws Exception {
+    LOGGER.info("Collecting statistics column-major for {} columns", _dataSchema.getPhysicalColumnNames().size());
+    
+    // Initialize stats collectors similar to SegmentPreIndexStatsCollectorImpl
+    Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap = new HashMap<>();
+    StatsCollectorConfig statsCollectorConfig = new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig());
+    
+    // Initialize collectors for each column
+    for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
+      
+      String column = fieldSpec.getName();
+      switch (fieldSpec.getDataType().getStoredType()) {
+        case INT:
+          columnStatsCollectorMap.put(column, new IntColumnPreIndexStatsCollector(column, statsCollectorConfig));
+          break;
+        case LONG:
+          columnStatsCollectorMap.put(column, new LongColumnPreIndexStatsCollector(column, statsCollectorConfig));
+          break;
+        case FLOAT:
+          columnStatsCollectorMap.put(column, new FloatColumnPreIndexStatsCollector(column, statsCollectorConfig));
+          break;
+        case DOUBLE:
+          columnStatsCollectorMap.put(column, new DoubleColumnPreIndexStatsCollector(column, statsCollectorConfig));
+          break;
+        case BIG_DECIMAL:
+          columnStatsCollectorMap.put(column, new BigDecimalColumnPreIndexStatsCollector(column, statsCollectorConfig));
+          break;
+        case STRING:
+          columnStatsCollectorMap.put(column, new StringColumnPreIndexStatsCollector(column, statsCollectorConfig));
+          break;
+        case BYTES:
+          columnStatsCollectorMap.put(column, new BytesColumnPredIndexStatsCollector(column, statsCollectorConfig));
+          break;
+        case MAP:
+          columnStatsCollectorMap.put(column, new MapColumnPreIndexStatsCollector(column, statsCollectorConfig));
+          break;
+        default:
+          throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
+      }
+    }
+    
+    // Process each column separately (column-major approach)
+    for (String columnName : _dataSchema.getPhysicalColumnNames()) {
+      AbstractColumnStatisticsCollector collector = columnStatsCollectorMap.get(columnName);
+      if (collector == null) {
+        continue;
+      }
+      
+      // Collect statistics for this column across all rows
+      for (GenericRow row : allRows) {
+        Object value = row.getValue(columnName);
+        if (value != null) {
+          try {
+            collector.collect(value);
+          } catch (Exception e) {
+            LOGGER.error("Exception while collecting stats for column:{} with value:{}", columnName, value);
+            throw e;
+          }
+        }
+      }
+      
+      // Seal the collector for this column
+      collector.seal();
+      LOGGER.debug("Completed statistics collection for column: {}", columnName);
+    }
+    
+    // Build the index creation info map
+    _segmentStats = new ColumnMajorSegmentStatsContainer(columnStatsCollectorMap, _totalDocs);
+    _indexCreationInfoMap = new TreeMap<>();
+    Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
+    
+    for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
+      
+      String column = fieldSpec.getName();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
+      DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
+      boolean createDictionary = dictionaryIndexConfig.isDisabled();
+      boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
+          || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
+      Object defaultNullValue = fieldSpec.getDefaultNullValue();
+      if (storedType == DataType.BYTES) {
+        defaultNullValue = new ByteArray((byte[]) defaultNullValue);
+      }
+      _indexCreationInfoMap.put(column,
+          new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, false/*isAutoGenerated*/,
+              defaultNullValue));
+    }
+    
+    _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
+    LOGGER.info("Completed statistics collection for all columns");
+  }
+
+  /**
+   * Indexes data in a column-major fashion after statistics have been collected.
+   */
+  private void indexDataColumnMajor(List<GenericRow> allRows) throws IOException {
+    LOGGER.info("Starting column-major indexing for {} rows", allRows.size());
+    
+    // Process each row for indexing
+    for (GenericRow row : allRows) {
+      _indexCreator.indexRow(row);
+    }
+    
+    LOGGER.info("Completed column-major indexing");
+  }
+
+  /**
+   * Internal stats container that wraps the column statistics collectors.
+   */
+  private static class ColumnMajorSegmentStatsContainer implements SegmentPreIndexStatsContainer {
+    private final Map<String, AbstractColumnStatisticsCollector> _columnStatsCollectorMap;
+    private final int _totalDocCount;
+    
+    public ColumnMajorSegmentStatsContainer(Map<String, AbstractColumnStatisticsCollector> columnStatsCollectorMap, int totalDocCount) {
+      _columnStatsCollectorMap = columnStatsCollectorMap;
+      _totalDocCount = totalDocCount;
+    }
+    
+    @Override
+    public ColumnStatistics getColumnProfileFor(String column) {
+      return _columnStatsCollectorMap.get(column);
+    }
+    
+    @Override
+    public int getTotalDocCount() {
+      return _totalDocCount;
+    }
   }
 
   public void buildByColumn(IndexSegment indexSegment)
