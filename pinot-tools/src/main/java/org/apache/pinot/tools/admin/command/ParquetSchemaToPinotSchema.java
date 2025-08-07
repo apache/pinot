@@ -1,0 +1,141 @@
+package org.apache.pinot.tools.admin.command;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.fs.Path;
+import org.apache.pinot.plugin.inputformat.parquet.ParquetUtils;
+import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.segment.local.recordtransformer.ComplexTypeTransformer;
+import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
+import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.tools.Command;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import picocli.CommandLine;
+
+@CommandLine.Command(name = "ParquetSchemaToPinotSchema", mixinStandardHelpOptions = true)
+public class ParquetSchemaToPinotSchema extends AbstractBaseAdminCommand implements Command {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ParquetSchemaToPinotSchema.class);
+
+  @CommandLine.Option(names = {"-parquetFile"}, required = true, description = "Path to parquet file.")
+  String _parquetFile;
+
+  @CommandLine.Option(names = {"-outputDir"}, required = true, description = "Path to output directory")
+  String _outputDir;
+
+  @CommandLine.Option(names = {"-pinotSchemaName"}, required = true, description = "Pinot schema name")
+  String _pinotSchemaName;
+
+  @CommandLine.Option(names = {"-dimensions"}, description = "Comma separated dimension column names.")
+  String _dimensions;
+
+  @CommandLine.Option(names = {"-metrics"}, description = "Comma separated metric column names.")
+  String _metrics;
+
+  @CommandLine.Option(names = {"-timeColumnName"}, description = "Name of the time column.")
+  String _timeColumnName;
+
+  @CommandLine.Option(names = {"-timeUnit"}, description = "Unit of the time column (default DAYS).")
+  TimeUnit _timeUnit = TimeUnit.DAYS;
+
+  @CommandLine.Option(names = {"-fieldsToUnnest"}, description = "Comma separated fields to unnest")
+  String _fieldsToUnnest;
+
+  @CommandLine.Option(names = {"-delimiter"}, description = "The delimiter separating components in nested structure, default to dot")
+  String _delimiter;
+
+  @CommandLine.Option(names = {"-complexType"}, description = "allow complex-type handling, default to false")
+  boolean _complexType;
+
+  @CommandLine.Option(names = {"-collectionNotUnnestedToJson"}, description = "The mode of converting collection to JSON string, can be NONE/NON_PRIMITIVE/ALL")
+  String _collectionNotUnnestedToJson;
+
+  @Override
+  public boolean execute() throws Exception {
+    if (_dimensions == null && _metrics == null && _timeColumnName == null) {
+      LOGGER.error("Error: Missing required argument, please specify at least one of -dimensions, -metrics, -timeColumnName");
+      return false;
+    }
+
+    Schema schema;
+    org.apache.avro.Schema avroSchema;
+    LOGGER.info("Extracting Avro schema from Parquet file: {}", _parquetFile);
+    avroSchema = ParquetUtils.getParquetAvroSchema(new Path(_parquetFile));
+    LOGGER.info("Avro schema extracted: {}", avroSchema.toString(true));
+    if (!_complexType) {
+      schema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, buildFieldTypesMap(), _timeUnit);
+    } else {
+      schema = AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, buildFieldTypesMap(), _timeUnit, buildFieldsToUnnest(), getDelimiter(), getCollectionNotUnnestedToJson());
+    }
+    LOGGER.info("Pinot schema generated: {}", schema.toPrettyJsonString());
+    schema.setSchemaName(_pinotSchemaName);
+
+    File outputDir = new File(_outputDir);
+    if (!outputDir.isDirectory()) {
+      LOGGER.error("ERROR: Output directory: {} does not exist or is not a directory", _outputDir);
+      return false;
+    }
+    File outputFile = new File(outputDir, _pinotSchemaName + ".json");
+    LOGGER.info("Store Pinot schema to file: {}", outputFile.getAbsolutePath());
+
+    try (FileWriter writer = new FileWriter(outputFile)) {
+      writer.write(schema.toPrettyJsonString());
+    }
+
+    return true;
+  }
+
+  @Override
+  public String description() {
+    return "Extracting Pinot schema file from Parquet file.";
+  }
+
+  @Override
+  public String toString() {
+    return "ParquetSchemaToPinotSchema -parquetFile " + _parquetFile + " -outputDir " + _outputDir + " -pinotSchemaName " + _pinotSchemaName + " -dimensions " + _dimensions + " -metrics " + _metrics + " -timeColumnName " + _timeColumnName + " -timeUnit " + _timeUnit + " _fieldsToUnnest " + _fieldsToUnnest + " _delimiter " + _delimiter + " _complexType " + _complexType + " _collectionNotUnnestedToJson " + _collectionNotUnnestedToJson;
+  }
+
+  private Map<String, FieldSpec.FieldType> buildFieldTypesMap() {
+    Map<String, FieldSpec.FieldType> fieldTypes = new HashMap<>();
+    if (_dimensions != null) {
+      for (String column : _dimensions.split("\\s*,\\s*")) {
+        fieldTypes.put(column, FieldSpec.FieldType.DIMENSION);
+      }
+    }
+    if (_metrics != null) {
+      for (String column : _metrics.split("\\s*,\\s*")) {
+        fieldTypes.put(column, FieldSpec.FieldType.METRIC);
+      }
+    }
+    if (_timeColumnName != null) {
+      fieldTypes.put(_timeColumnName, FieldSpec.FieldType.DATE_TIME);
+    }
+    return fieldTypes;
+  }
+
+  private List<String> buildFieldsToUnnest() {
+    if (_fieldsToUnnest != null) {
+      return Arrays.asList(_fieldsToUnnest.split("\\s*,\\s*"));
+    } else {
+      return Collections.emptyList();
+    }
+  }
+
+  private ComplexTypeConfig.CollectionNotUnnestedToJson getCollectionNotUnnestedToJson() {
+    if (_collectionNotUnnestedToJson == null) {
+      return ComplexTypeTransformer.DEFAULT_COLLECTION_TO_JSON_MODE;
+    }
+    return ComplexTypeConfig.CollectionNotUnnestedToJson.valueOf(_collectionNotUnnestedToJson);
+  }
+
+  private String getDelimiter() {
+    return _delimiter == null ? ComplexTypeTransformer.DEFAULT_DELIMITER : _delimiter;
+  }
+}

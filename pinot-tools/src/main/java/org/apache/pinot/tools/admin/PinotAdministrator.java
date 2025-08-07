@@ -48,6 +48,7 @@ import org.apache.pinot.tools.admin.command.LaunchSparkDataIngestionJobCommand;
 import org.apache.pinot.tools.admin.command.MoveReplicaGroup;
 import org.apache.pinot.tools.admin.command.OfflineSegmentIntervalCheckerCommand;
 import org.apache.pinot.tools.admin.command.OperateClusterConfigCommand;
+import org.apache.pinot.tools.admin.command.ParquetSchemaToPinotSchema;
 import org.apache.pinot.tools.admin.command.PostQueryCommand;
 import org.apache.pinot.tools.admin.command.QuickStartCommand;
 import org.apache.pinot.tools.admin.command.RealtimeProvisioningHelperCommand;
@@ -141,6 +142,7 @@ public class PinotAdministrator {
     SUBCOMMAND_MAP.put("BootstrapTable", new BootstrapTableCommand());
     SUBCOMMAND_MAP.put("SegmentProcessorFramework", new SegmentProcessorFrameworkCommand());
     SUBCOMMAND_MAP.put("FileSystem", new FileSystemCommand());
+    SUBCOMMAND_MAP.put("ParquetSchemaToPinotSchema", new ParquetSchemaToPinotSchema());
   }
 
   @CommandLine.Option(names = {"-help", "-h", "--h", "--help"}, required = false,
