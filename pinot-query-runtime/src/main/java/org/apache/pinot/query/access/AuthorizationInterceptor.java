@@ -28,17 +28,13 @@ import javax.annotation.Nullable;
 public class AuthorizationInterceptor implements ServerInterceptor {
   private final QueryAccessControlFactory _accessControlFactory;
 
-  public AuthorizationInterceptor(@Nullable QueryAccessControlFactory accessControlFactory) {
+  public AuthorizationInterceptor(QueryAccessControlFactory accessControlFactory) {
     _accessControlFactory = accessControlFactory;
   }
 
   @Override
   public <T, R> ServerCall.Listener<T> interceptCall(ServerCall<T, R> call, Metadata headers,
       ServerCallHandler<T, R> next) {
-    if (_accessControlFactory == null) {
-      return next.startCall(call, headers);
-    }
-
     if (!_accessControlFactory.create().hasAccess(call.getAttributes(), headers)) {
       call.close(Status.PERMISSION_DENIED.withDescription("MSE Access Denied"), headers);
     }

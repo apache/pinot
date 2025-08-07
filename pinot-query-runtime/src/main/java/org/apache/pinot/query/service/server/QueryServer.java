@@ -180,10 +180,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   }
 
   private <T extends ServerBuilder<T>> Server buildGrpcServer(ServerBuilder<T> builder) {
-    return builder
+    builder
          // By using directExecutor, GRPC doesn't need to manage its own thread pool
-        .directExecutor()
-        .intercept(new AuthorizationInterceptor(_accessControlFactory))
+        .directExecutor();
+    if (_accessControlFactory != null) {
+      builder.intercept(new AuthorizationInterceptor(_accessControlFactory));
+    }
+    return builder
         .addService(this)
         .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE)
         .build();

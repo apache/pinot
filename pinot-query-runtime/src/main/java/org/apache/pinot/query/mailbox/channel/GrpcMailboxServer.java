@@ -89,9 +89,11 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     }
 
     NettyServerBuilder builder = NettyServerBuilder
-        .forPort(port)
-        .intercept(new AuthorizationInterceptor(accessControlFactory))
-        .intercept(new MailboxServerInterceptor())
+        .forPort(port).intercept(new MailboxServerInterceptor());
+    if (accessControlFactory != null) {
+      builder.intercept(new AuthorizationInterceptor(accessControlFactory));
+    }
+    builder
         .addService(this)
         .withOption(ChannelOption.ALLOCATOR, bufAllocator)
         .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)
