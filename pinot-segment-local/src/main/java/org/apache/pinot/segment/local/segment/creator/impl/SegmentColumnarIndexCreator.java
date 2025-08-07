@@ -355,6 +355,43 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     _docIdCounter++;
   }
 
+  /**
+   * Indexes a column in column-major order using the provided values.
+   * @param columnName the column to index
+   * @param values the values for the column, in row order
+   */
+  public void indexColumnMajor(String columnName, List<Object> values) throws IOException {
+    LOGGER.info("[ColumnMajor] Indexing column {} with {} values", columnName, values.size());
+    Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+    SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+    NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
+    int docId = 0;
+    for (Object value : values) {
+      if (value == null) {
+        throw new RuntimeException("Null value for column:" + columnName);
+      }
+      try {
+        if (fieldSpec.isSingleValueField()) {
+          indexSingleValueRow(dictionaryCreator, value, creatorsByIndex);
+        } else {
+          indexMultiValueRow(dictionaryCreator, (Object[]) value, creatorsByIndex);
+        }
+        if (nullVec != null) {
+          // If value is null, set null in null value vector
+          // (Assume nulls are represented as null in the list)
+          if (value == null) {
+            nullVec.setNull(docId);
+          }
+        }
+      } catch (Exception e) {
+        LOGGER.error("[ColumnMajor] Error indexing value for column {} at docId {}: {}", columnName, docId, e.getMessage());
+        throw e;
+      }
+      docId++;
+    }
+  }
+
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
       throws IOException {
