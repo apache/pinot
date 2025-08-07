@@ -244,6 +244,9 @@ export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');
 
+export const getVersions = (): Promise<AxiosResponse<any>> =>
+  baseApi.get('/version');
+
 export const zookeeperGetList = (params: string): Promise<AxiosResponse<ZKGetList>> =>
   baseApi.get(`/zk/ls?path=${params}`);
 
