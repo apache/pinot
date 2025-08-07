@@ -993,7 +993,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
       _logger.warn("Missed taking snapshot for {} immutable segments", numMissedSegments);
       if (_deleteRecordColumn != null) {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
-            ServerMeter.UPSERT_MISSED_QUERYABLE_DOCS_SNAPSHOT_COUNT, numMissedSegments);
+            ServerMeter.UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
       }
     }
   }

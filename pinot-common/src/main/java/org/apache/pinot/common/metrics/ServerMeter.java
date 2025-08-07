@@ -68,7 +68,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS("rows", false),
   METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
-  UPSERT_MISSED_QUERYABLE_DOCS_SNAPSHOT_COUNT("segments", false),
+  UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_PRELOAD_FAILURE("count", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
