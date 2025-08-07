@@ -142,8 +142,8 @@ public class StorageQuotaChecker {
     long existingSegmentSizeBytes = sizeDetails != null ? sizeDetails._estimatedSizeInBytes : 0;
     SegmentZKMetadata existingSegmentZkMetadata =
         _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
-    long existingTarSegmentSize = existingSegmentZkMetadata != null ?
-        _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName).getSizeInBytes() : 0;
+    long existingTarSegmentSize = existingSegmentZkMetadata != null
+        ? _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName).getSizeInBytes() : 0;
 
     // Since tableNameWithType comes with the table type(OFFLINE), thus we guarantee that
     // tableSubtypeSize.estimatedSizeInBytes is the offline table size.
@@ -218,8 +218,8 @@ public class StorageQuotaChecker {
                 + "allowed storage size = configured quota: %s * number replicas: %d", tableNameWithType,
             DataSizeUtils.fromBytes(estimatedFinalSizeBytes), DataSizeUtils.fromBytes(allowedStorageBytes),
             DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes),
-            DataSizeUtils.fromBytes(existingSegmentSizeBytes), DataSizeUtils.fromBytes(untarredSegmentSizeInBytes), numReplicas,
-            quotaConfig.getStorage(), numReplicas);
+            DataSizeUtils.fromBytes(existingSegmentSizeBytes), DataSizeUtils.fromBytes(untarredSegmentSizeInBytes),
+            numReplicas, quotaConfig.getStorage(), numReplicas);
       }
       LOGGER.warn(message);
       return failure(message);

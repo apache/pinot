@@ -197,7 +197,8 @@ public class StorageQuotaCheckerTest {
   private boolean isSegmentWithinQuota(TableConfig tableConfig)
       throws InvalidConfigException {
     return _storageQuotaChecker
-        .isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES, SEGMENT_SIZE_IN_BYTES)._isSegmentWithinQuota;
+        .isSegmentStorageWithinQuota(tableConfig, SEGMENT_NAME, SEGMENT_SIZE_IN_BYTES, SEGMENT_SIZE_IN_BYTES)
+        ._isSegmentWithinQuota;
   }
 
   public void mockTableSizeResult(String tableName, long tableSizeInBytes, int numMissingSegments)
