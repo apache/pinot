@@ -857,14 +857,12 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     int numConsumingSegments = 0;
     int numUnchangedSegments = 0;
     // The segments without validDocIds & queryable docId snapshots should take their snapshots at last. So that when
-    // there is failure
-    // to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of valid docs across
-    // segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less. That no
-    // overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
-    // We wouldn't be using queryableDocIds anywhere currently during preload - storing them so we could better
-    // extend the functionality
-    // Best case scenario, if both validDocs and queryableDocs are not persisted, we will be considering that segment is
-    // not storing updated bitmap copies on disk
+    // there is failure to take snapshots, the validDocIds snapshot on disk still keep track of an exclusive set of
+    // valid docs across segments. Because the valid docs as tracked by the existing validDocIds snapshots can only get less.
+    // That no overlap of valid docs among segments with snapshots is required by the preloading to work correctly.
+    // We wouldn't be using queryableDocIds anywhere currently during preload - storing them so we could better extend
+    // the functionality. Best case scenario, if both validDocs and queryableDocs are not persisted, we will be considering
+    // that segment is not storing updated bitmap copies on disk
     Set<ImmutableSegmentImpl> segmentsWithoutSnapshot = new HashSet<>();
     TableDataManager tableDataManager = _context.getTableDataManager();
     Preconditions.checkNotNull(tableDataManager, "Taking snapshot requires tableDataManager");
@@ -980,7 +978,7 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
         ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT, numImmutableSegments);
     if (_deleteRecordColumn != null) {
       _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
-          ServerGauge.UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT, numImmutableSegments);
+          ServerGauge.UPSERT_QUERYABLE_DOCS_SNAPSHOT_COUNT, numImmutableSegments);
     }
     _serverMetrics.setValueOfPartitionGauge(_tableNameWithType, _partitionId,
         ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT, numPrimaryKeysInSnapshot);
