@@ -993,6 +993,8 @@ public class PinotLLCRealtimeSegmentManager {
         PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
             + streamConfig.getTopicName();
     StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    StreamPartitionMsgOffsetFactory offsetFactory = consumerFactory.createStreamMsgOffsetFactory();
+    StreamPartitionMsgOffset nextOffsetWithType = offsetFactory.create(nextOffset);
     StreamPartitionMsgOffset offsetAtSLA;
     StreamPartitionMsgOffset latestOffset;
     try (StreamMetadataProvider metadataProvider = consumerFactory.createPartitionMetadataProvider(clientId,
@@ -1015,12 +1017,13 @@ public class PinotLLCRealtimeSegmentManager {
       return nextOffset;
     }
     try {
-      if (timeThreshold > 0 && offsetAtSLA != null && Long.valueOf(offsetAtSLA.toString()) > Long.valueOf(nextOffset)) {
+      if (timeThreshold > 0 && offsetAtSLA != null && offsetAtSLA.compareTo(nextOffsetWithType) < 0) {
         LOGGER.info("Auto reset offset from {} to {} on partition {} because time threshold reached", nextOffset,
             latestOffset, partitionId);
         return latestOffset.toString();
       }
-      if (offsetThreshold > 0 && Long.valueOf(latestOffset.toString()) - Long.valueOf(nextOffset) > offsetThreshold) {
+      if (offsetThreshold > 0
+          && Long.parseLong(latestOffset.toString()) - Long.parseLong(nextOffset) > offsetThreshold) {
         LOGGER.info("Auto reset offset from {} to {} on partition {} because number of offsets threshold reached",
             nextOffset, latestOffset, partitionId);
         return latestOffset.toString();
