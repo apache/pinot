@@ -20,6 +20,7 @@ package org.apache.pinot.core.query.aggregation.function;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
@@ -130,6 +131,7 @@ public class MaxStringAggregationFunction extends NullableSingleInputAggregation
     return groupByResultHolder.getResult(groupKey);
   }
 
+  @Nullable
   @Override
   public String merge(String intermediateResult1, String intermediateResult2) {
     if (intermediateResult1 == null) {
