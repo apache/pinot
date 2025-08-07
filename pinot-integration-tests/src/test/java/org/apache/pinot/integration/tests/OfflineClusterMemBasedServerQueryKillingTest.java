@@ -291,7 +291,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     JsonNode queryResponse = postQuery(OOM_QUERY);
     String exceptionsNode = queryResponse.get("exceptions").toString();
     assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.INTERNAL.getId()), exceptionsNode);
-    assertTrue(exceptionsNode.contains("Received 1 error from stage 1"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Received 1 error"), exceptionsNode);
     assertTrue(_testAccountant.hasCallback());
     assertEquals(queryResponse.get("requestId").asText(), _testAccountant.getQueryResourceTracker().getQueryId());
   }
@@ -327,7 +327,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
 
     String exceptionsNode = queryResponse.get("exceptions").toString();
     assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.INTERNAL.getId()), exceptionsNode);
-    assertTrue(exceptionsNode.contains("Received 1 error from stage 1"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Received 1 error"), exceptionsNode);
     assertTrue(_testAccountant.hasCallback());
     assertEquals(queryResponse.get("requestId").asText(), _testAccountant.getQueryResourceTracker().getQueryId());
   }
@@ -347,7 +347,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
     String exceptionsNode = queryResponse.get("exceptions").toString();
     assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.INTERNAL.getId()), exceptionsNode);
-    assertTrue(exceptionsNode.contains("Received 1 error from stage 1"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Received 1 error"), exceptionsNode);
     assertTrue(_testAccountant.hasCallback());
     assertEquals(queryResponse.get("requestId").asText(), _testAccountant.getQueryResourceTracker().getQueryId());
   }

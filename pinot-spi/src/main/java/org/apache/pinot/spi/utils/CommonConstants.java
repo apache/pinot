@@ -820,7 +820,8 @@ public class CommonConstants {
     public static final Set<String> DEFAULT_DISABLED_RULES = Set.of(
         PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
         PlannerRuleNames.SORT_JOIN_TRANSPOSE,
-        PlannerRuleNames.SORT_JOIN_COPY
+        PlannerRuleNames.SORT_JOIN_COPY,
+        PlannerRuleNames.AGGREGATE_UNION_AGGREGATE
     );
 
     public static class FailureDetector {
