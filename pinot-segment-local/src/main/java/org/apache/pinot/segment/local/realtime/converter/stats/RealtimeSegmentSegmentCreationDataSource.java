@@ -51,6 +51,13 @@ public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreation
   }
 
   /**
+   * Returns the underlying mutable segment for column-major building.
+   */
+  public MutableSegment getMutableSegment() {
+    return _mutableSegment;
+  }
+
+  /**
    * Returns the consumer directory of the realtime segment
    */
   public File getConsumerDir() {

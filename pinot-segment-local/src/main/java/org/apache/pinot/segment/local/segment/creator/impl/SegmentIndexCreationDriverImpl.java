@@ -241,85 +241,119 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished building StatsCollector!");
     LOGGER.info("Collected stats for {} documents", _totalDocs);
 
-    _incompleteRowsFound = 0;
-    _skippedRowsFound = 0;
-    _sanitizedRowsFound = 0;
+    // Prefer column-major build when possible to avoid row re-reads
+    boolean usedColumnMajor = false;
     try {
-      // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
-      //    removed from this code.
+      int[] sortedDocIds = null;
       int[] immutableToMutableIdMap = null;
+
+      // Attempt column-major if record reader supports column access
       if (_recordReader instanceof PinotSegmentRecordReader) {
-        immutableToMutableIdMap =
-            getImmutableToMutableIdMap(((PinotSegmentRecordReader) _recordReader).getSortedDocIds());
+        PinotSegmentRecordReader pinotReader = (PinotSegmentRecordReader) _recordReader;
+        sortedDocIds = pinotReader.getSortedDocIds();
+        immutableToMutableIdMap = getImmutableToMutableIdMap(sortedDocIds);
+
+        // Initialize the index creation using the per-column statistics information
+        _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
+            immutableToMutableIdMap);
+
+        // Column-major indexing over each column using the underlying segment
+        LOGGER.info("Start building Index by column (column-major)");
+        TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
+        for (String col : columns) {
+          _indexCreator.indexColumn(col, sortedDocIds, pinotReader.getIndexSegment());
+        }
+        usedColumnMajor = true;
+      } else if (_dataSource instanceof RealtimeSegmentSegmentCreationDataSource) {
+        // Fallback for realtime conversion when reader type isn't PinotSegmentRecordReader (shouldn't happen normally)
+        RealtimeSegmentSegmentCreationDataSource rt = (RealtimeSegmentSegmentCreationDataSource) _dataSource;
+        if (_recordReader instanceof PinotSegmentRecordReader) {
+          sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+          immutableToMutableIdMap = getImmutableToMutableIdMap(sortedDocIds);
+        }
+        _indexCreator.init(
+            _config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
+            immutableToMutableIdMap);
+        LOGGER.info("Start building Index by column (realtime column-major)");
+        TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
+        for (String col : columns) {
+          _indexCreator.indexColumn(col, sortedDocIds, rt.getMutableSegment());
+        }
+        usedColumnMajor = true;
       }
 
-      // Initialize the index creation using the per-column statistics information
-      // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
-      //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
-      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
-          immutableToMutableIdMap);
+      if (!usedColumnMajor) {
+        // Row-major fallback (non-Pinot readers)
+        _incompleteRowsFound = 0;
+        _skippedRowsFound = 0;
+        _sanitizedRowsFound = 0;
 
-      // Build the index
-      _recordReader.rewind();
-      LOGGER.info("Start building IndexCreator!");
-      GenericRow reuse = new GenericRow();
-      while (_recordReader.hasNext()) {
-        long recordReadStopTimeNs;
-        reuse.clear();
+        _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
+            null);
 
-        TransformPipeline.Result result;
-        try {
-          long recordReadStartTimeNs = System.nanoTime();
-          GenericRow decodedRow = _recordReader.next(reuse);
-          result = _transformPipeline.processRow(decodedRow);
-          recordReadStopTimeNs = System.nanoTime();
-          _totalRecordReadTimeNs += recordReadStopTimeNs - recordReadStartTimeNs;
-        } catch (Exception e) {
-          if (!_continueOnError) {
-            throw new RuntimeException("Error occurred while reading row during indexing", e);
-          } else {
-            _incompleteRowsFound++;
-            LOGGER.debug("Error occurred while reading row during indexing", e);
-            continue;
+        _recordReader.rewind();
+        LOGGER.info("Start building IndexCreator (row-major fallback)!");
+        GenericRow reuse = new GenericRow();
+        while (_recordReader.hasNext()) {
+          long recordReadStopTimeNs;
+          reuse.clear();
+
+          TransformPipeline.Result result;
+          try {
+            long recordReadStartTimeNs = System.nanoTime();
+            GenericRow decodedRow = _recordReader.next(reuse);
+            result = _transformPipeline.processRow(decodedRow);
+            recordReadStopTimeNs = System.nanoTime();
+            _totalRecordReadTimeNs += recordReadStopTimeNs - recordReadStartTimeNs;
+          } catch (Exception e) {
+            if (!_continueOnError) {
+              throw new RuntimeException("Error occurred while reading row during indexing", e);
+            } else {
+              _incompleteRowsFound++;
+              LOGGER.debug("Error occurred while reading row during indexing", e);
+              continue;
+            }
           }
+
+          for (GenericRow row : result.getTransformedRows()) {
+            _indexCreator.indexRow(row);
+          }
+          _totalIndexTimeNs += System.nanoTime() - recordReadStopTimeNs;
+          _incompleteRowsFound += result.getIncompleteRowCount();
+          _skippedRowsFound += result.getSkippedRowCount();
+          _sanitizedRowsFound += result.getSanitizedRowCount();
         }
 
-        for (GenericRow row : result.getTransformedRows()) {
-          _indexCreator.indexRow(row);
+        if (_incompleteRowsFound > 0) {
+          LOGGER.warn(
+              "Incomplete data found for {} records. This can be due to error during reader or transformations",
+              _incompleteRowsFound);
         }
-        _totalIndexTimeNs += System.nanoTime() - recordReadStopTimeNs;
-        _incompleteRowsFound += result.getIncompleteRowCount();
-        _skippedRowsFound += result.getSkippedRowCount();
-        _sanitizedRowsFound += result.getSanitizedRowCount();
+        if (_skippedRowsFound > 0) {
+          LOGGER.info("Skipped {} records during transformation", _skippedRowsFound);
+        }
+        if (_sanitizedRowsFound > 0) {
+          LOGGER.info("Sanitized {} records during transformation", _sanitizedRowsFound);
+        }
+
+        MinionMetrics metrics = MinionMetrics.get();
+        String tableNameWithType = _config.getTableConfig().getTableName();
+        if (_incompleteRowsFound > 0) {
+          metrics.addMeteredTableValue(tableNameWithType, MinionMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
+        }
+        if (_skippedRowsFound > 0) {
+          metrics.addMeteredTableValue(tableNameWithType, MinionMeter.DROPPED_RECORD_COUNT, _skippedRowsFound);
+        }
+        if (_sanitizedRowsFound > 0) {
+          metrics.addMeteredTableValue(tableNameWithType, MinionMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
+        }
       }
     } catch (Exception e) {
       _indexCreator.close();
       throw e;
     } finally {
+      // The record reader is created by the `init` method and needs to be closed and cleaned up even by the Column Mode
       _recordReader.close();
-    }
-
-    if (_incompleteRowsFound > 0) {
-      LOGGER.warn("Incomplete data found for {} records. This can be due to error during reader or transformations",
-          _incompleteRowsFound);
-    }
-    if (_skippedRowsFound > 0) {
-      LOGGER.info("Skipped {} records during transformation", _skippedRowsFound);
-    }
-    if (_sanitizedRowsFound > 0) {
-      LOGGER.info("Sanitized {} records during transformation", _sanitizedRowsFound);
-    }
-
-    MinionMetrics metrics = MinionMetrics.get();
-    String tableNameWithType = _config.getTableConfig().getTableName();
-    if (_incompleteRowsFound > 0) {
-      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.TRANSFORMATION_ERROR_COUNT, _incompleteRowsFound);
-    }
-    if (_skippedRowsFound > 0) {
-      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.DROPPED_RECORD_COUNT, _skippedRowsFound);
-    }
-    if (_sanitizedRowsFound > 0) {
-      metrics.addMeteredTableValue(tableNameWithType, MinionMeter.CORRUPTED_RECORD_COUNT, _sanitizedRowsFound);
     }
 
     LOGGER.info("Finished records indexing in IndexCreator!");
