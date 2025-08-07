@@ -33,10 +33,11 @@ import {RebalanceTableSegmentJob} from "Models";
 type RebalanceServerStatusOpProps = {
     tableName: string;
     hideModal: () => void;
+    initialJobId?: string;
 };
 
 export const RebalanceServerStatusOp = (
-    { tableName, hideModal } : RebalanceServerStatusOpProps
+    { tableName, hideModal, initialJobId } : RebalanceServerStatusOpProps
 ) => {
     const [rebalanceServerJobs, setRebalanceServerJobs] = React.useState<RebalanceTableSegmentJob[]>([])
     const [jobSelected, setJobSelected] = useState<string | null>(null);
@@ -44,7 +45,7 @@ export const RebalanceServerStatusOp = (
     const [rebalanceProgressStats, setRebalanceProgressStats] = useState<{}>({});
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
+    const fetchRebalanceJobs = () => {
         setLoading(true);
         PinotMethodUtils
             .fetchRebalanceTableJobs(tableName)
@@ -52,7 +53,34 @@ export const RebalanceServerStatusOp = (
                 setRebalanceServerJobs(jobs)
             })
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchRebalanceJobs();
     }, []);
+
+    // Set initial job selection when jobs are loaded and initialJobId is provided
+    useEffect(() => {
+        if (initialJobId && rebalanceServerJobs.length > 0 && !jobSelected) {
+            const jobExists = rebalanceServerJobs.find(job => job.jobId === initialJobId);
+            if (jobExists) {
+                setJobSelected(initialJobId);
+            }
+        }
+    }, [initialJobId, rebalanceServerJobs, jobSelected]);
+
+    const RefreshAction = () => {
+        return (
+            <Button
+                variant='outlined'
+                color='primary'
+                onClick={fetchRebalanceJobs}
+                disabled={loading}
+            >
+                Refresh
+            </Button>
+        );
+    };
 
     const BackAction = () => {
         return (
@@ -64,7 +92,8 @@ export const RebalanceServerStatusOp = (
                 Back
             </Button>
         );
-    }
+    };
+
 
     useEffect(() => {
         try {
@@ -104,10 +133,15 @@ export const RebalanceServerStatusOp = (
             <Dialog
                 open={true}
                 handleClose={hideModal}
-                title="Rebalance Table Status"
+                title="Rebalance Servers Status"
                 showOkBtn={false}
                 size='lg'
-                moreActions={jobSelected ? <BackAction /> : null}
+                moreActions={
+                    <Box display="flex">
+                        <RefreshAction />
+                        {jobSelected && !initialJobId && <Box ml={1}><BackAction /></Box>}
+                    </Box>
+                }
             >
                 <DialogContent>
                     <Box alignItems='center' display='flex' justifyContent='center'>
@@ -122,10 +156,15 @@ export const RebalanceServerStatusOp = (
         <Dialog
             open={true}
             handleClose={hideModal}
-            title="Rebalance Table Status"
+            title="Rebalance Servers Status"
             showOkBtn={false}
             size='lg'
-            moreActions={jobSelected ? <BackAction /> : null}
+            moreActions={
+                <Box display="flex">
+                    <RefreshAction />
+                    {jobSelected && !initialJobId && <Box ml={1}><BackAction /></Box>}
+                </Box>
+            }
         >
             <DialogContent>
                 {
@@ -144,10 +183,11 @@ export const RebalanceServerStatusOp = (
                                         rebalanceServerJob.jobId,
                                         rebalanceServerJob.tableName,
                                         progressStats.status,
-                                        Utils.formatTime(+rebalanceServerJob.submissionTimeMs)
+                                        Utils.formatTime(+rebalanceServerJob.submissionTimeMs),
+                                        progressStats.status === 'DONE' ? Utils.formatTime(+rebalanceServerJob.submissionTimeMs + (JSON.parse(rebalanceServerJob?.REBALANCE_PROGRESS_STATS || '{}').timeToFinishInSeconds * 1000)) : 'N/A'
                                     ];
                                 }),
-                                columns: ['Job id', 'Table name', 'Status', 'Started at']
+                                columns: ['Job id', 'Table name', 'Status', 'Started at', 'Finished at']
                             }}
                             showSearchBox
                         /> :
