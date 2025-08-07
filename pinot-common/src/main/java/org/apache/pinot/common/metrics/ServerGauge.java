@@ -92,7 +92,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   LUCENE_INDEXING_DELAY_DOCS("documents", false),
   // Needed to track if valid doc id snapshots are present for faster restarts
   UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT("upsertValidDocIdSnapshotCount", false),
-  UPSERT_QUERYABLE_DOCS_SNAPSHOT_COUNT("upsertQueryableDocIdSnapshotCount", false),
+  UPSERT_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("upsertQueryableDocIdSnapshotCount", false),
   UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT("upsertPrimaryKeysInSnapshotCount", false),
   UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT("upsertQueryableDocIdsInSnapshot", false),
   REALTIME_INGESTION_OFFSET_LAG("offsetLag", false),
