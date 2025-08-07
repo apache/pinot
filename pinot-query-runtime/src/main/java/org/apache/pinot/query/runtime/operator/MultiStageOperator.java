@@ -97,7 +97,7 @@ public abstract class MultiStageOperator
       earlyTerminate();
       throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on " + getExplainName());
     }
-    Tracing.ThreadAccountantOps.sampleMSE();
+    Tracing.ThreadAccountantOps.sample();
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       earlyTerminate();
       throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "

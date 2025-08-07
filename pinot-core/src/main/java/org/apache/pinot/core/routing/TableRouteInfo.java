@@ -29,6 +29,8 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.query.QueryThreadContext;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -110,7 +112,7 @@ public interface TableRouteInfo {
    * @return a map of server instances to their route information for the offline table, or null if not available
    */
   @Nullable
-  Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable();
+  Map<ServerInstance, SegmentsToQuery> getOfflineRoutingTable();
 
   /**
    * Gets the routing table for the realtime table, if available.
@@ -120,35 +122,43 @@ public interface TableRouteInfo {
    * @return a map of server instances to their route information for the realtime table, or null if not available
    */
   @Nullable
-  Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable();
+  Map<ServerInstance, SegmentsToQuery> getRealtimeRoutingTable();
 
   /**
    * Checks if the table exists. A table exists if all required TableConfig objects are available.
    *
    * @return true if the table exists, false otherwise
    */
-  boolean isExists();
+  default boolean isExists() {
+    return hasOffline() || hasRealtime();
+  }
 
   /**
    * Checks if there are both offline and realtime tables.
    *
    * @return true if the table is a hybrid table, false otherwise
    */
-  boolean isHybrid();
+  default boolean isHybrid() {
+    return hasOffline() && hasRealtime();
+  }
 
   /**
    * Checks if the table has offline tables only
    *
    * @return true if the table has offline tables only, false otherwise
    */
-  boolean isOffline();
+  default boolean isOffline() {
+    return hasOffline() && !hasRealtime();
+  }
 
   /**
    * Checks if the table has realtime tables only.
    *
-   * @return true if the table table has realtime tables only, false otherwise
+   * @return true if the table has realtime tables only, false otherwise
    */
-  boolean isRealtime();
+  default boolean isRealtime() {
+    return !hasOffline() && hasRealtime();
+  }
 
   /**
    * Checks if the table has at least 1 offline table. It may or may not have realtime tables as well.
@@ -169,7 +179,15 @@ public interface TableRouteInfo {
    *
    * @return true if any route exists, false otherwise
    */
-  boolean isRouteExists();
+  default boolean isRouteExists() {
+    if (isOffline()) {
+      return isOfflineRouteExists();
+    } else if (isRealtime()) {
+      return isRealtimeRouteExists();
+    } else {
+      return isOfflineRouteExists() || isRealtimeRouteExists();
+    }
+  }
 
   boolean isOfflineRouteExists();
 
@@ -180,7 +198,15 @@ public interface TableRouteInfo {
    *
    * @return true if the table is disabled, false otherwise
    */
-  boolean isDisabled();
+  default boolean isDisabled() {
+    if (isOffline()) {
+      return isOfflineTableDisabled();
+    } else if (isRealtime()) {
+      return isRealtimeTableDisabled();
+    } else {
+      return isOfflineTableDisabled() && isRealtimeTableDisabled();
+    }
+  }
 
   boolean isOfflineTableDisabled();
 
@@ -215,4 +241,17 @@ public interface TableRouteInfo {
    * @return A map of ServerRoutingInstance and InstanceRequest
    */
   Map<ServerRoutingInstance, InstanceRequest> getRequestMap(long requestId, String brokerId, boolean preferTls);
+
+  static InstanceRequest createInstanceRequest(BrokerRequest brokerRequest, String brokerId, long requestId) {
+    InstanceRequest instanceRequest = new InstanceRequest();
+    instanceRequest.setBrokerId(brokerId);
+    instanceRequest.setRequestId(requestId);
+    instanceRequest.setCid(QueryThreadContext.getCid());
+    instanceRequest.setQuery(brokerRequest);
+    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+    if (queryOptions != null) {
+      instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
+    }
+    return instanceRequest;
+  }
 }

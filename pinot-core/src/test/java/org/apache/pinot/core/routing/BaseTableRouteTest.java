@@ -439,12 +439,12 @@ public class BaseTableRouteTest {
     return _logicalTableRouteProvider.getTableRouteInfo(logicalTableName, _tableCache, _routingManager);
   }
 
-  static void assertRoutingTableEqual(Map<ServerInstance, ServerRouteInfo> routeComputer,
+  static void assertRoutingTableEqual(Map<ServerInstance, SegmentsToQuery> routeComputer,
       Map<String, Set<String>> expectedRealtimeRoutingTable) {
-    for (Map.Entry<ServerInstance, ServerRouteInfo> entry : routeComputer.entrySet()) {
+    for (Map.Entry<ServerInstance, SegmentsToQuery> entry : routeComputer.entrySet()) {
       ServerInstance serverInstance = entry.getKey();
-      ServerRouteInfo serverRouteInfo = entry.getValue();
-      Set<String> segments = ImmutableSet.copyOf(serverRouteInfo.getSegments());
+      SegmentsToQuery segmentsToQuery = entry.getValue();
+      Set<String> segments = ImmutableSet.copyOf(segmentsToQuery.getSegments());
       assertTrue(expectedRealtimeRoutingTable.containsKey(serverInstance.toString()));
       assertEquals(expectedRealtimeRoutingTable.get(serverInstance.toString()), segments);
     }

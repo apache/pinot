@@ -188,7 +188,7 @@ export default function RebalanceServerTableOp({
               </Grid>
             </RebalanceServerSection>
           </Box>
-        : 
+        :
           <React.Fragment>
             <RebalanceResponse response={rebalanceResponse} />
           </React.Fragment>

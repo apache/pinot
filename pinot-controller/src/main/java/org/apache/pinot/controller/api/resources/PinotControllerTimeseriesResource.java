@@ -33,7 +33,7 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path("/timeseries")
+@Path("/")
 public class PinotControllerTimeseriesResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotControllerTimeseriesResource.class);
 
@@ -42,7 +42,7 @@ public class PinotControllerTimeseriesResource {
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
-  @Path("languages")
+  @Path("/timeseries/languages")
   @ApiOperation(value = "Get timeseries languages from controller configuration",
       notes = "Get timeseries languages from controller configuration")
   public List<String> getBrokerTimeSeriesLanguages(@Context HttpHeaders headers) {

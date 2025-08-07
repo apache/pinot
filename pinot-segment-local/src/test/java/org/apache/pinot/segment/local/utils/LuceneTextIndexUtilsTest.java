@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.segment.local.utils;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.core.WhitespaceAnalyzer;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.spans.SpanMultiTermQueryWrapper;
 import org.apache.lucene.queries.spans.SpanNearQuery;
@@ -27,9 +30,11 @@ import org.apache.lucene.queries.spans.SpanTermQuery;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.PrefixQuery;
+import org.apache.lucene.search.Query;
 import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.WildcardQuery;
+import org.apache.pinot.segment.local.segment.index.text.lucene.parsers.PrefixPhraseQueryParser;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -201,5 +206,133 @@ public class LuceneTextIndexUtilsTest {
     Assert.assertEquals(options.getTimeZone(), "EST");
     Assert.assertEquals(options.getPhraseSlop(), 2);
     Assert.assertEquals(options.getMaxDeterminizedStates(), 5000);
+  }
+
+  @Test
+  public void testMatchPhraseQueryParser()
+      throws Exception {
+    // Test the new MATCHPHRASE parser functionality
+    String optionsString = "parser=MATCHPHRASE,enablePrefixMatch=true";
+    LuceneTextIndexUtils.LuceneTextIndexOptions options =
+        new LuceneTextIndexUtils.LuceneTextIndexOptions(optionsString);
+
+    // Create a simple analyzer for testing
+    Analyzer analyzer = new WhitespaceAnalyzer();
+    String column = "testColumn";
+
+    // Test positive case: "java realtime streaming"
+    String query = "java realtime streaming";
+
+    Query result = LuceneTextIndexUtils.createQueryParserWithOptions(query, options, column, analyzer);
+    Assert.assertNotNull(result);
+    Assert.assertTrue(result instanceof SpanNearQuery);
+
+    // Test positive case: "realtime stream*"
+    query = "realtime stream*";
+    result = LuceneTextIndexUtils.createQueryParserWithOptions(query, options, column, analyzer);
+    Assert.assertNotNull(result);
+    Assert.assertTrue(result instanceof SpanNearQuery);
+
+    // Test positive case: "stream*" - single term should return SpanMultiTermQueryWrapper
+    query = "stream*";
+    result = LuceneTextIndexUtils.createQueryParserWithOptions(query, options, column, analyzer);
+    Assert.assertNotNull(result);
+    Assert.assertTrue(result instanceof SpanMultiTermQueryWrapper);
+
+    // Test edge case: empty string ""
+    query = "";
+    try {
+      LuceneTextIndexUtils.createQueryParserWithOptions(query, options, column, analyzer);
+      Assert.fail("Expected exception for empty query");
+    } catch (RuntimeException e) {
+      // The method wraps ParseException in RuntimeException via reflection
+      Assert.assertTrue(e.getCause() instanceof InvocationTargetException);
+    }
+
+    // Test edge case: null query
+    try {
+      LuceneTextIndexUtils.createQueryParserWithOptions(null, options, column, analyzer);
+      Assert.fail("Expected exception for null query");
+    } catch (RuntimeException e) {
+      // The method wraps ParseException in RuntimeException via reflection
+      Assert.assertTrue(e.getCause() instanceof InvocationTargetException);
+    }
+
+    // Test that TopLevelQuery throws UnsupportedOperationException
+    try {
+      PrefixPhraseQueryParser parser = new PrefixPhraseQueryParser(column, analyzer);
+      parser.TopLevelQuery(column);
+      Assert.fail("Expected UnsupportedOperationException for TopLevelQuery");
+    } catch (UnsupportedOperationException e) {
+      Assert.assertTrue(e.getMessage().contains("TopLevelQuery is not supported"));
+    }
+
+    // Test slop and inOrder settings
+    PrefixPhraseQueryParser slopParser = new PrefixPhraseQueryParser(column, analyzer);
+
+    // Test default slop and inOrder (0 slop, true inOrder)
+    Query defaultSlopQuery = slopParser.parse("java realtime streaming");
+    Assert.assertTrue(defaultSlopQuery instanceof SpanNearQuery);
+
+    // Test custom slop and inOrder
+    slopParser.setSlop(2);
+    slopParser.setInOrder(false);
+    Query customSlopQuery = slopParser.parse("java realtime streaming");
+    Assert.assertTrue(customSlopQuery instanceof SpanNearQuery);
+
+    // Test invalid slop (should throw exception)
+    try {
+      slopParser.setSlop(-1);
+      Assert.fail("Expected IllegalArgumentException for negative slop");
+    } catch (IllegalArgumentException e) {
+      Assert.assertTrue(e.getMessage().contains("Slop cannot be negative"));
+    }
+
+    // Test slop and inOrder with createQueryParserWithOptions
+    LuceneTextIndexUtils.LuceneTextIndexOptions slopOptions =
+        LuceneTextIndexUtils.createOptions("parser=MATCHPHRASE,enablePrefixMatch=true");
+
+    // Test default slop and inOrder behavior
+    Query defaultSlopResult = LuceneTextIndexUtils.createQueryParserWithOptions(
+        "java realtime streaming", slopOptions, column, analyzer);
+    Assert.assertTrue(defaultSlopResult instanceof SpanNearQuery);
+
+    // Test custom slop and inOrder settings
+    LuceneTextIndexUtils.LuceneTextIndexOptions customSlopOptions =
+        LuceneTextIndexUtils.createOptions("parser=MATCHPHRASE,enablePrefixMatch=true");
+
+    // Create a parser instance to test slop and inOrder settings
+    PrefixPhraseQueryParser customParser = new PrefixPhraseQueryParser(column, analyzer);
+    customParser.setEnablePrefixMatch(true);
+    customParser.setSlop(2);
+    customParser.setInOrder(false);
+
+    // Test that custom settings work correctly
+    Query customSlopResult = customParser.parse("java realtime streaming");
+    Assert.assertTrue(customSlopResult instanceof SpanNearQuery);
+
+    // Test that the parser can be configured with different slop values
+    customParser.setSlop(1);
+    Query slop1Result = customParser.parse("java realtime streaming");
+    Assert.assertTrue(slop1Result instanceof SpanNearQuery);
+
+    // Test that the parser can be configured with different inOrder values
+    customParser.setInOrder(true);
+    Query inOrderTrueResult = customParser.parse("java realtime streaming");
+    Assert.assertTrue(inOrderTrueResult instanceof SpanNearQuery);
+
+    // Test default behavior using createOptions
+    LuceneTextIndexUtils.LuceneTextIndexOptions defaultOptions =
+        LuceneTextIndexUtils.createOptions("parser=MATCHPHRASE");
+
+    // Test single term with default behavior (prefix match disabled)
+    Query defaultSingleTermQuery =
+        LuceneTextIndexUtils.createQueryParserWithOptions("stream", defaultOptions, column, analyzer);
+    Assert.assertTrue(defaultSingleTermQuery instanceof SpanTermQuery);
+
+    // Test multiple terms with default behavior (prefix match disabled)
+    Query defaultMultiTermQuery =
+        LuceneTextIndexUtils.createQueryParserWithOptions("java realtime streaming", defaultOptions, column, analyzer);
+    Assert.assertTrue(defaultMultiTermQuery instanceof SpanNearQuery);
   }
 }

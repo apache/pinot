@@ -95,7 +95,7 @@ const ZookeeperPage = () => {
   const handleChange = (event: React.ChangeEvent<{}>, newValue: number) => {
     setValue(newValue);
   };
-  
+
   // fetch and show children tree if not already fetched
   const showChildEvent = (pathObj) => {
     if(!pathObj.hasChildRendered){
