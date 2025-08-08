@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Map;
 import org.apache.pinot.plugin.ingestion.batch.common.BaseSegmentPushJobRunner;
@@ -37,7 +38,7 @@ public class SegmentUriPushJobRunner extends BaseSegmentPushJobRunner {
   }
 
   public void uploadSegments(Map<String, String> segmentsUriToTarPathMap)
-      throws AttemptsExceededException, RetriableOperationException {
+      throws AttemptsExceededException, FileNotFoundException, RetriableOperationException {
     SegmentPushUtils.sendSegmentUris(_spec, new ArrayList<>(segmentsUriToTarPathMap.keySet()));
   }
 }
