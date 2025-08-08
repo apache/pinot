@@ -26,7 +26,6 @@ import java.util.Map;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 import org.apache.pinot.spi.config.table.task.TableTaskConfigRegistry;
 import org.apache.pinot.spi.config.table.task.TableTaskTypeConfig;
-import org.apache.pinot.spi.config.table.task.TaskType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
