@@ -22,6 +22,12 @@ syntax = "proto3";
 package org.apache.pinot.common.proto;
 
 service PinotMailbox {
+  // Ping rpc, used to keep the connection active
+  // In future we may also use this to negotiate the mailbox protocol version
+  rpc ping(Ping) returns (Pong);
+
+  // Open a mailbox stream.
+  // Each mailbox stream is used to send data from MailboxSendOperator to MailboxReceiveOperator.
   rpc open(stream MailboxContent) returns (stream MailboxStatus);
 }
 
@@ -35,4 +41,14 @@ message MailboxContent {
   bytes payload = 2;
   map<string, string> metadata = 3;
   bool waitForMore = 4;
+}
+
+message Ping {
+  string hostname = 1;
+  int32 port = 2;
+}
+
+message Pong {
+  string hostname = 1;
+  int32 port = 2;
 }

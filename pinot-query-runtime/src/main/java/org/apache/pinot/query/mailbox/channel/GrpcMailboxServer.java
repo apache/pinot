@@ -38,6 +38,8 @@ import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -47,6 +49,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * send by the sender of the sender/receiver pair.
  */
 public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
+  private static final Logger LOGGER = LoggerFactory.getLogger(GrpcMailboxServer.class);
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000L;
 
   private final MailboxService _mailboxService;
@@ -120,5 +123,16 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   public StreamObserver<Mailbox.MailboxContent> open(StreamObserver<Mailbox.MailboxStatus> responseObserver) {
     String mailboxId = ChannelUtils.MAILBOX_ID_CTX_KEY.get();
     return new MailboxContentObserver(_mailboxService, mailboxId, responseObserver);
+  }
+
+  @Override
+  public void ping(Mailbox.Ping request, StreamObserver<Mailbox.Pong> responseObserver) {
+    LOGGER.debug("Received ping request: {}", request);
+    //super.ping(request, responseObserver);
+    Mailbox.Pong pong = Mailbox.Pong.newBuilder()
+        .setHostname(_mailboxService.getHostname())
+        .setPort(_mailboxService.getPort())
+        .build();
+    responseObserver.onNext(pong);
   }
 }
