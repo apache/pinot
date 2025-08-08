@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.sql.PinotSqlFunction;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
@@ -47,6 +48,14 @@ public interface PinotScalarFunction {
    * an optional {@link ScalarFunction}} annotation higher priority.
    */
   default Set<String> getNames() {
+    if (getClass().isAnnotationPresent(ScalarFunction.class)) {
+      ScalarFunction annotation = getClass().getAnnotation(ScalarFunction.class);
+      if (annotation.names() != null && annotation.names().length > 0) {
+        return Arrays.stream(annotation.names())
+            .map(FunctionRegistry::canonicalize)
+            .collect(Collectors.toSet());
+      }
+    }
     return Set.of(getName());
   }
 
