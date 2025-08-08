@@ -19,12 +19,11 @@
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
@@ -42,18 +41,32 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   private final String _tenantName;
   private final List<String> _unprocessedTables;
   private final TenantRebalanceProgressStats _progressStats;
+  private final TenantRebalanceContext _tenantRebalanceContext;
   // Keep track of number of updates. Useful during debugging.
   private int _numUpdatesToZk;
 
-  public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, Set<String> tables,
+  public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, TenantRebalanceProgressStats progressStats,
+      TenantRebalanceContext tenantRebalanceContext,
       PinotHelixResourceManager pinotHelixResourceManager) {
-    Preconditions.checkState(tables != null && !tables.isEmpty(), "List of tables to observe is empty.");
     _jobId = jobId;
     _tenantName = tenantName;
-    _unprocessedTables = new ArrayList<>(tables);
+    _unprocessedTables = progressStats.getTableStatusMap()
+        .entrySet()
+        .stream()
+        .filter(entry -> entry.getValue().equals(TenantRebalanceProgressStats.TableStatus.UNPROCESSED.name()))
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toList());
+    _tenantRebalanceContext = tenantRebalanceContext;
     _pinotHelixResourceManager = pinotHelixResourceManager;
-    _progressStats = new TenantRebalanceProgressStats(tables);
+    _progressStats = progressStats;
     _numUpdatesToZk = 0;
+  }
+
+  public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, Set<String> tables,
+      TenantRebalanceContext tenantRebalanceContext,
+      PinotHelixResourceManager pinotHelixResourceManager) {
+    this(jobId, tenantName, new TenantRebalanceProgressStats(tables), tenantRebalanceContext,
+        pinotHelixResourceManager);
   }
 
   @Override
@@ -78,24 +91,24 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
         break;
       default:
     }
-    trackStatsInZk();
+    syncStatsAndContextInZk();
   }
 
   @Override
   public void onSuccess(String msg) {
     _progressStats.setCompletionStatusMsg(msg);
     _progressStats.setTimeToFinishInSeconds((System.currentTimeMillis() - _progressStats.getStartTimeMs()) / 1000);
-    trackStatsInZk();
+    syncStatsAndContextInZk();
   }
 
   @Override
   public void onError(String errorMsg) {
     _progressStats.setCompletionStatusMsg(errorMsg);
     _progressStats.setTimeToFinishInSeconds(System.currentTimeMillis() - _progressStats.getStartTimeMs());
-    trackStatsInZk();
+    syncStatsAndContextInZk();
   }
 
-  private void trackStatsInZk() {
+  private void syncStatsAndContextInZk() {
     Map<String, String> jobMetadata = new HashMap<>();
     jobMetadata.put(CommonConstants.ControllerJob.TENANT_NAME, _tenantName);
     jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, _jobId);
@@ -106,6 +119,12 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
           JsonUtils.objectToString(_progressStats));
     } catch (JsonProcessingException e) {
       LOGGER.error("Error serialising rebalance stats to JSON for persisting to ZK {}", _jobId, e);
+    }
+    try {
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT,
+          JsonUtils.objectToString(_tenantRebalanceContext));
+    } catch (JsonProcessingException e) {
+      LOGGER.error("Error serialising rebalance context to JSON for persisting to ZK {}", _jobId, e);
     }
     _pinotHelixResourceManager.addControllerJobToZK(_jobId, jobMetadata, ControllerJobTypes.TENANT_REBALANCE);
     _numUpdatesToZk++;
