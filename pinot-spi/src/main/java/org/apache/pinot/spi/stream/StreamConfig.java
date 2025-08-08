@@ -204,10 +204,8 @@ public class StreamConfig {
     _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
 
     _enableOffsetAutoReset = Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.ENABLE_OFFSET_AUTO_RESET));
-    String offsetThreshold = streamConfigMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY);
-    _offsetAutoResetOffsetThreshold = offsetThreshold != null ? Integer.valueOf(offsetThreshold) : -1;
-    String timeSecThreshold = streamConfigMap.get(StreamConfigProperties.OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY);
-    _offsetAutoResetTimeSecThreshold = timeSecThreshold != null ? Integer.valueOf(timeSecThreshold) : -1;
+    _offsetAutoResetOffsetThreshold = parseOffsetAutoResetOffsetThreshold(streamConfigMap);
+    _offsetAutoResetTimeSecThreshold = parseOffsetAutoResetTimeSecThreshold(streamConfigMap);
 
     _streamConfigMap.putAll(streamConfigMap);
   }
@@ -320,6 +318,34 @@ public class StreamConfig {
     }
   }
 
+  public static int parseOffsetAutoResetOffsetThreshold(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY;
+    String offsetAutoResetOffsetThresholdStr = streamConfigMap.get(key);
+    if (offsetAutoResetOffsetThresholdStr != null) {
+      try {
+        return Integer.parseInt(offsetAutoResetOffsetThresholdStr);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid config " + key + ": " + offsetAutoResetOffsetThresholdStr);
+      }
+    } else {
+      return -1; // Default value indicating disabled
+    }
+  }
+
+  public static long parseOffsetAutoResetTimeSecThreshold(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY;
+    String offsetAutoResetTimeSecThresholdStr = streamConfigMap.get(key);
+    if (offsetAutoResetTimeSecThresholdStr != null) {
+      try {
+        return Long.parseLong(offsetAutoResetTimeSecThresholdStr);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid config " + key + ": " + offsetAutoResetTimeSecThresholdStr);
+      }
+    } else {
+      return -1; // Default value indicating disabled
+    }
+  }
+
   public String getType() {
     return _type;
   }
@@ -425,6 +451,7 @@ public class StreamConfig {
         + ", _flushThresholdVarianceFraction=" + _flushThresholdVarianceFraction
         + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='" + _groupId + '\''
         + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit
+        + ", _enableOffsetAutoReset=" + _enableOffsetAutoReset
         + ", _offsetAutoResetOffsetThreshold" + _offsetAutoResetOffsetThreshold
         + ", _offSetAutoResetTimeSecThreshold" + _offsetAutoResetTimeSecThreshold
         + ", _streamConfigMap=" + _streamConfigMap

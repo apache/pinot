@@ -353,7 +353,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(mockConsumerFactory.createStreamMsgOffsetFactory()).thenReturn(new LongMsgOffsetFactory());
     when(mockMetadataProvider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA),
         anyLong())).thenReturn(new LongMsgOffset(LATEST_OFFSET));
-    when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong())).thenReturn(PARTITION_OFFSET);
+    when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong(), anyLong())).thenReturn(PARTITION_OFFSET);
 
     try (MockedStatic<StreamConsumerFactoryProvider> mockedStaticProvider = mockStatic(
         StreamConsumerFactoryProvider.class)) {
@@ -419,7 +419,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     when(mockConsumerFactory.createStreamMsgOffsetFactory()).thenReturn(new LongMsgOffsetFactory());
     when(mockMetadataProvider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA),
         anyLong())).thenReturn(new LongMsgOffset(LATEST_OFFSET));
-    when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong())).thenReturn(
+    when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong(), anyLong())).thenReturn(
         new LongMsgOffset(PARTITION_OFFSET.getOffset() + 1L));
 
     try (MockedStatic<StreamConsumerFactoryProvider> mockedStaticProvider = mockStatic(

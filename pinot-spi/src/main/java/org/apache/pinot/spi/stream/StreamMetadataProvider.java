@@ -129,7 +129,7 @@ public interface StreamMetadataProvider extends Closeable {
   }
 
   @Nullable
-  default StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis) {
+  default StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
     return null;
   }
 
