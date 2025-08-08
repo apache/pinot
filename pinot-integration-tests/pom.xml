@@ -279,5 +279,10 @@
       <artifactId>pinot-batch-ingestion-spark-3</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-adls</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>
