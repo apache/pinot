@@ -547,7 +547,6 @@ public class QueryOptionsUtils {
   }
 
   public static String getWorkloadName(Map<String, String> queryOptions) {
-    return queryOptions.get(QueryOptionKey.WORKLOAD_NAME) != null ? queryOptions.get(QueryOptionKey.WORKLOAD_NAME)
-        : CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
+    return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
   }
 }
