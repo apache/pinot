@@ -35,6 +35,8 @@ package org.apache.pinot.spi.stream;
  * This information is needed by the stream, when grouping the partitions/shards into new partition groups.
  */
 public class PartitionGroupConsumptionStatus {
+
+  private final String _topicName;
   private final int _partitionGroupId;
   private final int _streamPartitionId;
   private int _sequenceNumber;
@@ -42,8 +44,9 @@ public class PartitionGroupConsumptionStatus {
   private StreamPartitionMsgOffset _endOffset;
   private String _status;
 
-  public PartitionGroupConsumptionStatus(int partitionGroupId, int streamPartitionId, int sequenceNumber,
-      StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+  public PartitionGroupConsumptionStatus(String topicName, int partitionGroupId, int streamPartitionId,
+      int sequenceNumber, StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+    _topicName = topicName;
     _partitionGroupId = partitionGroupId;
     _streamPartitionId = streamPartitionId;
     _sequenceNumber = sequenceNumber;
@@ -52,9 +55,18 @@ public class PartitionGroupConsumptionStatus {
     _status = status;
   }
 
-  public PartitionGroupConsumptionStatus(int partitionGroupId, int sequenceNumber, StreamPartitionMsgOffset startOffset,
-      StreamPartitionMsgOffset endOffset, String status) {
-    this(partitionGroupId, partitionGroupId, sequenceNumber, startOffset, endOffset, status);
+  public PartitionGroupConsumptionStatus(int partitionGroupId, int streamPartitionId,
+      int sequenceNumber, StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+    this("", partitionGroupId, streamPartitionId, sequenceNumber, startOffset, endOffset, status);
+  }
+
+  public PartitionGroupConsumptionStatus(int partitionGroupId, int sequenceNumber,
+      StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+    this("", partitionGroupId, partitionGroupId, sequenceNumber, startOffset, endOffset, status);
+  }
+
+  public String getTopicName() {
+    return _topicName;
   }
 
   public int getPartitionGroupId() {
