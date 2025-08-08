@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.local.utils.CustomSerDeUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
@@ -38,7 +39,10 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   }
 
   @Override
-  public AvgPair getInitialAggregatedValue(Object rawValue) {
+  public AvgPair getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return new AvgPair();
+    }
     if (rawValue instanceof byte[]) {
       return deserializeAggregatedValue((byte[]) rawValue);
     } else {
@@ -65,6 +69,11 @@ public class AvgValueAggregator implements ValueAggregator<Object, AvgPair> {
   @Override
   public AvgPair cloneAggregatedValue(AvgPair value) {
     return new AvgPair(value.getSum(), value.getCount());
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   @Override
