@@ -93,8 +93,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   RELOAD_FAILURES("segments", false),
   REFRESH_FAILURES("segments", false),
   UNTAR_FAILURES("segments", false),
-  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment "
-      + "fetch failures"),
+  SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment " + "fetch failures"),
   SEGMENT_DIR_MOVEMENT_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
@@ -209,6 +208,15 @@ public enum ServerMeter implements AbstractMetrics.Meter {
 
   // reingestion metrics
   SEGMENT_REINGESTION_FAILURE("segments", false),
+
+  // commit-time compaction metrics
+  COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS("segments", false,
+      "Number of segments processed with commit-time compaction enabled"),
+  COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION("rows", false, "Total rows before commit-time compaction"),
+  COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION("rows", false, "Total rows after commit-time compaction"),
+  COMMIT_TIME_COMPACTION_ROWS_REMOVED("rows", false, "Number of rows removed during commit-time compaction"),
+  COMMIT_TIME_COMPACTION_BUILD_TIME_MS("milliseconds", false,
+      "Additional time spent in commit-time compaction processing"),
 
   /**
    * Approximate heap bytes used by the mutable JSON index at the time of index close.
