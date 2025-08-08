@@ -91,6 +91,53 @@ public class StreamingReduceServiceTest {
         (cause) -> cause instanceof TimeoutException));
   }
 
+  @Test
+  public void testIgnoreMissingSegmentsFiltering() throws Exception {
+    // Build a metadata-only DataTable with a SERVER_SEGMENT_MISSING exception encoded as a streaming response
+    org.apache.pinot.common.utils.DataSchema schema =
+        new org.apache.pinot.common.utils.DataSchema(new String[]{"col1"},
+            new org.apache.pinot.common.utils.DataSchema.ColumnDataType[]{
+                org.apache.pinot.common.utils.DataSchema.ColumnDataType.LONG});
+    org.apache.pinot.core.common.datatable.DataTableBuilder builder =
+        org.apache.pinot.core.common.datatable.DataTableBuilderFactory.getDataTableBuilder(schema);
+    org.apache.pinot.common.datatable.DataTable dataTable = builder.build().toMetadataOnlyDataTable();
+    dataTable.addException(org.apache.pinot.spi.exception.QueryErrorCode.SERVER_SEGMENT_MISSING,
+        "1 segments [segA] missing on server: Server_localhost_9527");
+    // Set a request id in metadata so routing handling can route to the active async response
+    dataTable.getMetadata().put(org.apache.pinot.common.datatable.DataTable.MetadataKey.REQUEST_ID.getName(), "1");
+    byte[] payload = dataTable.toBytes();
+
+    // Mock one server streaming response yielding the metadata-only block
+    Iterator<Server.ServerResponse> mockedResponse = (Iterator<Server.ServerResponse>) mock(Iterator.class);
+    when(mockedResponse.hasNext()).thenReturn(true, false);
+    Server.ServerResponse resp = Server.ServerResponse.newBuilder()
+        .setPayload(com.google.protobuf.ByteString.copyFrom(payload)).build();
+    when(mockedResponse.next()).thenReturn(resp);
+
+    // Prepare inputs for reduceOnStreamResponse
+    StreamingReduceService service = new StreamingReduceService(
+        new org.apache.pinot.spi.env.PinotConfiguration(java.util.Map.of()));
+    org.apache.pinot.common.request.BrokerRequest brokerRequest =
+        org.apache.pinot.sql.parsers.CalciteSqlCompiler.compileToBrokerRequest(
+            "SELECT col1 FROM testTable LIMIT 1");
+    // Set the query option to ignore missing segments
+    brokerRequest.getPinotQuery().putToQueryOptions(
+        org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+
+    java.util.Map<ServerRoutingInstance, Iterator<Server.ServerResponse>> serverResponseMap = java.util.Map.of(
+        new ServerRoutingInstance("localhost", 9527, TableType.OFFLINE), mockedResponse);
+
+    org.apache.pinot.common.metrics.BrokerMetrics metrics = mock(org.apache.pinot.common.metrics.BrokerMetrics.class);
+    // Execute
+    org.apache.pinot.common.response.broker.BrokerResponseNative response = service.reduceOnStreamResponse(
+        brokerRequest, serverResponseMap, 1000, metrics);
+
+    // Validate the SERVER_SEGMENT_MISSING was filtered out
+    boolean hasMissing = response.getExceptions().stream().anyMatch(
+        e -> e.getErrorCode() == org.apache.pinot.spi.exception.QueryErrorCode.SERVER_SEGMENT_MISSING.getId());
+    org.testng.Assert.assertFalse(hasMissing);
+  }
+
   private static boolean verifyException(Callable<Void> verifyTarget, Predicate<Throwable> verifyCause) {
     boolean exceptionVerified = false;
     if (verifyTarget == null || verifyCause == null) {

@@ -62,6 +62,19 @@ public class QueryOptionsUtilsTest {
   }
 
   @Test
+  public void shouldReadIgnoreMissingSegmentsOption() {
+    // Given:
+    Map<String, String> optsTrue = Map.of(IGNORE_MISSING_SEGMENTS, "true");
+    Map<String, String> optsFalse = Map.of(IGNORE_MISSING_SEGMENTS, "false");
+    Map<String, String> optsMissing = Map.of();
+
+    // Then:
+    org.testng.Assert.assertTrue(QueryOptionsUtils.isIgnoreMissingSegments(optsTrue));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isIgnoreMissingSegments(optsFalse));
+    org.testng.Assert.assertFalse(QueryOptionsUtils.isIgnoreMissingSegments(optsMissing));
+  }
+
+  @Test
   public void testSkipIndexesParsing() {
     String skipIndexesStr = "col1=inverted,range&col2=sorted";
     Map<String, String> queryOptions = Map.of(SKIP_INDEXES, skipIndexesStr);

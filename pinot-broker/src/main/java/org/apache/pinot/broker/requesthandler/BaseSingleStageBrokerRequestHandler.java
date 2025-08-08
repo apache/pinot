@@ -745,6 +745,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverBrokerRequest.getPinotQuery().getQueryOptions()
               .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
         }
+        // Optionally set ignoreMissingSegments based on broker config
+        setIgnoreMissingSegmentsIfConfigured(queryOptions);
       }
     }
     if (realtimeBrokerRequest != null) {
@@ -758,6 +760,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverBrokerRequest.getPinotQuery().getQueryOptions()
               .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
         }
+        // Optionally set ignoreMissingSegments based on broker config
+        setIgnoreMissingSegmentsIfConfigured(queryOptions);
       }
     }
 
@@ -2080,6 +2084,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private String getGlobalQueryId(long requestId) {
     return _brokerId + "_" + requestId;
+  }
+
+  private void setIgnoreMissingSegmentsIfConfigured(Map<String, String> queryOptions) {
+    if (_config.getProperty(CommonConstants.Broker.CONFIG_OF_IGNORE_MISSING_SEGMENTS,
+        CommonConstants.Broker.DEFAULT_IGNORE_MISSING_SEGMENTS)) {
+      queryOptions.putIfAbsent(QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+    }
   }
 
   /**
