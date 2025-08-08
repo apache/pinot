@@ -28,7 +28,6 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.common.request.context.predicate.Predicate;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.TableResizer;
@@ -96,8 +95,7 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
     int numGroupsLimit = queryContext.getNumGroupsLimit();
     int maxInitialResultHolderCapacity = queryContext.getMaxInitialResultHolderCapacity();
     Map<ExpressionContext, Integer> groupByExpressionSizesFromPredicates = null;
-    if (queryContext.getQueryOptions() != null
-        && QueryOptionsUtils.optimizeMaxInitialResultHolderCapacityEnabled(queryContext.getQueryOptions())) {
+    if (queryContext.isOptimizeMaxInitialResultHolderCapacity()) {
       groupByExpressionSizesFromPredicates = getGroupByExpressionSizesFromPredicates(queryContext);
     }
     if (groupKeyGenerator != null) {
