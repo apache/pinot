@@ -144,6 +144,11 @@ public class StreamConfigProperties {
       "realtime.segment.pauseless.download.timeoutSeconds";
 
   /**
+   * Config used to indicate whether the topic is a temporary topic for offset auto reset backfilling
+   */
+  public static final String EPHEMERAL_BACKFILL_TOPIC = "realtime.segment.isBackfillTopic";
+
+  /**
    * Helper method to create a stream specific property
    */
   public static String constructStreamProperty(String streamType, String property) {
