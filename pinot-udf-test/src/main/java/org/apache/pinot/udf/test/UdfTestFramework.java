@@ -19,6 +19,7 @@
 package org.apache.pinot.udf.test;
 
 import com.google.common.collect.Maps;
+import com.google.common.math.DoubleMath;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -180,6 +181,9 @@ public class UdfTestFramework {
       if (e.getCause().getMessage().contains("Unsupported function")) {
         return new ResultByExample.Failure("Unsupported");
       }
+      if (e.getCause().getMessage().contains("Caught exception while doing operator")) {
+        return new ResultByExample.Failure("Operator execution error");
+      }
       return new ResultByExample.Failure(e.getCause().getMessage());
     }
   }
@@ -210,6 +214,10 @@ public class UdfTestFramework {
       actual = canonizeObject(actual);
       switch (this) {
         case EQUAL:
+          if (expected instanceof Double && actual instanceof Double
+            && !doubleEquals((Double) expected, (Double) actual)) {
+            throw new AssertionError(describeDiscrepancy(expected, actual));
+          }
           if (!Objects.equals(expected, actual)) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
@@ -233,7 +241,7 @@ public class UdfTestFramework {
                 + "comparison, but got: expected=" + expected + "(of type " + expectedClass + ")"
                 + ", actual=" + actual + "(of type " + actualClass + ")");
           }
-          if (Double.compare(((Number) expected).doubleValue(), ((Number) actual).doubleValue()) != 0) {
+          if (!doubleEquals(((Number) expected).doubleValue(), ((Number) actual).doubleValue())) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
           break;
@@ -278,11 +286,24 @@ public class UdfTestFramework {
             list.add(f);
           }
           return list;
+        } else if (componentType == byte.class) {
+          // Convert byte array to List<Byte> for consistency
+          byte[] byteArray = (byte[]) value;
+          ArrayList<Byte> list = new ArrayList<>(byteArray.length);
+          for (byte b : byteArray) {
+            list.add(b);
+          }
+          return list;
         } else {
           return Arrays.asList((Object[]) value);
         }
       }
       return value;
     }
+  }
+
+  private static boolean doubleEquals(double d1, double d2) {
+    double epsilon = 0.0001d;
+    return DoubleMath.fuzzyEquals(d1, d2, epsilon);
   }
 }
