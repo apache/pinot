@@ -197,6 +197,9 @@ public class AggregationResultsBlock extends BaseResultsBlock {
       case DOUBLE:
         dataTableBuilder.setColumn(index, (double) result);
         break;
+      case STRING:
+        dataTableBuilder.setColumn(index, result.toString());
+        break;
       default:
         throw new IllegalStateException("Illegal column data type in intermediate result: " + columnDataType);
     }
