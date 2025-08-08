@@ -20,6 +20,7 @@ package org.apache.pinot.spi.utils.builder;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -361,6 +362,26 @@ public class ControllerRequestURLBuilder {
     }
   }
 
+  private String constructQueryParametersString(Map<String, List<String>> queryParams) {
+    if (queryParams.isEmpty()) {
+      return "";
+    }
+    StringBuilder query = new StringBuilder("?");
+    boolean firstParam = true;
+    for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+      String key = entry.getKey();
+      for (String value : entry.getValue()) {
+        if (!firstParam) {
+          query.append("&");
+        }
+        query.append(key).append("=").append(value);
+        firstParam = false;
+      }
+    }
+    return query.toString();
+  }
+
+
   public String forSchemaValidate() {
     return StringUtil.join("/", _baseUrl, "schemas", "validate");
   }
@@ -445,7 +466,21 @@ public class ControllerRequestURLBuilder {
   }
 
   public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns) {
-    return StringUtil.join("/", _baseUrl, "segments", tableName, "metadata") + constructColumnsParameter(columns);
+    return forSegmentsMetadataFromServer(tableName, columns, null);
+  }
+
+  public String forSegmentsMetadataFromServer(String tableName, @Nullable List<String> columns,
+      @Nullable List<String> segments) {
+    String basePath = StringUtil.join("/", _baseUrl, "segments", tableName, "metadata");
+    Map<String, List<String>> queryParams = new LinkedHashMap<>();
+    if (!CollectionUtils.isEmpty(columns)) {
+      queryParams.put("columns", columns);
+    }
+    if (!CollectionUtils.isEmpty(segments)) {
+      queryParams.put("segments", segments);
+    }
+    String queryString = constructQueryParametersString(queryParams);
+    return basePath + queryString;
   }
 
   public String forSegmentMetadata(String tableName, String segmentName) {
