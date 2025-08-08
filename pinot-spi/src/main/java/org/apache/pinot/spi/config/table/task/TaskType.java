@@ -12,27 +12,5 @@ import java.util.Map;
  * 1. <TODO>
  */
 public enum TaskType {
-  FileIngestionTask;
-
-  public static boolean isValidTaskType(String taskType) {
-    try {
-      TaskType.valueOf(taskType);
-      return true;
-    } catch (IllegalArgumentException e) {
-      return false;
-    }
-  }
-
-  public static TableTaskTypeConfig createTaskTypeConfig(String taskType, Map<String, String> configs) {
-    if (!isValidTaskType(taskType)) {
-      throw new IllegalArgumentException("Invalid task type: " + taskType);
-    }
-    switch (TaskType.valueOf(taskType)) {
-      case FileIngestionTask:
-        return new SegmentRefreshTaskConfig(configs);
-      default:
-        throw new IllegalStateException("Unexpected task type: " + taskType);
-    }
-  }
 
 }
