@@ -194,6 +194,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
+
+    // Test clear and trim
+    dictionaryBasedGroupKeyGenerator.close();
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_MAP.get().size(), 0);
   }
 
   @Test
@@ -215,6 +219,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
+
+    // Test clear and trim
+    dictionaryBasedGroupKeyGenerator.close();
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_LONG_MAP.get().size(), 0);
   }
 
   @Test
@@ -236,6 +244,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), 2, _errorMessage);
     compareSingleValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), 2);
+
+    // Test clear and trim
+    dictionaryBasedGroupKeyGenerator.close();
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().size(), 0);
   }
 
   /**
@@ -293,6 +305,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
+
+    // Test clear and trim
+    dictionaryBasedGroupKeyGenerator.close();
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_MAP.get().size(), 0);
   }
 
   @Test
@@ -316,6 +332,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
+
+    // Test clear and trim
+    dictionaryBasedGroupKeyGenerator.close();
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_LONG_MAP.get().size(), 0);
   }
 
   @Test
@@ -338,6 +358,10 @@ public class DictionaryBasedGroupKeyGeneratorTest {
     assertEquals(dictionaryBasedGroupKeyGenerator.getCurrentGroupKeyUpperBound(), numUniqueKeys, _errorMessage);
     compareMultiValueBuffer();
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numUniqueKeys);
+
+    // Test clear and trim
+    dictionaryBasedGroupKeyGenerator.close();
+    assertEquals(DictionaryBasedGroupKeyGenerator.THREAD_LOCAL_INT_ARRAY_MAP.get().size(), 0);
   }
 
   @Test
@@ -372,6 +396,7 @@ public class DictionaryBasedGroupKeyGeneratorTest {
       assertEquals(MV_GROUP_KEY_BUFFER[i + 1], MV_GROUP_KEY_BUFFER[1], _errorMessage);
     }
     testGetGroupKeys(dictionaryBasedGroupKeyGenerator.getGroupKeys(), numGroupsLimit);
+    dictionaryBasedGroupKeyGenerator.close();
   }
 
   private static ExpressionContext[] getExpressions(String[] columns) {

@@ -20,18 +20,15 @@ package org.apache.pinot.core.accounting;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Level;
@@ -296,57 +293,6 @@ public class ResourceManagerAccountingTest {
       });
     }
     Thread.sleep(1000_000);
-  }
-
-
-  /**
-   * Test the mechanism of worker thread checking for runnerThread's interruption flag
-   */
-  @Test
-  public void testWorkerThreadInterruption()
-      throws Exception {
-    ResourceManager rm = getResourceManager(2, 5, 1, 3, Collections.emptyMap(),
-        new Tracing.DefaultThreadResourceUsageAccountant());
-    AtomicReference<Future>[] futures = new AtomicReference[5];
-    for (int i = 0; i < 5; i++) {
-      futures[i] = new AtomicReference<>();
-    }
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
-    AtomicReference<Thread> runnerThread = new AtomicReference<>();
-    rm.getQueryRunners().submit(() -> {
-      Thread thread = Thread.currentThread();
-      runnerThread.set(thread);
-      for (int j = 0; j < 5; j++) {
-        futures[j].set(rm.getQueryWorkers().submit(() -> {
-          for (int i = 0; i < 1000000; i++) {
-            try {
-              Thread.sleep(5);
-            } catch (InterruptedException ignored) {
-            }
-            if (thread.isInterrupted()) {
-              throw new EarlyTerminationException();
-            }
-          }
-        }));
-      }
-      while (true) {
-      }
-    });
-    Thread.sleep(50);
-    runnerThread.get().interrupt();
-
-    for (int i = 0; i < 5; i++) {
-      try {
-        futures[i].get().get();
-      } catch (ExecutionException e) {
-        Assert.assertFalse(futures[i].get().isCancelled());
-        Assert.assertTrue(futures[i].get().isDone());
-        Assert.assertTrue(e.getMessage().contains("EarlyTerminationException"),
-            "Error message should contain EarlyTerminationException, found: " + e.getMessage());
-        return;
-      }
-    }
-    Assert.fail("Expected EarlyTerminationException to be thrown");
   }
 
   /**

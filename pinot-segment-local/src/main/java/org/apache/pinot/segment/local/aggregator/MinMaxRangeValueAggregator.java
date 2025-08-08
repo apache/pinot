@@ -42,7 +42,7 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
     if (rawValue instanceof byte[]) {
       return deserializeAggregatedValue((byte[]) rawValue);
     } else {
-      double doubleValue = ((Number) rawValue).doubleValue();
+      double doubleValue = ValueAggregatorUtils.toDouble(rawValue);
       return new MinMaxRangePair(doubleValue, doubleValue);
     }
   }
@@ -52,8 +52,7 @@ public class MinMaxRangeValueAggregator implements ValueAggregator<Object, MinMa
     if (rawValue instanceof byte[]) {
       value.apply(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      double doubleValue = ((Number) rawValue).doubleValue();
-      value.apply(doubleValue);
+      value.apply(ValueAggregatorUtils.toDouble(rawValue));
     }
     return value;
   }

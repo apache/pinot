@@ -716,6 +716,13 @@ public class PinotTableRestletResource {
       @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
       boolean downtime,
+      @ApiParam(value = "This flag only applies to peer-download enabled tables undergoing downtime=true or "
+          + "minAvailableReplicas=0 rebalance (both of which can result in possible data loss scenarios). If enabled, "
+          + "this flag will allow the rebalance to continue even in cases where data loss scenarios have been "
+          + "detected, otherwise the rebalance will be failed and user action will be required to rebalance again. "
+          + "This flag should be used with caution and only used in scenarios where data loss is acceptable")
+      @DefaultValue("false") @QueryParam("allowPeerDownloadDataLoss")
+      boolean allowPeerDownloadDataLoss,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
           + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("-1")
       @QueryParam("minAvailableReplicas") int minAvailableReplicas,
@@ -779,6 +786,7 @@ public class PinotTableRestletResource {
     rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);
     rebalanceConfig.setBootstrap(bootstrap);
     rebalanceConfig.setDowntime(downtime);
+    rebalanceConfig.setAllowPeerDownloadDataLoss(allowPeerDownloadDataLoss);
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
