@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.plannode;
 import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.calcite.rel.RelFieldCollation;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.logical.RexExpression;
@@ -34,16 +35,19 @@ public class JoinNode extends BasePlanNode {
   private final JoinStrategy _joinStrategy;
   @Nullable
   private final RexExpression _matchCondition;
+  @Nullable
+  private final List<RelFieldCollation> _collations;
 
   public JoinNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
       JoinStrategy joinStrategy) {
-    this(stageId, dataSchema, nodeHint, inputs, joinType, leftKeys, rightKeys, nonEquiConditions, joinStrategy, null);
+    this(stageId, dataSchema, nodeHint, inputs, joinType, leftKeys, rightKeys, nonEquiConditions, joinStrategy, null,
+        null);
   }
 
   public JoinNode(int stageId, DataSchema dataSchema, NodeHint nodeHint, List<PlanNode> inputs, JoinRelType joinType,
       List<Integer> leftKeys, List<Integer> rightKeys, List<RexExpression> nonEquiConditions,
-      JoinStrategy joinStrategy, RexExpression matchCondition) {
+      JoinStrategy joinStrategy, RexExpression matchCondition, List<RelFieldCollation> collations) {
     super(stageId, dataSchema, nodeHint, inputs);
     _joinType = joinType;
     _leftKeys = leftKeys;
@@ -51,6 +55,7 @@ public class JoinNode extends BasePlanNode {
     _nonEquiConditions = nonEquiConditions;
     _joinStrategy = joinStrategy;
     _matchCondition = matchCondition;
+    _collations = collations;
   }
 
   public JoinRelType getJoinType() {
@@ -74,6 +79,11 @@ public class JoinNode extends BasePlanNode {
   }
 
   @Nullable
+  public List<RelFieldCollation> getCollations() {
+    return _collations;
+  }
+
+  @Nullable
   public RexExpression getMatchCondition() {
     return _matchCondition;
   }
@@ -91,7 +101,7 @@ public class JoinNode extends BasePlanNode {
   @Override
   public PlanNode withInputs(List<PlanNode> inputs) {
     return new JoinNode(_stageId, _dataSchema, _nodeHint, inputs, _joinType, _leftKeys, _rightKeys, _nonEquiConditions,
-        _joinStrategy, _matchCondition);
+        _joinStrategy, _matchCondition, _collations);
   }
 
   @Override
@@ -118,6 +128,6 @@ public class JoinNode extends BasePlanNode {
   }
 
   public enum JoinStrategy {
-    HASH, LOOKUP, ASOF
+    HASH, LOOKUP, ASOF, MERGE
   }
 }

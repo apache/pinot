@@ -92,6 +92,7 @@ enum JoinStrategy {
   HASH = 0;
   LOOKUP = 1;
   AS_OF = 2;
+  MERGE = 3;
 }
 
 message JoinNode {
@@ -101,6 +102,7 @@ message JoinNode {
   repeated Expression nonEquiConditions = 4;
   JoinStrategy joinStrategy = 5;
   Expression matchCondition = 6;
+  repeated Collation collations = 7;
 }
 
 enum ExchangeType {
