@@ -79,4 +79,46 @@ public class BrokerReduceServiceTest {
     assertEquals(exceptions.size(), 1);
     assertEquals(exceptions.get(0).getErrorCode(), QueryErrorCode.BROKER_TIMEOUT.getId());
   }
+
+  @Test
+  public void testIgnoreMissingSegmentsFiltering() throws Exception {
+    // Build a simple broker reduce service
+    BrokerReduceService brokerReduceService =
+        new BrokerReduceService(new PinotConfiguration(Map.of(Broker.CONFIG_OF_MAX_REDUCE_THREADS_PER_QUERY, 2)));
+
+    // Prepare a broker request with queryOptions toggled
+    BrokerRequest brokerRequestNoIgnore =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM testTable");
+    BrokerRequest brokerRequestIgnore =
+        CalciteSqlCompiler.compileToBrokerRequest("SELECT COUNT(*) FROM testTable");
+    brokerRequestIgnore.getPinotQuery().putToQueryOptions(
+        org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+
+    // Create a metadata-only DataTable with a SERVER_SEGMENT_MISSING exception
+    DataTableBuilder dataTableBuilder = DataTableBuilderFactory.getDataTableBuilder(
+        new DataSchema(new String[]{"count(*)"}, new ColumnDataType[]{ColumnDataType.LONG}));
+    // no rows; build data table and then mark it metadata-only
+    org.apache.pinot.common.datatable.DataTable dataTable = dataTableBuilder.build().toMetadataOnlyDataTable();
+    dataTable.addException(QueryErrorCode.SERVER_SEGMENT_MISSING,
+        "1 segments [segA] missing on server: Server_localhost_12345");
+
+    Map<ServerRoutingInstance, org.apache.pinot.common.datatable.DataTable> dataTableMap = new HashMap<>();
+    dataTableMap.put(new ServerRoutingInstance("localhost", 12345, TableType.OFFLINE), dataTable);
+
+    // Case 1: ignoreMissingSegments=false (default) -> exception should be present
+    BrokerResponseNative responseNoIgnore = brokerReduceService.reduceOnDataTable(
+        brokerRequestNoIgnore, brokerRequestNoIgnore, dataTableMap, 10_000, mock(BrokerMetrics.class));
+    long missingErrCountNoIgnore = responseNoIgnore.getExceptions().stream()
+        .filter(e -> e.getErrorCode() == QueryErrorCode.SERVER_SEGMENT_MISSING.getId()).count();
+    assertEquals(missingErrCountNoIgnore, 1L);
+
+    // Case 2: ignoreMissingSegments=true -> exception should be filtered out
+    BrokerResponseNative responseIgnore = brokerReduceService.reduceOnDataTable(
+        brokerRequestIgnore, brokerRequestIgnore, dataTableMap, 10_000, mock(BrokerMetrics.class));
+    long missingErrCountIgnore = responseIgnore.getExceptions().stream()
+        .filter(e -> e.getErrorCode() == QueryErrorCode.SERVER_SEGMENT_MISSING.getId()).count();
+    assertEquals(missingErrCountIgnore, 0L);
+
+    brokerReduceService.shutDown();
+  }
 }

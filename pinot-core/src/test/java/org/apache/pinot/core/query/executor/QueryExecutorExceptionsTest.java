@@ -171,6 +171,29 @@ public class QueryExecutorExceptionsTest {
     assertEqualsNoOrder(actualMissingSegments, expectedMissingSegments);
   }
 
+  /**
+   * When ignoreMissingSegments is set in queryOptions, the server should not populate SERVER_SEGMENT_MISSING exception.
+   */
+  @Test
+  public void testServerSegmentMissingExceptionIgnoredByOption() {
+    String query = "SELECT COUNT(*) FROM " + OFFLINE_TABLE_NAME;
+    // 1) Without the option -> we should see SERVER_SEGMENT_MISSING
+    InstanceRequest instanceRequestNoOpt = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequestNoOpt.setSearchSegments(_segmentNames);
+    InstanceResponseBlock responseNoOpt = _queryExecutor.execute(getQueryRequest(instanceRequestNoOpt), QUERY_RUNNERS);
+    Map<Integer, String> exceptionsNoOpt = responseNoOpt.getExceptions();
+    assertTrue(exceptionsNoOpt.containsKey(QueryErrorCode.SERVER_SEGMENT_MISSING.getId()));
+
+    // 2) With ignoreMissingSegments=true -> we should NOT see SERVER_SEGMENT_MISSING
+    InstanceRequest instanceRequestOpt = new InstanceRequest(0L, CalciteSqlCompiler.compileToBrokerRequest(query));
+    instanceRequestOpt.getQuery().getPinotQuery().putToQueryOptions(
+        org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+    instanceRequestOpt.setSearchSegments(_segmentNames);
+    InstanceResponseBlock responseOpt = _queryExecutor.execute(getQueryRequest(instanceRequestOpt), QUERY_RUNNERS);
+    Map<Integer, String> exceptionsOpt = responseOpt.getExceptions();
+    assertFalse(exceptionsOpt.containsKey(QueryErrorCode.SERVER_SEGMENT_MISSING.getId()));
+  }
+
   @AfterClass
   public void tearDown() {
     for (IndexSegment segment : _indexSegments) {

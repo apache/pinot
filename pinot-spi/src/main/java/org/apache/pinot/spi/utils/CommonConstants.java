@@ -458,6 +458,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
+
+      // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
+      // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
+      public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =
+          "pinot.broker.query.ignore.missing.segments";
+      public static final boolean DEFAULT_IGNORE_MISSING_SEGMENTS = false;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -701,6 +707,10 @@ public class CommonConstants {
 
         // If query submission causes an exception, still continue to submit the query to other servers
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
+
+        // Ignore server-side segment missing errors and proceed without marking the query as failed.
+        // When set to true, SERVER_SEGMENT_MISSING exceptions are filtered out on the broker.
+        public static final String IGNORE_MISSING_SEGMENTS = "ignoreMissingSegments";
 
         // Indicates that a query belongs to a secondary workload when using the BinaryWorkloadScheduler. The
         // BinaryWorkloadScheduler divides queries into two workloads, primary and secondary. Primary workloads are
