@@ -23,7 +23,6 @@ import io.grpc.ServerCall;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
 import io.grpc.Status;
-import javax.annotation.Nullable;
 
 public class AuthorizationInterceptor implements ServerInterceptor {
   private final QueryAccessControlFactory _accessControlFactory;
@@ -38,7 +37,8 @@ public class AuthorizationInterceptor implements ServerInterceptor {
     if (!_accessControlFactory.create().hasAccess(call.getAttributes(), headers)) {
       call.close(Status.PERMISSION_DENIED.withDescription("MSE Access Denied"), headers);
       // Skip any future operations since we have closed the call
-      return new ServerCall.Listener<T>() {};
+      return new ServerCall.Listener<T>() {
+      };
     }
     return next.startCall(call, headers);
   }
