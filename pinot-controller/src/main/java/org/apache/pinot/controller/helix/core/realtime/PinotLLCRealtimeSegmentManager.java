@@ -791,10 +791,6 @@ public class PinotLLCRealtimeSegmentManager {
         long newSegmentCreationTimeMs = getCurrentTimeMs();
         LLCSegmentName newLLCSegment = new LLCSegmentName(rawTableName, committingSegmentPartitionGroupId,
             committingLLCSegment.getSequenceNumber() + 1, newSegmentCreationTimeMs);
-        // TODO: This code does not support size-based segment thresholds for tables with pauseless enabled. The
-        //  calculation of row thresholds based on segment size depends on the size of the previously committed
-        //  segment. For tables with pauseless mode enabled, this size is unavailable at this step because the
-        //  segment has not yet been built.
 
         createNewSegmentZKMetadata(tableConfig, streamConfigs.get(0), newLLCSegment, newSegmentCreationTimeMs,
             committingSegmentDescriptor, committingSegmentZKMetadata, instancePartitions, partitionIds.size(),
