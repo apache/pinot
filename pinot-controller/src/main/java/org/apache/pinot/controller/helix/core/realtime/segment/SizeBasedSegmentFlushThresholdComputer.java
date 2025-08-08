@@ -76,16 +76,38 @@ class SizeBasedSegmentFlushThresholdComputer {
   synchronized void onSegmentCommit(CommittingSegmentDescriptor committingSegmentDescriptor,
       SegmentZKMetadata committingSegmentZKMetadata) {
     String segmentName = committingSegmentZKMetadata.getSegmentName();
-    int rowsConsumed = (int) committingSegmentZKMetadata.getTotalDocs();
-    long sizeInBytes = committingSegmentDescriptor.getSegmentSizeBytes();
+    long postCommitRows = (int) committingSegmentZKMetadata.getTotalDocs();
+    long preCommitRows = committingSegmentDescriptor.getPreCommitRowCount();
+    long postCommitSizeBytes = committingSegmentDescriptor.getSegmentSizeBytes();
+
+    // Use pre-commit rows if available (for commit time compaction), otherwise use post-commit rows
+    boolean usingPreCommitRows = preCommitRows > 0;
+    long rowsForCalculation = usingPreCommitRows ? preCommitRows : postCommitRows;
+
+    // Estimate pre-commit size when using pre-commit rows. If post-commit rows are 0 (cannot infer),
+    // fall back to using post-commit size for estimation.
+    long sizeForCalculation;
+    if (usingPreCommitRows) {
+      if (postCommitRows > 0) {
+        double estimatedPreCommitSize = ((double) postCommitSizeBytes) * ((double) preCommitRows)
+            / (double) postCommitRows;
+        sizeForCalculation = (long) Math.max(1L, Math.round(estimatedPreCommitSize));
+      } else {
+        sizeForCalculation = postCommitSizeBytes;
+      }
+    } else {
+      sizeForCalculation = postCommitSizeBytes;
+    }
+
     // Skip updating the ratio if the segment is empty, size is not available, or the segment is force-committed.
-    if (rowsConsumed <= 0 || sizeInBytes <= 0 || SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(
+    if (rowsForCalculation <= 0 || sizeForCalculation <= 0
+        || SegmentCompletionProtocol.REASON_FORCE_COMMIT_MESSAGE_RECEIVED.equals(
         committingSegmentDescriptor.getStopReason())) {
       if (committingSegmentZKMetadata.getStatus() == Status.DONE) {
         // Do not log for COMMITTING segment, as it is expected to not have rowsConsumed and sizeInBytes set
         LOGGER.info(
             "Skipping updating segment rows to size ratio for segment: {} with rows: {}, size: {} and stop reason: {}",
-            segmentName, rowsConsumed, sizeInBytes, committingSegmentDescriptor.getStopReason());
+            segmentName, rowsForCalculation, sizeForCalculation, committingSegmentDescriptor.getStopReason());
       }
       // When segment rows to size ratio is not available, update the rows threshold to be used for the next segment.
       // For pauseless consumption, this can ensure the first new consuming segment carries over the rows threshold from
@@ -97,24 +119,32 @@ class SizeBasedSegmentFlushThresholdComputer {
       }
       return;
     }
+
     long timeConsumed = _clock.millis() - committingSegmentZKMetadata.getCreationTime();
     int rowsThreshold = committingSegmentZKMetadata.getSizeThresholdToFlushSegment();
+
+    // Store values using the actual rows consumed for threshold calculations
     _timeConsumedForLastSegment = timeConsumed;
-    _rowsConsumedForLastSegment = rowsConsumed;
-    _sizeForLastSegment = sizeInBytes;
+    _rowsConsumedForLastSegment = (int) rowsForCalculation;
+    _sizeForLastSegment = sizeForCalculation;
     _rowsThresholdForLastSegment = rowsThreshold;
-    double segmentRatio = (double) rowsConsumed / sizeInBytes;
+
+    // Calculate ratio using actual rows (pre-commit if available)
+    double segmentRatio = (double) rowsForCalculation / (double) sizeForCalculation;
     double currentRatio = _segmentRowsToSizeRatio;
+
+      // Update the segment rows to size ratio using weighted average
     if (currentRatio > 0) {
       _segmentRowsToSizeRatio =
           CURRENT_SEGMENT_RATIO_WEIGHT * segmentRatio + PREVIOUS_SEGMENT_RATIO_WEIGHT * currentRatio;
     } else {
       _segmentRowsToSizeRatio = segmentRatio;
     }
-    LOGGER.info("Updated with segment: {}, time: {}, rows: {}, size: {}, ratio: {}, threshold: {}. "
-            + "Segment rows to size ratio got updated from: {} to: {}", segmentName,
-        TimeUtils.convertMillisToPeriod(timeConsumed), rowsConsumed, sizeInBytes, segmentRatio, rowsThreshold,
-        currentRatio, _segmentRowsToSizeRatio);
+    LOGGER.info(
+        "Updated segment: {}, time: {}, rows used for calculation: {} (pre-commit: {}, post-commit: {}), size used: {}"
+            + " (post-commit size: {}), consuming ratio: {}, threshold: {}. Segment rows to size ratio updated from: {} to: {}",
+        segmentName, TimeUtils.convertMillisToPeriod(timeConsumed), rowsForCalculation, preCommitRows, postCommitRows,
+        sizeForCalculation, postCommitSizeBytes, segmentRatio, rowsThreshold, currentRatio, _segmentRowsToSizeRatio);
   }
 
   synchronized int computeThreshold(StreamConfig streamConfig, String segmentName) {
