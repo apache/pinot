@@ -113,7 +113,8 @@ import {
   getServerToSegmentsCount,
   pauseConsumption,
   resumeConsumption,
-  getPauseStatus
+  getPauseStatus,
+  getVersions
 } from '../requests';
 import { baseApi } from './axios-config';
 import Utils from './Utils';
@@ -1351,6 +1352,23 @@ const getAuthUserEmailFromAccessToken = (
   return email;
 };
 
+// This method is used to display package versions in tabular format on cluster manager home page
+// API: /version
+// Expected Output: {columns: [], records: []}
+const getPackageVersionsData = () => {
+  return getVersions().then(({ data }) => {
+    const records = Object.entries(data).map(([packageName, version]) => [
+      packageName,
+      String(version)
+    ]);
+    
+    return {
+      columns: ['Package', 'Version'],
+      records: records
+    };
+  });
+};
+
 export default {
   getTenantsData,
   getAllInstances,
@@ -1448,5 +1466,6 @@ export default {
   resumeConsumptionOp,
   getPauseStatusData,
   fetchServerToSegmentsCountData,
-  getConsumingSegmentsInfoData
+  getConsumingSegmentsInfoData,
+  getPackageVersionsData
 };
