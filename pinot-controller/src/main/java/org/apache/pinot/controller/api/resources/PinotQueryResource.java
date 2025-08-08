@@ -177,7 +177,7 @@ public class PinotQueryResource {
     }
   }
 
-  private static class MultiStageQueryValidationResponse {
+  public static class MultiStageQueryValidationResponse {
     private final boolean _compiledSuccessfully;
     private final String _errorMessage;
     private final QueryErrorCode _errorCode;

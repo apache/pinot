@@ -1683,7 +1683,18 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testValidateQueryApi()
+  public void testValidateQueryApiSuccess()
+      throws Exception {
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
+            "{\"sql\": \"SELECT * FROM mytable\"}", null));
+    assertTrue(result.get("compiledSuccessfully").asBoolean());
+    assertTrue(result.get("errorCode").isNull());
+    assertTrue(result.get("errorMessage").isNull());
+  }
+
+  @Test
+  public void testValidateQueryApiError()
       throws Exception {
     JsonNode result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
@@ -1691,13 +1702,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertFalse(result.get("compiledSuccessfully").asBoolean());
     assertEquals(result.get("errorCode").asText(), QueryErrorCode.TABLE_DOES_NOT_EXIST.name());
     assertFalse(result.get("errorMessage").isNull());
-
-    result = JsonUtils.stringToJsonNode(
-        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
-            "{\"sql\": \"SELECT * FROM mytable\"}", null));
-    assertTrue(result.get("compiledSuccessfully").asBoolean());
-    assertTrue(result.get("errorCode").isNull());
-    assertTrue(result.get("errorMessage").isNull());
 
     result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
