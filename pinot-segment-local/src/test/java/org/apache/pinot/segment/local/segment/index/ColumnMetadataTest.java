@@ -270,4 +270,35 @@ public class ColumnMetadataTest {
           "Index size should be a non-negative integer value between 0 and 281474976710655");
     }
   }
+
+  @Test
+  public void testBadTimeColumnWithoutContinueOnError()
+      throws Exception {
+    SegmentGeneratorConfig config = createSegmentConfigWithCreator();
+    // column4 is not a time column and should cause an exception to be thrown when the segment is sealed and time
+    // metadata is being parsed and written
+    config.setTimeColumnName("column4");
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    Assert.assertThrows(NumberFormatException.class, driver::build);
+  }
+
+  @Test
+  public void testBadTimeColumnWithContinueOnError()
+      throws Exception {
+    SegmentGeneratorConfig config = createSegmentConfigWithCreator();
+    // column4 is not a time column and should cause an exception to be thrown when the segment is sealed and time
+    // metadata is being parsed and written
+    config.setTimeColumnName("column4");
+    config.setContinueOnError(true);
+    SegmentIndexCreationDriver driver = SegmentCreationDriverFactory.get(null);
+    driver.init(config);
+    driver.build();
+    SegmentMetadata segmentMetadata = new SegmentMetadataImpl(INDEX_DIR.listFiles()[0]);
+    // The time unit being used is hours since epoch.
+    long hoursSinceEpoch = System.currentTimeMillis() / TimeUnit.HOURS.toMillis(1);
+    // Use tolerance of 1 hour to eliminate any flakiness in the test.
+    Assert.assertTrue(hoursSinceEpoch - segmentMetadata.getStartTime() <= 1);
+    Assert.assertTrue(hoursSinceEpoch - segmentMetadata.getStartTime() <= 1);
+  }
 }
