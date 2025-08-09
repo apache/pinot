@@ -44,6 +44,8 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
 
   @Override
   public QuantileDigest getInitialAggregatedValue(Object rawValue) {
+    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index.
+    assert rawValue != null;
     QuantileDigest initialValue;
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
@@ -90,6 +92,11 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
   @Override
   public QuantileDigest cloneAggregatedValue(QuantileDigest value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return false;
   }
 
   @Override
