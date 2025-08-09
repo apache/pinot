@@ -137,6 +137,8 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
       configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
       configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
+      configs.put(RefreshSegmentTask.ENABLE_COLUMN_MAJOR_BUILD_KEY,
+              String.valueOf(taskConfigs.get(RefreshSegmentTask.ENABLE_COLUMN_MAJOR_BUILD_KEY)));
       pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
       tableNumTasks++;
     }

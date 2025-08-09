@@ -417,6 +417,45 @@ public class RefreshSegmentMinionClusterIntegrationTest extends BaseClusterInteg
     }
   }
 
+  @Test(priority = 6)
+  public void testSegmentBuildByColumn() throws Exception {
+
+    JsonNode expectedData = postQuery("select FlightNum from mytable order by FlightNum limit 1000000").get("resultTable").get("rows");
+
+    String offlineTableName = TableNameBuilder.OFFLINE.tableNameWithType(getTableName());
+    // Enable column-major build for the refresh segment task
+    TableTaskConfig taskConfig = getRefreshSegmentTaskConfig();
+    taskConfig.getConfigsForTaskType(MinionConstants.RefreshSegmentTask.TASK_TYPE)
+            .put(MinionConstants.RefreshSegmentTask.ENABLE_COLUMN_MAJOR_BUILD_KEY, "true");
+
+    // Enable inverted index for FlightNum, Origin, and Quarter
+    TableConfig tableConfig = getOfflineTableConfig();
+    IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
+    // inverted index are only present in ["DivActualElapsedTime", "Origin", "Quarter"]
+    assertTrue(postQuery("select * from mytable where FlightNum = 1 limit 10").get("numEntriesScannedInFilter").asLong() > 0L);
+    indexingConfig.setInvertedIndexColumns(Arrays.asList("FlightNum"));
+    tableConfig.setTaskConfig(taskConfig);
+    updateTableConfig(tableConfig);
+
+    // Schedule the refresh segment task
+    assertNotNull(_taskManager.scheduleTasks(new TaskSchedulingContext()
+                    .setTablesToSchedule(Collections.singleton(offlineTableName)))
+            .get(MinionConstants.RefreshSegmentTask.TASK_TYPE));
+    assertTrue(_helixTaskResourceManager.getTaskQueues()
+            .contains(PinotHelixTaskResourceManager.getHelixJobQueueName(MinionConstants.RefreshSegmentTask.TASK_TYPE)));
+    MinionTaskTestUtils.assertNoTaskSchedule(new TaskSchedulingContext()
+                    .setTablesToSchedule(Collections.singleton(offlineTableName))
+                    .setTasksToSchedule(Collections.singleton(MinionConstants.RefreshSegmentTask.TASK_TYPE)),
+            _taskManager);
+    waitForTaskToComplete();
+
+    // check data matches
+    JsonNode actualData = postQuery("select FlightNum from mytable order by FlightNum limit 1000000").get("resultTable").get("rows");
+    assertEquals(actualData, expectedData);
+    // validate index is set
+    assertEquals(postQuery("select * from mytable where FlightNum = 1 limit 10").get("numEntriesScannedInFilter").asLong(), 0L);
+  }
+
   protected void waitForTaskToComplete() {
     TestUtils.waitForCondition(input -> {
       // Check task state
