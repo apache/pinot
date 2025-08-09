@@ -52,6 +52,7 @@ import org.apache.helix.HelixManager;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.cache.SegmentQueryCacheFactory;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -99,6 +100,7 @@ import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.instance.InstanceDataManagerConfig;
+import org.apache.pinot.spi.config.table.CacheConfig;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.MultiColumnTextIndexConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
@@ -153,6 +155,9 @@ public abstract class BaseTableDataManager implements TableDataManager {
   // Caches the latest TableConfig and Schema pair. The cache should not be modified.
   protected volatile Pair<TableConfig, Schema> _cachedTableConfigAndSchema;
 
+  // Query Cache Configs
+  protected CacheConfig _cacheConfig;
+
   protected volatile boolean _shutDown;
   protected volatile boolean _isDeleted;
 
@@ -196,6 +201,16 @@ public abstract class BaseTableDataManager implements TableDataManager {
         .expireAfterWrite(instanceDataManagerConfig.getDeletedSegmentsCacheTtlMinutes(), TimeUnit.MINUTES)
         .build();
     _cachedTableConfigAndSchema = Pair.of(tableConfig, schema);
+    if (instanceDataManagerConfig.getConfig() == null || Boolean.parseBoolean(
+        instanceDataManagerConfig.getConfig().getProperty(CommonConstants.QueryCacheConfigs.QUERY_CACHE_ENABLED))) {
+      if (tableConfig.getQueryConfig() != null) {
+        _cacheConfig = tableConfig.getQueryConfig().getCacheConfig();
+      } else {
+        _cacheConfig = new CacheConfig();
+      }
+    } else {
+      _cacheConfig = new CacheConfig(false, null, 0, 0);
+    }
 
     _peerDownloadScheme = tableConfig.getValidationConfig().getPeerSegmentDownloadScheme();
     if (_peerDownloadScheme == null) {
@@ -233,7 +248,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     _logger = LoggerFactory.getLogger(_tableNameWithType + "-" + getClass().getSimpleName());
 
     doInit();
-
+    initQueryCache();
     _logger.info("Initialized table data manager with data directory: {}", _tableDataDir);
   }
 
@@ -1604,6 +1619,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
       } catch (Exception e) {
         LOGGER.warn("Failed to close SegmentDirectory due to error: {}", e.getMessage());
       }
+    }
+  }
+
+  protected void initQueryCache() {
+    if (_cacheConfig.isEnabled()) {
+      SegmentQueryCacheFactory.createQueryCache(_tableNameWithType, _cacheConfig);
     }
   }
 }
