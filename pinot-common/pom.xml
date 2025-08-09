@@ -114,6 +114,22 @@
           </execution>
         </executions>
       </plugin>
+
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.2.0</version>
+        <configuration>
+          <nonFilteredFileExtensions>
+            <nonFilteredFileExtension>mmdb</nonFilteredFileExtension>
+          </nonFilteredFileExtensions>
+          <resources>
+            <resource>
+              <directory>${project.basedir}/src/main/resources</directory>
+              <filtering>true</filtering>
+            </resource>
+          </resources>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
   <dependencies>
@@ -269,6 +285,11 @@
     <dependency>
       <groupId>com.google.auto.service</groupId>
       <artifactId>auto-service-annotations</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.maxmind.geoip2</groupId>
+      <artifactId>geoip2</artifactId>
+      <version>4.0.1</version>
     </dependency>
 
     <!-- Test -->
