@@ -144,6 +144,10 @@ public class QueryContext {
   // Collection of index types to skip per column
   private Map<String, Set<FieldConfig.IndexType>> _skipIndexes;
 
+  private int _groupByPartitionNumRadixBits = Server.DEFAULT_GROUPBY_RADIX_BITS;
+  private int _groupByNumPartitions;
+  private int _groupByPartitionThreshold = Server.DEFAULT_GROUPBY_PARTITION_THRESHOLD;
+
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
       @Nullable FilterContext filter, @Nullable List<ExpressionContext> groupByExpressions,
@@ -289,7 +293,6 @@ public class QueryContext {
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
   }
-
 
   public boolean isAccurateGroupByWithoutOrderBy() {
     return _accurateGroupByWithoutOrderBy;
@@ -490,6 +493,24 @@ public class QueryContext {
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
+  public int getGroupByPartitionThreshold() {
+    return _groupByPartitionThreshold;
+  }
+
+  public int getGroupByPartitionNumRadixBits() {
+    return _groupByPartitionNumRadixBits;
+  }
+
+  public void setGroupByPartitionNumRadixBits(int groupByPartitionNumRadixBits) {
+    _groupByPartitionNumRadixBits = groupByPartitionNumRadixBits;
+    _groupByNumPartitions = 1 << groupByPartitionNumRadixBits;
+  }
+
+  public int getGroupByNumPartitions() {
+    assert (_groupByNumPartitions == 1 << _groupByPartitionNumRadixBits);
+    return _groupByNumPartitions;
+  }
+
   public boolean isServerReturnFinalResult() {
     return _serverReturnFinalResult;
   }
@@ -667,6 +688,9 @@ public class QueryContext {
 
       queryContext._isUnsafeTrim =
           !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+
+      // TODO: parse and set _groupByNumPartitions and _groupByPartitionThreshold
+      queryContext._groupByNumPartitions = 1 << queryContext._groupByPartitionNumRadixBits;
 
       return queryContext;
     }
