@@ -56,6 +56,8 @@ public class RecordTransformerUtils {
   /// because empty Collection/Map/Object[] and invalid values can be replaced with null.
   /// - (Optional) [SanitizationTransformer] to sanitize values. It follows [NullValueTransformer] so that before
   /// sanitization, all values are non-null and follow the data types defined in the schema.
+  /// - [SchemaColumnConformingTransformer] to handle removed columns from schema. If a particular
+  /// row column is not present in the schema, it will be removed.
   public static List<RecordTransformer> getTransformers(TableConfig tableConfig, @Nullable Schema schema,
       boolean skipPreComplexTypeTransformers, boolean skipComplexTypeTransformer,
       boolean skipPostComplexTypeTransformers, boolean skipFilterTransformer) {
@@ -82,6 +84,7 @@ public class RecordTransformerUtils {
     addIfNotNoOp(transformers, new SpecialValueTransformer(schema));
     addIfNotNoOp(transformers, new NullValueTransformer(tableConfig, schema));
     addIfNotNoOp(transformers, new SanitizationTransformer(schema));
+    addIfNotNoOp(transformers, new SchemaColumnConformingTransformer(schema));
     return transformers;
   }
 
