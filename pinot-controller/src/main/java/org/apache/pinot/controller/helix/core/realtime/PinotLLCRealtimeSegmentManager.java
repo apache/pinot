@@ -171,6 +171,8 @@ public class PinotLLCRealtimeSegmentManager {
 
   // Max time to wait for all LLC segments to complete committing their metadata while stopping the controller.
   private static final long MAX_LLC_SEGMENT_METADATA_COMMIT_TIME_MILLIS = 30_000L;
+  // Timeout for calling stream metadata provider APIs
+  private static final long STREAM_FETCH_TIMEOUT_MS = 5_000L;
 
   // TODO: make this configurable with default set to 10
   /**
@@ -927,7 +929,11 @@ public class PinotLLCRealtimeSegmentManager {
       int numReplicas) {
     String realtimeTableName = tableConfig.getTableName();
     String segmentName = newLLCSegmentName.getSegmentName();
-    String startOffset = committingSegmentDescriptor.getNextOffset();
+
+    // Handle offset auto reset
+    String oldStartOffset = committingSegmentDescriptor.getNextOffset();
+    String startOffset = computeStartOffset(
+        oldStartOffset, streamConfig, newLLCSegmentName.getPartitionGroupId());
 
     LOGGER.info(
         "Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
@@ -956,6 +962,65 @@ public class PinotLLCRealtimeSegmentManager {
         getMaxNumPartitionsPerInstance(instancePartitions, numPartitions, numReplicas));
 
     persistSegmentZKMetadata(realtimeTableName, newSegmentZKMetadata, -1);
+  }
+
+  private String computeStartOffset(String nextOffset, StreamConfig streamConfig, int partitionId) {
+    if (!streamConfig.isEnableOffsetAutoReset()) {
+      return nextOffset;
+    }
+    long timeThreshold = streamConfig.getOffsetAutoResetTimeSecThreshold();
+    int offsetThreshold = streamConfig.getOffsetAutoResetOffsetThreshold();
+    if (timeThreshold <= 0 && offsetThreshold <= 0) {
+      LOGGER.warn("Invalid offset auto reset configuration for table: {}, topic: {}. "
+              + "timeThreshold: {}, offsetThreshold: {}",
+          streamConfig.getTableNameWithType(), streamConfig.getTopicName(), timeThreshold, offsetThreshold);
+      return nextOffset;
+    }
+    String clientId =
+        PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
+            + streamConfig.getTopicName();
+    StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    StreamPartitionMsgOffsetFactory offsetFactory = consumerFactory.createStreamMsgOffsetFactory();
+    StreamPartitionMsgOffset nextOffsetWithType = offsetFactory.create(nextOffset);
+    StreamPartitionMsgOffset offsetAtSLA;
+    StreamPartitionMsgOffset latestOffset;
+    try (StreamMetadataProvider metadataProvider = consumerFactory.createPartitionMetadataProvider(clientId,
+        partitionId)) {
+      // Fetching timestamp from an offset is an expensive operation which requires reading the data,
+      // while fetching offset from timestamp is lightweight and only needs to read metadata.
+      // Hence, instead of checking if latestOffset's time - nextOffset's time < SLA, we would check
+      // (CurrentTime - SLA)'s offset > nextOffset.
+      // TODO: it is relying on System.currentTimeMillis() which might be affected by time drift. If we are able to
+      // get nextOffset's time, we should instead check (nextOffset's time + SLA)'s offset < latestOffset
+      latestOffset = metadataProvider.fetchStreamPartitionOffset(
+          OffsetCriteria.LARGEST_OFFSET_CRITERIA, STREAM_FETCH_TIMEOUT_MS);
+      LOGGER.info("Latest offset of topic {} and partition {} is {}", streamConfig.getTopicName(), partitionId,
+          latestOffset);
+      offsetAtSLA =
+          metadataProvider.getOffsetAtTimestamp(partitionId, System.currentTimeMillis() - timeThreshold * 1000,
+              STREAM_FETCH_TIMEOUT_MS);
+      LOGGER.info("Offset at SLA of topic {} and partition {} is {}", streamConfig.getTopicName(), partitionId,
+          offsetAtSLA);
+    } catch (Exception e) {
+      LOGGER.warn("Not able to fetch the offset metadata, skip auto resetting offsets", e);
+      return nextOffset;
+    }
+    try {
+      if (timeThreshold > 0 && offsetAtSLA != null && offsetAtSLA.compareTo(nextOffsetWithType) < 0) {
+        LOGGER.info("Auto reset offset from {} to {} on partition {} because time threshold reached", nextOffset,
+            latestOffset, partitionId);
+        return latestOffset.toString();
+      }
+      if (offsetThreshold > 0
+          && Long.parseLong(latestOffset.toString()) - Long.parseLong(nextOffset) > offsetThreshold) {
+        LOGGER.info("Auto reset offset from {} to {} on partition {} because number of offsets threshold reached",
+            nextOffset, latestOffset, partitionId);
+        return latestOffset.toString();
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Not able to compare the offsets, skip auto resetting offsets", e);
+    }
+    return nextOffset;
   }
 
   @Nullable
@@ -1707,8 +1772,8 @@ public class PinotLLCRealtimeSegmentManager {
     LLCSegmentName newLLCSegmentName = getNextLLCSegmentName(latestLLCSegmentName, currentTimeMs);
     CommittingSegmentDescriptor committingSegmentDescriptor =
         new CommittingSegmentDescriptor(latestSegmentZKMetadata.getSegmentName(), startOffset.toString(), 0);
-    createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs, committingSegmentDescriptor,
-        latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
+    createNewSegmentZKMetadata(tableConfig, streamConfig, newLLCSegmentName, currentTimeMs,
+        committingSegmentDescriptor, latestSegmentZKMetadata, instancePartitions, numPartitions, numReplicas);
     String newSegmentName = newLLCSegmentName.getSegmentName();
     updateInstanceStatesForNewConsumingSegment(instanceStatesMap, null, newSegmentName, segmentAssignment,
         instancePartitionsMap);
