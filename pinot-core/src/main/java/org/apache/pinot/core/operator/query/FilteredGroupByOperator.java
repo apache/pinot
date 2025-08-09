@@ -187,48 +187,50 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // - There are more groups than the trim size
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
+    // TODO: extract common logic with GroupByOperator
     int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
     int trimSize = -1;
-    if (!_queryContext.isUnsafeTrim()) {
+    boolean unsafeTrim = _queryContext.isUnsafeTrim();
+    if (!unsafeTrim) {
       trimSize = _queryContext.getLimit();
     } else if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
       trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
     }
-    if (trimSize > 0) {
-      if (groupKeyGenerator.getNumKeys() > trimSize) {
-        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        List<IntermediateRecord> intermediateRecords =
-            tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
-        // Release the resources used by the group key generator
-        groupKeyGenerator.close();
 
-        ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
-        boolean unsafeTrim = _queryContext.isUnsafeTrim(); // set trim flag only if it's not safe
-        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
-        resultsBlock.setGroupsTrimmed(unsafeTrim);
-        resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
-        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
-        return resultsBlock;
-      }
-      if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
-        // if orderBy groupBy key, sort the array even if it's smaller than trimSize
-        // to benefit combining
-        TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        List<IntermediateRecord> intermediateRecords =
-            tableResizer.sortInSegmentResults(groupKeyGenerator,
-                groupByResultHolders, trimSize);
-        groupKeyGenerator.close();
-        GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
-        resultsBlock.setGroupsTrimmed(false);
-        resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
-        resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
-        return resultsBlock;
-      }
+    GroupByResultsBlock resultsBlock;
+    // sort and trim segment results if needed
+    if (trimSize > 0 && groupKeyGenerator.getNumKeys() > trimSize) {
+      TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+      // get sorted output if sort-aggregate
+      List<IntermediateRecord> intermediateRecords =
+          tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize, !unsafeTrim);
+      // Release the resources used by the group key generator
+      groupKeyGenerator.close();
+
+      ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
+      resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
+      // set trim flag only if it's not safe
+      resultsBlock.setGroupsTrimmed(unsafeTrim);
+      resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
+      resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
+      return resultsBlock;
     }
 
-    AggregationGroupByResult aggGroupByResult =
-        new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
-    GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
+    // when no trim needed
+    if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
+      // if orderBy groupBy key, sort the array even if it's smaller than trimSize
+      // to benefit combining
+      TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
+      List<IntermediateRecord> intermediateRecords =
+          tableResizer.sortInSegmentResults(groupKeyGenerator,
+              groupByResultHolders, trimSize);
+      groupKeyGenerator.close();
+      resultsBlock = new GroupByResultsBlock(_dataSchema, intermediateRecords, _queryContext);
+    } else {
+      AggregationGroupByResult aggGroupByResult =
+          new AggregationGroupByResult(groupKeyGenerator, _aggregationFunctions, groupByResultHolders);
+      resultsBlock = new GroupByResultsBlock(_dataSchema, aggGroupByResult, _queryContext);
+    }
     resultsBlock.setNumGroupsLimitReached(numGroupsLimitReached);
     resultsBlock.setNumGroupsWarningLimitReached(numGroupsWarningLimitReached);
     return resultsBlock;

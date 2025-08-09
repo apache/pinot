@@ -34,8 +34,4 @@ public class IntermediateRecord {
     _record = record;
     _values = values;
   }
-
-  static IntermediateRecord createForTest(Key key, Record record, Comparable[] values) {
-    return new IntermediateRecord(key, record, values);
-  }
 }

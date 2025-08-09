@@ -64,7 +64,7 @@ public class OrderByComparatorFactory {
   }
 
   /**
-   * get orderBy expressions on the groupBy keys when orderBy keys match groupBy keys
+   * Get orderBy expressions on the groupBy keys when orderBy keys match groupBy keys
    */
   public static Comparator<Record> getRecordKeyComparator(List<OrderByExpressionContext> orderByExpressions,
       List<ExpressionContext> groupByExpressions, boolean nullHandlingEnabled) {
@@ -84,22 +84,22 @@ public class OrderByComparatorFactory {
   }
 
   /**
-   * orderby expression with an index with respect to its position in the group keys
+   * Orderby expression with an index with respect to its position in the group keys
    */
-  public static class OrderByExpressionWithIndex {
-    OrderByExpressionContext _orderByExpressionContext;
-    Integer _index;
+  private static class OrderByExpressionWithIndex {
+    final OrderByExpressionContext _orderByExpressionContext;
+    final int _index;
 
-    OrderByExpressionWithIndex(OrderByExpressionContext orderByExpressionContext, Integer index) {
+    OrderByExpressionWithIndex(OrderByExpressionContext orderByExpressionContext, int index) {
       _orderByExpressionContext = orderByExpressionContext;
       _index = index;
     }
   }
 
   /**
-   * add an index for each orderby expression with respect to its position in the group keys
+   * Add an index for each orderby expression with respect to its position in the group keys
    */
-  public static List<OrderByExpressionWithIndex> getGroupKeyOrderByExpressionFromRowOrderByExpressions(
+  private static List<OrderByExpressionWithIndex> getGroupKeyOrderByExpressionFromRowOrderByExpressions(
       List<OrderByExpressionContext> rowOrderByExpressions, List<ExpressionContext> groupByExpressions) {
     Map<String, Integer> groupByExpressionIndexMap = getGroupByExpressionIndexMap(groupByExpressions);
     List<OrderByExpressionWithIndex> result = new ArrayList<>();
@@ -111,14 +111,10 @@ public class OrderByComparatorFactory {
   }
 
   /**
-   * get comparator that applies list of orderByExpressions that each has a column index
-   *
-   * @param orderByExpressions
-   * @param nullHandlingEnabled
-   * @return
+   * Get comparator that applies list of orderByExpressions that each has a column index
    */
   @SuppressWarnings({"rawtypes", "unchecked"})
-  public static Comparator<Object[]> getComparatorWithIndex(List<OrderByExpressionWithIndex> orderByExpressions,
+  private static Comparator<Object[]> getComparatorWithIndex(List<OrderByExpressionWithIndex> orderByExpressions,
       boolean nullHandlingEnabled) {
     int expressionSize = orderByExpressions.size();
 

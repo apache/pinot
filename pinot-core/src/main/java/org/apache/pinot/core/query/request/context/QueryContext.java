@@ -135,8 +135,8 @@ public class QueryContext {
   // Threshold to use sort aggregate for safeTrim case when LIMIT is below this
   private int _sortAggregateLimitThreshold = Server.DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD;
   // Threshold of number of segments to combine to use single-threaded sequential combine instead pair-wise
-  // This is defaulted to number of available cores
-  private int _sortAggregateSingleThreadedNumSegmentsThreshold = Runtime.getRuntime().availableProcessors();
+  private int _sortAggregateSequentialCombineNumSegmentsThreshold =
+      Server.DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -288,10 +288,12 @@ public class QueryContext {
    * Returns {@code true} if the query is an EXPLAIN query, {@code false} otherwise.
    * <p>
    * This is just an alias on top of {@link #getExplain() != ExplainMode.NONE}
+   *
    */
   public boolean isExplain() {
     return _explain != ExplainMode.NONE;
   }
+
 
   public boolean isAccurateGroupByWithoutOrderBy() {
     return _accurateGroupByWithoutOrderBy;
@@ -317,8 +319,7 @@ public class QueryContext {
   }
 
   /**
-   * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any
-   * aggregation.
+   * Returns the filtered aggregation functions for a query, or {@code null} if the query does not have any aggregation.
    */
   @Nullable
   public List<Pair<AggregationFunction, FilterContext>> getFilteredAggregationFunctions() {
@@ -508,23 +509,24 @@ public class QueryContext {
     return _sortAggregateLimitThreshold;
   }
 
-  public void setSortAggregateSingleThreadedNumSegmentsThreshold(int sortAggregateSingleThreadedNumSegmentsThreshold) {
-    _sortAggregateSingleThreadedNumSegmentsThreshold = sortAggregateSingleThreadedNumSegmentsThreshold;
+  public void setSortAggregateSequentialCombineNumSegmentsThreshold(
+      int sortAggregateSequentialCombineNumSegmentsThreshold) {
+    _sortAggregateSequentialCombineNumSegmentsThreshold =
+        sortAggregateSequentialCombineNumSegmentsThreshold;
   }
 
-  public int getSortAggregateSingleThreadedNumSegmentsThreshold() {
-    return _sortAggregateSingleThreadedNumSegmentsThreshold;
+  public int getSortAggregateSequentialCombineNumSegmentsThreshold() {
+    return _sortAggregateSequentialCombineNumSegmentsThreshold;
   }
 
   /**
-   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared within
-   * the scope of a query.
-   *
-   * @param type   the type of the value produced, guarantees type pollution is impossible.
-   * @param key    the key used to determine if the value has already been computed.
+   * Gets or computes a value of type {@code V} associated with a key of type {@code K} so that it can be shared
+   * within the scope of a query.
+   * @param type the type of the value produced, guarantees type pollution is impossible.
+   * @param key the key used to determine if the value has already been computed.
    * @param mapper A function to apply the first time a key is encountered to construct the value.
-   * @param <K>    the key type
-   * @param <V>    the value type
+   * @param <K> the key type
+   * @param <V> the value type
    * @return the shared value
    */
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
@@ -560,6 +562,18 @@ public class QueryContext {
 
   public boolean isUnsafeTrim() {
     return _isUnsafeTrim;
+  }
+
+  /**
+   * do sort aggregate when is safeTrim (order by group keys with no having clause)
+   * and limit is smaller than threshold
+   * TODO: we also want to do sort aggregate under order by group key with having case,
+   *   in this case we can check if the calculated Server trimSize is < sortAggregateLimitThreshold
+   *   if so, we do sort aggregate and trim to trimSize during combine.
+   *   This requires extracting Server trimSize calculation logic into QueryContext as pre-req
+   */
+  public boolean shouldSortAggregateUnderSafeTrim() {
+    return !isUnsafeTrim() && getLimit() < getSortAggregateLimitThreshold();
   }
 
   public static class Builder {
@@ -684,14 +698,14 @@ public class QueryContext {
         queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
       }
 
-      // sortAggregateSingleThreadedNumSegmentsThreshold is defaulted to hardware concurrency
+      // sortAggregateSequentialCombineNumSegmentsThreshold is defaulted to hardware concurrency
       // if not specified. this allows one more parallel thread (the main thread) to do only combine
       // while other worker threads process segments
-      Integer sortAggregateSingleThreadedNumSegmentsThreshold =
-          QueryOptionsUtils.getSortAggregateSingleThreadedNumSegmentsThreshold(_queryOptions);
-      if (sortAggregateSingleThreadedNumSegmentsThreshold != null) {
-        queryContext.setSortAggregateSingleThreadedNumSegmentsThreshold(
-            sortAggregateSingleThreadedNumSegmentsThreshold);
+      Integer sortAggregateSequentialCombineNumSegmentsThreshold =
+          QueryOptionsUtils.getSortAggregateSequentialCombineNumSegmentsThreshold(_queryOptions);
+      if (sortAggregateSequentialCombineNumSegmentsThreshold != null) {
+        queryContext.setSortAggregateSequentialCombineNumSegmentsThreshold(
+            sortAggregateSequentialCombineNumSegmentsThreshold);
       }
 
       return queryContext;

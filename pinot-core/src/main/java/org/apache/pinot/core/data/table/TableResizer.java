@@ -346,7 +346,7 @@ public class TableResizer {
    * This method is to be called from individual segment if the intermediate results need to be trimmed.
    */
   public List<IntermediateRecord> trimInSegmentResults(GroupKeyGenerator groupKeyGenerator,
-      GroupByResultHolder[] groupByResultHolders, int size) {
+      GroupByResultHolder[] groupByResultHolders, int size, boolean sortedOutput) {
     // Should not reach here when numGroups <= heap size because there is no need to create a heap
     assert groupKeyGenerator.getNumKeys() > size;
     Iterator<GroupKeyGenerator.GroupKey> groupKeyIterator = groupKeyGenerator.getGroupKeys();
@@ -366,6 +366,10 @@ public class TableResizer {
         heap[0] = intermediateRecord;
         downHeap(heap, size, 0, comparator);
       }
+    }
+
+    if (!sortedOutput) {
+      return Arrays.asList(heap);
     }
 
     for (int i = heap.length; i > 0; i--) {

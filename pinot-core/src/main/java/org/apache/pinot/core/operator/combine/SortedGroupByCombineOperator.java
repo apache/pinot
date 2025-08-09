@@ -44,7 +44,22 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Combine operator for group-by queries.
+ * <p>Pair-wise Combine operator for sort-aggregation</p>
+ *
+ * <p>In this algorithm, an {@link AtomicReference} is used as a "pit" to store
+ * the processed {@link SortedRecordTable} to be merged.</p>
+ *
+ * <p>Each worker thread first processes a segment to a {@link SortedRecordTable},
+ * then greedily take waiting tables from the pit and merge them in, until there
+ * is no table waiting, then the merged table is placed in the pit. The worker
+ * thread then proceed to process the next segment.</p>
+ *
+ * <p>When there is a table that merged together {@code _numOperators} tables, it
+ * is put into {@code _satisfiedTable} as the combine result.</p>
+ *
+ * <p>This pair-wise approach allows higher level of parallelism for the first rounds
+ * of combine, while keeping the processing in a streaming fashion without
+ * having to wait for all segments to be ready.</p>
  */
 @SuppressWarnings("rawtypes")
 public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
@@ -68,7 +83,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
       ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
-    assert (GroupByUtils.shouldSortAggregateUnderSafeTrim(queryContext));
+    assert (queryContext.shouldSortAggregateUnderSafeTrim());
     _operatorLatch = new CountDownLatch(_numTasks);
     _waitingTable = new AtomicReference<>();
     _satisfiedTable = new AtomicReference<>();

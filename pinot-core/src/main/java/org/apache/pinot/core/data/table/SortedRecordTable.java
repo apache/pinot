@@ -36,13 +36,14 @@ import org.apache.pinot.core.util.trace.TraceCallable;
 
 
 /**
- * Util class used for merging of sorted group-by aggregation
+ * Table used for merging of sorted group-by aggregation
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class SortedRecordTable extends BaseTable {
   private final ExecutorService _executorService;
-  protected final int _resultSize;
-  protected final int _numKeyColumns;
-  protected final AggregationFunction[] _aggregationFunctions;
+  private final int _resultSize;
+  private final int _numKeyColumns;
+  private final AggregationFunction[] _aggregationFunctions;
 
   protected Record[] _topRecords;
 
@@ -51,8 +52,8 @@ public class SortedRecordTable extends BaseTable {
   private final int _desiredNumMergedBlocks;
   private int _nextIdx;
   private final Comparator<Record> _comparator;
-  protected final int _numThreadsExtractFinalResult;
-  protected final int _chunkSizeExtractFinalResult;
+  private final int _numThreadsExtractFinalResult;
+  private final int _chunkSizeExtractFinalResult;
 
   public SortedRecordTable(DataSchema dataSchema, QueryContext queryContext, int resultSize,
       ExecutorService executorService,
@@ -218,7 +219,7 @@ public class SortedRecordTable extends BaseTable {
     finalizeRecordMerge(newRecords, newNextIdx);
   }
 
-  protected Record updateRecord(Record existingRecord, Record newRecord) {
+  private Record updateRecord(Record existingRecord, Record newRecord) {
     Object[] existingValues = existingRecord.getValues();
     Object[] newValues = newRecord.getValues();
     int numAggregations = _aggregationFunctions.length;
@@ -245,6 +246,7 @@ public class SortedRecordTable extends BaseTable {
   }
 
   // copied from IndexedTable, but always _hasOrderBy
+  // TODO: extract common logic between this and IndexedTable to BaseTable
   @Override
   public void finish(boolean sort, boolean storeFinalResult) {
     _topRecords = _records;

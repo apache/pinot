@@ -38,7 +38,6 @@ import org.apache.pinot.core.operator.streaming.StreamingSelectionOnlyCombineOpe
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.QueryCancelledException;
@@ -137,8 +136,8 @@ public class CombinePlanNode implements PlanNode {
           return new AggregationCombineOperator(operators, _queryContext, _executorService);
         } else {
           // Sorted aggregation group-by, when safeTrim and limit is not too large
-          if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
-            if (operators.size() < _queryContext.getSortAggregateSingleThreadedNumSegmentsThreshold()) {
+          if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
+            if (operators.size() < _queryContext.getSortAggregateSequentialCombineNumSegmentsThreshold()) {
               return new SequentialSortedGroupByCombineOperator(operators, _queryContext, _executorService);
             }
             return new SortedGroupByCombineOperator(operators, _queryContext, _executorService);

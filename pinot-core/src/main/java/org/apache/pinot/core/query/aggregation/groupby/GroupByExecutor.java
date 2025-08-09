@@ -55,7 +55,7 @@ public interface GroupByExecutor {
    * <p>Should be called after all transform blocks has been processed.
    *
    */
-  List<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer);
+  List<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer, boolean sortedOutput);
 
   GroupKeyGenerator getGroupKeyGenerator();
 

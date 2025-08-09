@@ -338,29 +338,41 @@ public class TableResizerTest {
     TableResizer tableResizer =
         new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "d3 DESC"));
     List<IntermediateRecord> results =
-        tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
+        tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE, false);
     assertEquals(results.size(), TRIM_TO_SIZE);
     //  _records[4],  _records[3],  _records[2]
-    assertEquals(results.get(0)._record, _records.get(4));
-    assertEquals(results.get(1)._record, _records.get(3));
-    assertEquals(results.get(2)._record, _records.get(2));
+    assertEquals(results.get(0)._record, _records.get(2));
+    if (results.get(1)._record.equals(_records.get(3))) {
+      assertEquals(results.get(2)._record, _records.get(4));
+    } else {
+      assertEquals(results.get(1)._record, _records.get(4));
+      assertEquals(results.get(2)._record, _records.get(3));
+    }
 
     tableResizer = new TableResizer(DATA_SCHEMA, QueryContextConverterUtils.getQueryContext(
         QUERY_PREFIX + "SUM(m1) DESC, max(m2) DESC, DISTINCTCOUNT(m3) DESC"));
-    results = tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
+    results = tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE, false);
     assertEquals(results.size(), TRIM_TO_SIZE);
     // _records[2],  _records[3],  _records[1]
-    assertEquals(results.get(0)._record, _records.get(2));
-    assertEquals(results.get(1)._record, _records.get(3));
-    assertEquals(results.get(2)._record, _records.get(1));
+    assertEquals(results.get(0)._record, _records.get(1));
+    if (results.get(1)._record.equals(_records.get(3))) {
+      assertEquals(results.get(2)._record, _records.get(2));
+    } else {
+      assertEquals(results.get(1)._record, _records.get(2));
+      assertEquals(results.get(2)._record, _records.get(3));
+    }
 
     tableResizer = new TableResizer(DATA_SCHEMA,
         QueryContextConverterUtils.getQueryContext(QUERY_PREFIX + "DISTINCTCOUNT(m3) DESC, AVG(m4) ASC"));
-    results = tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE);
+    results = tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, TRIM_TO_SIZE, false);
     assertEquals(results.size(), TRIM_TO_SIZE);
     // _records[4],  _records[3],  _records[1]
-    assertEquals(results.get(0)._record, _records.get(4));
-    assertEquals(results.get(1)._record, _records.get(3));
-    assertEquals(results.get(2)._record, _records.get(1));
+    assertEquals(results.get(0)._record, _records.get(1));
+    if (results.get(1)._record.equals(_records.get(3))) {
+      assertEquals(results.get(2)._record, _records.get(4));
+    } else {
+      assertEquals(results.get(1)._record, _records.get(4));
+      assertEquals(results.get(2)._record, _records.get(3));
+    }
   }
 }

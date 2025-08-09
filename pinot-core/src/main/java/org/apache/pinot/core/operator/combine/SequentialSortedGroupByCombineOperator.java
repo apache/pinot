@@ -37,7 +37,19 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Combine operator for group-by queries.
+ * <p>Sequential Combine operator for sort-aggregation</p>
+ *
+ * <p>This operator merges sorted group-by results similar to other
+ * {@link BaseSingleBlockCombineOperator}s,
+ * as it uses a producer-consumer paradigm.</p>
+ *
+ * <p>Each worker thread produces sorted segment-level group-by results
+ * while the main thread consumer via a {@code _blockingQueue} and merges them</p>
+ *
+ * <p>This allows merging in a streaming fashion without having to wait
+ * for all segments to be ready. This sequential merging is usually
+ * more efficient than the pair-size merging {@link SortedGroupByCombineOperator}
+ * when the number of segments is smaller than the available number of cores</p>
  */
 @SuppressWarnings("rawtypes")
 public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
@@ -58,7 +70,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
       ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
-    assert (GroupByUtils.shouldSortAggregateUnderSafeTrim(queryContext));
+    assert (queryContext.shouldSortAggregateUnderSafeTrim());
     _recordKeyComparator = OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
         queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
   }

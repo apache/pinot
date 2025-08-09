@@ -80,7 +80,7 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
     _operatorLatch = new CountDownLatch(_numTasks);
-    assert (!GroupByUtils.shouldSortAggregateUnderSafeTrim(queryContext));
+    assert (!queryContext.shouldSortAggregateUnderSafeTrim());
   }
 
   /**

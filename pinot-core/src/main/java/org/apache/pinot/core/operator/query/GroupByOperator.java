@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.IntermediateRecord;
@@ -141,12 +140,11 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     //       columns if no ordering is specified.
     int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
     int trimSize = -1;
-    List<OrderByExpressionContext> orderByExpressions = _queryContext.getOrderByExpressions();
     boolean unsafeTrim = _queryContext.isUnsafeTrim();
     if (!unsafeTrim) {
       // if orderby key is groupby key, and there's no having clause, keep at most `limit` rows only
       trimSize = _queryContext.getLimit();
-    } else if (orderByExpressions != null && minGroupTrimSize > 0) {
+    } else if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
       // max(minSegmentGroupTrimSize, 5 * LIMIT)
       trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
     }
@@ -156,7 +154,8 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     if (trimSize > 0 && groupByExecutor.getNumGroups() > trimSize) {
       TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
       // intermediateRecords is always sorted after trim
-      List<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+      List<IntermediateRecord> intermediateRecords =
+          groupByExecutor.trimGroupByResult(trimSize, tableResizer, !unsafeTrim);
       // close groupKeyGenerator after getting intermediateRecords
       groupByExecutor.getGroupKeyGenerator().close();
 
@@ -170,7 +169,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     // when no trim needed
-    if (GroupByUtils.shouldSortAggregateUnderSafeTrim(_queryContext)) {
+    if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
       // if sort-aggregate, sort the array even if it's smaller than trimSize
       // to benefit combining. This is not very large overhead since the
       // limit threshold of sort-aggregate is small
