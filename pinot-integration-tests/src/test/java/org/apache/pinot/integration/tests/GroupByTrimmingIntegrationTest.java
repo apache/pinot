@@ -232,7 +232,7 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     // Assert col3 of all data rows is 4
     for (int i = 1; i < lines.length; i++) {
       String[] cols = lines[i].split("\t");
-      assertEquals("4", cols[2]);
+      assertEquals(cols[2], "4");
     }
 
 

@@ -212,10 +212,10 @@ abstract public class BaseFunnelCountQueriesTest extends BaseQueriesTest {
     QueriesTestUtils.testInnerSegmentExecutionStatistics(groupByOperator.getExecutionStatistics(),
         expectedFilteredNumDocs, getExpectedNumEntriesScannedInFilter(), 2 * expectedFilteredNumDocs, NUM_RECORDS);
 
-    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
-    assertNotNull(aggregationGroupByResult);
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
     int numGroups = 0;
-    Iterator<IntermediateRecord> groupKeyIterator = aggregationGroupByResult.iterator();
+    Iterator<IntermediateRecord> groupKeyIterator = resultRecords.iterator();
     while (groupKeyIterator.hasNext()) {
       numGroups++;
       IntermediateRecord record = groupKeyIterator.next();

@@ -218,21 +218,19 @@ public class HistogramQueriesTest extends BaseQueriesTest {
     GroupByResultsBlock resultsBlock = ((GroupByOperator) operator).nextBlock();
     QueriesTestUtils.testInnerSegmentExecutionStatistics(((Operator) operator).getExecutionStatistics(), NUM_RECORDS, 0,
         NUM_RECORDS * 2, NUM_RECORDS);
-    List<IntermediateRecord> aggregationGroupByResult = resultsBlock.getIntermediateRecords();
-    IntermediateRecord firstRecord = aggregationGroupByResult.get(0);
-//    AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
-    assertNotNull(aggregationGroupByResult);
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(0)._record.getValues()[1]).elements(),
+    List<IntermediateRecord> resultRecords = resultsBlock.getIntermediateRecords();
+    assertNotNull(resultRecords);
+    assertEquals(((DoubleArrayList) resultRecords.get(0)._record.getValues()[1]).elements(),
         new double[]{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [0]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(1)._record.getValues()[1]).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(1)._record.getValues()[1]).elements(),
         new double[]{99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [1-400]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(2)._record.getValues()[1]).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(2)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}); // [401-800]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(3)._record.getValues()[1]).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(3)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0, 0, 0, 0, 0}); // [801-1200]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(4)._record.getValues()[1]).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(4)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100, 1, 0, 0, 0}); // [1201-1600]
-    assertEquals(((DoubleArrayList) aggregationGroupByResult.get(5)._record.getValues()[1]).elements(),
+    assertEquals(((DoubleArrayList) resultRecords.get(5)._record.getValues()[1]).elements(),
         new double[]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 99, 100, 100, 100}); // [1601-2000]
 
     // Inter segment
