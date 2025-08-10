@@ -579,7 +579,7 @@ public class S3PinotFS extends BasePinotFS {
           listObjectsV2Response = retryWithS3CredentialRefresh(() -> _s3Client.listObjectsV2(listObjectsV2Request));
         } else {
           ListObjectsV2Request listObjectsV2Request = listObjectsV2RequestBuilder.prefix(prefix).build();
-          listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
+          listObjectsV2Response = retryWithS3CredentialRefresh(() -> _s3Client.listObjectsV2(listObjectsV2Request));
         }
         boolean deleteSucceeded = true;
         for (S3Object s3Object : listObjectsV2Response.contents()) {
