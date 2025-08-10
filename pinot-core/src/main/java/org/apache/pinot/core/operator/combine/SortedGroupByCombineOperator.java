@@ -139,17 +139,10 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
           );
           break;
         }
-        // save one call to getAndPopulateLinkedHashMapIndexedTable
-        //  by merging the current block in if there is a waitingTable
-        SortedRecordTable waitingTable = _waitingTable.getAndUpdate(v -> v == null
-            ? GroupByUtils.getAndPopulateSortedRecordTable(resultsBlock, _queryContext,
-            _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator)
-            : null);
-        if (waitingTable == null) {
-          continue;
-        }
-        SortedRecordTable table = mergeBlocks(waitingTable, resultsBlock);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+
+        SortedRecordTable table =
+            GroupByUtils.getAndPopulateSortedRecordTable(resultsBlock, _queryContext,
+            _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator);
 
         while (true) {
           if (_satisfiedTable.get() != null) {
@@ -160,7 +153,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
             return;
           }
           SortedRecordTable finalTable = table;
-          waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
+          SortedRecordTable waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
           if (waitingTable == null) {
             break;
           }
