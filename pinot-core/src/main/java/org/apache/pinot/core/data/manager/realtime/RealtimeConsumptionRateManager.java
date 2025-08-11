@@ -197,10 +197,10 @@ public class RealtimeConsumptionRateManager {
   }
 
   /**
-   * Tracks quota utilization for a stream consumer by aggregating the number of messages consumed and computing
-   * the consumption rate against the configured rate limit.
+   * Tracks quota utilization for a stream consumer by aggregating the number of units (messages or bytes) consumed
+   * and computing the consumption rate against the configured rate limit.
    * <p>
-   * This class maintains the message count over time and computes the quota utilization ratio once per minute.
+   * This class maintains the unit count over time and computes the quota utilization ratio once per minute.
    * The utilization is reported as a gauge metric to {@link ServerMetrics}.
    * <p>
    * Note: This class is not thread-safe and is intended to be used in contexts where concurrency control is
@@ -231,7 +231,7 @@ public class RealtimeConsumptionRateManager {
         _aggregateUnits += unitsConsumed;
       } else {
         if (_previousMinute != -1) { // not first time
-          double actualRate = _aggregateUnits / ((nowInMinutes - _previousMinute) * 60.0); // messages per second
+          double actualRate = _aggregateUnits / ((nowInMinutes - _previousMinute) * 60.0); // units per second
           ratioPercentage = (int) Math.round(actualRate / rateLimit * 100);
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
               ratioPercentage);
