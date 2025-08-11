@@ -96,28 +96,22 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
-    if (!_isRightChildOperatorProcessed) {
-      MseBlock mseBlock = null;
-
-      while (mseBlock == null && !_isRightChildOperatorProcessed) {
-        mseBlock = processRightOperator();
-      }
-
-      if (mseBlock != null) {
-        if (mseBlock.isData()) {
-          return mseBlock;
-        } else if (mseBlock.isError()) {
-          _eos = (MseBlock.Eos) mseBlock;
-          return _eos;
-        } else if (mseBlock.isSuccess()) {
-          // If it's a regular EOS block, we continue to process the left child operator.
-          _isRightChildOperatorProcessed = true;
-        }
-      }
-    }
-
     if (_eos != null) {
       return _eos;
+    }
+
+    if (!_isRightChildOperatorProcessed) {
+      MseBlock mseBlock = processRightOperator();
+
+      if (mseBlock.isData()) {
+        return mseBlock;
+      } else if (mseBlock.isError()) {
+        _eos = (MseBlock.Eos) mseBlock;
+        return _eos;
+      } else if (mseBlock.isSuccess()) {
+        // If it's a regular EOS block, we continue to process the left child operator.
+        _isRightChildOperatorProcessed = true;
+      }
     }
 
     MseBlock mseBlock = processLeftOperator();
@@ -133,8 +127,7 @@ public abstract class SetOperator extends MultiStageOperator {
    * Processes the right child operator and build the set of rows that can be used to filter the left child. This method
    * can be overridden to also be able to return data blocks while processing the right operator.
    *
-   * @return null if no blocks are to be returned from processing the right operator (but there are still blocks left to
-   * be processed), or else a data / EoS block.
+   * @return either a data block containing rows or an EoS block, never {@code null}.
    */
   protected MseBlock processRightOperator() {
     MseBlock block = _rightChildOperator.nextBlock();

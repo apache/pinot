@@ -48,6 +48,7 @@
       { "sql": "SELECT intCol FROM {tbl1} UNION ALL SELECT intCol FROM {tbl2}"},
       { "sql": "SELECT intCol FROM {tbl1} INTERSECT SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}", "ignoreV2Optimizer":  true},
       { "sql": "SELECT intCol FROM {tbl1} UNION SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}", "ignoreV2Optimizer":  true},
+      { "sql": "SELECT intCol FROM {tbl1} UNION SELECT intCol FROM {tbl2} UNION (SELECT intCol FROM {tbl1} WHERE intCol > 2)", "ignoreV2Optimizer":  true},
       { "sql": "SELECT intCol FROM {tbl1} UNION SELECT intCol FROM {tbl2} UNION ALL SELECT intCol FROM {tbl1}"},
       { "sql": "SELECT intCol FROM {tbl1} UNION SELECT intCol FROM {tbl2} INTERSECT SELECT intCol FROM {tbl1}"},
       { "sql": "SELECT intCol FROM {tbl1} UNION SELECT intCol FROM {tbl2} EXCEPT SELECT intCol FROM {tbl1}"},
