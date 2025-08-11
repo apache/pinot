@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.combine;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -48,6 +49,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
+import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -85,6 +87,15 @@ public class SortedGroupByCombineOperatorsTest {
     for (int i = 0; i < NUM_SEGMENTS; i++) {
       _indexSegments.add(createOfflineSegment(i));
     }
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    for (IndexSegment indexSegment : _indexSegments) {
+      indexSegment.destroy();
+    }
+    FileUtils.deleteDirectory(TEMP_DIR);
   }
 
   private IndexSegment createOfflineSegment(int index)
@@ -159,6 +170,18 @@ public class SortedGroupByCombineOperatorsTest {
   }
 
   @Test
+  public void testSafeTrimPairWiseEmptyCombine() {
+    GroupByResultsBlock combineResult = getPairWiseCombineResult(
+        "SELECT intColumn, COUNT(*) FROM testTable WHERE intColumn < 0 "
+            + "GROUP BY intColumn ORDER BY intColumn LIMIT 100");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+    assertEquals(combineResult.getRows().size(), 0);
+    assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+  }
+
+  @Test
   public void testSafeTrimSequentialCombineLimit0() {
     GroupByResultsBlock combineResult = getSequentialCombineResult(
         "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY intColumn LIMIT 0");
@@ -204,6 +227,18 @@ public class SortedGroupByCombineOperatorsTest {
       assertEquals(row[0], i);
       assertEquals(row[1], 1L);
     }
+  }
+
+  @Test
+  public void testSafeSequentialEmptyCombine() {
+    GroupByResultsBlock combineResult = getSequentialCombineResult(
+        "SELECT intColumn, COUNT(*) FROM testTable WHERE intColumn < 0 "
+            + "GROUP BY intColumn ORDER BY intColumn LIMIT 100");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+    assertEquals(combineResult.getRows().size(), 0);
+    assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
   }
 
   @SuppressWarnings({"rawTypes"})
