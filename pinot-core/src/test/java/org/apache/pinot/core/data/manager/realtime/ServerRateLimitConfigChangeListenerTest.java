@@ -1,20 +1,14 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Licensed to the Apache Software Foundation (ASF) under one or more contributor license agreements.  See the NOTICE
+ * file distributed with this work for additional information regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
+ * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations under the License.
  */
 package org.apache.pinot.core.data.manager.realtime;
 
@@ -43,14 +37,17 @@ public class ServerRateLimitConfigChangeListenerTest {
   private static final double DELTA = 0.0001;
   private static final ServerMetrics MOCK_SERVER_METRICS = mock(ServerMetrics.class);
 
-  static {
-    when(SERVER_CONFIG.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
-        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
-  }
-
   @Test
   public void testRateLimitUpdate()
       throws InterruptedException {
+    String rateLimiterConfigKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT;
+    if (Math.random() < 0.5) {
+      rateLimiterConfigKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES;
+    }
+
+    when(SERVER_CONFIG.getProperty(rateLimiterConfigKey,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
+
     AtomicReference<Throwable> errorRef = new AtomicReference<>();
     simulateThrottling(errorRef);
     // Initial state
@@ -61,10 +58,9 @@ public class ServerRateLimitConfigChangeListenerTest {
 
     // Simulate config change
     Map<String, String> newConfig = new HashMap<>();
-    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "300.0");
+    newConfig.put(rateLimiterConfigKey, "300.0");
     ServerRateLimitConfigChangeListener listener = new ServerRateLimitConfigChangeListener(MOCK_SERVER_METRICS);
-    Set<String> changedConfigSet =
-        new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    Set<String> changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
     simulateThrottling(errorRef);
     listener.onChange(changedConfigSet, newConfig);
     simulateThrottling(errorRef);
@@ -77,8 +73,8 @@ public class ServerRateLimitConfigChangeListenerTest {
 
     // Test removal of serverRateLimit
     newConfig = new HashMap<>();
-    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "0");
-    changedConfigSet = new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    newConfig.put(rateLimiterConfigKey, "0");
+    changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
     simulateThrottling(errorRef);
     listener.onChange(changedConfigSet, newConfig);
     simulateThrottling(errorRef);
@@ -92,8 +88,8 @@ public class ServerRateLimitConfigChangeListenerTest {
 
     // Test update of serverRateLimit after it was removed
     newConfig = new HashMap<>();
-    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "10000");
-    changedConfigSet = new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    newConfig.put(rateLimiterConfigKey, "10000");
+    changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
     simulateThrottling(errorRef);
     listener.onChange(changedConfigSet, newConfig);
     simulateThrottling(errorRef);
