@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -195,6 +196,10 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
       trimSize = _queryContext.getLimit();
     } else if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
       trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
+    }
+
+    if (trimSize == 0) {
+      return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
     }
 
     GroupByResultsBlock resultsBlock;

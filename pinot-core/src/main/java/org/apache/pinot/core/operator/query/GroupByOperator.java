@@ -149,6 +149,10 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
       trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
     }
 
+    if (trimSize == 0) {
+      return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
+    }
+
     GroupByResultsBlock resultsBlock;
     // sort and trim segment results if needed
     if (trimSize > 0 && groupByExecutor.getNumGroups() > trimSize) {
