@@ -36,7 +36,9 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.common.utils.FileUtils;
+import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
+import org.apache.pinot.segment.local.recordtransformer.DataTypeTransformer;
 import org.apache.pinot.segment.local.segment.creator.impl.nullvalue.NullValueVectorCreator;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
@@ -103,6 +105,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private final Map<String, NullValueVectorCreator> _nullValueVectorCreatorMap = new HashMap<>();
   private String _segmentName;
   private Schema _schema;
+  private boolean _enableDataTypeConversion;
   private File _indexDir;
   private int _totalDocs;
   private int _docIdCounter;
@@ -112,8 +115,18 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
       @Nullable int[] immutableToMutableIdMap)
       throws Exception {
+    init(segmentCreationSpec, segmentIndexCreationInfo, indexCreationInfoMap, schema, outDir, immutableToMutableIdMap,
+        false);
+  }
+
+  @Override
+  public void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
+      @Nullable int[] immutableToMutableIdMap, boolean enableDataTypeConversion)
+      throws Exception {
     _docIdCounter = 0;
     _config = segmentCreationSpec;
+    _enableDataTypeConversion = enableDataTypeConversion;
     _indexCreationInfoMap = indexCreationInfoMap;
 
     // Check that the output directory does not exist
@@ -368,16 +381,22 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
       NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
       FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
       SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+
+      // Check if data type conversion is needed once per column (not per value for performance)
+      final boolean needsConversion = _enableDataTypeConversion
+          && needsDataTypeConversion(columnName, fieldSpec, segment);
+
       if (sortedDocIds != null) {
         int onDiskDocId = 0;
         for (int docId : sortedDocIds) {
           indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, onDiskDocId,
-              nullVec);
+              nullVec, needsConversion);
           onDiskDocId++;
         }
       } else {
         for (int docId = 0; docId < numDocs; docId++) {
-          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec);
+          indexColumnValue(colReader, creatorsByIndex, columnName, fieldSpec, dictionaryCreator, docId, docId, nullVec,
+              needsConversion);
         }
       }
     }
@@ -386,11 +405,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
   private void indexColumnValue(PinotSegmentColumnReader colReader,
       Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex, String columnName, FieldSpec fieldSpec,
       SegmentDictionaryCreator dictionaryCreator, int sourceDocId, int onDiskDocPos,
-      @Nullable NullValueVectorCreator nullVec)
+      @Nullable NullValueVectorCreator nullVec, boolean needsConversion)
       throws IOException {
     Object columnValueToIndex = colReader.getValue(sourceDocId);
     if (columnValueToIndex == null) {
       throw new RuntimeException("Null value for column:" + columnName);
+    }
+
+    // Convert value from source segment data type to target schema data type if needed
+    if (needsConversion) {
+      columnValueToIndex = convertValueToTargetDataType(columnValueToIndex, fieldSpec, columnName);
     }
 
     if (fieldSpec.isSingleValueField()) {
@@ -421,6 +445,59 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     int[] dictId = dictionaryCreator != null ? dictionaryCreator.indexOfMV(values) : null;
     for (IndexCreator creator : creatorsByIndex.values()) {
       creator.add(values, dictId);
+    }
+  }
+
+  /**
+   * Check if data type conversion is needed by comparing source and target data types.
+   * Gets source column data type directly from the source segment.
+   */
+  private boolean needsDataTypeConversion(String columnName, FieldSpec targetFieldSpec, IndexSegment sourceSegment) {
+    // Check if column exists in source segment
+    if (!sourceSegment.getPhysicalColumnNames().contains(columnName)) {
+      // New column - no conversion needed since it doesn't exist in source
+      return false;
+    }
+
+    // Get source data type from segment metadata
+    Schema sourceSchema = sourceSegment.getSegmentMetadata().getSchema();
+    FieldSpec sourceFieldSpec = sourceSchema.getFieldSpecFor(columnName);
+    if (sourceFieldSpec == null) {
+      // Column not found in source schema - assume conversion needed to be safe
+      return true;
+    }
+
+    FieldSpec.DataType sourceDataType = sourceFieldSpec.getDataType();
+    FieldSpec.DataType targetDataType = targetFieldSpec.getDataType();
+
+    boolean needsConversion = !sourceDataType.equals(targetDataType);
+    if (needsConversion) {
+      LOGGER.debug("Data type conversion needed for column: {} from {} to {}",
+          columnName, sourceDataType, targetDataType);
+    }
+
+    return needsConversion;
+  }
+
+  /**
+   * Convert value from source segment data type to target schema data type using DataTypeTransformer's
+   * conversion logic. This ensures consistency with the standard data transformation pipeline.
+   */
+  private Object convertValueToTargetDataType(Object value, FieldSpec targetFieldSpec, String columnName) {
+    if (value == null) {
+      return null;
+    }
+
+    try {
+      // Get target PinotDataType using Pinot's standard method for ingestion
+      PinotDataType targetType = PinotDataType.getPinotDataTypeForIngestion(targetFieldSpec);
+
+            // Use DataTypeTransformer's conversion logic for consistency
+      return DataTypeTransformer.convertValue(value, targetType, columnName);
+    } catch (Exception e) {
+      LOGGER.warn("Failed to convert value '{}' to target data type {} for column {}: {}. Using original value.",
+          value, targetFieldSpec.getDataType(), columnName, e.getMessage());
+      return value;
     }
   }
 
@@ -741,6 +818,43 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
 
   public static void removeColumnMetadataInfo(PropertiesConfiguration properties, String column) {
     properties.subset(COLUMN_PROPS_KEY_PREFIX + column).clear();
+  }
+
+  /**
+   * Index a new column with default values for all documents.
+   * This method is used when a column exists in the target schema but not in the source segment.
+   * It reuses the existing indexColumn logic by directly calling the indexing methods.
+   */
+  public void indexNewColumnWithDefaultValues(String columnName, int numDocs) throws IOException {
+    if (numDocs == 0) {
+      return;
+    }
+
+    Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
+    NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+    SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+
+    Preconditions.checkNotNull(creatorsByIndex, "Index creators for column: %s not found", columnName);
+
+    Object defaultValue = fieldSpec.getDefaultNullValue();
+
+    if (fieldSpec.isSingleValueField()) {
+      for (int docId = 0; docId < numDocs; docId++) {
+        indexSingleValueRow(dictionaryCreator, defaultValue, creatorsByIndex);
+        if (nullVec != null && defaultValue == null) {
+          nullVec.setNull(docId);
+        }
+      }
+    } else {
+      Object[] defaultArray = new Object[]{defaultValue};
+      for (int docId = 0; docId < numDocs; docId++) {
+        indexMultiValueRow(dictionaryCreator, defaultArray, creatorsByIndex);
+        if (nullVec != null && defaultValue == null) {
+          nullVec.setNull(docId);
+        }
+      }
+    }
   }
 
   @Override

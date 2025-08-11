@@ -76,46 +76,7 @@ public class DataTypeTransformer implements RecordTransformer {
           continue;
         }
 
-        PinotDataType dest = entry.getValue();
-        if (dest != PinotDataType.JSON && dest != PinotDataType.MAP) {
-          value = standardize(column, value, dest.isSingleValue());
-        }
-
-        // NOTE: The standardized value could be null for empty Collection/Map/Object[].
-        if (value == null) {
-          record.putValue(column, null);
-          continue;
-        }
-
-        // Convert data type if necessary
-        PinotDataType source;
-        if (value instanceof Object[]) {
-          // Multi-value column
-          Object[] values = (Object[]) value;
-          // JSON is not standardised for empty json array
-          if (dest == PinotDataType.JSON && values.length == 0) {
-            source = PinotDataType.JSON;
-          } else {
-            source = PinotDataType.getMultiValueType(values[0].getClass());
-          }
-        } else {
-          // Single-value column
-          source = PinotDataType.getSingleValueType(value.getClass());
-        }
-
-        // Skipping conversion when srcType!=destType is speculative, and can be unsafe when
-        // the array for MV column contains values of mixing types. Mixing types can lead
-        // to ClassCastException during conversion, often aborting data ingestion jobs.
-        //
-        // So now, calling convert() unconditionally for safety. Perf impact is negligible:
-        // 1. for SV column, when srcType=destType, the conversion is simply pass through.
-        // 2. for MV column, when srcType=destType, the conversion is simply pass through
-        // if the source type is not Object[] (but sth like Integer[], Double[]). For Object[],
-        // the conversion loops through values in the array like before, but can catch the
-        // ClassCastException if it happens and continue the conversion now.
-        value = dest.convert(value, source);
-        value = dest.toInternal(value);
-
+        value = convertValue(value, entry.getValue(), column);
         record.putValue(column, value);
       } catch (Exception e) {
         if (!_continueOnError) {
@@ -126,6 +87,63 @@ public class DataTypeTransformer implements RecordTransformer {
         record.markIncomplete();
       }
     }
+  }
+
+  /**
+   * Converts a value to the target PinotDataType.
+   * This utility method can be reused by other components that need data type conversion for a column value
+   *
+   * @param value the input value to convert
+   * @param dest the target PinotDataType
+   * @param columnName the column name (used for error messages)
+   * @return the converted value
+   * @throws RuntimeException if conversion fails
+   */
+  public static Object convertValue(Object value, PinotDataType dest, String columnName) {
+    if (value == null) {
+      return null;
+    }
+
+    // Standardize the value (same logic as DataTypeTransformer)
+    if (dest != PinotDataType.JSON && dest != PinotDataType.MAP) {
+      value = standardize(columnName, value, dest.isSingleValue());
+    }
+
+    // NOTE: The standardized value could be null for empty Collection/Map/Object[].
+    if (value == null) {
+      return value;
+    }
+
+    // Convert data type if necessary
+    PinotDataType source;
+    if (value instanceof Object[]) {
+      // Multi-value column
+      Object[] values = (Object[]) value;
+      // JSON is not standardised for empty json array
+      if (dest == PinotDataType.JSON && values.length == 0) {
+        source = PinotDataType.JSON;
+      } else {
+        source = PinotDataType.getMultiValueType(values[0].getClass());
+      }
+    } else {
+      // Single-value column
+      source = PinotDataType.getSingleValueType(value.getClass());
+    }
+
+    // Skipping conversion when srcType!=destType is speculative, and can be unsafe when
+    // the array for MV column contains values of mixing types. Mixing types can lead
+    // to ClassCastException during conversion, often aborting data ingestion jobs.
+    //
+    // So now, calling convert() unconditionally for safety. Perf impact is negligible:
+    // 1. for SV column, when srcType=destType, the conversion is simply pass through.
+    // 2. for MV column, when srcType=destType, the conversion is simply pass through
+    // if the source type is not Object[] (but sth like Integer[], Double[]). For Object[],
+    // the conversion loops through values in the array like before, but can catch the
+    // ClassCastException if it happens and continue the conversion now.
+    value = dest.convert(value, source);
+    value = dest.toInternal(value);
+
+    return value;
   }
 
   /**

@@ -49,6 +49,22 @@ public interface SegmentCreator extends Closeable, Serializable {
    */
   void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
       TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
+      @Nullable int[] immutableToMutableIdMap, boolean enableDataTypeConversion)
+      throws Exception;
+
+
+
+  /**
+   * Initializes the segment creation.
+   *
+   * @param segmentCreationSpec
+   * @param indexCreationInfoMap
+   * @param schema
+   * @param outDir
+   * @throws Exception
+   */
+  void init(SegmentGeneratorConfig segmentCreationSpec, SegmentIndexCreationInfo segmentIndexCreationInfo,
+      TreeMap<String, ColumnIndexCreationInfo> indexCreationInfoMap, Schema schema, File outDir,
       @Nullable int[] immutableToMutableIdMap)
       throws Exception;
 
