@@ -72,7 +72,15 @@ public class RealtimeConsumptionRateManagerTest {
 
     when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
-    when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+    if (Math.random() < 0.5) {
+      when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
+          CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
+    }
+    if (Math.random() < 0.5) {
+      when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+          CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(2.5);
+    }
+    when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(2.5);
     when(SERVER_CONFIG_3.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(0.0);
@@ -111,6 +119,7 @@ public class RealtimeConsumptionRateManagerTest {
     serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_2, null);
     try {
       assertEquals(((ServerRateLimiter) rateLimiter).getRate(), 2.5, DELTA);
+      assertEquals(serverRateLimiter.getRate(), 2.5, DELTA);
     } finally {
       serverRateLimiter.close();
     }
@@ -129,7 +138,7 @@ public class RealtimeConsumptionRateManagerTest {
       assertEquals(serverRateLimiter.getRate(), 1);
       assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 1);
 
-      serverRateLimiter.updateRateLimit(12_000);
+      serverRateLimiter.updateRateLimit(12_000, ByteCountThrottlingStrategy.INSTANCE);
       assertEquals(serverRateLimiter.getRate(), 12_000);
       assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 12_000);
     } finally {

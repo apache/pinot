@@ -129,10 +129,7 @@ public class RealtimeConsumptionRateManager {
 
     if (currentRateLimiter instanceof ServerRateLimiter) {
       ServerRateLimiter existingLimiter = (ServerRateLimiter) _serverRateLimiter;
-      if (existingLimiter.getThrottlingStrategy().equals(throttlingStrategy)) {
-        existingLimiter.updateRateLimit(serverRateLimit);
-        return;
-      }
+      existingLimiter.updateRateLimit(serverRateLimit, throttlingStrategy);
     }
 
     _serverRateLimiter = new ServerRateLimiter(serverRateLimit, serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME,
@@ -351,7 +348,7 @@ public class RealtimeConsumptionRateManager {
   static class ServerRateLimiter implements ConsumptionRateLimiter {
     private final RateLimiter _rateLimiter;
     private final AsyncMetricEmitter _metricEmitter;
-    private final ThrottlingStrategy _throttlingStrategy;
+    private ThrottlingStrategy _throttlingStrategy;
 
     public ServerRateLimiter(double initialRateLimit, ServerMetrics serverMetrics, String metricKeyName,
         ThrottlingStrategy throttlingStrategy) {
@@ -369,9 +366,10 @@ public class RealtimeConsumptionRateManager {
       }
     }
 
-    public void updateRateLimit(double newRateLimit) {
+    public void updateRateLimit(double newRateLimit, ThrottlingStrategy throttlingStrategy) {
       _rateLimiter.setRate(newRateLimit);
       _metricEmitter.updateRateLimit(newRateLimit);
+      _throttlingStrategy = throttlingStrategy;
     }
 
     public ThrottlingStrategy getThrottlingStrategy() {
