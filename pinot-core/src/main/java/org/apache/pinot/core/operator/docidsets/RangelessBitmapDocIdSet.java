@@ -27,7 +27,7 @@ public class RangelessBitmapDocIdSet implements BlockDocIdSet {
   private final RangelessBitmapDocIdIterator _iterator;
 
   public RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds) {
-    _iterator = new RangelessBitmapDocIdIterator(docIds);
+    this(new RangelessBitmapDocIdIterator(docIds));
   }
 
   public RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator) {
@@ -42,5 +42,13 @@ public class RangelessBitmapDocIdSet implements BlockDocIdSet {
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
+  }
+
+  @Override
+  public BlockDocIdSet getOptimizedDocIdSet() {
+    if (_iterator.getDocIds().isEmpty()) {
+      return EmptyDocIdSet.getInstance();
+    }
+    return this;
   }
 }
