@@ -51,7 +51,7 @@ public class MinionConf extends PinotConfiguration {
   }
 
   public String getZkAddress() {
-    return getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    return getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
   }
 
   public String getHostName()

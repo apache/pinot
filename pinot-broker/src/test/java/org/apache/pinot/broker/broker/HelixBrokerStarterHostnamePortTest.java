@@ -33,7 +33,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_BROKER
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_BROKER_ID;
 import static org.apache.pinot.spi.utils.CommonConstants.Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME;
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER;
+import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.Instance.INSTANCE_ID_KEY;
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.KEY_OF_BROKER_QUERY_PORT;
 import static org.testng.Assert.assertEquals;
@@ -52,7 +52,7 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
   public void testHostnamePortOverride()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(INSTANCE_ID_KEY, "Broker_myInstance");
     properties.put(CONFIG_OF_BROKER_HOSTNAME, "myHost");
@@ -77,7 +77,7 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
   public void testInvalidInstanceId()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(INSTANCE_ID_KEY, "myInstance");
     properties.put(CONFIG_OF_BROKER_HOSTNAME, "myHost");
@@ -91,7 +91,7 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
   public void testDefaultInstanceId()
       throws Exception {
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(CONFIG_OF_BROKER_HOSTNAME, "myHost");
     properties.put(KEY_OF_BROKER_QUERY_PORT, 1234);
@@ -116,7 +116,7 @@ public class HelixBrokerStarterHostnamePortTest extends ControllerTest {
       throws Exception {
     // Ensures that pinot.broker.instance.id has higher precedence compared to instanceId
     Map<String, Object> properties = new HashMap<>();
-    properties.put(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     properties.put(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
     properties.put(CONFIG_OF_BROKER_ID, "Broker_morePrecedence");
     properties.put(INSTANCE_ID_KEY, "Broker_lessPrecedence");
