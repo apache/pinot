@@ -48,9 +48,9 @@ public abstract class SetOperator extends MultiStageOperator {
   protected final MultiStageOperator _rightChildOperator;
   protected final DataSchema _dataSchema;
 
-  protected boolean _isRightChildOperatorProcessed;
-  protected MseBlock.Eos _eos;
-  protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+  private boolean _isRightChildOperatorProcessed;
+  private MseBlock.Eos _eos;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
@@ -104,7 +104,15 @@ public abstract class SetOperator extends MultiStageOperator {
       }
 
       if (mseBlock != null) {
-        return mseBlock;
+        if (mseBlock.isData()) {
+          return mseBlock;
+        } else if (mseBlock.isError()) {
+          _eos = (MseBlock.Eos) mseBlock;
+          return _eos;
+        } else if (mseBlock.isSuccess()) {
+          // If it's a regular EOS block, we continue to process the left child operator.
+          _isRightChildOperatorProcessed = true;
+        }
       }
     }
 
@@ -112,17 +120,21 @@ public abstract class SetOperator extends MultiStageOperator {
       return _eos;
     }
 
-    return processLeftOperator();
+    MseBlock mseBlock = processLeftOperator();
+    if (mseBlock.isEos()) {
+      _eos = (MseBlock.Eos) mseBlock;
+      return _eos;
+    } else {
+      return mseBlock;
+    }
   }
 
   /**
-   * Processes the right child operator to build the set of rows that can be used to filter the left child.
-   * This method can be overridden to also be able to return blocks while processing the right operator.
-   * <p>
-   * {@link #_isRightChildOperatorProcessed} should be set to true when the right operator is fully processed.
+   * Processes the right child operator and build the set of rows that can be used to filter the left child. This method
+   * can be overridden to also be able to return data blocks while processing the right operator.
    *
-   * @return null if no blocks are returned from processing the right operator, or a block if there are rows to be
-   * returned.
+   * @return null if no blocks are to be returned from processing the right operator (but there are still blocks left to
+   * be processed), or else a data / EoS block.
    */
   protected MseBlock processRightOperator() {
     MseBlock block = _rightChildOperator.nextBlock();
@@ -134,19 +146,14 @@ public abstract class SetOperator extends MultiStageOperator {
       sampleAndCheckInterruption();
       block = _rightChildOperator.nextBlock();
     }
-    MseBlock.Eos eosBlock = (MseBlock.Eos) block;
-    if (eosBlock.isError()) {
-      _eos = eosBlock;
-    }
-    _isRightChildOperatorProcessed = true;
-    // The default implementation returns null because blocks are only returned while processing the left operator after
-    // the right operator is fully processed. This behavior can be overridden in subclasses if needed.
-    return null;
+    assert block.isEos();
+    return block;
   }
 
   /**
-   * Processes the left child operator and return blocks of rows that match the criteria defined by the set operation.
-   * @return block containing matched rows or EOS, never {@code null}.
+   * Processes the left child operator and returns blocks of rows that match the criteria defined by the set operation.
+   *
+   * @return block containing matched rows or EoS, never {@code null}.
    */
   protected MseBlock processLeftOperator() {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
@@ -154,9 +161,7 @@ public abstract class SetOperator extends MultiStageOperator {
     while (true) {
       MseBlock leftBlock = _leftChildOperator.nextBlock();
       if (leftBlock.isEos()) {
-        MseBlock.Eos eosBlock = (MseBlock.Eos) leftBlock;
-        _eos = eosBlock;
-        return eosBlock;
+        return leftBlock;
       }
       MseBlock.Data dataBlock = (MseBlock.Data) leftBlock;
       List<Object[]> rows = new ArrayList<>();

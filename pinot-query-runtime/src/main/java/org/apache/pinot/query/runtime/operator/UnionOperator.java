@@ -50,9 +50,11 @@ public class UnionOperator extends SetOperator {
       MseBlock.Data dataBlock = (MseBlock.Data) block;
       List<Object[]> rows = new ArrayList<>();
       for (Object[] row : dataBlock.asRowHeap().getRows()) {
-        if (!_rightRowSet.contains(new Record(row))) {
+        Record record = new Record(row);
+        if (!_rightRowSet.contains(record)) {
+          // Add a new unique row.
           rows.add(row);
-          _rightRowSet.add(new Record(row));
+          _rightRowSet.add(record);
         }
       }
       sampleAndCheckInterruption();
@@ -63,24 +65,19 @@ public class UnionOperator extends SetOperator {
         block = _rightChildOperator.nextBlock();
       }
     }
-    MseBlock.Eos eosBlock = (MseBlock.Eos) block;
-    // If it's a regular EOS block, we continue to process the left child operator. If it's an error block, we
-    // short-circuit the operator and return the error block.
-    if (eosBlock.isError()) {
-      _eos = eosBlock;
-    }
-    _isRightChildOperatorProcessed = true;
-    // Finished processing the right operator.
-    return null;
+    assert block.isEos();
+    return block;
   }
 
   @Override
   protected boolean handleRowMatched(Object[] row) {
     if (!_rightRowSet.contains(new Record(row))) {
+      // Row is unique, add it to the result and also to the row set to skip later duplicates.
       _rightRowSet.add(new Record(row));
-      return true; // Row is unique, add it to the result.
+      return true;
     } else {
-      return false; // Row is a duplicate, skip it.
+      // Row is a duplicate, skip it.
+      return false;
     }
   }
 

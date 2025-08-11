@@ -55,35 +55,16 @@ public class UnionAllOperator extends SetOperator {
 
   @Override
   protected MseBlock processRightOperator() {
-    MseBlock block = _rightChildOperator.nextBlock();
-
-    if (block.isData()) {
-      return block;
-    } else {
-      // If it's a regular EOS block, we continue to process the left child operator. If it's an error block, we
-      // short-circuit the operator and return the error block.
-      if (block.isError()) {
-        _eos = (MseBlock.Eos) block;
-      }
-      _isRightChildOperatorProcessed = true;
-      return null;
-    }
+    return _rightChildOperator.nextBlock();
   }
 
   @Override
   protected MseBlock processLeftOperator() {
-    MseBlock block = _leftChildOperator.nextBlock();
-
-    if (block.isData()) {
-      return block;
-    } else {
-      _eos = (MseBlock.Eos) block;
-      return _eos;
-    }
+    return _leftChildOperator.nextBlock();
   }
 
   @Override
   protected boolean handleRowMatched(Object[] row) {
-    throw new UnsupportedOperationException("Union operator does not support row matching");
+    throw new UnsupportedOperationException("UNION ALL operator does not support row matching");
   }
 }
