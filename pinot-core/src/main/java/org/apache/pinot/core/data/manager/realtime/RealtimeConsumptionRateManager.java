@@ -85,7 +85,7 @@ public class RealtimeConsumptionRateManager {
     return InstanceHolder.INSTANCE;
   }
 
-  public void enableThrottling() {
+  public void enablePartitionRateLimiter() {
     _isThrottlingAllowed = true;
   }
 

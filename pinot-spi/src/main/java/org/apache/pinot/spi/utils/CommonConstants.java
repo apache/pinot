@@ -783,7 +783,7 @@ public class CommonConstants {
       public static final String EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteral";
       public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressions";
       public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoin";
-      public static final String SEMIN_JOIN_DISTINCT_PROJECT = "SeminJoinDistinctProject";
+      public static final String SEMI_JOIN_DISTINCT_PROJECT = "SemiJoinDistinctProject";
       public static final String UNION_TO_DISTINCT = "UnionToDistinct";
       public static final String AGGREGATE_REMOVE = "AggregateRemove";
       public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
@@ -820,7 +820,8 @@ public class CommonConstants {
     public static final Set<String> DEFAULT_DISABLED_RULES = Set.of(
         PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
         PlannerRuleNames.SORT_JOIN_TRANSPOSE,
-        PlannerRuleNames.SORT_JOIN_COPY
+        PlannerRuleNames.SORT_JOIN_COPY,
+        PlannerRuleNames.AGGREGATE_UNION_AGGREGATE
     );
 
     public static class FailureDetector {

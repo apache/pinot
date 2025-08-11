@@ -53,6 +53,8 @@ public enum AggregationFunctionType {
   // TODO: min/max only supports NUMERIC in Pinot, where Calcite supports COMPARABLE_ORDERED
   MIN("min", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   MAX("max", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
+  MINSTRING("minString", SqlTypeName.VARCHAR, SqlTypeName.VARCHAR),
+  MAXSTRING("maxString", SqlTypeName.VARCHAR, SqlTypeName.VARCHAR),
   SUM("sum", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   SUM0("$sum0", SqlTypeName.DOUBLE, SqlTypeName.DOUBLE),
   SUMPRECISION("sumPrecision", ReturnTypes.explicit(SqlTypeName.DECIMAL), OperandTypes.ANY, SqlTypeName.OTHER),

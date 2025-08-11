@@ -151,6 +151,59 @@ public class PinotQueryResource {
     return executeTimeSeriesQueryCatching(httpHeaders, language, query, start, end, step);
   }
 
+  @POST
+  @Path("validateMultiStageQuery")
+  public MultiStageQueryValidationResponse validateMultiStageQuery(String requestJsonStr,
+      @Context HttpHeaders httpHeaders) {
+    JsonNode requestJson;
+    try {
+      requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while parsing request {}", e.getMessage());
+      return new MultiStageQueryValidationResponse(false, "Failed to parse request JSON: " + e.getMessage(), null);
+    }
+    if (!requestJson.has("sql")) {
+      return new MultiStageQueryValidationResponse(false, "JSON Payload is missing the query string field 'sql'", null);
+    }
+    String sqlQuery = requestJson.get("sql").asText();
+    Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
+    String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
+    try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database,
+        _pinotHelixResourceManager.getTableCache(), null).compile(sqlQuery)) {
+      return new MultiStageQueryValidationResponse(true, null, null);
+    } catch (QueryException e) {
+      LOGGER.info("Caught exception while compiling multi-stage query: {}", e.getMessage());
+      return new MultiStageQueryValidationResponse(false, e.getMessage(), e.getErrorCode());
+    }
+  }
+
+  public static class MultiStageQueryValidationResponse {
+    private final boolean _compiledSuccessfully;
+    private final String _errorMessage;
+    private final QueryErrorCode _errorCode;
+
+    public MultiStageQueryValidationResponse(boolean compiledSuccessfully, @Nullable String errorMessage,
+        @Nullable QueryErrorCode errorCode) {
+      _compiledSuccessfully = compiledSuccessfully;
+      _errorMessage = errorMessage;
+      _errorCode = errorCode;
+    }
+
+    public boolean isCompiledSuccessfully() {
+      return _compiledSuccessfully;
+    }
+
+    @Nullable
+    public String getErrorMessage() {
+      return _errorMessage;
+    }
+
+    @Nullable
+    public QueryErrorCode getErrorCode() {
+      return _errorCode;
+    }
+  }
+
   private StreamingOutput executeSqlQueryCatching(HttpHeaders httpHeaders, String sqlQuery, String traceEnabled,
       String queryOptions) {
     try {
