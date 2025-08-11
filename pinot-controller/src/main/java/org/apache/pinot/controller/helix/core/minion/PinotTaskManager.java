@@ -238,6 +238,15 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         LOGGER.warn("No ad-hoc task generated for task type: {}", taskType);
         continue;
       }
+      int maxNumberOfSubTasks = taskGenerator.getMaxNumSubTasks();
+      // choose first maxNumberOfSubTasks tasks to schedule from presentTaskConfig
+      if (pinotTaskConfigs.size() > maxNumberOfSubTasks) {
+        LOGGER.warn("Number of tasks generated for task type: {} for table: {} is {}, which is greater than the "
+                + "maximum number of tasks to schedule: {}. Only the first {} tasks will be scheduled. This is "
+                + "controlled by the cluster config maxAllowedSubTasks which is set based on controller's performance",
+            taskType, tableName, pinotTaskConfigs.size(), maxNumberOfSubTasks, maxNumberOfSubTasks);
+        pinotTaskConfigs = pinotTaskConfigs.subList(0, maxNumberOfSubTasks);
+      }
       pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
           .computeIfAbsent(TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
       LOGGER.info("Submitting ad-hoc task for task type: {} with task configs: {}", taskType, pinotTaskConfigs);
@@ -739,6 +748,16 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         List<PinotTaskConfig> presentTaskConfig =
             minionInstanceTagToTaskConfigs.computeIfAbsent(minionInstanceTag, k -> new ArrayList<>());
         taskGenerator.generateTasks(List.of(tableConfig), presentTaskConfig);
+        int maxNumberOfSubTasks = taskGenerator.getMaxNumSubTasks();
+        // choose first maxNumberOfSubTasks tasks to schedule from presentTaskConfig
+        if (presentTaskConfig.size() > maxNumberOfSubTasks) {
+          LOGGER.warn("Number of tasks generated for task type: {} for table: {} is {}, which is greater than the "
+              + "maximum number of tasks to schedule: {}. Only the first {} tasks will be scheduled. This is controlled"
+                  + " by the cluster config maxAllowedSubTasks which is set based on controller's performance",
+              taskType, tableName, presentTaskConfig.size(), maxNumberOfSubTasks, maxNumberOfSubTasks);
+          presentTaskConfig = presentTaskConfig.subList(0, maxNumberOfSubTasks);
+        }
+
         minionInstanceTagToTaskConfigs.put(minionInstanceTag, presentTaskConfig);
         long successRunTimestamp = System.currentTimeMillis();
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableName, taskType,

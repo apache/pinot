@@ -165,7 +165,7 @@ public class UpsertCompactionTaskGeneratorTest {
     taskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, "10");
 
     int maxTasks =
-        UpsertCompactionTaskGenerator.getMaxTasks(UpsertCompactionTask.TASK_TYPE, REALTIME_TABLE_NAME, taskConfigs);
+        _taskGenerator.getMaxTasks(UpsertCompactionTask.TASK_TYPE, REALTIME_TABLE_NAME, taskConfigs);
 
     assertEquals(maxTasks, 10);
   }

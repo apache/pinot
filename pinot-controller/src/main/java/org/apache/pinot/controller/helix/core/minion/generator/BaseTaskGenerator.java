@@ -82,6 +82,48 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   @Override
+  public int getMaxNumSubTasks() {
+    String configKey = MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY;
+    String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
+    if (configValue != null) {
+      try {
+        return Integer.parseInt(configValue);
+      } catch (Exception e) {
+        LOGGER.error("Invalid config {}: '{}'", configKey, configValue, e);
+      }
+    }
+    return MinionConstants.DEFAULT_MAX_NUM_OF_SUBTASKS;
+  }
+
+  /**
+   * Gets the final maximum number of subtasks for the given table based on the
+   * 1. configured value for the table subtask
+   * 2. default value for the task type
+   * 3. any cluster default(s)
+   * @param defaultNumSubTasks - the default number of subtasks for the task type
+   */
+  public int getNumSubTasks(Map<String, String> taskConfigs, int defaultNumSubTasks, String tableName) {
+    int tableMaxNumTasks = defaultNumSubTasks;
+    String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
+    if (tableMaxNumTasksConfig != null) {
+      try {
+        tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
+      } catch (Exception e) {
+        LOGGER.warn("MaxNumTasks {} have been wrongly set for table : {}, and task {}",
+            tableMaxNumTasksConfig, tableName, getTaskType());
+      }
+    }
+    if (tableMaxNumTasks > getMaxNumSubTasks() || tableMaxNumTasks <= 0) {
+      LOGGER.warn(
+          "MaxNumTasks for table {} for tasktype {} is {} which is greater than the max allowed subtasks {}"
+              + ". Setting it to the max allowed subtasks",
+          tableName, getTaskType(), tableMaxNumTasks, getMaxNumSubTasks());
+      tableMaxNumTasks = getMaxNumSubTasks();
+    }
+    return tableMaxNumTasks;
+  }
+
+  @Override
   public int getMaxAttemptsPerTask() {
     String taskType = getTaskType();
     String configKey = taskType + MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX;
