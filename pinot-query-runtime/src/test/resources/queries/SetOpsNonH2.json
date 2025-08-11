@@ -66,7 +66,19 @@
           [2],
           [3],
           [4]
-        ]
+        ],
+        "ignoreV2Optimizer":  true
+      },
+      {
+        "description": "INTERSECT ALL with UNION",
+        "sql": "SET skipPlannerRules='UnionToDistinct'; SELECT intCol FROM {tbl1} INTERSECT ALL SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [1],
+          [2],
+          [3],
+          [4]
+        ],
+        "ignoreV2Optimizer":  true
       },
       {
         "description": "INTERSECT ALL with UNION ALL",
@@ -100,6 +112,17 @@
       {
         "description": "EXCEPT ALL with UNION",
         "sql": "SELECT intCol FROM {tbl1} EXCEPT ALL SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [3],
+          [4],
+          [1],
+          [2]
+        ],
+        "ignoreV2Optimizer":  true
+      },
+      {
+        "description": "EXCEPT ALL with UNION",
+        "sql": "SET skipPlannerRules='UnionToDistinct'; SELECT intCol FROM {tbl1} EXCEPT ALL SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}",
         "outputs": [
           [3],
           [4],
