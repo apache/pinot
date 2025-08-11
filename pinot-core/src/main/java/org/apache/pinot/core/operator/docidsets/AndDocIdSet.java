@@ -29,6 +29,7 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
@@ -59,13 +60,20 @@ public final class AndDocIdSet implements BlockDocIdSet {
   // Keep the scan based BlockDocIdSets to be accessed when collecting query execution stats
   private final AtomicReference<List<BlockDocIdSet>> _scanBasedDocIdSets = new AtomicReference<>();
   private final boolean _cardinalityBasedRankingForScan;
+  private boolean _isAlwaysFalse;
   private List<BlockDocIdSet> _docIdSets;
   private volatile long _numEntriesScannedInFilter;
 
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions) {
+    this(docIdSets, queryOptions, false);
+  }
+
+  public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions,
+    boolean isAlwaysFalse) {
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         queryOptions != null && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
+    _isAlwaysFalse = isAlwaysFalse;
   }
 
   @Override
@@ -104,6 +112,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
     _docIdSets = null;
     _numEntriesScannedInFilter = numEntriesScannedForNonScanBasedDocIdSets;
     _scanBasedDocIdSets.set(scanBasedDocIdSets);
+    if (_isAlwaysFalse) {
+      return EmptyDocIdIterator.getInstance();
+    }
 
     // evaluate the bitmaps in the order of the lowest matching num docIds comes first, so that we minimize the number
     // of containers (range) for comparison from the beginning, as will minimize the effort of bitmap AND application
@@ -165,6 +176,9 @@ public final class AndDocIdSet implements BlockDocIdSet {
         }
       }
       for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
+        if (!docIds.cardinalityExceeds(0)) {
+           return EmptyDocIdIterator.getInstance();
+        }
         docIds = scanBasedDocIdIterator.applyAnd(docIds);
       }
       RangelessBitmapDocIdIterator rangelessBitmapDocIdIterator = new RangelessBitmapDocIdIterator(docIds);
@@ -195,5 +209,13 @@ public final class AndDocIdSet implements BlockDocIdSet {
       }
     }
     return _numEntriesScannedInFilter + numEntriesScannedForScanBasedDocIdSets;
+  }
+
+  @Override
+  public BlockDocIdSet getOptimizedDocIdSet() {
+    if (_isAlwaysFalse) {
+      return EmptyDocIdSet.getInstance();
+    }
+    return this;
   }
 }
