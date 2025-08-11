@@ -236,7 +236,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
       future.get(30, TimeUnit.SECONDS);
     }
 
-    SortedRecordTable table = _satisfiedTable.get();
+    SortedRecordTable table = _waitingTable.get();
     table.finish(true);
     blackhole.consume(table);
   }
@@ -285,10 +285,6 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
         if (_satisfiedTable.get() != null) {
           return;
         }
-        if (table.isSatisfied()) {
-          _satisfiedTable.compareAndSet(null, table);
-          return;
-        }
         SortedRecordTable finalTable = table;
         waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
         if (waitingTable == null) {
@@ -304,7 +300,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
   public SortedRecordTable getAndPopulateSortedRecordTable(int segmentId) {
     SortedRecordTable table =
         new SortedRecordTable(_dataSchema, _queryContext, _queryContext.getLimit(), _executorService,
-            1, _numSegments, _recordKeyComparator);
+            _recordKeyComparator);
     int mergedKeys = 0;
     for (IntermediateRecord intermediateRecord : _segmentIntermediateRecords.get(segmentId)) {
       if (!table.upsert(intermediateRecord._record)) {

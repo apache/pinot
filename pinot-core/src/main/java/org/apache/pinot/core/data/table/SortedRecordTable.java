@@ -48,19 +48,14 @@ public class SortedRecordTable extends BaseTable {
   protected Record[] _topRecords;
 
   private Record[] _records;
-  private int _numMergedBlocks;
-  private final int _desiredNumMergedBlocks;
   private int _nextIdx;
   private final Comparator<Record> _comparator;
   private final int _numThreadsExtractFinalResult;
   private final int _chunkSizeExtractFinalResult;
 
   public SortedRecordTable(DataSchema dataSchema, QueryContext queryContext, int resultSize,
-      ExecutorService executorService,
-      int numMergedBlocks, int desiredNumMergedBlocks, Comparator<Record> comparator) {
+      ExecutorService executorService, Comparator<Record> comparator) {
     super(dataSchema);
-    _numMergedBlocks = numMergedBlocks;
-    _desiredNumMergedBlocks = desiredNumMergedBlocks;
     _numKeyColumns = queryContext.getGroupByExpressions().size();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _executorService = executorService;
@@ -89,23 +84,16 @@ public class SortedRecordTable extends BaseTable {
     throw new UnsupportedOperationException("method unused for SortedRecordTable");
   }
 
-  public boolean isSatisfied() {
-    return _numMergedBlocks == _desiredNumMergedBlocks;
-  }
-
   /// Merge another SortedRecordTable into self
   public SortedRecordTable mergeSortedRecordTable(SortedRecordTable that) {
     assert (that._resultSize == _resultSize);
     if (that.size() == 0) {
-      _numMergedBlocks += that._numMergedBlocks;
       return this;
     }
     if (size() == 0) {
-      that._numMergedBlocks += _numMergedBlocks;
       return that;
     }
     mergeSortedRecords(that._records, that.size());
-    _numMergedBlocks += that._numMergedBlocks;
     return this;
   }
 
@@ -113,12 +101,10 @@ public class SortedRecordTable extends BaseTable {
   public SortedRecordTable mergeSortedGroupByResultBlock(GroupByResultsBlock block) {
     List<IntermediateRecord> segmentRecords = block.getIntermediateRecords();
     if (segmentRecords.isEmpty() || size() == 0) {
-      _numMergedBlocks += 1;
       segmentRecords.forEach(x -> upsert(x._record));
       return this;
     }
     mergeSegmentRecords(segmentRecords, segmentRecords.size());
-    _numMergedBlocks += 1;
     return this;
   }
 

@@ -76,7 +76,6 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   private volatile boolean _numGroupsWarningLimitReached;
 
   private final AtomicReference<SortedRecordTable> _waitingTable;
-  private final AtomicReference<SortedRecordTable> _satisfiedTable;
   private final Comparator<Record> _recordKeyComparator;
 
   public SortedGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
@@ -86,7 +85,6 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
     assert (queryContext.shouldSortAggregateUnderSafeTrim());
     _operatorLatch = new CountDownLatch(_numTasks);
     _waitingTable = new AtomicReference<>();
-    _satisfiedTable = new AtomicReference<>();
     _recordKeyComparator = OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
         queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
   }
@@ -133,7 +131,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
         }
         // short-circuit one segment case
         if (_numOperators == 1) {
-          _satisfiedTable.set(
+          _waitingTable.set(
               GroupByUtils.getAndPopulateSortedRecordTable(resultsBlock, _queryContext,
                   _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator)
           );
@@ -145,13 +143,6 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
             _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator);
 
         while (true) {
-          if (_satisfiedTable.get() != null) {
-            return;
-          }
-          if (table.isSatisfied()) {
-            _satisfiedTable.compareAndSet(null, table);
-            return;
-          }
           SortedRecordTable finalTable = table;
           SortedRecordTable waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
           if (waitingTable == null) {
@@ -222,7 +213,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
       return new ExceptionResultsBlock(errMsg);
     }
 
-    SortedRecordTable table = _satisfiedTable.get();
+    SortedRecordTable table = _waitingTable.get();
     assert (table != null);
     if (_queryContext.isServerReturnFinalResult()) {
       table.finish(true, true);
@@ -240,9 +231,5 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
 
   private SortedRecordTable mergeBlocks(SortedRecordTable block1, SortedRecordTable block2) {
     return block1.mergeSortedRecordTable(block2);
-  }
-
-  private SortedRecordTable mergeBlocks(SortedRecordTable block1, GroupByResultsBlock block2) {
-    return block1.mergeSortedGroupByResultBlock(block2);
   }
 }

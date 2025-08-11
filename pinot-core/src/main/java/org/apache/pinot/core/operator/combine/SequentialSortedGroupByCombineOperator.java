@@ -191,7 +191,6 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
       numBlocksMerged++;
     }
 
-    assert (_table.isSatisfied());
     if (_queryContext.isServerReturnFinalResult()) {
       _table.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {

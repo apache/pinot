@@ -222,7 +222,7 @@ public final class GroupByUtils {
       QueryContext queryContext, int resultSize,
       ExecutorService executorService, int desiredNumMergedBlocks, Comparator<Record> recordKeyComparator) {
     SortedRecordTable table = new SortedRecordTable(block.getDataSchema(), queryContext, resultSize, executorService,
-        1, desiredNumMergedBlocks, recordKeyComparator);
+        recordKeyComparator);
     int mergedKeys = 0;
     for (IntermediateRecord intermediateRecord : block.getIntermediateRecords()) {
       if (!table.upsert(intermediateRecord._record)) {
