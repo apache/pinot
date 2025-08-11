@@ -245,7 +245,7 @@ public class RealtimeConsumptionRateManagerTest {
         CompletableFuture.runAsync(() -> emitter.record(1));
       }
       TestUtils.waitForCondition(
-          aVoid -> (emitter.getMessageCount().intValue() == 0) && (emitter.getTracker().getAggregateNumMessages() > 0),
+          aVoid -> (emitter.getMessageCount().intValue() == 0) && (emitter.getTracker().getAggregateUnits() > 0),
           5000,
           "Expected messageCount to be zero because messageCount is always reset before emitter calls "
               + "quotaUtilisationTracker");
@@ -260,7 +260,7 @@ public class RealtimeConsumptionRateManagerTest {
         CompletableFuture.runAsync(() -> emitter1.record(1));
       }
       TestUtils.waitForCondition(
-          aVoid -> ((emitter1.getMessageCount().intValue() > 0) && (emitter1.getTracker().getAggregateNumMessages()
+          aVoid -> ((emitter1.getMessageCount().intValue() > 0) && (emitter1.getTracker().getAggregateUnits()
               == 0)), 5000,
           "Expected messageCount to be greater than zero because messageCount will reset post initial delay (first "
               + "run).");

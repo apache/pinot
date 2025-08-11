@@ -1025,7 +1025,7 @@ public class MutableSegmentImpl implements MutableSegment {
         case DOUBLE:
           switch (dataType) {
             case INT:
-              oldDoubleValue = ((Integer) forwardIndex.getInt(docId)).doubleValue();
+              oldDoubleValue = (double) forwardIndex.getInt(docId);
               newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
               forwardIndex.setInt(docId, newDoubleValue.intValue());
               break;

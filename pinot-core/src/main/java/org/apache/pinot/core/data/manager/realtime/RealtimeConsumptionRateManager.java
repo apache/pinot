@@ -215,7 +215,7 @@ public class RealtimeConsumptionRateManager {
    */
   static class QuotaUtilizationTracker {
     private long _previousMinute = -1;
-    private int _aggregateNumMessages = 0;
+    private int _aggregateUnits = 0;
     private final ServerMetrics _serverMetrics;
     private final String _metricKeyName;
 
@@ -227,27 +227,27 @@ public class RealtimeConsumptionRateManager {
     /**
      * Update count and return utilization ratio percentage (0 if not enough data yet).
      */
-    public int update(int numMsgsConsumed, double rateLimit, Instant now) {
+    public int update(int unitsConsumed, double rateLimit, Instant now) {
       int ratioPercentage = 0;
       long nowInMinutes = now.getEpochSecond() / 60;
       if (nowInMinutes == _previousMinute) {
-        _aggregateNumMessages += numMsgsConsumed;
+        _aggregateUnits += unitsConsumed;
       } else {
         if (_previousMinute != -1) { // not first time
-          double actualRate = _aggregateNumMessages / ((nowInMinutes - _previousMinute) * 60.0); // messages per second
+          double actualRate = _aggregateUnits / ((nowInMinutes - _previousMinute) * 60.0); // messages per second
           ratioPercentage = (int) Math.round(actualRate / rateLimit * 100);
           _serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
               ratioPercentage);
         }
-        _aggregateNumMessages = numMsgsConsumed;
+        _aggregateUnits = unitsConsumed;
         _previousMinute = nowInMinutes;
       }
       return ratioPercentage;
     }
 
     @VisibleForTesting
-    int getAggregateNumMessages() {
-      return _aggregateNumMessages;
+    int getAggregateUnits() {
+      return _aggregateUnits;
     }
   }
 
