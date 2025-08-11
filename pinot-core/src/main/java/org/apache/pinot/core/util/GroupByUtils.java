@@ -20,6 +20,7 @@ package org.apache.pinot.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -31,6 +32,8 @@ import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.SortedRecordTable;
+import org.apache.pinot.core.data.table.SortedRecords;
+import org.apache.pinot.core.data.table.SortedRecordsMerger;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
@@ -220,7 +223,7 @@ public final class GroupByUtils {
 
   public static SortedRecordTable getAndPopulateSortedRecordTable(GroupByResultsBlock block,
       QueryContext queryContext, int resultSize,
-      ExecutorService executorService, int desiredNumMergedBlocks, Comparator<Record> recordKeyComparator) {
+      ExecutorService executorService, Comparator<Record> recordKeyComparator) {
     SortedRecordTable table = new SortedRecordTable(block.getDataSchema(), queryContext, resultSize, executorService,
         recordKeyComparator);
     int mergedKeys = 0;
@@ -231,5 +234,21 @@ public final class GroupByUtils {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
     }
     return table;
+  }
+
+  public static SortedRecords getAndPopulateSortedRecords(GroupByResultsBlock block) {
+    List<IntermediateRecord> intermediateRecords = block.getIntermediateRecords();
+    Record[] sortedRecords = new Record[intermediateRecords.size()];
+    int idx = 0;
+    for (IntermediateRecord intermediateRecord : intermediateRecords) {
+      sortedRecords[idx++] = intermediateRecord._record;
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(idx);
+    }
+    return new SortedRecords(sortedRecords, idx);
+  }
+
+  public static SortedRecordsMerger getSortedReduceMerger(QueryContext queryContext,
+      int resultSize, Comparator<Record> comparator) {
+    return new SortedRecordsMerger(queryContext, resultSize, comparator);
   }
 }

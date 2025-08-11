@@ -68,6 +68,21 @@ public class SortedRecordTable extends BaseTable {
     _nextIdx = 0;
   }
 
+  public SortedRecordTable(SortedRecords sortedRecords, DataSchema dataSchema, QueryContext queryContext,
+      int resultSize, ExecutorService executorService, Comparator<Record> comparator) {
+    super(dataSchema);
+    _numKeyColumns = queryContext.getGroupByExpressions().size();
+    _aggregationFunctions = queryContext.getAggregationFunctions();
+    _executorService = executorService;
+    _comparator = comparator;
+    _resultSize = resultSize;
+    _numThreadsExtractFinalResult = Math.min(queryContext.getNumThreadsExtractFinalResult(),
+        Math.max(1, ResourceManager.DEFAULT_QUERY_RUNNER_THREADS));
+    _chunkSizeExtractFinalResult = queryContext.getChunkSizeExtractFinalResult();
+    _records = sortedRecords._records;
+    _nextIdx = sortedRecords._size;
+  }
+
   /// Only used when creating SortedRecordTable from unique, sorted segment groupby results
   @Override
   public boolean upsert(Record record) {

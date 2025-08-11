@@ -184,7 +184,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
 
       if (_table == null) {
         _table = GroupByUtils.getAndPopulateSortedRecordTable(groupByResultBlockToMerge, _queryContext,
-                _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator);
+                _queryContext.getLimit(), _executorService, _recordKeyComparator);
       } else {
         _table.mergeSortedGroupByResultBlock(groupByResultBlockToMerge);
       }

@@ -24,9 +24,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SortedRecordTable;
+import org.apache.pinot.core.data.table.SortedRecords;
+import org.apache.pinot.core.data.table.SortedRecordsMerger;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.ExceptionResultsBlock;
@@ -74,9 +77,11 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
+  private volatile DataSchema _dataSchema;
 
-  private final AtomicReference<SortedRecordTable> _waitingTable;
+  private final AtomicReference<SortedRecords> _waitingTable;
   private final Comparator<Record> _recordKeyComparator;
+  private final SortedRecordsMerger _sortedRecordsMerger;
 
   public SortedGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
@@ -87,6 +92,8 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
     _waitingTable = new AtomicReference<>();
     _recordKeyComparator = OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
         queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
+    _sortedRecordsMerger =
+        GroupByUtils.getSortedReduceMerger(queryContext, queryContext.getLimit(), _recordKeyComparator);
   }
 
   /**
@@ -129,22 +136,21 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
         if (resultsBlock.isNumGroupsWarningLimitReached()) {
           _numGroupsWarningLimitReached = true;
         }
+        if (_dataSchema == null) {
+          _dataSchema = resultsBlock.getDataSchema();
+        }
         // short-circuit one segment case
         if (_numOperators == 1) {
-          _waitingTable.set(
-              GroupByUtils.getAndPopulateSortedRecordTable(resultsBlock, _queryContext,
-                  _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator)
-          );
+          _waitingTable.set(GroupByUtils.getAndPopulateSortedRecords(resultsBlock));
           break;
         }
 
-        SortedRecordTable table =
-            GroupByUtils.getAndPopulateSortedRecordTable(resultsBlock, _queryContext,
-            _queryContext.getLimit(), _executorService, _numOperators, _recordKeyComparator);
+        SortedRecords table =
+            GroupByUtils.getAndPopulateSortedRecords(resultsBlock);
 
         while (true) {
-          SortedRecordTable finalTable = table;
-          SortedRecordTable waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
+          SortedRecords finalTable = table;
+          SortedRecords waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
           if (waitingTable == null) {
             break;
           }
@@ -213,8 +219,16 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
       return new ExceptionResultsBlock(errMsg);
     }
 
-    SortedRecordTable table = _waitingTable.get();
-    assert (table != null);
+    SortedRecords recordArray = _waitingTable.get();
+    return finishSortedRecords(recordArray);
+  }
+
+  private GroupByResultsBlock finishSortedRecords(SortedRecords recordArray) {
+    SortedRecordTable table =
+        new SortedRecordTable(recordArray, _dataSchema, _queryContext,
+            _queryContext.getLimit(), _executorService, _recordKeyComparator);
+
+    // finish
     if (_queryContext.isServerReturnFinalResult()) {
       table.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
@@ -229,7 +243,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
     return mergedBlock;
   }
 
-  private SortedRecordTable mergeBlocks(SortedRecordTable block1, SortedRecordTable block2) {
-    return block1.mergeSortedRecordTable(block2);
+  private SortedRecords mergeBlocks(SortedRecords block1, SortedRecords block2) {
+    return _sortedRecordsMerger.mergeSortedRecordArray(block1, block2);
   }
 }
