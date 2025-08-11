@@ -1824,6 +1824,18 @@ public class CommonConstants {
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
 
     /**
+     * Configuration for pinger period in seconds.
+     *
+     * This pinger is used to make sure the gRPC mailbox connection
+     * between servers doesn't reach the idle state, which would increase the latency of the next MSE query execution
+     * given it would need to re-establish the connection (including TLS negotiation).
+     *
+     * Set to 0 or negative to disable the pinger.
+     */
+    public static final String KEY_OF_PINGER_PERIOD_SECONDS = "pinot.query.runner.pinger.frequency.seconds";
+    public static final long DEFAULT_PINGER_PERIOD_SECONDS = 10 * 60L;
+
+    /**
      * Enable splitting of data block payload during mailbox transfer.
      */
     public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =

@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -66,6 +67,8 @@ public class MailboxService {
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
   private final int _maxByteStringSize;
+  @Nullable
+  private final MailboxSenderPinger _mailboxSenderPinger;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
@@ -78,7 +81,18 @@ public class MailboxService {
     _port = port;
     _config = config;
     _tlsConfig = tlsConfig;
-    _channelManager = new ChannelManager(tlsConfig);
+    long pingerPeriodMs = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_PINGER_PERIOD_SECONDS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_PINGER_PERIOD_SECONDS);
+    Duration pingerPeriod = Duration.ofSeconds(pingerPeriodMs);
+
+    _channelManager = new ChannelManager(tlsConfig, pingerPeriod);
+
+    if (pingerPeriodMs > 0) {
+      _mailboxSenderPinger = new MailboxSenderPinger(hostname, port, _channelManager, pingerPeriod);
+    } else {
+      _mailboxSenderPinger = null;
+    }
     boolean splitBlocks = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
@@ -99,6 +113,9 @@ public class MailboxService {
    */
   public void start() {
     LOGGER.info("Starting GrpcMailboxServer");
+    if (_mailboxSenderPinger != null) {
+      _mailboxSenderPinger.startAsync();
+    }
     _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig);
     _grpcMailboxServer.start();
   }
@@ -109,6 +126,9 @@ public class MailboxService {
   public void shutdown() {
     LOGGER.info("Shutting down GrpcMailboxServer");
     _grpcMailboxServer.shutdown();
+    if (_mailboxSenderPinger != null) {
+      _mailboxSenderPinger.stopAsync();
+    }
   }
 
   public String getHostname() {
