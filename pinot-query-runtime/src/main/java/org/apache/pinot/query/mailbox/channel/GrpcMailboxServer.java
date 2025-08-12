@@ -128,7 +128,6 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   @Override
   public void ping(Mailbox.Ping request, StreamObserver<Mailbox.Pong> responseObserver) {
     LOGGER.debug("Received ping request: {}", request);
-    //super.ping(request, responseObserver);
     Mailbox.Pong pong = Mailbox.Pong.newBuilder()
         .setHostname(_mailboxService.getHostname())
         .setPort(_mailboxService.getPort())
