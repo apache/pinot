@@ -160,7 +160,7 @@ public class StreamConfigProperties {
    * and (latestStreamOffset's timestamp - latestIngestedOffset's timestamp > thisValue)
    */
   public static final String OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY =
-      "realtime.segment.offsetAutoReset.timeSecThreshold";
+      "realtime.segment.offsetAutoReset.timeThresholdSeconds";
 
   /**
    * Helper method to create a stream specific property
