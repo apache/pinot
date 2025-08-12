@@ -113,7 +113,7 @@ public class SegmentGenerationAndPushTaskGenerator extends BaseTaskGenerator {
       Preconditions.checkNotNull(taskConfigs, "Task config shouldn't be null for Table: %s", tableNameWithType);
 
       // Get max number of subtasks for this table
-      int tableMaxNumTasks = getNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
+      int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
 
       // Generate tasks
       int tableNumTasks = 0;

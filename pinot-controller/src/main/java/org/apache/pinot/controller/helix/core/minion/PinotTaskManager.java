@@ -58,6 +58,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegi
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.UtilizationChecker;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -246,6 +247,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                 + "controlled by the cluster config maxAllowedSubTasks which is set based on controller's performance",
             taskType, tableName, pinotTaskConfigs.size(), maxNumberOfSubTasks, maxNumberOfSubTasks);
         pinotTaskConfigs = new ArrayList<>(pinotTaskConfigs.subList(0, maxNumberOfSubTasks));
+        // Provide user visibility to the maximum number of subtasks that were used for the task
+        pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
+            .put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, String.valueOf(maxNumberOfSubTasks)));
       }
       pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
           .computeIfAbsent(TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
@@ -756,6 +760,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                   + " by the cluster config maxAllowedSubTasks which is set based on controller's performance",
               taskType, tableName, presentTaskConfig.size(), maxNumberOfSubTasks, maxNumberOfSubTasks);
           presentTaskConfig = new ArrayList<>(presentTaskConfig.subList(0, maxNumberOfSubTasks));
+          // Provide user visibility to the maximum number of subtasks that were used for the task
+          presentTaskConfig.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
+              .put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, String.valueOf(maxNumberOfSubTasks)));
           response.addGenerationError("Number of tasks generated for task type: " + taskType
               + " for table: " + tableName + " is " + presentTaskConfig.size()
               + ", which is greater than the maximum number of tasks to schedule: " + maxNumberOfSubTasks

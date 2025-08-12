@@ -89,7 +89,8 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
 
     int tableNumTasks = 0;
     // Get max number of subtasks for this table
-    int tableMaxNumTasks = getNumSubTasks(taskConfigs, RefreshSegmentTask.MAX_NUM_TASKS_PER_TABLE, tableNameWithType);
+    int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs,
+        RefreshSegmentTask.MAX_NUM_TASKS_PER_TABLE, tableNameWithType);
 
     // Get info about table and schema.
     Stat tableStat = pinotHelixResourceManager.getTableStat(tableNameWithType);

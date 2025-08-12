@@ -175,7 +175,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       }
 
       int numTasks = 0;
-      int maxTasks = getMaxTasks(taskType, tableNameWithType, taskConfigs);
+      int maxTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
       for (SegmentZKMetadata segment : segmentSelectionResult.getSegmentsForCompaction()) {
         if (numTasks == maxTasks) {
           break;
@@ -285,12 +285,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       }
     }
     return completedSegments;
-  }
-
-  @VisibleForTesting
-  public int getMaxTasks(String taskType, String tableNameWithType, Map<String, String> taskConfigs) {
-    // Get max number of subtasks for this table
-    return getNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
   }
 
   @Override

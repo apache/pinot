@@ -199,7 +199,8 @@ public class UpsertCompactMergeTaskGenerator extends BaseTaskGenerator {
 
       int numTasks = 0;
       // Get max number of subtasks for this table
-      int maxTasks = getNumSubTasks(taskConfigs, MinionConstants.DEFAULT_TABLE_MAX_NUM_TASKS, tableNameWithType);
+      int maxTasks = getAndUpdateMaxNumSubTasks(taskConfigs,
+          MinionConstants.DEFAULT_TABLE_MAX_NUM_TASKS, tableNameWithType);
       for (Map.Entry<Integer, List<List<SegmentMergerMetadata>>> entry
           : segmentSelectionResult.getSegmentsForCompactMergeByPartition().entrySet()) {
         if (numTasks == maxTasks) {

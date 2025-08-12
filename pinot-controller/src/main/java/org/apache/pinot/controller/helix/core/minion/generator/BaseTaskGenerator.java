@@ -96,6 +96,20 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   /**
+   * Updates the max num tasks parameter with the actual maximum number of subtasks based on
+   * 1. configured value for the table subtask
+   * 2. default value for the task type
+   * 3. any cluster default(s)
+   * This is required to provide user visibility to the maximum number of subtasks that were used for the task
+   * @param defaultNumSubTasks - the default number of subtasks for the task type
+   */
+  public int getAndUpdateMaxNumSubTasks(Map<String, String> taskConfigs, int defaultNumSubTasks, String tableName) {
+    int maxNumSubTasks = getNumSubTasks(taskConfigs, defaultNumSubTasks, tableName);
+    taskConfigs.put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, String.valueOf(maxNumSubTasks));
+    return maxNumSubTasks;
+  }
+
+  /**
    * Gets the final maximum number of subtasks for the given table based on the
    * 1. configured value for the table subtask
    * 2. default value for the task type

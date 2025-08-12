@@ -77,7 +77,7 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
 
       LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
       // Get max number of subtasks for this table
-      int tableMaxNumTasks = getNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableName);
+      int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableName);
       List<SegmentZKMetadata> segmentsZKMetadata =
           tableConfig.getTableType() == TableType.OFFLINE
               ? getSegmentsZKMetadataForTable(tableName)
