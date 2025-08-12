@@ -626,7 +626,6 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     TABLE(StatMap.Type.STRING, null),
     EXECUTION_TIME_MS(StatMap.Type.LONG, null) {
       @Override
@@ -682,12 +681,11 @@ public class LeafOperator extends MultiStageOperator {
     /**
      * Time spent on GC while this operator or its children in the same stage were running.
      */
-    GC_TIME_MS(StatMap.Type.LONG, null),
+    GC_TIME_MS(StatMap.Type.LONG, null);
     // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.KeyStat or
     //  call the constructor that accepts a String as last argument and set it to null.
     //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will
     //  propagate to the caller, causing the query to timeout.
-    ; //@formatter:on
 
     private final StatMap.Type _type;
     @Nullable

@@ -124,7 +124,6 @@ public class FilterOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -144,8 +143,7 @@ public class FilterOperator extends MultiStageOperator {
     /**
      * Time spent on GC while this operator or its children in the same stage were running.
      */
-    GC_TIME_MS(StatMap.Type.LONG),
-    ; //@formatter:on
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 
