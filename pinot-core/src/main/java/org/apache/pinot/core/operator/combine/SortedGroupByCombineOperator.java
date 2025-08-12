@@ -244,6 +244,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   }
 
   private SortedRecords mergeBlocks(SortedRecords block1, SortedRecords block2) {
+
     return _sortedRecordsMerger.mergeSortedRecordArray(block1, block2);
   }
 }

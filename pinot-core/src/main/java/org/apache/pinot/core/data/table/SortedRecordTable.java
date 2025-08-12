@@ -187,7 +187,7 @@ public class SortedRecordTable extends BaseTable {
     super.finish(sort);
   }
 
-  // copied from IndexedTable, but always _hasOrderBy
+  // Copied from IndexedTable, but always _hasOrderBy
   // TODO: extract common logic between this and IndexedTable to BaseTable
   @Override
   public void finish(boolean sort, boolean storeFinalResult) {
