@@ -43,6 +43,8 @@ import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SortedRecordTable;
+import org.apache.pinot.core.data.table.SortedRecords;
+import org.apache.pinot.core.data.table.SortedRecordsMerger;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
@@ -94,9 +96,9 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
   private List<String> _d1;
   private List<Integer> _d2;
 
-  private AtomicReference<SortedRecordTable> _waitingTable;
-  private AtomicReference<SortedRecordTable> _satisfiedTable;
+  private AtomicReference<SortedRecords> _waitingRecords;
   private Comparator<Record> _recordKeyComparator;
+  private SortedRecordsMerger _sortedRecordsMerger;
 
   private List<List<IntermediateRecord>> _segmentIntermediateRecords;
 
@@ -148,8 +150,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
       _segmentIntermediateRecords.add(intermediateRecords);
     }
 
-    _waitingTable = new AtomicReference<>();
-    _satisfiedTable = new AtomicReference<>();
+    _waitingRecords = new AtomicReference<>();
   }
 
   private IntermediateRecord getIntermediateRecord()
@@ -221,11 +222,13 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
       throws InterruptedException, ExecutionException, TimeoutException {
     final AtomicInteger nextSegmentId = new AtomicInteger(0);
 
+    _sortedRecordsMerger = new SortedRecordsMerger(_queryContext, _queryContext.getLimit(), _recordKeyComparator);
+
     List<Callable<Void>> innerSegmentCallables = new ArrayList<>(_numSegments);
     for (int i = 0; i < _numThreads; i++) {
 
       Callable<Void> callable = () -> {
-        processSortedGroupByCombine(nextSegmentId);
+        processPairWiseSortedGroupByCombine(nextSegmentId);
         return null;
       };
       innerSegmentCallables.add(callable);
@@ -236,8 +239,9 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
       future.get(30, TimeUnit.SECONDS);
     }
 
-    SortedRecordTable table = _waitingTable.get();
-    table.finish(true);
+    SortedRecords records = _waitingRecords.get();
+    SortedRecordTable table = finishSortedRecords(records);
+
     blackhole.consume(table);
   }
 
@@ -265,36 +269,33 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
     blackhole.consume(waitingTable);
   }
 
-  public void processSortedGroupByCombine(AtomicInteger nextSegmentId) {
+  public void processPairWiseSortedGroupByCombine(AtomicInteger nextSegmentId) {
     int segmentId;
     while ((segmentId = nextSegmentId.getAndIncrement()) < _numSegments) {
-      int finalSegmentId = segmentId;
-      SortedRecordTable waitingTable = _waitingTable.getAndUpdate(v -> v == null
-          ? getAndPopulateSortedRecordTable(finalSegmentId)
-          : null);
-      if (waitingTable == null) {
-        continue;
-      }
 
-      GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema,
-          _segmentIntermediateRecords.get(finalSegmentId), _queryContext);
-      SortedRecordTable table = mergeBlocks(waitingTable, resultsBlock);
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
+      SortedRecords records = getAndPopulateSortedRecords(segmentId);
 
       while (true) {
-        if (_satisfiedTable.get() != null) {
-          return;
-        }
-        SortedRecordTable finalTable = table;
-        waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
-        if (waitingTable == null) {
+        SortedRecords finalRecords = records;
+        SortedRecords waitingRecords = _waitingRecords.getAndUpdate(v -> v == null ? finalRecords : null);
+        if (waitingRecords == null) {
           break;
         }
         // if found waiting block, merge and loop
-        table = mergeBlocks(table, waitingTable);
+        records = mergeBlocks(records, waitingRecords);
         Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       }
     }
+  }
+
+  public SortedRecords getAndPopulateSortedRecords(int segmentId) {
+    int mergedKeys = 0;
+    Record[] records = new Record[_segmentIntermediateRecords.size()];
+    for (IntermediateRecord intermediateRecord : _segmentIntermediateRecords.get(segmentId)) {
+      records[mergedKeys++] = intermediateRecord._record;
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
+    }
+    return new SortedRecords(records, records.length);
   }
 
   public SortedRecordTable getAndPopulateSortedRecordTable(int segmentId) {
@@ -315,8 +316,24 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
     return block1.mergeSortedGroupByResultBlock(block2);
   }
 
-  private SortedRecordTable mergeBlocks(SortedRecordTable block1, SortedRecordTable block2) {
-    return block1.mergeSortedRecordTable(block2);
+  private SortedRecords mergeBlocks(SortedRecords block1, SortedRecords block2) {
+    return _sortedRecordsMerger.mergeSortedRecordArray(block1, block2);
+  }
+
+  private SortedRecordTable finishSortedRecords(SortedRecords recordArray) {
+    SortedRecordTable table =
+        new SortedRecordTable(recordArray, _dataSchema, _queryContext,
+            _queryContext.getLimit(), _executorService, _recordKeyComparator);
+
+    // finish
+    if (_queryContext.isServerReturnFinalResult()) {
+      table.finish(true, true);
+    } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
+      table.finish(false, true);
+    } else {
+      table.finish(false);
+    }
+    return table;
   }
 
   public static void main(String[] args)

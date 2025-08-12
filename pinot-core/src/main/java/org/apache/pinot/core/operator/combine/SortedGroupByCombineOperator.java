@@ -79,7 +79,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   private volatile boolean _numGroupsWarningLimitReached;
   private volatile DataSchema _dataSchema;
 
-  private final AtomicReference<SortedRecords> _waitingTable;
+  private final AtomicReference<SortedRecords> _waitingRecords;
   private final Comparator<Record> _recordKeyComparator;
   private final SortedRecordsMerger _sortedRecordsMerger;
 
@@ -89,7 +89,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
 
     assert (queryContext.shouldSortAggregateUnderSafeTrim());
     _operatorLatch = new CountDownLatch(_numTasks);
-    _waitingTable = new AtomicReference<>();
+    _waitingRecords = new AtomicReference<>();
     _recordKeyComparator = OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
         queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
     _sortedRecordsMerger =
@@ -141,21 +141,21 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
         }
         // short-circuit one segment case
         if (_numOperators == 1) {
-          _waitingTable.set(GroupByUtils.getAndPopulateSortedRecords(resultsBlock));
+          _waitingRecords.set(GroupByUtils.getAndPopulateSortedRecords(resultsBlock));
           break;
         }
 
-        SortedRecords table =
+        SortedRecords records =
             GroupByUtils.getAndPopulateSortedRecords(resultsBlock);
 
         while (true) {
-          SortedRecords finalTable = table;
-          SortedRecords waitingTable = _waitingTable.getAndUpdate(v -> v == null ? finalTable : null);
-          if (waitingTable == null) {
+          SortedRecords finalRecords = records;
+          SortedRecords waitingRecords = _waitingRecords.getAndUpdate(v -> v == null ? finalRecords : null);
+          if (waitingRecords == null) {
             break;
           }
           // if found waiting block, merge and loop
-          table = mergeBlocks(table, waitingTable);
+          records = mergeBlocks(records, waitingRecords);
           Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
         }
       } catch (RuntimeException e) {
@@ -219,13 +219,13 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
       return new ExceptionResultsBlock(errMsg);
     }
 
-    SortedRecords recordArray = _waitingTable.get();
-    return finishSortedRecords(recordArray);
+    SortedRecords records = _waitingRecords.get();
+    return finishSortedRecords(records);
   }
 
-  private GroupByResultsBlock finishSortedRecords(SortedRecords recordArray) {
+  private GroupByResultsBlock finishSortedRecords(SortedRecords records) {
     SortedRecordTable table =
-        new SortedRecordTable(recordArray, _dataSchema, _queryContext,
+        new SortedRecordTable(records, _dataSchema, _queryContext,
             _queryContext.getLimit(), _executorService, _recordKeyComparator);
 
     // finish

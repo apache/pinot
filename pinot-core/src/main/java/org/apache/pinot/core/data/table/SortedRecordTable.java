@@ -99,19 +99,6 @@ public class SortedRecordTable extends BaseTable {
     throw new UnsupportedOperationException("method unused for SortedRecordTable");
   }
 
-  /// Merge another SortedRecordTable into self
-  public SortedRecordTable mergeSortedRecordTable(SortedRecordTable that) {
-    assert (that._resultSize == _resultSize);
-    if (that.size() == 0) {
-      return this;
-    }
-    if (size() == 0) {
-      return that;
-    }
-    mergeSortedRecords(that._records, that.size());
-    return this;
-  }
-
   /// Merge a segment result into self, saving an allocation of SortedRecordTable
   public SortedRecordTable mergeSortedGroupByResultBlock(GroupByResultsBlock block) {
     List<IntermediateRecord> segmentRecords = block.getIntermediateRecords();
@@ -121,52 +108,6 @@ public class SortedRecordTable extends BaseTable {
     }
     mergeSegmentRecords(segmentRecords, segmentRecords.size());
     return this;
-  }
-
-  /// Merge in that._records, update _records _curIdx
-  private void mergeSortedRecords(Record[] records2, int mj) {
-    Record[] newRecords = new Record[_resultSize];
-    int newNextIdx = 0;
-
-    Record[] records1 = _records;
-
-    int i = 0;
-    int j = 0;
-    int mi = size();
-
-    while (i < mi && j < mj) {
-      int cmp = _comparator.compare(records1[i], records2[j]);
-      if (cmp < 0) {
-        newRecords[newNextIdx++] = records1[i++];
-      } else if (cmp == 0) {
-        newRecords[newNextIdx++] = updateRecord(records1[i++], records2[j++]);
-      } else {
-        newRecords[newNextIdx++] = records2[j++];
-      }
-      // if enough records
-      if (newNextIdx == _resultSize) {
-        finalizeRecordMerge(newRecords, newNextIdx);
-        return;
-      }
-    }
-
-    while (i < mi) {
-      newRecords[newNextIdx++] = records1[i++];
-      if (newNextIdx == _resultSize) {
-        finalizeRecordMerge(newRecords, newNextIdx);
-        return;
-      }
-    }
-
-    while (j < mj) {
-      newRecords[newNextIdx++] = records2[j++];
-      if (newNextIdx == _resultSize) {
-        finalizeRecordMerge(newRecords, newNextIdx);
-        return;
-      }
-    }
-
-    finalizeRecordMerge(newRecords, newNextIdx);
   }
 
   private void finalizeRecordMerge(Record[] records, int newIdx) {
