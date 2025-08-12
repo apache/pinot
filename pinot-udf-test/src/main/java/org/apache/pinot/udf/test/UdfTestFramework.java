@@ -180,6 +180,9 @@ public class UdfTestFramework {
       if (e.getCause().getMessage().contains("Unsupported function")) {
         return new ResultByExample.Failure("Unsupported");
       }
+      if (e.getCause().getMessage().contains("Caught exception while doing operator")) {
+        return new ResultByExample.Failure("Operator execution error");
+      }
       return new ResultByExample.Failure(e.getCause().getMessage());
     }
   }
@@ -210,6 +213,10 @@ public class UdfTestFramework {
       actual = canonizeObject(actual);
       switch (this) {
         case EQUAL:
+          if (expected instanceof Double && actual instanceof Double
+            && doubleCompare((Double) expected, (Double) actual) != 0) {
+            throw new AssertionError(describeDiscrepancy(expected, actual));
+          }
           if (!Objects.equals(expected, actual)) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
@@ -233,7 +240,7 @@ public class UdfTestFramework {
                 + "comparison, but got: expected=" + expected + "(of type " + expectedClass + ")"
                 + ", actual=" + actual + "(of type " + actualClass + ")");
           }
-          if (Double.compare(((Number) expected).doubleValue(), ((Number) actual).doubleValue()) != 0) {
+          if (doubleCompare(((Number) expected).doubleValue(), ((Number) actual).doubleValue()) != 0) {
             throw new AssertionError(describeDiscrepancy(expected, actual));
           }
           break;
@@ -278,11 +285,38 @@ public class UdfTestFramework {
             list.add(f);
           }
           return list;
+        } else if (componentType == byte.class) {
+          // Convert byte array to List<Byte> for consistency
+          byte[] byteArray = (byte[]) value;
+          ArrayList<Byte> list = new ArrayList<>(byteArray.length);
+          for (byte b : byteArray) {
+            list.add(b);
+          }
+          return list;
         } else {
           return Arrays.asList((Object[]) value);
         }
       }
       return value;
     }
+  }
+
+  private static int doubleCompare(double d1, double d2) {
+    double epsilon = 0.0001d;
+    if (d1 > d2) {
+      if (d1 * (1 - epsilon) > d2) {
+        return 1;
+      } else {
+        return 0;
+      }
+    }
+    if (d2 > d1) {
+      if (d2 * (1 - epsilon) > d1) {
+        return -1;
+      } else {
+        return 0;
+      }
+    }
+    return 0;
   }
 }

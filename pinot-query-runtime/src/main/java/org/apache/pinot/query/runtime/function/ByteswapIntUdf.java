@@ -1,0 +1,58 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.pinot.query.runtime.function;
+
+import com.google.auto.service.AutoService;
+import java.util.Map;
+import java.util.Set;
+import org.apache.pinot.common.function.scalar.ArithmeticFunctions;
+import org.apache.pinot.core.udf.Udf;
+import org.apache.pinot.core.udf.UdfExample;
+import org.apache.pinot.core.udf.UdfExampleBuilder;
+import org.apache.pinot.core.udf.UdfParameter;
+import org.apache.pinot.core.udf.UdfSignature;
+import org.apache.pinot.spi.data.FieldSpec;
+
+@AutoService(Udf.class)
+public class ByteswapIntUdf extends Udf.FromAnnotatedMethod {
+
+  public ByteswapIntUdf() throws NoSuchMethodException {
+    super(ArithmeticFunctions.class.getMethod("byteswapInt", int.class));
+  }
+
+  @Override
+  public String getDescription() {
+    return "Returns the value obtained by reversing the byte order of the input integer.";
+  }
+
+  @Override
+  public Map<UdfSignature, Set<UdfExample>> getExamples() {
+    return UdfExampleBuilder.forSignature(UdfSignature.of(
+            UdfParameter.of("value", FieldSpec.DataType.INT)
+                .withDescription("The integer value to reverse byte order for."),
+            UdfParameter.result(FieldSpec.DataType.INT)
+                .withDescription("The integer with reversed byte order.")
+        ))
+        .addExample("byteswapInt(0x12345678)", 0x12345678, 0x78563412)
+        .addExample("byteswapInt(0)", 0, 0)
+        .addExample(UdfExample.create("null input", null, null).withoutNull(0))
+        .build()
+        .generateExamples();
+  }
+}

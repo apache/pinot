@@ -45,11 +45,11 @@ adler32:
 ago:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DateTimeFunctions.ago}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.AgoUdf"
 agomv:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DateTimeFunctions.agoMV}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.AgoMvUdf"
 and:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.AndOperatorTransformFunction"
@@ -69,43 +69,43 @@ arrayconcatdouble:
 arrayconcatfloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatFloat}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayConcatFloatUdf"
 arrayconcatint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayConcatIntUdf"
 arrayconcatlong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayConcatLongUdf"
 arrayconcatstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayConcatString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayConcatStringUdf"
 arraycontainsint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayContainsInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayContainsIntUdf"
 arraycontainsstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayContainsString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayContainsStringUdf"
 arraydistinctint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayDistinctInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayDistinctIntUdf"
 arraydistinctstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayDistinctString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayDistinctStringUdf"
 arrayelementatdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtDouble}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtDoubleUdf"
 arrayelementatfloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtFloat}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtFloatUdf"
 arrayelementatint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtInt}"
   transform: null
@@ -113,43 +113,43 @@ arrayelementatint:
 arrayelementatlong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtLongUdf"
 arrayelementatstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayElementAtString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayElementAtStringUdf"
 arrayindexesofdouble:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfDouble}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfDoubleUdf"
 arrayindexesoffloat:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfFloat}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfFloatUdf"
 arrayindexesofint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfIntUdf"
 arrayindexesoflong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfLongUdf"
 arrayindexesofstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexesOfString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexesOfStringUdf"
 arrayindexofint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexOfInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexOfIntUdf"
 arrayindexofstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayIndexOfString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayIndexOfStringUdf"
 arraylength:
   scalar: "org.apache.pinot.common.function.scalar.array.ArrayLengthScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.ArrayLengthTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayLengthUdf"
 arraymax:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ArrayMaxTransformFunction"
@@ -157,64 +157,64 @@ arraymax:
 arraymin:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ArrayMinTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayMinUdf"
 arrayremoveint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayRemoveInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayRemoveIntUdf"
 arrayremovestring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayRemoveString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayRemoveStringUdf"
 arrayreverseint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayReverseInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayReverseIntUdf"
 arrayreversestring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayReverseString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayReverseStringUdf"
 arraysliceint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySliceInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySliceIntUdf"
 arrayslicestring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySliceString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySliceStringUdf"
 arraysortint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySortInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySortIntUdf"
 arraysortstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySortString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySortStringUdf"
 arraysum:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ArraySumTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySumUdf"
 arraysumint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySumInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySumIntUdf"
 arraysumlong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arraySumLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArraySumLongUdf"
 arraytostring:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.ArrayFunctions.arrayToString,\
     \ 3: org.apache.pinot.common.function.scalar.ArrayFunctions.arrayToString]}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayToStringUdf"
 arrayunionint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayUnionIntUdf"
 arrayunionstring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayUnionString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayUnionStringUdf"
 arrayvalueconstructor:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArrayFunctions.arrayValueConstructor}"
   transform: null
@@ -222,15 +222,15 @@ arrayvalueconstructor:
 asin:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.asin}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AsinTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.AsinUdf"
 atan:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.atan}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AtanTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.AtanUdf"
 atan2:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.atan2}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.Atan2TransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.Atan2Udf"
 avgreduce:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.core.query.reduce.function.InternalReduceFunctions.avgReduce}"
   transform: null
@@ -238,15 +238,15 @@ avgreduce:
 base64decode:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.base64Decode}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.Base64DecodeUdf"
 base64encode:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.base64Encode}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.Base64EncodeUdf"
 between:
   scalar: "org.apache.pinot.common.function.scalar.comparison.BetweenScalarFunction"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.BetweenUdf"
 bigdecimaltobytes:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.bigDecimalToBytes}"
   transform: null
@@ -258,23 +258,23 @@ brokerid:
 bytestobigdecimal:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.bytesToBigDecimal}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.BytesToBigDecimalUdf"
 bytestohex:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DataTypeConversionFunctions.bytesToHex}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.BytesToHexUdf"
 byteswapint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.byteswapInt}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ByteswapIntUdf"
 byteswaplong:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.byteswapLong}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ByteswapLongUdf"
 cardinality:
   scalar: "org.apache.pinot.common.function.scalar.array.ArrayLengthScalarFunction"
   transform: "org.apache.pinot.core.operator.transform.function.ArrayLengthTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ArrayLengthUdf"
 case:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ObjectFunctions.caseWhen}"
   transform: "org.apache.pinot.core.operator.transform.function.CaseTransformFunction"
@@ -290,15 +290,15 @@ cast:
 ceil:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.ceil}"
   transform: "org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CeilUdf"
 ceiling:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.ceil}"
   transform: "org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CeilUdf"
 chr:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.chr}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ChrUdf"
 cid:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.InternalFunctions.cid}"
   transform: null
@@ -331,7 +331,7 @@ coalesce:
 codepoint:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.codepoint}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CodepointUdf"
 concat:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.StringFunctions.concat,\
     \ 3: org.apache.pinot.common.function.scalar.string.StringFunctions.concat]}"
@@ -344,15 +344,15 @@ concatws:
 contains:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.contains}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ContainsUdf"
 cos:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.cos}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CosTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CosUdf"
 cosh:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.cosh}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CoshTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CoshUdf"
 cosinedistance:
   scalar: "ArgumentCountBasedScalarFunction{[2: org.apache.pinot.common.function.scalar.VectorFunctions.cosineDistance,\
     \ 3: org.apache.pinot.common.function.scalar.VectorFunctions.cosineDistance]}"
@@ -361,7 +361,7 @@ cosinedistance:
 cot:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.TrigonometricFunctions.cot}"
   transform: "org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CotTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CotUdf"
 cpcsketchtostring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.core.function.scalar.SketchFunctions.cpcSketchToString}"
   transform: null
@@ -383,35 +383,35 @@ crc32c:
 cutfragment:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.cutFragment}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CutFragmentUdf"
 cutquerystring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.cutQueryString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CutQueryStringUdf"
 cutquerystringandfragment:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.cutQueryStringAndFragment}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CutQueryStringAndFragmentUdf"
 cuttofirstsignificantsubdomain:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.cutToFirstSignificantSubdomain}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CutToFirstSignificantSubdomainUdf"
 cuttofirstsignificantsubdomainwithwww:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.cutToFirstSignificantSubdomainWithWWW}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CutToFirstSignificantSubdomainWithWwwUdf"
 cuturlparameter:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.cutURLParameter}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CutUrlParameterUdf"
 cuturlparameters:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.cutURLParameters}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CutUrlParametersUdf"
 cutwww:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.cutWWW}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.CutWwwUdf"
 dateadd:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DateTimeFunctions.timestampAdd}"
   transform: null
@@ -570,7 +570,7 @@ encodeurl:
 endswith:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.endsWith}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.EndsWithUdf"
 endtime:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.InternalFunctions.endTime}"
   transform: null
@@ -586,7 +586,7 @@ euclideandistance:
 exp:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.exp}"
   transform: "org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction"
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ExpUdf"
 extract:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.DateTimeFunctions.extract}"
   transform: "org.apache.pinot.core.operator.transform.function.ExtractTransformFunction"
@@ -594,15 +594,15 @@ extract:
 extracturlparameter:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.extractURLParameter}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ExtractUrlParameterUdf"
 extracturlparameternames:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.extractURLParameterNames}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ExtractUrlParameterNamesUdf"
 extracturlparameters:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.extractURLParameters}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.ExtractUrlParametersUdf"
 floor:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.ArithmeticFunctions.floor}"
   transform: "org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction"
@@ -1410,7 +1410,7 @@ starea:
 startswith:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.StringFunctions.startsWith}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.StartsWithUdf"
 starttime:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.InternalFunctions.startTime}"
   transform: null
@@ -1815,75 +1815,75 @@ upper:
 urldecode:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlDecode}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlDecodeUdf"
 urldecodeformcomponent:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlDecodeFormComponent}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlDecodeFormComponentUdf"
 urldomain:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlDomain}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlDomainUdf"
 urldomainwithoutwww:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlDomainWithoutWWW}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlDomainWithoutWwwUdf"
 urlencode:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlEncode}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlEncodeUdf"
 urlencodeformcomponent:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlEncodeFormComponent}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlEncodeFormComponentUdf"
 urlfirstsignificantsubdomain:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlFirstSignificantSubdomain}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlFirstSignificantSubdomainUdf"
 urlfragment:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlFragment}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlFragmentUdf"
 urlhierarchy:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlHierarchy}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlHierarchyUdf"
 urlnetloc:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlNetloc}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlNetlocUdf"
 urlpath:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlPath}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlPathUdf"
 urlpathhierarchy:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlPathHierarchy}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlPathHierarchyUdf"
 urlpathwithquery:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlPathWithQuery}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlPathWithQueryUdf"
 urlport:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlPort}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlPortUdf"
 urlprotocol:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlProtocol}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlProtocolUdf"
 urlquerystring:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlQueryString}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlQueryStringUdf"
 urlquerystringandfragment:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlQueryStringAndFragment}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlQueryStringAndFragmentUdf"
 urltopleveldomain:
   scalar: "ArgumentCountBasedScalarFunction{org.apache.pinot.common.function.scalar.UrlFunctions.urlTopLevelDomain}"
   transform: null
-  udf: null
+  udf: "org.apache.pinot.query.runtime.function.UrlTopLevelDomainUdf"
 valuein:
   scalar: null
   transform: "org.apache.pinot.core.operator.transform.function.ValueInTransformFunction"
