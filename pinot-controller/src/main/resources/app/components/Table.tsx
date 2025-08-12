@@ -597,7 +597,7 @@ export default function CustomizedTables({
         </TableContainer>
         {finalData.length > 10 ? (
           <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
+            rowsPerPageOptions={[5, 10, 25, 50, 100]}
             component="div"
             count={finalData.length}
             rowsPerPage={rowsPerPage}

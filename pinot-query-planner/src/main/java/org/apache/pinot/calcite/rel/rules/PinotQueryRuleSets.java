@@ -116,8 +116,8 @@ public class PinotQueryRuleSets {
       // join and semi-join rules
       SemiJoinRule.ProjectToSemiJoinRule.ProjectToSemiJoinRuleConfig.DEFAULT
           .withDescription(PlannerRuleNames.PROJECT_TO_SEMI_JOIN).toRule(),
-      PinotSeminJoinDistinctProjectRule
-          .instanceWithDescription(PlannerRuleNames.SEMIN_JOIN_DISTINCT_PROJECT),
+      PinotSemiJoinDistinctProjectRule
+          .instanceWithDescription(PlannerRuleNames.SEMI_JOIN_DISTINCT_PROJECT),
 
       // Consider semijoin optimizations first before push transitive predicate
       // Pinot version doesn't push predicates to the right in case of lookup join

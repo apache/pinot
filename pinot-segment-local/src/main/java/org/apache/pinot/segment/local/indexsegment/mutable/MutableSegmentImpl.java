@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.indexsegment.mutable;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import it.unimi.dsi.fastutil.booleans.BooleanArrayList;
 import it.unimi.dsi.fastutil.booleans.BooleanList;
@@ -75,7 +76,6 @@ import org.apache.pinot.segment.local.upsert.UpsertContext;
 import org.apache.pinot.segment.local.utils.FixedIntArrayOffHeapIdMap;
 import org.apache.pinot.segment.local.utils.IdMap;
 import org.apache.pinot.segment.local.utils.IngestionUtils;
-import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.SegmentMetadata;
@@ -96,6 +96,7 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.MultiColumnTextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.index.startree.AggregationFunctionColumnPair;
 import org.apache.pinot.segment.spi.index.startree.StarTreeV2;
 import org.apache.pinot.segment.spi.memory.PinotDataBufferMemoryManager;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
@@ -480,7 +481,7 @@ public class MutableSegmentImpl implements MutableSegment {
   private static Map<String, Pair<String, ValueAggregator>> getMetricsAggregators(RealtimeSegmentConfig segmentConfig) {
     if (segmentConfig.aggregateMetrics()) {
       return fromAggregateMetrics(segmentConfig);
-    } else if (!CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs())) {
+    } else if (CollectionUtils.isNotEmpty(segmentConfig.getIngestionAggregationConfigs())) {
       return fromAggregationConfig(segmentConfig);
     } else {
       return Collections.emptyMap();
@@ -491,8 +492,10 @@ public class MutableSegmentImpl implements MutableSegment {
     Preconditions.checkState(CollectionUtils.isEmpty(segmentConfig.getIngestionAggregationConfigs()),
         "aggregateMetrics cannot be enabled if AggregationConfig is set");
 
-    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
-    for (String metricName : segmentConfig.getSchema().getMetricNames()) {
+    List<String> metricNames = segmentConfig.getSchema().getMetricNames();
+    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator =
+        Maps.newHashMapWithExpectedSize(metricNames.size());
+    for (String metricName : metricNames) {
       columnNameToAggregator.put(metricName, Pair.of(metricName,
           ValueAggregatorFactory.getValueAggregator(AggregationFunctionType.SUM, Collections.emptyList())));
     }
@@ -500,11 +503,11 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   private static Map<String, Pair<String, ValueAggregator>> fromAggregationConfig(RealtimeSegmentConfig segmentConfig) {
-    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator = new HashMap<>();
-
-    Preconditions.checkState(!segmentConfig.aggregateMetrics(),
-        "aggregateMetrics cannot be enabled if AggregationConfig is set");
-    for (AggregationConfig config : segmentConfig.getIngestionAggregationConfigs()) {
+    List<AggregationConfig> aggregationConfigs = segmentConfig.getIngestionAggregationConfigs();
+    assert !segmentConfig.aggregateMetrics() && CollectionUtils.isNotEmpty(aggregationConfigs);
+    Map<String, Pair<String, ValueAggregator>> columnNameToAggregator =
+        Maps.newHashMapWithExpectedSize(aggregationConfigs.size());
+    for (AggregationConfig config : aggregationConfigs) {
       ExpressionContext expressionContext = RequestContextUtils.getExpression(config.getAggregationFunction());
       // validation is also done when the table is created, this is just a sanity check.
       Preconditions.checkState(expressionContext.getType() == ExpressionContext.Type.FUNCTION,
@@ -512,14 +515,16 @@ public class MutableSegmentImpl implements MutableSegment {
       FunctionContext functionContext = expressionContext.getFunction();
       AggregationFunctionType functionType =
           AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-      TableConfigUtils.validateIngestionAggregation(functionType);
-      ExpressionContext argument = functionContext.getArguments().get(0);
+      List<ExpressionContext> arguments = functionContext.getArguments();
+      ExpressionContext argument = arguments.get(0);
       Preconditions.checkState(argument.getType() == ExpressionContext.Type.IDENTIFIER,
           "aggregator function argument must be a identifier: %s", config);
+      ValueAggregator valueAggregator =
+          ValueAggregatorFactory.getValueAggregator(functionType, arguments.subList(1, arguments.size()));
+      Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
+          "aggregator function must have fixed size aggregated value: %s", config);
 
-      columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(),
-          ValueAggregatorFactory.getValueAggregator(functionType,
-              functionContext.getArguments().subList(1, functionContext.getArguments().size()))));
+      columnNameToAggregator.put(config.getColumnName(), Pair.of(argument.getIdentifier(), valueAggregator));
     }
 
     return columnNameToAggregator;
@@ -811,9 +816,17 @@ public class MutableSegmentImpl implements MutableSegment {
       String column = entry.getKey();
       IndexContainer indexContainer = entry.getValue();
 
-      // aggregate metrics is enabled.
-      if (indexContainer._valueAggregator != null) {
-        Object value = row.getValue(indexContainer._sourceColumn);
+      // Handle ingestion aggregation
+      ValueAggregator valueAggregator = indexContainer._valueAggregator;
+      if (valueAggregator != null) {
+        String sourceColumn = indexContainer._sourceColumn;
+        // NOTE: value can be null if the column is not specified in the schema.
+        Object value = row.getValue(sourceColumn);
+        // Handle COUNT(*)
+        if (value == null && sourceColumn.equals(AggregationFunctionColumnPair.STAR)) {
+          assert valueAggregator.getAggregationType() == AggregationFunctionType.COUNT;
+          value = 1;
+        }
 
         // Update numValues info
         indexContainer._valuesInfo.updateSVNumValues();
@@ -822,7 +835,7 @@ public class MutableSegmentImpl implements MutableSegment {
         FieldSpec fieldSpec = indexContainer._fieldSpec;
 
         DataType dataType = fieldSpec.getDataType();
-        value = indexContainer._valueAggregator.getInitialAggregatedValue(value);
+        value = valueAggregator.getInitialAggregatedValue(value);
         // BIG_DECIMAL is actually stored as byte[] and hence can be supported here.
         switch (dataType.getStoredType()) {
           case INT:
@@ -839,7 +852,7 @@ public class MutableSegmentImpl implements MutableSegment {
             break;
           case BIG_DECIMAL:
           case BYTES:
-            forwardIndex.add(indexContainer._valueAggregator.serializeAggregatedValue(value), -1, docId);
+            forwardIndex.add(valueAggregator.serializeAggregatedValue(value), -1, docId);
             break;
           default:
             throw new UnsupportedOperationException(
@@ -926,7 +939,7 @@ public class MutableSegmentImpl implements MutableSegment {
         if (_multiColumnValues != null) {
           int pos = _multiColumnPos.getInt(column);
           if (pos > -1) {
-            _multiColumnValues.set(pos, (String) value);
+            _multiColumnValues.set(pos, value);
           }
         }
       } else {
@@ -1011,37 +1024,47 @@ public class MutableSegmentImpl implements MutableSegment {
   private void aggregateMetrics(GenericRow row, int docId) {
     for (MetricFieldSpec metricFieldSpec : _physicalMetricFieldSpecs) {
       IndexContainer indexContainer = _indexContainerMap.get(metricFieldSpec.getName());
-      Object value = row.getValue(indexContainer._sourceColumn);
+      ValueAggregator valueAggregator = indexContainer._valueAggregator;
+      String sourceColumn = indexContainer._sourceColumn;
+      // NOTE: value can be null if the column is not specified in the schema.
+      Object value = row.getValue(sourceColumn);
+      // Skip aggregation if the input value is null.
+      if (value == null) {
+        // Handle COUNT(*)
+        if (sourceColumn.equals(AggregationFunctionColumnPair.STAR)) {
+          assert valueAggregator.getAggregationType() == AggregationFunctionType.COUNT;
+          value = 1;
+        } else {
+          continue;
+        }
+      }
       MutableForwardIndex forwardIndex =
           (MutableForwardIndex) indexContainer._mutableIndexes.get(StandardIndexes.forward());
       DataType dataType = metricFieldSpec.getDataType();
 
-      Double oldDoubleValue;
-      Double newDoubleValue;
-      Long oldLongValue;
-      Long newLongValue;
-      ValueAggregator valueAggregator = indexContainer._valueAggregator;
       switch (valueAggregator.getAggregatedValueType()) {
         case DOUBLE:
+          double oldDoubleValue;
+          double newDoubleValue;
           switch (dataType) {
             case INT:
-              oldDoubleValue = ((Integer) forwardIndex.getInt(docId)).doubleValue();
-              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
-              forwardIndex.setInt(docId, newDoubleValue.intValue());
+              oldDoubleValue = forwardIndex.getInt(docId);
+              newDoubleValue = (double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              forwardIndex.setInt(docId, (int) newDoubleValue);
               break;
             case LONG:
-              oldDoubleValue = ((Long) forwardIndex.getLong(docId)).doubleValue();
-              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
-              forwardIndex.setLong(docId, newDoubleValue.longValue());
+              oldDoubleValue = forwardIndex.getLong(docId);
+              newDoubleValue = (double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              forwardIndex.setLong(docId, (long) newDoubleValue);
               break;
             case FLOAT:
-              oldDoubleValue = ((Float) forwardIndex.getFloat(docId)).doubleValue();
-              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
-              forwardIndex.setFloat(docId, newDoubleValue.floatValue());
+              oldDoubleValue = forwardIndex.getFloat(docId);
+              newDoubleValue = (double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              forwardIndex.setFloat(docId, (float) newDoubleValue);
               break;
             case DOUBLE:
               oldDoubleValue = forwardIndex.getDouble(docId);
-              newDoubleValue = (Double) valueAggregator.applyRawValue(oldDoubleValue, value);
+              newDoubleValue = (double) valueAggregator.applyRawValue(oldDoubleValue, value);
               forwardIndex.setDouble(docId, newDoubleValue);
               break;
             default:
@@ -1050,26 +1073,28 @@ public class MutableSegmentImpl implements MutableSegment {
           }
           break;
         case LONG:
+          long oldLongValue;
+          long newLongValue;
           switch (dataType) {
             case INT:
-              oldLongValue = ((Integer) forwardIndex.getInt(docId)).longValue();
-              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
-              forwardIndex.setInt(docId, newLongValue.intValue());
+              oldLongValue = forwardIndex.getInt(docId);
+              newLongValue = (long) valueAggregator.applyRawValue(oldLongValue, value);
+              forwardIndex.setInt(docId, (int) newLongValue);
               break;
             case LONG:
               oldLongValue = forwardIndex.getLong(docId);
-              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
+              newLongValue = (long) valueAggregator.applyRawValue(oldLongValue, value);
               forwardIndex.setLong(docId, newLongValue);
               break;
             case FLOAT:
-              oldLongValue = ((Float) forwardIndex.getFloat(docId)).longValue();
-              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
-              forwardIndex.setFloat(docId, newLongValue.floatValue());
+              oldLongValue = (long) forwardIndex.getFloat(docId);
+              newLongValue = (long) valueAggregator.applyRawValue(oldLongValue, value);
+              forwardIndex.setFloat(docId, (float) newLongValue);
               break;
             case DOUBLE:
-              oldLongValue = ((Double) forwardIndex.getDouble(docId)).longValue();
-              newLongValue = (Long) valueAggregator.applyRawValue(oldLongValue, value);
-              forwardIndex.setDouble(docId, newLongValue.doubleValue());
+              oldLongValue = (long) forwardIndex.getDouble(docId);
+              newLongValue = (long) valueAggregator.applyRawValue(oldLongValue, value);
+              forwardIndex.setDouble(docId, (double) newLongValue);
               break;
             default:
               throw new UnsupportedOperationException(String.format("Aggregation type %s of %s not supported for %s",

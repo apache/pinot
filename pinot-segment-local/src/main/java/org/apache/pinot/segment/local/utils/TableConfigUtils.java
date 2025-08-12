@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -44,6 +43,8 @@ import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.config.TagNameUtils;
+import org.apache.pinot.segment.local.aggregator.ValueAggregator;
+import org.apache.pinot.segment.local.aggregator.ValueAggregatorFactory;
 import org.apache.pinot.segment.local.function.FunctionEvaluator;
 import org.apache.pinot.segment.local.function.FunctionEvaluatorFactory;
 import org.apache.pinot.segment.local.recordtransformer.SchemaConformingTransformer;
@@ -105,7 +106,9 @@ import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.pinot.segment.spi.AggregationFunctionType.*;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTHLL;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.DISTINCTCOUNTHLLPLUS;
+import static org.apache.pinot.segment.spi.AggregationFunctionType.SUMPRECISION;
 
 
 /**
@@ -124,8 +127,6 @@ public final class TableConfigUtils {
   // this is duplicate with KinesisConfig.STREAM_TYPE, while instead of use KinesisConfig.STREAM_TYPE directly, we
   // hardcode the value here to avoid pulling the entire pinot-kinesis module as dependency.
   private static final String KINESIS_STREAM_TYPE = "kinesis";
-  private static final EnumSet<AggregationFunctionType> SUPPORTED_INGESTION_AGGREGATIONS =
-      EnumSet.of(SUM, MIN, MAX, COUNT, DISTINCTCOUNTHLL, SUMPRECISION, DISTINCTCOUNTHLLPLUS);
 
   private static final Set<String> UPSERT_DEDUP_ALLOWED_ROUTING_STRATEGIES =
       ImmutableSet.of(RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE,
@@ -418,7 +419,7 @@ public final class TableConfigUtils {
       // Aggregation configs
       List<AggregationConfig> aggregationConfigs = ingestionConfig.getAggregationConfigs();
       Set<String> aggregationSourceColumns = new HashSet<>();
-      if (!CollectionUtils.isEmpty(aggregationConfigs)) {
+      if (CollectionUtils.isNotEmpty(aggregationConfigs)) {
         Preconditions.checkState(!tableConfig.getIndexingConfig().isAggregateMetrics(),
             "aggregateMetrics cannot be set with AggregationConfig");
         Set<String> aggregationColumns = new HashSet<>();
@@ -453,8 +454,6 @@ public final class TableConfigUtils {
           FunctionContext functionContext = expressionContext.getFunction();
           AggregationFunctionType functionType =
               AggregationFunctionType.getAggregationFunctionType(functionContext.getFunctionName());
-          validateIngestionAggregation(functionType);
-
           List<ExpressionContext> arguments = functionContext.getArguments();
           int numArguments = arguments.size();
           if (functionType == DISTINCTCOUNTHLL) {
@@ -510,6 +509,18 @@ public final class TableConfigUtils {
           Preconditions.checkState(firstArgument.getType() == ExpressionContext.Type.IDENTIFIER,
               "First argument of aggregation function: %s must be identifier, got: %s", functionType,
               firstArgument.getType());
+          // Create a ValueAggregator for the aggregation function and check if it is supported for ingestion (fixed
+          // size aggregated value).
+          ValueAggregator<?, ?> valueAggregator;
+          try {
+            valueAggregator =
+                ValueAggregatorFactory.getValueAggregator(functionType, arguments.subList(1, numArguments));
+          } catch (Exception e) {
+            throw new IllegalStateException(
+                "Caught exception while creating ValueAggregator for aggregation function: " + aggregationFunction, e);
+          }
+          Preconditions.checkState(valueAggregator.isAggregatedValueFixedSize(),
+              "Aggregation function: %s must have fixed size aggregated value", aggregationFunction);
 
           aggregationSourceColumns.add(firstArgument.getIdentifier());
         }
@@ -599,11 +610,6 @@ public final class TableConfigUtils {
         SchemaConformingTransformer.validateSchema(schema, schemaConformingTransformerConfig);
       }
     }
-  }
-
-  public static void validateIngestionAggregation(AggregationFunctionType functionType) {
-    Preconditions.checkState(SUPPORTED_INGESTION_AGGREGATIONS.contains(functionType),
-        "Aggregation function: %s must be one of: %s", functionType, SUPPORTED_INGESTION_AGGREGATIONS);
   }
 
   private static void validateStreamConfigMaps(TableConfig tableConfig) {
