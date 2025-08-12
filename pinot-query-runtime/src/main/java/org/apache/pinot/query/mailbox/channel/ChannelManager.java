@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
+import com.google.common.base.Preconditions;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
@@ -55,11 +56,10 @@ public class ChannelManager {
    */
   private final Duration _idleTimeout;
 
-  public ChannelManager(@Nullable TlsConfig tlsConfig, Duration pingerPeriod) {
+  public ChannelManager(@Nullable TlsConfig tlsConfig, Duration idleTimeout) {
+    Preconditions.checkArgument(idleTimeout.isNegative() || idleTimeout.isZero(), "Idle timeout must be positive");
     _tlsConfig = tlsConfig;
-    _idleTimeout = pingerPeriod.isNegative() || pingerPeriod.isZero()
-        ? Duration.ofMinutes(30)
-        : pingerPeriod.multipliedBy(2);
+    _idleTimeout = idleTimeout;
   }
 
   public ManagedChannel getChannel(String hostname, int port) {

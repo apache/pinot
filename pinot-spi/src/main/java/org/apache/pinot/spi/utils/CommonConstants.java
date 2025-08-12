@@ -1836,6 +1836,19 @@ public class CommonConstants {
     public static final long DEFAULT_PINGER_PERIOD_SECONDS = 10 * 60L;
 
     /**
+     * Configuration for channel idle timeout in seconds.
+     *
+     * gRPC channels go idle after a period of inactivity. This value should be higher than the pinger period
+     * to ensure that the pinger can keep the channel alive.
+     *
+     * The default value of -1 means that the channel idle timeout is automatically set to be higher than the pinger
+     * period. In general, this value should not be changed except for special cases like testing or disabling the
+     * pinger and setting the channel idle timeout to a larger value to avoid the channel going idle.
+     */
+    public static final String KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS = "pinot.query.runner.channel.idle.timeout.seconds";
+    public static final long DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS = -1;
+
+    /**
      * Enable splitting of data block payload during mailbox transfer.
      */
     public static final String KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT =

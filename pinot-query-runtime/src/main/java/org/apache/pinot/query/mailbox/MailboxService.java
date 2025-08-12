@@ -81,14 +81,10 @@ public class MailboxService {
     _port = port;
     _config = config;
     _tlsConfig = tlsConfig;
-    long pingerPeriodSecs = config.getProperty(
-        CommonConstants.MultiStageQueryRunner.KEY_OF_PINGER_PERIOD_SECONDS,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_PINGER_PERIOD_SECONDS);
-    Duration pingerPeriod = Duration.ofSeconds(pingerPeriodSecs);
+    _channelManager = new ChannelManager(tlsConfig, getIdleTimeout(config));
 
-    _channelManager = new ChannelManager(tlsConfig, pingerPeriod);
-
-    if (pingerPeriodSecs > 0) {
+    Duration pingerPeriod = getPingerPeriod(config);
+    if (!pingerPeriod.isZero() && !pingerPeriod.isNegative()) {
       _mailboxSenderPinger = new MailboxSenderPinger(hostname, port, _channelManager, pingerPeriod);
     } else {
       _mailboxSenderPinger = null;
@@ -178,5 +174,27 @@ public class MailboxService {
    */
   public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
     _receivingMailboxCache.invalidate(mailbox.getId());
+  }
+
+  private static Duration getPingerPeriod(PinotConfiguration config) {
+    long pingerPeriodSecs = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_PINGER_PERIOD_SECONDS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_PINGER_PERIOD_SECONDS);
+    return Duration.ofSeconds(pingerPeriodSecs);
+  }
+
+  private static Duration getIdleTimeout(PinotConfiguration config) {
+    long channelIdleTimeoutSeconds = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS);
+    if (channelIdleTimeoutSeconds > 0) {
+      return Duration.ofSeconds(channelIdleTimeoutSeconds);
+    }
+    Duration pingerPeriod = getPingerPeriod(config);
+    if (pingerPeriod.isNegative() || pingerPeriod.isZero()) {
+      return Duration.ofMinutes(30);
+    } else {
+      return pingerPeriod.multipliedBy(2);
+    }
   }
 }
