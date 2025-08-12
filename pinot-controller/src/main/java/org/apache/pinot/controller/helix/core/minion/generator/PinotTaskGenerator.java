@@ -85,7 +85,7 @@ public interface PinotTaskGenerator {
    * 2. This method can also be used by individual task generators to consider the limit while generating subtasks
    */
   default int getMaxNumSubTasks() {
-    return MinionConstants.DEFAULT_MAX_NUM_OF_SUBTASKS;
+    return MinionConstants.DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT;
   }
 
   /**

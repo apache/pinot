@@ -92,7 +92,7 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
         LOGGER.error("Invalid config {}: '{}'", configKey, configValue, e);
       }
     }
-    return MinionConstants.DEFAULT_MAX_NUM_OF_SUBTASKS;
+    return MinionConstants.DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT;
   }
 
   /**

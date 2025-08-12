@@ -79,7 +79,7 @@ public class MinionConstants {
    * Job configs
    */
   public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
-  public static final int DEFAULT_MAX_NUM_OF_SUBTASKS = Integer.MAX_VALUE;
+  public static final int DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT = Integer.MAX_VALUE;
 
   /**
    * Segment download thread pool size to be set at task level.
