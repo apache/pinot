@@ -245,7 +245,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                 + "maximum number of tasks to schedule: {}. Only the first {} tasks will be scheduled. This is "
                 + "controlled by the cluster config maxAllowedSubTasks which is set based on controller's performance",
             taskType, tableName, pinotTaskConfigs.size(), maxNumberOfSubTasks, maxNumberOfSubTasks);
-        pinotTaskConfigs = pinotTaskConfigs.subList(0, maxNumberOfSubTasks);
+        pinotTaskConfigs = new ArrayList<>(pinotTaskConfigs.subList(0, maxNumberOfSubTasks));
       }
       pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
           .computeIfAbsent(TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
@@ -756,6 +756,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                   + " by the cluster config maxAllowedSubTasks which is set based on controller's performance",
               taskType, tableName, presentTaskConfig.size(), maxNumberOfSubTasks, maxNumberOfSubTasks);
           presentTaskConfig = new ArrayList<>(presentTaskConfig.subList(0, maxNumberOfSubTasks));
+          response.addGenerationError("Number of tasks generated for task type: " + taskType
+              + " for table: " + tableName + " is " + presentTaskConfig.size()
+              + ", which is greater than the maximum number of tasks to schedule: " + maxNumberOfSubTasks
+              + ". Only the first " + maxNumberOfSubTasks + " tasks will be scheduled. Please trigger the task again "
+              + " or run it with a configured schedule");
         }
 
         minionInstanceTagToTaskConfigs.put(minionInstanceTag, presentTaskConfig);
