@@ -141,9 +141,11 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   private void addReceivingStats(StatMap<ReceivingMailbox.StatKey> from) {
@@ -255,8 +257,16 @@ public abstract class BaseMailboxReceiveOperator extends MultiStageOperator {
     /**
      * How long (in CPU time) it took to wait for the messages to be offered to downstream operator.
      */
-    UPSTREAM_WAIT_MS(StatMap.Type.LONG);
-    //@formatter:on
+    UPSTREAM_WAIT_MS(StatMap.Type.LONG),
+    /**
+     * Allocated memory in bytes for this operator or its children in the same stage.
+     */
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /**
+     * Time spent on GC while this operator or its children in the same stage were running.
+     */
+    GC_TIME_MS(StatMap.Type.LONG),
+    ; //@formatter:on
 
     private final StatMap.Type _type;
 
