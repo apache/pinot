@@ -94,7 +94,7 @@ public class ArrayToMvValidationVisitor implements PlanNodeVisitor<Void, Boolean
           && columnDataTypes[key] != null
           && columnDataTypes[key].isArray()) {
         throw new QueryException(QueryErrorCode.QUERY_PLANNING,
-            "Multi-values are not supported as a grouping key in the intermediate stage. "
+            "Multi-valued columns are not supported as a grouping key in the intermediate stage. "
                 + "Use ARRAY_TO_MV() to group by multi-value column");
       }
     }
