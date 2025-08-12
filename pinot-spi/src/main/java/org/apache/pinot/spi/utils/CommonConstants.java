@@ -1106,10 +1106,16 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
-    // threshold for number of rows per segment result for doing partitioned group-by
-    public static final int DEFAULT_GROUPBY_RADIX_BITS = 4;
-    // number of partitions when doing partitioned group-by
-    public static final int DEFAULT_GROUPBY_PARTITION_THRESHOLD = 10_000;
+    // Number of available processors
+    public static final int RUNTIME_AVAILABLE_PROCESSORS = Runtime.getRuntime().availableProcessors();
+    // Number of partitions when doing partitioned group-by. Defaulted to log2(RUNTIME_AVAILABLE_PROCESSORS)
+    public static final int DEFAULT_GROUPBY_RADIX_BITS = isPowerOfTwo(RUNTIME_AVAILABLE_PROCESSORS)
+        ? Integer.numberOfTrailingZeros(RUNTIME_AVAILABLE_PROCESSORS)
+        : (int) Math.ceil(Math.log(RUNTIME_AVAILABLE_PROCESSORS) / Math.log(2));
+
+    public static boolean isPowerOfTwo(int n) {
+      return n > 0 && (n & (n - 1)) == 0;
+    }
 
     // TODO: Merge this with "mse"
     /**

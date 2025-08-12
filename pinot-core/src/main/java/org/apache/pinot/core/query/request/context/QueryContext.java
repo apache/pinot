@@ -145,7 +145,6 @@ public class QueryContext {
 
   private int _groupByPartitionNumRadixBits = Server.DEFAULT_GROUPBY_RADIX_BITS;
   private int _groupByNumPartitions;
-  private int _groupByPartitionThreshold = Server.DEFAULT_GROUPBY_PARTITION_THRESHOLD;
 
   private QueryContext(@Nullable String tableName, @Nullable QueryContext subquery,
       List<ExpressionContext> selectExpressions, boolean distinct, List<String> aliasList,
@@ -483,10 +482,6 @@ public class QueryContext {
     _nullHandlingEnabled = nullHandlingEnabled;
   }
 
-  public int getGroupByPartitionThreshold() {
-    return _groupByPartitionThreshold;
-  }
-
   public int getGroupByPartitionNumRadixBits() {
     return _groupByPartitionNumRadixBits;
   }
@@ -679,7 +674,6 @@ public class QueryContext {
       queryContext._isUnsafeTrim =
           !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
 
-      // TODO: parse and set _groupByNumPartitions and _groupByPartitionThreshold
       queryContext._groupByNumPartitions = 1 << queryContext._groupByPartitionNumRadixBits;
 
       return queryContext;

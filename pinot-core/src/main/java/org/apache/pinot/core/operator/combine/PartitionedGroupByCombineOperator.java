@@ -49,7 +49,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.GroupByUtils;
-import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
@@ -99,11 +98,10 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
     assert _queryContext.getGroupByExpressions() != null;
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
-    _numPartitions = QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY;
+    _numPartitions = queryContext.getGroupByNumPartitions();
     _operatorLatch = new CountDownLatch(_numPartitions);
     _futures = new Future[_numPartitions];
 
-    _queryContext.setGroupByPartitionNumRadixBits(31 - Integer.numberOfLeadingZeros(_numPartitions));
     _mergedIndexedTables = new TwoLevelHashMapIndexedTable[_numPartitions];
     _queues = new LinkedBlockingQueue[_numPartitions];
     for (int i = 0; i < _queues.length; i++) {
