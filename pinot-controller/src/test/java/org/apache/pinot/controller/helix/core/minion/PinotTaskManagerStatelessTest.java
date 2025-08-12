@@ -146,16 +146,16 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
 
     // Test ad-hoc task creation - should limit to maxSubTasks
     Map<String, String> result = taskManager.createTask(taskType, RAW_TABLE_NAME, null, new HashMap<>());
-    
+
     // Verify task was created but limited to maxSubTasks
     assertNotNull(result);
     assertEquals(result.size(), 1);
     String taskName = result.get(TABLE_NAME_WITH_TYPE);
     assertNotNull(taskName);
-    
+
     // Verify the number of subtasks is limited to maxSubTasks
     List<PinotTaskConfig> subtaskConfigs = taskResourceManager.getSubtaskConfigs(taskName);
-    assertEquals(subtaskConfigs.size(), maxSubTasks, 
+    assertEquals(subtaskConfigs.size(), maxSubTasks,
         "Expected " + maxSubTasks + " subtasks but got " + subtaskConfigs.size());
 
     dropOfflineTable(RAW_TABLE_NAME);
@@ -190,21 +190,21 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTablesToSchedule(Collections.singleton(TABLE_NAME_WITH_TYPE))
         .setTasksToSchedule(Collections.singleton(taskType));
-    
+
     Map<String, TaskSchedulingInfo> result = taskManager.scheduleTasks(context);
-    
+
     // Verify task was scheduled but limited to maxSubTasks
     assertNotNull(result);
     assertTrue(result.containsKey(taskType));
     TaskSchedulingInfo schedulingInfo = result.get(taskType);
     assertNotNull(schedulingInfo.getScheduledTaskNames());
     assertEquals(schedulingInfo.getScheduledTaskNames().size(), 1);
-    
+
     String taskName = schedulingInfo.getScheduledTaskNames().get(0);
-    
+
     // Verify the number of subtasks is limited to maxSubTasks
     List<PinotTaskConfig> subtaskConfigs = taskResourceManager.getSubtaskConfigs(taskName);
-    assertEquals(subtaskConfigs.size(), maxSubTasks, 
+    assertEquals(subtaskConfigs.size(), maxSubTasks,
         "Expected " + maxSubTasks + " subtasks but got " + subtaskConfigs.size());
 
     // Verify result contains a generation error
@@ -225,7 +225,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     String rawTableName2 = "testTable2";
     String tableNameWithType1 = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName1);
     String tableNameWithType2 = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName2);
-    
+
     Schema schema1 = new Schema.SchemaBuilder().setSchemaName(rawTableName1)
         .addSingleValueDimension("col1", FieldSpec.DataType.STRING).build();
     Schema schema2 = new Schema.SchemaBuilder().setSchemaName(rawTableName2)
@@ -260,21 +260,21 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTablesToSchedule(Set.of(tableNameWithType1, tableNameWithType2))
         .setTasksToSchedule(Collections.singleton(taskType));
-    
+
     Map<String, TaskSchedulingInfo> result = taskManager.scheduleTasks(context);
-    
+
     // Verify task was scheduled but limited to maxSubTasks total
     assertNotNull(result);
     assertTrue(result.containsKey(taskType));
     TaskSchedulingInfo schedulingInfo = result.get(taskType);
     assertNotNull(schedulingInfo.getScheduledTaskNames());
     assertEquals(schedulingInfo.getScheduledTaskNames().size(), 1);
-    
+
     String taskName = schedulingInfo.getScheduledTaskNames().get(0);
-    
+
     // Verify the total number of subtasks is limited to maxSubTasks across all tables
     List<PinotTaskConfig> subtaskConfigs = taskResourceManager.getSubtaskConfigs(taskName);
-    assertEquals(subtaskConfigs.size(), maxSubTasks, 
+    assertEquals(subtaskConfigs.size(), maxSubTasks,
         "Expected " + maxSubTasks + " total subtasks across all tables but got " + subtaskConfigs.size());
 
     dropOfflineTable(rawTableName1);
