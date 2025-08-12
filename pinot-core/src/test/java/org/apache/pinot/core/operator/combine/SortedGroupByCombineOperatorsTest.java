@@ -67,6 +67,7 @@ public class SortedGroupByCombineOperatorsTest {
   // Create (MAX_NUM_THREADS_PER_QUERY * 2) segments so that each thread needs to process 2 segments
   private static final int NUM_SEGMENTS = QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY * 2;
   private static final int NUM_RECORDS_PER_SEGMENT = 100;
+  private static final int NUM_RECORDS_PER_SMALL_SEGMENT = 50;
 
   private static final String INT_COLUMN = "intColumn";
   private static final TableConfig TABLE_CONFIG =
@@ -162,6 +163,27 @@ public class SortedGroupByCombineOperatorsTest {
     }
   }
 
+  @Test
+  public void testSafeTrimPairWiseLargeSmallSegments() {
+    GroupByResultsBlock combineResult = getPairWiseCombineResultLargeSmallBlocks(
+        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY intColumn LIMIT 100");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+    assertEquals(combineResult.getRows().size(), 100);
+    assertEquals(combineResult.getNumSegmentsProcessed(), 2);
+    for (int i = 0; i < 50; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 1L);
+    }
+    for (int i = 50; i < 100; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 2L);
+    }
+  }
+
   // ----
   // Sequential combine
   @Test
@@ -209,6 +231,27 @@ public class SortedGroupByCombineOperatorsTest {
       Object[] row = combineResult.getRows().get(i);
       assertEquals(row[0], i);
       assertEquals(row[1], 1L);
+    }
+  }
+
+  @Test
+  public void testSafeTrimSequentialLargeSmallSegments() {
+    GroupByResultsBlock combineResult = getSequentialCombineResultLargeSmallBlocks(
+        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY intColumn LIMIT 100");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+    assertEquals(combineResult.getRows().size(), 100);
+    assertEquals(combineResult.getNumSegmentsProcessed(), 2);
+    for (int i = 0; i < 50; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 1L);
+    }
+    for (int i = 50; i < 100; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 2L);
     }
   }
 
@@ -289,6 +332,29 @@ public class SortedGroupByCombineOperatorsTest {
     return ImmutableSegmentLoader.load(new File(TEMP_DIR, segmentName), ReadMode.mmap);
   }
 
+  private IndexSegment createOfflineSmallSegment(int index)
+      throws Exception {
+    int baseValue = index * NUM_RECORDS_PER_SEGMENT / 2;
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SMALL_SEGMENT);
+    for (int i = 0; i < NUM_RECORDS_PER_SMALL_SEGMENT; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(INT_COLUMN, baseValue + i);
+      records.add(record);
+    }
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
+    String segmentName = SEGMENT_NAME_PREFIX + index;
+    segmentGeneratorConfig.setSegmentName(segmentName);
+    segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.build();
+
+    return ImmutableSegmentLoader.load(new File(TEMP_DIR, segmentName), ReadMode.mmap);
+  }
+
   @SuppressWarnings({"rawTypes"})
   private GroupByResultsBlock getPairWiseCombineResult(String query) {
     // ensure pair-wise execution
@@ -349,6 +415,48 @@ public class SortedGroupByCombineOperatorsTest {
       List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
       IndexSegment indexSegment = createOfflineSegment(0);
       planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
+      queryContext.setEndTimeMs(System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, null);
+      BaseCombineOperator combineOperator = combinePlanNode.run();
+      Preconditions.checkState(combineOperator instanceof SequentialSortedGroupByCombineOperator);
+      return (GroupByResultsBlock) combineOperator.nextBlock();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @SuppressWarnings({"rawTypes"})
+  private GroupByResultsBlock getPairWiseCombineResultLargeSmallBlocks(String query) {
+    // ensure pair-wise execution
+    try {
+      query = "SET sortAggregateSingleThreadedNumSegmentsThreshold=1; " + query;
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
+      IndexSegment indexSegment1 = createOfflineSegment(0);
+      IndexSegment indexSegment2 = createOfflineSmallSegment(1);
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment1), queryContext));
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment2), queryContext));
+      queryContext.setEndTimeMs(System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+      CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, null);
+      BaseCombineOperator combineOperator = combinePlanNode.run();
+      Preconditions.checkState(combineOperator instanceof SortedGroupByCombineOperator);
+      return (GroupByResultsBlock) combineOperator.nextBlock();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @SuppressWarnings({"rawTypes"})
+  private GroupByResultsBlock getSequentialCombineResultLargeSmallBlocks(String query) {
+    // ensure pair-wise execution
+    try {
+      query = "SET sortAggregateSingleThreadedNumSegmentsThreshold=10000000; " + query;
+      QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+      List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
+      IndexSegment indexSegment1 = createOfflineSegment(0);
+      IndexSegment indexSegment2 = createOfflineSmallSegment(1);
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment1), queryContext));
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment2), queryContext));
       queryContext.setEndTimeMs(System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
       CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, null);
       BaseCombineOperator combineOperator = combinePlanNode.run();
