@@ -20,11 +20,12 @@ package org.apache.pinot.core.operator.combine;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,6 +49,11 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.core.util.QueryMultiThreadingUtils;
+import org.apache.pinot.core.util.trace.TraceRunnable;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryErrorMessage;
 import org.apache.pinot.spi.exception.QueryException;
@@ -73,13 +79,13 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
 
   private volatile DataSchema _dataSchema;
   private volatile IndexedTable _indexedTable;
-  private final CompletableFuture<RadixPartitionedIntermediateRecords>[] _partitionedRecordsFutures;
 
   private final AtomicInteger _nextPartitionId = new AtomicInteger(0);
   private final TwoLevelHashMapIndexedTable[] _mergedIndexedTables;
   private volatile boolean _groupsTrimmed;
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
+  protected final Future[] _futures;
 
   private final LinkedBlockingQueue<List<IntermediateRecord>>[] _queues;
 
@@ -93,19 +99,67 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
     assert _queryContext.getGroupByExpressions() != null;
     _numGroupByExpressions = _queryContext.getGroupByExpressions().size();
     _numColumns = _numGroupByExpressions + _numAggregationFunctions;
-    _operatorLatch = new CountDownLatch(_numTasks);
-    _partitionedRecordsFutures = new CompletableFuture[operators.size()];
+    _numPartitions = QueryMultiThreadingUtils.MAX_NUM_THREADS_PER_QUERY;
+    _operatorLatch = new CountDownLatch(_numPartitions);
+    _futures = new Future[_numPartitions];
 
-    for (int i = 0; i < operators.size(); i++) {
-      _partitionedRecordsFutures[i] = new CompletableFuture<>();
-    }
-
-    _numPartitions = _numTasks;
     _queryContext.setGroupByPartitionNumRadixBits(31 - Integer.numberOfLeadingZeros(_numPartitions));
     _mergedIndexedTables = new TwoLevelHashMapIndexedTable[_numPartitions];
     _queues = new LinkedBlockingQueue[_numPartitions];
     for (int i = 0; i < _queues.length; i++) {
       _queues[i] = new LinkedBlockingQueue<>();
+    }
+  }
+
+  /**
+   * Copied from {@link BaseCombineOperator}, but fires {@code _numPartitions} tasks instead of {@code _numTasks}.
+   * Start the combine operator process. This will spin up multiple threads to process data segments in parallel.
+   */
+  @Override
+  protected void startProcess() {
+    Tracing.activeRecording().setNumTasks(_numPartitions);
+    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
+    for (int i = 0; i < _numPartitions; i++) {
+      int taskId = i;
+      _futures[i] = _executorService.submit(new TraceRunnable() {
+        @Override
+        public void runJob() {
+          ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
+          Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
+
+          // Register the task to the phaser
+          // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
+          //       the query execution has finished, and the main thread has deregistered itself and returned the
+          //       result. Directly return as no execution result will be taken.
+          if (_phaser.register() < 0) {
+            Tracing.ThreadAccountantOps.clear();
+            return;
+          }
+          try {
+            processSegments();
+          } catch (EarlyTerminationException e) {
+            // Early-terminated by interruption (canceled by the main thread)
+          } catch (Throwable t) {
+            // Caught exception/error, skip processing the remaining segments
+            // NOTE: We need to handle Error here, or the execution threads will die without adding the execution
+            //       exception into the query response, and the main thread might wait infinitely (until timeout) or
+            //       throw unexpected exceptions (such as NPE).
+            if (t instanceof Exception) {
+              LOGGER.error("Caught exception while processing query: {}", _queryContext, t);
+            } else {
+              LOGGER.error("Caught serious error while processing query: {}", _queryContext, t);
+            }
+            onProcessSegmentsException(t);
+          } finally {
+            onProcessSegmentsFinish();
+            _phaser.arriveAndDeregister();
+            Tracing.ThreadAccountantOps.clear();
+          }
+
+          _totalWorkerThreadCpuTimeNs.getAndAdd(resourceSnapshot.getCpuTimeNs());
+          _totalWorkerThreadMemAllocatedBytes.getAndAdd(resourceSnapshot.getAllocatedBytes());
+        }
+      });
     }
   }
 
@@ -205,6 +259,9 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
         GroupByResultsBlock resultsBlock = (GroupByResultsBlock) operator.nextBlock();
         if (_dataSchema == null) {
           _dataSchema = resultsBlock.getDataSchema();
+        }
+        if (_queryContext.getLimit() == 0) {
+          return;
         }
         if (table == null) {
           table = GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService);
@@ -380,6 +437,10 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
         errMsg = new QueryErrorMessage(QueryErrorCode.QUERY_EXECUTION, userError, devError);
       }
       return new ExceptionResultsBlock(errMsg);
+    }
+
+    if (_queryContext.getLimit() == 0) {
+      return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
     }
 
     return mergePartitionedGroupByResults();
