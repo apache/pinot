@@ -47,7 +47,7 @@ import TimeseriesChart from './TimeseriesChart';
 import MetricStatsTable from './MetricStatsTable';
 import { parseTimeseriesResponse, isPrometheusFormat } from '../../utils/TimeseriesUtils';
 import { ChartSeries } from 'Models';
-import { MAX_SERIES_LIMIT } from '../../utils/ChartConstants';
+import { DEFAULT_SERIES_LIMIT } from '../../utils/ChartConstants';
 
 // Define proper types
 interface TimeseriesQueryResponse {
@@ -274,7 +274,7 @@ const TimeseriesQueryPage = () => {
   const [copyMsg, showCopyMsg] = React.useState(false);
   const [viewType, setViewType] = useState<'json' | 'chart'>('chart');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
-  const [seriesLimitInput, setSeriesLimitInput] = useState<string>(MAX_SERIES_LIMIT.toString());
+  const [seriesLimitInput, setSeriesLimitInput] = useState<string>(DEFAULT_SERIES_LIMIT.toString());
 
 
   // Fetch supported languages from controller configuration
@@ -380,9 +380,9 @@ const TimeseriesQueryPage = () => {
       const series = parseTimeseriesResponse(parsedData);
       setTotalSeriesCount(series.length);
 
-      // Create truncated series for visualization (limit to seriesLimitInput or default to MAX_SERIES_LIMIT)
+      // Create truncated series for visualization (limit to seriesLimitInput or default to DEFAULT_SERIES_LIMIT)
       const limit = parseInt(seriesLimitInput, 10);
-      const effectiveLimit = !isNaN(limit) && limit > 0 ? limit : MAX_SERIES_LIMIT;
+      const effectiveLimit = !isNaN(limit) && limit > 0 ? limit : DEFAULT_SERIES_LIMIT;
 
       const truncatedSeries = series.slice(0, effectiveLimit);
       setChartSeries(truncatedSeries);
@@ -606,7 +606,7 @@ const TimeseriesQueryPage = () => {
                           value={seriesLimitInput}
                           onChange={(e) => setSeriesLimitInput(e.target.value)}
                           inputProps={{ min: 1, max: 1000 }}
-                          placeholder="20"
+                          placeholder={DEFAULT_SERIES_LIMIT.toString()}
                         />
                       </FormControl>
                     </div>
