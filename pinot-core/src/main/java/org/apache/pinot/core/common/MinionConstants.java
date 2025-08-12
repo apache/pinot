@@ -198,6 +198,10 @@ public class MinionConstants {
 
     // Maximum number of tasks to create per table per run.
     public static final int MAX_NUM_TASKS_PER_TABLE = 20;
+
+    // Configuration to enable column-wise segment rebuilding for immutable-to-immutable conversion
+    // When set to true, uses rebuildSegment() method for optimized column-wise processing
+    public static final String COLUMNAR_RELOAD_AND_SKIP_TRANSFORMATION = "columnarReloadAndSkipTransformation";
   }
 
   public static class UpsertCompactionTask {
