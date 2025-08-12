@@ -91,7 +91,7 @@ class SizeBasedSegmentFlushThresholdComputer {
       if (postCommitRows > 0) {
         double estimatedPreCommitSize = ((double) postCommitSizeBytes) * ((double) preCommitRows)
             / (double) postCommitRows;
-        sizeForCalculation = (long) Math.max(1L, Math.round(estimatedPreCommitSize));
+        sizeForCalculation = Math.round(estimatedPreCommitSize);
       } else {
         sizeForCalculation = postCommitSizeBytes;
       }
