@@ -78,7 +78,7 @@ public class UdfReporter {
     if (byScenario.getMap().values().stream()
         .flatMap(bySignature -> bySignature.getMap().values().stream())
         .noneMatch(UdfReporter::requiresScenarioForSignature)) {
-      return ;
+      return;
     }
 
     report.append("### Scenarios\n\n");
