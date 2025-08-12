@@ -79,48 +79,8 @@ public class SortedGroupByCombineOperatorsTest {
 
   private List<IndexSegment> _indexSegments;
 
-  @BeforeClass
-  public void setUp()
-      throws Exception {
-    FileUtils.deleteDirectory(TEMP_DIR);
-    _indexSegments = new ArrayList<>(NUM_SEGMENTS);
-    for (int i = 0; i < NUM_SEGMENTS; i++) {
-      _indexSegments.add(createOfflineSegment(i));
-    }
-  }
-
-  @AfterClass
-  public void tearDown()
-      throws IOException {
-    for (IndexSegment indexSegment : _indexSegments) {
-      indexSegment.destroy();
-    }
-    FileUtils.deleteDirectory(TEMP_DIR);
-  }
-
-  private IndexSegment createOfflineSegment(int index)
-      throws Exception {
-    int baseValue = index * NUM_RECORDS_PER_SEGMENT / 2;
-    List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SEGMENT);
-    for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
-      GenericRow record = new GenericRow();
-      record.putValue(INT_COLUMN, baseValue + i);
-      records.add(record);
-    }
-
-    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
-    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
-    String segmentName = SEGMENT_NAME_PREFIX + index;
-    segmentGeneratorConfig.setSegmentName(segmentName);
-    segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
-
-    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
-    driver.build();
-
-    return ImmutableSegmentLoader.load(new File(TEMP_DIR, segmentName), ReadMode.mmap);
-  }
-
+  // ----
+  // Pairwise combine
   @Test
   public void testSafeTrimPairWiseCombineLimit0() {
     GroupByResultsBlock combineResult = getPairWiseCombineResult(
@@ -182,6 +142,29 @@ public class SortedGroupByCombineOperatorsTest {
   }
 
   @Test
+  public void testSafeTrimPairWiseCombineServerReturnFinal() {
+    GroupByResultsBlock combineResult = getPairWiseCombineResultServerReturnFinal(
+        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY intColumn LIMIT 100");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+    assertEquals(combineResult.getRows().size(), 100);
+    assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    for (int i = 0; i < 50; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 1L);
+    }
+    for (int i = 50; i < 100; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 2L);
+    }
+  }
+
+  // ----
+  // Sequential combine
+  @Test
   public void testSafeTrimSequentialCombineLimit0() {
     GroupByResultsBlock combineResult = getSequentialCombineResult(
         "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY intColumn LIMIT 0");
@@ -239,6 +222,71 @@ public class SortedGroupByCombineOperatorsTest {
             new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
     assertEquals(combineResult.getRows().size(), 0);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+  }
+
+  @Test
+  public void testSafeTrimSequentialCombineServerReturnFinal() {
+    GroupByResultsBlock combineResult = getSequentialCombineResultServerReturnFinal(
+        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY intColumn LIMIT 100");
+    assertEquals(combineResult.getDataSchema(),
+        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+    assertEquals(combineResult.getRows().size(), 100);
+    assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
+    for (int i = 0; i < 50; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 1L);
+    }
+    for (int i = 50; i < 100; i++) {
+      Object[] row = combineResult.getRows().get(i);
+      assertEquals(row[0], i);
+      assertEquals(row[1], 2L);
+    }
+  }
+
+  // ----
+  // Utils
+  @BeforeClass
+  public void setUp()
+      throws Exception {
+    FileUtils.deleteDirectory(TEMP_DIR);
+    _indexSegments = new ArrayList<>(NUM_SEGMENTS);
+    for (int i = 0; i < NUM_SEGMENTS; i++) {
+      _indexSegments.add(createOfflineSegment(i));
+    }
+  }
+
+  @AfterClass
+  public void tearDown()
+      throws IOException {
+    for (IndexSegment indexSegment : _indexSegments) {
+      indexSegment.destroy();
+    }
+    FileUtils.deleteDirectory(TEMP_DIR);
+  }
+
+  private IndexSegment createOfflineSegment(int index)
+      throws Exception {
+    int baseValue = index * NUM_RECORDS_PER_SEGMENT / 2;
+    List<GenericRow> records = new ArrayList<>(NUM_RECORDS_PER_SEGMENT);
+    for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
+      GenericRow record = new GenericRow();
+      record.putValue(INT_COLUMN, baseValue + i);
+      records.add(record);
+    }
+
+    SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(TABLE_CONFIG, SCHEMA);
+    segmentGeneratorConfig.setTableName(RAW_TABLE_NAME);
+    String segmentName = SEGMENT_NAME_PREFIX + index;
+    segmentGeneratorConfig.setSegmentName(segmentName);
+    segmentGeneratorConfig.setOutDir(TEMP_DIR.getPath());
+
+    SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+    driver.init(segmentGeneratorConfig, new GenericRowRecordReader(records));
+    driver.build();
+
+    return ImmutableSegmentLoader.load(new File(TEMP_DIR, segmentName), ReadMode.mmap);
   }
 
   @SuppressWarnings({"rawTypes"})
@@ -309,5 +357,41 @@ public class SortedGroupByCombineOperatorsTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @SuppressWarnings({"rawTypes"})
+  private GroupByResultsBlock getPairWiseCombineResultServerReturnFinal(String query) {
+    // ensure pair-wise execution
+    query = "SET sortAggregateSingleThreadedNumSegmentsThreshold=1; "
+        + "SET serverReturnFinalResult=true; "
+        + query;
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
+    for (IndexSegment indexSegment : _indexSegments) {
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
+    }
+    queryContext.setEndTimeMs(System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, null);
+    BaseCombineOperator combineOperator = combinePlanNode.run();
+    Preconditions.checkState(combineOperator instanceof SortedGroupByCombineOperator);
+    return (GroupByResultsBlock) combineOperator.nextBlock();
+  }
+
+  @SuppressWarnings({"rawTypes"})
+  private GroupByResultsBlock getSequentialCombineResultServerReturnFinal(String query) {
+    // ensure pair-wise execution
+    query = "SET sortAggregateSingleThreadedNumSegmentsThreshold=10000000; "
+        + "SET serverReturnFinalResult=true; "
+        + query;
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
+    List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
+    for (IndexSegment indexSegment : _indexSegments) {
+      planNodes.add(PLAN_MAKER.makeSegmentPlanNode(new SegmentContext(indexSegment), queryContext));
+    }
+    queryContext.setEndTimeMs(System.currentTimeMillis() + CommonConstants.Server.DEFAULT_QUERY_EXECUTOR_TIMEOUT_MS);
+    CombinePlanNode combinePlanNode = new CombinePlanNode(planNodes, queryContext, EXECUTOR, null);
+    BaseCombineOperator combineOperator = combinePlanNode.run();
+    Preconditions.checkState(combineOperator instanceof SequentialSortedGroupByCombineOperator);
+    return (GroupByResultsBlock) combineOperator.nextBlock();
   }
 }
