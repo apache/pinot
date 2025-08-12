@@ -133,5 +133,6 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
         .setPort(_mailboxService.getPort())
         .build();
     responseObserver.onNext(pong);
+    responseObserver.onCompleted();
   }
 }
