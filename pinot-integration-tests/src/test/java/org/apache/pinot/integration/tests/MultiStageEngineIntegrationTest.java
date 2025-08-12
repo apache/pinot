@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.jayway.jsonpath.DocumentContext;
+import com.jayway.jsonpath.JsonPath;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
@@ -891,6 +893,19 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + "GROUP BY ARRAY_TO_MV(RandomAirports)";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
+  }
+
+  @Test
+  public void incorrectMultiValueColumnGroupBy()
+      throws Exception {
+    String pinotQuery = "SELECT count(*) FROM mytable "
+        + "GROUP BY RandomAirports";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    DocumentContext docContext = JsonPath.parse(jsonNode.toString());
+    List<String> messages = docContext.read("$.exceptions[*].message");
+    Assertions.assertThat(messages)
+        .anySatisfy(message ->
+            Assertions.assertThat(message).contains("Use ARRAY_TO_MV() to group by multi-value column"));
   }
 
   @Test
