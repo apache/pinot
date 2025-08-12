@@ -599,7 +599,7 @@ const TimeseriesQueryPage = () => {
                     />
                     <div className={classes.seriesLimitContainer}>
                       <Typography variant="body2" color="textSecondary">
-                        Max Series Limit:
+                        Max Series Render Limit:
                       </Typography>
                       <FormControl className={classes.seriesLimitInput}>
                         <Input
