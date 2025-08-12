@@ -216,6 +216,10 @@ public class AggregationFunctionFactory {
             return new MinAggregationFunction(arguments, nullHandlingEnabled);
           case MAX:
             return new MaxAggregationFunction(arguments, nullHandlingEnabled);
+          case MINSTRING:
+            return new MinStringAggregationFunction(arguments, nullHandlingEnabled);
+          case MAXSTRING:
+            return new MaxStringAggregationFunction(arguments, nullHandlingEnabled);
           case SUM:
           case SUM0:
             return new SumAggregationFunction(arguments, nullHandlingEnabled);
