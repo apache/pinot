@@ -113,6 +113,10 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
             tableMaxNumTasksConfig, tableName, getTaskType());
       }
     }
+    // A negative value for maxNumTasks is generally used to indicate that the intention
+    // is to not have a limit on the number of subtasks.
+    // Thus, rather than throwing an error, or setting it to the default value,
+    // we set it to the max allowed subtasks.
     if (tableMaxNumTasks > getMaxNumSubTasks() || tableMaxNumTasks <= 0) {
       LOGGER.warn(
           "MaxNumTasks for table {} for tasktype {} is {} which is greater than the max allowed subtasks {}"

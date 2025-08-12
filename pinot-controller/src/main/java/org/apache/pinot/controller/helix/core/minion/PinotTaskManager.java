@@ -755,7 +755,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
               + "maximum number of tasks to schedule: {}. Only the first {} tasks will be scheduled. This is controlled"
                   + " by the cluster config maxAllowedSubTasks which is set based on controller's performance",
               taskType, tableName, presentTaskConfig.size(), maxNumberOfSubTasks, maxNumberOfSubTasks);
-          presentTaskConfig = presentTaskConfig.subList(0, maxNumberOfSubTasks);
+          presentTaskConfig = new ArrayList<>(presentTaskConfig.subList(0, maxNumberOfSubTasks));
         }
 
         minionInstanceTagToTaskConfigs.put(minionInstanceTag, presentTaskConfig);
