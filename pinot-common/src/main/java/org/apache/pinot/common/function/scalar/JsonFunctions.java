@@ -75,6 +75,25 @@ public class JsonFunctions {
     CacheProvider.setCache(new JsonPathCache());
   }
 
+  @ScalarFunction
+  public static String jsonExtractScalar(String jsonString, String jsonPath) {
+    try {
+        JsonNode root = JsonUtils.stringToJsonNode(jsonString);
+        String cleanPath = jsonPath.replaceFirst("^\\$\\.", "");
+        String[] keys = cleanPath.split("\\.");
+        JsonNode current = root;
+        for (String key : keys) {
+            if (current == null) {
+                return null;
+            }
+            current = current.get(key);
+        }
+        return (current != null && current.isValueNode()) ? current.asText() : null;
+    } catch (Exception e) {
+        return null;
+    }
+  }
+
   /**
    * Convert Map to Json String
    */
