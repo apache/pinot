@@ -81,14 +81,14 @@ public class MailboxService {
     _port = port;
     _config = config;
     _tlsConfig = tlsConfig;
-    long pingerPeriodMs = config.getProperty(
+    long pingerPeriodSecs = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_PINGER_PERIOD_SECONDS,
         CommonConstants.MultiStageQueryRunner.DEFAULT_PINGER_PERIOD_SECONDS);
-    Duration pingerPeriod = Duration.ofSeconds(pingerPeriodMs);
+    Duration pingerPeriod = Duration.ofSeconds(pingerPeriodSecs);
 
     _channelManager = new ChannelManager(tlsConfig, pingerPeriod);
 
-    if (pingerPeriodMs > 0) {
+    if (pingerPeriodSecs > 0) {
       _mailboxSenderPinger = new MailboxSenderPinger(hostname, port, _channelManager, pingerPeriod);
     } else {
       _mailboxSenderPinger = null;
