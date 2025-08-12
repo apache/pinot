@@ -638,6 +638,9 @@ public class CommonConstants {
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
         public static final String SKIP_INDEXES = "skipIndexes";
 
+        // Query option key used to trace rule productions
+        public static final String TRACE_RULE_PRODUCTIONS = "traceRuleProductions";
+
         // Query option key used to skip a given set of rules
         public static final String SKIP_PLANNER_RULES = "skipPlannerRules";
 
