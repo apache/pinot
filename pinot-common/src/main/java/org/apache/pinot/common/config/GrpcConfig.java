@@ -27,7 +27,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 ///
 /// Remember that in Pinot we use different gPRC services for different purposes:
 /// - **query**: used by Pinot users for executing queries
-/// - **interla**: used by Pinot for internal communication between servers/broker in MSE. This includes the ability
+/// - **internal**: used by Pinot for internal communication between servers/broker in MSE. This includes the ability
 /// to send query plans from broker to server, and the mailbox service for sending data between servers/brokers.
 ///
 /// This class only affects the **query** service. See ChannelManager, MailboxService and GrpcMailboxServer to learn
