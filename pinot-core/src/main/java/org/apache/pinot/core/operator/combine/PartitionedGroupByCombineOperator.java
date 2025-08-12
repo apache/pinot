@@ -62,7 +62,8 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * Combine operator for group-by queries.
+ * Partitioned parallel combine operator for group-by queries.
+ * See {@link PartitionedGroupByCombineOperator#processSegments()} for algorithm details
  */
 @SuppressWarnings("rawtypes")
 public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
@@ -88,6 +89,7 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
 
   private final LinkedBlockingQueue<List<IntermediateRecord>>[] _queues;
 
+  @SuppressWarnings({"unchecked"})
   public PartitionedGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
@@ -162,6 +164,20 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
   }
 
   /**
+   * Stop the combine operator process. This will stop all sub-tasks that were spun up to process data segments.
+   */
+  protected void stopProcess() {
+    // Cancel all ongoing jobs
+    for (Future future : _futures) {
+      if (future != null && !future.isDone()) {
+        future.cancel(true);
+      }
+    }
+    // Deregister the main thread and wait for all threads done
+    _phaser.awaitAdvance(_phaser.arriveAndDeregister());
+  }
+
+  /**
    * For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks
    * as the default number of query worker threads (or the number of operators / segments if that's lower).
    */
@@ -210,11 +226,13 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
     TwoLevelHashMapIndexedTable table = null;
     LinkedBlockingQueue<List<IntermediateRecord>> queue = _queues[partitionId];
 
-    while (true) {
+    while (_processingException.get() == null) {
       // merge
       if (localPendingPartition != null) {
+        int mergedKeys = 0;
         for (IntermediateRecord record : localPendingPartition) {
           table.upsert(record);
+          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
         }
         localPendingPartition = null;
         if (++progress == _numOperators) {
@@ -225,21 +243,26 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
 
       try {
         while (!queue.isEmpty() || operatorId >= _numOperators) {
+          if (_processingException.get() != null) {
+            return;
+          }
           long timeoutMs = _queryContext.getEndTimeMs() - System.currentTimeMillis();
           List<IntermediateRecord> partition = queue.poll(timeoutMs, TimeUnit.MILLISECONDS);
           assert (partition != null);
           if (table == null) {
             table = GroupByUtils.createIndexedTableForPartitionMerge(_dataSchema, _queryContext, _executorService);
           }
+          int mergedKeys = 0;
           for (IntermediateRecord record : partition) {
             table.upsert(record);
+            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
           }
           if (++progress == _numOperators) {
             _mergedIndexedTables[partitionId] = table;
             return;
           }
         }
-      } catch (Exception e) {
+      } catch (RuntimeException | InterruptedException e) {
         throw wrapOperatorException(this, new RuntimeException(e));
       }
 
@@ -320,8 +343,7 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
               values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
             }
             convertedRecords[idx++] = new IntermediateRecord(new Key(keys), new Record(values), null);
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-            mergedKeys++;
+            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
           }
           intermediateRecords = Arrays.asList(convertedRecords);
         } finally {
@@ -334,10 +356,8 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
     }
 
     // in-place partition segment results
-    RadixPartitionedIntermediateRecords partitionedRecords =
-        new RadixPartitionedIntermediateRecords(_queryContext.getGroupByPartitionNumRadixBits(), operatorId,
-            intermediateRecords);
-    return partitionedRecords;
+    return new RadixPartitionedIntermediateRecords(_queryContext.getGroupByPartitionNumRadixBits(), operatorId,
+        intermediateRecords);
   }
 
   @Override
