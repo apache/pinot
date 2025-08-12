@@ -31,9 +31,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -113,9 +115,15 @@ public class PinotBrokerTimeSeriesResponse {
   }
 
   public BrokerResponse toBrokerResponse() {
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    if (_errorType != null) {
+      // TODO: Introduce proper error code based exception handling for timeseries.
+      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.UNKNOWN, _errorType + ": "
+          + _error));
+      return brokerResponse;
+    }
     DataSchema dataSchema = deriveBrokerResponseDataSchema(_data);
     ResultTable resultTable = new ResultTable(dataSchema, deriveBrokerResponseRows(_data, dataSchema.getColumnNames()));
-    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     brokerResponse.setResultTable(resultTable);
     return brokerResponse;
   }

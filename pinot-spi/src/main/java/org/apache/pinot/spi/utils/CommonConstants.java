@@ -557,6 +557,7 @@ public class CommonConstants {
       public static final String TRACE = "trace";
       public static final String QUERY_OPTIONS = "queryOptions";
       public static final String LANGUAGE = "language";
+      public static final String QUERY = "query";
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";

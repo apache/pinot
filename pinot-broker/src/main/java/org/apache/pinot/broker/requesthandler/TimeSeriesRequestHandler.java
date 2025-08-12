@@ -180,8 +180,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     }
 
     String query = mergedParams.get("query");
-    Long startTs = parseLong(mergedParams.get("start"));
-    Long endTs = parseLong(mergedParams.get("end"));
+    Long startTs = parseLongSafe(mergedParams.get("start"));
+    Long endTs = parseLongSafe(mergedParams.get("end"));
     Long stepSeconds = getStepSeconds(mergedParams.get("step"));
     Duration timeout = StringUtils.isNotBlank(mergedParams.get("timeout"))
         ? HumanReadableDuration.from(mergedParams.get("timeout")) : Duration.ofMillis(_brokerTimeoutMs);
@@ -198,7 +198,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     );
   }
 
-  private Long parseLong(String value) {
+  private Long parseLongSafe(String value) {
     return value != null ? Long.parseLong(value) : null;
   }
 
