@@ -115,10 +115,13 @@ const TaskDetail = (props) => {
     }
 
     const filtered = subtaskTableData.records.filter(([_, status]) => {
-      const subtaskStatus = typeof status === 'object' && status !== null && 'value' in status
-        ? status.value as string
-        : status as string;
-      return subtaskStatus.toUpperCase() === subtaskStatusFilter;
+      const rawStatus = (typeof status === 'object' && status !== null && 'value' in status)
+        ? (status as { value?: unknown }).value
+        : status;
+      const statusString = typeof rawStatus === 'string' ? rawStatus : '';
+      const statusUpper = statusString.toUpperCase();
+      const normalized = statusUpper === 'TIMEDOUT' ? 'TIMED_OUT' : statusUpper;
+      return normalized === subtaskStatusFilter;
     });
 
     return { ...subtaskTableData, records: filtered };

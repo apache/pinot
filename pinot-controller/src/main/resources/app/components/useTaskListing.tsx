@@ -49,25 +49,31 @@ export default function useTaskListing(props) {
     }
 
     const filtered = tasks.records.filter(([_, status]) => {
-      const taskStatus = typeof status === 'object' && status !== null && 'value' in status
-        ? status.value as string
-        : status as string;
-      return taskStatus.toUpperCase() === statusFilter;
+      const rawStatus = (typeof status === 'object' && status !== null && 'value' in status)
+        ? (status as { value?: unknown }).value
+        : status;
+      const statusString = typeof rawStatus === 'string' ? rawStatus : '';
+      const upperStatus = statusString.toUpperCase();
+      const normalized = upperStatus === 'TIMEDOUT' ? 'TIMED_OUT' : upperStatus;
+      return normalized === statusFilter;
     });
 
     return { ...tasks, records: filtered };
   }, [tasks, statusFilter]);
 
+  // Minion task page statuses
   const statusFilterOptions = [
     { label: 'All', value: 'ALL' as const },
+    { label: 'Not Started', value: 'NOT_STARTED' as const },
+    { label: 'In Progress', value: 'IN_PROGRESS' as const },
+    { label: 'Stopped', value: 'STOPPED' as const },
+    { label: 'Stopping', value: 'STOPPING' as const },
+    { label: 'Failed', value: 'FAILED' as const },
     { label: 'Completed', value: 'COMPLETED' as const },
-    { label: 'Running', value: 'RUNNING' as const },
-    { label: 'Waiting', value: 'WAITING' as const },
-    { label: 'Error', value: 'ERROR' as const },
-    { label: 'Unknown', value: 'UNKNOWN' as const },
-    { label: 'Dropped', value: 'DROPPED' as const },
-    { label: 'Timed Out', value: 'TIMED_OUT' as const },
     { label: 'Aborted', value: 'ABORTED' as const },
+    { label: 'Timed Out', value: 'TIMED_OUT' as const },
+    { label: 'Timing Out', value: 'TIMING_OUT' as const },
+    { label: 'Failing', value: 'FAILING' as const },
   ];
 
   const statusFilterElement = (
