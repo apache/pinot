@@ -84,7 +84,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
      */
     private static final String ACCOUNTANT_TASK_NAME = "CPUMemThreadAccountant";
     private static final int ACCOUNTANT_PRIORITY = 4;
-    private final ExecutorService _executorService = Executors.newFixedThreadPool(1, r -> {
+
+    private final ExecutorService _executorService = Executors.newSingleThreadExecutor(r -> {
       Thread thread = new Thread(r);
       thread.setPriority(ACCOUNTANT_PRIORITY);
       thread.setDaemon(true);
@@ -340,7 +341,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     }
 
     @Override
-    public void setupRunner(@Nullable String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
+    public void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType,
         String workloadName) {
       _threadLocalEntry.get()._errorStatus.set(null);
       if (queryId != null) {

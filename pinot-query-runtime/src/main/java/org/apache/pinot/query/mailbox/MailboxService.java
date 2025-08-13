@@ -78,16 +78,17 @@ public class MailboxService {
     _port = port;
     _config = config;
     _tlsConfig = tlsConfig;
-    _channelManager = new ChannelManager(tlsConfig);
+    int maxInboundMessageSize = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
+    );
+    _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize);
     boolean splitBlocks = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
     if (splitBlocks) {
       // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-      _maxByteStringSize = Math.max(config.getProperty(
-          CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-          CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
-      ) / 2, 1);
+      _maxByteStringSize = Math.max(maxInboundMessageSize / 2, 1);
     } else {
       _maxByteStringSize = 0;
     }

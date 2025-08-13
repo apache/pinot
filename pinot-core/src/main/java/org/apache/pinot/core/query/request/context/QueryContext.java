@@ -39,6 +39,7 @@ import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.plan.maker.InstancePlanMakerImplV2;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunctionFactory;
+import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.MemoizedClassAssociation;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -128,6 +129,7 @@ public class QueryContext {
   private int _minServerGroupTrimSize = Server.DEFAULT_QUERY_EXECUTOR_MIN_SERVER_GROUP_TRIM_SIZE;
   // Trim threshold to use for server combine for SQL GROUP BY
   private int _groupTrimThreshold = Server.DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD;
+  private boolean _optimizeMaxInitialResultHolderCapacity;
   // Number of threads to use for final reduce
   private int _numThreadsExtractFinalResult = InstancePlanMakerImplV2.DEFAULT_NUM_THREADS_EXTRACT_FINAL_RESULT;
   // Parallel chunk size for final reduce
@@ -137,6 +139,8 @@ public class QueryContext {
   // Threshold of number of segments to combine to use single-threaded sequential combine instead pair-wise
   private int _sortAggregateSequentialCombineNumSegmentsThreshold =
       Server.DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD;
+  // Segment trim size for group by operator
+  private int _effectiveSegmentGroupTrimSize;
   // Whether null handling is enabled
   private boolean _nullHandlingEnabled;
   // Whether server returns the final result
@@ -443,6 +447,7 @@ public class QueryContext {
 
   public void setMinSegmentGroupTrimSize(int minSegmentGroupTrimSize) {
     _minSegmentGroupTrimSize = minSegmentGroupTrimSize;
+    _effectiveSegmentGroupTrimSize = calculateEffectiveSegmentGroupTrimSize();
   }
 
   public int getMinServerGroupTrimSize() {
@@ -460,6 +465,15 @@ public class QueryContext {
   public void setGroupTrimThreshold(int groupTrimThreshold) {
     _groupTrimThreshold = groupTrimThreshold;
   }
+
+  public boolean isOptimizeMaxInitialResultHolderCapacity() {
+    return _optimizeMaxInitialResultHolderCapacity;
+  }
+
+  public void setOptimizeMaxInitialResultHolderCapacity(boolean optimizeMaxInitialResultHolderCapacity) {
+    _optimizeMaxInitialResultHolderCapacity = optimizeMaxInitialResultHolderCapacity;
+  }
+
 
   public int getNumThreadsExtractFinalResult() {
     return _numThreadsExtractFinalResult;
@@ -531,6 +545,24 @@ public class QueryContext {
    */
   public <K, V> V getOrComputeSharedValue(Class<V> type, K key, Function<K, V> mapper) {
     return ((ConcurrentHashMap<K, V>) _sharedValues.apply(type)).computeIfAbsent(key, mapper);
+  }
+
+  public int getEffectiveSegmentGroupTrimSize() {
+    return _effectiveSegmentGroupTrimSize;
+  }
+
+  private int calculateEffectiveSegmentGroupTrimSize() {
+    int minGroupTrimSize = getMinSegmentGroupTrimSize();
+    List<OrderByExpressionContext> orderByExpressions = getOrderByExpressions();
+    if (!isUnsafeTrim() && !hasFilteredAggregations()) {
+      // if orderby key is groupby key, and there's no having clause, and there's no filtered aggr,
+      // keep at most `limit` rows only
+      return getLimit();
+    } else if (orderByExpressions != null && minGroupTrimSize > 0) {
+      // otherwise trim to max(minSegmentGroupTrimSize, 5 * LIMIT)
+      return GroupByUtils.getTableCapacity(getLimit(), minGroupTrimSize);
+    }
+    return -1;
   }
 
   /**

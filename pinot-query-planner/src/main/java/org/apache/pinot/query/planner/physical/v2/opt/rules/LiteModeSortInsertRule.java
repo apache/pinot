@@ -21,6 +21,7 @@ package org.apache.pinot.query.planner.physical.v2.opt.rules;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.calcite.plan.RelTraitSet;
+import org.apache.calcite.rel.RelCollation;
 import org.apache.calcite.rel.RelCollations;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexNode;
@@ -29,6 +30,7 @@ import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.logical.RexExpressionUtils;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
+import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalExchange;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalSort;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelOptRule;
 import org.apache.pinot.query.planner.physical.v2.opt.PRelOptRuleCall;
@@ -87,9 +89,20 @@ public class LiteModeSortInsertRule extends PRelOptRule {
       int limit = aggregate.getLimit() > 0 ? aggregate.getLimit() : serverStageLimit;
       return aggregate.withLimit(limit);
     }
+    RelCollation relCollation = RelCollations.EMPTY;
+    if (!call._parents.isEmpty()) {
+      // Pass collation from the Exchange above if it exists.
+      PRelNode parent = call._parents.getLast();
+      if (parent.unwrap() instanceof PhysicalExchange) {
+        PhysicalExchange physicalExchange = (PhysicalExchange) parent.unwrap();
+        if (physicalExchange.getRelCollation() != null) {
+          relCollation = physicalExchange.getRelCollation();
+        }
+      }
+    }
     PRelNode input = call._currentNode;
     return new PhysicalSort(input.unwrap().getCluster(), RelTraitSet.createEmpty(), List.of(),
-        RelCollations.EMPTY, null /* offset */, newFetch, input, nodeId(), input.getPinotDataDistributionOrThrow(),
+        relCollation, null /* offset */, newFetch, input, nodeId(), input.getPinotDataDistributionOrThrow(),
         true);
   }
 

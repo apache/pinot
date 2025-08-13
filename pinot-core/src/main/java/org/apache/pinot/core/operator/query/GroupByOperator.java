@@ -42,7 +42,6 @@ import org.apache.pinot.core.query.aggregation.groupby.DefaultGroupByExecutor;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByExecutor;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
-import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,17 +137,9 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // - There are more groups than the trim size
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
-    int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
-    int trimSize = -1;
+    int trimSize = _queryContext.getEffectiveSegmentGroupTrimSize();
     boolean unsafeTrim = _queryContext.isUnsafeTrim();
-    if (!unsafeTrim) {
-      // if orderby key is groupby key, and there's no having clause, keep at most `limit` rows only
-      trimSize = _queryContext.getLimit();
-    } else if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
-      // max(minSegmentGroupTrimSize, 5 * LIMIT)
-      trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
-    }
-
+    
     if (trimSize == 0) {
       return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
     }

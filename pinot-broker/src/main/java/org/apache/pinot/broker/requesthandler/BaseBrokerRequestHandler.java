@@ -394,6 +394,12 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         ? sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
   }
 
+  /**
+   * Called when a query starts
+   * TODO: This method was created to keep track of running queries for cancellation, but it is useful for other uses.
+   *   But right now the semantics are not clear. For example, while MSE calls this method once, SSE calls it once per
+   *   query AND subquery, which means this method is called multiple times for the same query.
+   */
   protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
     if (isQueryCancellationEnabled()) {
       _queriesById.put(requestId, query);

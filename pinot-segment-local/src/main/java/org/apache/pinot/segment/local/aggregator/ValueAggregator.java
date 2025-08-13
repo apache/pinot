@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -42,8 +43,10 @@ public interface ValueAggregator<R, A> {
 
   /**
    * Returns the initial aggregated value.
+   * <p>NOTE: rawValue can be null when the aggregator is used for ingestion aggregation, and the column is not
+   * specified in the schema.
    */
-  A getInitialAggregatedValue(R rawValue);
+  A getInitialAggregatedValue(@Nullable R rawValue);
 
   /**
    * Applies a raw value to the current aggregated value.
@@ -61,6 +64,12 @@ public interface ValueAggregator<R, A> {
    * Clones an aggregated value.
    */
   A cloneAggregatedValue(A value);
+
+  /**
+   * Returns whether the aggregated value is of fixed size. Value aggregator can be used for ingestion aggregation only
+   * when the aggregated value is of fixed size.
+   */
+  boolean isAggregatedValueFixedSize();
 
   /**
    * Returns the maximum size in bytes of the aggregated values seen so far.

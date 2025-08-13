@@ -54,12 +54,11 @@ import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
-import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
-import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -670,6 +669,90 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     }
   }
 
+  @Test
+  public void testRebalancePeerDownloadDataLoss()
+      throws Exception {
+    for (int batchSizePerServer : Arrays.asList(RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER, 1, 2)) {
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX, true);
+
+      ExecutorService executorService = Executors.newFixedThreadPool(10);
+      DefaultRebalancePreChecker preChecker = new DefaultRebalancePreChecker();
+      preChecker.init(_helixResourceManager, executorService, 1);
+      TableRebalancer tableRebalancer =
+          new TableRebalancer(_helixManager, null, null, preChecker, _tableSizeReader, null);
+      TableConfig tableConfig =
+          new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+              .setNumReplicas(1)
+              .setStreamConfigs(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap())
+              .build();
+      // Create the table
+      addDummySchema(RAW_TABLE_NAME);
+      _helixResourceManager.addTable(tableConfig);
+
+      // Add the segments with peer download uri (i.e. simulate segments without deep store uri)
+      int numSegments = 10;
+      for (int i = 0; i < numSegments; i++) {
+        _helixResourceManager.addNewSegment(REALTIME_TABLE_NAME,
+            SegmentMetadataMockUtils.mockSegmentMetadata(RAW_TABLE_NAME, SEGMENT_NAME_PREFIX + i),
+            CommonConstants.Segment.METADATA_URI_FOR_PEER_DOWNLOAD);
+      }
+
+      // Rebalance should return NO_OP status
+      RebalanceConfig rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setBatchSizePerServer(batchSizePerServer);
+      RebalanceResult rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.NO_OP);
+
+      // Add 1 more servers
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + 1, true);
+
+      // Enable peer-download for the table and validate that rebalance with different parameters
+      // The table has segments without deep store uri, so it should fail with peer download data loss protection
+
+      // Case 1: downtime=true, allowPeerDownloadDataLoss=false (should fail)
+      tableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
+      rebalanceConfig = new RebalanceConfig();
+      rebalanceConfig.setDowntime(true);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
+      // to make sure the failure is due to peer download data loss protection (the description is too long, only check
+      // the keyword here)
+      assertTrue(rebalanceResult.getDescription().toLowerCase().contains("peer-download"));
+
+      // Case 2: downtime=true, allowPeerDownloadDataLoss=true (should succeed)
+      rebalanceConfig.setDowntime(true);
+      rebalanceConfig.setAllowPeerDownloadDataLoss(true);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+
+      // Case 3: downtime=false, minAvailableReplicas=0, allowPeerDownloadDataLoss=false (should fail)
+      // Add 1 more servers
+      addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + 2, true);
+
+      rebalanceConfig.setDowntime(false);
+      rebalanceConfig.setAllowPeerDownloadDataLoss(false);
+      rebalanceConfig.setMinAvailableReplicas(0);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.FAILED);
+      // to make sure the failure is due to peer download data loss protection
+      assertTrue(rebalanceResult.getDescription().toLowerCase().contains("peer-download"));
+
+      // Case 4: downtime=false, minAvailableReplicas=0, allowPeerDownloadDataLoss=true (should succeed)
+      rebalanceConfig.setAllowPeerDownloadDataLoss(true);
+      rebalanceResult = tableRebalancer.rebalance(tableConfig, rebalanceConfig, null);
+      // notice that in real world scenario, the rebalance will hang because servers cannot find segments to download
+      // in this stateless test, servers are mocked to always succeed any state transition so we expect a DONE here
+      assertEquals(rebalanceResult.getStatus(), RebalanceResult.Status.DONE);
+
+      _helixResourceManager.deleteRealtimeTable(RAW_TABLE_NAME);
+
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX);
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + 1);
+      stopAndDropFakeInstance(SERVER_INSTANCE_ID_PREFIX + 2);
+      executorService.shutdown();
+    }
+  }
+
   @Test(timeOut = 60000)
   public void testRebalanceStrictReplicaGroup()
       throws Exception {
@@ -1207,13 +1290,8 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.PASS);
     assertEquals(preCheckerResult.getMessage(), "All rebalance parameters look good");
 
-    // trigger pauseless table rebalance warning
-    IngestionConfig ingestionConfig = new IngestionConfig();
-    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(
-        Collections.singletonList(FakeStreamConfigUtils.getDefaultLowLevelStreamConfigs().getStreamConfigsMap()));
-    streamIngestionConfig.setPauselessConsumptionEnabled(true);
-    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
-    newTableConfig.setIngestionConfig(ingestionConfig);
+    // trigger peer-download enabled table rebalance warning
+    newTableConfig.getValidationConfig().setPeerSegmentDownloadScheme("http");
 
     rebalanceConfig.setDowntime(true);
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
@@ -1221,19 +1299,19 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Replication of the table is 1, which is not recommended for pauseless tables as it may cause data loss "
-            + "during rebalance");
+        "Replication of the table is 1, which is not recommended for peer-download enabled tables as it may "
+            + "cause data loss during rebalance");
 
     newTableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(3).build();
-    newTableConfig.setIngestionConfig(ingestionConfig);
+    newTableConfig.getValidationConfig().setPeerSegmentDownloadScheme("https");
 
     rebalanceResult = tableRebalancer.rebalance(newTableConfig, rebalanceConfig, null);
     preCheckerResult = rebalanceResult.getPreChecksResult().get(DefaultRebalancePreChecker.REBALANCE_CONFIG_OPTIONS);
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Number of replicas (3) is greater than 1, downtime is not recommended.\nDowntime or minAvailableReplicas=0 "
-            + "for pauseless tables may cause data loss during rebalance");
+        "Number of replicas (3) is greater than 1, downtime is not recommended.\nDowntime or minAvailableReplicas<=0 "
+            + "for peer-download enabled tables may cause data loss during rebalance");
 
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setMinAvailableReplicas(-3);
@@ -1242,7 +1320,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
+        "Downtime or minAvailableReplicas<=0 for peer-download enabled tables may cause data loss during rebalance");
 
     rebalanceConfig.setDowntime(false);
     rebalanceConfig.setMinAvailableReplicas(0);
@@ -1251,7 +1329,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertNotNull(preCheckerResult);
     assertEquals(preCheckerResult.getPreCheckStatus(), RebalancePreCheckerResult.PreCheckStatus.WARN);
     assertEquals(preCheckerResult.getMessage(),
-        "Downtime or minAvailableReplicas=0 for pauseless tables may cause data loss during rebalance");
+        "Downtime or minAvailableReplicas<=0 for peer-download enabled tables may cause data loss during rebalance");
 
     // test pass
     rebalanceConfig.setMinAvailableReplicas(1);
