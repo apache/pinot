@@ -326,8 +326,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
-    _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), CommonConstants.Accounting.ANCHOR_TASK_ID,
-        ThreadExecutionContext.TaskType.SSE, workloadName);
+    _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.SSE,
+        workloadName);
 
     try {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
