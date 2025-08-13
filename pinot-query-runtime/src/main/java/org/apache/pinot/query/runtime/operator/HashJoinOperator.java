@@ -79,7 +79,7 @@ public class HashJoinOperator extends BaseJoinOperator {
     _nullKeyRightRows = needUnmatchedRightRows() ? new ArrayList<>() : null;
   }
 
-  /** constructor that takes the schema for NonEquiEvaluator as an argument */
+  /// Constructor that takes the schema for NonEquiEvaluator as an argument
   public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
     super(context, leftInput, leftSchema, rightInput, node, nonEquiEvaluationSchema);

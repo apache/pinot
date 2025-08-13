@@ -75,7 +75,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return EXPLAIN_NAME;
   }
 
-  /// filter, project on a joined row view
+  /// Filter, project on a joined row view
   private void filterProjectLimit(List<Object> rowView, List<Object[]> rows) {
     Object[] row = null;
 
@@ -105,7 +105,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     rows.add(row == null ? rowView.toArray() : row);
   }
 
-  /// filter, project, limit on the left and right row by creating a view
+  /// Filter, project, limit on the left and right row by creating a view
   private void filterProjectLimit(Object[] leftRow, Object[] rightRow, List<Object[]> rows,
       int resultColumnSize, int leftColumnSize) {
     List<Object> rowView = JoinedRowView.of(leftRow, rightRow, resultColumnSize, leftColumnSize);
@@ -137,7 +137,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     rows.add(row == null ? rowView.toArray() : row);
   }
 
-  /// limit on a row, return true if the limit reached before adding this row
+  /// Limit on a row, return true if the limit reached before adding this row
   private boolean rowNotNeeded() {
     // limit only, terminate if enough rows
     if (_rowsSeen++ == _numRowsToKeep) {
@@ -148,7 +148,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return false;
   }
 
-  /// filter a row by left and right child, return whether the row is discarded
+  /// Filter a row by left and right child, return whether the row is discarded
   private boolean filterDiscardRow(List<Object> rowView, TransformOperand filter) {
     Object filterResult = filter.apply(rowView);
     return !BooleanUtils.isTrueInternalValue(filterResult);
@@ -159,7 +159,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return !BooleanUtils.isTrueInternalValue(filterResult);
   }
 
-  /// return the projected row
+  /// Return the projected row
   private Object[] projectRow(List<Object> rowView, List<TransformOperand> project) {
     Object[] resultRow = new Object[project.size()];
     for (int i = 0; i < project.size(); i++) {
@@ -168,7 +168,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return resultRow;
   }
 
-  /// return the projected row from input row
+  /// Return the projected row from input row
   private Object[] projectRow(Object[] row, List<TransformOperand> project) {
     Object[] resultRow = new Object[project.size()];
     for (int i = 0; i < project.size(); i++) {
@@ -177,7 +177,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     return resultRow;
   }
 
-  /// read result from _priorityQueue if sort needed, else return rows
+  /// Read result from _priorityQueue if sort needed, else return rows
   private List<Object[]> getOutputRows(List<Object[]> rows) {
     if (_numRowsToOffset <= 0) {
       return rows;
@@ -258,7 +258,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     }
   }
 
-  /// matchNonEquiConditions that takes the row view
+  /// MatchNonEquiConditions that takes the row view
   protected final boolean matchNonEquiConditions(List<Object> rowView) {
     if (_nonEquiEvaluators.isEmpty()) {
       return true;

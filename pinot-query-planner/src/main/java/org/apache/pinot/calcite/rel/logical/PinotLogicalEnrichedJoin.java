@@ -44,8 +44,10 @@ public class PinotLogicalEnrichedJoin extends Join {
 
   private final RelDataType _outputRowType;
   private final List<FilterProjectRexNode> _filterProjectRexNodes;
-  /// currently variableSet of Project Rel is ignored since
-  /// We don't support nested expressions in execution
+  /**
+   * Currently variableSet of Project Rel is ignored since
+   * we don't support nested expressions in execution
+   */
   private final Set<CorrelationId> _projectVariableSet;
   @Nullable
   private final List<RexNode> _squashedProjects;
@@ -128,7 +130,7 @@ public class PinotLogicalEnrichedJoin extends Join {
     return _squashedProjects == null ? Collections.emptyList() : _squashedProjects;
   }
 
-  /** combine all projects in _filterProjectRexNodes into a single project */
+  /// Combine all projects in _filterProjectRexNodes into a single project
   @Nullable
   private List<RexNode> squashProjects() {
     List<RexNode> prevProject = null;
@@ -148,7 +150,7 @@ public class PinotLogicalEnrichedJoin extends Join {
     return prevProject;
   }
 
-  /** adopted from @link{RelOptUtil.pushPastProject} */
+  /// Adopted from {@link org.apache.calcite.plan.RelOptUtil#pushPastProject}
   private static List<RexNode> combineProjects(List<RexNode> upper, List<RexNode> lower) {
     return new RexShuttle() {
       @Override

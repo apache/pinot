@@ -27,9 +27,9 @@ import org.apache.pinot.query.planner.logical.RexExpression;
 
 public class EnrichedJoinNode extends JoinNode {
   private final List<FilterProjectRex> _filterProjectRexes;
-  // output schema of the join
+  /// Output schema of the join
   private final DataSchema _joinResultSchema;
-  // output schema after projection, same as _joinResultSchema if no projection
+  /// Output schema after projection, same as _joinResultSchema if no projection
   private final DataSchema _projectResultSchema;
   private final int _fetch;
   private final int _offset;
@@ -54,12 +54,8 @@ public class EnrichedJoinNode extends JoinNode {
     return _joinResultSchema;
   }
 
-  public DataSchema getProjectResultSchema() {
-    return _projectResultSchema;
-  }
-
+  /// The final output schema is project output schema since only project and join alters schema
   @Override
-  // the final output schema is project output schema since only project and join alters schema
   public DataSchema getDataSchema() {
     return _projectResultSchema;
   }

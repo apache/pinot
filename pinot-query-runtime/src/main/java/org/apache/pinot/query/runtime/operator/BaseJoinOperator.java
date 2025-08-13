@@ -108,7 +108,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     _joinOverflowMode = getJoinOverflowMode(metadata, nodeHint);
   }
 
-  /** constructor that takes the schema for NonEquiEvaluator as an argument */
+  /// Constructor that takes the schema for NonEquiEvaluator as an argument
   public BaseJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
       MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
     super(context);
@@ -404,13 +404,11 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   /**
-   * This util class is a view over the left and right row joined together
-   * currently this is used for filtering and input of projection. So if the joined
-   * tuple doesn't pass the predicate, the join result is not materialized into Object[].
-   *
-   * It is debatable whether we always want to use this instead of copying the tuple
+   * This util class is a view over the left and right row joined together.
+   * Currently, this is used for filtering and input of projection. So if the joined
+   * tuple doesn't pass the predicate, the join result is not materialized into {@code Object[]}.
    */
-  abstract static class JoinedRowView extends AbstractList<Object> implements List<Object> {
+  protected abstract static class JoinedRowView extends AbstractList<Object> implements List<Object> {
     protected final int _leftSize;
     protected final int _size;
 
