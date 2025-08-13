@@ -66,7 +66,7 @@ public class MinionConstants {
   // Cluster level config of maximum subtasks for a given task
   // This is primarily used to prevent performance issues in helix leader controller when it creates
   // more subtasks than it can support
-  public static final String MAX_ALLOWED_SUB_TASKS_KEY = "maxAllowedSubTasksPerTask";
+  public static final String MAX_ALLOWED_SUB_TASKS_KEY = "minion.maxAllowedSubTasksPerTask";
 
   /**
    * Table level configs

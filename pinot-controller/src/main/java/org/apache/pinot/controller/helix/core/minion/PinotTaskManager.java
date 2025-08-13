@@ -249,8 +249,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         String message = String.format(
             "Number of tasks generated for task type: %s for table: %s is %d, which is greater than the "
                 + "maximum number of tasks to schedule: %d. This is "
-                + "controlled by the cluster config %s which is set based on controller's performance", taskType,
+                + "controlled by the cluster config %s which is set based on controller's performance.", taskType,
             tableName, pinotTaskConfigs.size(), maxNumberOfSubTasks, MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY);
+        message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
           // We throw an exception to notify the user
           // This is to ensure that the user is aware of the task generation limit
           throw new RuntimeException(message);
@@ -770,9 +771,10 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           String message = String.format(
               "Number of tasks generated for task type: %s for table: %s is %d, which is greater than the "
                   + "maximum number of tasks to schedule: %d. This is "
-                  + "controlled by the cluster config %s which is set based on controller's performance", taskType,
+                  + "controlled by the cluster config %s which is set based on controller's performance.", taskType,
               tableName, presentTaskConfig.size(), maxNumberOfSubTasks, MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY);
           if (TaskSchedulingContext.isUserTriggeredTask(triggeredBy)) {
+            message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
             presentTaskConfig.clear();
             // If the task is user-triggered, we throw an exception to notify the user
             // This is to ensure that the user is aware of the task generation limit
@@ -852,6 +854,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       // No job got scheduled due to errors
       if (numErrorTasksScheduled == minionInstanceTagToTaskConfigs.size()) {
         return response;
+      }
+    }
+    if (submittedTaskNames.isEmpty()) {
+      if (!response.getGenerationErrors().isEmpty() || !response.getSchedulingErrors().isEmpty()) {
+        throw new RuntimeException("No tasks submitted due to " + response.getGenerationErrors()
+            + " " + response.getSchedulingErrors());
       }
     }
     return response.setScheduledTaskNames(submittedTaskNames);
