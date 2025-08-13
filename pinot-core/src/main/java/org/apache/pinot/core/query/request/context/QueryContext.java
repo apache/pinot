@@ -567,6 +567,11 @@ public class QueryContext {
     private Map<ExpressionContext, ExpressionContext> _expressionOverrideHints;
     private ExplainMode _explain = ExplainMode.NONE;
 
+    public Builder() {
+      _selectExpressions = List.of();
+      _aliasList = List.of();
+    }
+
     public Builder setTableName(String tableName) {
       _tableName = tableName;
       return this;
