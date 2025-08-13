@@ -125,6 +125,6 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
 
   @Override
   public void close() {
-    _dataFetcher.close();
+    _dataBlockCache.close();
   }
 }
