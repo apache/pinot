@@ -139,7 +139,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     //       columns if no ordering is specified.
     int trimSize = _queryContext.getEffectiveSegmentGroupTrimSize();
     boolean unsafeTrim = _queryContext.isUnsafeTrim();
-    
+
     if (trimSize == 0) {
       return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
     }
