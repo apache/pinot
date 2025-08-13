@@ -27,7 +27,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS;
-import static org.apache.pinot.spi.utils.CommonConstants.Helix.DEFAULT_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS;
 
 
 @InterfaceAudience.Public
@@ -47,8 +46,12 @@ public abstract class QueryAccessControlFactory {
    */
   @Nullable
   public static QueryAccessControlFactory fromConfig(PinotConfiguration configuration) {
-    String configuredClass = configuration.getProperty(CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS,
-        DEFAULT_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS);
+    String configuredClass = configuration.getProperty(CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS);
+    if (configuredClass == null) {
+      LOGGER.info("No configured QueryAccessControlFactory. You can set {} to set one.",
+          CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS);
+      return null;
+    }
     try {
       QueryAccessControlFactory factory = PluginManager.get().createInstance(configuredClass);
       LOGGER.info("Built QueryAccessControlFactory from configured class {}", configuredClass);
