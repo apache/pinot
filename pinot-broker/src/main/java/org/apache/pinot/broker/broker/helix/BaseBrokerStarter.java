@@ -19,7 +19,6 @@
 package org.apache.pinot.broker.broker.helix;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -572,7 +571,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
       if (StringUtils.isNotEmpty(instanceTagsConfig)) {
         for (String instanceTag : StringUtils.split(instanceTagsConfig, ',')) {
           Preconditions.checkArgument(TagNameUtils.isBrokerTag(instanceTag), "Illegal broker instance tag: %s",
-                  instanceTag);
+              instanceTag);
           instanceConfig.addTag(instanceTag);
         }
         shouldUpdateBrokerResource = true;
@@ -622,11 +621,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
 
     LOGGER.info("Registering service status handler");
     ServiceStatus.setServiceStatusCallback(_instanceId, new ServiceStatus.MultipleCallbackServiceStatusCallback(
-        ImmutableList.of(new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
+        List.of(
+            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown),
+            new ServiceStatus.IdealStateAndCurrentStateMatchServiceStatusCallback(_participantHelixManager,
                 _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
             new ServiceStatus.IdealStateAndExternalViewMatchServiceStatusCallback(_participantHelixManager,
-                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup),
-            new ServiceStatus.LifecycleServiceStatusCallback(this::isStarting, this::isShuttingDown))));
+                _clusterName, _instanceId, resourcesToMonitor, minResourcePercentForStartup))));
   }
 
   private String getDefaultBrokerId() {
