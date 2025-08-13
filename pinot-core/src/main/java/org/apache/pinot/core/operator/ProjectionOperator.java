@@ -41,6 +41,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
 
   protected final Map<String, DataSource> _dataSourceMap;
   protected final BaseOperator<DocIdSetBlock> _docIdSetOperator;
+  protected final DataFetcher _dataFetcher;
   protected final DataBlockCache _dataBlockCache;
   protected final Map<String, ColumnContext> _columnContextMap;
   protected final QueryContext _queryContext;
@@ -49,7 +50,8 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
       @Nullable BaseOperator<DocIdSetBlock> docIdSetOperator, QueryContext queryContext) {
     _dataSourceMap = dataSourceMap;
     _docIdSetOperator = docIdSetOperator;
-    _dataBlockCache = new DataBlockCache(new DataFetcher(dataSourceMap));
+    _dataFetcher = new DataFetcher(dataSourceMap);
+    _dataBlockCache = new DataBlockCache(_dataFetcher);
     _columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
     dataSourceMap.forEach(
         (column, dataSource) -> _columnContextMap.put(column, ColumnContext.fromDataSource(dataSource)));
@@ -123,6 +125,6 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
 
   @Override
   public void close() {
-    _dataBlockCache.close();
+    _dataFetcher.close();
   }
 }
