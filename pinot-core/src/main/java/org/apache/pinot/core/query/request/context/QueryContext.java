@@ -450,6 +450,10 @@ public class QueryContext {
     _effectiveSegmentGroupTrimSize = calculateEffectiveSegmentGroupTrimSize();
   }
 
+  public void setEffectiveSegmentGroupTrimSize(int effectiveSegmentGroupTrimSize) {
+    _effectiveSegmentGroupTrimSize = effectiveSegmentGroupTrimSize;
+  }
+
   public int getMinServerGroupTrimSize() {
     return _minServerGroupTrimSize;
   }
@@ -722,22 +726,25 @@ public class QueryContext {
       generateAggregationFunctions(queryContext);
       extractColumns(queryContext);
 
-      queryContext._isUnsafeTrim =
-          !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+      // Pre-calculate group-by configs
+      if (queryContext.getGroupByExpressions() != null) {
+        queryContext._isUnsafeTrim =
+            !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
+        Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
+        if (sortAggregateLimitThreshold != null) {
+          queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
+        }
+        queryContext.setEffectiveSegmentGroupTrimSize(queryContext.calculateEffectiveSegmentGroupTrimSize());
 
-      Integer sortAggregateLimitThreshold = QueryOptionsUtils.getSortAggregateLimitThreshold(_queryOptions);
-      if (sortAggregateLimitThreshold != null) {
-        queryContext.setSortAggregateLimitThreshold(sortAggregateLimitThreshold);
-      }
-
-      // sortAggregateSequentialCombineNumSegmentsThreshold is defaulted to hardware concurrency
-      // if not specified. this allows one more parallel thread (the main thread) to do only combine
-      // while other worker threads process segments
-      Integer sortAggregateSequentialCombineNumSegmentsThreshold =
-          QueryOptionsUtils.getSortAggregateSequentialCombineNumSegmentsThreshold(_queryOptions);
-      if (sortAggregateSequentialCombineNumSegmentsThreshold != null) {
-        queryContext.setSortAggregateSequentialCombineNumSegmentsThreshold(
-            sortAggregateSequentialCombineNumSegmentsThreshold);
+        // sortAggregateSequentialCombineNumSegmentsThreshold is defaulted to hardware concurrency
+        // if not specified. this allows one more parallel thread (the main thread) to do only combine
+        // while other worker threads process segments
+        Integer sortAggregateSequentialCombineNumSegmentsThreshold =
+            QueryOptionsUtils.getSortAggregateSequentialCombineNumSegmentsThreshold(_queryOptions);
+        if (sortAggregateSequentialCombineNumSegmentsThreshold != null) {
+          queryContext.setSortAggregateSequentialCombineNumSegmentsThreshold(
+              sortAggregateSequentialCombineNumSegmentsThreshold);
+        }
       }
 
       return queryContext;

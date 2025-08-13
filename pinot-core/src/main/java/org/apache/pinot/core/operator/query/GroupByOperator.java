@@ -164,7 +164,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     // when no trim needed
-    if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
+    if (trimSize > 0 && _queryContext.shouldSortAggregateUnderSafeTrim()) {
       // if sort-aggregate, sort the array even if it's smaller than trimSize
       // to benefit combining. This is not very large overhead since the
       // limit threshold of sort-aggregate is small

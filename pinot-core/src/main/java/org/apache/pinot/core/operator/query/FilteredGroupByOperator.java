@@ -215,7 +215,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     // when no trim needed
-    if (_queryContext.shouldSortAggregateUnderSafeTrim()) {
+    if (trimSize > 0 && _queryContext.shouldSortAggregateUnderSafeTrim()) {
       // if orderBy groupBy key, sort the array even if it's smaller than trimSize
       // to benefit combining
       TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
