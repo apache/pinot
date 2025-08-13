@@ -34,7 +34,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
-import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -107,7 +106,8 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
 
   @Override
   public PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
-      RequestContext requestContext, RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
+      Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
+      HttpHeaders httpHeaders) {
     PinotBrokerTimeSeriesResponse timeSeriesResponse = null;
     long queryStartTime = System.currentTimeMillis();
     try {
@@ -117,7 +117,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       RangeTimeSeriesRequest timeSeriesRequest = null;
       firstStageAccessControlCheck(requesterIdentity);
       try {
-        timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString);
+        timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
         return PinotBrokerTimeSeriesResponse.newErrorResponse("BAD_REQUEST", "Error building RangeTimeSeriesRequest");
       }
@@ -169,57 +169,41 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     return false;
   }
 
-  private RangeTimeSeriesRequest buildRangeTimeSeriesRequest(String language, String queryParamString)
+  private RangeTimeSeriesRequest buildRangeTimeSeriesRequest(String language, String queryParamString,
+      Map<String, String> queryParams)
       throws URISyntaxException {
-    List<NameValuePair> pairs = URLEncodedUtils.parse(
-        new URI("http://localhost?" + queryParamString), "UTF-8");
-    String query = null;
-    Long startTs = null;
-    Long endTs = null;
-    String step = null;
-    String timeoutStr = null;
-    int limit = RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT;
-    int numGroupsLimit = RangeTimeSeriesRequest.DEFAULT_NUM_GROUPS_LIMIT;
-    for (NameValuePair nameValuePair : pairs) {
-      switch (nameValuePair.getName()) {
-        case "query":
-          query = nameValuePair.getValue();
-          break;
-        case "start":
-          startTs = Long.parseLong(nameValuePair.getValue());
-          break;
-        case "end":
-          endTs = Long.parseLong(nameValuePair.getValue());
-          break;
-        case "step":
-          step = nameValuePair.getValue();
-          break;
-        case "timeout":
-          timeoutStr = nameValuePair.getValue();
-          break;
-        case "limit":
-          limit = Integer.parseInt(nameValuePair.getValue());
-          break;
-        case "numGroupsLimit":
-          numGroupsLimit = Integer.parseInt(nameValuePair.getValue());
-          break;
-        default:
-          /* Okay to ignore unknown parameters since the language implementor may be using them. */
-          break;
-      }
+    Map<String, String> mergedParams = new HashMap<>(queryParams);
+    // If queryParams is empty, parse the queryParamString to extract parameters.
+    if (queryParams.isEmpty()) {
+      URLEncodedUtils.parse(new URI("http://localhost?" + queryParamString), "UTF-8")
+          .forEach(pair -> mergedParams.putIfAbsent(pair.getName(), pair.getValue()));
     }
-    Long stepSeconds = getStepSeconds(step);
+
+    String query = mergedParams.get("query");
+    Long startTs = parseLongSafe(mergedParams.get("start"));
+    Long endTs = parseLongSafe(mergedParams.get("end"));
+    Long stepSeconds = getStepSeconds(mergedParams.get("step"));
+    Duration timeout = StringUtils.isNotBlank(mergedParams.get("timeout"))
+        ? HumanReadableDuration.from(mergedParams.get("timeout")) : Duration.ofMillis(_brokerTimeoutMs);
+
     Preconditions.checkNotNull(query, "Query cannot be null");
     Preconditions.checkNotNull(startTs, "Start time cannot be null");
     Preconditions.checkNotNull(endTs, "End time cannot be null");
     Preconditions.checkState(stepSeconds != null && stepSeconds > 0, "Step must be a positive integer");
-    Duration timeout = Duration.ofMillis(_brokerTimeoutMs);
-    if (StringUtils.isNotBlank(timeoutStr)) {
-      timeout = HumanReadableDuration.from(timeoutStr);
-    }
-    // TODO: Pass full raw query param string to the request
-    return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout, limit, numGroupsLimit,
-        queryParamString);
+
+    return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout,
+        parseIntOrDefault(mergedParams.get("limit"), RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT),
+        parseIntOrDefault(mergedParams.get("numGroupsLimit"), RangeTimeSeriesRequest.DEFAULT_NUM_GROUPS_LIMIT),
+        queryParamString
+    );
+  }
+
+  private Long parseLongSafe(String value) {
+    return value != null ? Long.parseLong(value) : null;
+  }
+
+  private int parseIntOrDefault(String value, int defaultValue) {
+    return value != null ? Integer.parseInt(value) : defaultValue;
   }
 
   public static Long getStepSeconds(@Nullable String step) {

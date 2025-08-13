@@ -48,7 +48,6 @@ import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupKeyGenerator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.startree.executor.StarTreeGroupByExecutor;
-import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -188,13 +187,14 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // - There are more groups than the trim size
     // TODO: Currently the groups are not trimmed if there is no ordering specified. Consider ordering on group-by
     //       columns if no ordering is specified.
-    int minGroupTrimSize = _queryContext.getMinSegmentGroupTrimSize();
-    if (_queryContext.getOrderByExpressions() != null && minGroupTrimSize > 0) {
-      int trimSize = GroupByUtils.getTableCapacity(_queryContext.getLimit(), minGroupTrimSize);
+    int trimSize = _queryContext.getEffectiveSegmentGroupTrimSize();
+    if (trimSize > 0) {
       if (groupKeyGenerator.getNumKeys() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
         Collection<IntermediateRecord> intermediateRecords =
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
+        // Release the resources used by the group key generator
+        groupKeyGenerator.close();
 
         ServerMetrics.get().addMeteredGlobalValue(ServerMeter.AGGREGATE_TIMES_GROUPS_TRIMMED, 1);
         boolean unsafeTrim = _queryContext.isUnsafeTrim(); // set trim flag only if it's not safe
