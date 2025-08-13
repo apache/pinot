@@ -58,6 +58,7 @@ import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorRegi
 import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTask;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
 import org.apache.pinot.controller.validation.UtilizationChecker;
+import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableTaskConfig;
@@ -98,7 +99,6 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
   private static final String TASK_QUEUE_PATH_PATTERN = "/TaskRebalancer/TaskQueue_%s/Context";
-  public static final String TRIGGERED_BY = "triggeredBy";
 
   private final PinotHelixTaskResourceManager _helixTaskResourceManager;
   private final ClusterInfoAccessor _clusterInfoAccessor;
@@ -233,13 +233,31 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       } catch (Exception e) {
         LOGGER.warn("Caught exception while checking resource utilization for table: {}", tableName, e);
       }
+
+      // Update the task config with the triggeredBy information
+      // This can be used by the generator to appropriately set the subtask configs
+      // Example usage in BaseTaskGenerator.getNumSubTasks()
+      taskConfigs.put(MinionConstants.TRIGGERED_BY, CommonConstants.TaskTriggers.ADHOC_TRIGGER.name());
+
       List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(tableConfig, taskConfigs);
       if (pinotTaskConfigs.isEmpty()) {
         LOGGER.warn("No ad-hoc task generated for task type: {}", taskType);
         continue;
       }
+      int maxNumberOfSubTasks = taskGenerator.getMaxAllowedSubTasksPerTask();
+      if (pinotTaskConfigs.size() > maxNumberOfSubTasks) {
+        String message = String.format(
+            "Number of tasks generated for task type: %s for table: %s is %d, which is greater than the "
+                + "maximum number of tasks to schedule: %d. This is "
+                + "controlled by the cluster config %s which is set based on controller's performance.", taskType,
+            tableName, pinotTaskConfigs.size(), maxNumberOfSubTasks, MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY);
+        message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
+          // We throw an exception to notify the user
+          // This is to ensure that the user is aware of the task generation limit
+          throw new RuntimeException(message);
+      }
       pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
-          .computeIfAbsent(TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
+          .computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
       LOGGER.info("Submitting ad-hoc task for task type: {} with task configs: {}", taskType, pinotTaskConfigs);
       _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_ADHOC_TASKS_SUBMITTED, 1);
       responseMap.put(tableNameWithType,
@@ -738,7 +756,37 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
             : taskGenerator.getMinionInstanceTag(tableConfig);
         List<PinotTaskConfig> presentTaskConfig =
             minionInstanceTagToTaskConfigs.computeIfAbsent(minionInstanceTag, k -> new ArrayList<>());
+
+        // Update the task config with the triggeredBy information
+        // This can be used by the generator to appropriately set the subtask configs
+        // Example usage in BaseTaskGenerator.getNumSubTasks()
+        TableTaskConfig tableTaskConfig = tableConfig.getTaskConfig();
+        if (tableTaskConfig != null && tableTaskConfig.isTaskTypeEnabled(taskType)) {
+          tableTaskConfig.getConfigsForTaskType(taskType).put(MinionConstants.TRIGGERED_BY, triggeredBy);
+        }
+
         taskGenerator.generateTasks(List.of(tableConfig), presentTaskConfig);
+        int maxNumberOfSubTasks = taskGenerator.getMaxAllowedSubTasksPerTask();
+        if (presentTaskConfig.size() > maxNumberOfSubTasks) {
+          String message = String.format(
+              "Number of tasks generated for task type: %s for table: %s is %d, which is greater than the "
+                  + "maximum number of tasks to schedule: %d. This is "
+                  + "controlled by the cluster config %s which is set based on controller's performance.", taskType,
+              tableName, presentTaskConfig.size(), maxNumberOfSubTasks, MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY);
+          if (TaskSchedulingContext.isUserTriggeredTask(triggeredBy)) {
+            message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
+            presentTaskConfig.clear();
+            // If the task is user-triggered, we throw an exception to notify the user
+            // This is to ensure that the user is aware of the task generation limit
+            throw new RuntimeException(message);
+          }
+          // For scheduled tasks, we log a warning and limit the number of tasks
+          LOGGER.warn(message + "Only the first {} tasks will be scheduled", maxNumberOfSubTasks);
+          presentTaskConfig = new ArrayList<>(presentTaskConfig.subList(0, maxNumberOfSubTasks));
+          // Provide user visibility to the maximum number of subtasks that were used for the task
+          presentTaskConfig.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
+              .put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, String.valueOf(maxNumberOfSubTasks)));
+        }
         minionInstanceTagToTaskConfigs.put(minionInstanceTag, presentTaskConfig);
         long successRunTimestamp = System.currentTimeMillis();
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableName, taskType,
@@ -787,7 +835,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {} with task configs: {}", numTasks,
               taskType, minionInstanceTag, pinotTaskConfigs);
           pinotTaskConfigs.forEach(pinotTaskConfig ->
-              pinotTaskConfig.getConfigs().computeIfAbsent(TRIGGERED_BY, k -> triggeredBy));
+              pinotTaskConfig.getConfigs().computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> triggeredBy));
           String submittedTaskName = _helixTaskResourceManager.submitTask(pinotTaskConfigs, minionInstanceTag,
               taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(),
               taskGenerator.getMaxAttemptsPerTask());
@@ -806,6 +854,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       // No job got scheduled due to errors
       if (numErrorTasksScheduled == minionInstanceTagToTaskConfigs.size()) {
         return response;
+      }
+    }
+    if (submittedTaskNames.isEmpty()) {
+      if (!response.getGenerationErrors().isEmpty() || !response.getSchedulingErrors().isEmpty()) {
+        throw new RuntimeException("No tasks submitted due to " + response.getGenerationErrors()
+            + " " + response.getSchedulingErrors());
       }
     }
     return response.setScheduledTaskNames(submittedTaskNames);
