@@ -34,7 +34,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.Helix.DEFAULT_MULTI_STA
 @InterfaceStability.Unstable
 public abstract class QueryAccessControlFactory {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryAccessControlFactory.class);
-  void init(PinotConfiguration configuration) {
+  protected void init(PinotConfiguration configuration) {
   }
 
   public abstract QueryAccessControl create();
@@ -45,7 +45,8 @@ public abstract class QueryAccessControlFactory {
    * @param configuration Populated PinotConfiguration
    * @return Concrete QueryAccessControlFactory instance or null if there is an error
    */
-  public static @Nullable QueryAccessControlFactory fromConfig(PinotConfiguration configuration) {
+  @Nullable
+  public static QueryAccessControlFactory fromConfig(PinotConfiguration configuration) {
     String configuredClass = configuration.getProperty(CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS,
         DEFAULT_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS);
     try {
