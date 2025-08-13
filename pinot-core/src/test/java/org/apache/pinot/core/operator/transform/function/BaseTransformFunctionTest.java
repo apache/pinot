@@ -207,9 +207,7 @@ public abstract class BaseTransformFunctionTest {
       Random random = new Random();
       for (int j = 0; j < VECTOR_DIM_SIZE; j++) {
         _vector1Values[i][j] = random.nextFloat();
-        ;
         _vector2Values[i][j] = random.nextFloat();
-        ;
       }
 
       // Time in the past year
