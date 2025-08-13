@@ -33,17 +33,11 @@ import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 
-
+@SuppressWarnings({"unchecked", "rawType"})
 public class EnrichedHashJoinOperator extends HashJoinOperator {
   private static final String EXPLAIN_NAME = "ENRICHED_JOIN";
-  private final int _projectResultSize;
   private final List<FilterProjectOperand> _filterProjectOperands;
-  private final DataSchema _joinResultSchema;
-  /// _projectResultSchema is currently not used because sort operation
-  ///    does not care about input schema
-  private final DataSchema _projectResultSchema;
   private final int _resultColumnSize;
-  private final int _offset;
   private final int _numRowsToKeep;
   private int _rowsSeen = 0;
   private int _numRowsToOffset;
@@ -53,13 +47,13 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
       EnrichedJoinNode node) {
     super(context, leftInput, leftSchema, rightInput, node, node.getJoinResultSchema());
 
-    _joinResultSchema = node.getJoinResultSchema();
+    DataSchema joinResultSchema = node.getJoinResultSchema();
 
-    _resultColumnSize = _joinResultSchema.size();
+    _resultColumnSize = joinResultSchema.size();
 
     // a chain of filter and project operands
     _filterProjectOperands = new ArrayList<>();
-    DataSchema currentSchema = _joinResultSchema;
+    DataSchema currentSchema = joinResultSchema;
     // iterate and convert filter and project rexes into operands with the correctly chained schema
     for (EnrichedJoinNode.FilterProjectRex rex : node.getFilterProjectRexes()) {
       _filterProjectOperands.add(new FilterProjectOperand(rex, currentSchema));
@@ -67,16 +61,13 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
           ? currentSchema : rex.getProjectAndResultSchema().getSchema();
     }
 
-    _projectResultSchema = currentSchema;
-    _projectResultSize = _projectResultSchema.size();
-
-    _offset = Math.max(node.getOffset(), 0);
+    int offset = Math.max(node.getOffset(), 0);
     int fetch = node.getFetch();
 
     // TODO: see if this need to be converted to input args
     int defaultResponseLimit = CommonConstants.Broker.DEFAULT_BROKER_QUERY_RESPONSE_LIMIT;
-    _numRowsToKeep = fetch > 0 ? fetch + _offset : defaultResponseLimit;
-    _numRowsToOffset = _offset;
+    _numRowsToKeep = fetch > 0 ? fetch + offset : defaultResponseLimit;
+    _numRowsToOffset = offset;
   }
 
   @Override
@@ -91,6 +82,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
       if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
         // use rowView before reaching a project
+        assert (filterProjectOperand.getFilter() != null);
         if (row == null
             ? filterDiscardRow(rowView, filterProjectOperand.getFilter())
             : filterDiscardRow(row, filterProjectOperand.getFilter())
@@ -98,13 +90,14 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
           return;
         }
       } else {
+        assert (filterProjectOperand.getProject() != null);
         row = row == null
             ? projectRow(rowView, filterProjectOperand.getProject())
             : projectRow(row, filterProjectOperand.getProject());
       }
     }
 
-    if (!limitRow()) {
+    if (rowNotNeeded()) {
       return;
     }
 
@@ -121,6 +114,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     for (FilterProjectOperand filterProjectOperand : _filterProjectOperands) {
       if (filterProjectOperand.getType() == FilterProjectOperandsType.FILTER) {
         // use rowView before reaching a project
+        assert (filterProjectOperand.getFilter() != null);
         if (row == null
             ? filterDiscardRow(rowView, filterProjectOperand.getFilter())
             : filterDiscardRow(row, filterProjectOperand.getFilter())
@@ -128,13 +122,14 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
           return;
         }
       } else {
+        assert (filterProjectOperand.getProject() != null);
         row = row == null
             ? projectRow(rowView, filterProjectOperand.getProject())
             : projectRow(row, filterProjectOperand.getProject());
       }
     }
 
-    if (!limitRow()) {
+    if (rowNotNeeded()) {
       return;
     }
 
@@ -142,15 +137,15 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
     rows.add(row == null ? rowView.toArray() : row);
   }
 
-  /// limit on a row, return false if the limit reached before adding this row
-  private boolean limitRow() {
+  /// limit on a row, return true if the limit reached before adding this row
+  private boolean rowNotNeeded() {
     // limit only, terminate if enough rows
     if (_rowsSeen++ == _numRowsToKeep) {
       earlyTerminate();
       logger().debug("EnrichedHashJoinOperator: seen enough rows with no sort, early terminating");
-      return false;
+      return true;
     }
-    return true;
+    return false;
   }
 
   /// filter a row by left and right child, return whether the row is discarded
@@ -400,6 +395,7 @@ public class EnrichedHashJoinOperator extends HashJoinOperator {
         _type = FilterProjectOperandsType.PROJECT;
         _filter = null;
         List<TransformOperand> projects = new ArrayList<>();
+        assert (rex.getProjectAndResultSchema() != null);
         rex.getProjectAndResultSchema().getProject().forEach((x) ->
             projects.add(TransformOperandFactory.getTransformOperand(x, inputSchema)));
         _project = projects;

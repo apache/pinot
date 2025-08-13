@@ -101,8 +101,8 @@ public class EnrichedJoinNode extends JoinNode {
   public static class FilterProjectRex {
 
     public static class ProjectAndResultSchema {
-      private List<RexExpression> _project;
-      private DataSchema _schema;
+      private final List<RexExpression> _project;
+      private final DataSchema _schema;
 
       private ProjectAndResultSchema(List<RexExpression> project, DataSchema resultSchema) {
         _project = project;
@@ -152,9 +152,13 @@ public class EnrichedJoinNode extends JoinNode {
 
     @Override
     public String toString() {
-      return _type == FilterProjectRexType.FILTER
-          ? "Filter: " + _filter.toString()
-          : "Project: " + _projectAndResultSchema.getProject().toString();
+      if (_type == FilterProjectRexType.FILTER) {
+        assert _filter != null;
+        return "Filter: " + _filter;
+      } else {
+        assert _projectAndResultSchema != null;
+        return "Project: " + _projectAndResultSchema.getProject().toString();
+      }
     }
   }
 }

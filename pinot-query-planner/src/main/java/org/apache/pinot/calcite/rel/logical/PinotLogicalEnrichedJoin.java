@@ -42,7 +42,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 
 public class PinotLogicalEnrichedJoin extends Join {
 
-  private final RelDataType _joinRowType;
   private final RelDataType _outputRowType;
   private final List<FilterProjectRexNode> _filterProjectRexNodes;
   /// currently variableSet of Project Rel is ignored since
@@ -64,10 +63,10 @@ public class PinotLogicalEnrichedJoin extends Join {
     super(cluster, traitSet, hints, left, right, joinCondition, variablesSet, joinType);
     _filterProjectRexNodes = filterProjectRexNodes;
     _squashedProjects = squashProjects();
-    _joinRowType = getJoinRowType();
+    RelDataType joinRowType = getJoinRowType();
     // if there's projection, getRowType() should return the final projected row type as output row type
     //   otherwise it's the same as _joinRowType
-    _outputRowType = outputRowType == null ? _joinRowType : outputRowType;
+    _outputRowType = outputRowType == null ? joinRowType : outputRowType;
     _projectVariableSet = projectVariableSet;
     _offset = offset;
     _fetch = fetch;
@@ -137,6 +136,7 @@ public class PinotLogicalEnrichedJoin extends Join {
       if (node.getType() == FilterProjectRexNodeType.FILTER) {
         continue;
       }
+      assert node.getProjectAndResultRowType() != null;
       List<RexNode> project = node.getProjectAndResultRowType().getProject();
       if (prevProject == null) {
         prevProject = project;
@@ -198,9 +198,13 @@ public class PinotLogicalEnrichedJoin extends Join {
 
     @Override
     public String toString() {
-      return _type == FilterProjectRexNodeType.FILTER
-          ? "Filter: " + _filter.toString()
-          : "Project: " + _projectAndResultRowType.getProject().toString();
+      if (_type == FilterProjectRexNodeType.FILTER) {
+        assert _filter != null;
+        return "Filter: " + _filter;
+      } else {
+        assert _projectAndResultRowType != null;
+        return "Project: " + _projectAndResultRowType.getProject().toString();
+      }
     }
 
     public FilterProjectRexNode(RexNode filter) {
