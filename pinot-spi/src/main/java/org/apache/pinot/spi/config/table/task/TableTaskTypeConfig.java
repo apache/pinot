@@ -33,6 +33,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * Attributes of subclass can be of 2 types
  * 1. Required -> Such attributes should either have defaults or should fail validation if not set.
  * 2. Optional -> Such attributes should be Optional<> so that the implementation knows that it can be null.
+ *
+ * This setup helps -
+ * 1. Provide visibility and documentation of all configs and their defaults available for a task type.
+ * 2. Enable easier validation and correction of configs through above awareness.
+ * 3. Abstract backward compatibility handling of configs making the generator / executor simpler.
  */
 public abstract class TableTaskTypeConfig {
 
@@ -49,6 +54,13 @@ public abstract class TableTaskTypeConfig {
   protected final String minionInstanceTag;
 
   /**
+   * Maximum number of sub-tasks that can be executed in a single trigger of the segment refresh task.
+   * This is used to control helix resource usage on controller.
+   * If more sub-tasks are needed to be merged / reloaded, multiple triggers of the task will be needed.
+   */
+  private final int maxNumTasks;
+
+  /**
    * The actual user defined configuration for the task type.
    * This is not supposed to be used by any task generator / executor but is used by controller for persisting user defined configs
    * This is required because the attribute values in the subclass are modified based on defaults, corrections, etc
@@ -59,6 +71,7 @@ public abstract class TableTaskTypeConfig {
     // TODO - Move the constants from pinot-controller to pinot-spi and use them here.
     this.schedule = configs.get("schedule");
     this.minionInstanceTag = configs.getOrDefault("minionInstanceTag", CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+    this.maxNumTasks = Integer.parseInt(configs.getOrDefault("tableMaxNumTasks", "1000"));
     this.configs = configs;
   }
 
@@ -102,6 +115,10 @@ public abstract class TableTaskTypeConfig {
    */
   public Map<String, String> getConfigs() {
     return Collections.unmodifiableMap(configs);
+  }
+
+  public int getMaxNumTasks() {
+    return maxNumTasks;
   }
 
 }
