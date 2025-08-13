@@ -29,6 +29,7 @@ import org.apache.helix.task.JobConfig;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.controller.api.exception.UnknownTaskTypeException;
 import org.apache.pinot.controller.helix.core.minion.ClusterInfoAccessor;
+import org.apache.pinot.controller.helix.core.minion.TaskSchedulingContext;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.minion.PinotTaskConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -82,7 +83,7 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   @Override
-  public int getMaxNumSubTasks() {
+  public int getMaxAllowedSubTasksPerTask() {
     String configKey = MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY;
     String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
     if (configValue != null) {
@@ -99,7 +100,8 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
    * Updates the max num tasks parameter with the actual maximum number of subtasks based on
    * 1. configured value for the table subtask
    * 2. default value for the task type
-   * 3. any cluster default(s)
+   * 3. if the task is triggered manually or adhoc
+   * 4. any cluster default(s)
    * This is required to provide user visibility to the maximum number of subtasks that were used for the task
    * @param defaultNumSubTasks - the default number of subtasks for the task type
    */
@@ -113,7 +115,8 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
    * Gets the final maximum number of subtasks for the given table based on the
    * 1. configured value for the table subtask
    * 2. default value for the task type
-   * 3. any cluster default(s)
+   * 3. if the task is triggered manually or adhoc
+   * 4. any cluster default(s)
    * @param defaultNumSubTasks - the default number of subtasks for the task type
    */
   public int getNumSubTasks(Map<String, String> taskConfigs, int defaultNumSubTasks, String tableName) {
@@ -127,16 +130,33 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
             tableMaxNumTasksConfig, tableName, getTaskType());
       }
     }
+
+    // For manual / adhoc triggers, the user expects the task to run upto configured (or task's default) value
+    // Based on system constraints, we may not be able to run the task with that many subtasks
+    // To identify such cases, we return the configured / default value in this method
+    // And the API that calls this method can fail the task generation if the generated tasks exceed the limit
+    if (taskConfigs.containsKey(MinionConstants.TRIGGERED_BY)) {
+      String triggeredBy = taskConfigs.get(MinionConstants.TRIGGERED_BY);
+      if (TaskSchedulingContext.isUserTriggeredTask(triggeredBy)) {
+        if (tableMaxNumTasks <= 0) {
+          // A negative value for maxNumTasks is generally used to indicate that the intention
+          // is to not have a limit on the number of subtasks.
+          tableMaxNumTasks = Integer.MAX_VALUE;
+        }
+        return tableMaxNumTasks;
+      }
+    }
+
     // A negative value for maxNumTasks is generally used to indicate that the intention
     // is to not have a limit on the number of subtasks.
     // Thus, rather than throwing an error, or setting it to the default value,
     // we set it to the max allowed subtasks.
-    if (tableMaxNumTasks > getMaxNumSubTasks() || tableMaxNumTasks <= 0) {
+    if (tableMaxNumTasks > getMaxAllowedSubTasksPerTask() || tableMaxNumTasks <= 0) {
       LOGGER.warn(
           "MaxNumTasks for table {} for tasktype {} is {} which is greater than the max allowed subtasks {}"
               + ". Setting it to the max allowed subtasks",
-          tableName, getTaskType(), tableMaxNumTasks, getMaxNumSubTasks());
-      tableMaxNumTasks = getMaxNumSubTasks();
+          tableName, getTaskType(), tableMaxNumTasks, getMaxAllowedSubTasksPerTask());
+      tableMaxNumTasks = getMaxAllowedSubTasksPerTask();
     }
     return tableMaxNumTasks;
   }

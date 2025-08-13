@@ -44,6 +44,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -144,7 +145,20 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
 
     taskResourceManager.ensureTaskQueueExists(taskType);
 
-    // Test ad-hoc task creation - should limit to maxSubTasks
+    // Test adhoc task creation. This should throw a RuntimeException
+    // if the number of subtasks exceeds the maxSubTasks limit.
+    try {
+      taskManager.createTask(taskType, RAW_TABLE_NAME, null, new HashMap<>());
+      fail("Expected RuntimeException due to exceeding maxSubTasks limit");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage().contains("greater than the maximum number of tasks"));
+    }
+
+    // Verify that increasing max subtasks limit allows task creation
+    taskType = "TestTaskType2";
+    maxSubTasks = 5;
+    generatedTasks = 5;
+    taskManager.registerTaskGenerator(createFakeTaskGenerator(taskType, maxSubTasks, generatedTasks));
     Map<String, String> result = taskManager.createTask(taskType, RAW_TABLE_NAME, null, new HashMap<>());
 
     // Verify task was created but limited to maxSubTasks
@@ -207,8 +221,13 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     assertEquals(subtaskConfigs.size(), maxSubTasks,
         "Expected " + maxSubTasks + " subtasks but got " + subtaskConfigs.size());
 
-    // Verify result contains a generation error
-    assertFalse(schedulingInfo.getGenerationErrors().isEmpty());
+    // Verify that setting triggered by in context to adhoc should result in task schedule failure
+    context.setTriggeredBy(CommonConstants.TaskTriggers.ADHOC_TRIGGER.name());
+    result = taskManager.scheduleTasks(context);
+    assertEquals(result.size(), 1);
+    schedulingInfo = result.get(taskType);
+    assertEquals(schedulingInfo.getScheduledTaskNames().size(), 0);
+    assertEquals(schedulingInfo.getGenerationErrors().size(), 1);
     assertTrue(schedulingInfo.getGenerationErrors().get(0).contains("greater than the maximum number of tasks"));
 
     dropOfflineTable(RAW_TABLE_NAME);
@@ -587,7 +606,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
       }
 
       @Override
-      public int getMaxNumSubTasks() {
+      public int getMaxAllowedSubTasksPerTask() {
         return maxSubTasks;
       }
 

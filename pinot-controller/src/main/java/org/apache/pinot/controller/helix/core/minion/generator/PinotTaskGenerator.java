@@ -84,7 +84,7 @@ public interface PinotTaskGenerator {
    * 1. This method is used by the scheduling framework to limit the number of subtasks across task types
    * 2. This method can also be used by individual task generators to consider the limit while generating subtasks
    */
-  default int getMaxNumSubTasks() {
+  default int getMaxAllowedSubTasksPerTask() {
     return MinionConstants.DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT;
   }
 

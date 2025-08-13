@@ -66,7 +66,7 @@ public class MinionConstants {
   // Cluster level config of maximum subtasks for a given task
   // This is primarily used to prevent performance issues in helix leader controller when it creates
   // more subtasks than it can support
-  public static final String MAX_ALLOWED_SUB_TASKS_KEY = "maxAllowedSubTasks";
+  public static final String MAX_ALLOWED_SUB_TASKS_KEY = "maxAllowedSubTasksPerTask";
 
   /**
    * Table level configs
@@ -80,6 +80,8 @@ public class MinionConstants {
    */
   public static final int DEFAULT_MAX_ATTEMPTS_PER_TASK = 1;
   public static final int DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT = Integer.MAX_VALUE;
+  // Source of minion task trigger. Possible values are in enum CommonConstants.TaskTriggers
+  public static final String TRIGGERED_BY = "triggeredBy";
 
   /**
    * Segment download thread pool size to be set at task level.
