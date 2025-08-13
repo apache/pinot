@@ -628,6 +628,12 @@ public final class TableConfigUtils {
       streamConfigs.add(streamConfig);
     }
     if (numStreamConfigs > 1) {
+      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+      if (ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null) {
+        Preconditions.checkState(
+            !tableConfig.getIngestionConfig().getStreamIngestionConfig().isPauselessConsumptionEnabled(),
+            "Multiple stream configs are not supported with pauseless consumption enabled");
+      }
       Preconditions.checkState(!tableConfig.isUpsertEnabled(),
           "Multiple stream configs are not supported for upsert table");
 
