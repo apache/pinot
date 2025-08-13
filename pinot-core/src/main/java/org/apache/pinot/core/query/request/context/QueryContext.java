@@ -680,11 +680,6 @@ public class QueryContext {
       queryContext._isUnsafeTrim =
           !queryContext.isSameOrderAndGroupByColumns(queryContext) || queryContext.getHavingFilter() != null;
 
-      // Pre-calculate group by trim size
-      if (queryContext.getGroupByExpressions() != null) {
-        queryContext._effectiveSegmentGroupTrimSize = queryContext.calculateEffectiveSegmentGroupTrimSize();
-      }
-
       return queryContext;
     }
 
