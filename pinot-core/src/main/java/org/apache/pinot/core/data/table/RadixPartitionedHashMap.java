@@ -33,15 +33,12 @@ import javax.ws.rs.NotSupportedException;
  * Radix partitioned hashtable that provides a single view for multiple hashtable that could be indexed
  */
 public class RadixPartitionedHashMap implements Map<Key, Record> {
-  private final int _numRadixBits;
   private final int _numPartitions;
   private final int _mask;
   private final TwoLevelLinearProbingRecordHashMap[] _maps;
   private int _size;
-  private int _segmentId = -1;
 
   public RadixPartitionedHashMap(TwoLevelLinearProbingRecordHashMap[] maps, int numRadixBits) {
-    _numRadixBits = numRadixBits;
     _numPartitions = 1 << numRadixBits;
     assert (maps.length == _numPartitions);
     _mask = _numPartitions - 1;
@@ -50,10 +47,6 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
     for (TwoLevelLinearProbingRecordHashMap map : maps) {
       _size += map.size();
     }
-  }
-
-  public int getSegmentId() {
-    return _segmentId;
   }
 
   public TwoLevelLinearProbingRecordHashMap getPartition(int i) {
@@ -66,10 +59,6 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
 
   public int partition(Key key) {
     return key.hashCode() & _mask;
-  }
-
-  public int partitionFromHashCode(int hash) {
-    return hash & _mask;
   }
 
   @Override
@@ -99,15 +88,6 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
     return map.get((Key) o);
   }
 
-  public Record putIntoPartition(Key k, Record v, int partition) {
-    TwoLevelLinearProbingRecordHashMap map = _maps[partition];
-    Record prev = map.put((Key) k, (Record) v);
-    if (prev == null) {
-      _size++;
-    }
-    return prev;
-  }
-
   @Nullable
   @Override
   public Record put(Key k, Record v) {
@@ -122,12 +102,6 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
   @Override
   public Record remove(Object o) {
     throw new NotSupportedException("don't remove");
-//    TwoLevelLinearProbingRecordHashmap map = _maps[partition((Key) o)];
-//    Record prev = map.remove(o);
-//    if (prev != null) {
-//      _size--;
-//    }
-//    return prev;
   }
 
   @Override
@@ -151,18 +125,7 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
     }
     return set;
   }
-//
-//  @Override
-//  public Collection<Record> values() {
-//    List<Record>[] payloads = new List[_numPartitions];
-//    int idx = 0;
-//    for (TwoLevelLinearProbingRecordHashMap map : _maps) {
-//      payloads[idx++] = map.getPayloads();
-//    }
-//    return new FlatViewList<>(payloads);
-//  }
 
-  // TODO: investigate why reduce time increased, even doubled
   @Override
   public Collection<Record> values() {
     List<Record> list = new ArrayList<>(_size);
@@ -174,11 +137,11 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
 
   @Override
   public Set<Entry<Key, Record>> entrySet() {
-    Set<Entry<Key, Record>> set = new HashSet<>(_size);
-    for (TwoLevelLinearProbingRecordHashMap map : _maps) {
-      set.addAll(map.entrySet());
-    }
-    return set;
+    throw new NotSupportedException("Use iterator or getPayloads instead");
+  }
+
+  public List<Record> getPayloads(int partition) {
+    return _maps[partition].getPayloads();
   }
 
   public Iterator<IntermediateRecord> iterator() {
@@ -216,9 +179,5 @@ public class RadixPartitionedHashMap implements Map<Key, Record> {
       }
       return _curIt.next();
     }
-  }
-
-  public List<Record> getPayloads(int partition) {
-    return _maps[partition].getPayloads();
   }
 }

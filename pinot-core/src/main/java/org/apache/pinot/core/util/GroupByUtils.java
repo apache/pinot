@@ -29,13 +29,11 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.Key;
 import org.apache.pinot.core.data.table.PartitionedIndexedTable;
 import org.apache.pinot.core.data.table.RadixPartitionedHashMap;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
 import org.apache.pinot.core.data.table.TwoLevelHashMapIndexedTable;
 import org.apache.pinot.core.data.table.TwoLevelLinearProbingRecordHashMap;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
-import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.reduce.DataTableReducerContext;
 import org.apache.pinot.core.query.request.context.QueryContext;
 
@@ -48,17 +46,17 @@ public final class GroupByUtils {
   public static final int MAX_TRIM_THRESHOLD = 1_000_000_000;
 
   /**
-   * Returns the capacity of the table required by the given query. NOTE: It returns {@code max(limit * 5, 5000)} to
-   * ensure the result accuracy.
+   * Returns the capacity of the table required by the given query.
+   * NOTE: It returns {@code max(limit * 5, 5000)} to ensure the result accuracy.
    */
   public static int getTableCapacity(int limit) {
     return getTableCapacity(limit, DEFAULT_MIN_NUM_GROUPS);
   }
 
   /**
-   * Returns the capacity of the table required by the given query. NOTE: It returns
-   * {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and result
-   * accuracy.
+   * Returns the capacity of the table required by the given query.
+   * NOTE: It returns {@code max(limit * 5, minNumGroups)} where minNumGroups is configurable to tune the table size and
+   * result accuracy.
    */
   public static int getTableCapacity(int limit, int minNumGroups) {
     long capacityByLimit = limit * 5L;
@@ -99,10 +97,9 @@ public final class GroupByUtils {
   }
 
   /**
-   * whether we should do partitionedGroupBy, currently only handle safeTrim
-   * case for backward compatible results
-   * TODO: handle unsafeTrim case using sort-aggregate separately
-   * TODO: add conditions checking for number of threads available
+   * Whether we should do partitionedGroupBy.
+   * Handles cases for non-safeTrim and has order-by.
+   * TODO: change this to !shouldSortAggregate when sort-aggregate is supported
    */
   public static boolean shouldPartitionGroupBy(QueryContext queryContext) {
     return queryContext.isUnsafeTrim() && queryContext.getOrderByExpressions() != null;
@@ -116,18 +113,6 @@ public final class GroupByUtils {
    */
   public static int hashForPartition(Key key) {
     return key.hashCode() & 0x7fffffff;
-  }
-
-  private static Record updateRecord(Record existingRecord, Record newRecord,
-      AggregationFunction[] aggregationFunctions, int numKeyColumns) {
-    Object[] existingValues = existingRecord.getValues();
-    Object[] newValues = newRecord.getValues();
-    int numAggregations = aggregationFunctions.length;
-    int index = numKeyColumns;
-    for (int i = 0; i < numAggregations; i++, index++) {
-      existingValues[index] = aggregationFunctions[i].merge(existingValues[index], newValues[index]);
-    }
-    return existingRecord;
   }
 
   /**

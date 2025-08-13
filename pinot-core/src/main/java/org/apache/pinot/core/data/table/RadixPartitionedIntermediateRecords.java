@@ -41,7 +41,7 @@ public class RadixPartitionedIntermediateRecords {
     partitionInPlace();
   }
 
-  // O(n) in-place partition of _records, updates _partitionBoundaries
+  /// O(n) in-place partition of _records, updates _partitionBoundaries
   private void partitionInPlace() {
     int[] partitionSizes = new int[_numPartitions];
     for (IntermediateRecord record : _records) {

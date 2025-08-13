@@ -204,24 +204,8 @@ public class TableResizer {
   }
 
   /**
-   * Resizes the recordsMap to the given size.
-   */
-  public void resizeRecordsMapPutOnly(RadixPartitionedHashMap recordsMap, int size) {
-    int numRecordsToEvict = recordsMap.size() - size;
-    if (numRecordsToEvict <= 0) {
-      return;
-    }
-    // Fewer records to retain than evict, make a heap of records to retain
-    IntermediateRecord[] recordsToRetain =
-        getTopRecordsHeap(recordsMap, size, _intermediateRecordComparator.reversed());
-    recordsMap.clear();
-    for (IntermediateRecord recordToRetain : recordsToRetain) {
-      recordsMap.put(recordToRetain._key, recordToRetain._record);
-    }
-  }
-
-  /**
    * Returns a heap of the top records from the recordsMap.
+   * Specialized for {@link RadixPartitionedHashMap} to use the iterator
    */
   private IntermediateRecord[] getTopRecordsHeap(RadixPartitionedHashMap recordsMap, int size,
       Comparator<IntermediateRecord> comparator) {
@@ -255,13 +239,14 @@ public class TableResizer {
 
   /**
    * Resizes the recordsMap to the given size.
+   * Specialized for {@link TwoLevelLinearProbingRecordHashMap} to not use remove
    */
   public void resizeRecordsMapPutOnly(TwoLevelLinearProbingRecordHashMap recordsMap, int size) {
     int numRecordsToEvict = recordsMap.size() - size;
     if (numRecordsToEvict <= 0) {
       return;
     }
-    // Fewer records to retain than evict, make a heap of records to retain
+    // make a heap of records to retain
     IntermediateRecord[] recordsToRetain =
         getTopRecordsHeap(recordsMap, size, _intermediateRecordComparator.reversed());
     recordsMap.clear();
@@ -272,6 +257,7 @@ public class TableResizer {
 
   /**
    * Returns a heap of the top records from the recordsMap.
+   * Specialized for {@link TwoLevelLinearProbingRecordHashMap} to use the iterator
    */
   private IntermediateRecord[] getTopRecordsHeap(TwoLevelLinearProbingRecordHashMap recordsMap, int size,
       Comparator<IntermediateRecord> comparator) {
@@ -378,6 +364,10 @@ public class TableResizer {
     return sort ? getSortedTopRecords(recordsMap, size) : getUnsortedTopRecords(recordsMap, size);
   }
 
+  /**
+   * Returns the top records from the recordsMap.
+   * Specialized for {@link RadixPartitionedHashMap} to use the iterator
+   */
   public Collection<Record> getTopRecords(RadixPartitionedHashMap recordsMap, int size, boolean sort) {
     return sort ? getSortedTopRecords(recordsMap, size) : getUnsortedTopRecords(recordsMap, size);
   }
@@ -423,61 +413,6 @@ public class TableResizer {
     int numRecords = recordsMap.size();
     if (numRecords <= size) {
       return recordsMap.values();
-    } else {
-      IntermediateRecord[] topRecords = getTopRecordsHeap(recordsMap, size, _intermediateRecordComparator.reversed());
-      Record[] unsortedTopRecords = new Record[size];
-      int index = 0;
-      for (IntermediateRecord topRecord : topRecords) {
-        unsortedTopRecords[index++] = topRecord._record;
-      }
-      return Arrays.asList(unsortedTopRecords);
-    }
-  }
-
-  public Collection<Record> getTopRecords(TwoLevelLinearProbingRecordHashMap recordsMap, int size, boolean sort) {
-    return sort ? getSortedTopRecords(recordsMap, size) : getUnsortedTopRecords(recordsMap, size);
-  }
-
-  @VisibleForTesting
-  List<Record> getSortedTopRecords(TwoLevelLinearProbingRecordHashMap recordsMap, int size) {
-    int numRecords = recordsMap.size();
-    if (numRecords == 0) {
-      return Collections.emptyList();
-    }
-    if (numRecords <= size) {
-      // Use quick sort if all the records are top records
-      IntermediateRecord[] intermediateRecords = new IntermediateRecord[numRecords];
-      int index = 0;
-      Iterator<IntermediateRecord> it = recordsMap.iterator();
-      while (it.hasNext()) {
-        IntermediateRecord record = it.next();
-        record._values = getIntermediateRecordValues(record);
-        intermediateRecords[index++] = record;
-      }
-      Arrays.sort(intermediateRecords, _intermediateRecordComparator);
-      Record[] sortedTopRecords = new Record[numRecords];
-      for (int i = 0; i < numRecords; i++) {
-        sortedTopRecords[i] = intermediateRecords[i]._record;
-      }
-      return Arrays.asList(sortedTopRecords);
-    } else {
-      // Use heap sort if only partial records are top records
-      Comparator<IntermediateRecord> comparator = _intermediateRecordComparator.reversed();
-      IntermediateRecord[] topRecordsHeap = getTopRecordsHeap(recordsMap, size, comparator);
-      Record[] sortedTopRecords = new Record[size];
-      while (size-- > 0) {
-        sortedTopRecords[size] = topRecordsHeap[0]._record;
-        topRecordsHeap[0] = topRecordsHeap[size];
-        downHeap(topRecordsHeap, size, 0, comparator);
-      }
-      return Arrays.asList(sortedTopRecords);
-    }
-  }
-
-  private Collection<Record> getUnsortedTopRecords(TwoLevelLinearProbingRecordHashMap recordsMap, int size) {
-    int numRecords = recordsMap.size();
-    if (numRecords <= size) {
-      return recordsMap.getPayloads();
     } else {
       IntermediateRecord[] topRecords = getTopRecordsHeap(recordsMap, size, _intermediateRecordComparator.reversed());
       Record[] unsortedTopRecords = new Record[size];

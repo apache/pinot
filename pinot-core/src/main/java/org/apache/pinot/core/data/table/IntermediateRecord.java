@@ -36,13 +36,10 @@ public class IntermediateRecord {
     _values = values;
   }
 
+  /// Create with pre-calculated key hashcode
   public static IntermediateRecord create(Key key, Record record, int keyHashCode) {
     IntermediateRecord r = new IntermediateRecord(key, record, null);
     r._keyHashCode = keyHashCode;
     return r;
-  }
-
-  static IntermediateRecord createForTest(Key key, Record record, Comparable[] values) {
-    return new IntermediateRecord(key, record, values);
   }
 }

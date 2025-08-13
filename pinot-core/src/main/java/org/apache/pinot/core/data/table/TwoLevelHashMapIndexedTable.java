@@ -36,10 +36,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * {@link Table} implementation for aggregating TableRecords based on combination of keys
+ * Wraps a {@link TwoLevelLinearProbingRecordHashMap} instead of a java util map
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 @NotThreadSafe
 public class TwoLevelHashMapIndexedTable extends BaseTable {
-  private static final Logger log = LoggerFactory.getLogger(TwoLevelHashMapIndexedTable.class);
+  private static final Logger logger = LoggerFactory.getLogger(TwoLevelHashMapIndexedTable.class);
   protected final ExecutorService _executorService;
   protected final TwoLevelLinearProbingRecordHashMap _lookupMap;
   protected final boolean _hasFinalInput;
@@ -149,7 +151,7 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
     _resizeTimeNs += resizeTimeNs;
   }
 
-  ///  should only use after called {@code finish}
+  /// Should only use after called {@link this#finish}
   @Override
   public int size() {
     return _lookupMap.size();
@@ -172,7 +174,7 @@ public class TwoLevelHashMapIndexedTable extends BaseTable {
     resizePutOnly();
   }
 
-  ///  update an existing {@code IntermediateRecord._record} with a new record
+  /// Update an existing {@code IntermediateRecord._record} with a new record
   private IntermediateRecord updateRecord(IntermediateRecord existingIntermdiaterecord, Record newRecord) {
     Record existingRecord = existingIntermdiaterecord._record;
     Object[] existingValues = existingRecord.getValues();

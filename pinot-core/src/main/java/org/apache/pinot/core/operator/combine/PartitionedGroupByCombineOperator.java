@@ -166,6 +166,7 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
   /**
    * Stop the combine operator process. This will stop all sub-tasks that were spun up to process data segments.
    */
+  @Override
   protected void stopProcess() {
     // Cancel all ongoing jobs
     for (Future future : _futures) {
@@ -180,6 +181,7 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
   /**
    * For group-by queries, when maxExecutionThreads is not explicitly configured, override it to create as many tasks
    * as the default number of query worker threads (or the number of operators / segments if that's lower).
+   * TODO: This should be useless since numPartitions is used instead, remove.
    */
   private static QueryContext overrideMaxExecutionThreads(QueryContext queryContext, int numOperators) {
     int maxExecutionThreads = queryContext.getMaxExecutionThreads();
@@ -195,22 +197,22 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
   }
 
   /**
-   * producer-consumer version of partition-merge
+   * Producer-consumer version of partition-merge
    * <p>
    * Two-phase Partitioned GroupBy Execution.
    * </p><p>
    * This handles any cases that has an OrderBy clause.
    * </p><p>
-   * phase 1:
+   * Phase 1:
    * each thread repeatedly takes a single segment and partition it into thread-local
    * {@link RadixPartitionedIntermediateRecords}
    * </p><p>
-   * phase 2:
+   * Phase 2:
    * each thread merge one partition of all {@link RadixPartitionedIntermediateRecords} into a single
    * {@link TwoLevelHashMapIndexedTable} that internally uses a {@link TwoLevelLinearProbingRecordHashMap}
    * for minimal movement and copy of the payload {@link IntermediateRecord}s
    * </p><p>
-   * when all threads finishes, {@link PartitionedGroupByCombineOperator#mergePartitionedGroupByResults()} is called
+   * When all threads finishes, {@link PartitionedGroupByCombineOperator#mergePartitionedGroupByResults()} is called
    * to logically
    * stitch the {@link TwoLevelHashMapIndexedTable} together into a single {@link RadixPartitionedHashMap} and
    * then wrap it into a {@link org.apache.pinot.core.data.table.PartitionedIndexedTable} as final indexedTable
@@ -318,7 +320,7 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
     }
   }
 
-  /// get IntermediateRecords from resultBlock and partition in-place
+  /// Get IntermediateRecords from resultBlock and partition in-place
   private RadixPartitionedIntermediateRecords getRadixPartitionedIntermediateRecords(GroupByResultsBlock resultsBlock,
       int operatorId) {
     List<IntermediateRecord> intermediateRecords = resultsBlock.getIntermediateRecords();

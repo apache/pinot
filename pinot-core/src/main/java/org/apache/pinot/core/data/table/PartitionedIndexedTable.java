@@ -36,6 +36,7 @@ import org.apache.pinot.core.util.trace.TraceCallable;
  * IndexedTable wrapper for RadixPartitionedHashMap,
  * used for and stitching hash tables together in phase 2
  */
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class PartitionedIndexedTable extends IndexedTable {
   public PartitionedIndexedTable(DataSchema dataSchema, boolean hasFinalInput, QueryContext queryContext,
       int resultSize, int trimSize, int trimThreshold, RadixPartitionedHashMap map,

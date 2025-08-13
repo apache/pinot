@@ -106,14 +106,12 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   protected GroupByResultsBlock getNextBlock() {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
-    // TODO: pass trimGroupSize to executor, who creates the result holder
     if (_useStarTree) {
       groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     } else {
       groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     }
     ValueBlock valueBlock;
-
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
       groupByExecutor.process(valueBlock);
@@ -134,6 +132,8 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     // Trim the groups when iff:
+    // - SafeTrim case
+    // OR
     // - Query has ORDER BY clause
     // - Segment group trim is enabled
     // - There are more groups than the trim size

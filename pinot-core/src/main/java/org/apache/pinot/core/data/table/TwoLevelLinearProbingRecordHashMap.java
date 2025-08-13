@@ -23,9 +23,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.ws.rs.NotSupportedException;
@@ -35,6 +32,7 @@ import org.apache.pinot.core.util.GroupByUtils;
 
 /**
  * Two-level linear probing hashmap for group by execution
+ * See docs below for details
  */
 public class TwoLevelLinearProbingRecordHashMap {
   ///  Because fast modulo is used, {@code INITIAL_CAP} must be power of 2
@@ -44,11 +42,11 @@ public class TwoLevelLinearProbingRecordHashMap {
   private static final int BLOCK_SIZE = 256;
 
   /**
-   * <p>pointer table: stores indices into payloads</p>
+   * <p>Pointer table: stores indices into payloads</p>
    * <p>{@code _pointers} is <b><i>logically</i></b> an {@code int[_ptrsRealSize][3]} array,
    * where each row represents a pointer to the actual payload, and the column layout: </p>
    * <p> 0: blockId, 1: blockOffset, 2: salt (payload key's hash value).</p>
-   * <p>salt is kept in the pointer array for less jumping to payload block
+   * <p>Salt is kept in the pointer array for less jumping to payload block
    * when comparing during linear probing</p>
    * <p>{@code _ptrsRealSize} is the logical size of the pointer array that should be used
    * when probing. For performance, the pointer array is <b><i>flattened</i></b> and hence
@@ -59,7 +57,7 @@ public class TwoLevelLinearProbingRecordHashMap {
   private int _size;
   private final int _initialCap;
 
-  // payload storage
+  /// Payload block storage
   private final List<IntermediateRecord[]> _payloads;
 
   private int _currBlockId;
@@ -121,20 +119,7 @@ public class TwoLevelLinearProbingRecordHashMap {
     return null;
   }
 
-  public Set<Map.Entry<Key, Record>> entrySet() {
-    throw new NotSupportedException();
-//    Set<Map.Entry<Key, Record>> entrySet = new HashSet<>();
-//    for (int blockId = 0; blockId <= _currBlockId; blockId++) {
-//      int offsetLimit = blockId == _currBlockId ? _nextBlockOffset : BLOCK_SIZE;
-//      IntermediateRecord[] block = _payloads.get(blockId);
-//      for (int blockOffset = 0; blockOffset < offsetLimit; blockOffset++) {
-//        entrySet.add(new Entry(block[blockOffset]._key, block[blockOffset]._record));
-//      }
-//    }
-//    return entrySet;
-  }
-
-  void compute(IntermediateRecord record, Function<IntermediateRecord, IntermediateRecord> remappingFunction) {
+  public void compute(IntermediateRecord record, Function<IntermediateRecord, IntermediateRecord> remappingFunction) {
     if ((double) _size > _ptrsRealSize * LOAD_FACTOR) {
       resize();
     }
@@ -152,7 +137,8 @@ public class TwoLevelLinearProbingRecordHashMap {
     remappingFunction.apply(oldValue);
   }
 
-  void computeIfPresent(IntermediateRecord record, Function<IntermediateRecord, IntermediateRecord> remappingFunction) {
+  public void computeIfPresent(IntermediateRecord record,
+      Function<IntermediateRecord, IntermediateRecord> remappingFunction) {
     int ptrIdx = findPointerIndex(record._key, record._keyHashCode, _pointers, _ptrsRealSize);
     int blockId = _pointers[ptrIdx];
     // if no existing found, return null
@@ -165,7 +151,7 @@ public class TwoLevelLinearProbingRecordHashMap {
     remappingFunction.apply(oldValue);
   }
 
-  boolean containsKey(Key key) {
+  public boolean containsKey(Key key) {
     int ptrIdx = findPointerIndex(key, hash(key), _pointers, _ptrsRealSize);
     return _pointers[ptrIdx] != -1;
   }
@@ -196,7 +182,7 @@ public class TwoLevelLinearProbingRecordHashMap {
     }
   }
 
-  /// put non-existing record
+  /// Put non-existing record
   private void putNew(IntermediateRecord record, int ptrIdx) {
     Preconditions.checkState(record._keyHashCode == hash(record._key));
     assert (record._keyHashCode != -1);
@@ -218,7 +204,7 @@ public class TwoLevelLinearProbingRecordHashMap {
     return GroupByUtils.hashForPartition(key);
   }
 
-  // linear probing over pointer array
+  /// Linear probing over pointer array
   private int findPointerIndex(Key key, int hash, int[] ptrs, int cap) {
     int idx = hash & (cap - 1);
     int realIdx;
@@ -320,8 +306,8 @@ public class TwoLevelLinearProbingRecordHashMap {
     return new PayLoadWrapperList();
   }
 
+  /// Wrapper for list view over the block payloads
   public class PayLoadWrapperList extends AbstractList<Record> {
-
     @Override
     public Record get(int i) {
       int blockId = i / BLOCK_SIZE;
@@ -370,53 +356,6 @@ public class TwoLevelLinearProbingRecordHashMap {
     @Override
     public void forEachRemaining(Consumer<? super IntermediateRecord> action) {
       throw new NotSupportedException();
-    }
-  }
-
-  public static class Entry implements Map.Entry<Key, Record> {
-    private final Key _key;
-    private Record _value;
-
-    public Entry(Key key, Record value) {
-      _key = key;
-      _value = value;
-    }
-
-    @Override
-    public Key getKey() {
-      return _key;
-    }
-
-    @Override
-    public Record getValue() {
-      return _value;
-    }
-
-    @Override
-    public Record setValue(Record value) {
-      Record old = _value;
-      _value = value;
-      return old;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-      if (!(o instanceof Map.Entry)) {
-        return false;
-      }
-      Map.Entry<?, ?> other = (Map.Entry<?, ?>) o;
-      return Objects.equals(_key, other.getKey())
-          && Objects.equals(_value, other.getValue());
-    }
-
-    @Override
-    public int hashCode() {
-      return Objects.hashCode(_key) ^ Objects.hashCode(_value);
-    }
-
-    @Override
-    public String toString() {
-      return _key + "=" + _value;
     }
   }
 }

@@ -182,6 +182,8 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     // Trim the groups when iff:
+    // - SafeTrim case
+    // OR
     // - Query has ORDER BY clause
     // - Segment group trim is enabled
     // - There are more groups than the trim size
