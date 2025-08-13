@@ -33,7 +33,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.config.TlsConfig;
@@ -357,10 +356,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     try (QueryThreadContext.CloseableContext qTlClosable
         = QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
         QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
-      // Explain the stage for each worker
-      BiFunction<StagePlan, WorkerMetadata, StagePlan> explainFun = (stagePlan, workerMetadata) ->
-          _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
-
       List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
 
       for (Worker.StagePlan protoStagePlan : protoStagePlans) {
