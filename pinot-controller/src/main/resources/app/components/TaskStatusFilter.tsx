@@ -100,7 +100,23 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-export type TaskStatus = 'COMPLETED' | 'RUNNING' | 'WAITING' | 'ERROR' | 'UNKNOWN' | 'DROPPED' | 'TIMED_OUT' | 'ABORTED';
+export type TaskStatus =
+  | 'COMPLETED'
+  | 'RUNNING'
+  | 'WAITING'
+  | 'ERROR'
+  | 'UNKNOWN'
+  | 'DROPPED'
+  | 'TIMED_OUT'
+  | 'ABORTED'
+  // Additional task-level statuses for Minion task page
+  | 'NOT_STARTED'
+  | 'IN_PROGRESS'
+  | 'STOPPED'
+  | 'STOPPING'
+  | 'FAILED'
+  | 'TIMING_OUT'
+  | 'FAILING';
 
 type TaskStatusFilterOption = {
   label: string;
@@ -125,6 +141,8 @@ export const getTaskStatusChipClass = (status: string, classes?: any) => {
       return classes.waiting;
     case 'ERROR':
       return classes.error;
+    case 'FAILED':
+      return classes.error;
     case 'UNKNOWN':
       return classes.unknown;
     case 'DROPPED':
@@ -132,8 +150,20 @@ export const getTaskStatusChipClass = (status: string, classes?: any) => {
     case 'TIMED_OUT':
     case 'TIMEDOUT':
       return classes.timedout;
+    case 'TIMING_OUT':
+      return classes.timedout;
     case 'ABORTED':
       return classes.aborted;
+    case 'NOT_STARTED':
+      return classes.unknown;
+    case 'IN_PROGRESS':
+      return classes.running;
+    case 'STOPPING':
+      return classes.waiting;
+    case 'STOPPED':
+      return classes.aborted;
+    case 'FAILING':
+      return classes.error;
     default:
       return '';
   }
