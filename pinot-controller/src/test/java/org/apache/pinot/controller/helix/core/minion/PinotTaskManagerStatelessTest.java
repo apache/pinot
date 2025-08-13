@@ -223,12 +223,12 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
 
     // Verify that setting triggered by in context to adhoc should result in task schedule failure
     context.setTriggeredBy(CommonConstants.TaskTriggers.ADHOC_TRIGGER.name());
-    result = taskManager.scheduleTasks(context);
-    assertEquals(result.size(), 1);
-    schedulingInfo = result.get(taskType);
-    assertEquals(schedulingInfo.getScheduledTaskNames().size(), 0);
-    assertEquals(schedulingInfo.getGenerationErrors().size(), 1);
-    assertTrue(schedulingInfo.getGenerationErrors().get(0).contains("greater than the maximum number of tasks"));
+    try {
+      taskManager.scheduleTasks(context);
+      fail("Expected RuntimeException due to exceeding maxSubTasks limit");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage().contains("greater than the maximum number of tasks"));
+    }
 
     dropOfflineTable(RAW_TABLE_NAME);
     stopFakeInstances();
