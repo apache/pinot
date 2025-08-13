@@ -53,7 +53,8 @@ export default function useTaskListing(props) {
         ? (status as { value?: unknown }).value
         : status;
       const statusString = typeof rawStatus === 'string' ? rawStatus : '';
-      const normalized = statusString.toUpperCase() === 'TIMEDOUT' ? 'TIMED_OUT' : statusString.toUpperCase();
+      const upperStatus = statusString.toUpperCase();
+      const normalized = upperStatus === 'TIMEDOUT' ? 'TIMED_OUT' : upperStatus;
       return normalized === statusFilter;
     });
 

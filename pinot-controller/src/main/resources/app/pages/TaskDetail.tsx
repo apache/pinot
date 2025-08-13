@@ -119,7 +119,8 @@ const TaskDetail = (props) => {
         ? (status as { value?: unknown }).value
         : status;
       const statusString = typeof rawStatus === 'string' ? rawStatus : '';
-      const normalized = statusString.toUpperCase() === 'TIMEDOUT' ? 'TIMED_OUT' : statusString.toUpperCase();
+      const statusUpper = statusString.toUpperCase();
+      const normalized = statusUpper === 'TIMEDOUT' ? 'TIMED_OUT' : statusUpper;
       return normalized === subtaskStatusFilter;
     });
 
