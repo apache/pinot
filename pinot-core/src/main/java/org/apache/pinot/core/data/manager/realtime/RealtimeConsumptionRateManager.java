@@ -278,6 +278,7 @@ public class RealtimeConsumptionRateManager {
 
     @Override
     public int getUnits(MessageBatch messageBatch) {
+      // messageBatchSize should not be greater than Integer.MAX
       return (int) messageBatch.getSizeInBytes();
     }
   }
