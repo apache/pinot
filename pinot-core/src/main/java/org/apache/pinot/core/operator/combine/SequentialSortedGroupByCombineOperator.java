@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
  * more efficient than the pair-size merging {@link SortedGroupByCombineOperator}
  * when the number of segments is smaller than the available number of cores</p>
  */
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes"})
 public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SequentialSortedGroupByCombineOperator.class);

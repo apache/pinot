@@ -56,6 +56,7 @@ public class SortedRecordTable extends BaseTable {
   public SortedRecordTable(DataSchema dataSchema, QueryContext queryContext, int resultSize,
       ExecutorService executorService, Comparator<Record> comparator) {
     super(dataSchema);
+    assert queryContext.getGroupByExpressions() != null;
     _numKeyColumns = queryContext.getGroupByExpressions().size();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _executorService = executorService;
