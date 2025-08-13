@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -165,7 +166,8 @@ public abstract class GeoFunctionTest {
     }
 
     ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(length), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+        new DocIdSetOperator(new MatchAllFilterOperator(length), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new QueryContext.Builder().build()).nextBlock();
 
     ExpressionContext expression = RequestContextUtils.getExpression(function);
     TransformFunction transformFunction = TransformFunctionFactory.get(expression, dataSourceMap);

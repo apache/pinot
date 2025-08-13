@@ -56,6 +56,7 @@ import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 import static org.apache.pinot.spi.data.FieldSpec.DEFAULT_DIMENSION_NULL_VALUE_OF_STRING;
 import static org.testng.Assert.assertEquals;
@@ -151,7 +152,8 @@ public class ClpTransformFunctionsTest {
     }
 
     _projectionBlock = new ProjectionOperator(_dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new QueryContext.Builder().build()).nextBlock();
   }
 
   @BeforeTest

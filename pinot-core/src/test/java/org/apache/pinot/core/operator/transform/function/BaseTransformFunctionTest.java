@@ -62,6 +62,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.roaringbitmap.RoaringBitmap;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 import static org.testng.Assert.assertEquals;
 
@@ -205,8 +206,10 @@ public abstract class BaseTransformFunctionTest {
 
       Random random = new Random();
       for (int j = 0; j < VECTOR_DIM_SIZE; j++) {
-        _vector1Values[i][j] = random.nextFloat();;
-        _vector2Values[i][j] = random.nextFloat();;
+        _vector1Values[i][j] = random.nextFloat();
+        ;
+        _vector2Values[i][j] = random.nextFloat();
+        ;
       }
 
       // Time in the past year
@@ -328,7 +331,8 @@ public abstract class BaseTransformFunctionTest {
     }
 
     _projectionBlock = new ProjectionOperator(_dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new QueryContext.Builder().build()).nextBlock();
   }
 
   // overridden in startree json index tests

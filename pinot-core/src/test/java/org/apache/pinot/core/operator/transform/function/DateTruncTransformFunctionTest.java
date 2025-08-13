@@ -56,6 +56,7 @@ import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.ISODateTimeFormat;
 import org.testng.Assert;
 import org.testng.annotations.Test;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public class DateTruncTransformFunctionTest {
@@ -106,7 +107,8 @@ public class DateTruncTransformFunctionTest {
       }
 
       ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
-          new DocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+          new DocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+          new QueryContext.Builder().build()).nextBlock();
 
       ExpressionContext expression = RequestContextUtils.getExpression(
           String.format("dateTrunc('%s', \"%s\", '%s', '%s')", unit, TIME_COLUMN, TimeUnit.MILLISECONDS, tz));

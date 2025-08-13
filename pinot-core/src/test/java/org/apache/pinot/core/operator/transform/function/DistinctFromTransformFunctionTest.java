@@ -49,6 +49,7 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 public abstract class DistinctFromTransformFunctionTest {
@@ -97,7 +98,8 @@ public abstract class DistinctFromTransformFunctionTest {
 
   private static ProjectionBlock getProjectionBlock(Map<String, DataSource> dataSourceMap) {
     return new ProjectionOperator(dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL)).nextBlock();
+        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new QueryContext.Builder().build()).nextBlock();
   }
 
   private static boolean isEqualRow(int i) {

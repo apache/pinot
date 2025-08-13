@@ -50,6 +50,7 @@ import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.utils.ReadMode;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import picocli.CommandLine;
+import org.apache.pinot.core.query.request.context.QueryContext;
 
 
 /**
@@ -222,7 +223,8 @@ public class RawIndexBenchmark {
     BaseFilterOperator filterOperator =
         new TestFilterOperator(docIds, segment.getDataSource(column).getDataSourceMetadata().getNumDocs());
     DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-    ProjectionOperator projectionOperator = new ProjectionOperator(buildDataSourceMap(segment), docIdSetOperator);
+    ProjectionOperator projectionOperator =
+        new ProjectionOperator(buildDataSourceMap(segment), docIdSetOperator, new QueryContext.Builder().build());
 
     long start = System.currentTimeMillis();
     ProjectionBlock projectionBlock;
