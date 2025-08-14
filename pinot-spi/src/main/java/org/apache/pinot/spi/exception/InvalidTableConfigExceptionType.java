@@ -16,24 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table.task;
+package org.apache.pinot.spi.exception;
 
-// TODO - Move this to a relevant package and merge with org.apache.pinot.controller.api.exception.InvalidTableConfigException
-public class InvalidTableConfigException extends RuntimeException {
+public enum InvalidTableConfigExceptionType {
 
-  private final InvalidTableConfigExceptionType type;
+  TASK_NOT_ALLOWED,
+  TASK_CONFIG_INVALID
 
-  public InvalidTableConfigException(InvalidTableConfigExceptionType type, String message) {
-    super(message);
-    this.type = type;
-  }
-
-  public InvalidTableConfigException(InvalidTableConfigExceptionType type, String message, Throwable cause) {
-    super(message, cause);
-    this.type = type;
-  }
-
-  public InvalidTableConfigExceptionType getType() {
-    return type;
-  }
 }

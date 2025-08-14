@@ -16,18 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.spi.config.table.task;
+package org.apache.pinot.spi.exception;
 
+// TODO - Move this to a relevant package and merge with org.apache.pinot.controller.api.exception.InvalidTableConfigException
+public class InvalidTableConfigException extends RuntimeException {
 
+  private final InvalidTableConfigExceptionType type;
 
-/**
- * To add a new task type,
- * 1. Add the new enum value here.
- * 2. Extend the {@link TableTaskTypeConfig} class to create a new task config class.
- *
- * To test that a new task type is correctly added,
- * 1. <TODO>
- */
-public enum TaskType {
+  public InvalidTableConfigException(InvalidTableConfigExceptionType type, String message) {
+    super(message);
+    this.type = type;
+  }
 
+  public InvalidTableConfigException(InvalidTableConfigExceptionType type, String message, Throwable cause) {
+    super(message, cause);
+    this.type = type;
+  }
+
+  public InvalidTableConfigExceptionType getType() {
+    return type;
+  }
 }

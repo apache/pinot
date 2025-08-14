@@ -60,8 +60,11 @@ public class TaskConfigUtils {
         if (taskGenerator != null) {
           Map<String, String> taskConfigs = taskConfigEntry.getValue();
           doCommonTaskValidations(tableConfig, taskType, taskConfigs);
-          // TODO - Call TableTaskTypeConfig.isValidConfig() here once it is implemented
-          taskGenerator.validateTaskConfigs(tableConfig, schema, taskConfigs);
+          if (taskConfig.getTaskConfig(taskType) != null) {
+            taskConfig.getTaskConfig(taskType).checkValidity(tableConfig);
+          } else {
+            taskGenerator.validateTaskConfigs(tableConfig, schema, taskConfigs);
+          }
         } else {
           throw new RuntimeException(String.format("Task generator not found for task type: %s, while validating table "
               + "configs for table: %s", taskType, tableConfig.getTableName()));
