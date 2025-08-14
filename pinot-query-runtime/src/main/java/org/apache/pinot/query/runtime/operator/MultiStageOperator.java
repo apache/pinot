@@ -124,6 +124,7 @@ public abstract class MultiStageOperator
       try {
         nextBlock = getNextBlock();
       } catch (Exception e) {
+        logger().warn("Operator {}: Exception while processing next block", _operatorId, e);
         nextBlock = ErrorMseBlock.fromException(e);
       }
       int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;

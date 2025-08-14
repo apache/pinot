@@ -91,93 +91,95 @@ public class DataBlockBuilder {
     PagedPinotOutputStream varSize = new PagedPinotOutputStream(allocator);
     Object2IntOpenHashMap<String> dictionary = new Object2IntOpenHashMap<>();
 
-    for (int rowId = 0; rowId < numRows; rowId++) {
-      Object[] row = rows.get(rowId);
-      for (int colId = 0; colId < numColumns; colId++) {
-        Object value = row[colId];
-        ColumnDataType storedType = storedTypes[colId];
+    interruptableLoop(0, numRows,1000, (start, end) -> {
+      for (int rowId = start; rowId < end; rowId++) {
+        Object[] row = rows.get(rowId);
+        for (int colId = 0; colId < numColumns; colId++) {
+          Object value = row[colId];
+          ColumnDataType storedType = storedTypes[colId];
 
-        if (storedType == ColumnDataType.OBJECT) {
-          // Custom intermediate result for aggregation function
-          assert aggFunctions != null;
-          if (value == null) {
-            setNull(fixedSize, varSize);
-          } else {
-            // NOTE: The first (numColumns - numAggFunctions) columns are key columns
-            int numAggFunctions = aggFunctions.length;
-            AggregationFunction aggFunction = aggFunctions[colId + numAggFunctions - numColumns];
-            setColumn(fixedSize, varSize, aggFunction.serializeIntermediateResult(value));
-          }
-          continue;
-        }
-
-        if (value == null) {
-          if (storedType == ColumnDataType.UNKNOWN) {
-            setNull(fixedSize, varSize);
+          if (storedType == ColumnDataType.OBJECT) {
+            // Custom intermediate result for aggregation function
+            assert aggFunctions != null;
+            if (value == null) {
+              setNull(fixedSize, varSize);
+            } else {
+              // NOTE: The first (numColumns - numAggFunctions) columns are key columns
+              int numAggFunctions = aggFunctions.length;
+              AggregationFunction aggFunction = aggFunctions[colId + numAggFunctions - numColumns];
+              setColumn(fixedSize, varSize, aggFunction.serializeIntermediateResult(value));
+            }
             continue;
-          } else {
-            nullBitmaps[colId].add(rowId);
-            value = nullPlaceholders[colId];
           }
-        }
 
-        // NOTE:
-        // We intentionally make the type casting very strict here (e.g. only accepting Integer for INT) to ensure the
-        // rows conform to the data schema. This can help catch the unexpected data type issues early.
-        switch (storedType) {
-          // Single-value column
-          case INT:
-            fixedSize.putInt((int) value);
-            break;
-          case LONG:
-            fixedSize.putLong((long) value);
-            break;
-          case FLOAT:
-            fixedSize.putFloat((float) value);
-            break;
-          case DOUBLE:
-            fixedSize.putDouble((double) value);
-            break;
-          case BIG_DECIMAL:
-            setColumn(fixedSize, varSize, (BigDecimal) value);
-            break;
-          case STRING:
-            int dictId = dictionary.computeIfAbsent((String) value, k -> dictionary.size());
-            fixedSize.putInt(dictId);
-            break;
-          case BYTES:
-            setColumn(fixedSize, varSize, (ByteArray) value);
-            break;
-          case MAP:
-            setColumn(fixedSize, varSize, (Map) value);
-            break;
-          // Multi-value column
-          case INT_ARRAY:
-            setColumn(fixedSize, varSize, (int[]) value);
-            break;
-          case LONG_ARRAY:
-            setColumn(fixedSize, varSize, (long[]) value);
-            break;
-          case FLOAT_ARRAY:
-            setColumn(fixedSize, varSize, (float[]) value);
-            break;
-          case DOUBLE_ARRAY:
-            setColumn(fixedSize, varSize, (double[]) value);
-            break;
-          case STRING_ARRAY:
-            setColumn(fixedSize, varSize, (String[]) value, dictionary);
-            break;
-          // Null
-          case UNKNOWN:
-            setNull(fixedSize, varSize);
-            break;
+          if (value == null) {
+            if (storedType == ColumnDataType.UNKNOWN) {
+              setNull(fixedSize, varSize);
+              continue;
+            } else {
+              nullBitmaps[colId].add(rowId);
+              value = nullPlaceholders[colId];
+            }
+          }
 
-          default:
-            throw new IllegalStateException(
-                "Unsupported stored type: " + storedType + " for column: " + dataSchema.getColumnName(colId));
+          // NOTE:
+          // We intentionally make the type casting very strict here (e.g. only accepting Integer for INT) to ensure the
+          // rows conform to the data schema. This can help catch the unexpected data type issues early.
+          switch (storedType) {
+            // Single-value column
+            case INT:
+              fixedSize.putInt((int) value);
+              break;
+            case LONG:
+              fixedSize.putLong((long) value);
+              break;
+            case FLOAT:
+              fixedSize.putFloat((float) value);
+              break;
+            case DOUBLE:
+              fixedSize.putDouble((double) value);
+              break;
+            case BIG_DECIMAL:
+              setColumn(fixedSize, varSize, (BigDecimal) value);
+              break;
+            case STRING:
+              int dictId = dictionary.computeIfAbsent((String) value, k -> dictionary.size());
+              fixedSize.putInt(dictId);
+              break;
+            case BYTES:
+              setColumn(fixedSize, varSize, (ByteArray) value);
+              break;
+            case MAP:
+              setColumn(fixedSize, varSize, (Map) value);
+              break;
+            // Multi-value column
+            case INT_ARRAY:
+              setColumn(fixedSize, varSize, (int[]) value);
+              break;
+            case LONG_ARRAY:
+              setColumn(fixedSize, varSize, (long[]) value);
+              break;
+            case FLOAT_ARRAY:
+              setColumn(fixedSize, varSize, (float[]) value);
+              break;
+            case DOUBLE_ARRAY:
+              setColumn(fixedSize, varSize, (double[]) value);
+              break;
+            case STRING_ARRAY:
+              setColumn(fixedSize, varSize, (String[]) value, dictionary);
+              break;
+            // Null
+            case UNKNOWN:
+              setNull(fixedSize, varSize);
+              break;
+
+            default:
+              throw new IllegalStateException(
+                  "Unsupported stored type: " + storedType + " for column: " + dataSchema.getColumnName(colId));
+          }
         }
       }
-    }
+    });
 
     CompoundDataBuffer.Builder varBufferBuilder =
         new CompoundDataBuffer.Builder(ByteOrder.BIG_ENDIAN, true).addPagedOutputStream(varSize);
@@ -250,6 +252,7 @@ public class DataBlockBuilder {
     int numRows = columns.get(colId).length;
 
     Object[] column = columns.get(colId);
+    int interruptableLoopStep = 10000;
 
     // NOTE:
     // We intentionally make the type casting very strict here (e.g. only accepting Integer for INT) to ensure the
@@ -258,195 +261,225 @@ public class DataBlockBuilder {
       // Single-value column
       case INT: {
         int nullPlaceholder = (int) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            fixedSize.putInt(nullPlaceholder);
-          } else {
-            fixedSize.putInt((int) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {;
+          for (int rowId = start; rowId < end; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              fixedSize.putInt(nullPlaceholder);
+            } else {
+              fixedSize.putInt((int) value);
+            }
           }
-        }
+        });
         break;
       }
       case LONG: {
         long nullPlaceholder = (long) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            fixedSize.putLong(nullPlaceholder);
-          } else {
-            fixedSize.putLong((long) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = start; rowId < end; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              fixedSize.putLong(nullPlaceholder);
+            } else {
+              fixedSize.putLong((long) value);
+            }
           }
-        }
+        });
         break;
       }
       case FLOAT: {
         float nullPlaceholder = (float) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            fixedSize.putFloat(nullPlaceholder);
-          } else {
-            fixedSize.putFloat((float) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = start; rowId < end; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              fixedSize.putFloat(nullPlaceholder);
+            } else {
+              fixedSize.putFloat((float) value);
+            }
           }
-        }
+        });
         break;
       }
       case DOUBLE: {
         double nullPlaceholder = (double) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            fixedSize.putDouble(nullPlaceholder);
-          } else {
-            fixedSize.putDouble((double) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = start; rowId < end; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              fixedSize.putDouble(nullPlaceholder);
+            } else {
+              fixedSize.putDouble((double) value);
+            }
           }
-        }
+        });
         break;
       }
       case BIG_DECIMAL: {
         BigDecimal nullPlaceholder = (BigDecimal) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            setColumn(fixedSize, varSize, nullPlaceholder);
-          } else {
-            setColumn(fixedSize, varSize, (BigDecimal) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (BigDecimal) value);
+            }
           }
-        }
+        });
         break;
       }
       case STRING: {
         ToIntFunction<String> didSupplier = k -> dictionary.size();
         int nullPlaceHolder = dictionary.computeIfAbsent((String) storedType.getNullPlaceholder(), didSupplier);
 
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            fixedSize.putInt(nullPlaceHolder);
-          } else {
-            int dictId = dictionary.computeIfAbsent((String) value, didSupplier);
-            fixedSize.putInt(dictId);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              fixedSize.putInt(nullPlaceHolder);
+            } else {
+              int dictId = dictionary.computeIfAbsent((String) value, didSupplier);
+              fixedSize.putInt(dictId);
+            }
           }
-        }
+        });
         break;
       }
       case BYTES: {
         ByteArray nullPlaceholder = (ByteArray) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            setColumn(fixedSize, varSize, nullPlaceholder);
-          } else {
-            setColumn(fixedSize, varSize, (ByteArray) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (ByteArray) value);
+            }
           }
-        }
+        });
         break;
       }
       case MAP: {
         Map nullPlaceholder = (Map) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            setColumn(fixedSize, varSize, nullPlaceholder);
-          } else {
-            setColumn(fixedSize, varSize, (Map) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (Map) value);
+            }
           }
-        }
+        });
         break;
       }
       // Multi-value column
       case INT_ARRAY: {
         int[] nullPlaceholder = (int[]) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            setColumn(fixedSize, varSize, nullPlaceholder);
-          } else {
-            setColumn(fixedSize, varSize, (int[]) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (int[]) value);
+            }
           }
-        }
+        });
         break;
       }
       case LONG_ARRAY: {
         long[] nullPlaceholder = (long[]) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            setColumn(fixedSize, varSize, nullPlaceholder);
-          } else {
-            setColumn(fixedSize, varSize, (long[]) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (long[]) value);
+            }
           }
-        }
+        });
         break;
       }
       case FLOAT_ARRAY: {
         float[] nullPlaceholder = (float[]) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            setColumn(fixedSize, varSize, nullPlaceholder);
-          } else {
-            setColumn(fixedSize, varSize, (float[]) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (float[]) value);
+            }
           }
-        }
+        });
         break;
       }
       case DOUBLE_ARRAY: {
         double[] nullPlaceholder = (double[]) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            setColumn(fixedSize, varSize, nullPlaceholder);
-          } else {
-            setColumn(fixedSize, varSize, (double[]) value);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder);
+            } else {
+              setColumn(fixedSize, varSize, (double[]) value);
+            }
           }
-        }
+        });
         break;
       }
       case STRING_ARRAY: {
         String[] nullPlaceholder = (String[]) storedType.getNullPlaceholder();
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            nullBitmap.add(rowId);
-            setColumn(fixedSize, varSize, nullPlaceholder, dictionary);
-          } else {
-            setColumn(fixedSize, varSize, (String[]) value, dictionary);
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              nullBitmap.add(rowId);
+              setColumn(fixedSize, varSize, nullPlaceholder, dictionary);
+            } else {
+              setColumn(fixedSize, varSize, (String[]) value, dictionary);
+            }
           }
-        }
+        });
         break;
       }
       // Custom intermediate result for aggregation function
       case OBJECT: {
         assert aggFunction != null;
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          Object value = column[rowId];
-          if (value == null) {
-            setNull(fixedSize, varSize);
-          } else {
-            setColumn(fixedSize, varSize, aggFunction.serializeIntermediateResult(value));
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            Object value = column[rowId];
+            if (value == null) {
+              setNull(fixedSize, varSize);
+            } else {
+              setColumn(fixedSize, varSize, aggFunction.serializeIntermediateResult(value));
+            }
           }
-        }
+        });
         break;
       }
       // Null
       case UNKNOWN:
-        for (int rowId = 0; rowId < numRows; rowId++) {
-          setNull(fixedSize, varSize);
-        }
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
+          for (int rowId = 0; rowId < numRows; rowId++) {
+            setNull(fixedSize, varSize);
+          }
+        });
         break;
 
       default:
@@ -621,5 +654,22 @@ public class DataBlockBuilder {
     writeVarOffsetInFixed(fixedSize, varSize);
     fixedSize.putInt(0);
     varSize.writeInt(CustomObject.NULL_TYPE_VALUE);
+  }
+
+  /// Iterate using two loops.
+  /// The outer loop will iterate over a maximum of configurable step rows and check for the interruption flag,
+  /// calling the inner loop to process the rows without checking the interruption flag.
+  static void interruptableLoop(int start, int max, int step, InnerLoop loop) throws IOException {
+    for (int i = start; i < max; i += step) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new RuntimeException("Thread interrupted while processing rows. Rows processed so far: " + i);
+      }
+      int end = Math.min(i + step, max);
+      loop.run(i, end);
+    }
+  }
+
+  private interface InnerLoop {
+    void run(int from, int to) throws IOException;
   }
 }
