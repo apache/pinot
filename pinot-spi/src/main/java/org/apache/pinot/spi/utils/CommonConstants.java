@@ -158,39 +158,39 @@ public interface CommonConstants {
     String UNTAGGED_SERVER_INSTANCE = "server_untagged";
     String UNTAGGED_MINION_INSTANCE = "minion_untagged";
 
-    class StateModel {
-      public static class SegmentStateModel {
-        public static final String ONLINE = "ONLINE";
-        public static final String OFFLINE = "OFFLINE";
-        public static final String ERROR = "ERROR";
-        public static final String CONSUMING = "CONSUMING";
+    interface StateModel {
+      interface SegmentStateModel {
+        String ONLINE = "ONLINE";
+        String OFFLINE = "OFFLINE";
+        String ERROR = "ERROR";
+        String CONSUMING = "CONSUMING";
       }
 
-      public static class DisplaySegmentStatus {
-        public static final String BAD = "BAD";
-        public static final String GOOD = "GOOD";
-        public static final String UPDATING = "UPDATING";
+      interface DisplaySegmentStatus {
+        String BAD = "BAD";
+        String GOOD = "GOOD";
+        String UPDATING = "UPDATING";
       }
 
-      public static class BrokerResourceStateModel {
-        public static final String ONLINE = "ONLINE";
-        public static final String OFFLINE = "OFFLINE";
-        public static final String ERROR = "ERROR";
+      interface BrokerResourceStateModel {
+        String ONLINE = "ONLINE";
+        String OFFLINE = "OFFLINE";
+        String ERROR = "ERROR";
       }
     }
 
-    class ZkClient {
-      public static final int DEFAULT_CONNECT_TIMEOUT_MS = 60_000;
-      public static final int DEFAULT_SESSION_TIMEOUT_MS = 30_000;
+    interface ZkClient {
+      int DEFAULT_CONNECT_TIMEOUT_MS = 60_000;
+      int DEFAULT_SESSION_TIMEOUT_MS = 30_000;
       // Retry interval and count for ZK operations where we would rather fail than get an empty (wrong) result back
-      public static final int RETRY_INTERVAL_MS = 50;
-      public static final int RETRY_COUNT = 2;
-      public static final String ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG = "zk.client.connection.timeout.ms";
-      public static final String ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG = "zk.client.session.timeout.ms";
+      int RETRY_INTERVAL_MS = 50;
+      int RETRY_COUNT = 2;
+      String ZK_CLIENT_CONNECTION_TIMEOUT_MS_CONFIG = "zk.client.connection.timeout.ms";
+      String ZK_CLIENT_SESSION_TIMEOUT_MS_CONFIG = "zk.client.session.timeout.ms";
     }
 
-    class DataSource {
-      public enum SegmentAssignmentStrategyType {
+    interface DataSource {
+      enum SegmentAssignmentStrategyType {
         RandomAssignmentStrategy,
         BalanceNumSegmentAssignmentStrategy,
         BucketizedSegmentAssignmentStrategy,
@@ -198,20 +198,20 @@ public interface CommonConstants {
       }
     }
 
-    class Instance {
+    interface Instance {
       @Deprecated
-      public static final String INSTANCE_ID_KEY = "instanceId";
-      public static final String DATA_DIR_KEY = "dataDir";
-      public static final String ADMIN_PORT_KEY = "adminPort";
-      public static final String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
-      public static final String GRPC_PORT_KEY = "grpcPort";
-      public static final String NETTY_TLS_PORT_KEY = "nettyTlsPort";
+      String INSTANCE_ID_KEY = "instanceId";
+      String DATA_DIR_KEY = "dataDir";
+      String ADMIN_PORT_KEY = "adminPort";
+      String ADMIN_HTTPS_PORT_KEY = "adminHttpsPort";
+      String GRPC_PORT_KEY = "grpcPort";
+      String NETTY_TLS_PORT_KEY = "nettyTlsPort";
 
-      public static final String MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY = "queryServerPort";
-      public static final String MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY = "queryMailboxPort";
+      String MULTI_STAGE_QUERY_ENGINE_SERVICE_PORT_KEY = "queryServerPort";
+      String MULTI_STAGE_QUERY_ENGINE_MAILBOX_PORT_KEY = "queryMailboxPort";
 
-      public static final String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
-      public static final String PINOT_VERSION_KEY = "pinotVersion";
+      String SYSTEM_RESOURCE_INFO_KEY = "SYSTEM_RESOURCE_INFO";
+      String PINOT_VERSION_KEY = "pinotVersion";
     }
 
     String SET_INSTANCE_ID_TO_HOSTNAME_KEY = "pinot.set.instance.id.to.hostname";
@@ -548,26 +548,26 @@ public interface CommonConstants {
     @Deprecated
     int FALLBACK_REPLICA_GROUP_ID = -1;
 
-    class Request {
-      public static final String SQL = "sql";
-      public static final String SQL_V1 = "sqlV1";
-      public static final String SQL_V2 = "sqlV2";
-      public static final String TRACE = "trace";
-      public static final String QUERY_OPTIONS = "queryOptions";
-      public static final String LANGUAGE = "language";
-      public static final String QUERY = "query";
+    interface Request {
+      String SQL = "sql";
+      String SQL_V1 = "sqlV1";
+      String SQL_V2 = "sqlV2";
+      String TRACE = "trace";
+      String QUERY_OPTIONS = "queryOptions";
+      String LANGUAGE = "language";
+      String QUERY = "query";
 
-      public static class QueryOptionKey {
-        public static final String TIMEOUT_MS = "timeoutMs";
-        public static final String EXTRA_PASSIVE_TIMEOUT_MS = "extraPassiveTimeoutMs";
-        public static final String SKIP_UPSERT = "skipUpsert";
-        public static final String SKIP_UPSERT_VIEW = "skipUpsertView";
-        public static final String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
-        public static final String USE_STAR_TREE = "useStarTree";
-        public static final String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
-        public static final String ROUTING_OPTIONS = "routingOptions";
-        public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
-        public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
+      interface QueryOptionKey {
+        String TIMEOUT_MS = "timeoutMs";
+        String EXTRA_PASSIVE_TIMEOUT_MS = "extraPassiveTimeoutMs";
+        String SKIP_UPSERT = "skipUpsert";
+        String SKIP_UPSERT_VIEW = "skipUpsertView";
+        String UPSERT_VIEW_FRESHNESS_MS = "upsertViewFreshnessMs";
+        String USE_STAR_TREE = "useStarTree";
+        String SCAN_STAR_TREE_NODES = "scanStarTreeNodes";
+        String ROUTING_OPTIONS = "routingOptions";
+        String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
+        String MAX_EXECUTION_THREADS = "maxExecutionThreads";
 
         // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
         // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When
@@ -583,38 +583,38 @@ public interface CommonConstants {
         // - Broker level: while merging the server level results into broker level results. (SSE only)
         // - MSE intermediate stage (MSE only)
 
-        public static final String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
-        public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
-        public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
-        public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
+        String MIN_SEGMENT_GROUP_TRIM_SIZE = "minSegmentGroupTrimSize";
+        String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
+        String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
+        String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
 
         /**
          * This will help in getting accurate and correct result for queries
          * with group by and limit but  without order by
          */
-        public static final String ACCURATE_GROUP_BY_WITHOUT_ORDER_BY = "accurateGroupByWithoutOrderBy";
+        String ACCURATE_GROUP_BY_WITHOUT_ORDER_BY = "accurateGroupByWithoutOrderBy";
 
         /** Number of threads used in the final reduce.
          * This is useful for expensive aggregation functions. E.g. Funnel queries are considered as expensive
          * aggregation functions. */
-        public static final String NUM_THREADS_EXTRACT_FINAL_RESULT = "numThreadsExtractFinalResult";
+        String NUM_THREADS_EXTRACT_FINAL_RESULT = "numThreadsExtractFinalResult";
 
         /** Number of threads used in the final reduce at broker level. */
-        public static final String CHUNK_SIZE_EXTRACT_FINAL_RESULT = "chunkSizeExtractFinalResult";
+        String CHUNK_SIZE_EXTRACT_FINAL_RESULT = "chunkSizeExtractFinalResult";
 
-        public static final String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
+        String NUM_REPLICA_GROUPS_TO_QUERY = "numReplicaGroupsToQuery";
 
         @Deprecated
-        public static final String ORDERED_PREFERRED_REPLICAS = "orderedPreferredReplicas";
-        public static final String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
-        public static final String USE_FIXED_REPLICA = "useFixedReplica";
-        public static final String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
-        public static final String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
-        public static final String INFER_PARTITION_HINT = "inferPartitionHint";
-        public static final String ENABLE_NULL_HANDLING = "enableNullHandling";
-        public static final String APPLICATION_NAME = "applicationName";
-        public static final String USE_SPOOLS = "useSpools";
-        public static final String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
+        String ORDERED_PREFERRED_REPLICAS = "orderedPreferredReplicas";
+        String ORDERED_PREFERRED_POOLS = "orderedPreferredPools";
+        String USE_FIXED_REPLICA = "useFixedReplica";
+        String EXPLAIN_PLAN_VERBOSE = "explainPlanVerbose";
+        String USE_MULTISTAGE_ENGINE = "useMultistageEngine";
+        String INFER_PARTITION_HINT = "inferPartitionHint";
+        String ENABLE_NULL_HANDLING = "enableNullHandling";
+        String APPLICATION_NAME = "applicationName";
+        String USE_SPOOLS = "useSpools";
+        String USE_PHYSICAL_OPTIMIZER = "usePhysicalOptimizer";
         /**
          * If set, changes the explain behavior in multi-stage engine.
          *
@@ -622,70 +622,70 @@ public interface CommonConstants {
          *
          * Use false in order to mimic behavior of Pinot 1.2.0 and previous.
          */
-        public static final String EXPLAIN_ASKING_SERVERS = "explainAskingServers";
+        String EXPLAIN_ASKING_SERVERS = "explainAskingServers";
 
         // Can be applied to aggregation and group-by queries to ask servers to directly return final results instead of
         // intermediate results for aggregations.
-        public static final String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
+        String SERVER_RETURN_FINAL_RESULT = "serverReturnFinalResult";
         // Can be applied to group-by queries to ask servers to directly return final results instead of intermediate
         // results for aggregations. Different from SERVER_RETURN_FINAL_RESULT, this option should be used when the
         // group key is not server partitioned, but the aggregated values are server partitioned. When this option is
         // used, server will return final results, but won't directly trim the result to the query limit.
-        public static final String SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED =
+        String SERVER_RETURN_FINAL_RESULT_KEY_UNPARTITIONED =
             "serverReturnFinalResultKeyUnpartitioned";
 
         // Reorder scan based predicates based on cardinality and number of selected values
-        public static final String AND_SCAN_REORDERING = "AndScanReordering";
-        public static final String SKIP_INDEXES = "skipIndexes";
+        String AND_SCAN_REORDERING = "AndScanReordering";
+        String SKIP_INDEXES = "skipIndexes";
 
         // Query option key used to skip a given set of rules
-        public static final String SKIP_PLANNER_RULES = "skipPlannerRules";
+        String SKIP_PLANNER_RULES = "skipPlannerRules";
 
         // Query option key used to enable a given set of defaultly disabled rules
-        public static final String USE_PLANNER_RULES = "usePlannerRules";
+        String USE_PLANNER_RULES = "usePlannerRules";
 
-        public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
+        String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
-        public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
+        String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
 
         // TODO: Apply this to SSE as well
         /** Throw an exception on reaching num_groups_limit instead of just setting a flag. */
-        public static final String ERROR_ON_NUM_GROUPS_LIMIT = "errorOnNumGroupsLimit";
+        String ERROR_ON_NUM_GROUPS_LIMIT = "errorOnNumGroupsLimit";
 
-        public static final String NUM_GROUPS_LIMIT = "numGroupsLimit";
+        String NUM_GROUPS_LIMIT = "numGroupsLimit";
         // Not actually accepted as Query Option but faked as one during MSE
-        public static final String NUM_GROUPS_WARNING_LIMIT = "numGroupsWarningLimit";
-        public static final String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
-        public static final String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
-        public static final String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
-        public static final String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
-        public static final String STAGE_PARALLELISM = "stageParallelism";
+        String NUM_GROUPS_WARNING_LIMIT = "numGroupsWarningLimit";
+        String MAX_INITIAL_RESULT_HOLDER_CAPACITY = "maxInitialResultHolderCapacity";
+        String MIN_INITIAL_INDEXED_TABLE_CAPACITY = "minInitialIndexedTableCapacity";
+        String MSE_MAX_INITIAL_RESULT_HOLDER_CAPACITY = "mseMaxInitialResultHolderCapacity";
+        String GROUP_TRIM_THRESHOLD = "groupTrimThreshold";
+        String STAGE_PARALLELISM = "stageParallelism";
 
-        public static final String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
-        public static final String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
+        String IN_PREDICATE_PRE_SORTED = "inPredicatePreSorted";
+        String IN_PREDICATE_LOOKUP_ALGORITHM = "inPredicateLookupAlgorithm";
 
-        public static final String DROP_RESULTS = "dropResults";
+        String DROP_RESULTS = "dropResults";
 
         // Maximum number of pending results blocks allowed in the streaming operator
-        public static final String MAX_STREAMING_PENDING_BLOCKS = "maxStreamingPendingBlocks";
+        String MAX_STREAMING_PENDING_BLOCKS = "maxStreamingPendingBlocks";
 
         // Handle JOIN Overflow
-        public static final String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
-        public static final String JOIN_OVERFLOW_MODE = "joinOverflowMode";
+        String MAX_ROWS_IN_JOIN = "maxRowsInJoin";
+        String JOIN_OVERFLOW_MODE = "joinOverflowMode";
 
         // Handle WINDOW Overflow
-        public static final String MAX_ROWS_IN_WINDOW = "maxRowsInWindow";
-        public static final String WINDOW_OVERFLOW_MODE = "windowOverflowMode";
+        String MAX_ROWS_IN_WINDOW = "maxRowsInWindow";
+        String WINDOW_OVERFLOW_MODE = "windowOverflowMode";
 
         // Indicates the maximum length of the serialized response per server for a query.
-        public static final String MAX_SERVER_RESPONSE_SIZE_BYTES = "maxServerResponseSizeBytes";
+        String MAX_SERVER_RESPONSE_SIZE_BYTES = "maxServerResponseSizeBytes";
 
         // Indicates the maximum length of serialized response across all servers for a query. This value is equally
         // divided across all servers processing the query.
-        public static final String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
+        String MAX_QUERY_RESPONSE_SIZE_BYTES = "maxQueryResponseSizeBytes";
 
         // If query submission causes an exception, still continue to submit the query to other servers
-        public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
+        String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
 
         // Indicates that a query belongs to a secondary workload when using the BinaryWorkloadScheduler. The
         // BinaryWorkloadScheduler divides queries into two workloads, primary and secondary. Primary workloads are
@@ -693,7 +693,7 @@ public interface CommonConstants {
         // fashion with limited compute.des queries into two workloads, primary and secondary. Primary workloads are
         // executed in an  Unbounded FCFS fashion. However, secondary workloads are executed in a constrainted FCFS
         // fashion with limited compute.
-        public static final String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
+        String IS_SECONDARY_WORKLOAD = "isSecondaryWorkload";
 
         // For group by queries with only filtered aggregations (and no non-filtered aggregations), the default behavior
         // is to compute all groups over the rows matching the main query filter. This ensures SQL compliant results,
@@ -702,32 +702,32 @@ public interface CommonConstants {
         // users are okay with skipping empty groups - i.e., only the groups matching at least one aggregation filter
         // will be returned - this query option can be set. This is useful for performance, since indexes can be used
         // for the aggregation filters and a full scan can be avoided.
-        public static final String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
+        String FILTERED_AGGREGATIONS_SKIP_EMPTY_GROUPS = "filteredAggregationsSkipEmptyGroups";
 
         // When set to true, the max initial result holder capacity will be optimized based on the query. Rather than
         // using the default value. This is best-effort for now and returns the default value if the optimization is not
         // possible.
-        public static final String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
+        String OPTIMIZE_MAX_INITIAL_RESULT_HOLDER_CAPACITY =
             "optimizeMaxInitialResultHolderCapacity";
 
         // Set to true if a cursor should be returned instead of the complete result set
-        public static final String GET_CURSOR = "getCursor";
+        String GET_CURSOR = "getCursor";
         // Number of rows that the cursor should contain
-        public static final String CURSOR_NUM_ROWS = "cursorNumRows";
+        String CURSOR_NUM_ROWS = "cursorNumRows";
 
         // Custom Query ID provided by the client
-        public static final String CLIENT_QUERY_ID = "clientQueryId";
+        String CLIENT_QUERY_ID = "clientQueryId";
 
         // Use MSE compiler when trying to fill a response with no schema metadata
         // (overrides the "pinot.broker.use.mse.to.fill.empty.response.schema" broker conf)
-        public static final String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = "useMSEToFillEmptyResponseSchema";
+        String USE_MSE_TO_FILL_EMPTY_RESPONSE_SCHEMA = "useMSEToFillEmptyResponseSchema";
 
         // Used by the MSE Engine when auto-inferring data partitioning. Realtime streams can often incorrectly assign
         // records to stream partitions, which can make a segment have multiple partitions. The scale of this is
         // usually low, and this query option allows the MSE Optimizer to infer the partition of a segment based on its
         // name, when that segment has multiple partitions in its columnPartitionMap.
         @Deprecated
-        public static final String INFER_INVALID_SEGMENT_PARTITION = "inferInvalidSegmentPartition";
+        String INFER_INVALID_SEGMENT_PARTITION = "inferInvalidSegmentPartition";
         // For realtime tables, this infers the segment partition for all segments. The partition column, function,
         // and number of partitions still rely on the Table's segmentPartitionConfig. This is useful if you have
         // scenarios where the stream doesn't guarantee 100% accuracy for stream partition assignment. In such
@@ -735,30 +735,30 @@ public interface CommonConstants {
         // you have compaction enabled, it's possible that after compaction you are only left with invalid partition
         // records, which can change the partition of a segment from something like [1, 3, 5] to [5], for a segment
         // that was supposed to be in partition-1.
-        public static final String INFER_REALTIME_SEGMENT_PARTITION = "inferRealtimeSegmentPartition";
-        public static final String USE_LITE_MODE = "useLiteMode";
+        String INFER_REALTIME_SEGMENT_PARTITION = "inferRealtimeSegmentPartition";
+        String USE_LITE_MODE = "useLiteMode";
         // Server stage limit for lite mode queries.
-        public static final String LITE_MODE_SERVER_STAGE_LIMIT = "liteModeServerStageLimit";
+        String LITE_MODE_SERVER_STAGE_LIMIT = "liteModeServerStageLimit";
         // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
         // new MSE query optimizer.
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already
         //   a table config to enable broker pruning (it is disabled by default).
-        public static final String USE_BROKER_PRUNING = "useBrokerPruning";
+        String USE_BROKER_PRUNING = "useBrokerPruning";
         // When lite mode is enabled, if this flag is set, we will run all the non-leaf stage operators within the
         // broker itself. That way, the MSE queries will model the scatter gather pattern used by the V1 Engine.
-        public static final String RUN_IN_BROKER = "runInBroker";
+        String RUN_IN_BROKER = "runInBroker";
 
         /// For MSE queries, when this option is set to true, only use servers for leaf stages as the workers for the
         /// intermediate stages. This is useful to control the fanout of the query and reduce data shuffling.
-        public static final String USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = "useLeafServerForIntermediateStage";
+        String USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = "useLeafServerForIntermediateStage";
 
         // Option denoting the workloadName to which the query belongs. This is used to enforce resource budgets for
         // each workload if "Query Workload Isolation" feature enabled.
-        public static final String WORKLOAD_NAME = "workloadName";
+        String WORKLOAD_NAME = "workloadName";
       }
 
-      public static class QueryOptionValue {
-        public static final int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
+      interface QueryOptionValue {
+        int DEFAULT_MAX_STREAMING_PENDING_BLOCKS = 100;
       }
     }
 
@@ -767,47 +767,47 @@ public interface CommonConstants {
      * used for enable and disabling of rules, this will be iterated through in PlannerContext
      * to check if rule is disabled.
      */
-    class PlannerRuleNames {
-      public static final String FILTER_INTO_JOIN = "FilterIntoJoin";
-      public static final String FILTER_AGGREGATE_TRANSPOSE = "FilterAggregateTranspose";
-      public static final String FILTER_SET_OP_TRANSPOSE = "FilterSetOpTranspose";
-      public static final String PROJECT_JOIN_TRANSPOSE = "ProjectJoinTranspose";
-      public static final String PROJECT_SET_OP_TRANSPOSE = "ProjectSetOpTranspose";
-      public static final String FILTER_PROJECT_TRANSPOSE = "FilterProjectTranspose";
-      public static final String JOIN_CONDITION_PUSH = "JoinConditionPush";
-      public static final String JOIN_PUSH_TRANSITIVE_PREDICATES = "JoinPushTransitivePredicates";
-      public static final String PROJECT_REMOVE = "ProjectRemove";
-      public static final String PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW = "ProjectToLogicalProjectAndWindow";
-      public static final String PROJECT_WINDOW_TRANSPOSE = "ProjectWindowTranspose";
-      public static final String EVALUATE_LITERAL_PROJECT = "EvaluateProjectLiteral";
-      public static final String EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteral";
-      public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressions";
-      public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoin";
-      public static final String SEMI_JOIN_DISTINCT_PROJECT = "SemiJoinDistinctProject";
-      public static final String UNION_TO_DISTINCT = "UnionToDistinct";
-      public static final String AGGREGATE_REMOVE = "AggregateRemove";
-      public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
-      public static final String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregate";
-      public static final String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
-      public static final String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
-      public static final String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
-      public static final String PROJECT_MERGE = "ProjectMerge";
-      public static final String AGGREGATE_PROJECT_MERGE = "AggregateProjectMerge";
-      public static final String FILTER_MERGE = "FilterMerge";
-      public static final String SORT_REMOVE = "SortRemove";
-      public static final String SORT_JOIN_TRANSPOSE = "SortJoinTranspose";
-      public static final String SORT_JOIN_COPY = "SortJoinCopy";
-      public static final String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeExtended";
-      public static final String PRUNE_EMPTY_AGGREGATE = "PruneEmptyAggregate";
-      public static final String PRUNE_EMPTY_FILTER = "PruneEmptyFilter";
-      public static final String PRUNE_EMPTY_PROJECT = "PruneEmptyProject";
-      public static final String PRUNE_EMPTY_SORT = "PruneEmptySort";
-      public static final String PRUNE_EMPTY_UNION = "PruneEmptyUnion";
-      public static final String PRUNE_EMPTY_CORRELATE_LEFT = "PruneEmptyCorrelateLeft";
-      public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
-      public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
-      public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
-      public static final String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
+    interface PlannerRuleNames {
+      String FILTER_INTO_JOIN = "FilterIntoJoin";
+      String FILTER_AGGREGATE_TRANSPOSE = "FilterAggregateTranspose";
+      String FILTER_SET_OP_TRANSPOSE = "FilterSetOpTranspose";
+      String PROJECT_JOIN_TRANSPOSE = "ProjectJoinTranspose";
+      String PROJECT_SET_OP_TRANSPOSE = "ProjectSetOpTranspose";
+      String FILTER_PROJECT_TRANSPOSE = "FilterProjectTranspose";
+      String JOIN_CONDITION_PUSH = "JoinConditionPush";
+      String JOIN_PUSH_TRANSITIVE_PREDICATES = "JoinPushTransitivePredicates";
+      String PROJECT_REMOVE = "ProjectRemove";
+      String PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW = "ProjectToLogicalProjectAndWindow";
+      String PROJECT_WINDOW_TRANSPOSE = "ProjectWindowTranspose";
+      String EVALUATE_LITERAL_PROJECT = "EvaluateProjectLiteral";
+      String EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteral";
+      String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressions";
+      String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoin";
+      String SEMI_JOIN_DISTINCT_PROJECT = "SemiJoinDistinctProject";
+      String UNION_TO_DISTINCT = "UnionToDistinct";
+      String AGGREGATE_REMOVE = "AggregateRemove";
+      String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
+      String AGGREGATE_UNION_AGGREGATE = "AggregateUnionAggregate";
+      String AGGREGATE_REDUCE_FUNCTIONS = "AggregateReduceFunctions";
+      String AGGREGATE_CASE_TO_FILTER = "AggregateCaseToFilter";
+      String PROJECT_FILTER_TRANSPOSE = "ProjectFilterTranspose";
+      String PROJECT_MERGE = "ProjectMerge";
+      String AGGREGATE_PROJECT_MERGE = "AggregateProjectMerge";
+      String FILTER_MERGE = "FilterMerge";
+      String SORT_REMOVE = "SortRemove";
+      String SORT_JOIN_TRANSPOSE = "SortJoinTranspose";
+      String SORT_JOIN_COPY = "SortJoinCopy";
+      String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeExtended";
+      String PRUNE_EMPTY_AGGREGATE = "PruneEmptyAggregate";
+      String PRUNE_EMPTY_FILTER = "PruneEmptyFilter";
+      String PRUNE_EMPTY_PROJECT = "PruneEmptyProject";
+      String PRUNE_EMPTY_SORT = "PruneEmptySort";
+      String PRUNE_EMPTY_UNION = "PruneEmptyUnion";
+      String PRUNE_EMPTY_CORRELATE_LEFT = "PruneEmptyCorrelateLeft";
+      String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
+      String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
+      String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
+      String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
     }
 
     /**
@@ -826,8 +826,8 @@ public interface CommonConstants {
         PlannerRuleNames.JOIN_TO_ENRICHED_JOIN
     );
 
-    class FailureDetector {
-      public enum Type {
+    interface FailureDetector {
+      enum Type {
         // Do not detect any failure
         NO_OP,
 
@@ -838,22 +838,22 @@ public interface CommonConstants {
         CUSTOM
       }
 
-      public static final String CONFIG_OF_TYPE = "pinot.broker.failure.detector.type";
-      public static final String DEFAULT_TYPE = Type.NO_OP.name();
-      public static final String CONFIG_OF_CLASS_NAME = "pinot.broker.failure.detector.class";
+      String CONFIG_OF_TYPE = "pinot.broker.failure.detector.type";
+      String DEFAULT_TYPE = Type.NO_OP.name();
+      String CONFIG_OF_CLASS_NAME = "pinot.broker.failure.detector.class";
 
       // Exponential backoff delay of retrying an unhealthy server when a failure is detected
-      public static final String CONFIG_OF_RETRY_INITIAL_DELAY_MS =
+      String CONFIG_OF_RETRY_INITIAL_DELAY_MS =
           "pinot.broker.failure.detector.retry.initial.delay.ms";
-      public static final long DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L;
-      public static final String CONFIG_OF_RETRY_DELAY_FACTOR = "pinot.broker.failure.detector.retry.delay.factor";
-      public static final double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
-      public static final String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
-      public static final int DEFAULT_MAX_RETRIES = 10;
+      long DEFAULT_RETRY_INITIAL_DELAY_MS = 5_000L;
+      String CONFIG_OF_RETRY_DELAY_FACTOR = "pinot.broker.failure.detector.retry.delay.factor";
+      double DEFAULT_RETRY_DELAY_FACTOR = 2.0;
+      String CONFIG_OF_MAX_RETRIES = "pinot.broker.failure.detector.max.retries";
+      int DEFAULT_MAX_RETRIES = 10;
     }
 
     // Configs related to AdaptiveServerSelection.
-    class AdaptiveServerSelector {
+    interface AdaptiveServerSelector {
       /**
        * Adaptive Server Selection feature has 2 parts:
        * 1. Stats Collection
@@ -883,7 +883,7 @@ public interface CommonConstants {
        *                   Collection to be enabled.
        */
 
-      public enum Type {
+      enum Type {
         NO_OP,
 
         NUM_INFLIGHT_REQ,
@@ -893,63 +893,63 @@ public interface CommonConstants {
         HYBRID
       }
 
-      private static final String CONFIG_PREFIX = "pinot.broker.adaptive.server.selector";
+      String CONFIG_PREFIX = "pinot.broker.adaptive.server.selector";
 
       // Determines the type of AdaptiveServerSelector to use.
-      public static final String CONFIG_OF_TYPE = CONFIG_PREFIX + ".type";
-      public static final String DEFAULT_TYPE = Type.NO_OP.name();
+      String CONFIG_OF_TYPE = CONFIG_PREFIX + ".type";
+      String DEFAULT_TYPE = Type.NO_OP.name();
 
       // Determines whether stats collection is enabled. This can be enabled independent of CONFIG_OF_TYPE. This is
       // so that users have an option to just enable stats collection and analyze them before deciding and enabling
       // adaptive server selection.
-      public static final String CONFIG_OF_ENABLE_STATS_COLLECTION = CONFIG_PREFIX + ".enable.stats.collection";
-      public static final boolean DEFAULT_ENABLE_STATS_COLLECTION = false;
+      String CONFIG_OF_ENABLE_STATS_COLLECTION = CONFIG_PREFIX + ".enable.stats.collection";
+      boolean DEFAULT_ENABLE_STATS_COLLECTION = false;
 
       // Parameters to tune exponential moving average.
 
       // The weightage to be given for a new incoming value. For example, alpha=0.30 will give 30% weightage to the
       // new value and 70% weightage to the existing value in the Exponential Weighted Moving Average calculation.
-      public static final String CONFIG_OF_EWMA_ALPHA = CONFIG_PREFIX + ".ewma.alpha";
-      public static final double DEFAULT_EWMA_ALPHA = 0.666;
+      String CONFIG_OF_EWMA_ALPHA = CONFIG_PREFIX + ".ewma.alpha";
+      double DEFAULT_EWMA_ALPHA = 0.666;
 
       // If the EMA average has not been updated during a specified time window (defined by this property), the
       // EMA average value is automatically decayed by an incoming value of zero. This is required to bring a server
       // back to healthy state gracefully after it has experienced some form of slowness.
-      public static final String CONFIG_OF_AUTODECAY_WINDOW_MS = CONFIG_PREFIX + ".autodecay.window.ms";
-      public static final long DEFAULT_AUTODECAY_WINDOW_MS = 10 * 1000;
+      String CONFIG_OF_AUTODECAY_WINDOW_MS = CONFIG_PREFIX + ".autodecay.window.ms";
+      long DEFAULT_AUTODECAY_WINDOW_MS = 10 * 1000;
 
       // Determines the initial duration during which incoming values are skipped in the Exponential Moving Average
       // calculation. Until this duration has elapsed, average returned will be equal to AVG_INITIALIZATION_VAL.
-      public static final String CONFIG_OF_WARMUP_DURATION_MS = CONFIG_PREFIX + ".warmup.duration";
-      public static final long DEFAULT_WARMUP_DURATION_MS = 0;
+      String CONFIG_OF_WARMUP_DURATION_MS = CONFIG_PREFIX + ".warmup.duration";
+      long DEFAULT_WARMUP_DURATION_MS = 0;
 
       // Determines the initialization value for Exponential Moving Average.
-      public static final String CONFIG_OF_AVG_INITIALIZATION_VAL = CONFIG_PREFIX + ".avg.initialization.val";
-      public static final double DEFAULT_AVG_INITIALIZATION_VAL = 1.0;
+      String CONFIG_OF_AVG_INITIALIZATION_VAL = CONFIG_PREFIX + ".avg.initialization.val";
+      double DEFAULT_AVG_INITIALIZATION_VAL = 1.0;
 
       // Parameters related to Hybrid score.
-      public static final String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
-      public static final int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
+      String CONFIG_OF_HYBRID_SCORE_EXPONENT = CONFIG_PREFIX + ".hybrid.score.exponent";
+      int DEFAULT_HYBRID_SCORE_EXPONENT = 3;
 
       // Threadpool size of ServerRoutingStatsManager. This controls the number of threads available to update routing
       // stats for servers upon query submission and response arrival.
-      public static final String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
+      String CONFIG_OF_STATS_MANAGER_THREADPOOL_SIZE =
           CONFIG_PREFIX + ".stats.manager.threadpool.size";
-      public static final int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
+      int DEFAULT_STATS_MANAGER_THREADPOOL_SIZE = 2;
     }
 
-    class Grpc {
-      public static final String KEY_OF_GRPC_PORT = "pinot.broker.grpc.port";
-      public static final String KEY_OF_GRPC_TLS_ENABLED = "pinot.broker.grpc.tls.enabled";
-      public static final String KEY_OF_GRPC_TLS_PORT = "pinot.broker.grpc.tls.port";
-      public static final String KEY_OF_GRPC_TLS_PREFIX = "pinot.broker.grpctls";
+    interface Grpc {
+      String KEY_OF_GRPC_PORT = "pinot.broker.grpc.port";
+      String KEY_OF_GRPC_TLS_ENABLED = "pinot.broker.grpc.tls.enabled";
+      String KEY_OF_GRPC_TLS_PORT = "pinot.broker.grpc.tls.port";
+      String KEY_OF_GRPC_TLS_PREFIX = "pinot.broker.grpctls";
 
-      public static final String BLOCK_ROW_SIZE = "blockRowSize";
-      public static final int DEFAULT_BLOCK_ROW_SIZE = 10_000;
-      public static final String COMPRESSION = "compression";
-      public static final String DEFAULT_COMPRESSION = "ZSTD";
-      public static final String ENCODING = "encoding";
-      public static final String DEFAULT_ENCODING = "JSON";
+      String BLOCK_ROW_SIZE = "blockRowSize";
+      int DEFAULT_BLOCK_ROW_SIZE = 10_000;
+      String COMPRESSION = "compression";
+      String DEFAULT_COMPRESSION = "ZSTD";
+      String ENCODING = "encoding";
+      String DEFAULT_ENCODING = "JSON";
     }
 
     String PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY = "pinot.broker.storage.factory";
@@ -1293,38 +1293,38 @@ public interface CommonConstants {
         "pinot.server.messagesCount.refreshIntervalSeconds";
     int DEFAULT_MESSAGES_COUNT_REFRESH_INTERVAL_SECONDS = 30;
 
-    class SegmentCompletionProtocol {
-      public static final String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
+    interface SegmentCompletionProtocol {
+      String PREFIX_OF_CONFIG_OF_SEGMENT_UPLOADER = "pinot.server.segment.uploader";
 
       /**
        * Deprecated. Enable legacy https configs for segment upload.
        * Use server-wide TLS configs instead.
        */
       @Deprecated
-      public static final String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
+      String CONFIG_OF_CONTROLLER_HTTPS_ENABLED = "enabled";
 
       /**
        * Deprecated. Set the legacy https port for segment upload.
        * Use server-wide TLS configs instead.
        */
       @Deprecated
-      public static final String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
+      String CONFIG_OF_CONTROLLER_HTTPS_PORT = "controller.port";
 
-      public static final String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
+      String CONFIG_OF_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = "upload.request.timeout.ms";
 
       /**
        * Specify connection scheme to use for controller upload connections. Defaults to "http"
        */
-      public static final String CONFIG_OF_PROTOCOL = "protocol";
+      String CONFIG_OF_PROTOCOL = "protocol";
 
       /**
        * Service token for accessing protected controller APIs.
        * E.g. null (auth disabled), "Basic abcdef..." (basic auth), "Bearer 123def..." (oauth2)
        */
-      public static final String CONFIG_OF_SEGMENT_UPLOADER_AUTH = KEY_OF_AUTH;
+      String CONFIG_OF_SEGMENT_UPLOADER_AUTH = KEY_OF_AUTH;
 
-      public static final int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
-      public static final int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
+      int DEFAULT_SEGMENT_UPLOAD_REQUEST_TIMEOUT_MS = 300_000;
+      int DEFAULT_OTHER_REQUESTS_TIMEOUT = 10_000;
     }
 
     String DEFAULT_METRICS_PREFIX = "pinot.server.";
@@ -1352,28 +1352,28 @@ public interface CommonConstants {
     String ENVIRONMENT_PROVIDER_CLASS_NAME = "pinot.server.environmentProvider.className";
 
     /// All the keys should be prefixed with {@link #INSTANCE_DATA_MANAGER_CONFIG_PREFIX}
-    class Upsert {
-      public static final String CONFIG_PREFIX = "upsert";
-      public static final String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
-      public static final String DEFAULT_ENABLE_SNAPSHOT = "default.enable.snapshot";
-      public static final String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
+    interface Upsert {
+      String CONFIG_PREFIX = "upsert";
+      String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
+      String DEFAULT_ENABLE_SNAPSHOT = "default.enable.snapshot";
+      String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
 
       /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
       @Deprecated
-      public static final String DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT =
+      String DEFAULT_ALLOW_PARTIAL_UPSERT_CONSUMPTION_DURING_COMMIT =
           "default.allow.partial.upsert.consumption.during.commit";
     }
 
     /// All the keys should be prefixed with {@link #INSTANCE_DATA_MANAGER_CONFIG_PREFIX}
-    class Dedup {
-      public static final String CONFIG_PREFIX = "dedup";
-      public static final String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
-      public static final String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
-      public static final String DEFAULT_IGNORE_NON_DEFAULT_TIERS = "default.ignore.non.default.tiers";
+    interface Dedup {
+      String CONFIG_PREFIX = "dedup";
+      String DEFAULT_METADATA_MANAGER_CLASS = "default.metadata.manager.class";
+      String DEFAULT_ENABLE_PRELOAD = "default.enable.preload";
+      String DEFAULT_IGNORE_NON_DEFAULT_TIERS = "default.ignore.non.default.tiers";
 
       /// @deprecated use {@link org.apache.pinot.spi.config.table.ingestion.ParallelSegmentConsumptionPolicy)} instead.
       @Deprecated
-      public static final String DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT =
+      String DEFAULT_ALLOW_DEDUP_CONSUMPTION_DURING_COMMIT =
           "default.allow.dedup.consumption.during.commit";
     }
   }
