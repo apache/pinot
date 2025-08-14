@@ -87,14 +87,14 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       return new NotDocIdSet(getNulls(), _numDocs);
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE);
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, _queryContext);
     }
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
     return new ExpressionDocIdSet(_transformFunction, null, _dataSourceMap, _numDocs,
-        _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL);
+        ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, _queryContext);
   }
 
   @Override
@@ -105,7 +105,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       return getNulls();
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          _queryContext.isNullHandlingEnabled(), ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE);
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, _queryContext);
     }
   }
 
