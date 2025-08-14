@@ -117,6 +117,12 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.segment.validation.frequencyPeriod";
     public static final String REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtime.segment.validation.initialDelayInSeconds";
+    public static final String REALTIME_OFFSET_AUTO_RESET_ENABLED =
+        "controller.realtime.offsetAutoReset.enabled";
+    public static final String REALTIME_OFFSET_AUTO_RESET_FREQUENCY_PERIOD =
+        "controller.realtime.offsetAutoReset.frequencyPeriod";
+    public static final String REALTIME_OFFSET_AUTO_RESET_INITIAL_DELAY_IN_SECONDS =
+        "controller.realtime.offsetAutoReset.initialDelayInSeconds";
     // Deprecated as of 0.8.0
     @Deprecated
     public static final String DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS =
@@ -275,6 +281,7 @@ public class ControllerConf extends PinotConfiguration {
     public static final int DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
     public static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
     public static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
+    public static final int DEFAULT_OFFSET_AUTO_RESET_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_STATUS_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     public static final int DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
@@ -675,6 +682,20 @@ public class ControllerConf extends PinotConfiguration {
   public void setRealtimeSegmentValidationFrequencyInSeconds(int validationFrequencyInSeconds) {
     setProperty(ControllerPeriodicTasksConf.DEPRECATED_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS,
         Integer.toString(validationFrequencyInSeconds));
+  }
+
+  public boolean isRealtimeOffsetAutoResetEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_ENABLED, false);
+  }
+
+  public int getRealtimeOffsetAutoResetFrequencyInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_FREQUENCY_PERIOD,
+        ControllerPeriodicTasksConf.DEFAULT_OFFSET_AUTO_RESET_FREQUENCY_IN_SECONDS);
+  }
+
+  public void setRealtimeOffsetAutoResetFrequencyInSeconds(int offsetAutoResetFrequencyInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_FREQUENCY_PERIOD,
+        Integer.toString(offsetAutoResetFrequencyInSeconds));
   }
 
   /**
@@ -1153,6 +1174,11 @@ public class ControllerConf extends PinotConfiguration {
 
   public long getRealtimeSegmentValidationManagerInitialDelaySeconds() {
     return getProperty(ControllerPeriodicTasksConf.REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS,
+        getPeriodicTaskInitialDelayInSeconds());
+  }
+
+  public long getRealtimeOffsetAutoResetInitialDelaySeconds() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_INITIAL_DELAY_IN_SECONDS,
         getPeriodicTaskInitialDelayInSeconds());
   }
 

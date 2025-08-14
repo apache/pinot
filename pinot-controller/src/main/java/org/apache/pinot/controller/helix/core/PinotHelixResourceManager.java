@@ -2106,6 +2106,7 @@ public class PinotHelixResourceManager {
       throws IOException {
     validateTableTenantConfig(tableConfig);
     validateTableTaskMinionInstanceTagConfig(tableConfig);
+    // TODO: make sure external table update would not remove the ephemeral backfill topics
     setExistingTableConfig(tableConfig);
   }
 
