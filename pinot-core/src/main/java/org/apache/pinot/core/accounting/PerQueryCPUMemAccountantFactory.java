@@ -130,7 +130,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     protected final Set<String> _inactiveQuery;
 
-    protected Set<String> _cancelSentQueries;
+    protected Set<String> _cancelSentQueries = ConcurrentHashMap.newKeySet();
 
     /**
      * Tracks the query that has the maximum heap usage. The value is updated periodically by the watcher task
@@ -160,7 +160,6 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       _inactiveQuery = inactiveQuery;
       _instanceId = instanceId;
       _instanceType = instanceType;
-      _cancelSentQueries = ConcurrentHashMap.newKeySet();
       _watcherTask = createWatcherTask();
       _queryCancelCallbacks = CacheBuilder.newBuilder().build();
     }
@@ -785,12 +784,17 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           reapFinishedTasks();
           if (_triggeringLevel.ordinal() > TriggeringLevel.Normal.ordinal()) {
             _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
+          }
+
+          if (_triggeringLevel.ordinal() >= TriggeringLevel.HeapMemoryCritical.ordinal() &&
+              _aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()) {
             _maxHeapUsageQuery.set(_aggregatedUsagePerActiveQuery.values().stream()
                 .filter(stats -> !_cancelSentQueries.contains(stats.getQueryId()))
                 .max(Comparator.comparing(AggregatedStats::getAllocatedBytes)).orElse(null));
           } else {
             _maxHeapUsageQuery.set(null);
           }
+
           // post aggregation function
           postAggregation(_aggregatedUsagePerActiveQuery);
           // Act on one triggered actions
