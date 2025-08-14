@@ -119,6 +119,9 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   private static final int DEFAULT_DELETED_TABLES_CACHE_TTL_MINUTES = 60;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_SIZE = 10_000;
   private static final int DEFAULT_DELETED_SEGMENTS_CACHE_TTL_MINUTES = 2;
+  // By default, check CRC matching when loading segments.
+  private static final boolean DEFAULT_CHECK_CRC_ON_SEGMENT_LOAD = true;
+  private static final String CHECK_CRC_ON_SEGMENT_LOAD = "check.crc.on.segment.load";
 
   private final PinotConfiguration _serverConfig;
   private final PinotConfiguration _upsertConfig;
@@ -330,5 +333,10 @@ public class HelixInstanceDataManagerConfig implements InstanceDataManagerConfig
   @Override
   public boolean isUploadSegmentToDeepStore() {
     return _serverConfig.getProperty(UPLOAD_SEGMENT_TO_DEEP_STORE, DEFAULT_UPLOAD_SEGMENT_TO_DEEP_STORE);
+  }
+
+  @Override
+  public boolean shouldCheckCRCOnSegmentLoad() {
+    return _serverConfig.getProperty(CHECK_CRC_ON_SEGMENT_LOAD, DEFAULT_CHECK_CRC_ON_SEGMENT_LOAD);
   }
 }
