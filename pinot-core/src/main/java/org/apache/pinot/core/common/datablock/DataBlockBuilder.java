@@ -261,7 +261,7 @@ public class DataBlockBuilder {
       // Single-value column
       case INT: {
         int nullPlaceholder = (int) storedType.getNullPlaceholder();
-        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {;
+        interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
           for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
