@@ -48,7 +48,7 @@ public abstract class BlockExchange {
 
   private final List<SendingMailbox> _sendingMailboxes;
   private final BlockSplitter _splitter;
- private final Function<List<SendingMailbox>, Integer> _statsIndexChooser;
+  private final Function<List<SendingMailbox>, Integer> _statsIndexChooser;
 
   protected static final Function<List<SendingMailbox>, Integer> RANDOM_INDEX_CHOOSER =
       (mailboxes) -> ThreadLocalRandom.current().nextInt(mailboxes.size());

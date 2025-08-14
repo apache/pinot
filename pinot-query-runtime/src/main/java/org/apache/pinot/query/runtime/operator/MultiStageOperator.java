@@ -21,6 +21,8 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import java.lang.management.GarbageCollectorMXBean;
+import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +35,7 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
@@ -40,6 +43,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
+import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.InvocationScope;
@@ -71,7 +75,7 @@ public abstract class MultiStageOperator
 
   public abstract Type getOperatorType();
 
-  public abstract void registerExecution(long time, int numRows);
+  public abstract void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs);
 
   /// This method should be called periodically by the operator to check whether the execution should be interrupted.
   ///
@@ -118,6 +122,9 @@ public abstract class MultiStageOperator
     if (logger().isDebugEnabled()) {
       logger().debug("Operator {}: Reading next block", _operatorId);
     }
+
+    ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
+    long preBlockGcTime = getGcTimeMillis();
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       MseBlock nextBlock;
       Stopwatch executeStopwatch = Stopwatch.createStarted();
@@ -127,7 +134,9 @@ public abstract class MultiStageOperator
         nextBlock = ErrorMseBlock.fromException(e);
       }
       int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;
-      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), numRows);
+      long memoryUsedBytes = resourceSnapshot.getAllocatedBytes();
+      long gcTimeMs = getGcTimeMillis() - preBlockGcTime;
+      registerExecution(executeStopwatch.elapsed(TimeUnit.MILLISECONDS), numRows, memoryUsedBytes, gcTimeMs);
 
       if (logger().isDebugEnabled()) {
         logger().debug("Operator {}. Block {} ready to send", _operatorId, nextBlock);
@@ -221,6 +230,25 @@ public abstract class MultiStageOperator
 
   protected Map<String, Plan.ExplainNode.AttributeValue> getExplainAttributes() {
     return Collections.emptyMap();
+  }
+
+  private long getGcTimeMillis() {
+    if (!isCollectGcStats(_context.getOpChainMetadata())) {
+      return -1;
+    }
+    long totalGCTime = 0;
+    List<GarbageCollectorMXBean> gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
+    for (GarbageCollectorMXBean gcBean : gcBeans) {
+      long gcTime = gcBean.getCollectionTime();
+      if (gcTime > 0) {
+        totalGCTime += gcTime;
+      }
+    }
+    return totalGCTime;
+  }
+
+  private static boolean isCollectGcStats(Map<String, String> opChainMetadata) {
+    return QueryOptionsUtils.isCollectGcStats(opChainMetadata);
   }
 
   /**

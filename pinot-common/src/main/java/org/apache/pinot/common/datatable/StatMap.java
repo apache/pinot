@@ -45,7 +45,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
  *   <li>Change the name of the keys</li>
  * </ul>
  *
- * Any other change (like changing the type of key, changing their literal order are not supported or removing keys)
+ * Any other change (like changing the type of key, changing their literal order or removing keys)
  * are backward incompatible changes.
  * @param <K>
  */

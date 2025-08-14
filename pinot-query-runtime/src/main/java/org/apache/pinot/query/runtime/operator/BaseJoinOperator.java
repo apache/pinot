@@ -159,9 +159,11 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -371,7 +373,6 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
   }
 
   public enum StatKey implements StatMap.Key {
-    //@formatter:off
     EXECUTION_TIME_MS(StatMap.Type.LONG) {
       @Override
       public boolean includeDefaultInJson() {
@@ -388,8 +389,15 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
     /**
      * How long (CPU time) has been spent on building the hash table.
      */
-    TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG);
-    //@formatter:on
+    TIME_BUILDING_HASH_TABLE_MS(StatMap.Type.LONG),
+    /**
+     * Allocated memory in bytes for this operator or its children in the same stage.
+     */
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    /**
+     * Time spent on GC while this operator or its children in the same stage were running.
+     */
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 
