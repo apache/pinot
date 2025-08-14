@@ -43,7 +43,7 @@ public class TableTaskConfigRegistry {
 
   /**
    * Registers the table task type configurations via reflection.
-   * NOTE: In order to plugin a class using reflection, the class should include ".plugin.config.table.task" in its class
+   * NOTE: To plugin a class using reflection, the class should include ".plugin.config.table.task" in its class
    * path. This convention can significantly reduce the time of class scanning.
    */
   public TableTaskConfigRegistry() {

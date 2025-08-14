@@ -52,13 +52,13 @@ public abstract class TableTaskTypeConfig {
    * Schedule in quartz cron format. eg: "0 0/5 * * * ?" to run every 5 minutes
    * The default value is null, which means the task is not scheduled by default (except if it's a default task)
    */
-  protected final Optional<String> schedule;
+  protected final Optional<String> _schedule;
 
   /**
    * Minion Tag identifier to schedule a task on a dedicated pool of minion hosts which match the tag.
    * Default value matches the default minion instance tag.
    */
-  protected final String minionInstanceTag;
+  protected final String _minionInstanceTag;
 
   /**
    * Maximum number of sub-tasks that can be executed in a single trigger of the segment refresh task.
@@ -66,21 +66,24 @@ public abstract class TableTaskTypeConfig {
    * If more sub-tasks are needed to be merged / reloaded, multiple triggers of the task will be needed.
    * This is going to be bounded by the cluster limit of max number of subtasks possible
    */
-  private final int maxNumSubTasks;
+  private final int _maxNumSubTasks;
 
   /**
    * The actual user defined configuration for the task type.
-   * This is not supposed to be used by any task generator / executor but is used by controller for persisting user defined configs
+   * This is not supposed to be used by any task generator / executor
+   * but is used by controller for persisting user defined configs
    * This is required because the attribute values in the subclass are modified based on defaults, corrections, etc
    */
-  protected Map<String, String> configs;
+  protected Map<String, String> _configs;
 
   protected TableTaskTypeConfig(Map<String, String> configs) {
     // TODO - Move the constants from pinot-controller to pinot-spi and use them here.
-    this.schedule = Optional.ofNullable(configs.get("schedule"));
-    this.minionInstanceTag = configs.getOrDefault("minionInstanceTag", CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
-    this.maxNumSubTasks = Integer.parseInt(configs.getOrDefault("tableMaxNumTasks", String.valueOf(getDefaultMaxNumSubTasks())));
-    this.configs = configs;
+    _schedule = Optional.ofNullable(configs.get("schedule"));
+    _minionInstanceTag = configs.getOrDefault("minionInstanceTag",
+        CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
+    _maxNumSubTasks = Integer.parseInt(configs.getOrDefault("tableMaxNumTasks",
+        String.valueOf(getDefaultMaxNumSubTasks())));
+    _configs = configs;
   }
 
   /**
@@ -108,11 +111,11 @@ public abstract class TableTaskTypeConfig {
    * Returns an unmodifiable copy of the task type configuration.
    */
   public Map<String, String> getConfigs() {
-    return Collections.unmodifiableMap(configs);
+    return Collections.unmodifiableMap(_configs);
   }
 
   public int getMaxNumSubTasks() {
-    return maxNumSubTasks;
+    return _maxNumSubTasks;
   }
 
   // Can be overridden by subclasses
@@ -133,8 +136,8 @@ public abstract class TableTaskTypeConfig {
   protected abstract void checkTaskConfigValiditiy() throws InvalidTableTaskConfigException;
 
   private void validateCronSchedule() throws InvalidTableTaskConfigException {
-    if (schedule.isPresent()) {
-      String cronExprStr = schedule.get();
+    if (_schedule.isPresent()) {
+      String cronExprStr = _schedule.get();
       try {
         CronScheduleBuilder.cronSchedule(cronExprStr);
       } catch (Exception e) {
@@ -144,5 +147,4 @@ public abstract class TableTaskTypeConfig {
       }
     }
   }
-
 }

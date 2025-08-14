@@ -18,22 +18,22 @@
  */
 package org.apache.pinot.spi.exception;
 
-// TODO - Move this to a relevant package and merge with org.apache.pinot.controller.api.exception.InvalidTableConfigException
+// TODO - Move this to a relevant package and merge with controller's InvalidTableConfigException
 public class InvalidTableConfigException extends RuntimeException {
 
-  private final InvalidTableConfigExceptionType type;
+  private final InvalidTableConfigExceptionType _type;
 
   public InvalidTableConfigException(InvalidTableConfigExceptionType type, String message) {
     super(message);
-    this.type = type;
+    _type = type;
   }
 
   public InvalidTableConfigException(InvalidTableConfigExceptionType type, String message, Throwable cause) {
     super(message, cause);
-    this.type = type;
+    _type = type;
   }
 
   public InvalidTableConfigExceptionType getType() {
-    return type;
+    return _type;
   }
 }

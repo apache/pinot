@@ -19,8 +19,6 @@
 package org.apache.pinot.spi.exception;
 
 public enum InvalidTableConfigExceptionType {
-
   TASK_NOT_ALLOWED,
   TASK_CONFIG_INVALID
-
 }
