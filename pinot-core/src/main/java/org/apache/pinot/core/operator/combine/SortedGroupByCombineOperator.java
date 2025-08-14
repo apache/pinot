@@ -80,7 +80,6 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   private volatile DataSchema _dataSchema;
 
   private final AtomicReference _waitingRecords;
-  private final Comparator<Record> _recordKeyComparator;
   private final SortedRecordsMerger _sortedRecordsMerger;
 
   public SortedGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
@@ -90,10 +89,11 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
     assert (queryContext.shouldSortAggregateUnderSafeTrim());
     _operatorLatch = new CountDownLatch(_numTasks);
     _waitingRecords = new AtomicReference<>();
-    _recordKeyComparator = OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
-        queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
+    Comparator<Record> recordKeyComparator =
+        OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
+            queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
     _sortedRecordsMerger =
-        GroupByUtils.getSortedReduceMerger(queryContext, queryContext.getLimit(), _recordKeyComparator);
+        GroupByUtils.getSortedReduceMerger(queryContext, queryContext.getLimit(), recordKeyComparator);
   }
 
   /**

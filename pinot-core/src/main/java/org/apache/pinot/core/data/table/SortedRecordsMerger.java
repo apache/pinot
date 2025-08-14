@@ -25,6 +25,7 @@ import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.GroupByUtils;
+import org.apache.pinot.spi.trace.Tracing;
 
 
 @SuppressWarnings({"unchecked", "rawtypes"})
@@ -70,6 +71,7 @@ public class SortedRecordsMerger {
         finalizeRecordMerge(left, newRecords, newNextIdx);
         return;
       }
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(newNextIdx);
     }
 
     while (i < mi) {
@@ -78,6 +80,7 @@ public class SortedRecordsMerger {
         finalizeRecordMerge(left, newRecords, newNextIdx);
         return;
       }
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(newNextIdx);
     }
 
     while (j < mj) {
@@ -86,6 +89,7 @@ public class SortedRecordsMerger {
         finalizeRecordMerge(left, newRecords, newNextIdx);
         return;
       }
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(newNextIdx);
     }
 
     finalizeRecordMerge(left, newRecords, newNextIdx);
