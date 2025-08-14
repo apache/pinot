@@ -558,7 +558,7 @@ public class QueryContext {
   private int calculateEffectiveSegmentGroupTrimSize() {
     int minGroupTrimSize = getMinSegmentGroupTrimSize();
     List<OrderByExpressionContext> orderByExpressions = getOrderByExpressions();
-    if (!isUnsafeTrim() && !hasFilteredAggregations()) {
+    if (!isUnsafeTrim()) {
       // if orderby key is groupby key, and there's no having clause, and there's no filtered aggr,
       // keep at most `limit` rows only
       return getLimit();
