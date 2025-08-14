@@ -69,6 +69,12 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    */
   public static final BrokerMeter POOL_SEG_QUERIES = create("POOL_SEG_QUERIES", "routing", false);
   /**
+   * Number of segments whose replicas are not distributed into multiple pools in ideal state.
+   * <p>
+   * This metric is not global and is attached to a particular table
+   */
+  public static final BrokerMeter SINGLE_POOL_SEGMENTS = create("SINGLE_POOL_SEGMENTS", "segments", false);
+  /**
    * Number of multi-stage queries that have been started.
    * <p>
    * Unlike {@link #MULTI_STAGE_QUERIES}, this metric is global and not attached to a particular table.
