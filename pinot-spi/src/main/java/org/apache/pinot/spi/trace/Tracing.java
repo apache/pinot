@@ -35,6 +35,7 @@ import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -331,17 +332,27 @@ public class Tracing {
           || Tracing.getThreadAccountant().isQueryTerminated();
     }
 
-    public static void sampleAndCheckInterruption() {
-      if (isInterrupted()) {
+    public static void checkInterruptionAndThrow(ThreadResourceUsageAccountant accountant) {
+      if (Thread.interrupted()) {
         throw new EarlyTerminationException("Interrupted while merging records");
       }
+
+      if (accountant.isAnchorThreadInterrupted() || accountant.isQueryTerminated()) {
+        throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded by query.");
+      }
+    }
+
+    public static void checkInterruptionAndThrow() {
+      checkInterruptionAndThrow(Tracing.getThreadAccountant());
+    }
+
+    public static void sampleAndCheckInterruption() {
+      checkInterruptionAndThrow();
       sample();
     }
 
     public static void sampleAndCheckInterruption(ThreadResourceUsageAccountant accountant) {
-      if (Thread.interrupted() || accountant.isAnchorThreadInterrupted() || accountant.isQueryTerminated()) {
-        throw new EarlyTerminationException("Interrupted while merging records");
-      }
+      checkInterruptionAndThrow(accountant);
       accountant.sampleUsage();
     }
 

@@ -138,9 +138,7 @@ public class BenchmarkThreadInterruptionCheck {
   public void benchmarkWorkloadWithTiling1(Blackhole bh) {
     AtomicInteger atm = new AtomicInteger(0);
     for (int i = 0; i < TOTAL_LOOPS; i += LOOP_TILE_SIZE) {
-      if (Tracing.ThreadAccountantOps.isInterrupted()) {
-        throw new EarlyTerminationException();
-      }
+      Tracing.ThreadAccountantOps.checkInterruptionAndThrow();
       for (int j = i; j < Math.min(i + LOOP_TILE_SIZE, TOTAL_LOOPS); j++) {
         atm.getAndAdd(String.valueOf(j % 16321 + 100).hashCode() % 1000);
       }
@@ -167,9 +165,7 @@ public class BenchmarkThreadInterruptionCheck {
       try {
         for (int i = 0; i < totalSize; i += tileSize) {
           int upper = Math.min(i + tileSize, totalSize);
-          if (Tracing.ThreadAccountantOps.isInterrupted()) {
-            throw new EarlyTerminationException();
-          }
+          Tracing.ThreadAccountantOps.checkInterruptionAndThrow();
           for (int j = i; j < upper; j++) {
             consumer.accept(j);
           }

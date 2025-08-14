@@ -33,7 +33,7 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.mockito.MockedStatic;
@@ -110,13 +110,43 @@ public class PerQueryCPUMemAccountantTest extends QueryRunnerAccountingTest {
     }
   }
 
-  @Test(expectedExceptions = EarlyTerminationException.class)
-  void testInterrupt() {
+  @Test(expectedExceptions = QueryException.class, expectedExceptionsMessageRegExp = "Resource limit exceeded by "
+      + "query.")
+  void testAnchorInterrupt() {
     HashMap<String, Object> configs = getAccountingConfig();
 
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
     InterruptingAccountant accountant =
         new InterruptingAccountant(new PinotConfiguration(configs), "testWithPerQueryAccountantFactory",
+            InstanceType.SERVER);
+
+    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
+      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
+      queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
+    }
+  }
+
+  public static class TerminatingAccountant
+      extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
+
+    public TerminatingAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
+      super(config, instanceId, instanceType);
+    }
+
+    @Override
+    public boolean isQueryTerminated() {
+      return true;
+    }
+  }
+
+  @Test(expectedExceptions = QueryException.class, expectedExceptionsMessageRegExp = "Resource limit exceeded by "
+      + "query.")
+  void testQueryTerminated() {
+    HashMap<String, Object> configs = getAccountingConfig();
+
+    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
+    TerminatingAccountant accountant =
+        new TerminatingAccountant(new PinotConfiguration(configs), "testQueryTerminated",
             InstanceType.SERVER);
 
     try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {

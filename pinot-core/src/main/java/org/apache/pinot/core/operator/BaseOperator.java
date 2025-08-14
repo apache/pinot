@@ -25,7 +25,6 @@ import java.util.stream.Collectors;
 import org.apache.pinot.core.common.Block;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 
@@ -41,9 +40,7 @@ public abstract class BaseOperator<T extends Block> implements Operator<T> {
        runner's flag is raised. If the runner thread has already acted upon the flag and reset it, then the runner
        itself will cancel all worker's futures. Therefore, the worker will interrupt even if we only kill the runner
        thread. */
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException("Interrupted while processing next block");
-    }
+    Tracing.ThreadAccountantOps.checkInterruptionAndThrow();
     try (InvocationScope ignored = Tracing.getTracer().createScope(getClass())) {
       return getNextBlock();
     }
