@@ -16,26 +16,32 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator;
+package org.apache.pinot.query.runtime.operator.set;
 
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Union operator for UNION ALL queries.
+ * Intersect operator.
  */
-public class UnionAllOperator extends SetOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(UnionAllOperator.class);
-  private static final String EXPLAIN_NAME = "UNION_ALL";
+public class IntersectOperator extends RightRowSetBasedSetOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IntersectOperator.class);
+  private static final String EXPLAIN_NAME = "INTERSECT";
 
-  public UnionAllOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
+  public IntersectOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, inputOperators, dataSchema);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.INTERSECT;
   }
 
   @Override
@@ -44,27 +50,12 @@ public class UnionAllOperator extends SetOperator {
   }
 
   @Override
-  public Type getOperatorType() {
-    return Type.UNION;
-  }
-
-  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }
 
   @Override
-  protected MseBlock processRightOperator() {
-    return _rightChildOperator.nextBlock();
-  }
-
-  @Override
-  protected MseBlock processLeftOperator() {
-    return _leftChildOperator.nextBlock();
-  }
-
-  @Override
   protected boolean handleRowMatched(Object[] row) {
-    throw new UnsupportedOperationException("UNION ALL operator does not support row matching");
+    return _rightRowSet.setCount(new Record(row), 0) != 0;
   }
 }
