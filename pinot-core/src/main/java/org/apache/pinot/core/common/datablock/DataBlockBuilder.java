@@ -91,7 +91,7 @@ public class DataBlockBuilder {
     PagedPinotOutputStream varSize = new PagedPinotOutputStream(allocator);
     Object2IntOpenHashMap<String> dictionary = new Object2IntOpenHashMap<>();
 
-    interruptableLoop(0, numRows,1000, (start, end) -> {
+    interruptableLoop(0, numRows, 1000, (start, end) -> {
       for (int rowId = start; rowId < end; rowId++) {
         Object[] row = rows.get(rowId);
         for (int colId = 0; colId < numColumns; colId++) {
