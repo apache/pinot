@@ -176,7 +176,9 @@ public abstract class SetOperator extends MultiStageOperator {
   }
 
   /**
-   * Returns true if the row is matched. Also updates the right row set based on the Operator.
+   * Returns true if the row is matched.
+   * <p>
+   * Also updates the right row set based on the Operator.
    *
    * @param row the row to be checked for matching.
    * @return true if the row is matched.
