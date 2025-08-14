@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -419,8 +419,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     assertEquals(distinctCount, expectedCountAfterUpsert, "Distinct primary key count should match expected");
 
     // Verify that each primary key appears exactly once
-    String primaryKeyCountQuery = "SELECT " + PRIMARY_KEY_COL + ", COUNT(*) as cnt FROM " + SCHEMA_NAME +
-        " GROUP BY " + PRIMARY_KEY_COL + " HAVING COUNT(*) > 1";
+    String primaryKeyCountQuery = "SELECT " + PRIMARY_KEY_COL + ", COUNT(*) as cnt FROM " + SCHEMA_NAME
+        + " GROUP BY " + PRIMARY_KEY_COL + " HAVING COUNT(*) > 1";
     JsonNode primaryKeyCountResponse = postQuery(primaryKeyCountQuery);
     assertEquals(primaryKeyCountResponse.get("resultTable").get("rows").size(), 0,
         "No primary key should appear more than once after upsert merge");
@@ -449,8 +449,8 @@ public class UpsertCompactMergeTaskIntegrationTest extends BaseClusterIntegratio
     // playerId 101: latest timestamp 1681258290000, score 12500.20 (from player "Suess")
     // playerId 102: latest timestamp 1681036400000, score 102 (from player "Clifford")
 
-    String latestRecordsQuery = "SELECT " + PRIMARY_KEY_COL + ", name, score, " + TIME_COL_NAME +
-        " FROM " + SCHEMA_NAME + " ORDER BY " + PRIMARY_KEY_COL;
+    String latestRecordsQuery = "SELECT " + PRIMARY_KEY_COL + ", name, score, " + TIME_COL_NAME
+        + " FROM " + SCHEMA_NAME + " ORDER BY " + PRIMARY_KEY_COL;
     JsonNode latestRecordsResponse = postQuery(latestRecordsQuery);
 
     JsonNode rows = latestRecordsResponse.get("resultTable").get("rows");
