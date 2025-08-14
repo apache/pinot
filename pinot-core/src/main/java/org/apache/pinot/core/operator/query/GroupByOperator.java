@@ -102,6 +102,11 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   protected GroupByResultsBlock getNextBlock() {
+    // Short-circuit LIMIT 0 cases
+    if (_queryContext.getLimit() == 0) {
+      return new GroupByResultsBlock(_dataSchema, List.of(), _queryContext);
+    }
+
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
     // TODO: pass trimGroupSize to executor, who creates the result holder
@@ -139,10 +144,6 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     //       columns if no ordering is specified.
     int trimSize = _queryContext.getEffectiveSegmentGroupTrimSize();
     boolean unsafeTrim = _queryContext.isUnsafeTrim();
-
-    if (trimSize == 0) {
-      return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
-    }
 
     GroupByResultsBlock resultsBlock;
     // sort and trim segment results if needed

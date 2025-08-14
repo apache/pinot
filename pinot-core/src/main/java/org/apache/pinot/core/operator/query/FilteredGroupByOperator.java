@@ -113,6 +113,11 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
 
   @Override
   protected GroupByResultsBlock getNextBlock() {
+    // Short-circuit LIMIT 0 case
+    if (_queryContext.getLimit() == 0) {
+      return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
+    }
+
     int numAggregations = _aggregationFunctions.length;
     GroupByResultHolder[] groupByResultHolders = new GroupByResultHolder[numAggregations];
     IdentityHashMap<AggregationFunction, Integer> resultHolderIndexMap =
@@ -190,10 +195,6 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     // TODO: extract common logic with GroupByOperator
     int trimSize = _queryContext.getEffectiveSegmentGroupTrimSize();
     boolean unsafeTrim = _queryContext.isUnsafeTrim();
-
-    if (trimSize == 0) {
-      return new GroupByResultsBlock(_dataSchema, Collections.emptyList(), _queryContext);
-    }
 
     GroupByResultsBlock resultsBlock;
     // sort and trim segment results if needed
