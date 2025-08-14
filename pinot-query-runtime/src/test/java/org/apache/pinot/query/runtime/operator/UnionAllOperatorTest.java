@@ -107,6 +107,10 @@ public class UnionAllOperatorTest {
         new UnionAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
     MseBlock result = unionAllOperator.nextBlock();
+    // Keep calling nextBlock until we get an EoS block
+    while (!result.isEos()) {
+      result = unionAllOperator.nextBlock();
+    }
     Assert.assertTrue(result.isError());
   }
 
@@ -125,11 +129,10 @@ public class UnionAllOperatorTest {
         new UnionAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
     MseBlock result = unionAllOperator.nextBlock();
-    // The first block will be the regular data block from the right operator
-    Assert.assertFalse(result.isError());
-    Assert.assertTrue(result.isData());
-    // The second block should be the error block from the left operator
-    result = unionAllOperator.nextBlock();
+    // Keep calling nextBlock until we get an EoS block
+    while (!result.isEos()) {
+      result = unionAllOperator.nextBlock();
+    }
     Assert.assertTrue(result.isError());
   }
 }

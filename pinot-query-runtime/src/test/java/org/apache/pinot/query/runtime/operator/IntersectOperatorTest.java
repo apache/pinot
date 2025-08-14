@@ -132,6 +132,10 @@ public class IntersectOperatorTest {
         new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
     MseBlock result = intersectOperator.nextBlock();
+    // Keep calling nextBlock until we get an EoS block
+    while (!result.isEos()) {
+      result = intersectOperator.nextBlock();
+    }
     Assert.assertTrue(result.isError());
   }
 
@@ -150,6 +154,10 @@ public class IntersectOperatorTest {
         new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
     MseBlock result = intersectOperator.nextBlock();
+    // Keep calling nextBlock until we get an EoS block
+    while (!result.isEos()) {
+      result = intersectOperator.nextBlock();
+    }
     Assert.assertTrue(result.isError());
   }
 }

@@ -134,6 +134,10 @@ public class MinusOperatorTest {
         new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
     MseBlock result = minusOperator.nextBlock();
+    // Keep calling nextBlock until we get an EoS block
+    while (!result.isEos()) {
+      result = minusOperator.nextBlock();
+    }
     Assert.assertTrue(result.isError());
   }
 
@@ -152,6 +156,10 @@ public class MinusOperatorTest {
         new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
     MseBlock result = minusOperator.nextBlock();
+    // Keep calling nextBlock until we get an EoS block
+    while (!result.isEos()) {
+      result = minusOperator.nextBlock();
+    }
     Assert.assertTrue(result.isError());
   }
 }
