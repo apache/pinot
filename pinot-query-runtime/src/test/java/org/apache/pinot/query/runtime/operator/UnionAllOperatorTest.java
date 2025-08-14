@@ -19,6 +19,7 @@
 package org.apache.pinot.query.runtime.operator;
 
 import com.google.common.collect.ImmutableList;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -35,7 +36,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class IntersectOperatorTest {
+public class UnionAllOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
@@ -60,57 +61,31 @@ public class IntersectOperatorTest {
   }
 
   @Test
-  public void testIntersectOperator() {
+  public void testUnionOperator() {
     DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"}))
+        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
-            OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{4, "DD"}))
+            OperatorTestUtil.block(schema, new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"}))
         .thenReturn(SuccessMseBlock.INSTANCE);
 
-    IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+    UnionAllOperator unionAllOperator =
+        new UnionAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
-
-    MseBlock result = intersectOperator.nextBlock();
-    while (result.isEos()) {
-      result = intersectOperator.nextBlock();
+    List<Object[]> resultRows = new ArrayList<>();
+    MseBlock result = unionAllOperator.nextBlock();
+    while (result.isData()) {
+      resultRows.addAll(((MseBlock.Data) result).asRowHeap().getRows());
+      result = unionAllOperator.nextBlock();
     }
-    List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "BB"});
-    Assert.assertEquals(resultRows.size(), expectedRows.size());
-    for (int i = 0; i < resultRows.size(); i++) {
-      Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
-    }
-  }
-
-  @Test
-  public void testDedup() {
-    DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
-    });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
-            new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
-            OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{4, "DD"},
-                new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{4, "DD"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
-
-    IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
-            schema);
-
-    MseBlock result = intersectOperator.nextBlock();
-    while (result.isEos()) {
-      result = intersectOperator.nextBlock();
-    }
-    List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1, "AA"}, new Object[]{2, "BB"});
+    // Note that UNION ALL does not guarantee the order of rows, and our implementation adds rows from the right child
+    // first
+    List<Object[]> expectedRows =
+        Arrays.asList(new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"}, new Object[]{1, "AA"},
+            new Object[]{2, "BB"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
       Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
@@ -128,13 +103,13 @@ public class IntersectOperatorTest {
     Mockito.when(_rightOperator.nextBlock())
         .thenReturn(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
 
-    IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+    UnionAllOperator unionAllOperator =
+        new UnionAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
-    MseBlock result = intersectOperator.nextBlock();
+    MseBlock result = unionAllOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
     while (!result.isEos()) {
-      result = intersectOperator.nextBlock();
+      result = unionAllOperator.nextBlock();
     }
     Assert.assertTrue(result.isError());
   }
@@ -150,13 +125,13 @@ public class IntersectOperatorTest {
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{3, "aa"}, new Object[]{4, "bb"}))
         .thenReturn(SuccessMseBlock.INSTANCE);
 
-    IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+    UnionAllOperator unionAllOperator =
+        new UnionAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
-    MseBlock result = intersectOperator.nextBlock();
+    MseBlock result = unionAllOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
     while (!result.isEos()) {
-      result = intersectOperator.nextBlock();
+      result = unionAllOperator.nextBlock();
     }
     Assert.assertTrue(result.isError());
   }
