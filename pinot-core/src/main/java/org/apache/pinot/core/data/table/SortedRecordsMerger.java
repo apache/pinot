@@ -19,56 +19,51 @@
 package org.apache.pinot.core.data.table;
 
 import java.util.Comparator;
+import java.util.List;
+import java.util.function.BiFunction;
+import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
+import org.apache.pinot.core.util.GroupByUtils;
 
 
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class SortedRecordsMerger {
   private final int _resultSize;
   private final Comparator<Record> _comparator;
   private final int _numKeyColumns;
   private final AggregationFunction[] _aggregationFunctions;
+  private static final BiFunction<Object, Integer, Record> INTERMEDIATE_RECORD_EXTRACTOR =
+      (Object intermediateRecords, Integer idx) ->
+          ((List<IntermediateRecord>) intermediateRecords).get(idx)._record;
+  private static final BiFunction<Object, Integer, Record> RECORD_ARRAY_EXTRACTOR =
+      (Object records, Integer idx) -> ((Record[]) records)[idx];
 
   public SortedRecordsMerger(QueryContext queryContext, int resultSize, Comparator<Record> comparator) {
+    assert queryContext.getGroupByExpressions() != null;
     _numKeyColumns = queryContext.getGroupByExpressions().size();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _resultSize = resultSize;
     _comparator = comparator;
   }
 
-  /// Merge a SortedRecords into another SortedRecords
-  public SortedRecords mergeSortedRecordArray(SortedRecords left, SortedRecords right) {
-    if (right._size == 0) {
-      return left;
-    }
-    if (left._size == 0) {
-      return right;
-    }
-    mergeSortedRecords(left, right);
-    return left;
-  }
-
-  /// Merge in right._records, update left._records left._nextIdx
-  private void mergeSortedRecords(SortedRecords left, SortedRecords right) {
+  private void merge(SortedRecords left, Object right, int mj, BiFunction<Object, Integer, Record> rightExtractor) {
     int mi = left._size;
-    int mj = right._size;
     Record[] records1 = left._records;
-    Record[] records2 = right._records;
-    Record[] newRecords = new Record[Math.min(left._size + right._size, _resultSize)];
+    Record[] newRecords = new Record[Math.min(left._size + mj, _resultSize)];
     int newNextIdx = 0;
-
 
     int i = 0;
     int j = 0;
 
     while (i < mi && j < mj) {
-      int cmp = _comparator.compare(records1[i], records2[j]);
+      int cmp = _comparator.compare(records1[i], rightExtractor.apply(right, j));
       if (cmp < 0) {
         newRecords[newNextIdx++] = records1[i++];
       } else if (cmp == 0) {
-        newRecords[newNextIdx++] = updateRecord(records1[i++], records2[j++]);
+        newRecords[newNextIdx++] = updateRecord(records1[i++], rightExtractor.apply(right, j++));
       } else {
-        newRecords[newNextIdx++] = records2[j++];
+        newRecords[newNextIdx++] = rightExtractor.apply(right, j++);
       }
       // if enough records
       if (newNextIdx == _resultSize) {
@@ -86,7 +81,7 @@ public class SortedRecordsMerger {
     }
 
     while (j < mj) {
-      newRecords[newNextIdx++] = records2[j++];
+      newRecords[newNextIdx++] = rightExtractor.apply(right, j++);
       if (newNextIdx == _resultSize) {
         finalizeRecordMerge(left, newRecords, newNextIdx);
         return;
@@ -94,6 +89,31 @@ public class SortedRecordsMerger {
     }
 
     finalizeRecordMerge(left, newRecords, newNextIdx);
+  }
+
+  /// Merge a SortedRecords into another SortedRecords
+  public SortedRecords mergeSortedRecordArray(SortedRecords left, SortedRecords right) {
+    if (right._size == 0) {
+      return left;
+    }
+    if (left._size == 0) {
+      return right;
+    }
+    merge(left, right._records, right._size, RECORD_ARRAY_EXTRACTOR);
+    return left;
+  }
+
+  /// Merge a GroupByResultsBlock into another SortedRecords
+  public SortedRecords mergeGroupByResultsBlock(SortedRecords left, GroupByResultsBlock right) {
+    List<IntermediateRecord> intermediateRecords = right.getIntermediateRecords();
+    if (intermediateRecords.isEmpty()) {
+      return left;
+    }
+    if (left._size == 0) {
+      return GroupByUtils.getAndPopulateSortedRecords(right);
+    }
+    merge(left, intermediateRecords, intermediateRecords.size(), INTERMEDIATE_RECORD_EXTRACTOR);
+    return left;
   }
 
   private void finalizeRecordMerge(SortedRecords sortedRecords, Record[] records, int newIdx) {

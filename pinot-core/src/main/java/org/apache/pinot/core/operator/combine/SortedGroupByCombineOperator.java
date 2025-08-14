@@ -64,7 +64,7 @@ import org.slf4j.LoggerFactory;
  * of combine, while keeping the processing in a streaming fashion without
  * having to wait for all segments to be ready.</p>
  */
-@SuppressWarnings("rawtypes")
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedGroupByCombineOperator.class);
@@ -79,7 +79,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   private volatile boolean _numGroupsWarningLimitReached;
   private volatile DataSchema _dataSchema;
 
-  private final AtomicReference<SortedRecords> _waitingRecords;
+  private final AtomicReference _waitingRecords;
   private final Comparator<Record> _recordKeyComparator;
   private final SortedRecordsMerger _sortedRecordsMerger;
 
@@ -151,18 +151,31 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
           _waitingRecords.set(GroupByUtils.getAndPopulateSortedRecords(resultsBlock));
           break;
         }
-
-        SortedRecords records =
-            GroupByUtils.getAndPopulateSortedRecords(resultsBlock);
+        Object waitingObject = _waitingRecords.getAndUpdate(v -> v == null ? resultsBlock : null);
+        if (waitingObject == null) {
+          continue;
+        }
+        SortedRecords records = GroupByUtils.getAndPopulateSortedRecords(resultsBlock);
+        // if found waiting block, merge and loop
+        if (waitingObject instanceof GroupByResultsBlock) {
+          records = mergeBlocks(records, (GroupByResultsBlock) waitingObject);
+        } else {
+          records = mergeRecords(records, (SortedRecords) waitingObject);
+        }
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
 
         while (true) {
           SortedRecords finalRecords = records;
-          SortedRecords waitingRecords = _waitingRecords.getAndUpdate(v -> v == null ? finalRecords : null);
-          if (waitingRecords == null) {
+          waitingObject = _waitingRecords.getAndUpdate(v -> v == null ? finalRecords : null);
+          if (waitingObject == null) {
             break;
           }
           // if found waiting block, merge and loop
-          records = mergeBlocks(records, waitingRecords);
+          if (waitingObject instanceof GroupByResultsBlock) {
+            records = mergeBlocks(records, (GroupByResultsBlock) waitingObject);
+          } else {
+            records = mergeRecords(records, (SortedRecords) waitingObject);
+          }
           Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
         }
       } catch (RuntimeException e) {
@@ -226,8 +239,10 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
       return new ExceptionResultsBlock(errMsg);
     }
 
-    SortedRecords records = _waitingRecords.get();
-    return finishSortedRecords(records);
+    Object records = _waitingRecords.get();
+    // should be SortedRecords since one-block only case is short-circuited
+    assert (records instanceof SortedRecords);
+    return finishSortedRecords((SortedRecords) records);
   }
 
   private GroupByResultsBlock finishSortedRecords(SortedRecords records) {
@@ -250,8 +265,11 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
     return mergedBlock;
   }
 
-  private SortedRecords mergeBlocks(SortedRecords block1, SortedRecords block2) {
-
+  private SortedRecords mergeRecords(SortedRecords block1, SortedRecords block2) {
     return _sortedRecordsMerger.mergeSortedRecordArray(block1, block2);
+  }
+
+  private SortedRecords mergeBlocks(SortedRecords block1, GroupByResultsBlock block2) {
+    return _sortedRecordsMerger.mergeGroupByResultsBlock(block1, block2);
   }
 }

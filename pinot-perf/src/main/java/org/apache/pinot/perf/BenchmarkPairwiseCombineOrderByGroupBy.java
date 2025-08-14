@@ -35,6 +35,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
@@ -73,6 +74,11 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @State(Scope.Benchmark)
 @Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
 public class BenchmarkPairwiseCombineOrderByGroupBy {
+  private static final BiFunction<Object, Integer, Record> INTERMEDIATE_RECORD_EXTRACTOR =
+      (Object intermediateRecords, Integer idx) ->
+          ((List<IntermediateRecord>) intermediateRecords).get(idx)._record;
+  private static final BiFunction<Object, Integer, Record> RECORD_ARRAY_EXTRACTOR =
+      (Object records, Integer idx) -> ((Record[]) records)[idx];
 
   public static final String QUERY = "SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY d1, d2";
   @Param({"20", "50"})
