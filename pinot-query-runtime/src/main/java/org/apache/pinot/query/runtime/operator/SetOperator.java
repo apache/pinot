@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Multiset;
 import java.util.ArrayList;
@@ -43,24 +44,23 @@ import org.apache.pinot.segment.spi.IndexSegment;
 public abstract class SetOperator extends MultiStageOperator {
   protected final Multiset<Record> _rightRowSet;
 
-  private final List<MultiStageOperator> _inputOperators;
-  private final MultiStageOperator _leftChildOperator;
-  private final MultiStageOperator _rightChildOperator;
-  private final DataSchema _dataSchema;
+  protected final MultiStageOperator _leftChildOperator;
+  protected final MultiStageOperator _rightChildOperator;
+  protected final DataSchema _dataSchema;
 
-  private boolean _isRightSetBuilt;
-  protected MseBlock.Eos _eos;
-  protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+  private boolean _isRightChildOperatorProcessed;
+  private MseBlock.Eos _eos;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext);
     _dataSchema = dataSchema;
-    _inputOperators = inputOperators;
-    _leftChildOperator = getChildOperators().get(0);
-    _rightChildOperator = getChildOperators().get(1);
+    Preconditions.checkState(inputOperators.size() == 2, "Set operator should have 2 child operators");
+    _leftChildOperator = inputOperators.get(0);
+    _rightChildOperator = inputOperators.get(1);
     _rightRowSet = HashMultiset.create();
-    _isRightSetBuilt = false;
+    _isRightChildOperatorProcessed = false;
   }
 
   @Override
@@ -71,7 +71,7 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return _inputOperators;
+    return List.of(_leftChildOperator, _rightChildOperator);
   }
 
   @Override
@@ -96,17 +96,40 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
-    if (!_isRightSetBuilt) {
-      // construct a SET with all the right side rows.
-      constructRightBlockSet();
-    }
     if (_eos != null) {
       return _eos;
     }
-    return constructResultBlockSet();
+
+    if (!_isRightChildOperatorProcessed) {
+      MseBlock mseBlock = processRightOperator();
+
+      if (mseBlock.isData()) {
+        return mseBlock;
+      } else if (mseBlock.isError()) {
+        _eos = (MseBlock.Eos) mseBlock;
+        return _eos;
+      } else if (mseBlock.isSuccess()) {
+        // If it's a regular EOS block, we continue to process the left child operator.
+        _isRightChildOperatorProcessed = true;
+      }
+    }
+
+    MseBlock mseBlock = processLeftOperator();
+    if (mseBlock.isEos()) {
+      _eos = (MseBlock.Eos) mseBlock;
+      return _eos;
+    } else {
+      return mseBlock;
+    }
   }
 
-  protected void constructRightBlockSet() {
+  /**
+   * Processes the right child operator and build the set of rows that can be used to filter the left child. This method
+   * can be overridden to also be able to return data blocks while processing the right operator.
+   *
+   * @return either a data block containing rows or an EoS block, never {@code null}.
+   */
+  protected MseBlock processRightOperator() {
     MseBlock block = _rightChildOperator.nextBlock();
     while (block.isData()) {
       MseBlock.Data dataBlock = (MseBlock.Data) block;
@@ -116,23 +139,22 @@ public abstract class SetOperator extends MultiStageOperator {
       sampleAndCheckInterruption();
       block = _rightChildOperator.nextBlock();
     }
-    MseBlock.Eos eosBlock = (MseBlock.Eos) block;
-    if (eosBlock.isError()) {
-      _eos = eosBlock;
-    } else {
-      _isRightSetBuilt = true;
-    }
+    assert block.isEos();
+    return block;
   }
 
-  protected MseBlock constructResultBlockSet() {
+  /**
+   * Processes the left child operator and returns blocks of rows that match the criteria defined by the set operation.
+   *
+   * @return block containing matched rows or EoS, never {@code null}.
+   */
+  protected MseBlock processLeftOperator() {
     // Keep reading the input blocks until we find a match row or all blocks are processed.
     // TODO: Consider batching the rows to improve performance.
     while (true) {
       MseBlock leftBlock = _leftChildOperator.nextBlock();
       if (leftBlock.isEos()) {
-        MseBlock.Eos eosBlock = (MseBlock.Eos) leftBlock;
-        _eos = eosBlock;
-        return eosBlock;
+        return leftBlock;
       }
       MseBlock.Data dataBlock = (MseBlock.Data) leftBlock;
       List<Object[]> rows = new ArrayList<>();
@@ -155,8 +177,10 @@ public abstract class SetOperator extends MultiStageOperator {
 
   /**
    * Returns true if the row is matched.
+   * <p>
    * Also updates the right row set based on the Operator.
-   * @param row
+   *
+   * @param row the row to be checked for matching.
    * @return true if the row is matched.
    */
   protected abstract boolean handleRowMatched(Object[] row);

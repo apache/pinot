@@ -816,6 +816,48 @@ public class TableConfigUtilsTest {
     // Legacy behavior: allow size based threshold to be explicitly set to 0
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "0");
     TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
+
+    // Test for multiple stream configs with pauseless consumption enabled - should fail
+    StreamIngestionConfig streamIngestionConfigWithPauseless =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+    streamIngestionConfigWithPauseless.setPauselessConsumptionEnabled(true);
+
+    IngestionConfig ingestionConfigWithPauseless = new IngestionConfig();
+    ingestionConfigWithPauseless.setStreamIngestionConfig(streamIngestionConfigWithPauseless);
+
+    TableConfig tableConfigWithPauseless = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithPauseless)
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfigWithPauseless, schema);
+      fail("Should fail when pauseless consumption is enabled with multiple stream configs");
+    } catch (IllegalStateException e) {
+      // Expected - should fail with specific error message
+      assertTrue(
+          e.getMessage().contains("Multiple stream configs are not supported with pauseless consumption enabled"));
+    }
+
+    // Test for multiple stream configs with pauseless consumption disabled - should pass
+    StreamIngestionConfig streamIngestionConfigWithoutPauseless =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+    streamIngestionConfigWithoutPauseless.setPauselessConsumptionEnabled(false);
+
+    IngestionConfig ingestionConfigWithoutPauseless = new IngestionConfig();
+    ingestionConfigWithoutPauseless.setStreamIngestionConfig(streamIngestionConfigWithoutPauseless);
+
+    TableConfig tableConfigWithoutPauseless = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithoutPauseless)
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfigWithoutPauseless, schema);
+      // Should pass - multiple stream configs are allowed when pauseless consumption is disabled
+    } catch (IllegalStateException e) {
+      fail("Should not fail when pauseless consumption is disabled with multiple stream configs: " + e.getMessage());
+    }
   }
 
   @Test

@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.routing.VirtualServerAddress;
+import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.mockito.Mock;
@@ -114,5 +115,49 @@ public class IntersectOperatorTest {
     for (int i = 0; i < resultRows.size(); i++) {
       Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
     }
+  }
+
+  @Test
+  public void testErrorBlockRightChild() {
+    DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
+    Mockito.when(_leftOperator.nextBlock())
+        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    Mockito.when(_rightOperator.nextBlock())
+        .thenReturn(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
+
+    IntersectOperator intersectOperator =
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+            schema);
+    MseBlock result = intersectOperator.nextBlock();
+    // Keep calling nextBlock until we get an EoS block
+    while (!result.isEos()) {
+      result = intersectOperator.nextBlock();
+    }
+    Assert.assertTrue(result.isError());
+  }
+
+  @Test
+  public void testErrorBlockLeftChild() {
+    DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
+    Mockito.when(_leftOperator.nextBlock())
+        .thenReturn(ErrorMseBlock.fromException(new RuntimeException("Error in left operator")));
+    Mockito.when(_rightOperator.nextBlock())
+        .thenReturn(OperatorTestUtil.block(schema, new Object[]{3, "aa"}, new Object[]{4, "bb"}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+
+    IntersectOperator intersectOperator =
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+            schema);
+    MseBlock result = intersectOperator.nextBlock();
+    // Keep calling nextBlock until we get an EoS block
+    while (!result.isEos()) {
+      result = intersectOperator.nextBlock();
+    }
+    Assert.assertTrue(result.isError());
   }
 }

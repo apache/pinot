@@ -130,8 +130,9 @@ public class AvroSink implements AutoCloseable {
   private static void addType(
       FieldSpec.DataType dataType, Schema scalarSchema, Schema nullSchema) {
     NOT_NULL_SCALAR_MAP.put(dataType, scalarSchema);
-    NULL_SCALAR_MAP.put(dataType, Schema.createUnion(scalarSchema, nullSchema));
-    Schema multiValueSchema = Schema.createArray(scalarSchema);
+    Schema nullableSchema = Schema.createUnion(scalarSchema, nullSchema);
+    NULL_SCALAR_MAP.put(dataType, nullableSchema);
+    Schema multiValueSchema = Schema.createArray(nullableSchema);
     NOT_NULL_MULTI_VALUE_MAP.put(dataType, multiValueSchema);
     NULL_MULTI_VALUE_MAP.put(dataType, Schema.createUnion(multiValueSchema, nullSchema));
   }

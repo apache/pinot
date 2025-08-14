@@ -20,9 +20,7 @@ package org.apache.pinot.core.accounting;
 
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.CountDownLatch;
-import java.util.stream.Collectors;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -76,11 +74,13 @@ class TestResourceAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPU
   }
 
   public TaskThread getTaskThread(String queryId, int taskId) {
-    Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> workerEntry =
-        _threadEntriesMap.entrySet().stream().filter(
-            e -> e.getValue()._currentThreadTaskStatus.get().getTaskId() == 3 && Objects.equals(
-                e.getValue()._currentThreadTaskStatus.get().getQueryId(), queryId)).collect(Collectors.toList()).get(0);
-    return new TaskThread(workerEntry.getValue(), workerEntry.getKey());
+    for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : _threadEntriesMap.entrySet()) {
+      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
+      if (queryId.equals(threadEntry.getQueryId()) && taskId == threadEntry.getTaskId()) {
+        return new TaskThread(threadEntry, entry.getKey());
+      }
+    }
+    throw new IllegalStateException("Failed to find thread for queryId: " + queryId + ", taskId: " + taskId);
   }
 
   public static class TaskThread {

@@ -61,18 +61,15 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTHLL:
       case DISTINCTCOUNTRAWHLL:
         return new DistinctCountHLLValueAggregator(arguments);
-      case PERCENTILEEST:
-      case PERCENTILERAWEST:
-        return new PercentileEstValueAggregator();
-      case PERCENTILETDIGEST:
-      case PERCENTILERAWTDIGEST:
-        return new PercentileTDigestValueAggregator(arguments);
-      case DISTINCTCOUNTTHETASKETCH:
-      case DISTINCTCOUNTRAWTHETASKETCH:
-        return new DistinctCountThetaSketchValueAggregator(arguments);
       case DISTINCTCOUNTHLLPLUS:
       case DISTINCTCOUNTRAWHLLPLUS:
         return new DistinctCountHLLPlusValueAggregator(arguments);
+      case DISTINCTCOUNTULL:
+      case DISTINCTCOUNTRAWULL:
+        return new DistinctCountULLValueAggregator(arguments);
+      case DISTINCTCOUNTTHETASKETCH:
+      case DISTINCTCOUNTRAWTHETASKETCH:
+        return new DistinctCountThetaSketchValueAggregator(arguments);
       case DISTINCTCOUNTTUPLESKETCH:
       case DISTINCTCOUNTRAWINTEGERSUMTUPLESKETCH:
       case AVGVALUEINTEGERSUMTUPLESKETCH:
@@ -81,9 +78,12 @@ public class ValueAggregatorFactory {
       case DISTINCTCOUNTCPCSKETCH:
       case DISTINCTCOUNTRAWCPCSKETCH:
         return new DistinctCountCPCSketchValueAggregator(arguments);
-      case DISTINCTCOUNTULL:
-      case DISTINCTCOUNTRAWULL:
-        return new DistinctCountULLValueAggregator(arguments);
+      case PERCENTILEEST:
+      case PERCENTILERAWEST:
+        return new PercentileEstValueAggregator();
+      case PERCENTILETDIGEST:
+      case PERCENTILERAWTDIGEST:
+        return new PercentileTDigestValueAggregator(arguments);
       default:
         throw new IllegalStateException("Unsupported aggregation type: " + aggregationType);
     }

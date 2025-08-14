@@ -151,13 +151,13 @@
     <jersey.version>2.47</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.27.0</swagger-ui.version>
+    <swagger-ui.version>5.27.1</swagger-ui.version>
     <hadoop.version>3.4.1</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
     <quartz.version>2.5.0</quartz.version>
     <calcite.version>1.40.0</calcite.version>
-    <immutables.version>2.11.2</immutables.version>
+    <immutables.version>2.11.3</immutables.version>
     <lucene.version>9.12.0</lucene.version>
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.25.0</dynatrace.hash4j.version>
@@ -178,7 +178,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.32.15</aws.sdk.version>
+    <aws.sdk.version>2.32.21</aws.sdk.version>
     <azure.sdk.version>1.2.37</azure.sdk.version>
     <azure.msal4j.version>1.22.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
@@ -254,10 +254,10 @@
 
     <!-- Solve conflicts and vulnerabilities -->
     <kerby.version>2.1.0</kerby.version>
-    <jline.version>3.30.4</jline.version>
+    <jline.version>3.30.5</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>10.4</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.4.1</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.57.v20241219</eclipse.jetty.version>
     <woodstox.version>7.1.1</woodstox.version>
@@ -296,7 +296,7 @@
     <tyrus-standalone-client.version>2.2.0</tyrus-standalone-client.version>
     <jopt-simple.version>5.0.4</jopt-simple.version>
     <ipaddress.version>5.5.1</ipaddress.version>
-    <openhft.chronicle-bom.version>2.27ea65</openhft.chronicle-bom.version>
+    <openhft.chronicle-bom.version>2.27ea72</openhft.chronicle-bom.version>
     <jdom2.version>2.0.6.1</jdom2.version>
     <maven.version>3.9.11</maven.version>
     <plexus-component-annotations.version>2.2.0</plexus-component-annotations.version>
@@ -310,7 +310,7 @@
     <h2.version>2.3.232</h2.version>
     <jnr-posix.version>3.1.20</jnr-posix.version>
     <scalatest.version>3.2.19</scalatest.version>
-    <assertj.version>3.27.3</assertj.version>
+    <assertj.version>3.27.4</assertj.version>
     <archiver.compress>true</archiver.compress>
     <archiver.recompressZippedFiles>true</archiver.recompressZippedFiles>
 

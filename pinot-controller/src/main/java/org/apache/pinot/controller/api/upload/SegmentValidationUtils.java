@@ -57,11 +57,13 @@ public class SegmentValidationUtils {
     }
   }
 
-  public static void checkStorageQuota(String segmentName, long segmentSizeInBytes, TableConfig tableConfig,
+  public static void checkStorageQuota(String segmentName, long tarSegmentSizeInBytes, long untarredSegmentSizeInBytes,
+      TableConfig tableConfig,
       StorageQuotaChecker quotaChecker) {
     StorageQuotaChecker.QuotaCheckerResponse response;
     try {
-      response = quotaChecker.isSegmentStorageWithinQuota(tableConfig, segmentName, segmentSizeInBytes);
+      response = quotaChecker
+          .isSegmentStorageWithinQuota(tableConfig, segmentName, tarSegmentSizeInBytes, untarredSegmentSizeInBytes);
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
           String.format("Caught exception while checking the storage quota for segment: %s of table: %s", segmentName,

@@ -25,6 +25,7 @@ import PinotMethodUtils from '../utils/PinotMethodUtils';
 import TenantsListing from '../components/Homepage/TenantsListing';
 import Instances from '../components/Homepage/InstancesTables';
 import ClusterConfig from '../components/Homepage/ClusterConfig';
+import PackageVersions from '../components/Homepage/PackageVersions';
 import useTaskTypesTable from '../components/Homepage/useTaskTypesTable';
 import Skeleton from '@material-ui/lab/Skeleton';
 import { getTenants } from '../requests';
@@ -215,6 +216,7 @@ const HomePage = () => {
       />
       {taskTypesTable}
       <ClusterConfig />
+      <PackageVersions />
     </Grid>
   );
 };
