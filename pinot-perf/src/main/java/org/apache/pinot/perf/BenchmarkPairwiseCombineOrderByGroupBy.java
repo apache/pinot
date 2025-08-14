@@ -35,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.ConcurrentIndexedTable;
@@ -74,11 +73,6 @@ import org.openjdk.jmh.runner.options.TimeValue;
 @State(Scope.Benchmark)
 @Fork(value = 1, jvmArgs = {"-server", "-Xmx8G", "-XX:MaxDirectMemorySize=16G"})
 public class BenchmarkPairwiseCombineOrderByGroupBy {
-  private static final BiFunction<Object, Integer, Record> INTERMEDIATE_RECORD_EXTRACTOR =
-      (Object intermediateRecords, Integer idx) ->
-          ((List<IntermediateRecord>) intermediateRecords).get(idx)._record;
-  private static final BiFunction<Object, Integer, Record> RECORD_ARRAY_EXTRACTOR =
-      (Object records, Integer idx) -> ((Record[]) records)[idx];
 
   public static final String QUERY = "SELECT sum(m1), max(m2) FROM testTable GROUP BY d1, d2 ORDER BY d1, d2";
   @Param({"20", "50"})
@@ -259,20 +253,22 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
   @BenchmarkMode(Mode.AverageTime)
   @OutputTimeUnit(TimeUnit.MICROSECONDS)
   public void sequentialCombineGroupBy(Blackhole blackhole) {
-    SortedRecordTable waitingTable = null;
+    SortedRecords records = null;
     for (int segmentId = 0; segmentId < _numSegments; segmentId++) {
-      if (waitingTable == null) {
-        waitingTable = getAndPopulateSortedRecordTable(segmentId);
+      if (records == null) {
+        records = getAndPopulateSortedRecords(segmentId);
         continue;
       }
       GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema,
           _segmentIntermediateRecords.get(segmentId), _queryContext);
-      mergeBlock(waitingTable, resultsBlock);
+      records = mergeRecords(records, resultsBlock);
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
     }
 
-    waitingTable.finish(true);
-    blackhole.consume(waitingTable);
+    SortedRecordTable table =
+        new SortedRecordTable(records, _dataSchema, _queryContext, _executorService);
+    table.finish(true);
+    blackhole.consume(table);
   }
 
   public void processPairWiseSortedGroupByCombine(AtomicInteger nextSegmentId) {
@@ -304,32 +300,17 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
     return new SortedRecords(records, records.length);
   }
 
-  public SortedRecordTable getAndPopulateSortedRecordTable(int segmentId) {
-    SortedRecordTable table =
-        new SortedRecordTable(_dataSchema, _queryContext, _queryContext.getLimit(), _executorService,
-            _recordKeyComparator);
-    int mergedKeys = 0;
-    for (IntermediateRecord intermediateRecord : _segmentIntermediateRecords.get(segmentId)) {
-      if (!table.upsert(intermediateRecord._record)) {
-        break;
-      }
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
-    }
-    return table;
-  }
-
-  private void mergeBlock(SortedRecordTable block1, GroupByResultsBlock block2) {
-    block1.mergeSortedGroupByResultBlock(block2);
-  }
-
   private SortedRecords mergeRecords(SortedRecords block1, SortedRecords block2) {
     return _sortedRecordsMerger.mergeSortedRecordArray(block1, block2);
   }
 
+  private SortedRecords mergeRecords(SortedRecords block1, GroupByResultsBlock block2) {
+    return _sortedRecordsMerger.mergeGroupByResultsBlock(block1, block2);
+  }
+
   private SortedRecordTable finishSortedRecords(SortedRecords recordArray) {
     SortedRecordTable table =
-        new SortedRecordTable(recordArray, _dataSchema, _queryContext,
-            _queryContext.getLimit(), _executorService, _recordKeyComparator);
+        new SortedRecordTable(recordArray, _dataSchema, _queryContext, _executorService);
 
     // finish
     if (_queryContext.isServerReturnFinalResult()) {

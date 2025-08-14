@@ -22,9 +22,12 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SortedRecordTable;
+import org.apache.pinot.core.data.table.SortedRecords;
+import org.apache.pinot.core.data.table.SortedRecordsMerger;
 import org.apache.pinot.core.operator.AcquireReleaseColumnsSegmentOperator;
 import org.apache.pinot.core.operator.blocks.results.BaseResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
@@ -63,16 +66,18 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
   private volatile boolean _numGroupsLimitReached;
   private volatile boolean _numGroupsWarningLimitReached;
 
-  private SortedRecordTable _table = null;
-  private final Comparator<Record> _recordKeyComparator;
+  private SortedRecords _records = null;
+  private final SortedRecordsMerger _sortedRecordsMerger;
 
   public SequentialSortedGroupByCombineOperator(List<Operator> operators, QueryContext queryContext,
       ExecutorService executorService) {
     super(null, operators, overrideMaxExecutionThreads(queryContext, operators.size()), executorService);
 
     assert (queryContext.shouldSortAggregateUnderSafeTrim());
-    _recordKeyComparator = OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
-        queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
+    Comparator<Record> recordKeyComparator =
+        OrderByComparatorFactory.getRecordKeyComparator(queryContext.getOrderByExpressions(),
+            queryContext.getGroupByExpressions(), queryContext.isNullHandlingEnabled());
+    _sortedRecordsMerger = new SortedRecordsMerger(queryContext, queryContext.getLimit(), recordKeyComparator);
   }
 
   /**
@@ -150,6 +155,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
 
     int numBlocksMerged = 0;
     long endTimeMs = _queryContext.getEndTimeMs();
+    DataSchema dataSchema = null;
     while (numBlocksMerged < _numOperators) {
       // Timeout has reached, shouldn't continue to process. `_blockingQueue.poll` will continue to return blocks even
       // if negative timeout is provided; therefore an extra check is needed
@@ -170,6 +176,9 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
         return blockToMerge;
       }
       GroupByResultsBlock groupByResultBlockToMerge = (GroupByResultsBlock) blockToMerge;
+      if (dataSchema == null) {
+        dataSchema = groupByResultBlockToMerge.getDataSchema();
+      }
 
       if (groupByResultBlockToMerge.isGroupsTrimmed()) {
         _groupsTrimmed = true;
@@ -182,23 +191,25 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
         _numGroupsWarningLimitReached = true;
       }
 
-      if (_table == null) {
-        _table = GroupByUtils.getAndPopulateSortedRecordTable(groupByResultBlockToMerge, _queryContext,
-                _queryContext.getLimit(), _executorService, _recordKeyComparator);
+      if (_records == null) {
+        _records = GroupByUtils.getAndPopulateSortedRecords(groupByResultBlockToMerge);
       } else {
-        _table.mergeSortedGroupByResultBlock(groupByResultBlockToMerge);
+        _records = _sortedRecordsMerger.mergeGroupByResultsBlock(_records, groupByResultBlockToMerge);
       }
       numBlocksMerged++;
     }
 
+    SortedRecordTable table =
+        new SortedRecordTable(_records, dataSchema, _queryContext, _executorService);
+
     if (_queryContext.isServerReturnFinalResult()) {
-      _table.finish(true, true);
+      table.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
-      _table.finish(false, true);
+      table.finish(false, true);
     } else {
-      _table.finish(false);
+      table.finish(false);
     }
-    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(_table, _queryContext);
+    GroupByResultsBlock mergedBlock = new GroupByResultsBlock(table, _queryContext);
     mergedBlock.setGroupsTrimmed(_groupsTrimmed);
     mergedBlock.setNumGroupsLimitReached(_numGroupsLimitReached);
     mergedBlock.setNumGroupsWarningLimitReached(_numGroupsWarningLimitReached);

@@ -31,7 +31,6 @@ import org.apache.pinot.core.data.table.IndexedTable;
 import org.apache.pinot.core.data.table.IntermediateRecord;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.data.table.SimpleIndexedTable;
-import org.apache.pinot.core.data.table.SortedRecordTable;
 import org.apache.pinot.core.data.table.SortedRecords;
 import org.apache.pinot.core.data.table.SortedRecordsMerger;
 import org.apache.pinot.core.data.table.UnboundedConcurrentIndexedTable;
@@ -219,21 +218,6 @@ public final class GroupByUtils {
       return new ConcurrentIndexedTable(dataSchema, hasFinalInput, queryContext, resultSize, trimSize, trimThreshold,
           initialCapacity, executorService);
     }
-  }
-
-  public static SortedRecordTable getAndPopulateSortedRecordTable(GroupByResultsBlock block,
-      QueryContext queryContext, int resultSize,
-      ExecutorService executorService, Comparator<Record> recordKeyComparator) {
-    SortedRecordTable table = new SortedRecordTable(block.getDataSchema(), queryContext, resultSize, executorService,
-        recordKeyComparator);
-    int mergedKeys = 0;
-    for (IntermediateRecord intermediateRecord : block.getIntermediateRecords()) {
-      if (!table.upsert(intermediateRecord._record)) {
-        break;
-      }
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
-    }
-    return table;
   }
 
   public static SortedRecords getAndPopulateSortedRecords(GroupByResultsBlock block) {

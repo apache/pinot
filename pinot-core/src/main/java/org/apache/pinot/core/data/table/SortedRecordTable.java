@@ -20,14 +20,12 @@ package org.apache.pinot.core.data.table;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;
 import org.apache.pinot.core.query.aggregation.function.AggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
@@ -36,140 +34,38 @@ import org.apache.pinot.core.util.trace.TraceCallable;
 
 
 /**
- * Table used for merging of sorted group-by aggregation
+ * Table used for wrapping merged result of sorted group-by aggregation
+ * This table is initialized with a {@link SortedRecords}, which is already merged and trimmed
+ * to desired size.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class SortedRecordTable extends BaseTable {
   private final ExecutorService _executorService;
-  private final int _resultSize;
   private final int _numKeyColumns;
   private final AggregationFunction[] _aggregationFunctions;
 
-  private Record[] _records;
-  private int _nextIdx;
-  private final Comparator<Record> _comparator;
+  private final Record[] _records;
+  private final int _size;
   private final int _numThreadsExtractFinalResult;
   private final int _chunkSizeExtractFinalResult;
 
-  public SortedRecordTable(SortedRecords sortedRecords, DataSchema dataSchema, QueryContext queryContext,
-      int resultSize, ExecutorService executorService, Comparator<Record> comparator) {
+  public SortedRecordTable(SortedRecords sortedRecords, DataSchema dataSchema,
+      QueryContext queryContext, ExecutorService executorService) {
     super(dataSchema);
     assert queryContext.getGroupByExpressions() != null;
     _numKeyColumns = queryContext.getGroupByExpressions().size();
     _aggregationFunctions = queryContext.getAggregationFunctions();
     _executorService = executorService;
-    _comparator = comparator;
-    _resultSize = resultSize;
     _numThreadsExtractFinalResult = Math.min(queryContext.getNumThreadsExtractFinalResult(),
         Math.max(1, ResourceManager.DEFAULT_QUERY_RUNNER_THREADS));
     _chunkSizeExtractFinalResult = queryContext.getChunkSizeExtractFinalResult();
     _records = sortedRecords._records;
-    _nextIdx = sortedRecords._size;
-  }
-
-  public SortedRecordTable(DataSchema dataSchema, QueryContext queryContext, int resultSize,
-      ExecutorService executorService, Comparator<Record> comparator) {
-    this(new SortedRecords(new Record[resultSize], 0),
-        dataSchema, queryContext, resultSize, executorService, comparator);
-  }
-
-  /// Only used when creating SortedRecordTable from unique, sorted segment groupby results
-  @Override
-  public boolean upsert(Record record) {
-    if (_nextIdx == _resultSize) {
-      // enough records
-      return false;
-    }
-    _records[_nextIdx++] = record;
-    return true;
-  }
-
-  @Override
-  public boolean upsert(Key key, Record record) {
-    throw new UnsupportedOperationException("method unused for SortedRecordTable");
-  }
-
-  /// Merge a segment result into self, saving an allocation of SortedRecordTable
-  public void mergeSortedGroupByResultBlock(GroupByResultsBlock block) {
-    List<IntermediateRecord> segmentRecords = block.getIntermediateRecords();
-    if (segmentRecords.isEmpty()) {
-      return;
-    }
-    if (size() == 0) {
-      for (int i = 0; i < Math.min(_resultSize, segmentRecords.size()); i++) {
-        _records[_nextIdx++] = segmentRecords.get(i)._record;
-      }
-      return;
-    }
-    mergeSegmentRecords(segmentRecords);
-  }
-
-  private void finalizeRecordMerge(Record[] records, int newIdx) {
-    _records = records;
-    _nextIdx = newIdx;
-  }
-
-  /// Merge in that._records, update _records _curIdx
-  private void mergeSegmentRecords(List<IntermediateRecord> records2) {
-    Record[] newRecords = new Record[_resultSize];
-    int newNextIdx = 0;
-
-    Record[] records1 = _records;
-
-    int i = 0;
-    int j = 0;
-    int mi = size();
-    int mj = records2.size();
-
-    while (i < mi && j < mj) {
-      int cmp = _comparator.compare(records1[i], records2.get(j)._record);
-      if (cmp < 0) {
-        newRecords[newNextIdx++] = records1[i++];
-      } else if (cmp == 0) {
-        newRecords[newNextIdx++] = updateRecord(records1[i++], records2.get(j++)._record);
-      } else {
-        newRecords[newNextIdx++] = records2.get(j++)._record;
-      }
-      // if enough records
-      if (newNextIdx == _resultSize) {
-        finalizeRecordMerge(newRecords, newNextIdx);
-        return;
-      }
-    }
-
-    while (i < mi) {
-      newRecords[newNextIdx++] = records1[i++];
-      if (newNextIdx == _resultSize) {
-        finalizeRecordMerge(newRecords, newNextIdx);
-        return;
-      }
-    }
-
-    while (j < mj) {
-      newRecords[newNextIdx++] = records2.get(j++)._record;
-      if (newNextIdx == _resultSize) {
-        finalizeRecordMerge(newRecords, newNextIdx);
-        return;
-      }
-    }
-
-    finalizeRecordMerge(newRecords, newNextIdx);
-  }
-
-  private Record updateRecord(Record existingRecord, Record newRecord) {
-    Object[] existingValues = existingRecord.getValues();
-    Object[] newValues = newRecord.getValues();
-    int numAggregations = _aggregationFunctions.length;
-    int index = _numKeyColumns;
-    for (int i = 0; i < numAggregations; i++, index++) {
-      existingValues[index] = _aggregationFunctions[i].merge(existingValues[index], newValues[index]);
-    }
-    return existingRecord;
+    _size = sortedRecords._size;
   }
 
   @Override
   public int size() {
-    return _nextIdx;
+    return _size;
   }
 
   @Override
@@ -274,5 +170,16 @@ public class SortedRecordTable extends BaseTable {
       }
     }
     return false;
+  }
+
+  /// Not used. Instead, create a {@link SortedRecords} and initialize this with it
+  @Override
+  public boolean upsert(Record record) {
+    throw new UnsupportedOperationException("method unused for SortedRecordTable");
+  }
+
+  @Override
+  public boolean upsert(Key key, Record record) {
+    throw new UnsupportedOperationException("method unused for SortedRecordTable");
   }
 }

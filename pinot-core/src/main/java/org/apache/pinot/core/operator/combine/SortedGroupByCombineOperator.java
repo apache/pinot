@@ -247,8 +247,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
 
   private GroupByResultsBlock finishSortedRecords(SortedRecords records) {
     SortedRecordTable table =
-        new SortedRecordTable(records, _dataSchema, _queryContext,
-            _queryContext.getLimit(), _executorService, _recordKeyComparator);
+        new SortedRecordTable(records, _dataSchema, _queryContext, _executorService);
 
     // finish
     if (_queryContext.isServerReturnFinalResult()) {
