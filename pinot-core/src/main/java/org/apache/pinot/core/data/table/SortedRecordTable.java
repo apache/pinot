@@ -45,16 +45,14 @@ public class SortedRecordTable extends BaseTable {
   private final int _numKeyColumns;
   private final AggregationFunction[] _aggregationFunctions;
 
-  protected Record[] _topRecords;
-
   private Record[] _records;
   private int _nextIdx;
   private final Comparator<Record> _comparator;
   private final int _numThreadsExtractFinalResult;
   private final int _chunkSizeExtractFinalResult;
 
-  public SortedRecordTable(DataSchema dataSchema, QueryContext queryContext, int resultSize,
-      ExecutorService executorService, Comparator<Record> comparator) {
+  public SortedRecordTable(SortedRecords sortedRecords, DataSchema dataSchema, QueryContext queryContext,
+      int resultSize, ExecutorService executorService, Comparator<Record> comparator) {
     super(dataSchema);
     assert queryContext.getGroupByExpressions() != null;
     _numKeyColumns = queryContext.getGroupByExpressions().size();
@@ -65,23 +63,14 @@ public class SortedRecordTable extends BaseTable {
     _numThreadsExtractFinalResult = Math.min(queryContext.getNumThreadsExtractFinalResult(),
         Math.max(1, ResourceManager.DEFAULT_QUERY_RUNNER_THREADS));
     _chunkSizeExtractFinalResult = queryContext.getChunkSizeExtractFinalResult();
-    _records = new Record[_resultSize];
-    _nextIdx = 0;
-  }
-
-  public SortedRecordTable(SortedRecords sortedRecords, DataSchema dataSchema, QueryContext queryContext,
-      int resultSize, ExecutorService executorService, Comparator<Record> comparator) {
-    super(dataSchema);
-    _numKeyColumns = queryContext.getGroupByExpressions().size();
-    _aggregationFunctions = queryContext.getAggregationFunctions();
-    _executorService = executorService;
-    _comparator = comparator;
-    _resultSize = resultSize;
-    _numThreadsExtractFinalResult = Math.min(queryContext.getNumThreadsExtractFinalResult(),
-        Math.max(1, ResourceManager.DEFAULT_QUERY_RUNNER_THREADS));
-    _chunkSizeExtractFinalResult = queryContext.getChunkSizeExtractFinalResult();
     _records = sortedRecords._records;
     _nextIdx = sortedRecords._size;
+  }
+
+  public SortedRecordTable(DataSchema dataSchema, QueryContext queryContext, int resultSize,
+      ExecutorService executorService, Comparator<Record> comparator) {
+    this(new SortedRecords(new Record[resultSize], 0),
+        dataSchema, queryContext, resultSize, executorService, comparator);
   }
 
   /// Only used when creating SortedRecordTable from unique, sorted segment groupby results
@@ -101,14 +90,18 @@ public class SortedRecordTable extends BaseTable {
   }
 
   /// Merge a segment result into self, saving an allocation of SortedRecordTable
-  public SortedRecordTable mergeSortedGroupByResultBlock(GroupByResultsBlock block) {
+  public void mergeSortedGroupByResultBlock(GroupByResultsBlock block) {
     List<IntermediateRecord> segmentRecords = block.getIntermediateRecords();
-    if (segmentRecords.isEmpty() || size() == 0) {
-      segmentRecords.forEach(x -> upsert(x._record));
-      return this;
+    if (segmentRecords.isEmpty()) {
+      return;
     }
-    mergeSegmentRecords(segmentRecords, segmentRecords.size());
-    return this;
+    if (size() == 0) {
+      for (int i = 0; i < Math.min(_resultSize, segmentRecords.size()); i++) {
+        _records[_nextIdx++] = segmentRecords.get(i)._record;
+      }
+      return;
+    }
+    mergeSegmentRecords(segmentRecords);
   }
 
   private void finalizeRecordMerge(Record[] records, int newIdx) {
@@ -117,7 +110,7 @@ public class SortedRecordTable extends BaseTable {
   }
 
   /// Merge in that._records, update _records _curIdx
-  private void mergeSegmentRecords(List<IntermediateRecord> records2, int mj) {
+  private void mergeSegmentRecords(List<IntermediateRecord> records2) {
     Record[] newRecords = new Record[_resultSize];
     int newNextIdx = 0;
 
@@ -126,6 +119,7 @@ public class SortedRecordTable extends BaseTable {
     int i = 0;
     int j = 0;
     int mi = size();
+    int mj = records2.size();
 
     while (i < mi && j < mj) {
       int cmp = _comparator.compare(records1[i], records2.get(j)._record);
@@ -180,7 +174,7 @@ public class SortedRecordTable extends BaseTable {
 
   @Override
   public Iterator<Record> iterator() {
-    return Arrays.stream(_topRecords, 0, size()).iterator();
+    return Arrays.stream(_records, 0, size()).iterator();
   }
 
   @Override
@@ -192,7 +186,6 @@ public class SortedRecordTable extends BaseTable {
   // TODO: extract common logic between this and IndexedTable to BaseTable
   @Override
   public void finish(boolean sort, boolean storeFinalResult) {
-    _topRecords = _records;
     if (storeFinalResult) {
       DataSchema.ColumnDataType[] columnDataTypes = _dataSchema.getColumnDataTypes();
       int numAggregationFunctions = _aggregationFunctions.length;
@@ -215,7 +208,7 @@ public class SortedRecordTable extends BaseTable {
                 @Override
                 public Void callJob() {
                   for (int recordIdx = startIdx; recordIdx < endIdx; recordIdx++) {
-                    Object[] values = _topRecords[recordIdx].getValues();
+                    Object[] values = _records[recordIdx].getValues();
                     for (int i = 0; i < numAggregationFunctions; i++) {
                       int colId = i + _numKeyColumns;
                       values[colId] = _aggregationFunctions[i].extractFinalResult(values[colId]);
@@ -239,7 +232,7 @@ public class SortedRecordTable extends BaseTable {
         }
       } else {
         for (int idx = 0; idx < size(); idx++) {
-          Record record = _topRecords[idx];
+          Record record = _records[idx];
           Object[] values = record.getValues();
           for (int i = 0; i < numAggregationFunctions; i++) {
             int colId = i + _numKeyColumns;
@@ -256,7 +249,7 @@ public class SortedRecordTable extends BaseTable {
     }
     if (containsExpensiveAggregationFunctions()) {
       int parallelChunkSize = _chunkSizeExtractFinalResult;
-      if (_topRecords != null && size() > parallelChunkSize) {
+      if (_records != null && size() > parallelChunkSize) {
         int estimatedThreads = (int) Math.ceil((double) size() / parallelChunkSize);
         if (estimatedThreads == 0) {
           return 1;

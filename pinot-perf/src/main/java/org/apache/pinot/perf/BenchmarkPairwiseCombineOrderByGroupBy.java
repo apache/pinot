@@ -261,7 +261,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
       }
       GroupByResultsBlock resultsBlock = new GroupByResultsBlock(_dataSchema,
           _segmentIntermediateRecords.get(segmentId), _queryContext);
-      waitingTable = mergeBlocks(waitingTable, resultsBlock);
+      mergeBlock(waitingTable, resultsBlock);
       Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
     }
 
@@ -282,7 +282,7 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
           break;
         }
         // if found waiting block, merge and loop
-        records = mergeBlocks(records, waitingRecords);
+        records = mergeRecords(records, waitingRecords);
         Tracing.ThreadAccountantOps.sampleAndCheckInterruption();
       }
     }
@@ -312,11 +312,11 @@ public class BenchmarkPairwiseCombineOrderByGroupBy {
     return table;
   }
 
-  private SortedRecordTable mergeBlocks(SortedRecordTable block1, GroupByResultsBlock block2) {
-    return block1.mergeSortedGroupByResultBlock(block2);
+  private void mergeBlock(SortedRecordTable block1, GroupByResultsBlock block2) {
+    block1.mergeSortedGroupByResultBlock(block2);
   }
 
-  private SortedRecords mergeBlocks(SortedRecords block1, SortedRecords block2) {
+  private SortedRecords mergeRecords(SortedRecords block1, SortedRecords block2) {
     return _sortedRecordsMerger.mergeSortedRecordArray(block1, block2);
   }
 

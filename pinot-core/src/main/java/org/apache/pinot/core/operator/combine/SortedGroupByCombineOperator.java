@@ -139,7 +139,14 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
         if (_dataSchema == null) {
           _dataSchema = resultsBlock.getDataSchema();
         }
-        // short-circuit one segment case
+        // Short-circuit one segment case
+        // This is reachable when we have 1 core only, and we have single operator.
+        // In case that we have 1 core only, it makes more sense to use pair-wise rather than sequential combine,
+        //   since the producer - consumer model in the latter does not guarantee
+        //   timely consumption of produced results (depend on thread scheduling),
+        //   which might build up to mem pressure.
+        // Our default behavior also accounts for this,
+        //   pair-wise is used when numOperators >= numAvailableCores.
         if (_numOperators == 1) {
           _waitingRecords.set(GroupByUtils.getAndPopulateSortedRecords(resultsBlock));
           break;
