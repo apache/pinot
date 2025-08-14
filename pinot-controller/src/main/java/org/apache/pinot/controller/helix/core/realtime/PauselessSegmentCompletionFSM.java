@@ -46,7 +46,7 @@ public class PauselessSegmentCompletionFSM extends BlockingSegmentCompletionFSM 
     try {
       CommittingSegmentDescriptor committingSegmentDescriptor =
           CommittingSegmentDescriptor.fromSegmentCompletionReqParams(reqParams);
-      LOGGER.info(
+      _logger.info(
           "Starting to commit changes to ZK and ideal state for the segment:{} during pauseles ingestion as the "
               + "leader has been selected", _segmentName);
       _segmentManager.commitSegmentMetadataToCommitting(
