@@ -322,7 +322,7 @@ public class DataBlockBuilder {
       case BIG_DECIMAL: {
         BigDecimal nullPlaceholder = (BigDecimal) storedType.getNullPlaceholder();
         interruptableLoop(0, numRows, interruptableLoopStep, (start, end) -> {
-          for (int rowId = 0; rowId < numRows; rowId++) {
+          for (int rowId = start; rowId < end; rowId++) {
             Object value = column[rowId];
             if (value == null) {
               nullBitmap.add(rowId);
