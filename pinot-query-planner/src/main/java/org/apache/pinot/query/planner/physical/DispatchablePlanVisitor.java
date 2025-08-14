@@ -27,6 +27,7 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -101,6 +102,12 @@ public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, Dispatchab
   public Void visitJoin(JoinNode node, DispatchablePlanContext context) {
     node.getInputs().forEach(join -> join.visit(this, context));
     getOrCreateDispatchablePlanMetadata(node, context);
+    return null;
+  }
+
+  @Override
+  public Void visitEnrichedJoin(EnrichedJoinNode node, DispatchablePlanContext context) {
+    visitJoin(node, context);
     return null;
   }
 
