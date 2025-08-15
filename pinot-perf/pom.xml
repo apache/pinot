@@ -198,6 +198,10 @@
               <mainClass>org.apache.pinot.perf.StringDictionaryPerfTest</mainClass>
               <name>pinot-StringDictionaryPerfTest</name>
             </program>
+            <program>
+              <mainClass>org.apache.pinot.perf.BenchmarkStringDictionaryUnPaddedString</mainClass>
+              <name>pinot-BenchmarkStringDictionaryUnPaddedString</name>
+            </program>
           </programs>
           <repositoryLayout>flat</repositoryLayout>
           <repositoryName>lib</repositoryName>
