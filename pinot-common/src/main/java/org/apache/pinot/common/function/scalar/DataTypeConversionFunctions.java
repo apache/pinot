@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.PinotDataType;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.BytesUtils;
+import org.apache.pinot.spi.utils.TimestampUtils;
 
 import static org.apache.pinot.common.utils.PinotDataType.*;
 
@@ -67,6 +68,14 @@ public class DataTypeConversionFunctions {
           throw new IllegalArgumentException("Unknown data type: " + targetTypeLiteral);
         }
         break;
+    }
+    if (sourceType == STRING && targetDataType == LONG) {
+      // Check if the STRING is a TIMESTAMP
+      try {
+        return TimestampUtils.toTimestamp(value.toString().trim()).getTime();
+      } catch (Exception e) {
+        // If it is not a TIMESTAMP, we will try to parse it as a LONG, so do nothing here.
+      }
     }
     if (sourceType == STRING && (targetDataType == INTEGER || targetDataType == LONG)) {
       if (String.valueOf(value).contains(".")) {
