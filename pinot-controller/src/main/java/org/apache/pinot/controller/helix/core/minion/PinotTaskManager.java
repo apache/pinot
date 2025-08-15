@@ -727,7 +727,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    */
   protected TaskSchedulingInfo scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader, @Nullable String minionInstanceTagForTask, String triggeredBy) {
-     TaskSchedulingInfo response = new TaskSchedulingInfo();
+      TaskSchedulingInfo response = new TaskSchedulingInfo();
     String taskType = taskGenerator.getTaskType();
     List<String> enabledTables =
         enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
@@ -776,9 +776,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           if (TaskSchedulingContext.isUserTriggeredTask(triggeredBy)) {
             message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
             presentTaskConfig.clear();
-             // If the task is user-triggered, we throw an exception to notify the user
-             // This is to ensure that the user is aware of the task generation limit
-             throw new RuntimeException(message);
+              // If the task is user-triggered, we throw an exception to notify the user
+              // This is to ensure that the user is aware of the task generation limit
+              throw new RuntimeException(message);
           }
           // For scheduled tasks, we log a warning and limit the number of tasks
           LOGGER.warn(message + "Only the first {} tasks will be scheduled", maxNumberOfSubTasks);
