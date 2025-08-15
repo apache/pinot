@@ -252,9 +252,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                 + "controlled by the cluster config %s which is set based on controller's performance.", taskType,
             tableName, pinotTaskConfigs.size(), maxNumberOfSubTasks, MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY);
         message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
-          // We throw an exception to notify the user
-          // This is to ensure that the user is aware of the task generation limit
-          throw new RuntimeException(message);
+        // We throw an exception to notify the user
+        // This is to ensure that the user is aware of the task generation limit
+        throw new RuntimeException(message);
       }
       pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
           .computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
@@ -318,7 +318,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return String.format(TASK_QUEUE_PATH_PATTERN, taskType);
   }
 
-  public void cleanUpCronTaskSchedulerForTable(String tableWithType) {
+  public synchronized void cleanUpCronTaskSchedulerForTable(String tableWithType) {
     LOGGER.info("Cleaning up task in scheduler for table {}", tableWithType);
     TableTaskSchedulerUpdater tableTaskSchedulerUpdater = _tableTaskSchedulerUpdaterMap.get(tableWithType);
     if (tableTaskSchedulerUpdater != null) {
@@ -329,7 +329,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     _tableTaskSchedulerUpdaterMap.remove(tableWithType);
   }
 
-  private void removeAllTasksFromCronExpressions(String tableWithType) {
+  private synchronized void removeAllTasksFromCronExpressions(String tableWithType) {
     Set<JobKey> jobKeys;
     try {
       jobKeys = _scheduler.getJobKeys(GroupMatcher.anyJobGroup());
@@ -355,7 +355,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return String.format("%s.%s", tableWithType, taskType);
   }
 
-  public void subscribeTableConfigChanges(String tableWithType) {
+  public synchronized void subscribeTableConfigChanges(String tableWithType) {
     if (_tableTaskSchedulerUpdaterMap.containsKey(tableWithType)) {
       return;
     }
@@ -370,7 +370,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  public void updateCronTaskScheduler(String tableWithType) {
+  public synchronized void updateCronTaskScheduler(String tableWithType) {
     LOGGER.info("Trying to update task schedule for table: {}", tableWithType);
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableWithType);
     if (tableConfig == null) {
@@ -539,7 +539,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of tasks scheduled.
    */
   @Deprecated(forRemoval = true)
-  public Map<String, TaskSchedulingInfo> scheduleAllTasksForAllTables(@Nullable String minionInstanceTag) {
+  public synchronized Map<String, TaskSchedulingInfo> scheduleAllTasksForAllTables(@Nullable String minionInstanceTag) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setMinionInstanceTag(minionInstanceTag);
     return scheduleTasks(context);
@@ -551,7 +551,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of tasks scheduled.
    */
   @Deprecated(forRemoval = true)
-  public Map<String, TaskSchedulingInfo> scheduleAllTasksForDatabase(@Nullable String database,
+  public synchronized Map<String, TaskSchedulingInfo> scheduleAllTasksForDatabase(@Nullable String database,
       @Nullable String minionInstanceTag) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setDatabasesToSchedule(Collections.singleton(database))
@@ -565,7 +565,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of tasks scheduled.
    */
   @Deprecated(forRemoval = true)
-  public Map<String, TaskSchedulingInfo> scheduleAllTasksForTable(String tableNameWithType,
+  public synchronized Map<String, TaskSchedulingInfo> scheduleAllTasksForTable(String tableNameWithType,
       @Nullable String minionInstanceTag) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTablesToSchedule(Collections.singleton(tableNameWithType))
@@ -583,7 +583,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    *  - list of task scheduling errors if any
    */
   @Deprecated(forRemoval = true)
-  public TaskSchedulingInfo scheduleTaskForAllTables(String taskType, @Nullable String minionInstanceTag) {
+  public synchronized TaskSchedulingInfo scheduleTaskForAllTables(String taskType, @Nullable String minionInstanceTag) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTasksToSchedule(Collections.singleton(taskType))
         .setMinionInstanceTag(minionInstanceTag);
@@ -600,7 +600,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    *  - list of task scheduling errors if any
    */
   @Deprecated(forRemoval = true)
-  public TaskSchedulingInfo scheduleTaskForDatabase(String taskType, @Nullable String database,
+  public synchronized TaskSchedulingInfo scheduleTaskForDatabase(String taskType, @Nullable String database,
       @Nullable String minionInstanceTag) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTasksToSchedule(Collections.singleton(taskType))
@@ -619,7 +619,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    *  - list of task scheduling errors if any
    */
   @Deprecated(forRemoval = true)
-  public TaskSchedulingInfo scheduleTaskForTable(String taskType, String tableNameWithType,
+  public synchronized TaskSchedulingInfo scheduleTaskForTable(String taskType, String tableNameWithType,
       @Nullable String minionInstanceTag) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTasksToSchedule(Collections.singleton(taskType))
@@ -633,7 +633,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of the tasks scheduled.
    */
   @Deprecated(forRemoval = true)
-  protected Map<String, TaskSchedulingInfo> scheduleTasks(List<String> tableNamesWithType,
+  protected synchronized Map<String, TaskSchedulingInfo> scheduleTasks(List<String> tableNamesWithType,
       boolean isLeader, @Nullable String minionInstanceTag) {
     TaskSchedulingContext context = new TaskSchedulingContext()
         .setTablesToSchedule(new HashSet<>(tableNamesWithType))
@@ -646,7 +646,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    * Helper method to schedule tasks (all task types) for the given tables that have the tasks enabled.
    * Returns a map from the task type to the {@link TaskSchedulingInfo} of the tasks scheduled.
    */
-  public Map<String, TaskSchedulingInfo> scheduleTasks(TaskSchedulingContext context) {
+  public synchronized Map<String, TaskSchedulingInfo> scheduleTasks(TaskSchedulingContext context) {
     _controllerMetrics.addMeteredGlobalValue(ControllerMeter.NUMBER_TIMES_SCHEDULE_TASKS_CALLED, 1L);
 
     Map<String, List<TableConfig>> enabledTableConfigMap = new HashMap<>();
@@ -694,8 +694,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       } else {
         List<String> enabledTables =
             enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
-        String message =
-            "Task type: " + taskType + " is not registered, cannot enable it for tables: " + enabledTables;
+        String message = "Task type: " + taskType + " is not registered, cannot enable it for tables: " + enabledTables;
         LOGGER.warn(message);
         TaskSchedulingInfo taskSchedulingInfo = new TaskSchedulingInfo();
         taskSchedulingInfo.addSchedulingError(message);
@@ -707,7 +706,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   }
 
   @Deprecated(forRemoval = true)
-  protected TaskSchedulingInfo scheduleTask(String taskType, List<String> tables,
+  protected synchronized TaskSchedulingInfo scheduleTask(String taskType, List<String> tables,
       @Nullable String minionInstanceTag) {
     Preconditions.checkState(_taskGeneratorRegistry.getAllTaskTypes().contains(taskType),
         "Task type: %s is not registered", taskType);
@@ -728,7 +727,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
    */
   protected TaskSchedulingInfo scheduleTask(PinotTaskGenerator taskGenerator, List<TableConfig> enabledTableConfigs,
       boolean isLeader, @Nullable String minionInstanceTagForTask, String triggeredBy) {
-      TaskSchedulingInfo response = new TaskSchedulingInfo();
+    TaskSchedulingInfo response = new TaskSchedulingInfo();
     String taskType = taskGenerator.getTaskType();
     List<String> enabledTables =
         enabledTableConfigs.stream().map(TableConfig::getTableName).collect(Collectors.toList());
@@ -901,7 +900,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     return _scheduler;
   }
 
-  public void reportMetrics(String taskType) {
+  public synchronized void reportMetrics(String taskType) {
     // Reset all counters to 0
     for (Map.Entry<TaskState, Integer> entry : _taskStateToCountMap.entrySet()) {
       entry.setValue(0);
@@ -918,7 +917,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
     }
   }
 
-  protected void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
+  protected synchronized void addTaskTypeMetricsUpdaterIfNeeded(String taskType) {
     if (!_taskTypeMetricsUpdaterMap.containsKey(taskType)) {
       TaskTypeMetricsUpdater taskTypeMetricsUpdater = new TaskTypeMetricsUpdater(taskType, this);
       _pinotHelixResourceManager.getPropertyStore()
