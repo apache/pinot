@@ -83,6 +83,20 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
       "SELECT stringDimSV2 FROM mytable GROUP BY stringDimSV2"
           + " ORDER BY stringDimSV2 LIMIT 3000000";
 
+  /// SafeTrim sort-aggregation case, pair-wise combine
+  private static final String OOM_QUERY_3 =
+      "SET sortAggregateSingleThreadedNumSegmentsThreshold=1;"
+          + "SET sortAggregateLimitThreshold=3000001;"
+          + " SELECT stringDimSV2 FROM mytable GROUP BY stringDimSV2"
+          + " ORDER BY stringDimSV2 LIMIT 3000000";
+
+  /// SafeTrim sort-aggregation case, sequential combine
+  private static final String OOM_QUERY_4 =
+      "SET sortAggregateSingleThreadedNumSegmentsThreshold=10000;"
+          + "SET sortAggregateLimitThreshold=3000001;"
+          + " SELECT stringDimSV2 FROM mytable GROUP BY stringDimSV2"
+          + " ORDER BY stringDimSV2 LIMIT 3000000";
+
   private static final String DIGEST_QUERY_1 =
       "SELECT PERCENTILETDigest(doubleDimSV1, 50) AS digest FROM mytable";
   private static final String COUNT_STAR_QUERY =
@@ -348,6 +362,48 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     String exceptionsNode = queryResponse.get("exceptions").toString();
     assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.INTERNAL.getId()), exceptionsNode);
     assertTrue(exceptionsNode.contains("Received 1 error"), exceptionsNode);
+    assertTrue(_testAccountant.hasCallback());
+    assertEquals(queryResponse.get("requestId").asText(), _testAccountant.getQueryResourceTracker().getQueryId());
+  }
+
+  /// SafeTrim sort-aggregation case, pair-wise combine
+  @Test
+  public void testDigestOOM3()
+      throws Exception {
+    JsonNode queryResponse = postQuery(OOM_QUERY_3);
+    String exceptionsNode = queryResponse.get("exceptions").toString();
+    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+  }
+
+  @Test
+  public void testDigestOOM3MSE()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    JsonNode queryResponse = postQuery(OOM_QUERY_3);
+    String exceptionsNode = queryResponse.get("exceptions").toString();
+    assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.INTERNAL.getId()), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Received 1 error from stage 1"), exceptionsNode);
+    assertTrue(_testAccountant.hasCallback());
+    assertEquals(queryResponse.get("requestId").asText(), _testAccountant.getQueryResourceTracker().getQueryId());
+  }
+
+  /// SafeTrim sort-aggregation case, sequential combine
+  @Test
+  public void testDigestOOM4()
+      throws Exception {
+    JsonNode queryResponse = postQuery(OOM_QUERY_4);
+    String exceptionsNode = queryResponse.get("exceptions").toString();
+    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+  }
+
+  @Test
+  public void testDigestOOM4MSE()
+      throws Exception {
+    setUseMultiStageQueryEngine(true);
+    JsonNode queryResponse = postQuery(OOM_QUERY_4);
+    String exceptionsNode = queryResponse.get("exceptions").toString();
+    assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.INTERNAL.getId()), exceptionsNode);
+    assertTrue(exceptionsNode.contains("Received 1 error from stage 1"), exceptionsNode);
     assertTrue(_testAccountant.hasCallback());
     assertEquals(queryResponse.get("requestId").asText(), _testAccountant.getQueryResourceTracker().getQueryId());
   }

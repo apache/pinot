@@ -590,6 +590,16 @@ public class CommonConstants {
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
 
+        // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
+        public static final String SORT_AGGREGATE_LIMIT_THRESHOLD = "sortAggregateLimitThreshold";
+
+        /**
+         * When safeTrim (ORDER BY groupKeys without HAVING clause),
+         * do single-threaded sort aggregate when num of segments is below this value
+         */
+        public static final String SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD =
+            "sortAggregateSingleThreadedNumSegmentsThreshold";
+
         /**
          * This will help in getting accurate and correct result for queries
          * with group by and limit but  without order by
@@ -1110,6 +1120,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUPBY_TRIM_THRESHOLD;
     public static final int DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+    // Do sort-aggregation when LIMIT is below this threshold
+    public static final int DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD = 10_000;
+    // Use sequential instead of pair-wise combine for sort-aggr when numSegments is below this threshold
+    // Sequential combine utilizes N + 1 threads, N for processing and 1 for merge. Pair-wise only uses N.
+    public static final int DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD =
+        Runtime.getRuntime().availableProcessors();
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
