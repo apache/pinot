@@ -252,9 +252,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                 + "controlled by the cluster config %s which is set based on controller's performance.", taskType,
             tableName, pinotTaskConfigs.size(), maxNumberOfSubTasks, MinionConstants.MAX_ALLOWED_SUB_TASKS_KEY);
         message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
-        // We throw an exception to notify the user
-        // This is to ensure that the user is aware of the task generation limit
-        throw new RuntimeException(message);
+          // We throw an exception to notify the user
+          // This is to ensure that the user is aware of the task generation limit
+          throw new RuntimeException(message);
       }
       pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
           .computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
@@ -776,9 +776,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           if (TaskSchedulingContext.isUserTriggeredTask(triggeredBy)) {
             message += "Optimise the task config or reduce tableMaxNumTasks to avoid the error";
             presentTaskConfig.clear();
-              // If the task is user-triggered, we throw an exception to notify the user
-              // This is to ensure that the user is aware of the task generation limit
-              throw new RuntimeException(message);
+            // If the task is user-triggered, we throw an exception to notify the user
+            // This is to ensure that the user is aware of the task generation limit
+            throw new RuntimeException(message);
           }
           // For scheduled tasks, we log a warning and limit the number of tasks
           LOGGER.warn(message + "Only the first {} tasks will be scheduled", maxNumberOfSubTasks);
