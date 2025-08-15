@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -182,6 +181,8 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     // Trim the groups when iff:
+    // - SafeTrim case
+    // OR
     // - Query has ORDER BY clause
     // - Segment group trim is enabled
     // - There are more groups than the trim size
@@ -191,7 +192,7 @@ public class FilteredGroupByOperator extends BaseOperator<GroupByResultsBlock> {
     if (trimSize > 0) {
       if (groupKeyGenerator.getNumKeys() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        Collection<IntermediateRecord> intermediateRecords =
+        List<IntermediateRecord> intermediateRecords =
             tableResizer.trimInSegmentResults(groupKeyGenerator, groupByResultHolders, trimSize);
         // Release the resources used by the group key generator
         groupKeyGenerator.close();

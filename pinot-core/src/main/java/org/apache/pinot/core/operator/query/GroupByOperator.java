@@ -20,7 +20,6 @@ package org.apache.pinot.core.operator.query;
 
 import com.google.common.base.CaseFormat;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -105,14 +104,12 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
   protected GroupByResultsBlock getNextBlock() {
     // Perform aggregation group-by on all the blocks
     GroupByExecutor groupByExecutor;
-    // TODO: pass trimGroupSize to executor, who creates the result holder
     if (_useStarTree) {
       groupByExecutor = new StarTreeGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     } else {
       groupByExecutor = new DefaultGroupByExecutor(_queryContext, _groupByExpressions, _projectOperator);
     }
     ValueBlock valueBlock;
-
     while ((valueBlock = _projectOperator.nextBlock()) != null) {
       _numDocsScanned += valueBlock.getNumDocs();
       groupByExecutor.process(valueBlock);
@@ -133,6 +130,8 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     }
 
     // Trim the groups when iff:
+    // - SafeTrim case
+    // OR
     // - Query has ORDER BY clause
     // - Segment group trim is enabled
     // - There are more groups than the trim size
@@ -142,7 +141,7 @@ public class GroupByOperator extends BaseOperator<GroupByResultsBlock> {
     if (trimSize > 0) {
       if (groupByExecutor.getNumGroups() > trimSize) {
         TableResizer tableResizer = new TableResizer(_dataSchema, _queryContext);
-        Collection<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
+        List<IntermediateRecord> intermediateRecords = groupByExecutor.trimGroupByResult(trimSize, tableResizer);
         // trim groupKeyGenerator after getting intermediateRecords
         groupByExecutor.getGroupKeyGenerator().close();
 

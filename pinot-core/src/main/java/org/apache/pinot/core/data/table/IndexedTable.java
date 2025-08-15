@@ -44,7 +44,7 @@ import org.apache.pinot.core.util.trace.TraceCallable;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public abstract class IndexedTable extends BaseTable {
-  private final ExecutorService _executorService;
+  protected final ExecutorService _executorService;
   protected final Map<Key, Record> _lookupMap;
   protected final boolean _hasFinalInput;
   protected final int _resultSize;
@@ -58,8 +58,8 @@ public abstract class IndexedTable extends BaseTable {
   protected final int _chunkSizeExtractFinalResult;
 
   protected Collection<Record> _topRecords;
-  private int _numResizes;
-  private long _resizeTimeNs;
+  protected int _numResizes;
+  protected long _resizeTimeNs;
 
   /**
    * Constructor for the IndexedTable.
@@ -264,6 +264,14 @@ public abstract class IndexedTable extends BaseTable {
   @Override
   public Iterator<Record> iterator() {
     return _topRecords.iterator();
+  }
+
+  public Map<Key, Record> getLookupMap() {
+    return _lookupMap;
+  }
+
+  public Collection<Record> getTopRecords() {
+    return _topRecords;
   }
 
   public int getNumResizes() {
