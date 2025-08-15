@@ -2223,7 +2223,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(consumingSegmentToBeMovedSummary.getNumConsumingSegmentsToBeMoved(),
         FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS * numReplica);
     assertEquals(consumingSegmentToBeMovedSummary.getNumServersGettingConsumingSegmentsAdded(), numServers);
-    Iterator<Integer> offsetToCatchUpIterator =
+    Iterator<Long> offsetToCatchUpIterator =
         consumingSegmentToBeMovedSummary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().values().iterator();
     assertEquals(offsetToCatchUpIterator.next(), mockOffsetBig);
     if (FakeStreamConfigUtils.DEFAULT_NUM_PARTITIONS > 1) {
