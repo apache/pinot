@@ -98,7 +98,7 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
   }
 
   /**
-   * Executes query on one sorted segment in a worker thread and merges the results into the sorted record table.
+   * Executes query on one sorted segment in a worker thread and ship them via {@link this#_blockingQueue}
    */
   @Override
   protected void processSegments() {
@@ -142,7 +142,8 @@ public class SequentialSortedGroupByCombineOperator extends BaseSingleBlockCombi
    * <p>Combines sorted intermediate aggregation result blocks from underlying operators and returns a merged one.
    * <ul>
    *   <li>
-   *     Merges multiple sorted intermediate aggregation result blocks as a merged one.
+   *     Merges multiple sorted intermediate aggregation result from {@link this#_blockingQueue} into one
+   *     and create a result block
    *   </li>
    *   <li>
    *     Set all exceptions encountered during execution into the merged result block

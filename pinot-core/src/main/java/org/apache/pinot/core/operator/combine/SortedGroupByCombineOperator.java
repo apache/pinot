@@ -114,7 +114,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   }
 
   /**
-   * Executes query on one sorted segment in a worker thread and merges the results into the sorted record table.
+   * Executes query on sorted segments in a worker thread and merges the results using the pair-wise combine algorithm.
    */
   @Override
   protected void processSegments() {
@@ -199,17 +199,8 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   }
 
   /**
-   * {@inheritDoc}
-   *
-   * <p>Combines sorted intermediate aggregation result blocks from underlying operators and returns a merged one.
-   * <ul>
-   *   <li>
-   *     Merges multiple sorted intermediate aggregation result blocks as a merged one.
-   *   </li>
-   *   <li>
-   *     Set all exceptions encountered during execution into the merged result block
-   *   </li>
-   * </ul>
+   * <p>Collect the merged group by result and wraps it into a result block
+   * <li>Set all exceptions encountered during execution into the merged result block</li>
    */
   @Override
   public BaseResultsBlock mergeResults()
