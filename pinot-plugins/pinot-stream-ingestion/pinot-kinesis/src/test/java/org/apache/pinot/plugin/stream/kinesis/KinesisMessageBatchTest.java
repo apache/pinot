@@ -42,7 +42,7 @@ public class KinesisMessageBatchTest {
     }
     KinesisMessageBatch batch =
         new KinesisMessageBatch(messages, new KinesisPartitionGroupOffset(SHARD_ID, Integer.toString(numMessages - 1)),
-            false);
+            false, 0);
 
     for (int i = 0; i < numMessages; i++) {
       BytesStreamMessage streamMessage = batch.getStreamMessage(i);

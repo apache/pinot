@@ -73,10 +73,13 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
       }
     }
 
+    long batchSizeInBytes = 0;
     // Read messages until all available messages are read, or we run out of time
     try {
       while (_reader.hasMessageAvailable() && System.currentTimeMillis() < endTimeMs) {
-        messages.add(PulsarUtils.buildPulsarStreamMessage(_reader.readNext(), _config));
+        BytesStreamMessage bytesStreamMessage = PulsarUtils.buildPulsarStreamMessage(_reader.readNext(), _config);
+        batchSizeInBytes += bytesStreamMessage.getMetadata().getRecordSerializedSize();
+        messages.add(bytesStreamMessage);
       }
     } catch (PulsarClientException e) {
       throw new RuntimeException("Caught exception while fetching messages from Pulsar", e);
@@ -89,7 +92,7 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
       offsetOfNextBatch = (MessageIdStreamOffset) messages.get(messages.size() - 1).getMetadata().getNextOffset();
     }
     _nextMessageId = offsetOfNextBatch.getMessageId();
-    return new PulsarMessageBatch(messages, offsetOfNextBatch, _reader.hasReachedEndOfTopic());
+    return new PulsarMessageBatch(messages, offsetOfNextBatch, _reader.hasReachedEndOfTopic(), batchSizeInBytes);
   }
 
   @Override

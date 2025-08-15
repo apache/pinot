@@ -95,4 +95,8 @@ public interface MessageBatch<T> {
   default boolean hasDataLoss() {
     return false;
   }
+
+  default long getSizeInBytes() {
+    return -1;
+  }
 }
