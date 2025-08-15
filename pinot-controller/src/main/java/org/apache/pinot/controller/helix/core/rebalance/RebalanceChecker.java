@@ -67,19 +67,19 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void processTables(List<String> tableNamesWithType, Properties periodicTaskProperties) {
-    int numTables = tableNamesWithType.size();
-    LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
-    int numTablesProcessed = retryRebalanceTables(new HashSet<>(tableNamesWithType));
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, _taskName,
-        numTablesProcessed);
-    LOGGER.info("Finish processing {}/{} tables in task: {}", numTablesProcessed, numTables, _taskName);
+    synchronized (_taskLock) {
+      int numTables = tableNamesWithType.size();
+      LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
+      // Rare but the task may be executed by more than one threads because user can trigger the periodic task to run
+      // immediately, in addition to the one scheduled to run periodically. So take a lock to prevent concurrent runs.
+      int numTablesProcessed = retryRebalanceTables(new HashSet<>(tableNamesWithType));
+      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, _taskName,
+          numTablesProcessed);
+      LOGGER.info("Finish processing {}/{} tables in task: {}", numTablesProcessed, numTables, _taskName);
+    }
   }
 
-  /**
-   * Rare but the task may be executed by more than one threads because user can trigger the periodic task to run
-   * immediately, in addition to the one scheduled to run periodically. So make this method synchronized to be simple.
-   */
-  private synchronized int retryRebalanceTables(Set<String> tableNamesWithType) {
+  private int retryRebalanceTables(Set<String> tableNamesWithType) {
     // Get all jobMetadata for all the given tables with a single ZK read.
     Map<String, Map<String, String>> allJobMetadataByJobId =
         _pinotHelixResourceManager.getAllJobs(Set.of(ControllerJobTypes.TABLE_REBALANCE),
