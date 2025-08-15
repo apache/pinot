@@ -1006,20 +1006,20 @@ public class TableRebalancer {
     Map<String, SegmentZKMetadata> consumingSegmentZKMetadata = new HashMap<>();
     uniqueConsumingSegments.forEach(segment -> consumingSegmentZKMetadata.put(segment,
         ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segment)));
-    Map<String, Integer> consumingSegmentsOffsetsToCatchUp =
+    Map<String, Long> consumingSegmentsOffsetsToCatchUp =
         getConsumingSegmentsOffsetsToCatchUp(tableConfig, consumingSegmentZKMetadata, tableRebalanceLogger);
-    Map<String, Integer> consumingSegmentsAge =
+    Map<String, Long> consumingSegmentsAge =
         getConsumingSegmentsAge(consumingSegmentZKMetadata, tableRebalanceLogger);
 
-    Map<String, Integer> consumingSegmentsOffsetsToCatchUpTopN;
+    Map<String, Long> consumingSegmentsOffsetsToCatchUpTopN;
     Map<String, RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer>
         consumingSegmentSummaryPerServer = new HashMap<>();
     if (consumingSegmentsOffsetsToCatchUp != null) {
       consumingSegmentsOffsetsToCatchUpTopN =
           getTopNConsumingSegmentWithValue(consumingSegmentsOffsetsToCatchUp, TOP_N_IN_CONSUMING_SEGMENT_SUMMARY);
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
-        int totalOffsetsToCatchUp =
-            segments.stream().mapToInt(consumingSegmentsOffsetsToCatchUp::get).sum();
+        long totalOffsetsToCatchUp =
+            segments.stream().mapToLong(consumingSegmentsOffsetsToCatchUp::get).sum();
         consumingSegmentSummaryPerServer.put(server,
             new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer(
                 segments.size(), totalOffsetsToCatchUp));
@@ -1033,7 +1033,7 @@ public class TableRebalancer {
       });
     }
 
-    Map<String, Integer> consumingSegmentsOldestTopN =
+    Map<String, Long> consumingSegmentsOldestTopN =
         consumingSegmentsAge == null ? null
             : getTopNConsumingSegmentWithValue(consumingSegmentsAge, TOP_N_IN_CONSUMING_SEGMENT_SUMMARY);
 
@@ -1042,9 +1042,9 @@ public class TableRebalancer {
         consumingSegmentSummaryPerServer);
   }
 
-  private static Map<String, Integer> getTopNConsumingSegmentWithValue(
-      Map<String, Integer> consumingSegmentsWithValue, @Nullable Integer topN) {
-    Map<String, Integer> topNConsumingSegments = new LinkedHashMap<>();
+  private static Map<String, Long> getTopNConsumingSegmentWithValue(
+      Map<String, Long> consumingSegmentsWithValue, @Nullable Integer topN) {
+    Map<String, Long> topNConsumingSegments = new LinkedHashMap<>();
     consumingSegmentsWithValue.entrySet()
         .stream()
         .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
@@ -1061,9 +1061,9 @@ public class TableRebalancer {
    * segment name to the age of that consuming segment. Return null if failed to obtain info for any consuming segment.
    */
   @Nullable
-  private Map<String, Integer> getConsumingSegmentsAge(Map<String, SegmentZKMetadata> consumingSegmentZKMetadata,
+  private Map<String, Long> getConsumingSegmentsAge(Map<String, SegmentZKMetadata> consumingSegmentZKMetadata,
       Logger tableRebalanceLogger) {
-    Map<String, Integer> consumingSegmentsAge = new HashMap<>();
+    Map<String, Long> consumingSegmentsAge = new HashMap<>();
     long now = System.currentTimeMillis();
     try {
       consumingSegmentZKMetadata.forEach(((s, segmentZKMetadata) -> {
@@ -1076,7 +1076,7 @@ public class TableRebalancer {
           tableRebalanceLogger.warn("Creation time is not found for segment: {}", s);
           throw new RuntimeException("Creation time is not found");
         }
-        consumingSegmentsAge.put(s, (int) (now - creationTime) / 60_000);
+        consumingSegmentsAge.put(s, (now - creationTime) / 60_000L);
       }));
     } catch (Exception e) {
       return null;
@@ -1091,9 +1091,9 @@ public class TableRebalancer {
    * segment. Return null if failed to obtain info for any consuming segment.
    */
   @Nullable
-  private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(TableConfig tableConfig,
+  private Map<String, Long> getConsumingSegmentsOffsetsToCatchUp(TableConfig tableConfig,
       Map<String, SegmentZKMetadata> consumingSegmentZKMetadata, Logger tableRebalanceLogger) {
-    Map<String, Integer> segmentToOffsetsToCatchUp = new HashMap<>();
+    Map<String, Long> segmentToOffsetsToCatchUp = new HashMap<>();
     try {
       for (Map.Entry<String, SegmentZKMetadata> entry : consumingSegmentZKMetadata.entrySet()) {
         String segmentName = entry.getKey();
@@ -1113,11 +1113,11 @@ public class TableRebalancer {
           tableRebalanceLogger.warn("Cannot determine partition id for realtime segment: {}", segmentName);
           return null;
         }
-        Integer latestOffset = getLatestOffsetOfStream(tableConfig, partitionId, tableRebalanceLogger);
+        Long latestOffset = getLatestOffsetOfStream(tableConfig, partitionId, tableRebalanceLogger);
         if (latestOffset == null) {
           return null;
         }
-        int offsetsToCatchUp = latestOffset - Integer.parseInt(startOffset);
+        long offsetsToCatchUp = latestOffset - Long.parseLong(startOffset);
         segmentToOffsetsToCatchUp.put(segmentName, offsetsToCatchUp);
       }
     } catch (Exception e) {
@@ -1142,7 +1142,7 @@ public class TableRebalancer {
   }
 
   @Nullable
-  private Integer getLatestOffsetOfStream(TableConfig tableConfig, int partitionId,
+  private Long getLatestOffsetOfStream(TableConfig tableConfig, int partitionId,
       Logger tableRebalanceLogger) {
     try {
       StreamPartitionMsgOffset partitionMsgOffset = fetchStreamPartitionOffset(tableConfig, partitionId);
@@ -1150,7 +1150,7 @@ public class TableRebalancer {
         tableRebalanceLogger.warn("Unsupported stream partition message offset type: {}", partitionMsgOffset);
         return null;
       }
-      return (int) ((LongMsgOffset) partitionMsgOffset).getOffset();
+      return ((LongMsgOffset) partitionMsgOffset).getOffset();
     } catch (Exception e) {
       tableRebalanceLogger.warn("Caught exception while trying to fetch stream partition of partitionId: {}",
           partitionId, e);
