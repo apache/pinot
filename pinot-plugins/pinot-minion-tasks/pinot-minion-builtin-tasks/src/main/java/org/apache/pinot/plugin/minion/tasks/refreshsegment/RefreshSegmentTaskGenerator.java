@@ -130,6 +130,13 @@ public class RefreshSegmentTaskGenerator extends BaseTaskGenerator {
       configs.put(MinionConstants.DOWNLOAD_URL_KEY, segmentZKMetadata.getDownloadUrl());
       configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
       configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, String.valueOf(segmentZKMetadata.getCrc()));
+
+      // Pass through columnar reload configuration from table task config to individual task
+      String columnarReloadConfig = taskConfigs.get(RefreshSegmentTask.COLUMNAR_RELOAD_AND_SKIP_TRANSFORMATION);
+      if (columnarReloadConfig != null) {
+        configs.put(RefreshSegmentTask.COLUMNAR_RELOAD_AND_SKIP_TRANSFORMATION, columnarReloadConfig);
+      }
+
       pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
       tableNumTasks++;
     }
