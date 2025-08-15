@@ -221,6 +221,7 @@ public class TableRebalancer {
     }
     boolean dryRun = rebalanceConfig.isDryRun();
     boolean preChecks = rebalanceConfig.isPreChecks();
+    boolean disableSummary = rebalanceConfig.isDisableSummary();
     boolean reassignInstances = rebalanceConfig.isReassignInstances();
     boolean includeConsuming = rebalanceConfig.isIncludeConsuming();
     boolean bootstrap = rebalanceConfig.isBootstrap();
@@ -244,15 +245,15 @@ public class TableRebalancer {
       forceCommit = false;
     }
     tableRebalanceLogger.info(
-        "Start rebalancing with dryRun: {}, preChecks: {}, reassignInstances: {}, "
+        "Start rebalancing with dryRun: {}, preChecks: {}, disableSummary: {}, reassignInstances: {}, "
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, allowPeerDownloadDataLoss: {}, "
             + "minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, "
             + "batchSizePerServer: {}, externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, "
             + "minimizeDataMovement: {}, forceCommit: {}, forceCommitBatchSize: {}, "
             + "forceCommitBatchStatusCheckIntervalMs: {}, forceCommitBatchStatusCheckTimeoutMs: {}",
-        dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime, allowPeerDownloadDataLoss,
-        minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
-        externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
+        dryRun, preChecks, disableSummary, reassignInstances, includeConsuming, bootstrap, downtime,
+        allowPeerDownloadDataLoss, minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts,
+        batchSizePerServer, externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
         forceCommit, rebalanceConfig.getForceCommitBatchSize(),
         rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
         rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
@@ -263,6 +264,12 @@ public class TableRebalancer {
       tableRebalanceLogger.error(errorMsg);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null,
           null);
+    }
+
+    if (preChecks && disableSummary) {
+      tableRebalanceLogger.warn("disableSummary must be set to false to enable preChecks, but was set to true. "
+          + "Setting to false, as summary calculation is needed for preChecks");
+      disableSummary = false;
     }
 
     // Fetch ideal state
@@ -355,18 +362,28 @@ public class TableRebalancer {
 
     // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
     // is expected or not based on the summary results
-    RebalanceSummaryResult summaryResult =
-        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, tableSubTypeSizeDetails,
-            tableConfig, tableRebalanceLogger);
+    RebalanceSummaryResult summaryResult = null;
+    if (!disableSummary) {
+      try {
+        summaryResult = calculateRebalanceSummary(currentAssignment, targetAssignment, tableNameWithType,
+            tableSubTypeSizeDetails, tableConfig, tableRebalanceLogger);
+      } catch (Exception e) {
+        tableRebalanceLogger.warn("Caught exception while trying to run the rebalance summary, skipping", e);
+      }
+    }
 
     if (preChecks) {
       if (_rebalancePreChecker == null) {
         tableRebalanceLogger.warn("Pre-checks are enabled but the pre-checker is not set, skipping pre-checks");
       } else {
-        RebalancePreChecker.PreCheckContext preCheckContext =
-            new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType, tableConfig, currentAssignment,
-                targetAssignment, tableSubTypeSizeDetails, rebalanceConfig, summaryResult);
-        preChecksResult = _rebalancePreChecker.check(preCheckContext);
+        try {
+          RebalancePreChecker.PreCheckContext preCheckContext =
+              new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType, tableConfig, currentAssignment,
+                  targetAssignment, tableSubTypeSizeDetails, rebalanceConfig, summaryResult);
+          preChecksResult = _rebalancePreChecker.check(preCheckContext);
+        } catch (Exception e) {
+          tableRebalanceLogger.warn("Caught exception while trying to run the rebalance pre-checks, skipping", e);
+        }
       }
     }
 
@@ -802,7 +819,7 @@ public class TableRebalancer {
     return tableSizeDetails == null ? -1 : tableSizeDetails._reportedSizePerReplicaInBytes;
   }
 
-  private RebalanceSummaryResult calculateDryRunSummary(Map<String, Map<String, String>> currentAssignment,
+  private RebalanceSummaryResult calculateRebalanceSummary(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, String tableNameWithType,
       TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, TableConfig tableConfig,
       Logger tableRebalanceLogger) {

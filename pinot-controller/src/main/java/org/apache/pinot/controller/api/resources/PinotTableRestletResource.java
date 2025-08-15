@@ -704,6 +704,8 @@ public class PinotTableRestletResource {
       boolean dryRun,
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
+      @ApiParam(value = "Whether to disable summary calculation")
+      @DefaultValue("false") @QueryParam("preChecks") boolean disableSummary,
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("true")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("true")
@@ -781,6 +783,7 @@ public class PinotTableRestletResource {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
     rebalanceConfig.setPreChecks(preChecks);
+    rebalanceConfig.setDisableSummary(disableSummary);
     rebalanceConfig.setReassignInstances(reassignInstances);
     rebalanceConfig.setIncludeConsuming(includeConsuming);
     rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);
