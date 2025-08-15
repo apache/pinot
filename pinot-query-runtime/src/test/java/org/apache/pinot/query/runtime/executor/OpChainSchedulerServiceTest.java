@@ -19,7 +19,7 @@
 package org.apache.pinot.query.runtime.executor;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -78,10 +78,10 @@ public class OpChainSchedulerServiceTest {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);
-    WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
     OpChainExecutionContext context =
-        new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, ImmutableMap.of(),
-            new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of()), workerMetadata, null, null,
+        new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, Long.MAX_VALUE, Map.of(),
+            new StageMetadata(0, ImmutableList.of(workerMetadata), Map.of()), workerMetadata, null, null,
             true);
     return new OpChain(context, operator);
   }

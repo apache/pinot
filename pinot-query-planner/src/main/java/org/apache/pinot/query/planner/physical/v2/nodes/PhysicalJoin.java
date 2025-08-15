@@ -24,11 +24,13 @@ import javax.annotation.Nullable;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.core.CorrelationId;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.hint.RelHint;
 import org.apache.calcite.rex.RexNode;
+import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
 import org.apache.pinot.query.planner.physical.v2.PinotDataDistribution;
 
@@ -38,6 +40,8 @@ public class PhysicalJoin extends Join implements PRelNode {
   private final List<PRelNode> _pRelInputs;
   @Nullable
   private final PinotDataDistribution _pinotDataDistribution;
+  @Nullable
+  private final List<PinotLogicalEnrichedJoin.FilterProjectRexNode> _filterProjectRexNodes;
 
   public PhysicalJoin(RelOptCluster cluster, RelTraitSet traitSet, List<RelHint> hints,
       RexNode condition, Set<CorrelationId> variablesSet, JoinRelType joinType, int nodeId, PRelNode left,
@@ -46,13 +50,25 @@ public class PhysicalJoin extends Join implements PRelNode {
     _nodeId = nodeId;
     _pRelInputs = List.of(left, right);
     _pinotDataDistribution = pinotDataDistribution;
+    _filterProjectRexNodes = null;
+  }
+
+  public PhysicalJoin(RelOptCluster cluster, RelTraitSet traitSet, List<RelHint> hints,
+      RexNode condition, Set<CorrelationId> variablesSet, JoinRelType joinType, int nodeId, PRelNode left,
+      PRelNode right, @Nullable PinotDataDistribution pinotDataDistribution,
+      List<PinotLogicalEnrichedJoin.FilterProjectRexNode> filterProjectRexNodes) {
+    super(cluster, traitSet, hints, left.unwrap(), right.unwrap(), condition, variablesSet, joinType);
+    _nodeId = nodeId;
+    _pRelInputs = List.of(left, right);
+    _pinotDataDistribution = pinotDataDistribution;
+    _filterProjectRexNodes = filterProjectRexNodes;
   }
 
   @Override
   public Join copy(RelTraitSet traitSet, RexNode conditionExpr, RelNode left, RelNode right, JoinRelType joinType,
       boolean semiJoinDone) {
     return new PhysicalJoin(getCluster(), traitSet, getHints(), conditionExpr, getVariablesSet(), joinType, _nodeId,
-        (PRelNode) left, (PRelNode) right, _pinotDataDistribution);
+        (PRelNode) left, (PRelNode) right, _pinotDataDistribution, _filterProjectRexNodes);
   }
 
   @Override
@@ -84,6 +100,12 @@ public class PhysicalJoin extends Join implements PRelNode {
   @Override
   public PRelNode with(int newNodeId, List<PRelNode> newInputs, PinotDataDistribution newDistribution) {
     return new PhysicalJoin(getCluster(), getTraitSet(), getHints(), getCondition(), getVariablesSet(), getJoinType(),
-        newNodeId, newInputs.get(0), newInputs.get(1), newDistribution);
+        newNodeId, newInputs.get(0), newInputs.get(1), newDistribution, _filterProjectRexNodes);
+  }
+
+  @Override
+  public RelWriter explainTerms(RelWriter pw) {
+    return super.explainTerms(pw)
+        .itemIf("filterProjectRex", _filterProjectRexNodes, _filterProjectRexNodes != null);
   }
 }
