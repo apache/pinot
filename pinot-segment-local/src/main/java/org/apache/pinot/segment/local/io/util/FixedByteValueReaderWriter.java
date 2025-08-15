@@ -92,6 +92,13 @@ public final class FixedByteValueReaderWriter implements ValueReader {
     return new String(buffer, 0, numBytesPerValue, UTF_8);
   }
 
+  public void getCustomPaddedString(int offset, int numBytesPerValue, ByteBuffer buffer) {
+    long l1 = _dataBuffer.getLong(offset);
+    long l2 = _dataBuffer.getLong(offset + Long.BYTES);
+    buffer.putLong(l1);
+    buffer.putLong(l2);
+  }
+
   @Override
   public byte[] getBytes(int index, int numBytesPerValue) {
     long startOffset = (long) index * numBytesPerValue;

@@ -20,6 +20,7 @@ package org.apache.pinot.perf;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.Random;
@@ -94,7 +95,7 @@ public class BenchmarkStringDictionaryUnPaddedString {
   }
 
   @Benchmark
-  public void benchmarkStringDictionaryUnPaddedString() {
+  public void benchmarkUnpaddedStringDefaultApproach() {
     FixedByteValueReaderWriter reader = new FixedByteValueReaderWriter(_dataBuffer);
     byte[] uuidBytes = new byte[BYTES_PER_VALUE];
     String[] result = new String[MAX_DOC_PER_CALL];
@@ -103,6 +104,32 @@ public class BenchmarkStringDictionaryUnPaddedString {
       reader.readUnpaddedBytes(dictId, BYTES_PER_VALUE, uuidBytes);
       result[index] = new String(uuidBytes, StandardCharsets.UTF_8);
       // result[index] = reader.getPaddedString(dictId, BYTES_PER_VALUE, uuidBytes);
+    }
+  }
+
+  @Benchmark
+  public void benchmarkGetPaddedString() {
+    FixedByteValueReaderWriter reader = new FixedByteValueReaderWriter(_dataBuffer);
+    byte[] uuidBytes = new byte[BYTES_PER_VALUE];
+    String[] result = new String[MAX_DOC_PER_CALL];
+    for (int index = 0; index < dictIds.length; index++) {
+      int dictId = dictIds[index];
+      result[index] = reader.getPaddedString(dictId, BYTES_PER_VALUE, uuidBytes);
+    }
+  }
+
+  @Benchmark
+  public void benchmarkGetCustomPaddedString() {
+    FixedByteValueReaderWriter reader = new FixedByteValueReaderWriter(_dataBuffer);
+    byte[] uuidBytes = new byte[BYTES_PER_VALUE];
+    String[] result = new String[MAX_DOC_PER_CALL];
+    ByteBuffer byteBuffer = ByteBuffer.wrap(uuidBytes);
+    for (int index = 0; index < dictIds.length; index++) {
+      int dictId = dictIds[index];
+      int offset = dictId * BYTES_PER_VALUE;
+      reader.getCustomPaddedString(offset, BYTES_PER_VALUE, byteBuffer);
+      result[index] = new String(uuidBytes, StandardCharsets.UTF_8);
+      byteBuffer.clear();
     }
   }
 
