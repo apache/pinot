@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator;
+package org.apache.pinot.query.runtime.operator.set;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +25,7 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * Union operator for UNION queries. Unlike {@link UnionAllOperator}, this operator removes duplicate rows and only
  * returns distinct rows.
  */
-public class UnionOperator extends SetOperator {
+public class UnionOperator extends RightRowSetBasedSetOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(UnionOperator.class);
   private static final String EXPLAIN_NAME = "UNION";
 

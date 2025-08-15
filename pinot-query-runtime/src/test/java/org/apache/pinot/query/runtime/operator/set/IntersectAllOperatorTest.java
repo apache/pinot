@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator;
+package org.apache.pinot.query.runtime.operator.set;
 
 import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
@@ -25,6 +25,8 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -34,7 +36,8 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class MinusAllOperatorTest {
+public class IntersectAllOperatorTest {
+
   private AutoCloseable _mocks;
 
   @Mock
@@ -59,27 +62,27 @@ public class MinusAllOperatorTest {
   }
 
   @Test
-  public void testExceptAllOperator() {
-    DataSchema schema = new DataSchema(new String[]{"int_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
-    });
+  public void testIntersectAllOperator() {
+    DataSchema schema = new DataSchema(new String[]{"int_col"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+
     Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}, new Object[]{4}))
+        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
-            OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{5}))
+            OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{4}))
         .thenReturn(SuccessMseBlock.INSTANCE);
 
-    MinusAllOperator minusOperator =
-        new MinusAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+    IntersectAllOperator intersectOperator =
+        new IntersectAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
-    MseBlock result = minusOperator.nextBlock();
+    MseBlock result = intersectOperator.nextBlock();
     while (result.isEos()) {
-      result = minusOperator.nextBlock();
+      result = intersectOperator.nextBlock();
     }
     List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{3}, new Object[]{4});
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{1}, new Object[]{2});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
       Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
@@ -87,28 +90,28 @@ public class MinusAllOperatorTest {
   }
 
   @Test
-  public void testExceptAllOperatorWithDups() {
-    DataSchema schema = new DataSchema(new String[]{"int_col"}, new DataSchema.ColumnDataType[]{
-        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
-    });
+  public void testIntersectAllOperatorWithDups() {
+    DataSchema schema = new DataSchema(new String[]{"int_col"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT});
+
     Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{2}, new Object[]{2},
-            new Object[]{3}, new Object[]{3}, new Object[]{3}))
+        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{2}, new Object[]{3},
+            new Object[]{3}, new Object[]{3}))
         .thenReturn(SuccessMseBlock.INSTANCE);
     Mockito.when(_rightOperator.nextBlock()).thenReturn(
             OperatorTestUtil.block(schema, new Object[]{2}, new Object[]{3}, new Object[]{3}, new Object[]{4}))
         .thenReturn(SuccessMseBlock.INSTANCE);
 
-    MinusAllOperator minusOperator =
-        new MinusAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+    IntersectAllOperator intersectOperator =
+        new IntersectAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
 
-    MseBlock result = minusOperator.nextBlock();
+    MseBlock result = intersectOperator.nextBlock();
     while (result.isEos()) {
-      result = minusOperator.nextBlock();
+      result = intersectOperator.nextBlock();
     }
     List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
-    List<Object[]> expectedRows = Arrays.asList(new Object[]{1}, new Object[]{2}, new Object[]{2}, new Object[]{3});
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{2}, new Object[]{3}, new Object[]{3});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
       Assert.assertEquals(resultRows.get(i), expectedRows.get(i));

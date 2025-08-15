@@ -16,10 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator;
+package org.apache.pinot.query.runtime.operator.set;
 
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -27,6 +26,8 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
+import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -36,7 +37,7 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class UnionOperatorTest {
+public class MinusOperatorTest {
   private AutoCloseable _mocks;
 
   @Mock
@@ -61,30 +62,59 @@ public class UnionOperatorTest {
   }
 
   @Test
-  public void testUnionOperator() {
+  public void testExceptOperator() {
     DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
     Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}))
+        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
+            new Object[]{4, "DD"}))
         .thenReturn(SuccessMseBlock.INSTANCE);
-    Mockito.when(_rightOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"},
-            new Object[]{2, "BB"}))
+    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+            OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"}))
         .thenReturn(SuccessMseBlock.INSTANCE);
 
-    UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+    MinusOperator minusOperator =
+        new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
-    List<Object[]> resultRows = new ArrayList<>();
-    MseBlock result = unionOperator.nextBlock();
-    while (result.isData()) {
-      resultRows.addAll(((MseBlock.Data) result).asRowHeap().getRows());
-      result = unionOperator.nextBlock();
+
+    MseBlock result = minusOperator.nextBlock();
+    while (result.isEos()) {
+      result = minusOperator.nextBlock();
     }
-    List<Object[]> expectedRows =
-        Arrays.asList(new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"}, new Object[]{2, "BB"},
-            new Object[]{1, "AA"});
+    List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{3, "CC"}, new Object[]{4, "DD"});
+    Assert.assertEquals(resultRows.size(), expectedRows.size());
+    for (int i = 0; i < resultRows.size(); i++) {
+      Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
+    }
+  }
+
+  @Test
+  public void testDedup() {
+    DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
+        DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
+    });
+    Mockito.when(_leftOperator.nextBlock())
+        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
+            new Object[]{4, "DD"}, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{3, "CC"},
+            new Object[]{4, "DD"}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+    Mockito.when(_rightOperator.nextBlock()).thenReturn(
+            OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"},
+                new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{5, "EE"}))
+        .thenReturn(SuccessMseBlock.INSTANCE);
+
+    MinusOperator minusOperator =
+        new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+            schema);
+
+    MseBlock result = minusOperator.nextBlock();
+    while (result.isEos()) {
+      result = minusOperator.nextBlock();
+    }
+    List<Object[]> resultRows = ((MseBlock.Data) result).asRowHeap().getRows();
+    List<Object[]> expectedRows = Arrays.asList(new Object[]{3, "CC"}, new Object[]{4, "DD"});
     Assert.assertEquals(resultRows.size(), expectedRows.size());
     for (int i = 0; i < resultRows.size(); i++) {
       Assert.assertEquals(resultRows.get(i), expectedRows.get(i));
@@ -102,13 +132,13 @@ public class UnionOperatorTest {
     Mockito.when(_rightOperator.nextBlock())
         .thenReturn(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
 
-    UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+    MinusOperator minusOperator =
+        new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
-    MseBlock result = unionOperator.nextBlock();
+    MseBlock result = minusOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
     while (!result.isEos()) {
-      result = unionOperator.nextBlock();
+      result = minusOperator.nextBlock();
     }
     Assert.assertTrue(result.isError());
   }
@@ -124,13 +154,13 @@ public class UnionOperatorTest {
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{3, "aa"}, new Object[]{4, "bb"}))
         .thenReturn(SuccessMseBlock.INSTANCE);
 
-    UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+    MinusOperator minusOperator =
+        new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
             schema);
-    MseBlock result = unionOperator.nextBlock();
+    MseBlock result = minusOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
     while (!result.isEos()) {
-      result = unionOperator.nextBlock();
+      result = minusOperator.nextBlock();
     }
     Assert.assertTrue(result.isError());
   }

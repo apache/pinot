@@ -16,31 +16,27 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator;
+package org.apache.pinot.query.runtime.operator.set;
 
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Intersect operator.
+ * Union operator for UNION ALL queries.
  */
-public class IntersectOperator extends SetOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(IntersectOperator.class);
-  private static final String EXPLAIN_NAME = "INTERSECT";
+public class UnionAllOperator extends SetOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UnionAllOperator.class);
+  private static final String EXPLAIN_NAME = "UNION_ALL";
 
-  public IntersectOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
+  public UnionAllOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, inputOperators, dataSchema);
-  }
-
-  @Override
-  public Type getOperatorType() {
-    return Type.INTERSECT;
   }
 
   @Override
@@ -49,12 +45,22 @@ public class IntersectOperator extends SetOperator {
   }
 
   @Override
+  public Type getOperatorType() {
+    return Type.UNION;
+  }
+
+  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }
 
   @Override
-  protected boolean handleRowMatched(Object[] row) {
-    return _rightRowSet.setCount(new Record(row), 0) != 0;
+  protected MseBlock processRightOperator() {
+    return _rightChildOperator.nextBlock();
+  }
+
+  @Override
+  protected MseBlock processLeftOperator() {
+    return _leftChildOperator.nextBlock();
   }
 }
