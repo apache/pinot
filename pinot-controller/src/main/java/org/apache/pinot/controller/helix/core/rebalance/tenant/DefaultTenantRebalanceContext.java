@@ -45,9 +45,9 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
       ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
     super(originalJobId, config, attemptId, allowRetries);
-    _parallelQueue = parallelQueue;
-    _sequentialQueue = sequentialQueue;
-    _ongoingJobsQueue = ongoingJobsQueue;
+    _parallelQueue = new ConcurrentLinkedDeque<>(parallelQueue);
+    _sequentialQueue = new LinkedList<>(sequentialQueue);
+    _ongoingJobsQueue = new ConcurrentLinkedQueue<>(ongoingJobsQueue);
   }
 
   public static DefaultTenantRebalanceContext forInitialRebalance(String originalJobId, TenantRebalanceConfig config,
