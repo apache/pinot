@@ -70,7 +70,6 @@ public class RuleTimingPlannerListener implements RelOptListener {
   @Override
   public void ruleProductionSucceeded(RuleProductionEvent event) {
     if (_traceRuleProductions && !event.isBefore()) {
-      System.out.println("registered " + event);
       _ruleProductions.add(Pair.of(event.getRuleCall(), event.getRel()));
     }
   }
