@@ -839,7 +839,7 @@ public class TableConfigUtilsTest {
           e.getMessage().contains("Multiple stream configs are not supported with pauseless consumption enabled"));
     }
 
-    // Test for multiple stream configs with pauseless consumption disabled - should pass
+    // Test for multiple stream configs with pauseless consumption disabled - fail if duplicate topic names are present
     StreamIngestionConfig streamIngestionConfigWithoutPauseless =
         new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
     streamIngestionConfigWithoutPauseless.setPauselessConsumptionEnabled(false);
@@ -854,9 +854,31 @@ public class TableConfigUtilsTest {
 
     try {
       TableConfigUtils.validate(tableConfigWithoutPauseless, schema);
-      // Should pass - multiple stream configs are allowed when pauseless consumption is disabled
+      fail("Should fail if duplicate topic names are present in multiple stream configs");
     } catch (IllegalStateException e) {
-      fail("Should not fail when pauseless consumption is disabled with multiple stream configs: " + e.getMessage());
+      assertTrue(e.getMessage().contains("Duplicate topic names found in streamConfigs"));
+    }
+
+    // Test for multiple stream configs with pauseless consumption disabled - pass if no duplicate topic names
+    Map<String, String> kafkaStreamConfigs = getKafkaStreamConfigs();
+    streamConfigs = getStreamConfigs();
+    streamIngestionConfigWithoutPauseless =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, kafkaStreamConfigs));
+    streamIngestionConfigWithoutPauseless.setPauselessConsumptionEnabled(false);
+
+    ingestionConfigWithoutPauseless = new IngestionConfig();
+    ingestionConfigWithoutPauseless.setStreamIngestionConfig(streamIngestionConfigWithoutPauseless);
+
+    tableConfigWithoutPauseless = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithoutPauseless)
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfigWithoutPauseless, schema);
+    } catch (IllegalStateException e) {
+      fail("Should not fail when no duplicate topic and no pauseless ingestion are present in multiple stream configs",
+          e);
     }
   }
 
@@ -2945,7 +2967,7 @@ public class TableConfigUtilsTest {
   private Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.topic.name", "test");
+    streamConfigs.put("stream.kafka.topic.name", "test_topic");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
     return streamConfigs;
@@ -2954,7 +2976,7 @@ public class TableConfigUtilsTest {
   private Map<String, String> getKafkaStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "kafka");
-    streamConfigs.put("stream.kafka.topic.name", "test");
+    streamConfigs.put("stream.kafka.topic.name", "test_kafka_topic");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.inputformat.protobuf.ProtoBufMessageDecoder");
     streamConfigs.put("stream.kafka.decoder.prop.descriptorFile", "file://test");
@@ -2965,7 +2987,7 @@ public class TableConfigUtilsTest {
   private Map<String, String> getPulsarStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
     streamConfigs.put("streamType", "pulsar");
-    streamConfigs.put("stream.pulsar.topic.name", "test");
+    streamConfigs.put("stream.pulsar.topic.name", "test_pulsar_topic");
     streamConfigs.put("stream.pulsar.decoder.prop.descriptorFile", "file://test");
     streamConfigs.put("stream.pulsar.decoder.prop.protoClassName", "test");
     streamConfigs.put("stream.pulsar.decoder.class.name",
