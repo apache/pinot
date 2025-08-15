@@ -67,16 +67,14 @@ public class RebalanceChecker extends ControllerPeriodicTask<Void> {
 
   @Override
   protected void processTables(List<String> tableNamesWithType, Properties periodicTaskProperties) {
-    synchronized (_taskLock) {
-      int numTables = tableNamesWithType.size();
-      LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
-      // Rare but the task may be executed by more than one threads because user can trigger the periodic task to run
-      // immediately, in addition to the one scheduled to run periodically. So take a lock to prevent concurrent runs.
-      int numTablesProcessed = retryRebalanceTables(new HashSet<>(tableNamesWithType));
-      _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, _taskName,
-          numTablesProcessed);
-      LOGGER.info("Finish processing {}/{} tables in task: {}", numTablesProcessed, numTables, _taskName);
-    }
+    int numTables = tableNamesWithType.size();
+    LOGGER.info("Processing {} tables in task: {}", numTables, _taskName);
+    // Rare but the task may be executed by more than one threads because user can trigger the periodic task to run
+    // immediately, in addition to the one scheduled to run periodically. So take a lock to prevent concurrent runs.
+    int numTablesProcessed = retryRebalanceTables(new HashSet<>(tableNamesWithType));
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, _taskName,
+        numTablesProcessed);
+    LOGGER.info("Finish processing {}/{} tables in task: {}", numTablesProcessed, numTables, _taskName);
   }
 
   private int retryRebalanceTables(Set<String> tableNamesWithType) {

@@ -51,8 +51,6 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
   protected final LeadControllerManager _leadControllerManager;
   protected final ControllerMetrics _controllerMetrics;
   protected Set<String> _prevLeaderOfTables = new HashSet<>();
-  // Lock used to synchronize access to running the task to protect it from ad-hoc periodic task runs
-  protected final Object _taskLock;
 
   public ControllerPeriodicTask(String taskName, long runFrequencyInSeconds, long initialDelayInSeconds,
       PinotHelixResourceManager pinotHelixResourceManager, LeadControllerManager leadControllerManager,
@@ -61,7 +59,6 @@ public abstract class ControllerPeriodicTask<C> extends BasePeriodicTask {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _leadControllerManager = leadControllerManager;
     _controllerMetrics = controllerMetrics;
-    _taskLock = new Object();
   }
 
   @Override
