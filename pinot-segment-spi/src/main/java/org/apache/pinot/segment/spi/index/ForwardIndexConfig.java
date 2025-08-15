@@ -141,6 +141,14 @@ public class ForwardIndexConfig extends IndexConfig {
           _chunkCompressionType = ChunkCompressionType.GZIP;
           _dictIdCompressionType = null;
           break;
+        case DELTA:
+          _chunkCompressionType = ChunkCompressionType.DELTA;
+          _dictIdCompressionType = null;
+          break;
+        case DELTADELTA:
+          _chunkCompressionType = ChunkCompressionType.DELTADELTA;
+          _dictIdCompressionType = null;
+          break;
         case MV_ENTRY_DICT:
           _dictIdCompressionType = DictIdCompressionType.MV_ENTRY_DICT;
           _chunkCompressionType = null;
@@ -186,6 +194,10 @@ public class ForwardIndexConfig extends IndexConfig {
           return CompressionCodec.ZSTANDARD;
         case LZ4:
           return CompressionCodec.LZ4;
+        case DELTA:
+          return CompressionCodec.DELTA;
+        case DELTADELTA:
+          return CompressionCodec.DELTADELTA;
         default:
           throw new IllegalStateException("Unsupported chunk compression type: " + chunkCompressionType);
       }
