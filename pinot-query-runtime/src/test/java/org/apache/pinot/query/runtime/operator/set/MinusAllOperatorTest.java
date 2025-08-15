@@ -22,58 +22,35 @@ import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.BlockListMultiStageOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class MinusAllOperatorTest {
-  private AutoCloseable _mocks;
-
-  @Mock
-  private MultiStageOperator _leftOperator;
-
-  @Mock
-  private MultiStageOperator _rightOperator;
-
-  @Mock
-  private VirtualServerAddress _serverAddress;
-
-  @BeforeMethod
-  public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
-  }
-
-  @AfterMethod
-  public void tearDown()
-      throws Exception {
-    _mocks.close();
-  }
 
   @Test
   public void testExceptAllOperator() {
     DataSchema schema = new DataSchema(new String[]{"int_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{3}, new Object[]{4}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
-            OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{5}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator leftOperator = new BlockListMultiStageOperator.Builder(schema)
+        .addRow(1)
+        .addRow(2)
+        .addRow(3)
+        .addRow(4)
+        .buildWithEos();
+    MultiStageOperator rightOperator = new BlockListMultiStageOperator.Builder(schema)
+        .addRow(1)
+        .addRow(2)
+        .addRow(5)
+        .buildWithEos();
 
     MinusAllOperator minusOperator =
-        new MinusAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+        new MinusAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = minusOperator.nextBlock();
@@ -93,16 +70,24 @@ public class MinusAllOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"int_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1}, new Object[]{2}, new Object[]{2}, new Object[]{2},
-            new Object[]{3}, new Object[]{3}, new Object[]{3}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
-    Mockito.when(_rightOperator.nextBlock()).thenReturn(
-            OperatorTestUtil.block(schema, new Object[]{2}, new Object[]{3}, new Object[]{3}, new Object[]{4}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator leftOperator = new BlockListMultiStageOperator.Builder(schema)
+        .addRow(1)
+        .addRow(2)
+        .addRow(2)
+        .addRow(2)
+        .addRow(3)
+        .addRow(3)
+        .addRow(3)
+        .buildWithEos();
+    MultiStageOperator rightOperator = new BlockListMultiStageOperator.Builder(schema)
+        .addRow(2)
+        .addRow(3)
+        .addRow(3)
+        .addRow(4)
+        .buildWithEos();
 
     MinusAllOperator minusOperator =
-        new MinusAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+        new MinusAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = minusOperator.nextBlock();

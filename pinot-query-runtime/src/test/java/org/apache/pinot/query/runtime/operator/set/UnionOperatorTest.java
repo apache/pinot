@@ -23,60 +23,35 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
-import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.BlockListMultiStageOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OperatorTestUtil;
-import org.mockito.Mock;
-import org.mockito.Mockito;
-import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
-import org.testng.annotations.AfterMethod;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
 public class UnionOperatorTest {
-  private AutoCloseable _mocks;
-
-  @Mock
-  private MultiStageOperator _leftOperator;
-
-  @Mock
-  private MultiStageOperator _rightOperator;
-
-  @Mock
-  private VirtualServerAddress _serverAddress;
-
-  @BeforeMethod
-  public void setUp() {
-    _mocks = MockitoAnnotations.openMocks(this);
-    Mockito.when(_serverAddress.toString()).thenReturn(new VirtualServerAddress("mock", 80, 0).toString());
-  }
-
-  @AfterMethod
-  public void tearDown()
-      throws Exception {
-    _mocks.close();
-  }
 
   @Test
   public void testUnionOperator() {
     DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
-    Mockito.when(_rightOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{3, "aa"}, new Object[]{4, "bb"}, new Object[]{5, "cc"},
-            new Object[]{2, "BB"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator leftOperator = new BlockListMultiStageOperator.Builder(schema)
+        .addRow(1, "AA")
+        .addRow(2, "BB")
+        .buildWithEos();
+    MultiStageOperator rightOperator = new BlockListMultiStageOperator.Builder(schema)
+        .addRow(3, "aa")
+        .addRow(4, "bb")
+        .addRow(5, "cc")
+        .addRow(2, "BB")
+        .buildWithEos();
 
     UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
             schema);
     List<Object[]> resultRows = new ArrayList<>();
     MseBlock result = unionOperator.nextBlock();
@@ -98,14 +73,15 @@ public class UnionOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
-    Mockito.when(_rightOperator.nextBlock())
-        .thenReturn(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
+    MultiStageOperator leftOperator = new BlockListMultiStageOperator.Builder(schema)
+        .addRow(1, "AA")
+        .addRow(2, "BB")
+        .buildWithEos();
+    MultiStageOperator rightOperator = new BlockListMultiStageOperator.Builder(schema)
+        .buildWithError(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
 
     UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
             schema);
     MseBlock result = unionOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
@@ -120,14 +96,15 @@ public class UnionOperatorTest {
     DataSchema schema = new DataSchema(new String[]{"int_col", "string_col"}, new DataSchema.ColumnDataType[]{
         DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.STRING
     });
-    Mockito.when(_leftOperator.nextBlock())
-        .thenReturn(ErrorMseBlock.fromException(new RuntimeException("Error in left operator")));
-    Mockito.when(_rightOperator.nextBlock())
-        .thenReturn(OperatorTestUtil.block(schema, new Object[]{3, "aa"}, new Object[]{4, "bb"}))
-        .thenReturn(SuccessMseBlock.INSTANCE);
+    MultiStageOperator leftOperator = new BlockListMultiStageOperator.Builder(schema)
+        .buildWithError(ErrorMseBlock.fromException(new RuntimeException("Error in left operator")));
+    MultiStageOperator rightOperator = new BlockListMultiStageOperator.Builder(schema)
+        .addRow(1, "AA")
+        .addRow(2, "BB")
+        .buildWithEos();
 
     UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(_leftOperator, _rightOperator),
+        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
             schema);
     MseBlock result = unionOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
