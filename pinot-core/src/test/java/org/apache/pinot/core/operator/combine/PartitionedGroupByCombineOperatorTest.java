@@ -57,7 +57,7 @@ import static org.testng.Assert.assertEquals;
 
 public class PartitionedGroupByCombineOperatorTest {
   /**
-   * Test for {@link SelectionOnlyCombineOperator} and {@link SelectionOrderByCombineOperator}.
+   * Test for {@link PartitionedGroupByCombineOperator}.
    */
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "PartitionedGroupByCombineOperatorTest");
   private static final String RAW_TABLE_NAME = "testTable";
@@ -67,10 +67,12 @@ public class PartitionedGroupByCombineOperatorTest {
   private static final int NUM_RECORDS_PER_SEGMENT = 100;
 
   private static final String INT_COLUMN = "intColumn";
+  private static final String INT_COLUMN2 = "intColumn2";
   private static final TableConfig TABLE_CONFIG =
       new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
   private static final Schema SCHEMA =
-      new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT).build();
+      new Schema.SchemaBuilder().addSingleValueDimension(INT_COLUMN, FieldSpec.DataType.INT)
+          .addSingleValueDimension(INT_COLUMN2, FieldSpec.DataType.INT).build();
 
   private static final PlanMaker PLAN_MAKER = new InstancePlanMakerImplV2();
   private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4);
@@ -103,6 +105,7 @@ public class PartitionedGroupByCombineOperatorTest {
     for (int i = 0; i < NUM_RECORDS_PER_SEGMENT; i++) {
       GenericRow record = new GenericRow();
       record.putValue(INT_COLUMN, baseValue + i);
+      record.putValue(INT_COLUMN2, baseValue + i);
       records.add(record);
     }
 
@@ -120,62 +123,69 @@ public class PartitionedGroupByCombineOperatorTest {
   }
 
   @Test
-  public void testSafeTrimPairWiseCombineLimit0() {
-    GroupByResultsBlock combineResult = getPairWiseCombineResult(
-        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY COUNT(*), intColumn LIMIT 0");
+  public void testPartitionedCombineLimit0() {
+    GroupByResultsBlock combineResult = getPartitionedCombineResult(
+        "SELECT intColumn, COUNT(*) FROM testTable "
+            + "GROUP BY intColumn, intColumn2 ORDER BY COUNT(*), intColumn LIMIT 0");
     assertEquals(combineResult.getDataSchema(),
-        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
-            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+      new DataSchema(new String[]{INT_COLUMN, INT_COLUMN2, "count(*)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+              DataSchema.ColumnDataType.LONG}));
     assertEquals(combineResult.getRows().size(), 0);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
   }
 
   @Test
-  public void testSafeTrimPairWiseOneSegmentOnly() {
-    GroupByResultsBlock combineResult = getPairWiseCombineResultSingleBlock(
-        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY COUNT(*), intColumn LIMIT 100");
+  public void testPartitionedOneSegmentOnly() {
+    GroupByResultsBlock combineResult = getPartitionedCombineResultSingleBlock(
+        "SELECT intColumn, COUNT(*) FROM testTable "
+            + "GROUP BY intColumn, intColumn2 ORDER BY COUNT(*), intColumn LIMIT 100");
     assertEquals(combineResult.getDataSchema(),
-        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
-            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+      new DataSchema(new String[]{INT_COLUMN, INT_COLUMN2, "count(*)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+              DataSchema.ColumnDataType.LONG}));
     assertEquals(combineResult.getRows().size(), 100);
     assertEquals(combineResult.getNumSegmentsProcessed(), 1);
     for (int i = 0; i < 100; i++) {
       Object[] row = combineResult.getRows().get(i);
-      assertEquals(row[1], 1L);
+      assertEquals(row[2], 1L);
     }
   }
 
   @Test
-  public void testSafeTrimPairWiseCombine() {
-    GroupByResultsBlock combineResult = getPairWiseCombineResult(
-        "SELECT intColumn, COUNT(*) FROM testTable GROUP BY intColumn ORDER BY COUNT(*), intColumn LIMIT 100");
+  public void testPartitionedCombine() {
+    GroupByResultsBlock combineResult = getPartitionedCombineResult(
+        "SELECT intColumn, COUNT(*) FROM testTable "
+            + "GROUP BY intColumn, intColumn2 ORDER BY COUNT(*), intColumn LIMIT 100");
     assertEquals(combineResult.getDataSchema(),
-        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
-            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+        new DataSchema(new String[]{INT_COLUMN, INT_COLUMN2, "count(*)"},
+            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+                DataSchema.ColumnDataType.LONG}));
     assertEquals(combineResult.getRows().size(), ((NUM_SEGMENTS + 1) / 2) * 100);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
     for (int i = 0; i < 100; i++) {
       Object[] row = combineResult.getRows().get(i);
       if ((int) row[0] < 50 || (int) row[0] > NUM_SEGMENTS * 100 - 50) {
-        assertEquals(row[1], 1L);
+        assertEquals(row[2], 1L);
       }
     }
   }
 
   @Test
-  public void testSafeTrimPairWiseEmptyCombine() {
-    GroupByResultsBlock combineResult = getPairWiseCombineResult(
+  public void testPartitionedEmptyCombine() {
+    GroupByResultsBlock combineResult = getPartitionedCombineResult(
         "SELECT intColumn, COUNT(*) FROM testTable WHERE intColumn < 0 "
-            + "GROUP BY intColumn ORDER BY COUNT(*), intColumn LIMIT 100");
+            + "GROUP BY intColumn, intColumn2 ORDER BY COUNT(*), intColumn LIMIT 100");
     assertEquals(combineResult.getDataSchema(),
-        new DataSchema(new String[]{INT_COLUMN, "count(*)"},
-            new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.LONG}));
+      new DataSchema(new String[]{INT_COLUMN, INT_COLUMN2, "count(*)"},
+          new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT, DataSchema.ColumnDataType.INT,
+              DataSchema.ColumnDataType.LONG}));
     assertEquals(combineResult.getRows().size(), 0);
     assertEquals(combineResult.getNumSegmentsProcessed(), NUM_SEGMENTS);
   }
 
   @SuppressWarnings({"rawTypes"})
-  private GroupByResultsBlock getPairWiseCombineResult(String query) {
+  private GroupByResultsBlock getPartitionedCombineResult(String query) {
     // ensure pair-wise execution
     QueryContext queryContext = QueryContextConverterUtils.getQueryContext(query);
     List<PlanNode> planNodes = new ArrayList<>(NUM_SEGMENTS);
@@ -190,7 +200,7 @@ public class PartitionedGroupByCombineOperatorTest {
   }
 
   @SuppressWarnings({"rawTypes"})
-  private GroupByResultsBlock getPairWiseCombineResultSingleBlock(String query) {
+  private GroupByResultsBlock getPartitionedCombineResultSingleBlock(String query) {
     // ensure pair-wise execution
     try {
       query = "SET sortAggregateSingleThreadedNumSegmentsThreshold=1; " + query;

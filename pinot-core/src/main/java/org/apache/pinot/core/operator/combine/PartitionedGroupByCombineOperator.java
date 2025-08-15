@@ -344,7 +344,9 @@ public class PartitionedGroupByCombineOperator extends BaseSingleBlockCombineOpe
             for (int i = 0; i < _numAggregationFunctions; i++) {
               values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
             }
-            convertedRecords[idx++] = new IntermediateRecord(new Key(keys), new Record(values), null);
+            Key key = new Key(keys);
+            convertedRecords[idx++] =
+                IntermediateRecord.create(key, new Record(values), GroupByUtils.hashForPartition(key));
             Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys++);
           }
           intermediateRecords = Arrays.asList(convertedRecords);

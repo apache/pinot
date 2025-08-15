@@ -30,7 +30,7 @@ public class IntermediateRecord {
   public Comparable[] _values;
   public int _keyHashCode = -1;
 
-  public IntermediateRecord(Key key, Record record, Comparable[] values) {
+  IntermediateRecord(Key key, Record record, Comparable[] values) {
     _key = key;
     _record = record;
     _values = values;
