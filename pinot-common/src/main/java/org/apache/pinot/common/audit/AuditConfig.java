@@ -30,7 +30,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public final class AuditConfig {
 
   @JsonProperty("enabled")
-  private boolean _enabled = true;
+  private boolean _enabled = false;
 
   @JsonProperty("capture.request.payload.enabled")
   private boolean _captureRequestPayload = false;
