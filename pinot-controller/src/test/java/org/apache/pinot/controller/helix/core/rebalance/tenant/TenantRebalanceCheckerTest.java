@@ -48,21 +48,16 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class TenantRebalanceCheckerTest extends ControllerTest {
-
   private static final String TENANT_NAME = "TestTenant";
   private static final String JOB_ID = "test-tenant-rebalance-job-123";
   private static final String ORIGINAL_JOB_ID = "original-tenant-rebalance-job-123";
@@ -94,6 +89,11 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     // Setup default mock behaviors
     when(_mockControllerConf.getTenantRebalanceCheckerFrequencyInSeconds()).thenReturn(300);
     when(_mockControllerConf.getTenantRebalanceCheckerInitialDelayInSeconds()).thenReturn(300L);
+    // mock ZK update success
+    doReturn(true).when(_mockPinotHelixResourceManager)
+        .addControllerJobToZK(anyString(), anyMap(), eq(ControllerJobTypes.TENANT_REBALANCE));
+    doReturn(true).when(_mockPinotHelixResourceManager)
+        .addControllerJobToZK(anyString(), anyMap(), eq(ControllerJobTypes.TENANT_REBALANCE), any());
 
     _tenantRebalanceChecker = new TenantRebalanceChecker(
         _mockControllerConf,
@@ -147,6 +147,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     // Verify the resumed context
     DefaultTenantRebalanceContext resumedContext = contextCaptor.getValue();
     assertNotNull(resumedContext);
+    assertEquals(resumedContext.getAttemptId(), DefaultTenantRebalanceContext.INITIAL_ATTEMPT_ID + 1);
     assertEquals(resumedContext.getOriginalJobId(), ORIGINAL_JOB_ID);
     assertEquals(resumedContext.getAttemptId(), 2); // Should be incremented from 1
     assertEquals(resumedContext.getConfig().getTenantName(), TENANT_NAME);
@@ -156,7 +157,8 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     TenantRebalancer.TenantTableRebalanceJobContext firstJobContextInParallelQueue =
         resumedContext.getParallelQueue().poll();
     assertNotNull(firstJobContextInParallelQueue);
-    assertEquals(firstJobContextInParallelQueue.getJobId(), STUCK_TABLE_JOB_ID);
+    // because the stuck job is aborted, a new job ID is generated
+    assertNotEquals(firstJobContextInParallelQueue.getJobId(), STUCK_TABLE_JOB_ID);
     assertEquals(firstJobContextInParallelQueue.getTableName(), TABLE_NAME_1);
     assertFalse(firstJobContextInParallelQueue.shouldRebalanceWithDowntime());
     assertTrue(resumedContext.getOngoingJobsQueue().isEmpty());
@@ -201,6 +203,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
 
     // Verify that both stuck table jobs were moved back to parallel queue
     DefaultTenantRebalanceContext resumedContext = contextCaptor.getValue();
+    assertEquals(resumedContext.getAttemptId(), DefaultTenantRebalanceContext.INITIAL_ATTEMPT_ID + 1);
     assertEquals(resumedContext.getParallelQueue().size(), 2);
     assertTrue(resumedContext.getOngoingJobsQueue().isEmpty());
   }
@@ -260,6 +263,44 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
 
     // Verify that the tenant rebalancer was NOT called
     verify(_mockTenantRebalancer, never()).rebalanceWithContext(any(), any());
+  }
+
+  @Test
+  public void testDoNotResumeTenantRebalanceJobWhileZKUpdateFailed()
+      throws Exception {
+
+    // Create a stuck tenant rebalance context
+    DefaultTenantRebalanceContext stuckContext = createStuckTenantRebalanceContext();
+    TenantRebalanceProgressStats progressStats = createProgressStats();
+
+    // Mock ZK metadata for the stuck job
+    Map<String, String> jobZKMetadata = createTenantJobZKMetadata(stuckContext, progressStats);
+    Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
+    allJobMetadata.put(JOB_ID, jobZKMetadata);
+
+    // Mock stuck table rebalance job metadata
+    Map<String, String> stuckTableJobMetadata = createStuckTableJobMetadata();
+
+    // Setup mocks
+    doReturn(allJobMetadata).when(_mockPinotHelixResourceManager)
+        .getAllJobs(eq(Set.of(ControllerJobTypes.TENANT_REBALANCE)), any());
+    doReturn(stuckTableJobMetadata).when(_mockPinotHelixResourceManager)
+        .getControllerJobZKMetadata(eq(STUCK_TABLE_JOB_ID), eq(ControllerJobTypes.TABLE_REBALANCE));
+    doReturn(false).when(_mockPinotHelixResourceManager)
+        .addControllerJobToZK(anyString(), anyMap(), eq(ControllerJobTypes.TENANT_REBALANCE), any());
+
+    // Mock the tenant rebalancer to capture the resumed context
+    ArgumentCaptor<DefaultTenantRebalanceContext> contextCaptor =
+        ArgumentCaptor.forClass(DefaultTenantRebalanceContext.class);
+    ArgumentCaptor<ZkBasedTenantRebalanceObserver> observerCaptor =
+        ArgumentCaptor.forClass(ZkBasedTenantRebalanceObserver.class);
+
+    // Execute the checker
+    _tenantRebalanceChecker.runTask(new Properties());
+
+    // Verify that the tenant rebalancer was NOT called because ZK update failed
+    verify(_mockTenantRebalancer, times(0)).rebalanceWithContext(
+        contextCaptor.capture(), observerCaptor.capture());
   }
 
   @Test

@@ -50,6 +50,16 @@ public class TenantRebalanceProgressStats {
     _remainingTables = _totalTables;
   }
 
+  public TenantRebalanceProgressStats(TenantRebalanceProgressStats other) {
+    _tableStatusMap = new HashMap<>(other._tableStatusMap);
+    _tableRebalanceJobIdMap.putAll(other._tableRebalanceJobIdMap);
+    _totalTables = other._totalTables;
+    _remainingTables = other._remainingTables;
+    _startTimeMs = other._startTimeMs;
+    _timeToFinishInSeconds = other._timeToFinishInSeconds;
+    _completionStatusMsg = other._completionStatusMsg;
+  }
+
   public Map<String, String> getTableStatusMap() {
     return _tableStatusMap;
   }
@@ -111,6 +121,6 @@ public class TenantRebalanceProgressStats {
   }
 
   public enum TableStatus {
-    UNPROCESSED, PROCESSING, PROCESSED
+    UNPROCESSED, PROCESSING, PROCESSED, ABORTED, CANCELLED
   }
 }

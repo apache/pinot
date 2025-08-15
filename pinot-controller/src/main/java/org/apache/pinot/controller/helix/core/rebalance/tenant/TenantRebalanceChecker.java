@@ -21,8 +21,10 @@ package org.apache.pinot.controller.helix.core.rebalance.tenant;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.common.metrics.ControllerMetrics;
@@ -32,7 +34,6 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.controllerjob.ControllerJobTypes;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceJobConstants;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
-import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceContext;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceProgressStats;
 import org.apache.pinot.core.periodictask.BasePeriodicTask;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -49,10 +50,10 @@ import org.slf4j.LoggerFactory;
  * if any of these table rebalance jobs has not updated their progress stats longer than the configured heartbeat
  * timeout. If so, the tenant rebalance job is considered stuck, and the task will resume the tenant rebalance job by
  * aborting all the ongoing table rebalance jobs, move the ongoing TenantTableRebalanceJobContext back to the head of
- * the parallel queue, and then trigger the tenant rebalance job again with the updated context.
+ * the parallel queue, and then trigger the tenant rebalance job again with the updated context, with an attempt job ID
  * <p>
- * Notice that this is not a retry but a resume, since we will not re-do the table rebalance for those tables that have
- * already been processed.
+ * Notice that fundamentally this is not a retry but a resume, since we will not re-do the table rebalance for those
+ * tables that have already been processed.
  */
 public class TenantRebalanceChecker extends BasePeriodicTask {
   private final static String TASK_NAME = TenantRebalanceChecker.class.getSimpleName();
@@ -99,14 +100,22 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
             JsonUtils.stringToObject(tenantRebalanceProgressStatsStr, TenantRebalanceProgressStats.class);
         long statsUpdatedAt = Long.parseLong(jobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
 
-        if (isTenantRebalanceJobStuck(tenantRebalanceContext, statsUpdatedAt)) {
+        DefaultTenantRebalanceContext retryTenantRebalanceContext =
+            prepareRetryIfTenantRebalanceJobStuck(jobZKMetadata, tenantRebalanceContext, statsUpdatedAt);
+        if (retryTenantRebalanceContext != null) {
           for (TenantRebalancer.TenantTableRebalanceJobContext ctx;
-              (ctx = tenantRebalanceContext.getOngoingJobsQueue().poll()) != null; ) {
+              (ctx = retryTenantRebalanceContext.getOngoingJobsQueue().poll()) != null; ) {
             abortTableRebalanceJob(ctx.getTableName());
-            tenantRebalanceContext.getParallelQueue().addFirst(ctx);
+            // the existing table rebalance job is aborted, we need to run the rebalance job with a new job ID.
+            TenantRebalancer.TenantTableRebalanceJobContext newCtx =
+                new TenantRebalancer.TenantTableRebalanceJobContext(
+                    ctx.getTableName(), UUID.randomUUID().toString(), ctx.shouldRebalanceWithDowntime());
+            retryTenantRebalanceContext.getParallelQueue().addFirst(newCtx);
           }
-          // If the job is stuck, we retry it
-          resumeTenantRebalanceJob(tenantRebalanceContext, progressStats);
+          // the retry tenant rebalance job id has been created in ZK, we can safely mark the original job as
+          // aborted, so that this original job will not be picked up again in the future.
+          markTenantRebalanceJobAsAborted(jobId, jobZKMetadata, tenantRebalanceContext, progressStats);
+          retryTenantRebalanceJob(retryTenantRebalanceContext, progressStats);
         } else {
           LOGGER.info("Tenant rebalance job: {} is not stuck", jobId);
         }
@@ -117,71 +126,107 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     }
   }
 
-  private void resumeTenantRebalanceJob(DefaultTenantRebalanceContext tenantRebalanceContext,
+  private void retryTenantRebalanceJob(DefaultTenantRebalanceContext tenantRebalanceContextForRetry,
       TenantRebalanceProgressStats progressStats) {
-    DefaultTenantRebalanceContext tenantRebalanceContextForRetry =
-        DefaultTenantRebalanceContext.forRetry(tenantRebalanceContext.getOriginalJobId(),
-            tenantRebalanceContext.getConfig(), tenantRebalanceContext.getAttemptId() + 1,
-            tenantRebalanceContext.getParallelQueue(),
-            tenantRebalanceContext.getSequentialQueue(), tenantRebalanceContext.getOngoingJobsQueue());
-
     ZkBasedTenantRebalanceObserver observer =
-        new ZkBasedTenantRebalanceObserver(tenantRebalanceContext.getJobId(),
-            tenantRebalanceContext.getConfig().getTenantName(),
+        new ZkBasedTenantRebalanceObserver(tenantRebalanceContextForRetry.getJobId(),
+            tenantRebalanceContextForRetry.getConfig().getTenantName(),
             progressStats, tenantRebalanceContextForRetry, _pinotHelixResourceManager);
     ((DefaultTenantRebalancer) _tenantRebalancer).rebalanceWithContext(tenantRebalanceContextForRetry, observer);
   }
 
-  private boolean isTenantRebalanceJobStuck(
-      DefaultTenantRebalanceContext tenantRebalanceContext, long statsUpdatedAt) {
+  /**
+   * Check if the tenant rebalance job is stuck, and prepare to retry it if necessary.
+   * A tenant rebalance job is considered stuck if:
+   * 1. There are no ongoing jobs, but there are jobs in the parallel or sequential queue, and the stats have not been
+   *    updated for longer than the heartbeat timeout.
+   * 2. There are ongoing table rebalance jobs, and at least one of them has not updated its status for longer than the
+   *    heartbeat timeout.
+   *
+   * @param jobZKMetadata The ZK metadata of the tenant rebalance job.
+   * @param tenantRebalanceContext The context of the tenant rebalance job.
+   * @param statsUpdatedAt The timestamp when the stats were last updated.
+   * @return The TenantRebalanceContext for retry if the tenant rebalance job is stuck and should be retried, null if
+   * other controller has prepared the retry first.
+   */
+  private DefaultTenantRebalanceContext prepareRetryIfTenantRebalanceJobStuck(
+      Map<String, String> jobZKMetadata, DefaultTenantRebalanceContext tenantRebalanceContext, long statsUpdatedAt) {
+    boolean isStuck = false;
+    String stuckTableRebalanceJobId = null;
+    long heartbeatTimeoutMs = tenantRebalanceContext.getConfig().getHeartbeatTimeoutInMs();
     if (tenantRebalanceContext.getOngoingJobsQueue().isEmpty()) {
-      if (tenantRebalanceContext.getParallelQueue().isEmpty() && tenantRebalanceContext.getSequentialQueue()
+      if (!tenantRebalanceContext.getParallelQueue().isEmpty() || !tenantRebalanceContext.getSequentialQueue()
           .isEmpty()) {
-        return false;
+        // If there are no ongoing jobs but in parallel or sequential queue, it could be because the tenant rebalancer
+        // is in the interval of the previous done job and consumption of the next job. We need to check the heartbeat
+        // timeout to be sure that it's actually stuck at this state for a long while.
+        isStuck = (System.currentTimeMillis() - statsUpdatedAt >= heartbeatTimeoutMs);
       }
-      // If there are no ongoing jobs but in parallel or sequential queue, it could be because the tenant rebalancer
-      // is in the interval of the previous done job and consumption of the next job. We need to check the heartbeat
-      // timeout to be sure that it's actually stuck at this state for a long while.
-      long heartbeatTimeoutMs = tenantRebalanceContext.getConfig().getHeartbeatTimeoutInMs();
-      return (System.currentTimeMillis() - statsUpdatedAt >= heartbeatTimeoutMs);
-    }
-
-    // Check if there's any stuck ongoing table rebalance jobs
-    for (TenantRebalancer.TenantTableRebalanceJobContext ctx : new ArrayList<>(
-        tenantRebalanceContext.getOngoingJobsQueue())) {
-      if (isTableRebalanceJobStuck(ctx.getJobId())) {
-        // If any of the table rebalance jobs is stuck, we consider the tenant rebalance job as stuck.
-        LOGGER.info("Found stuck table rebalance job: {} for tenant: {}", ctx.getJobId(),
-            tenantRebalanceContext.getConfig().getTenantName());
-        return true;
+    } else {
+      // Check if there's any stuck ongoing table rebalance jobs
+      for (TenantRebalancer.TenantTableRebalanceJobContext ctx : new ArrayList<>(
+          tenantRebalanceContext.getOngoingJobsQueue())) {
+        if (isTableRebalanceJobStuck(ctx.getJobId(), statsUpdatedAt, heartbeatTimeoutMs)) {
+          isStuck = true;
+          stuckTableRebalanceJobId = ctx.getJobId();
+          break;
+        }
       }
     }
-    return false;
+    if (isStuck) {
+      // If any of the table rebalance jobs is stuck, we consider the tenant rebalance job as stuck.
+      // We need to make sure only one controller instance retries the tenant rebalance job.
+      DefaultTenantRebalanceContext retryTenantRebalanceContext =
+          DefaultTenantRebalanceContext.forRetry(tenantRebalanceContext.getOriginalJobId(),
+              tenantRebalanceContext.getConfig(), tenantRebalanceContext.getAttemptId() + 1,
+              tenantRebalanceContext.getParallelQueue(), tenantRebalanceContext.getSequentialQueue(),
+              tenantRebalanceContext.getOngoingJobsQueue());
+      try {
+        jobZKMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT,
+            JsonUtils.objectToString(retryTenantRebalanceContext));
+        // this returns false if the retryJob already exists in ZK, which means another controller has already
+        // prepared the retry, so we should not retry again.
+        boolean shouldRetry =
+            _pinotHelixResourceManager.addControllerJobToZK(retryTenantRebalanceContext.getJobId(), jobZKMetadata,
+                ControllerJobTypes.TENANT_REBALANCE, Objects::isNull);
+        LOGGER.info("Found stuck table rebalance job: {} for tenant: {}. shouldRetry: {}", stuckTableRebalanceJobId,
+            tenantRebalanceContext.getConfig().getTenantName(), shouldRetry);
+        return shouldRetry ? retryTenantRebalanceContext : null;
+      } catch (JsonProcessingException e) {
+        LOGGER.error(
+            "Error serialising rebalance context to JSON for updating retryTenantRebalanceContext to ZK {}",
+            tenantRebalanceContext.getJobId(), e);
+      }
+    }
+    return null;
   }
 
-  private boolean isTableRebalanceJobStuck(String jobId) {
+  private boolean isTableRebalanceJobStuck(String jobId, long tenantRebalanceJobStatsUpdatedAt,
+      long heartbeatTimeoutMs) {
     Map<String, String> jobMetadata =
         _pinotHelixResourceManager.getControllerJobZKMetadata(jobId, ControllerJobTypes.TABLE_REBALANCE);
     if (jobMetadata == null) {
-      return false;
+      // if the table rebalance job metadata has not created for the table rebalance job id in ongoingJobsQueue
+      // longer than heartbeat timeout, the controller may have crashed or restarted
+      return System.currentTimeMillis() - tenantRebalanceJobStatsUpdatedAt >= heartbeatTimeoutMs;
     }
     long statsUpdatedAt = Long.parseLong(jobMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
     String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
     if (StringUtils.isEmpty(jobStatsInStr)) {
-      // Skip rebalance job as it has no job progress stats
-      return false;
+      // if the progress stats of a table rebalance job metadata has not been created for the table rebalance job id in
+      // ongoingJobsQueue longer than heartbeat timeout, the controller may have crashed or restarted
+      return System.currentTimeMillis() - tenantRebalanceJobStatsUpdatedAt >= heartbeatTimeoutMs;
     }
     String jobCtxInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT);
     if (StringUtils.isEmpty(jobCtxInStr)) {
-      // Skip rebalance job: {} as it has no job context
-      return false;
+      // if the job context of a table rebalance job metadata has not been created for the table rebalance job id in
+      // ongoingJobsQueue longer than heartbeat timeout, the controller may have crashed or restarted
+      return System.currentTimeMillis() - tenantRebalanceJobStatsUpdatedAt >= heartbeatTimeoutMs;
     }
 
     try {
       TableRebalanceProgressStats jobStats = JsonUtils.stringToObject(jobStatsInStr, TableRebalanceProgressStats.class);
-      TableRebalanceContext jobCtx = JsonUtils.stringToObject(jobCtxInStr, TableRebalanceContext.class);
       if (jobStats.getStatus() == RebalanceResult.Status.IN_PROGRESS) {
-        long heartbeatTimeoutMs = jobCtx.getConfig().getHeartbeatTimeoutInMs();
         if (System.currentTimeMillis() - statsUpdatedAt >= heartbeatTimeoutMs) {
           LOGGER.info("Found stuck rebalance job: {} that has not updated its status in ZK within "
               + "heartbeat timeout: {}", jobId, heartbeatTimeoutMs);
@@ -217,5 +262,37 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
               }
             });
     LOGGER.info("Tried to abort existing jobs at best effort and done: {}", updated);
+  }
+
+  private void markTenantRebalanceJobAsAborted(String jobId, Map<String, String> jobMetadata,
+      DefaultTenantRebalanceContext tenantRebalanceContext,
+      TenantRebalanceProgressStats progressStats) {
+    TenantRebalanceProgressStats abortedProgressStats = new TenantRebalanceProgressStats(progressStats);
+    for (Map.Entry<String, String> entry : abortedProgressStats.getTableStatusMap().entrySet()) {
+      if (Objects.equals(entry.getValue(), TenantRebalanceProgressStats.TableStatus.UNPROCESSED.name())) {
+        entry.setValue(TenantRebalanceProgressStats.TableStatus.CANCELLED.name());
+      } else if (Objects.equals(entry.getValue(),
+          TenantRebalanceProgressStats.TableStatus.PROCESSING.name())) {
+        entry.setValue(TenantRebalanceProgressStats.TableStatus.ABORTED.name());
+      }
+    }
+    tenantRebalanceContext.getSequentialQueue().clear();
+    tenantRebalanceContext.getParallelQueue().clear();
+    tenantRebalanceContext.getOngoingJobsQueue().clear();
+    try {
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS,
+          JsonUtils.objectToString(abortedProgressStats));
+    } catch (JsonProcessingException e) {
+      LOGGER.error("Error serialising rebalance stats to JSON for marking tenant rebalance job as aborted {}", jobId,
+          e);
+    }
+    try {
+      jobMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT,
+          JsonUtils.objectToString(tenantRebalanceContext));
+    } catch (JsonProcessingException e) {
+      LOGGER.error("Error serialising rebalance context to JSON for marking tenant rebalance job as aborted {}", jobId,
+          e);
+    }
+    _pinotHelixResourceManager.addControllerJobToZK(jobId, jobMetadata, ControllerJobTypes.TENANT_REBALANCE);
   }
 }
