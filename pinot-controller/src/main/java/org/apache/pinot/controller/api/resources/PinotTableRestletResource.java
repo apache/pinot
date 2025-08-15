@@ -705,7 +705,7 @@ public class PinotTableRestletResource {
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
       @ApiParam(value = "Whether to disable summary calculation")
-      @DefaultValue("false") @QueryParam("preChecks") boolean disableSummary,
+      @DefaultValue("false") @QueryParam("disableSummary") boolean disableSummary,
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("true")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("true")
