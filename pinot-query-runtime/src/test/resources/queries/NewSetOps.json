@@ -1,0 +1,36 @@
+{
+  "new_set_op_test": {
+    "tables": {
+      "tbl1": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, 8, 3.0, 5.176518e16, "lyons"],
+          [2, 9, 4.0, 4.608155e11, "onan"],
+          [3, 14, 5.0, 1.249261e11, "rudvalis"],
+          [4, 21, 6.0, 8.677557e19, "janko"],
+          [1, 41, 2.0, 4.15478e33, "baby"],
+          [2, 46, 1.0, 8.08017e53, "monster"]
+        ]
+      },
+      "tbl2": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "foo"],
+          [2, "bar"]
+        ]
+      }
+    },
+    "queries": [
+      { "sql": "SELECT intCol FROM {tbl1} INTERSECT SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}" }
+    ]
+  }
+}

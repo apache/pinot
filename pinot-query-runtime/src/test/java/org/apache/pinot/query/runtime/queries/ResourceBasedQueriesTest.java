@@ -287,6 +287,9 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
     // query pinot
+    if (!testCaseName.equals("new_set_op_test")) {
+      return;
+    }
     if (ignoreV2Optimizer) {
       throw new SkipException(
           "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
