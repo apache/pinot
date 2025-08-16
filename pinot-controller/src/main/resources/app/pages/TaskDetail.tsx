@@ -133,6 +133,7 @@ const TaskDetail = (props) => {
     { label: 'Running', value: 'RUNNING' as const },
     { label: 'Waiting', value: 'WAITING' as const },
     { label: 'Error', value: 'ERROR' as const },
+    { label: 'Task Error', value: 'TASK_ERROR' as const },
     { label: 'Unknown', value: 'UNKNOWN' as const },
     { label: 'Dropped', value: 'DROPPED' as const },
     { label: 'Timed Out', value: 'TIMED_OUT' as const },

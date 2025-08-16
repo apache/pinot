@@ -105,6 +105,7 @@ export type TaskStatus =
   | 'RUNNING'
   | 'WAITING'
   | 'ERROR'
+  | 'TASK_ERROR'
   | 'UNKNOWN'
   | 'DROPPED'
   | 'TIMED_OUT'
@@ -140,6 +141,8 @@ export const getTaskStatusChipClass = (status: string, classes?: any) => {
     case 'WAITING':
       return classes.waiting;
     case 'ERROR':
+      return classes.error;
+    case 'TASK_ERROR':
       return classes.error;
     case 'FAILED':
       return classes.error;
