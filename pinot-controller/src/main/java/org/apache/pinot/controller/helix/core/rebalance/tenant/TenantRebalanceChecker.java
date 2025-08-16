@@ -142,6 +142,8 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
    *    updated for longer than the heartbeat timeout.
    * 2. There are ongoing table rebalance jobs, and at least one of them has not updated its status for longer than the
    *    heartbeat timeout.
+   * The retry is prepared by creating a new tenant rebalance job with an incremented attempt ID, and persisting it to
+   * ZK.
    *
    * @param jobZKMetadata The ZK metadata of the tenant rebalance job.
    * @param tenantRebalanceContext The context of the tenant rebalance job.
