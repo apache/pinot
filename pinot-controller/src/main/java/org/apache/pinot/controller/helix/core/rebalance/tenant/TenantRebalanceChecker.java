@@ -201,6 +201,19 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     return null;
   }
 
+  /**
+   * Check if the table rebalance job is stuck.
+   * A table rebalance job is considered stuck if:
+   * 1. The job metadata does not exist in ZK, and the tenant rebalance job stats have not been updated for longer than
+   *    the heartbeat timeout.
+   * 2. The job metadata exists, but the progress stats has been empty or has not been updated for longer than the
+   * heartbeat timeout.
+   *
+   * @param jobId The ID of the table rebalance job.
+   * @param tenantRebalanceJobStatsUpdatedAt The timestamp when the tenant rebalance job stats were last updated.
+   * @param heartbeatTimeoutMs The heartbeat timeout in milliseconds.
+   * @return True if the table rebalance job is stuck, false otherwise.
+   */
   private boolean isTableRebalanceJobStuck(String jobId, long tenantRebalanceJobStatsUpdatedAt,
       long heartbeatTimeoutMs) {
     Map<String, String> jobMetadata =
@@ -214,12 +227,6 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     String jobStatsInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS);
     if (StringUtils.isEmpty(jobStatsInStr)) {
       // if the progress stats of a table rebalance job metadata has not been created for the table rebalance job id in
-      // ongoingJobsQueue longer than heartbeat timeout, the controller may have crashed or restarted
-      return System.currentTimeMillis() - tenantRebalanceJobStatsUpdatedAt >= heartbeatTimeoutMs;
-    }
-    String jobCtxInStr = jobMetadata.get(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT);
-    if (StringUtils.isEmpty(jobCtxInStr)) {
-      // if the job context of a table rebalance job metadata has not been created for the table rebalance job id in
       // ongoingJobsQueue longer than heartbeat timeout, the controller may have crashed or restarted
       return System.currentTimeMillis() - tenantRebalanceJobStatsUpdatedAt >= heartbeatTimeoutMs;
     }
