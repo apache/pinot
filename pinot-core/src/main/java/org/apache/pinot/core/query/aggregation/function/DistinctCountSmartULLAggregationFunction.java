@@ -18,8 +18,7 @@
  */
 package org.apache.pinot.core.query.aggregation.function;
 
-import com.clearspring.analytics.stream.cardinality.CardinalityMergeException;
-import com.clearspring.analytics.stream.cardinality.HyperLogLog;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import java.util.List;
@@ -32,6 +31,7 @@ import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -41,34 +41,38 @@ import org.roaringbitmap.RoaringBitmap;
 
 
 /**
- * The {@code DistinctCountSmartHLLAggregationFunction} calculates the number of distinct values for a given expression
+ * The {@code DistinctCountSmartULLAggregationFunction} calculates the number of distinct values for a given expression
  * (both single-valued and multi-valued are supported).
  *
  * For aggregation-only queries, the distinct values are stored in a Set initially. Once the number of distinct values
- * exceeds a threshold, the Set will be converted into a HyperLogLog, and approximate result will be returned.
+ * exceeds a threshold, the Set will be converted into an UltraLogLog, and approximate result will be returned.
  *
  * The function takes an optional second argument for parameters:
  * - threshold: Threshold of the number of distinct values to trigger the conversion, 100_000 by default. Non-positive
  *              value means never convert.
- * - log2m: Log2m for the converted HyperLogLog, 12 by default.
- * Example of second argument: 'threshold=10;log2m=8'
+ * - p: Parameter p for UltraLogLog, default defined by CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P.
+ * Example of second argument: 'threshold=10;p=16'
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
+public class DistinctCountSmartULLAggregationFunction extends BaseDistinctCountSmartSketchAggregationFunction {
+  // placeholder handled by base class
 
   private final int _threshold;
-  private final int _log2m;
+  private final int _p;
 
-  public DistinctCountSmartHLLAggregationFunction(List<ExpressionContext> arguments) {
+  public DistinctCountSmartULLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
-
+    int numExpressions = arguments.size();
+    // This function expects 1 or 2 arguments.
+    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountSmartULL expects 1 or 2 arguments, got: %s",
+        numExpressions);
     if (arguments.size() > 1) {
       Parameters parameters = new Parameters(arguments.get(1).getLiteral().getStringValue());
       _threshold = parameters._threshold;
-      _log2m = parameters._log2m;
+      _p = parameters._p;
     } else {
       _threshold = Parameters.DEFAULT_THRESHOLD;
-      _log2m = Parameters.DEFAULT_LOG2M;
+      _p = org.apache.pinot.spi.utils.CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P;
     }
   }
 
@@ -76,13 +80,13 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     return _threshold;
   }
 
-  public int getLog2m() {
-    return _log2m;
+  public int getP() {
+    return _p;
   }
 
   @Override
   public AggregationFunctionType getType() {
-    return AggregationFunctionType.DISTINCTCOUNTSMARTHLL;
+    return AggregationFunctionType.DISTINCTCOUNTSMARTULL;
   }
 
   // Result holder creators are provided by the base class
@@ -108,101 +112,121 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
       return;
     }
 
-    // For non-dictionary-encoded expression, store values into the value set or HLL
-    if (aggregationResultHolder.getResult() instanceof HyperLogLog) {
-      aggregateIntoHLL(length, aggregationResultHolder, blockValSet);
+    // For non-dictionary-encoded expression, store values into the value set or ULL
+    if (aggregationResultHolder.getResult() instanceof UltraLogLog) {
+      aggregateIntoULL(length, aggregationResultHolder, blockValSet);
     } else {
       aggregateIntoSet(length, aggregationResultHolder, blockValSet);
     }
   }
 
-  private void aggregateIntoHLL(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
+  private void aggregateIntoULL(int length, AggregationResultHolder aggregationResultHolder, BlockValSet blockValSet) {
     DataType valueType = blockValSet.getValueType();
     DataType storedType = valueType.getStoredType();
-    HyperLogLog hll = aggregationResultHolder.getResult();
+    UltraLogLog ull = aggregationResultHolder.getResult();
     if (blockValSet.isSingleValue()) {
       switch (storedType) {
-        case INT:
+        case INT: {
           int[] intValues = blockValSet.getIntValuesSV();
           for (int i = 0; i < length; i++) {
-            hll.offer(intValues[i]);
+            UltraLogLogUtils.hashObject(intValues[i]).ifPresent(ull::add);
           }
           break;
-        case LONG:
+        }
+        case LONG: {
           long[] longValues = blockValSet.getLongValuesSV();
           for (int i = 0; i < length; i++) {
-            hll.offer(longValues[i]);
+            UltraLogLogUtils.hashObject(longValues[i]).ifPresent(ull::add);
           }
           break;
-        case FLOAT:
+        }
+        case FLOAT: {
           float[] floatValues = blockValSet.getFloatValuesSV();
           for (int i = 0; i < length; i++) {
-            hll.offer(floatValues[i]);
+            UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
           }
           break;
-        case DOUBLE:
+        }
+        case DOUBLE: {
           double[] doubleValues = blockValSet.getDoubleValuesSV();
           for (int i = 0; i < length; i++) {
-            hll.offer(doubleValues[i]);
+            UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
           }
           break;
-        case STRING:
+        }
+        case STRING: {
           String[] stringValues = blockValSet.getStringValuesSV();
           for (int i = 0; i < length; i++) {
-            hll.offer(stringValues[i]);
+            UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
           }
           break;
-        case BYTES:
+        }
+        case BYTES: {
           byte[][] bytesValues = blockValSet.getBytesValuesSV();
           for (int i = 0; i < length; i++) {
-            hll.offer(bytesValues[i]);
+            UltraLogLogUtils.hashObject(bytesValues[i]).ifPresent(ull::add);
           }
           break;
+        }
         default:
           throw getIllegalDataTypeException(valueType, true);
       }
     } else {
       switch (storedType) {
-        case INT:
+        case INT: {
           int[][] intValues = blockValSet.getIntValuesMV();
           for (int i = 0; i < length; i++) {
             for (int value : intValues[i]) {
-              hll.offer(value);
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
             }
           }
           break;
-        case LONG:
+        }
+        case LONG: {
           long[][] longValues = blockValSet.getLongValuesMV();
           for (int i = 0; i < length; i++) {
             for (long value : longValues[i]) {
-              hll.offer(value);
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
             }
           }
           break;
-        case FLOAT:
+        }
+        case FLOAT: {
           float[][] floatValues = blockValSet.getFloatValuesMV();
           for (int i = 0; i < length; i++) {
             for (float value : floatValues[i]) {
-              hll.offer(value);
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
             }
           }
           break;
-        case DOUBLE:
+        }
+        case DOUBLE: {
           double[][] doubleValues = blockValSet.getDoubleValuesMV();
           for (int i = 0; i < length; i++) {
             for (double value : doubleValues[i]) {
-              hll.offer(value);
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
             }
           }
           break;
-        case STRING:
+        }
+        case STRING: {
           String[][] stringValues = blockValSet.getStringValuesMV();
           for (int i = 0; i < length; i++) {
             for (String value : stringValues[i]) {
-              hll.offer(value);
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
             }
           }
           break;
+        }
+        case BYTES: {
+          byte[][][] bytesValues = blockValSet.getBytesValuesMV();
+          for (int i = 0; i < length; i++) {
+            for (byte[] value : bytesValues[i]) {
+              UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+            }
+          }
+          break;
+        }
         default:
           throw getIllegalDataTypeException(valueType, false);
       }
@@ -211,28 +235,28 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
 
   // aggregateIntoSet is handled by the base class
 
-  protected HyperLogLog convertSetToHLL(Set valueSet, DataType storedType) {
+  protected UltraLogLog convertSetToULL(Set valueSet, DataType storedType) {
     if (storedType == DataType.BYTES) {
-      return convertByteArraySetToHLL((ObjectSet<ByteArray>) valueSet);
+      return convertByteArraySetToULL((ObjectSet<ByteArray>) valueSet);
     } else {
-      return convertNonByteArraySetToHLL(valueSet);
+      return convertNonByteArraySetToULL(valueSet);
     }
   }
 
-  protected HyperLogLog convertByteArraySetToHLL(ObjectSet<ByteArray> valueSet) {
-    HyperLogLog hll = new HyperLogLog(_log2m);
+  protected UltraLogLog convertByteArraySetToULL(ObjectSet<ByteArray> valueSet) {
+    UltraLogLog ull = UltraLogLog.create(_p);
     for (ByteArray value : valueSet) {
-      hll.offer(value.getBytes());
+      UltraLogLogUtils.hashObject(value.getBytes()).ifPresent(ull::add);
     }
-    return hll;
+    return ull;
   }
 
-  protected HyperLogLog convertNonByteArraySetToHLL(Set valueSet) {
-    HyperLogLog hll = new HyperLogLog(_log2m);
+  protected UltraLogLog convertNonByteArraySetToULL(Set valueSet) {
+    UltraLogLog ull = UltraLogLog.create(_p);
     for (Object value : valueSet) {
-      hll.offer(value);
+      UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
     }
-    return hll;
+    return ull;
   }
 
   // group-by SV handled by the base class
@@ -241,15 +265,13 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
 
   // extraction is handled by the base class
 
-  // extraction is handled by the base class
-
   @Override
   public Object merge(Object intermediateResult1, Object intermediateResult2) {
-    if (intermediateResult1 instanceof HyperLogLog) {
-      return mergeIntoHLL((HyperLogLog) intermediateResult1, intermediateResult2);
+    if (intermediateResult1 instanceof UltraLogLog) {
+      return mergeIntoULL((UltraLogLog) intermediateResult1, intermediateResult2);
     }
-    if (intermediateResult2 instanceof HyperLogLog) {
-      return mergeIntoHLL((HyperLogLog) intermediateResult2, intermediateResult1);
+    if (intermediateResult2 instanceof UltraLogLog) {
+      return mergeIntoULL((UltraLogLog) intermediateResult2, intermediateResult1);
     }
 
     Set valueSet1 = (Set) intermediateResult1;
@@ -262,40 +284,45 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     }
     valueSet1.addAll(valueSet2);
 
-    // Convert to HLL if the set size exceeds the threshold
     if (valueSet1.size() > _threshold) {
       if (valueSet1 instanceof ObjectSet && valueSet1.iterator().next() instanceof ByteArray) {
-        return convertByteArraySetToHLL((ObjectSet<ByteArray>) valueSet1);
+        return convertByteArraySetToULL((ObjectSet<ByteArray>) valueSet1);
       } else {
-        return convertNonByteArraySetToHLL(valueSet1);
+        return convertNonByteArraySetToULL(valueSet1);
       }
     } else {
       return valueSet1;
     }
   }
 
-  private static HyperLogLog mergeIntoHLL(HyperLogLog hll, Object intermediateResult) {
-    if (intermediateResult instanceof HyperLogLog) {
-      try {
-        hll.addAll((HyperLogLog) intermediateResult);
-      } catch (CardinalityMergeException e) {
-        throw new RuntimeException("Caught exception while merging HyperLogLog", e);
+  private UltraLogLog mergeIntoULL(UltraLogLog ull, Object intermediateResult) {
+    if (intermediateResult instanceof UltraLogLog) {
+      UltraLogLog other = (UltraLogLog) intermediateResult;
+      int largerP = Math.max(ull.getP(), other.getP());
+      if (largerP != ull.getP()) {
+        UltraLogLog merged = UltraLogLog.create(largerP);
+        merged.add(ull);
+        merged.add(other);
+        return merged;
+      } else {
+        ull.add(other);
+        return ull;
       }
     } else {
       Set valueSet = (Set) intermediateResult;
       if (!valueSet.isEmpty()) {
         if (valueSet instanceof ObjectSet && valueSet.iterator().next() instanceof ByteArray) {
           for (Object value : valueSet) {
-            hll.offer(((ByteArray) value).getBytes());
+            UltraLogLogUtils.hashObject(((ByteArray) value).getBytes()).ifPresent(ull::add);
           }
         } else {
           for (Object value : valueSet) {
-            hll.offer(value);
+            UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
           }
         }
       }
+      return ull;
     }
-    return hll;
   }
 
   @Override
@@ -305,9 +332,9 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
 
   @Override
   public SerializedIntermediateResult serializeIntermediateResult(Object o) {
-    if (o instanceof HyperLogLog) {
-      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.HyperLogLog.getValue(),
-          ObjectSerDeUtils.HYPER_LOG_LOG_SER_DE.serialize((HyperLogLog) o));
+    if (o instanceof UltraLogLog) {
+      return new SerializedIntermediateResult(ObjectSerDeUtils.ObjectType.UltraLogLog.getValue(),
+          ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.serialize((UltraLogLog) o));
     }
     return BaseDistinctAggregateAggregationFunction.serializeSet((Set) o);
   }
@@ -324,8 +351,8 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
 
   @Override
   public Integer extractFinalResult(Object intermediateResult) {
-    if (intermediateResult instanceof HyperLogLog) {
-      return (int) ((HyperLogLog) intermediateResult).cardinality();
+    if (intermediateResult instanceof UltraLogLog) {
+      return (int) Math.round(((UltraLogLog) intermediateResult).getDistinctCountEstimate());
     } else {
       return ((Set) intermediateResult).size();
     }
@@ -339,37 +366,92 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
   /**
    * Returns the dictionary id bitmap from the result holder or creates a new one if it does not exist.
    */
-  // helper methods for dict/value set conversions are provided by the base class
+  // getDictIdBitmap for result holder is provided by the base class
 
   /**
-   * Helper method to read dictionary and convert dictionary ids to a HyperLogLog for dictionary-encoded expression.
+   * Returns the value set from the result holder or creates a new one if it does not exist.
    */
-  private HyperLogLog convertToHLL(BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
-    HyperLogLog hyperLogLog = new HyperLogLog(_log2m);
+  // value set helpers are provided by the base class
+
+  /**
+   * Returns the dictionary id bitmap for the given group key or creates a new one if it does not exist.
+   */
+  // groupBy result helpers are provided by the base class
+
+  /**
+   * Returns the value set for the given group key or creates a new one if it does not exist.
+   */
+  // group-by value set helper is provided by the base class
+
+  /**
+   * Helper method to set dictionary id for the given group keys into the result holder.
+   */
+  // setDictIdForGroupKeys is provided by the base class
+
+  /**
+   * Helper method to set INT value for the given group keys into the result holder.
+   */
+  // typed setValueForGroupKeys helpers are provided by the base class
+
+  /**
+   * Helper method to set LONG value for the given group keys into the result holder.
+   */
+
+  /**
+   * Helper method to set FLOAT value for the given group keys into the result holder.
+   */
+
+  /**
+   * Helper method to set DOUBLE value for the given group keys into the result holder.
+   */
+
+  /**
+   * Helper method to set STRING value for the given group keys into the result holder.
+   */
+
+  /**
+   * Helper method to set BYTES value for the given group keys into the result holder.
+   */
+  // typed setValueForGroupKeys helpers are provided by the base class
+
+  /**
+   * Helper method to read dictionary and convert dictionary ids to a value set for dictionary-encoded expression.
+   */
+  // value set conversion handled by the base class
+
+  /**
+   * Helper method to read dictionary and convert dictionary ids to an UltraLogLog for dictionary-encoded expression.
+   */
+  private UltraLogLog convertToULL(BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
+    UltraLogLog ull = UltraLogLog.create(_p);
     Dictionary dictionary = dictIdsWrapper._dictionary;
     RoaringBitmap dictIdBitmap = dictIdsWrapper._dictIdBitmap;
     PeekableIntIterator iterator = dictIdBitmap.getIntIterator();
     while (iterator.hasNext()) {
-      hyperLogLog.offer(dictionary.get(iterator.next()));
+      UltraLogLogUtils.hashObject(dictionary.get(iterator.next())).ifPresent(ull::add);
     }
-    return hyperLogLog;
-  }
-
-  @Override
-  protected Object convertSetToSketch(Set valueSet, DataType storedType) {
-    return convertSetToHLL(valueSet, storedType);
-  }
-
-  @Override
-  protected Object convertToSketch(BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
-    return convertToHLL(dictIdsWrapper);
+    return ull;
   }
 
   @Override
   protected IllegalStateException getIllegalDataTypeException(DataType dataType, boolean singleValue) {
     return new IllegalStateException(
-        "Illegal data type for DISTINCT_COUNT_SMART_HLL aggregation function: " + dataType + (singleValue ? ""
+        "Illegal data type for DISTINCT_COUNT_SMART_ULL aggregation function: " + dataType + (singleValue ? ""
             : "_MV"));
+  }
+
+  // DictIdsWrapper is provided by the base class
+
+  // threshold accessor for base class is provided by getThreshold()
+
+  @Override
+  protected Object convertSetToSketch(Set valueSet, DataType storedType) {
+    return convertSetToULL(valueSet, storedType);
+  }
+
+  @Override
+  protected Object convertToSketch(BaseDistinctCountSmartSketchAggregationFunction.DictIdsWrapper dictIdsWrapper) {
+    return convertToULL(dictIdsWrapper);
   }
 
   /**
@@ -380,22 +462,15 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
     static final char PARAMETER_KEY_VALUE_SEPARATOR = '=';
 
     static final String THRESHOLD_KEY = "THRESHOLD";
-    // 100K values to trigger HLL conversion by default
     static final int DEFAULT_THRESHOLD = 100_000;
-    @Deprecated
-    static final String DEPRECATED_THRESHOLD_KEY = "HLLCONVERSIONTHRESHOLD";
 
-    static final String LOG2M_KEY = "LOG2M";
-    // Use 12 by default to get good accuracy for DistinctCount
-    static final int DEFAULT_LOG2M = 12;
-    @Deprecated
-    static final String DEPRECATED_LOG2M_KEY = "HLLLOG2M";
+    static final String P_KEY = "P";
 
     int _threshold = DEFAULT_THRESHOLD;
-    int _log2m = DEFAULT_LOG2M;
+    int _p = org.apache.pinot.spi.utils.CommonConstants.Helix.DEFAULT_ULTRALOGLOG_P;
 
     Parameters(String parametersString) {
-      StringUtils.deleteWhitespace(parametersString);
+      parametersString = StringUtils.deleteWhitespace(parametersString);
       String[] keyValuePairs = StringUtils.split(parametersString, PARAMETER_DELIMITER);
       for (String keyValuePair : keyValuePairs) {
         String[] keyAndValue = StringUtils.split(keyValuePair, PARAMETER_KEY_VALUE_SEPARATOR);
@@ -404,16 +479,13 @@ public class DistinctCountSmartHLLAggregationFunction extends BaseDistinctCountS
         String value = keyAndValue[1];
         switch (key.toUpperCase()) {
           case THRESHOLD_KEY:
-          case DEPRECATED_THRESHOLD_KEY:
             _threshold = Integer.parseInt(value);
-            // Treat non-positive threshold as unlimited
             if (_threshold <= 0) {
               _threshold = Integer.MAX_VALUE;
             }
             break;
-          case LOG2M_KEY:
-          case DEPRECATED_LOG2M_KEY:
-            _log2m = Integer.parseInt(value);
+          case P_KEY:
+            _p = Integer.parseInt(value);
             break;
           default:
             throw new IllegalArgumentException("Invalid parameter key: " + key);
