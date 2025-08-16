@@ -52,7 +52,7 @@ public class KafkaAdminClientManagerTest {
 
     // Use reflection to access private method for testing
     try {
-      java.lang.reflect.Method createCacheKeyMethod = 
+      java.lang.reflect.Method createCacheKeyMethod =
           KafkaAdminClientManager.class.getDeclaredMethod("createCacheKey", Properties.class);
       createCacheKeyMethod.setAccessible(true);
 
@@ -87,22 +87,22 @@ public class KafkaAdminClientManagerTest {
     props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
 
     KafkaAdminClientManager manager = KafkaAdminClientManager.getInstance();
-    
+
     // This test focuses on the reference mechanism without actually connecting to Kafka
     // We test that multiple calls with same properties don't throw exceptions
     try {
       KafkaAdminClientManager.AdminClientReference ref1 = manager.getOrCreateAdminClient(props);
       assertNotNull(ref1, "Reference should not be null");
-      
+
       // Closing a reference should not throw an exception
       ref1.close();
-      
+
       // Closing again should not throw an exception
       ref1.close();
     } catch (Exception e) {
       // This is expected since we're not connecting to a real Kafka cluster
       // The test is mainly to verify the reference counting mechanism doesn't crash
-      assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka") 
+      assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka")
           || e.getMessage().contains("timeout") || e.getMessage().contains("refused"));
     }
   }
@@ -113,16 +113,16 @@ public class KafkaAdminClientManagerTest {
     props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
 
     KafkaAdminClientManager manager = KafkaAdminClientManager.getInstance();
-    
+
     try {
       KafkaAdminClientManager.AdminClientReference ref = manager.getOrCreateAdminClient(props);
       ref.close();
-      
+
       // Should throw IllegalStateException when trying to use closed reference
       assertThrows(IllegalStateException.class, () -> ref.getAdminClient());
     } catch (Exception e) {
       // Expected when no real Kafka cluster is available
-      assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka") 
+      assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka")
           || e.getMessage().contains("timeout") || e.getMessage().contains("refused"));
     }
   }

@@ -22,7 +22,7 @@ import java.util.Collections;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertTrue;
 
 
 public class KafkaPartitionLevelConnectionHandlerTest {
@@ -35,12 +35,13 @@ public class KafkaPartitionLevelConnectionHandlerTest {
 
   @Test
   public void testSharedAdminClientReference() {
-    StreamConfig streamConfig = new StreamConfig("testTopic", Collections.singletonMap("bootstrap.servers", "localhost:9092"));
-    
+    StreamConfig streamConfig =
+        new StreamConfig("testTopic", Collections.singletonMap("bootstrap.servers", "localhost:9092"));
+
     try {
-      TestableKafkaPartitionLevelConnectionHandler handler = 
+      TestableKafkaPartitionLevelConnectionHandler handler =
           new TestableKafkaPartitionLevelConnectionHandler("testClient", streamConfig, 0);
-      
+
       // Test that we can call getOrCreateSharedAdminClient multiple times
       // without throwing exceptions (even though it may fail to connect)
       try {
@@ -48,16 +49,16 @@ public class KafkaPartitionLevelConnectionHandlerTest {
         handler.getOrCreateSharedAdminClient(); // Should reuse the same reference
       } catch (Exception e) {
         // Expected when no real Kafka cluster is available
-        assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka") 
+        assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka")
             || e.getMessage().contains("timeout") || e.getMessage().contains("refused")
             || e.getCause() != null);
       }
-      
+
       // Test that close doesn't throw exceptions
       handler.close();
     } catch (Exception e) {
       // Expected when initializing without a real Kafka cluster
-      assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka") 
+      assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka")
           || e.getMessage().contains("timeout") || e.getMessage().contains("refused")
           || e.getCause() != null);
     }
@@ -65,26 +66,27 @@ public class KafkaPartitionLevelConnectionHandlerTest {
 
   @Test
   public void testGetOrCreateAdminClientBackwardCompatibility() {
-    StreamConfig streamConfig = new StreamConfig("testTopic", Collections.singletonMap("bootstrap.servers", "localhost:9092"));
-    
+    StreamConfig streamConfig =
+        new StreamConfig("testTopic", Collections.singletonMap("bootstrap.servers", "localhost:9092"));
+
     try {
-      TestableKafkaPartitionLevelConnectionHandler handler = 
+      TestableKafkaPartitionLevelConnectionHandler handler =
           new TestableKafkaPartitionLevelConnectionHandler("testClient", streamConfig, 0);
-      
+
       // Test that the backward compatibility method still works
       try {
         handler.getOrCreateAdminClient();
       } catch (Exception e) {
         // Expected when no real Kafka cluster is available
-        assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka") 
+        assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka")
             || e.getMessage().contains("timeout") || e.getMessage().contains("refused")
             || e.getCause() != null);
       }
-      
+
       handler.close();
     } catch (Exception e) {
       // Expected when initializing without a real Kafka cluster
-      assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka") 
+      assertTrue(e.getMessage().contains("Connection") || e.getMessage().contains("Kafka")
           || e.getMessage().contains("timeout") || e.getMessage().contains("refused")
           || e.getCause() != null);
     }

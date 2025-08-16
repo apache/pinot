@@ -114,12 +114,14 @@ public class KafkaAdminClientManager {
   private void releaseAdminClient(String cacheKey) {
     AdminClientWrapper wrapper = _adminClients.get(cacheKey);
     if (wrapper != null && wrapper.removeReference() == 0) {
-      _adminClients.remove(cacheKey);
-      try {
-        wrapper.getAdminClient().close();
-        LOGGER.info("Closed shared admin client for cache key: {}", cacheKey);
-      } catch (Exception e) {
-        LOGGER.warn("Error closing admin client for cache key: {}", cacheKey, e);
+      // Use remove with condition to handle concurrent access
+      if (_adminClients.remove(cacheKey, wrapper)) {
+        try {
+          wrapper.getAdminClient().close();
+          LOGGER.info("Closed shared admin client for cache key: {}", cacheKey);
+        } catch (Exception e) {
+          LOGGER.warn("Error closing admin client for cache key: {}", cacheKey, e);
+        }
       }
     }
   }
