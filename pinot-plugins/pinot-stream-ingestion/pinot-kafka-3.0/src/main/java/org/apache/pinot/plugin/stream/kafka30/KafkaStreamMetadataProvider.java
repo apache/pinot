@@ -188,6 +188,17 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     }
   }
 
+  @Override
+  public StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
+    try {
+      return new LongMsgOffset(_consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
+          Duration.ofMillis(timeoutMillis)).get(_topicPartition).offset());
+    } catch (Exception e) {
+      LOGGER.warn("Failed to get offset at timestamp {} for partition {}", timestampMillis, partitionId, e);
+      return null;
+    }
+  }
+
   public static class KafkaTopicMetadata implements TopicMetadata {
     private String _name;
 
@@ -199,12 +210,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
       _name = name;
       return this;
     }
-  }
-
-  @Override
-  public StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
-    return new LongMsgOffset(_consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
-        Duration.ofMillis(timeoutMillis)).get(_topicPartition).offset());
   }
 
   @Override

@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.plugin.stream.kafka30;
 
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.testng.annotations.Test;
 
@@ -33,10 +34,19 @@ public class KafkaPartitionLevelConnectionHandlerTest {
     }
   }
 
+  private StreamConfig createTestStreamConfig() {
+    Map<String, String> streamConfigMap = new HashMap<>();
+    streamConfigMap.put("streamType", "kafka");
+    streamConfigMap.put("stream.kafka.topic.name", "testTopic");
+    streamConfigMap.put("stream.kafka.broker.list", "localhost:9092");
+    streamConfigMap.put("stream.kafka.consumer.factory.class.name", KafkaConsumerFactory.class.getName());
+    streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
+    return new StreamConfig("testTable_REALTIME", streamConfigMap);
+  }
+
   @Test
   public void testSharedAdminClientReference() {
-    StreamConfig streamConfig =
-        new StreamConfig("testTopic", Collections.singletonMap("bootstrap.servers", "localhost:9092"));
+    StreamConfig streamConfig = createTestStreamConfig();
 
     try {
       TestableKafkaPartitionLevelConnectionHandler handler =
@@ -66,8 +76,7 @@ public class KafkaPartitionLevelConnectionHandlerTest {
 
   @Test
   public void testGetOrCreateAdminClientBackwardCompatibility() {
-    StreamConfig streamConfig =
-        new StreamConfig("testTopic", Collections.singletonMap("bootstrap.servers", "localhost:9092"));
+    StreamConfig streamConfig = createTestStreamConfig();
 
     try {
       TestableKafkaPartitionLevelConnectionHandler handler =
