@@ -368,7 +368,8 @@ public class TableRebalancer {
         summaryResult = calculateRebalanceSummary(currentAssignment, targetAssignment, tableNameWithType,
             tableSubTypeSizeDetails, tableConfig, tableRebalanceLogger);
       } catch (Exception e) {
-        tableRebalanceLogger.warn("Caught exception while trying to run the rebalance summary, skipping", e);
+        tableRebalanceLogger.warn("Caught exception while trying to calculate the rebalance summary, skipping summary "
+            + "calculation", e);
       }
     }
 

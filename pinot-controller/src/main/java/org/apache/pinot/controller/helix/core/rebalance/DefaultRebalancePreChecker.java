@@ -425,8 +425,10 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
         }
       }
     } else {
+      // Rebalance summary should not be null when pre-checks are enabled unless an exception was thrown while
+      // calculating it
       pass = false;
-      warnings.add("Could not assess batchSizePerServer recommendation as rebalance summary is null");
+      warnings.add("Could not assess batchSizePerServer recommendation as rebalance summary could not be calculated");
     }
 
     return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")
