@@ -56,6 +56,7 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   protected final Consumer<String, Bytes> _consumer;
   protected final TopicPartition _topicPartition;
   protected final Properties _consumerProp;
+  protected volatile KafkaAdminClientManager.AdminClientReference _sharedAdminClientRef;
 
   public KafkaPartitionLevelConnectionHandler(String clientId, StreamConfig streamConfig, int partition) {
     _config = new KafkaPartitionLevelStreamConfig(streamConfig);
@@ -90,6 +91,34 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     return retry(() -> AdminClient.create(_consumerProp), 5);
   }
 
+  /**
+   * Gets or creates a reusable admin client instance. The admin client is lazily initialized
+   * and reused across multiple calls to avoid the overhead of creating new connections.
+   *
+   * @return the admin client instance
+   */
+  protected AdminClient getOrCreateAdminClient() {
+    return createAdminClient();
+  }
+
+  /**
+   * Gets or creates a shared admin client instance that can be reused across multiple
+   * connection handlers connecting to the same Kafka cluster. This provides better
+   * resource efficiency when multiple consumers/producers connect to the same bootstrap servers.
+   *
+   * @return the shared admin client instance
+   */
+  protected AdminClient getOrCreateSharedAdminClient() {
+    if (_sharedAdminClientRef == null) {
+      synchronized (this) {
+        if (_sharedAdminClientRef == null) {
+          _sharedAdminClientRef = KafkaAdminClientManager.getInstance().getOrCreateAdminClient(_consumerProp);
+        }
+      }
+    }
+    return _sharedAdminClientRef.getAdminClient();
+  }
+
   private static <T> T retry(Supplier<T> s, int nRetries) {
     // Creation of the KafkaConsumer can fail for multiple reasons including DNS issues.
     // We arbitrarily chose 5 retries with 2 seconds sleep in between retries. 10 seconds total felt
@@ -116,6 +145,9 @@ public abstract class KafkaPartitionLevelConnectionHandler {
   public void close()
       throws IOException {
     _consumer.close();
+    if (_sharedAdminClientRef != null) {
+      _sharedAdminClientRef.close();
+    }
   }
 
   @VisibleForTesting
