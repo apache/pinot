@@ -188,7 +188,6 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     }
   }
 
-  @Override
   public StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
     try {
       return new LongMsgOffset(_consumer.offsetsForTimes(Map.of(_topicPartition, timestampMillis),
