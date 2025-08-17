@@ -20,6 +20,7 @@ package org.apache.pinot.plugin.stream.kafka20;
 
 import java.util.Properties;
 import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.pinot.plugin.stream.kafka.KafkaAdminClientManager;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.*;
