@@ -188,13 +188,17 @@ public class PinotQueryResource {
 
         List<Schema> schemas = new ArrayList<>();
         for (JsonNode schemaNode : requestJson.get("schemas")) {
-          schemas.add(JsonUtils.jsonNodeToObject(schemaNode, Schema.class));
+          if (schemaNode != null && !schemaNode.isEmpty()) {
+            schemas.add(JsonUtils.jsonNodeToObject(schemaNode, Schema.class));
+          }
         }
 
         List<LogicalTableConfig> logicalTableConfigs = new ArrayList<>();
         if (requestJson.has("logicalTableConfigs")) {
           for (JsonNode logicalTableConfigNode : requestJson.get("logicalTableConfigs")) {
-            logicalTableConfigs.add(JsonUtils.jsonNodeToObject(logicalTableConfigNode, LogicalTableConfig.class));
+            if (logicalTableConfigNode != null && !logicalTableConfigNode.isEmpty()) {
+              logicalTableConfigs.add(JsonUtils.jsonNodeToObject(logicalTableConfigNode, LogicalTableConfig.class));
+            }
           }
         }
 
@@ -217,7 +221,7 @@ public class PinotQueryResource {
       LOGGER.info("Caught exception while compiling multi-stage query: {}", e.getMessage());
       return new MultiStageQueryValidationResponse(false, e.getMessage(), e.getErrorCode());
     } catch (Exception e) {
-      LOGGER.error("Unexpected exception while validating multi-stage query", e);
+      LOGGER.error("Caught exception while validating multi-stage query: {}", e.getMessage());
       return new MultiStageQueryValidationResponse(false, "Unexpected error: " + e.getMessage(),
           QueryErrorCode.QUERY_VALIDATION);
     }
