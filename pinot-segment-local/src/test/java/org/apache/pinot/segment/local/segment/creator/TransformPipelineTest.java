@@ -28,6 +28,7 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertNull;
 
 
 public class TransformPipelineTest {
@@ -357,6 +358,30 @@ public class TransformPipelineTest {
             + "    {\n"
             + "      \"name\": \"commits.url\",\n"
             + "      \"dataType\": \"STRING\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"name\": \"a.id\",\n"
+            + "      \"dataType\": \"INT\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"name\": \"a.login\",\n"
+            + "      \"dataType\": \"STRING\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"name\": \"a.display_login\",\n"
+            + "      \"dataType\": \"STRING\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"name\": \"a.gravatar_id\",\n"
+            + "      \"dataType\": \"STRING\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"name\": \"a.url\",\n"
+            + "      \"dataType\": \"STRING\"\n"
+            + "    },\n"
+            + "    {\n"
+            + "      \"name\": \"a.avatar_url\",\n"
+            + "      \"dataType\": \"STRING\"\n"
             + "    }\n"
             + "  ],\n"
             + "  \"dateTimeFieldSpecs\": [\n"
@@ -441,8 +466,9 @@ public class TransformPipelineTest {
     assertEquals(transformedRow.getValue("a.url"), "https://api.github.com/users/LimeVista");
     assertEquals(transformedRow.getValue("a.avatar_url"), "https://avatars.githubusercontent.com/u/18542751?");
 
-    assertEquals(transformedRow.getValue("r.id"), 115911530);
-    assertEquals(transformedRow.getValue("r.name"), "LimeVista/Tapes");
-    assertEquals(transformedRow.getValue("r.url"), "https://api.github.com/repos/LimeVista/Tapes");
+    // field names should be in the schema
+    assertNull(transformedRow.getValue("r.id"));
+    assertNull(transformedRow.getValue("r.name"));
+    assertNull(transformedRow.getValue("r.url"));
   }
 }
