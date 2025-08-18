@@ -40,8 +40,8 @@ public interface RecordTransformer extends Serializable {
     return List.of();
   }
 
-  /// Provides hint to the transformer with all the columns that are required as input across all the downstream
-  /// transformers in the TransformPipeline.
+  /// Provides hint to the transformer that which columns are required as input across all the downstream transformers
+  /// in the TransformPipeline.
   default void withInputColumnsOfDownStreamTransformers(Collection<String> inputColumnsOfDownstream) {
   }
 
