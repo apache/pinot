@@ -19,8 +19,9 @@
 package org.apache.pinot.spi.config.table.task;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.exception.InvalidTableConfigException;
 import org.apache.pinot.spi.exception.InvalidTaskConfigException;
@@ -52,13 +53,14 @@ public abstract class TableTaskTypeConfig {
    * Schedule in quartz cron format. eg: "0 0/5 * * * ?" to run every 5 minutes
    * The default value is null, which means the task is not scheduled by default (except if it's a default task)
    */
-  protected final Optional<String> _schedule;
+  @Nullable
+  private final String _schedule;
 
   /**
    * Minion Tag identifier to schedule a task on a dedicated pool of minion hosts which match the tag.
    * Default value matches the default minion instance tag.
    */
-  protected final String _minionInstanceTag;
+  private final String _minionInstanceTag;
 
   /**
    * Maximum number of sub-tasks that can be executed in a single trigger of the segment refresh task.
@@ -74,11 +76,11 @@ public abstract class TableTaskTypeConfig {
    * but is used by controller for persisting user defined configs
    * This is required because the attribute values in the subclass are modified based on defaults, corrections, etc
    */
-  private Map<String, String> _configs;
+  private final Map<String, String> _configs;
 
   protected TableTaskTypeConfig(Map<String, String> configs) {
     // TODO - Move the constants from pinot-controller to pinot-spi and use them here.
-    _schedule = Optional.ofNullable(configs.get("schedule"));
+    _schedule = configs.get("schedule");
     _minionInstanceTag = configs.getOrDefault("minionInstanceTag",
         CommonConstants.Helix.UNTAGGED_MINION_INSTANCE);
     _maxNumSubTasks = Integer.parseInt(configs.getOrDefault("tableMaxNumTasks",
@@ -89,23 +91,32 @@ public abstract class TableTaskTypeConfig {
   /**
    * Validates the task type configuration.
    * TODO - This should be called by PinotTaskGenerator before generating tasks. It shouldn't be called by each task.
-   * @return true if the configuration is valid, false otherwise.
+   * @throws InvalidTableConfigException if the configuration is not valid for the table.
    */
   public final void checkValidity(TableConfig tableConfig) throws InvalidTableConfigException {
-    validateCronSchedule();
+    ensureValidCron();
+    ensureValidMaxNumSubTasks(null);
     // TODO - check minion instance tag is valid.
     checkIfAllowedForTable(tableConfig);
-    checkTaskConfigValiditiy();
+    ensureValidTaskConfig(null);
   }
 
   /**
    * Corrects the task type configuration if needed to make it pass validations
-   * This will only work if the validation failed due to {@link InvalidTaskConfigException}.
+   * This can only work if the validation failed due to {@link InvalidTaskConfigException}.
    * This is typically used when task generator runs but the current task type configuration is invalid
    * due to modifications in validation logic across Pinot versions.
    * TODO - This should be called by PinotTaskGenerator before generating tasks. It shouldn't be called by each task.
+   * @throws InvalidTableConfigException if the configuration can't be corrected
    */
-  public abstract TableTaskTypeConfig getCorrectedConfig();
+  public final TableTaskTypeConfig getCorrectedConfig(TableConfig tableConfig) throws InvalidTableConfigException {
+    Map<String, String> correctedConfigs = new HashMap<>(_configs);
+    ensureValidMaxNumSubTasks(correctedConfigs);
+    ensureValidTaskConfig(correctedConfigs);
+    TableTaskTypeConfig correctedConfig = createConfig(correctedConfigs);
+    correctedConfig.checkValidity(tableConfig); // Will throw InvalidTableConfigException if not valid for table
+    return correctedConfig;
+  }
 
   /**
    * Returns an unmodifiable copy of the task type configuration.
@@ -120,7 +131,7 @@ public abstract class TableTaskTypeConfig {
 
   // Can be overridden by subclasses
   protected int getDefaultMaxNumSubTasks() {
-    return 1000;
+    return Integer.MAX_VALUE;
   }
 
   /**
@@ -131,19 +142,40 @@ public abstract class TableTaskTypeConfig {
 
   /**
    * Validates the task type configuration.
+   * If incorrect, the same method can optionally correct the config (if possible)
+   * The correction is done by modifying the input configBuilder map rather than modifying
+   *  the instance variable (which is designed to be immutable).
+   * If configBuilder is null, the method should throw an exception if the validation fails.
+   * @param configBuilder Optional map where the task type configuration can be corrected.
    * @throws InvalidTaskConfigException with message on why the configuration is not valid.
+   *  This is thrown if validation fails and configBuilder is null. Or if the config can't be corrected.
    */
-  protected abstract void checkTaskConfigValiditiy() throws InvalidTaskConfigException;
+  protected abstract void ensureValidTaskConfig(@Nullable Map<String, String> configBuilder) throws InvalidTaskConfigException;
 
-  private void validateCronSchedule() throws InvalidTaskConfigException {
-    if (_schedule.isPresent()) {
-      String cronExprStr = _schedule.get();
+  /**
+   * Creates a new instance of the task type configuration based on the provided configs.
+   */
+  protected abstract TableTaskTypeConfig createConfig(Map<String, String> configs);
+
+  private void ensureValidCron() throws InvalidTaskConfigException {
+    if (_schedule != null) {
       try {
-        CronScheduleBuilder.cronSchedule(cronExprStr);
+        CronScheduleBuilder.cronSchedule(_schedule);
       } catch (Exception e) {
         throw new InvalidTaskConfigException(
             String.format("Task contains an invalid cron schedule: %s. Cron schedule is required in quartz format",
-                cronExprStr), e);
+                _schedule), e);
+      }
+    }
+  }
+
+  private void ensureValidMaxNumSubTasks(@Nullable Map<String, String> configBuilder) {
+    if (_maxNumSubTasks <= 0) {
+      if (configBuilder != null) {
+        configBuilder.remove("tableMaxNumTasks");
+      } else {
+        throw new InvalidTaskConfigException(
+            "Max number of subtasks must be greater than 0, got: " + _maxNumSubTasks);
       }
     }
   }
