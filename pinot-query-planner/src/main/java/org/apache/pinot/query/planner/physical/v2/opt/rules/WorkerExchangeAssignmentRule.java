@@ -111,6 +111,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     currentNode = processCurrentNode(currentNode, parent, meetConstraints);
     // Process remaining inputs.
     if (currentNode instanceof PhysicalExchange) {
+      Preconditions.checkState(meetConstraints, "PhysicalExchange should not be created constraints were skipped");
       PhysicalExchange exchange = (PhysicalExchange) currentNode;
       currentNode = exchange.getPRelInput(0);
       for (int index = 1; index < currentNode.getPRelInputs().size(); index++) {
