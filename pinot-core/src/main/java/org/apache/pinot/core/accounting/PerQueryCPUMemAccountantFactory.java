@@ -786,8 +786,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             _aggregatedUsagePerActiveQuery = getQueryResourcesImpl();
           }
 
-          if (_triggeringLevel.ordinal() >= TriggeringLevel.HeapMemoryCritical.ordinal() &&
-              _aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()) {
+          if (_triggeringLevel.ordinal() >= TriggeringLevel.HeapMemoryCritical.ordinal()
+              && _aggregatedUsagePerActiveQuery != null && !_aggregatedUsagePerActiveQuery.isEmpty()) {
             _maxHeapUsageQuery.set(_aggregatedUsagePerActiveQuery.values().stream()
                 .filter(stats -> !_cancelSentQueries.contains(stats.getQueryId()))
                 .max(Comparator.comparing(AggregatedStats::getAllocatedBytes)).orElse(null));
