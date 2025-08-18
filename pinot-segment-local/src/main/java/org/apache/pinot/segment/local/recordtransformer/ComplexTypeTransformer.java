@@ -184,7 +184,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   @Override
-  public void withInputColumnsOfDownStreamTransformers(Collection<String> columns) {
+  public void withInputColumnsForDownstreamTransformers(Set<String> columns) {
     _fieldsNeededForDownstreamTransformers = new HashSet<>(columns);
   }
 

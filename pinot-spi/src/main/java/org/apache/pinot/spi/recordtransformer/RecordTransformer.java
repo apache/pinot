@@ -21,6 +21,7 @@ package org.apache.pinot.spi.recordtransformer;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -42,7 +43,7 @@ public interface RecordTransformer extends Serializable {
 
   /// Provides hint to the transformer that which columns are required as input across all the downstream transformers
   /// in the TransformPipeline.
-  default void withInputColumnsOfDownStreamTransformers(Collection<String> inputColumnsOfDownstream) {
+  default void withInputColumnsForDownstreamTransformers(Set<String> inputColumnsOfDownstream) {
   }
 
   /// Transforms and returns records based on some custom rules. Implement this method when the transformer can produce
