@@ -47,13 +47,13 @@ public class AuditRequestProcessorTest {
 
   @Mock
   private AuditConfigManager _configManager;
-  
+
   @Mock
   private ContainerRequestContext _requestContext;
-  
+
   @Mock
   private UriInfo _uriInfo;
-  
+
   private AuditRequestProcessor _processor;
   private AuditConfig _defaultConfig;
 
@@ -69,14 +69,14 @@ public class AuditRequestProcessorTest {
     } catch (Exception e) {
       throw new RuntimeException("Failed to inject mock config manager", e);
     }
-    
+
     _defaultConfig = new AuditConfig();
     _defaultConfig.setEnabled(true);
     _defaultConfig.setCaptureRequestPayload(false);
     _defaultConfig.setCaptureRequestHeaders(false);
     _defaultConfig.setMaxPayloadSize(10240);
     _defaultConfig.setExcludedEndpoints("");
-    
+
     when(_configManager.isEnabled()).thenReturn(true);
     when(_configManager.getCurrentConfig()).thenReturn(_defaultConfig);
     when(_configManager.isEndpointExcluded(any())).thenReturn(false);
@@ -101,7 +101,7 @@ public class AuditRequestProcessorTest {
   // IP Address Extraction Tests
 
   @Test
-  public void testExtractIpFromXForwardedFor_SingleIp() {
+  public void testExtractIpFromXForwardedForSingleIp() {
     MultivaluedMap<String, String> headers = createHeaders("X-Forwarded-For", "192.168.1.100");
     when(_requestContext.getHeaders()).thenReturn(headers);
     when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn("192.168.1.100");
@@ -116,8 +116,9 @@ public class AuditRequestProcessorTest {
   }
 
   @Test
-  public void testExtractIpFromXForwardedFor_MultipleIps() {
-    MultivaluedMap<String, String> headers = createHeaders("X-Forwarded-For", "192.168.1.100, 10.0.0.50, 203.0.113.195");
+  public void testExtractIpFromXForwardedForMultipleIps() {
+    MultivaluedMap<String, String> headers =
+        createHeaders("X-Forwarded-For", "192.168.1.100, 10.0.0.50, 203.0.113.195");
     when(_requestContext.getHeaders()).thenReturn(headers);
     when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn("192.168.1.100, 10.0.0.50, 203.0.113.195");
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
@@ -148,10 +149,8 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testExtractIpPriorityOrder() {
-    MultivaluedMap<String, String> headers = createHeaders(
-        "X-Forwarded-For", "192.168.1.100",
-        "X-Real-IP", "192.168.1.200"
-    );
+    MultivaluedMap<String, String> headers =
+        createHeaders("X-Forwarded-For", "192.168.1.100", "X-Real-IP", "192.168.1.200");
     when(_requestContext.getHeaders()).thenReturn(headers);
     when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn("192.168.1.100");
     when(_requestContext.getHeaderString("X-Real-IP")).thenReturn("192.168.1.200");
@@ -167,10 +166,7 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testExtractIpWithBlankHeaders() {
-    MultivaluedMap<String, String> headers = createHeaders(
-        "X-Forwarded-For", "   ",
-        "X-Real-IP", ""
-    );
+    MultivaluedMap<String, String> headers = createHeaders("X-Forwarded-For", "   ", "X-Real-IP", "");
     when(_requestContext.getHeaders()).thenReturn(headers);
     when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn("   ");
     when(_requestContext.getHeaderString("X-Real-IP")).thenReturn("");
@@ -232,7 +228,8 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testExtractUserIdFromBearerToken() {
-    MultivaluedMap<String, String> headers = createHeaders("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
+    MultivaluedMap<String, String> headers =
+        createHeaders("Authorization", "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
     when(_requestContext.getHeaders()).thenReturn(headers);
     when(_requestContext.getHeaderString("Authorization")).thenReturn("Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9");
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
@@ -280,11 +277,8 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testExtractUserIdPriorityOrder() {
-    MultivaluedMap<String, String> headers = createHeaders(
-        "Authorization", "Basic dXNlcjpwYXNzd29yZA==",
-        "X-User-ID", "johndoe",
-        "X-Username", "janedoe"
-    );
+    MultivaluedMap<String, String> headers =
+        createHeaders("Authorization", "Basic dXNlcjpwYXNzd29yZA==", "X-User-ID", "johndoe", "X-Username", "janedoe");
     when(_requestContext.getHeaders()).thenReturn(headers);
     when(_requestContext.getHeaderString("Authorization")).thenReturn("Basic dXNlcjpwYXNzd29yZA==");
     when(_requestContext.getHeaderString("X-User-ID")).thenReturn("johndoe");
@@ -364,10 +358,8 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testExtractServiceIdPriorityOrder() {
-    MultivaluedMap<String, String> headers = createHeaders(
-        "X-Service-ID", "payment-service",
-        "X-Service-Name", "user-management"
-    );
+    MultivaluedMap<String, String> headers =
+        createHeaders("X-Service-ID", "payment-service", "X-Service-Name", "user-management");
     when(_requestContext.getHeaders()).thenReturn(headers);
     when(_requestContext.getHeaderString("X-Service-ID")).thenReturn("payment-service");
     when(_requestContext.getHeaderString("X-Service-Name")).thenReturn("user-management");
@@ -438,7 +430,7 @@ public class AuditRequestProcessorTest {
     MultivaluedMap<String, String> queryParams = new MultivaluedHashMap<>();
     queryParams.addAll("tags", Arrays.asList("tag1", "tag2", "tag3"));
     queryParams.add("single", "value");
-    
+
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
     when(_uriInfo.getQueryParameters()).thenReturn(queryParams);
     when(_uriInfo.getPath()).thenReturn("/test");
@@ -460,11 +452,12 @@ public class AuditRequestProcessorTest {
   }
 
   @Test
-  public void testCaptureRequestBodyWhenEnabled() throws IOException {
+  public void testCaptureRequestBodyWhenEnabled()
+      throws IOException {
     _defaultConfig.setCaptureRequestPayload(true);
     String requestBody = "{\"key\": \"value\"}";
     InputStream entityStream = new ByteArrayInputStream(requestBody.getBytes());
-    
+
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
     when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(_uriInfo.getPath()).thenReturn("/test");
@@ -486,7 +479,7 @@ public class AuditRequestProcessorTest {
   @Test
   public void testSkipRequestBodyWhenDisabled() {
     _defaultConfig.setCaptureRequestPayload(false);
-    
+
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
     when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(_uriInfo.getPath()).thenReturn("/test");
@@ -508,13 +501,12 @@ public class AuditRequestProcessorTest {
   @Test
   public void testCaptureHeadersWhenEnabled() {
     _defaultConfig.setCaptureRequestHeaders(true);
-    MultivaluedMap<String, String> headers = createHeaders(
-        "Content-Type", "application/json",
-        "X-Custom-Header", "custom-value",
-        "Authorization", "Bearer token123",  // Should be filtered out
-        "X-Password", "secret123"  // Should be filtered out
-    );
-    
+    MultivaluedMap<String, String> headers =
+        createHeaders("Content-Type", "application/json", "X-Custom-Header", "custom-value", "Authorization",
+            "Bearer token123",  // Should be filtered out
+            "X-Password", "secret123"  // Should be filtered out
+        );
+
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
     when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(_uriInfo.getPath()).thenReturn("/test");
@@ -539,7 +531,7 @@ public class AuditRequestProcessorTest {
   public void testSkipHeadersWhenDisabled() {
     _defaultConfig.setCaptureRequestHeaders(false);
     MultivaluedMap<String, String> headers = createHeaders("Content-Type", "application/json");
-    
+
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
     when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(_uriInfo.getPath()).thenReturn("/test");
@@ -559,15 +551,13 @@ public class AuditRequestProcessorTest {
   @Test
   public void testFilterSensitiveHeaders() {
     _defaultConfig.setCaptureRequestHeaders(true);
-    MultivaluedMap<String, String> headers = createHeaders(
-        "authorization", "Bearer token123",
-        "x-auth-token", "token456",
-        "password-header", "pass123",
-        "api-secret", "secret789",
-        "x-api-key", "key123",  // Should be filtered (contains 'secret' logic might not catch this)
-        "content-type", "application/json"  // Should be kept
-    );
-    
+    MultivaluedMap<String, String> headers =
+        createHeaders("authorization", "Bearer token123", "x-auth-token", "token456", "password-header", "pass123",
+            "api-secret", "secret789", "x-api-key", "key123",
+            // Should be filtered (contains 'secret' logic might not catch this)
+            "content-type", "application/json"  // Should be kept
+        );
+
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
     when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
     when(_uriInfo.getPath()).thenReturn("/test");
