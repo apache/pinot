@@ -1953,7 +1953,17 @@ public class CommonConstants {
     /// Max time to keep the op stats in the cache.
     public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.ms";
     public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 60 * 1000;
+
+    /// Max number of cancelled queries to keep in the cache.
+    public static final String KEY_OF_CANCELLED_QUERY_CACHE_SIZE = "pinot.server.query.cancelled.cache.size";
+    public static final int DEFAULT_OF_CANCELLED_QUERY_CACHE_SIZE = 1000;
+
+    /// Max time to keep the cancelled queries in the cache.
+    public static final String KEY_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS = "pinot.server.query.cancelled.cache.ms";
+    public static final int DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS = 60 * 1000;
+
     /// Timeout of the cancel request, in milliseconds.
+    /// TODO: This is used by the broker. Consider renaming it.
     public static final String KEY_OF_CANCEL_TIMEOUT_MS = "pinot.server.query.cancel.timeout.ms";
     public static final long DEFAULT_OF_CANCEL_TIMEOUT_MS = 1000;
   }
