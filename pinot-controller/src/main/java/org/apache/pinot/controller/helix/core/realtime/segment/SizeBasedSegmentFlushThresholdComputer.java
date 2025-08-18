@@ -142,7 +142,8 @@ class SizeBasedSegmentFlushThresholdComputer {
     }
     LOGGER.info(
         "Updated segment: {}, time: {}, rows used for calculation: {} (pre-commit: {}, post-commit: {}), size used: {}"
-            + " (post-commit size: {}), consuming ratio: {}, threshold: {}. Segment rows to size ratio updated from: {} to: {}",
+            + " (post-commit size: {}), consuming ratio: {}, threshold: {}."
+            + " Segment rows to size ratio updated from: {} to: {}",
         segmentName, TimeUtils.convertMillisToPeriod(timeConsumed), rowsForCalculation, preCommitRows, postCommitRows,
         sizeForCalculation, postCommitSizeBytes, segmentRatio, rowsThreshold, currentRatio, _segmentRowsToSizeRatio);
   }
