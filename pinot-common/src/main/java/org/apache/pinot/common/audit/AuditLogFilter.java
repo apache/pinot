@@ -24,8 +24,6 @@ import javax.inject.Provider;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerRequestFilter;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.HttpHeaders;
 import org.glassfish.grizzly.http.server.Request;
 
 
@@ -39,8 +37,6 @@ public class AuditLogFilter implements ContainerRequestFilter {
 
   @Inject
   Provider<Request> _requestProvider;
-  @Context
-  HttpHeaders _httpHeaders;
   @Inject
   private AuditRequestProcessor _auditRequestProcessor;
 
@@ -56,7 +52,7 @@ public class AuditLogFilter implements ContainerRequestFilter {
     final Request grizzlyRequest = _requestProvider.get();
     final String remoteAddr = grizzlyRequest.getRemoteAddr();
 
-    final AuditEvent auditEvent = _auditRequestProcessor.processRequest(requestContext, _httpHeaders, remoteAddr);
+    final AuditEvent auditEvent = _auditRequestProcessor.processRequest(requestContext, remoteAddr);
     if (auditEvent != null) {
       AuditLogger.auditLog(auditEvent);
     }

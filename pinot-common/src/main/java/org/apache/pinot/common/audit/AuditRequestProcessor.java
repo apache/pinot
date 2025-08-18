@@ -29,7 +29,6 @@ import java.util.Map;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
 import org.apache.commons.lang3.StringUtils;
@@ -52,7 +51,7 @@ public class AuditRequestProcessor {
   @Inject
   private AuditConfigManager _configManager;
 
-  public AuditEvent processRequest(ContainerRequestContext requestContext, HttpHeaders httpHeaders, String remoteAddr) {
+  public AuditEvent processRequest(ContainerRequestContext requestContext, String remoteAddr) {
     // Check if auditing is enabled (if config manager is available)
     if (!isEnabled()) {
       return null;
@@ -68,14 +67,15 @@ public class AuditRequestProcessor {
       }
 
       String method = requestContext.getMethod();
-      String originIpAddress = extractClientIpAddress(httpHeaders, remoteAddr);
-      String userId = extractUserId(httpHeaders);
+      String originIpAddress = extractClientIpAddress(requestContext, remoteAddr);
+      String userId = extractUserId(requestContext);
 
       // Capture request payload based on configuration
       Object requestPayload = captureRequestPayload(requestContext);
 
       // Log the audit event (service ID will be extracted from headers, not config)
-      return new AuditEvent(extractServiceId(httpHeaders), endpoint, method, originIpAddress, userId, requestPayload);
+      return new AuditEvent(extractServiceId(requestContext), endpoint, method, originIpAddress, userId,
+          requestPayload);
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main request
       LOG.warn("Failed to process audit logging for request", e);
@@ -91,20 +91,20 @@ public class AuditRequestProcessor {
    * Extracts the client IP address from the request.
    * Checks common proxy headers before falling back to remote address.
    *
-   * @param headers the HTTP headers
+   * @param requestContext the container request context
    * @param remoteAddr the remote address from the underlying request
    * @return the client IP address
    */
-  private String extractClientIpAddress(HttpHeaders headers, String remoteAddr) {
+  private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
     try {
       // Check for proxy headers first
-      String xForwardedFor = headers.getHeaderString("X-Forwarded-For");
+      String xForwardedFor = requestContext.getHeaderString("X-Forwarded-For");
       if (StringUtils.isNotBlank(xForwardedFor)) {
         // X-Forwarded-For can contain multiple IPs, take the first one
         return xForwardedFor.split(",")[0].trim();
       }
 
-      String xRealIp = headers.getHeaderString("X-Real-IP");
+      String xRealIp = requestContext.getHeaderString("X-Real-IP");
       if (StringUtils.isNotBlank(xRealIp)) {
         return xRealIp.trim();
       }
@@ -121,13 +121,13 @@ public class AuditRequestProcessor {
    * Extracts user ID from request headers.
    * Looks for common authentication headers.
    *
-   * @param headers the HTTP headers
+   * @param requestContext the container request context
    * @return the user ID or "anonymous" if not found
    */
-  private String extractUserId(HttpHeaders headers) {
+  private String extractUserId(ContainerRequestContext requestContext) {
     try {
       // Check for common user identification headers
-      String authHeader = headers.getHeaderString("Authorization");
+      String authHeader = requestContext.getHeaderString("Authorization");
       if (StringUtils.isNotBlank(authHeader)) {
         // For basic auth, extract username; for bearer tokens, use a placeholder
         if (authHeader.startsWith("Basic ")) {
@@ -139,12 +139,12 @@ public class AuditRequestProcessor {
       }
 
       // Check for custom user headers
-      String userHeader = headers.getHeaderString("X-User-ID");
+      String userHeader = requestContext.getHeaderString("X-User-ID");
       if (StringUtils.isNotBlank(userHeader)) {
         return userHeader.trim();
       }
 
-      userHeader = headers.getHeaderString("X-Username");
+      userHeader = requestContext.getHeaderString("X-Username");
       if (StringUtils.isNotBlank(userHeader)) {
         return userHeader.trim();
       }
@@ -160,18 +160,18 @@ public class AuditRequestProcessor {
    * Extracts service ID from request headers.
    * Service ID should be provided by the client in headers, not from configuration.
    *
-   * @param headers the HTTP headers
+   * @param requestContext the container request context
    * @return the service ID or "unknown" if not found
    */
-  private String extractServiceId(HttpHeaders headers) {
+  private String extractServiceId(ContainerRequestContext requestContext) {
     try {
       // Check for custom service ID headers
-      String serviceId = headers.getHeaderString("X-Service-ID");
+      String serviceId = requestContext.getHeaderString("X-Service-ID");
       if (StringUtils.isNotBlank(serviceId)) {
         return serviceId.trim();
       }
 
-      serviceId = headers.getHeaderString("X-Service-Name");
+      serviceId = requestContext.getHeaderString("X-Service-Name");
       if (StringUtils.isNotBlank(serviceId)) {
         return serviceId.trim();
       }
