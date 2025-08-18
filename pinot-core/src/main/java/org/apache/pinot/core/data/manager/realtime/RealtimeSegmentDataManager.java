@@ -573,8 +573,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private boolean processStreamEvents(MessageBatch messageBatch, long idlePipeSleepTimeMillis) {
     int messageCount = messageBatch.getMessageCount();
-    _partitionRateLimiter.throttle(messageCount);
-    _serverRateLimiter.throttle(messageCount);
+    _partitionRateLimiter.throttle(messageBatch.getUnfilteredMessageCount());
+    _serverRateLimiter.throttle(messageBatch.getUnfilteredMessageCount());
 
     PinotMeter realtimeBytesIngestedMeter = null;
     PinotMeter realtimeBytesDroppedMeter = null;
