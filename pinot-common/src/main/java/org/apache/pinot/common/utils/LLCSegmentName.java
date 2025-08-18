@@ -38,6 +38,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   private final int _sequenceNumber;
   private final String _creationTime;
   private final String _segmentName;
+  @Nullable
   private final String _topicName;
 
   public LLCSegmentName(String segmentName) {
@@ -49,7 +50,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
         parts.length >= 4 && parts.length <= 5, "Invalid LLC segment name: %s", segmentName);
     _tableName = parts[0];
     if (parts.length == 4) {
-      _topicName = "";
+      _topicName = null;
       _partitionGroupId = Integer.parseInt(parts[1]);
       _sequenceNumber = Integer.parseInt(parts[2]);
       _creationTime = parts[3];
@@ -63,11 +64,11 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   }
 
   public LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
-    this(tableName, "", partitionGroupId, sequenceNumber, msSinceEpoch);
+    this(tableName, null, partitionGroupId, sequenceNumber, msSinceEpoch);
   }
 
   public LLCSegmentName(
-      String tableName, String topicName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
+      String tableName, @Nullable String topicName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
     Preconditions.checkArgument(topicName == null || !topicName.contains(SEPARATOR),
         "Illegal topic name: %s", tableName);
@@ -77,7 +78,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     _sequenceNumber = sequenceNumber;
     // ISO8601 date: 20160120T1234Z
     _creationTime = DATE_FORMATTER.print(msSinceEpoch);
-    if ("".equals(topicName)) {
+    if (topicName == null) {
       _segmentName = tableName + SEPARATOR + partitionGroupId + SEPARATOR + sequenceNumber + SEPARATOR + _creationTime;
     } else {
       _segmentName =
@@ -141,6 +142,7 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return _tableName;
   }
 
+  @Nullable
   public String getTopicName() {
     return _topicName;
   }
@@ -149,8 +151,8 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     return _partitionGroupId;
   }
 
-  public String getPartitionGroupInfo() {
-    if (_topicName.isEmpty()) {
+  public String getPartitionGroupTopicAndId() {
+    if (_topicName == null) {
       return String.valueOf(_partitionGroupId);
     } else {
       return _topicName + SEPARATOR + _partitionGroupId;
@@ -179,7 +181,9 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
   public int compareTo(LLCSegmentName other) {
     Preconditions.checkArgument(_tableName.equals(other._tableName),
         "Cannot compare segment names from different table: %s, %s", _segmentName, other.getSegmentName());
-    if (!_topicName.equals(other._topicName)) {
+    String thisTopicName = _topicName == null ? "" : _topicName;
+    String otherTopicName = other._topicName == null ? "" : other._topicName;
+    if (!thisTopicName.equals(otherTopicName)) {
       return StringUtils.compare(_topicName, other._topicName);
     }
     if (_partitionGroupId != other._partitionGroupId) {

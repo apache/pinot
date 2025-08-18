@@ -83,7 +83,7 @@ public class MissingConsumingSegmentFinder {
     try {
       PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), false)
           .forEach(metadata -> {
-            _partitionGroupInfoToLargestStreamOffsetMap.put(metadata.getPartitionGroupInfo(),
+            _partitionGroupInfoToLargestStreamOffsetMap.put(metadata.getPartitionGroupTopicAndId(),
                 metadata.getStartOffset());
           });
     } catch (Exception e) {
@@ -182,7 +182,7 @@ public class MissingConsumingSegmentFinder {
 
   private void updateMap(Map<String, LLCSegmentName> partitionGroupInfoToLatestSegmentMap,
       LLCSegmentName llcSegmentName) {
-    partitionGroupInfoToLatestSegmentMap.compute(llcSegmentName.getPartitionGroupInfo(), (pid, existingSegment) -> {
+    partitionGroupInfoToLatestSegmentMap.compute(llcSegmentName.getPartitionGroupTopicAndId(), (pid, existingSegment) -> {
       if (existingSegment == null) {
         return llcSegmentName;
       } else {

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.stream;
 
+import javax.annotation.Nullable;
+
+
 /**
  * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
  * This class is a container for the metadata regarding a partition group, that is needed by a consumer to start
@@ -30,14 +33,15 @@ public class PartitionGroupMetadata {
 
   private static final String SEPARATOR = "__";
   private final int _partitionGroupId;
+  @Nullable
   private final String _topicName;
   private final StreamPartitionMsgOffset _startOffset;
 
   public PartitionGroupMetadata(int partitionGroupId, StreamPartitionMsgOffset startOffset) {
-    this("", partitionGroupId, startOffset);
+    this(null, partitionGroupId, startOffset);
   }
 
-  public PartitionGroupMetadata(String topicName, int partitionGroupId, StreamPartitionMsgOffset startOffset) {
+  public PartitionGroupMetadata(@Nullable String topicName, int partitionGroupId, StreamPartitionMsgOffset startOffset) {
     _topicName = topicName;
     _partitionGroupId = partitionGroupId;
     _startOffset = startOffset;
@@ -51,8 +55,8 @@ public class PartitionGroupMetadata {
     return _topicName;
   }
 
-  public String getPartitionGroupInfo() {
-    if (_topicName.isEmpty()) {
+  public String getPartitionGroupTopicAndId() {
+    if (_topicName == null) {
       return String.valueOf(_partitionGroupId);
     } else {
       return _topicName + SEPARATOR + _partitionGroupId;
