@@ -569,10 +569,12 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
               timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
               convertedTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
             }
-            LOGGER.warn("Caught exception while writing time metadata for segment: {}, time column: {}, "
-                    + "total docs: {}. Continuing using current time ({}) as the start / end time for the segment.",
+            LOGGER.warn(
+                "Caught exception while writing time metadata for segment: {}, time column: {}, total docs: {}. "
+                    + "Continuing using current time ({}) as the end time, and Unix epoch as the start time for the "
+                    + "segment.",
                 _segmentName, timeColumnName, _totalDocs, now, e);
-            properties.setProperty(SEGMENT_START_TIME, convertedTime);
+            properties.setProperty(SEGMENT_START_TIME, 0);
             properties.setProperty(SEGMENT_END_TIME, convertedTime);
             properties.setProperty(TIME_UNIT, timeUnit);
           }

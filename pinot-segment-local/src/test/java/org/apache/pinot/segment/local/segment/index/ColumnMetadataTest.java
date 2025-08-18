@@ -297,8 +297,8 @@ public class ColumnMetadataTest {
     SegmentMetadata segmentMetadata = new SegmentMetadataImpl(INDEX_DIR.listFiles()[0]);
     // The time unit being used is hours since epoch.
     long hoursSinceEpoch = System.currentTimeMillis() / TimeUnit.HOURS.toMillis(1);
-    // Use tolerance of 1 hour to eliminate any flakiness in the test.
-    Assert.assertTrue(hoursSinceEpoch - segmentMetadata.getStartTime() <= 1);
-    Assert.assertTrue(hoursSinceEpoch - segmentMetadata.getStartTime() <= 1);
+    // Use tolerance of 1 hour to eliminate any flakiness in the test due to time boundaries.
+    Assert.assertTrue(hoursSinceEpoch - segmentMetadata.getEndTime() <= 1);
+    Assert.assertEquals(segmentMetadata.getStartTime(), 0);
   }
 }
