@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
+import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +67,7 @@ public class SparkSegmentMetadataPushJobRunner extends BaseSparkSegmentMetadataP
               .getSegmentUriToTarPathMap(finalOutputDirURI, _spec.getPushJobSpec(), new String[]{segmentTarPath});
           SegmentPushUtils.sendSegmentUriAndMetadata(_spec, PinotFSFactory.create(finalOutputDirURI.getScheme()),
               segmentUriToTarPathMap);
-        } catch (RetriableOperationException | AttemptsExceededException e) {
+        } catch (RetriableOperationException | AttemptsExceededException | FileNotFoundException e) {
           throw new RuntimeException(e);
         }
       }
