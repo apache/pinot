@@ -181,7 +181,9 @@ public class PinotQueryResource {
       if (requestJson.has("tableConfigs") && requestJson.has("schemas")) {
         List<TableConfig> tableConfigs = new ArrayList<>();
         for (JsonNode tableConfigNode : requestJson.get("tableConfigs")) {
-          tableConfigs.add(JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class));
+          if (tableConfigNode != null && !tableConfigNode.isEmpty()) {
+            tableConfigs.add(JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class));
+          }
         }
 
         List<Schema> schemas = new ArrayList<>();
