@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.core.accounting;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
@@ -31,21 +34,30 @@ import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
-public class PerQueryCPUMemAccountantTest {
-
+public class PerQueryCPUMemAccountantTest extends BasePerQueryCPUMemAccountantTest {
   @Test
   void testQueryAggregation() {
-    Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries = new HashMap<>();
     CountDownLatch threadLatch = new CountDownLatch(1);
+    AtomicInteger terminationCount = new AtomicInteger(0);
     String queryId = "testQueryAggregation";
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, threadEntries);
 
-    TestResourceAccountant accountant = new TestResourceAccountant(threadEntries);
+    TestResourceAccountant accountant = new TestResourceAccountant();
+    Tracing.register(accountant);
+    startQueryThreads(queryId, threadLatch, terminationCount, List.of(1000, 2000, 2500));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
+
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
     assertEquals(queryResourceTrackerMap.size(), 1);
     QueryResourceTracker queryResourceTracker = queryResourceTrackerMap.get(queryId);
     assertEquals(queryResourceTracker.getAllocatedBytes(), 5500);
     threadLatch.countDown();
+
+    TestUtils.waitForCondition(aVoid -> {
+      accountant.reapFinishedTasks();
+      return accountant.getCancelSentQueries().isEmpty();
+    }, 100L, 1000L, "Wait for no active queries");
   }
 
   /*
@@ -54,18 +66,21 @@ public class PerQueryCPUMemAccountantTest {
    */
   @Test
   void testQueryAggregationCreateNewTask() {
-    Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries = new HashMap<>();
     CountDownLatch threadLatch = new CountDownLatch(1);
     String queryId = "testQueryAggregationCreateNewTask";
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, threadEntries);
-    TestResourceAccountant accountant = new TestResourceAccountant(threadEntries);
+    TestResourceAccountant accountant = new TestResourceAccountant();
+    Tracing.register(accountant);
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     TestResourceAccountant.TaskThread anchorThread =
         accountant.getTaskThread(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID);
     assertNotNull(anchorThread);
 
-    // Replace task id = 3 (2500 bytes) with a new task id 5 (1500 bytes)
-    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 3);
+    // Replace task id = 2 (2500 bytes) with a new task id 5 (1500 bytes)
+    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 2);
     assertNotNull(workerEntry);
 
     // New Task
@@ -80,29 +95,33 @@ public class PerQueryCPUMemAccountantTest {
     QueryResourceTracker queryResourceTracker = queryResourceTrackerMap.get(queryId);
     assertEquals(queryResourceTracker.getAllocatedBytes(), 4500);
     threadLatch.countDown();
+
+    TestUtils.waitForCondition(aVoid -> {
+      accountant.reapFinishedTasks();
+      return accountant.getCancelSentQueries().isEmpty();
+    }, 100L, 1000L, "Wait for no active queries");
   }
 
   @Test
   void testQueryAggregationSetToIdle() {
-    Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries = new HashMap<>();
     CountDownLatch threadLatch = new CountDownLatch(1);
     String queryId = "testQueryAggregationSetToIdle";
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, threadEntries);
-    TestResourceAccountant accountant = new TestResourceAccountant(threadEntries);
+    TestResourceAccountant accountant = new TestResourceAccountant();
+    Tracing.register(accountant);
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
 
     TestResourceAccountant.TaskThread anchorThread =
         accountant.getTaskThread(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID);
     assertNotNull(anchorThread);
 
     // Replace task id = 3 (2500 bytes) with a new task id 5 (1500 bytes)
-    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 3);
+    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 2);
     assertNotNull(workerEntry);
 
-    // New Task
     CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = workerEntry._threadEntry;
-    threadEntry._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, ThreadExecutionContext.TaskType.SSE,
-            anchorThread._workerThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     threadEntry.setToIdle();
 
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
@@ -110,6 +129,11 @@ public class PerQueryCPUMemAccountantTest {
     QueryResourceTracker queryResourceTracker = queryResourceTrackerMap.get(queryId);
     assertEquals(queryResourceTracker.getAllocatedBytes(), 3000);
     threadLatch.countDown();
+
+    TestUtils.waitForCondition(aVoid -> {
+      accountant.reapFinishedTasks();
+      return accountant.getCancelSentQueries().isEmpty();
+    }, 100L, 1000L, "Wait for no active queries");
   }
 
   /*
@@ -118,19 +142,23 @@ public class PerQueryCPUMemAccountantTest {
    */
   @Test
   void testQueryAggregationReapAndCreateNewTask() {
-    Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries = new HashMap<>();
     CountDownLatch threadLatch = new CountDownLatch(1);
     String queryId = "testQueryAggregationReapAndCreateNewTask";
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, threadEntries);
-    TestResourceAccountant accountant = new TestResourceAccountant(threadEntries);
+    TestResourceAccountant accountant = new TestResourceAccountant();
+    Tracing.register(accountant);
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
+
     accountant.reapFinishedTasks();
 
     TestResourceAccountant.TaskThread anchorThread =
         accountant.getTaskThread(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID);
     assertNotNull(anchorThread);
 
-    // Replace task id = 3 (2500 bytes) with a new task id 5 (1500 bytes)
-    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 3);
+    // Replace task id = 2 (2500 bytes) with a new task id 5 (1500 bytes)
+    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 2);
     assertNotNull(workerEntry);
 
     // New Task
@@ -147,23 +175,33 @@ public class PerQueryCPUMemAccountantTest {
     QueryResourceTracker queryResourceTracker = queryResourceTrackerMap.get(queryId);
     assertEquals(queryResourceTracker.getAllocatedBytes(), 7000);
     threadLatch.countDown();
+
+    TestUtils.waitForCondition(aVoid -> {
+      accountant.reapFinishedTasks();
+      return accountant.getCancelSentQueries().isEmpty();
+    }, 100L, 1000L, "Wait for no active queries");
   }
+
 
   @Test
   void testQueryAggregationReapAndSetToIdle() {
-    Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries = new HashMap<>();
     CountDownLatch threadLatch = new CountDownLatch(1);
     String queryId = "testQueryAggregationReapAndSetToIdle";
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, threadEntries);
-    TestResourceAccountant accountant = new TestResourceAccountant(threadEntries);
+    TestResourceAccountant accountant = new TestResourceAccountant();
+    Tracing.register(accountant);
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
+
     accountant.reapFinishedTasks();
 
     TestResourceAccountant.TaskThread anchorThread =
         accountant.getTaskThread(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID);
     assertNotNull(anchorThread);
 
-    // Replace task id = 3 (2500 bytes) with null
-    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 3);
+    // Replace task id = 2 (2500 bytes) with null
+    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 2);
     assertNotNull(workerEntry);
 
     // Set to Idle
@@ -177,18 +215,26 @@ public class PerQueryCPUMemAccountantTest {
     QueryResourceTracker queryResourceTracker = queryResourceTrackerMap.get(queryId);
     assertEquals(queryResourceTracker.getAllocatedBytes(), 5500);
     threadLatch.countDown();
+
+    TestUtils.waitForCondition(aVoid -> {
+      accountant.reapFinishedTasks();
+      return accountant.getCancelSentQueries().isEmpty();
+    }, 100L, 1000L, "Wait for no active queries");
   }
 
   @Test
   void testInActiveQuerySet() {
-    Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries = new HashMap<>();
     CountDownLatch threadLatch = new CountDownLatch(1);
     String queryId = "testQueryAggregation";
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, threadEntries);
 
-    TestResourceAccountant accountant = new TestResourceAccountant(threadEntries);
+    TestResourceAccountant accountant = new TestResourceAccountant();
+    Tracing.register(accountant);
+    startQueryThreads(queryId, threadLatch, new AtomicInteger(0), List.of(1000, 2000, 2500));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
+
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
-    assertEquals(queryResourceTrackerMap.size(), 1);
     assertTrue(accountant.getInactiveQueries().isEmpty());
     accountant.reapFinishedTasks();
 
@@ -197,8 +243,8 @@ public class PerQueryCPUMemAccountantTest {
         accountant.getTaskThread(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID);
     assertNotNull(anchorThread);
 
-    // Replace task id = 3 (2500 bytes) with a new task id 5 (1500 bytes)
-    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 3);
+    // Replace task id = 2 (2500 bytes) with a new task id 5 (1500 bytes)
+    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 2);
     assertNotNull(workerEntry);
 
     // New Task
@@ -218,33 +264,42 @@ public class PerQueryCPUMemAccountantTest {
     accountant.reapFinishedTasks();
     assertTrue(accountant.getInactiveQueries().isEmpty());
     threadLatch.countDown();
+
+    TestUtils.waitForCondition(aVoid -> {
+      accountant.reapFinishedTasks();
+      return accountant.getCancelSentQueries().isEmpty();
+    }, 100L, 1000L, "Wait for no active queries");
   }
 
   @Test
   void testQueryAggregationAddNewQueryTask() {
-    Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries = new HashMap<>();
     CountDownLatch threadLatch = new CountDownLatch(1);
     String queryId = "testQueryAggregationAddNewQueryTask";
-    TestResourceAccountant.getQueryThreadEntries(queryId, threadLatch, threadEntries);
-    TestResourceAccountant accountant = new TestResourceAccountant(threadEntries);
+    AtomicInteger terminatedCount = new AtomicInteger(0);
+    TestResourceAccountant accountant = new TestResourceAccountant();
+    Tracing.register(accountant);
+    startQueryThreads(queryId, threadLatch, terminatedCount, List.of(1000, 2000, 2500));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, queryId, 5500);
+
     accountant.reapFinishedTasks();
 
     // Start a new query.
     CountDownLatch newQueryThreadLatch = new CountDownLatch(1);
     String newQueryId = "newQuery";
-    Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> newQueryThreadEntries = new HashMap<>();
-    TestResourceAccountant.getQueryThreadEntries(newQueryId, newQueryThreadLatch, newQueryThreadEntries);
-    for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : newQueryThreadEntries.entrySet()) {
-      accountant.addThreadEntry(entry.getKey(), entry.getValue());
-    }
+    startQueryThreads(newQueryId, newQueryThreadLatch, terminatedCount, List.of(1000, 2000, 2500));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, newQueryId, 5500);
 
     // Create a new task for newQuery
     TestResourceAccountant.TaskThread anchorThread =
         accountant.getTaskThread(newQueryId, CommonConstants.Accounting.ANCHOR_TASK_ID);
     assertNotNull(anchorThread);
 
-    // Replace task id = 3 (2500 bytes) of first query with a new task id 5 of new query (3500 bytes)
-    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 3);
+    // Replace task id = 2 (2500 bytes) of first query with a new task id 5 of new query (3500 bytes)
+    TestResourceAccountant.TaskThread workerEntry = accountant.getTaskThread(queryId, 2);
     assertNotNull(workerEntry);
 
     // New Task
@@ -264,5 +319,10 @@ public class PerQueryCPUMemAccountantTest {
     assertEquals(newQueryResourceTracker.getAllocatedBytes(), 9000);
     threadLatch.countDown();
     newQueryThreadLatch.countDown();
+
+    TestUtils.waitForCondition(aVoid -> {
+      accountant.reapFinishedTasks();
+      return accountant.getCancelSentQueries().isEmpty();
+    }, 100L, 1000L, "Wait for no active queries");
   }
 }

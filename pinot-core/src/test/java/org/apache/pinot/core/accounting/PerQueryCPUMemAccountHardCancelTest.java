@@ -28,36 +28,39 @@ import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
-public class PerQueryCPUMemAccountCancelTest extends BasePerQueryCPUMemAccountantTest {
+public class PerQueryCPUMemAccountHardCancelTest extends BasePerQueryCPUMemAccountantTest {
   @Test
-  void testCancelSingleQueryCritical() {
-    CountDownLatch threadLatch = new CountDownLatch(1);
+  void testHardCancelOfSingleQueryCriticalLevel() {
+    CountDownLatch sampleLatch = new CountDownLatch(1);
+    String queryId = "testExpensiveAggregation";
     AtomicInteger terminationCount = new AtomicInteger(0);
-    String queryId = "testQueryAggregation";
 
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    startQueryThreads(queryId, threadLatch, terminationCount, List.of(1000, 2000, 2500));
+    startQueryThreads(queryId, sampleLatch, terminationCount, List.of(1000, 2000, 2500));
 
-    // Ensure the Accountant state is correctly initialized
     waitForQueryResourceTracker(accountant, queryId, 5500);
 
+    // Ensure the Accountant state is correctly initialized
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
+    assertEquals(queryResourceTrackerMap.size(), 1);
     QueryResourceTracker queryResourceTracker = queryResourceTrackerMap.get(queryId);
     assertEquals(queryResourceTracker.getAllocatedBytes(), 5500);
 
     // Set the critical level heap usage ratio to a value that will trigger hard cancellation
     accountant.setCriticalLevelHeapUsageRatio(10000, 0.5);
     accountant.setHeapUsageBytes(5500);
-
-    // Cancel a query.
     accountant.getWatcherTask().runOnce();
-    threadLatch.countDown();
+    sampleLatch.countDown();
 
     TestUtils.waitForCondition(aVoid -> accountant.getCancelSentQueries().contains(queryId), 10L, 1000L,
         "Waiting for query to be cancelled");
+    assertTrue(accountant.getCancelSentQueries().contains(queryId));
+    TestUtils.waitForCondition(aVoid -> terminationCount.get() == 4, 10L, 1000L,
+        "Waiting for all threads to terminate");
 
     TestUtils.waitForCondition(aVoid -> {
       accountant.reapFinishedTasks();
@@ -66,16 +69,16 @@ public class PerQueryCPUMemAccountCancelTest extends BasePerQueryCPUMemAccountan
   }
 
   @Test
-  void testCancelTwoQueryCriticalLevel() {
-    CountDownLatch threadLatch = new CountDownLatch(1);
-    AtomicInteger terminationCount = new AtomicInteger(0);
+  void testHardCancelOfTwoQueriesAtCriticalLevel() {
+    CountDownLatch sampleLatch = new CountDownLatch(1);
     String expensiveQueryId = "testExpensiveAggregation";
     String cheapQueryId = "testCheapAggregation";
+    AtomicInteger terminationCount = new AtomicInteger(0);
 
     TestResourceAccountant accountant = new TestResourceAccountant();
     Tracing.register(accountant);
-    startQueryThreads(expensiveQueryId, threadLatch, terminationCount, List.of(1000, 2000, 2500));
-    startQueryThreads(cheapQueryId, threadLatch, terminationCount, List.of(100, 200, 250));
+    startQueryThreads(expensiveQueryId, sampleLatch, terminationCount, List.of(1000, 2000, 2500));
+    startQueryThreads(cheapQueryId, sampleLatch, terminationCount, List.of(100, 200, 250));
 
     // Ensure the Accountant state is correctly initialized
     waitForQueryResourceTracker(accountant, expensiveQueryId, 5500);
@@ -84,13 +87,49 @@ public class PerQueryCPUMemAccountCancelTest extends BasePerQueryCPUMemAccountan
     // Set the critical level heap usage ratio to a value that will trigger hard cancellation
     accountant.setCriticalLevelHeapUsageRatio(10000, 0.5);
     accountant.setHeapUsageBytes(6050);
-    // Cancel a query.
     accountant.getWatcherTask().runOnce();
-    threadLatch.countDown();
+    sampleLatch.countDown();
+
+    TestUtils.waitForCondition(aVoid -> accountant.getCancelSentQueries().contains(expensiveQueryId), 10L, 1000L,
+        "Waiting for query to be cancelled");
+    assertTrue(accountant.getCancelSentQueries().contains(expensiveQueryId));
+    TestUtils.waitForCondition(aVoid -> terminationCount.get() == 4, 10L, 1000L,
+        "Waiting for all threads to terminate");
+
+    TestUtils.waitForCondition(aVoid -> {
+      accountant.reapFinishedTasks();
+      return accountant.getCancelSentQueries().isEmpty();
+    }, 100L, 1000L, "CancelSentList was not cleared");
+  }
+
+  @Test
+  void testHardCancelOfTwoQueriesAtPanicLevel() {
+    CountDownLatch sampleLatch = new CountDownLatch(1);
+    String expensiveQueryId = "testExpensiveAggregation";
+    String cheapQueryId = "testCheapAggregation";
+    AtomicInteger terminationCount = new AtomicInteger(0);
+
+    TestResourceAccountant accountant = new TestResourceAccountant();
+    Tracing.register(accountant);
+    startQueryThreads(expensiveQueryId, sampleLatch, terminationCount, List.of(1000, 2000, 2500));
+    startQueryThreads(cheapQueryId, sampleLatch, terminationCount, List.of(100, 200, 250));
+
+    // Ensure the Accountant state is correctly initialized
+    waitForQueryResourceTracker(accountant, expensiveQueryId, 5500);
+    waitForQueryResourceTracker(accountant, cheapQueryId, 550);
+
+    // Set the critical level heap usage ratio to a value that will trigger hard cancellation
+    accountant.setPanicLevelHeapUsageRatio(10000, 0.5);
+    accountant.setHeapUsageBytes(6050);
+    accountant.getWatcherTask().runOnce();
+    sampleLatch.countDown();
 
     TestUtils.waitForCondition(
-        aVoid -> accountant.getCancelSentQueries().contains(expensiveQueryId) && !accountant.getCancelSentQueries()
-            .contains(cheapQueryId), 10L, 1000L, "Waiting for one of the queries to be cancelled");
+        aVoid -> accountant.getCancelSentQueries().contains(expensiveQueryId) && accountant.getCancelSentQueries()
+            .contains(cheapQueryId), 10L, 1000L, "Waiting for query to be cancelled");
+    assertTrue(accountant.getCancelSentQueries().contains(expensiveQueryId));
+    TestUtils.waitForCondition(aVoid -> terminationCount.get() == 8, 10L, 1000L,
+        "Waiting for all threads to terminate");
 
     TestUtils.waitForCondition(aVoid -> {
       accountant.reapFinishedTasks();
