@@ -40,6 +40,11 @@ public interface RecordTransformer extends Serializable {
     return List.of();
   }
 
+  /// Provides hint to the transformer with all the columns that are required as input across all the downstream
+  /// transformers in the TransformPipeline.
+  default void withInputColumnsOfDownStreamTransformers(Collection<String> inputColumnsOfDownstream) {
+  }
+
   /// Transforms and returns records based on some custom rules. Implement this method when the transformer can produce
   /// more records (e.g. unnesting) or fewer records (e.g. filtering).
   default List<GenericRow> transform(List<GenericRow> records) {

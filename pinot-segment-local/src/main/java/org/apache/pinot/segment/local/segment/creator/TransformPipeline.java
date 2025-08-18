@@ -53,11 +53,14 @@ public class TransformPipeline {
     _tableNameWithType = tableNameWithType;
     _transformers = transformers;
     FilterTransformer filterTransformer = null;
-    for (RecordTransformer recordTransformer : transformers) {
+    Set<String> cumulativeInputColumns = new HashSet<>();
+    for (int i = transformers.size() - 1; i >= 0; i--) {
+      RecordTransformer recordTransformer = transformers.get(i);
       if (recordTransformer instanceof FilterTransformer) {
         filterTransformer = (FilterTransformer) recordTransformer;
-        break;
       }
+      recordTransformer.withInputColumnsOfDownStreamTransformers(cumulativeInputColumns);
+      cumulativeInputColumns.addAll(recordTransformer.getInputColumns());
     }
     _filterTransformer = filterTransformer;
   }

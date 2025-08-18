@@ -97,6 +97,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
   private final Map<String, String> _prefixesToRename;
   private final boolean _continueOnError;
+  private List<String> _fieldsToUnnestAndKeepOriginal;
 
   private ComplexTypeTransformer(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
@@ -113,6 +114,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     } else {
       _fieldsToUnnest = List.of();
     }
+    _fieldsToUnnestAndKeepOriginal = new ArrayList<>(_fieldsToUnnest);
 
     _delimiter = Objects.requireNonNullElse(complexTypeConfig.getDelimiter(), DEFAULT_DELIMITER);
     _collectionNotUnnestedToJson =
@@ -139,6 +141,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
     _continueOnError = continueOnError;
+    _fieldsToUnnestAndKeepOriginal = new ArrayList<>(_fieldsToUnnest);
   }
 
   @VisibleForTesting
@@ -181,6 +184,11 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   @Override
+  public void withInputColumnsOfDownStreamTransformers(Collection<String> columns) {
+    _fieldsToUnnestAndKeepOriginal.retainAll(columns);
+  }
+
+  @Override
   public List<String> getInputColumns() {
     return _fieldsToUnnest;
   }
@@ -195,7 +203,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
           flattenMap(record, columns);
           transformedRecords.add(record);
         } else {
-          Map<String, Object> originalValues = record.copy(_fieldsToUnnest).getFieldToValueMap();
+          Map<String, Object> originalValues = record.copy(_fieldsToUnnestAndKeepOriginal).getFieldToValueMap();
           flattenMap(record, columns);
           List<GenericRow> unnestedRecords = List.of(record);
           for (String field : _fieldsToUnnest) {
