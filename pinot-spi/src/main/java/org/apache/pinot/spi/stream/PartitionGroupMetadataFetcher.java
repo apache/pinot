@@ -76,8 +76,12 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
             + topicName;
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
-        StreamConsumerFactory.getUniqueClientId(clientId))) {
+    StreamMetadataProvider streamMetadataProvider = null;
+    boolean shouldRecreateProvider = false;
+
+    try {
+      // Use cached provider first
+      streamMetadataProvider = streamConsumerFactory.createCachedStreamMetadataProvider(clientId);
       _newPartitionGroupMetadataList.addAll(streamMetadataProvider.computePartitionGroupMetadata(clientId, streamConfig,
           _partitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000, _forceGetOffsetFromStream));
       if (_exception != null) {
@@ -87,11 +91,22 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
     } catch (TransientConsumerException e) {
       LOGGER.warn("Transient Exception: Could not get partition count for topic {}", topicName, e);
       _exception = e;
+      shouldRecreateProvider = true;
       return Boolean.FALSE;
     } catch (Exception e) {
       LOGGER.warn("Could not get partition count for topic {}", topicName, e);
       _exception = e;
+      shouldRecreateProvider = true;
       throw e;
+    } finally {
+      // Recreate provider on failure to ensure fresh connection for next attempt
+      if (shouldRecreateProvider && streamMetadataProvider != null) {
+        try {
+          streamConsumerFactory.recreateCachedStreamMetadataProvider(clientId);
+        } catch (Exception e) {
+          LOGGER.warn("Failed to recreate stream metadata provider", e);
+        }
+      }
     }
     return Boolean.TRUE;
   }
@@ -112,8 +127,12 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
               .filter(partitionGroupConsumptionStatus -> IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
                   partitionGroupConsumptionStatus.getPartitionGroupId()) == index)
               .collect(Collectors.toList());
-      try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
-          StreamConsumerFactory.getUniqueClientId(clientId))) {
+      StreamMetadataProvider streamMetadataProvider = null;
+      boolean shouldRecreateProvider = false;
+
+      try {
+        // Use cached provider
+        streamMetadataProvider = streamConsumerFactory.createCachedStreamMetadataProvider(clientId);
         _newPartitionGroupMetadataList.addAll(
             streamMetadataProvider.computePartitionGroupMetadata(clientId,
                     streamConfig, topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000,
@@ -130,11 +149,22 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
       } catch (TransientConsumerException e) {
         LOGGER.warn("Transient Exception: Could not get partition count for topic {}", topicName, e);
         _exception = e;
+        shouldRecreateProvider = true;
         return Boolean.FALSE;
       } catch (Exception e) {
         LOGGER.warn("Could not get partition count for topic {}", topicName, e);
         _exception = e;
+        shouldRecreateProvider = true;
         throw e;
+      } finally {
+        // Recreate provider on failure to ensure fresh connection for next attempt
+        if (shouldRecreateProvider && streamMetadataProvider != null) {
+          try {
+            streamConsumerFactory.recreateCachedStreamMetadataProvider(clientId);
+          } catch (Exception e) {
+            LOGGER.warn("Failed to recreate stream metadata provider", e);
+          }
+        }
       }
     }
     return Boolean.TRUE;

@@ -976,14 +976,17 @@ public class PinotLLCRealtimeSegmentManager {
           streamConfig.getTableNameWithType(), streamConfig.getTopicName(), timeThreshold, offsetThreshold);
       return nextOffset;
     }
-    String clientId = getTableTopicUniqueClientId(streamConfig);
+    String clientId = getTableTopicClientId(streamConfig);
     StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     StreamPartitionMsgOffsetFactory offsetFactory = consumerFactory.createStreamMsgOffsetFactory();
     StreamPartitionMsgOffset nextOffsetWithType = offsetFactory.create(nextOffset);
     StreamPartitionMsgOffset offsetAtSLA = null;
     StreamPartitionMsgOffset latestOffset;
-    try (StreamMetadataProvider metadataProvider = consumerFactory.createPartitionMetadataProvider(clientId,
-        partitionId)) {
+    StreamMetadataProvider metadataProvider = null;
+    boolean shouldRecreateProvider = false;
+    try {
+      // Use cached partition metadata provider
+      metadataProvider = consumerFactory.createCachedPartitionMetadataProvider(clientId, partitionId);
       // Fetching timestamp from an offset is an expensive operation which requires reading the data,
       // while fetching offset from timestamp is lightweight and only needs to read metadata.
       // Hence, instead of checking if latestOffset's time - nextOffset's time < SLA, we would check
@@ -1003,7 +1006,17 @@ public class PinotLLCRealtimeSegmentManager {
       }
     } catch (Exception e) {
       LOGGER.warn("Not able to fetch the offset metadata, skip auto resetting offsets", e);
+      shouldRecreateProvider = true;
       return nextOffset;
+    } finally {
+      // Recreate provider on failure to ensure fresh connection for next attempt
+      if (shouldRecreateProvider && metadataProvider != null) {
+        try {
+          consumerFactory.recreateCachedPartitionMetadataProvider(clientId, partitionId);
+        } catch (Exception ex) {
+          // Log but don't throw, as this is cleanup
+        }
+      }
     }
     try {
       if (timeThreshold > 0 && offsetAtSLA != null && offsetAtSLA.compareTo(nextOffsetWithType) < 0) {
@@ -1071,10 +1084,9 @@ public class PinotLLCRealtimeSegmentManager {
     return commitTimeoutMS;
   }
 
-  private String getTableTopicUniqueClientId(StreamConfig streamConfig) {
-    return StreamConsumerFactory.getUniqueClientId(
-        PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
-            + streamConfig.getTopicName());
+  private String getTableTopicClientId(StreamConfig streamConfig) {
+    return PinotLLCRealtimeSegmentManager.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
+        + streamConfig.getTopicName();
   }
 
   /**
@@ -1084,10 +1096,27 @@ public class PinotLLCRealtimeSegmentManager {
   @VisibleForTesting
   Set<Integer> getPartitionIds(StreamConfig streamConfig)
       throws Exception {
-    String clientId = getTableTopicUniqueClientId(streamConfig);
+    String clientId = getTableTopicClientId(streamConfig);
     StreamConsumerFactory consumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    try (StreamMetadataProvider metadataProvider = consumerFactory.createStreamMetadataProvider(clientId)) {
+    StreamMetadataProvider metadataProvider = null;
+    boolean shouldRecreateProvider = false;
+
+    try {
+      // Use cached provider
+      metadataProvider = consumerFactory.createCachedStreamMetadataProvider(clientId);
       return metadataProvider.fetchPartitionIds(5000L);
+    } catch (Exception e) {
+      shouldRecreateProvider = true;
+      throw e;
+    } finally {
+      // Recreate provider on failure to ensure fresh connection for next attempt
+      if (shouldRecreateProvider && metadataProvider != null) {
+        try {
+          consumerFactory.recreateCachedStreamMetadataProvider(clientId);
+        } catch (Exception ex) {
+          // Log but don't throw, as this is cleanup
+        }
+      }
     }
   }
 

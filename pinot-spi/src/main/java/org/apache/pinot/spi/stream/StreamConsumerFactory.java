@@ -76,6 +76,58 @@ public abstract class StreamConsumerFactory {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Creates a cached stream metadata provider that reuses connections when possible.
+   * This method should be preferred over createStreamMetadataProvider to avoid creating
+   * too many open ports when using unique client IDs.
+   *
+   * @param clientId a client id to identify the creator of this consumer
+   * @return cached StreamMetadataProvider instance
+   */
+  public StreamMetadataProvider createCachedStreamMetadataProvider(String clientId) {
+    return StreamMetadataProviderCacheManager.getInstance()
+        .getOrCreateStreamMetadataProvider(this, clientId, _streamConfig);
+  }
+
+  /**
+   * Creates a cached partition metadata provider that reuses connections when possible.
+   * This method should be preferred over createPartitionMetadataProvider to avoid creating
+   * too many open ports when using unique client IDs.
+   *
+   * @param clientId a client id to identify the creator of this consumer
+   * @param partition the partition id of the partition for which this metadata provider is being created
+   * @return cached StreamMetadataProvider instance
+   */
+  public StreamMetadataProvider createCachedPartitionMetadataProvider(String clientId, int partition) {
+    return StreamMetadataProviderCacheManager.getInstance()
+        .getOrCreatePartitionMetadataProvider(this, clientId, _streamConfig, partition);
+  }
+
+  /**
+   * Recreates a stream metadata provider when the cached one fails.
+   * This invalidates the cached provider and creates a new one.
+   *
+   * @param clientId a client id to identify the creator of this consumer
+   * @return new StreamMetadataProvider instance
+   */
+  public StreamMetadataProvider recreateCachedStreamMetadataProvider(String clientId) {
+    return StreamMetadataProviderCacheManager.getInstance()
+        .recreateStreamMetadataProvider(this, clientId, _streamConfig);
+  }
+
+  /**
+   * Recreates a partition metadata provider when the cached one fails.
+   * This invalidates the cached provider and creates a new one.
+   *
+   * @param clientId a client id to identify the creator of this consumer
+   * @param partition the partition id of the partition for which this metadata provider is being created
+   * @return new StreamMetadataProvider instance
+   */
+  public StreamMetadataProvider recreateCachedPartitionMetadataProvider(String clientId, int partition) {
+    return StreamMetadataProviderCacheManager.getInstance()
+        .recreatePartitionMetadataProvider(this, clientId, _streamConfig, partition);
+  }
+
   public static String getUniqueClientId(String prefix) {
     if (prefix == null) {
       return String.valueOf(CLIENT_ID_SEQ.getAndIncrement());

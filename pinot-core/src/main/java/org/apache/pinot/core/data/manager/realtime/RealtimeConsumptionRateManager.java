@@ -349,14 +349,27 @@ public class RealtimeConsumptionRateManager {
 
   @VisibleForTesting
   static final PartitionCountFetcher DEFAULT_PARTITION_COUNT_FETCHER = streamConfig -> {
-    String clientId =
-        StreamConsumerFactory.getUniqueClientId(streamConfig.getTopicName() + "-consumption.rate.manager");
+    String clientId = streamConfig.getTopicName() + "-consumption.rate.manager";
     StreamConsumerFactory factory = StreamConsumerFactoryProvider.create(streamConfig);
-    try (StreamMetadataProvider streamMetadataProvider = factory.createStreamMetadataProvider(clientId)) {
+    StreamMetadataProvider streamMetadataProvider = null;
+    boolean shouldRecreateProvider = false;
+    try {
+      // Use cached provider
+      streamMetadataProvider = factory.createCachedStreamMetadataProvider(clientId);
       return streamMetadataProvider.fetchPartitionCount(/*maxWaitTimeMs*/10_000);
     } catch (Exception e) {
       LOGGER.warn("Error fetching metadata for topic {}", streamConfig.getTopicName(), e);
+      shouldRecreateProvider = true;
       return null;
+    } finally {
+      // Recreate provider on failure to ensure fresh connection for next attempt
+      if (shouldRecreateProvider && streamMetadataProvider != null) {
+        try {
+          factory.recreateCachedStreamMetadataProvider(clientId);
+        } catch (Exception ex) {
+          // Log but don't throw, as this is cleanup
+        }
+      }
     }
   };
 

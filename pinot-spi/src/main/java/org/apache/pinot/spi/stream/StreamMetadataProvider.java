@@ -90,11 +90,26 @@ public interface StreamMetadataProvider extends Closeable {
     // Use offset criteria from stream config
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     for (int i = partitionGroupConsumptionStatuses.size(); i < partitionCount; i++) {
-      try (StreamMetadataProvider partitionMetadataProvider = streamConsumerFactory.createPartitionMetadataProvider(
-          StreamConsumerFactory.getUniqueClientId(clientId), i)) {
+      StreamMetadataProvider partitionMetadataProvider = null;
+      boolean shouldRecreateProvider = false;
+      try {
+        // Use cached partition metadata provider
+        partitionMetadataProvider = streamConsumerFactory.createCachedPartitionMetadataProvider(clientId, i);
         StreamPartitionMsgOffset streamPartitionMsgOffset =
             partitionMetadataProvider.fetchStreamPartitionOffset(streamConfig.getOffsetCriteria(), timeoutMillis);
         newPartitionGroupMetadataList.add(new PartitionGroupMetadata(i, streamPartitionMsgOffset));
+      } catch (Exception e) {
+        shouldRecreateProvider = true;
+        throw e;
+      } finally {
+        // Recreate provider on failure to ensure fresh connection for next attempt
+        if (shouldRecreateProvider && partitionMetadataProvider != null) {
+          try {
+            streamConsumerFactory.recreateCachedPartitionMetadataProvider(clientId, i);
+          } catch (Exception ex) {
+            // Log but don't throw, as this is cleanup
+          }
+        }
       }
     }
     return newPartitionGroupMetadataList;
