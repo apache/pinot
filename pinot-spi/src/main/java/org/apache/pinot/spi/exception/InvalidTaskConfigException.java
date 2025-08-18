@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.spi.exception;
 
-public class InvalidTableTaskConfigException extends InvalidTableConfigException {
+public class InvalidTaskConfigException extends InvalidTableConfigException {
 
-  public InvalidTableTaskConfigException(String message) {
+  public InvalidTaskConfigException(String message) {
     super(InvalidTableConfigExceptionType.TASK_CONFIG_INVALID, message);
   }
 
-  public InvalidTableTaskConfigException(String message, Throwable cause) {
+  public InvalidTaskConfigException(String message, Throwable cause) {
     super(InvalidTableConfigExceptionType.TASK_CONFIG_INVALID, message, cause);
   }
 }

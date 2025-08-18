@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.exception.InvalidTableConfigException;
-import org.apache.pinot.spi.exception.InvalidTableTaskConfigException;
+import org.apache.pinot.spi.exception.InvalidTaskConfigException;
 import org.apache.pinot.spi.exception.TaskNotAllowedForTableException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.quartz.CronScheduleBuilder;
@@ -74,7 +74,7 @@ public abstract class TableTaskTypeConfig {
    * but is used by controller for persisting user defined configs
    * This is required because the attribute values in the subclass are modified based on defaults, corrections, etc
    */
-  protected Map<String, String> _configs;
+  private Map<String, String> _configs;
 
   protected TableTaskTypeConfig(Map<String, String> configs) {
     // TODO - Move the constants from pinot-controller to pinot-spi and use them here.
@@ -100,7 +100,7 @@ public abstract class TableTaskTypeConfig {
 
   /**
    * Corrects the task type configuration if needed to make it pass validations
-   * This will only work if the validation failed due to {@link InvalidTableTaskConfigException}.
+   * This will only work if the validation failed due to {@link InvalidTaskConfigException}.
    * This is typically used when task generator runs but the current task type configuration is invalid
    * due to modifications in validation logic across Pinot versions.
    * TODO - This should be called by PinotTaskGenerator before generating tasks. It shouldn't be called by each task.
@@ -131,17 +131,17 @@ public abstract class TableTaskTypeConfig {
 
   /**
    * Validates the task type configuration.
-   * @throws InvalidTableTaskConfigException with message on why the configuration is not valid.
+   * @throws InvalidTaskConfigException with message on why the configuration is not valid.
    */
-  protected abstract void checkTaskConfigValiditiy() throws InvalidTableTaskConfigException;
+  protected abstract void checkTaskConfigValiditiy() throws InvalidTaskConfigException;
 
-  private void validateCronSchedule() throws InvalidTableTaskConfigException {
+  private void validateCronSchedule() throws InvalidTaskConfigException {
     if (_schedule.isPresent()) {
       String cronExprStr = _schedule.get();
       try {
         CronScheduleBuilder.cronSchedule(cronExprStr);
       } catch (Exception e) {
-        throw new InvalidTableTaskConfigException(
+        throw new InvalidTaskConfigException(
             String.format("Task contains an invalid cron schedule: %s. Cron schedule is required in quartz format",
                 cronExprStr), e);
       }
