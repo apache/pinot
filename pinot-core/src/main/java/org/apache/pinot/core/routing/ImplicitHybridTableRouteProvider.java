@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
@@ -52,7 +53,7 @@ public class ImplicitHybridTableRouteProvider implements TableRouteProvider {
   }
 
   public void fillTableConfigMetadata(ImplicitHybridTableRouteInfo tableRouteInfo,
-      String tableName, TableCache tableCache) {
+      String tableName, TableCacheProvider tableCache) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
 
     if (tableType == TableType.OFFLINE) {

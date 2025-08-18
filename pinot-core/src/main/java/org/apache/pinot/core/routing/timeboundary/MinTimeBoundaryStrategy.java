@@ -23,7 +23,7 @@ import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
@@ -40,7 +40,7 @@ public class MinTimeBoundaryStrategy implements TimeBoundaryStrategy {
   Map<String, DateTimeFormatSpec> _dateTimeFormatSpecMap;
 
   @Override
-  public void init(LogicalTableConfig logicalTableConfig, TableCache tableCache) {
+  public void init(LogicalTableConfig logicalTableConfig, TableCacheProvider tableCache) {
     List<String> includedTables = getTimeBoundaryTableNames(logicalTableConfig);
     _dateTimeFormatSpecMap = new HashMap<>(includedTables.size());
     for (String physicalTableName : includedTables) {

@@ -65,7 +65,7 @@ import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.sql.fun.PinotOperatorTable;
 import org.apache.pinot.calcite.sql2rel.PinotConvertletTable;
 import org.apache.pinot.common.catalog.PinotCatalogReader;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.query.catalog.PinotCatalog;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
@@ -155,7 +155,7 @@ public class QueryEnvironment {
     _optProgram = getOptProgram(Set.of(), Set.of());
   }
 
-  public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
+  public QueryEnvironment(String database, TableCacheProvider tableCache, @Nullable WorkerManager workerManager) {
     this(configBuilder()
         .requestId(-1L)
         .database(database)
@@ -645,7 +645,7 @@ public class QueryEnvironment {
      * In theory nullable only in tests. We should fix LiteralOnlyBrokerRequestTest to not need this.
      */
     @Nullable
-    TableCache getTableCache();
+    TableCacheProvider getTableCache();
 
     /**
      * Whether the schema should be considered case-insensitive.

@@ -40,7 +40,7 @@ import org.apache.calcite.rel.hint.RelHint;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.DataSource;
@@ -98,11 +98,11 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafStageWorkerAssignmentRule.class);
   private static final int LIMIT_OF_INVALID_SEGMENTS_TO_LOG = 3;
   private static final BrokerMetrics BROKER_METRICS = BrokerMetrics.get();
-  private final TableCache _tableCache;
+  private final TableCacheProvider _tableCache;
   private final RoutingManager _routingManager;
   private final PhysicalPlannerContext _physicalPlannerContext;
 
-  public LeafStageWorkerAssignmentRule(PhysicalPlannerContext physicalPlannerContext, TableCache tableCache) {
+  public LeafStageWorkerAssignmentRule(PhysicalPlannerContext physicalPlannerContext, TableCacheProvider tableCache) {
     _routingManager = physicalPlannerContext.getRoutingManager();
     _physicalPlannerContext = physicalPlannerContext;
     _tableCache = tableCache;

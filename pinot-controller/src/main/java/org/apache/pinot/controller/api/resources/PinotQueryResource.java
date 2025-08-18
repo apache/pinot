@@ -55,6 +55,8 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
+import org.apache.pinot.common.config.provider.TableCacheQueryValidator;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -70,7 +72,9 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -162,18 +166,58 @@ public class PinotQueryResource {
       LOGGER.warn("Caught exception while parsing request {}", e.getMessage());
       return new MultiStageQueryValidationResponse(false, "Failed to parse request JSON: " + e.getMessage(), null);
     }
-    if (!requestJson.has("sql")) {
-      return new MultiStageQueryValidationResponse(false, "JSON Payload is missing the query string field 'sql'", null);
+
+    if (!requestJson.has("sql") || requestJson.get("sql").asText().trim().isEmpty()) {
+      return new MultiStageQueryValidationResponse(false, "Request is missing the query string field 'sql'", null);
     }
+
     String sqlQuery = requestJson.get("sql").asText();
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
-    try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database,
-        _pinotHelixResourceManager.getTableCache(), null).compile(sqlQuery)) {
-      return new MultiStageQueryValidationResponse(true, null, null);
+
+    try {
+      TableCacheProvider tableCache;
+
+      if (requestJson.has("tableConfigs") && requestJson.has("schemas")) {
+        List<TableConfig> tableConfigs = new ArrayList<>();
+        for (JsonNode tableConfigNode : requestJson.get("tableConfigs")) {
+          tableConfigs.add(JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class));
+        }
+
+        List<Schema> schemas = new ArrayList<>();
+        for (JsonNode schemaNode : requestJson.get("schemas")) {
+          schemas.add(JsonUtils.jsonNodeToObject(schemaNode, Schema.class));
+        }
+
+        List<LogicalTableConfig> logicalTableConfigs = new ArrayList<>();
+        if (requestJson.has("logicalTableConfigs")) {
+          for (JsonNode logicalTableConfigNode : requestJson.get("logicalTableConfigs")) {
+            logicalTableConfigs.add(JsonUtils.jsonNodeToObject(logicalTableConfigNode, LogicalTableConfig.class));
+          }
+        }
+
+        boolean ignoreCase = false;
+        if (requestJson.has("ignoreCase")) {
+          ignoreCase = requestJson.get("ignoreCase").asBoolean();
+        }
+
+        tableCache = new TableCacheQueryValidator(tableConfigs, schemas, logicalTableConfigs, ignoreCase);
+      } else {
+        // Use TableCache from environment
+        tableCache = _pinotHelixResourceManager.getTableCache();
+      }
+
+      try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache,
+          null).compile(sqlQuery)) {
+        return new MultiStageQueryValidationResponse(true, null, null);
+      }
     } catch (QueryException e) {
       LOGGER.info("Caught exception while compiling multi-stage query: {}", e.getMessage());
       return new MultiStageQueryValidationResponse(false, e.getMessage(), e.getErrorCode());
+    } catch (Exception e) {
+      LOGGER.error("Unexpected exception while validating multi-stage query", e);
+      return new MultiStageQueryValidationResponse(false, "Unexpected error: " + e.getMessage(),
+          QueryErrorCode.QUERY_VALIDATION);
     }
   }
 

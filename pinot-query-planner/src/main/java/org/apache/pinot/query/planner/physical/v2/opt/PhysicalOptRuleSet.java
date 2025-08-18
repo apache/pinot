@@ -20,7 +20,7 @@ package org.apache.pinot.query.planner.physical.v2.opt;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.AggregatePushdownRule;
 import org.apache.pinot.query.planner.physical.v2.opt.rules.LeafStageAggregateRule;
@@ -37,7 +37,7 @@ public class PhysicalOptRuleSet {
   private PhysicalOptRuleSet() {
   }
 
-  public static List<PRelNodeTransformer> create(PhysicalPlannerContext context, TableCache tableCache) {
+  public static List<PRelNodeTransformer> create(PhysicalPlannerContext context, TableCacheProvider tableCache) {
     List<PRelNodeTransformer> transformers = new ArrayList<>();
     transformers.add(create(LeafStageBoundaryRule.INSTANCE, RuleExecutors.Type.POST_ORDER, context));
     transformers.add(create(new LeafStageWorkerAssignmentRule(context, tableCache), RuleExecutors.Type.POST_ORDER,

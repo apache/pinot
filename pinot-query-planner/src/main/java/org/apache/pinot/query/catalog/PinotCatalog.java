@@ -31,7 +31,7 @@ import org.apache.calcite.schema.SchemaPlus;
 import org.apache.calcite.schema.SchemaVersion;
 import org.apache.calcite.schema.Schemas;
 import org.apache.calcite.schema.Table;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
@@ -39,21 +39,22 @@ import static java.util.Objects.requireNonNull;
 
 
 /**
- * Simple Catalog that only contains list of tables. Backed by {@link TableCache}.
+ * Simple Catalog that only contains list of tables. Backed by {@link TableCacheProvider}.
  *
  * <p>Catalog is needed for utilizing Apache Calcite's validator, which requires a root schema to store the
  * entire catalog. In Pinot, since we don't have nested sub-catalog concept, we just return a flat list of schemas.
  */
 public class PinotCatalog implements Schema {
 
-  private final TableCache _tableCache;
+  private final TableCacheProvider _tableCache;
   private final String _databaseName;
 
   /**
-   * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
-   * table available for query and processes table/segment metadata updates when cluster status changes.
+   * PinotCatalog needs have access to the actual {@link TableCacheProvider} object because TableCacheProvider hosts
+   * the actual table available for query and processes table/segment metadata updates when cluster
+   * status changes.
    */
-  public PinotCatalog(TableCache tableCache, String databaseName) {
+  public PinotCatalog(TableCacheProvider tableCache, String databaseName) {
     _tableCache = tableCache;
     _databaseName = databaseName;
   }

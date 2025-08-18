@@ -42,7 +42,6 @@ import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
-import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -61,11 +60,11 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * An implementation of {@link PinotConfigProvider}
+ * An implementation of {@link TableCacheProvider}
  * The {@code TableCache} caches all the table configs and schemas within the cluster, and listens on ZK changes to keep
  * them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
  */
-public class TableCache implements PinotConfigProvider {
+public class TableCache implements TableCacheProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
@@ -646,7 +645,7 @@ public class TableCache implements PinotConfigProvider {
     }
   }
 
-  private static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
+  public static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
       QueryConfig queryConfig) {
     Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
     if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {

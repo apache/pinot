@@ -22,7 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.query.context.PlannerContext;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
@@ -38,10 +38,10 @@ public class PinotDispatchPlanner {
   private final long _requestId;
   private final PlannerContext _plannerContext;
 
-  private final TableCache _tableCache;
+  private final TableCacheProvider _tableCache;
 
   public PinotDispatchPlanner(PlannerContext plannerContext, WorkerManager workerManager, long requestId,
-      TableCache tableCache) {
+      TableCacheProvider tableCache) {
     _plannerContext = plannerContext;
     _workerManager = workerManager;
     _requestId = requestId;
