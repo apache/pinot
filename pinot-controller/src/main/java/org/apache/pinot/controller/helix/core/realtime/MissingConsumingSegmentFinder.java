@@ -182,7 +182,8 @@ public class MissingConsumingSegmentFinder {
 
   private void updateMap(Map<String, LLCSegmentName> partitionGroupInfoToLatestSegmentMap,
       LLCSegmentName llcSegmentName) {
-    partitionGroupInfoToLatestSegmentMap.compute(llcSegmentName.getPartitionGroupTopicAndId(), (pid, existingSegment) -> {
+    partitionGroupInfoToLatestSegmentMap.compute(llcSegmentName.getPartitionGroupTopicAndId(),
+        (pid, existingSegment) -> {
       if (existingSegment == null) {
         return llcSegmentName;
       } else {

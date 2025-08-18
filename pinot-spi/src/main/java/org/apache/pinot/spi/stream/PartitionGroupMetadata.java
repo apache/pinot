@@ -41,7 +41,8 @@ public class PartitionGroupMetadata {
     this(null, partitionGroupId, startOffset);
   }
 
-  public PartitionGroupMetadata(@Nullable String topicName, int partitionGroupId, StreamPartitionMsgOffset startOffset) {
+  public PartitionGroupMetadata(@Nullable String topicName, int partitionGroupId,
+      StreamPartitionMsgOffset startOffset) {
     _topicName = topicName;
     _partitionGroupId = partitionGroupId;
     _startOffset = startOffset;

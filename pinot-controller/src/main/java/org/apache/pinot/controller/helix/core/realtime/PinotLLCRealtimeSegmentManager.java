@@ -1348,8 +1348,9 @@ public class PinotLLCRealtimeSegmentManager {
     Map<String, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
     for (String segmentName : segments) {
       LLCSegmentName llcSegmentName = new LLCSegmentName(segmentName);
-      latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionGroupTopicAndId(), (partitionInfo, latestLLCSegmentName) -> {
-        if (latestLLCSegmentName == null) {
+      latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionGroupTopicAndId(),
+          (partitionInfo, latestLLCSegmentName) -> {
+            if (latestLLCSegmentName == null) {
           return llcSegmentName;
         } else {
           if (llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
@@ -1910,8 +1911,8 @@ public class PinotLLCRealtimeSegmentManager {
     int partitionGroupId = partitionGroupMetadata.getPartitionGroupId();
     String topicName = partitionGroupMetadata.getTopicName();
     String startOffset = partitionGroupMetadata.getStartOffset().toString();
-    LOGGER.info("Setting up new partition group: {} for table: {}", partitionGroupMetadata.getPartitionGroupTopicAndId(),
-        realtimeTableName);
+    LOGGER.info("Setting up new partition group: {} for table: {}",
+        partitionGroupMetadata.getPartitionGroupTopicAndId(), realtimeTableName);
 
     String rawTableName = TableNameBuilder.extractRawTableName(realtimeTableName);
     LLCSegmentName newLLCSegmentName =
@@ -2422,7 +2423,8 @@ public class PinotLLCRealtimeSegmentManager {
         .map(Integer::parseInt)
         .collect(Collectors.toSet());
     Set<String> targetSegments = allConsumingSegments.stream()
-        .filter(segmentName -> partitionsToCommit.contains(new LLCSegmentName(segmentName).getPartitionGroupTopicAndId()))
+        .filter(
+            segmentName -> partitionsToCommit.contains(new LLCSegmentName(segmentName).getPartitionGroupTopicAndId()))
         .collect(Collectors.toSet());
     Preconditions.checkState(!targetSegments.isEmpty(), "Cannot find segments to commit for partitions: %s",
         partitionGroupInfosToCommitStr);
