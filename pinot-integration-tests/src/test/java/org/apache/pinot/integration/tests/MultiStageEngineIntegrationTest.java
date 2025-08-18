@@ -1767,7 +1767,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
     JsonNode schemaNode = JsonUtils.stringToJsonNode(
         sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
-    
+
     String[] successfulQueries = {
         "SELECT COUNT(*) FROM mytable",
         "SELECT DivAirportSeqIDs, COUNT(*) FROM mytable GROUP BY DivAirportSeqIDs",
