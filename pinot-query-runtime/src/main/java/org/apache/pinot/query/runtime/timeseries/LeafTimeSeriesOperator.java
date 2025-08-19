@@ -21,7 +21,7 @@ package org.apache.pinot.query.runtime.timeseries;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
 import org.apache.pinot.core.operator.blocks.results.AggregationResultsBlock;
 import org.apache.pinot.core.operator.blocks.results.GroupByResultsBlock;

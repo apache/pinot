@@ -20,7 +20,7 @@ package org.apache.pinot.query.routing;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 
 

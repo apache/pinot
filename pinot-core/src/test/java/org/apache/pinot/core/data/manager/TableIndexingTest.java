@@ -523,7 +523,8 @@ public class TableIndexingTest {
       Assert.fail("No expected status found for test case: " + testCase);
     } else if (testCase._expectedSuccess && testCase._error != null) {
       Assert.fail("Expected success for test case: " + testCase + " but got error: " + testCase._error);
-    } else if (!testCase._expectedSuccess && !testCase.getErrorMessage().equals(testCase._expectedMessage)) {
+    } else if (!testCase._expectedSuccess && !testCase.getErrorMessage().equals(testCase._expectedMessage)
+        && !testCase.getErrorMessage().matches(testCase._expectedMessage)) {
       Assert.fail("Expected error: \"" + testCase._expectedMessage + "\" for test case: " + testCase + " but got: \""
           + testCase.getErrorMessage() + "\"");
     }

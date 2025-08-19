@@ -44,10 +44,15 @@ data: {
     keywords: [
       "FILE"
       "ARCHIVE"
-      "BIG_DECIMAL"
-      "BYTES"
+      # Pinot types allowed in CAST function
+      # LONG - for BIGINT
+      # BIG_DECIMAL - for DECIMAL
+      # STRING - for VARCHAR
+      # BYTES - for VARBINARY
       "LONG"
+      "BIG_DECIMAL"
       "STRING"
+      "BYTES"
     ]
 
     # List of non-reserved keywords to add;
@@ -55,14 +60,16 @@ data: {
     nonReservedKeywordsToAdd: [
       "FILE"
       "ARCHIVE"
-      "BIG_DECIMAL"
-      "BYTES"
-      "LONG"
-      "STRING"
       # Pinot allows using DEFAULT as the catalog name
       "DEFAULT_"
-      # Pinot allows using DATETIME as column name
+      # Pinot allows using LONG/BIG_DECIMAL/STRING/BYTES/DATETIME/VARIANT/UUID as column name
+      "LONG"
+      "BIG_DECIMAL"
+      "STRING"
+      "BYTES"
       "DATETIME"
+      "VARIANT"
+      "UUID"
 
       # The following keywords are reserved in core Calcite,
       # are reserved in some version of SQL,

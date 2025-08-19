@@ -44,6 +44,7 @@ public class QueryMonitorConfigTest {
   private static final boolean EXPECTED_IS_CPU_TIME_BASED_KILLING_ENABLED = true;
   private static final long EXPECTED_CPU_TIME_BASED_KILLING_THRESHOLD_NS = 1000;
   private static final boolean EXPECTED_IS_QUERY_KILLED_METRIC_ENABLED = true;
+  private static final boolean EXPECTED_IS_THREAD_SELF_TERMINATE_IN_PANIC_MODE = true;
   private static final Map<String, String> CLUSTER_CONFIGS = new HashMap<>();
 
   private static String getFullyQualifiedConfigName(String config) {
@@ -79,6 +80,9 @@ public class QueryMonitorConfigTest {
         Double.toString(EXPECTED_MIN_MEMORY_FOOTPRINT_FOR_KILL));
     CLUSTER_CONFIGS.put(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED),
         Boolean.toString(EXPECTED_IS_QUERY_KILLED_METRIC_ENABLED));
+    CLUSTER_CONFIGS.put(
+        getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE),
+        Boolean.toString(EXPECTED_IS_THREAD_SELF_TERMINATE_IN_PANIC_MODE));
   }
 
   @Test
@@ -242,5 +246,18 @@ public class QueryMonitorConfigTest {
         .onChange(Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED)),
             CLUSTER_CONFIGS);
     assertTrue(accountant.getWatcherTask().getQueryMonitorConfig().isQueryKilledMetricEnabled());
+  }
+
+  @Test
+  void testThreadSelfTerminateInPanicMode() {
+    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
+        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(), "test",
+            InstanceType.SERVER);
+
+    assertFalse(accountant.getWatcherTask().getQueryMonitorConfig().isThreadSelfTerminate());
+    accountant.getWatcherTask().onChange(
+        Set.of(getFullyQualifiedConfigName(CommonConstants.Accounting.CONFIG_OF_THREAD_SELF_TERMINATE)),
+        CLUSTER_CONFIGS);
+    assertTrue(accountant.getWatcherTask().getQueryMonitorConfig().isThreadSelfTerminate());
   }
 }

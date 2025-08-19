@@ -83,6 +83,7 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
     startZk();
     startController();
     startBroker();
+    Tracing.unregisterThreadAccountant();
     startServer();
 
     if (_controllerRequestURLBuilder == null) {

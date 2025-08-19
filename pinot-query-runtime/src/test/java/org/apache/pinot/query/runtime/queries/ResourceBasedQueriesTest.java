@@ -62,6 +62,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.SkipException;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -287,8 +288,8 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
       throws Exception {
     // query pinot
     if (ignoreV2Optimizer) {
-      LOGGER.warn("Ignoring query for test-case ({}): with v2 optimizer: {}", testCaseName, sql);
-      return;
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
     }
     sql = String.format("SET usePhysicalOptimizer=true; %s", sql);
     runQuery(sql, expect, false).ifPresent(queryResult -> {
@@ -302,7 +303,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithOutput(String testCaseName, boolean isIgnored, String sql, String h2Sql,
-      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
     runQuery(sql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -310,8 +311,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithNewOptimizerWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
+    if (ignoreV2Optimizer) {
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
+    }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -319,8 +324,12 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
 
   @Test(dataProvider = "testResourceQueryTestCaseProviderBoth")
   public void testQueryTestCasesWithLiteModeWithOutput(String testCaseName, boolean isIgnored, String sql,
-      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder)
+      String h2Sql, List<Object[]> expectedRows, String expect, boolean keepOutputRowOrder, boolean ignoreV2Optimizer)
       throws Exception {
+    if (ignoreV2Optimizer) {
+      throw new SkipException(
+          "Ignoring query for test-case with v2 optimizer, testCase: " + testCaseName + ", SQL: " + sql);
+    }
     final String finalSql = String.format("SET usePhysicalOptimizer=true; SET useLiteMode=true; %s", sql);
     runQuery(finalSql, expect, false).ifPresent(
         queryResult -> compareRowEquals(queryResult.getResultTable(), expectedRows, keepOutputRowOrder));
@@ -435,7 +444,7 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
           }
           Object[] testEntry = new Object[]{
               testCaseName, queryCase._ignored, sql, h2Sql, expectedRows, queryCase._expectedException,
-              queryCase._keepOutputRowOrder
+              queryCase._keepOutputRowOrder, queryCase._ignoreV2Optimizer
           };
           providerContent.add(testEntry);
         }

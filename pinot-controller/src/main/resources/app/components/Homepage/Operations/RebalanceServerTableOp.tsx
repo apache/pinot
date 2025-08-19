@@ -32,6 +32,7 @@ import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
 import {rebalanceServerOptions} from "./RebalanceServer/RebalanceServerOptions";
 import {RebalanceServerConfigurationOption} from "./RebalanceServer/RebalanceServerConfigurationOption";
 import {RebalanceResponse} from "./RebalanceServer/RebalanceResponse";
+import {RebalanceServerStatusOp} from "./RebalanceServerStatusOp";
 
 type Props = {
   tableType: string,
@@ -41,8 +42,16 @@ type Props = {
 
 const DryRunAction = ({ handleOnRun, disabled }: { handleOnRun: () => void, disabled?: boolean }) => {
   return (
-      <Button disabled={disabled} onClick={handleOnRun} variant="outlined" style={{ textTransform: 'none' }} color="primary">
+      <Button disabled={disabled} onClick={handleOnRun} variant="contained" style={{ textTransform: 'none' }} color="primary">
         Dry Run
+      </Button>
+  );
+}
+
+const RebalanceAction = ({ handleOnRun, disabled }: { handleOnRun: () => void, disabled?: boolean }) => {
+  return (
+      <Button disabled={disabled} onClick={handleOnRun} variant="contained" style={{ textTransform: 'none' }} color="primary">
+        Rebalance
       </Button>
   );
 }
@@ -55,6 +64,8 @@ const BackAction = ({ onClick }: { onClick: () => void }) => {
   );
 }
 
+
+
 export default function RebalanceServerTableOp({
   hideModal,
   tableName,
@@ -65,6 +76,12 @@ export default function RebalanceServerTableOp({
   const [rebalanceConfig, setRebalanceConfig] = React.useState(
       rebalanceServerOptions.reduce((config, option) => ({ ...config, [option.name]: option.defaultValue }), {})
   );
+  const [isDryRun, setIsDryRun] = React.useState(false);
+  const [dryRunCompleted, setDryRunCompleted] = React.useState(false);
+  const [dryRunResponse, setDryRunResponse] = React.useState(null);
+  const [showingDryRunResults, setShowingDryRunResults] = React.useState(false);
+  const [showJobStatusDialog, setShowJobStatusDialog] = React.useState(false);
+  const [selectedJobId, setSelectedJobId] = React.useState<string | null>(null);
 
   const getData = () => {
     return {
@@ -87,10 +104,14 @@ export default function RebalanceServerTableOp({
     } else {
       setRebalanceResponse(response);
     }
+
+    setShowingDryRunResults(false);
+    setIsDryRun(false);
     setPending(false);
   };
 
-  const handleDryRun = async () => {
+    const handleDryRun = async () => {
+    setIsDryRun(true);
     const data = getData();
     setPending(true);
     const response = await PinotMethodUtils.rebalanceServersForTableOp(tableName, {
@@ -106,7 +127,10 @@ export default function RebalanceServerTableOp({
       })
     } else {
       setRebalanceResponse(response);
+      setDryRunResponse(response);
+      setDryRunCompleted(true);
     }
+    setShowingDryRunResults(true);
     setPending(false);
   };
 
@@ -137,62 +161,95 @@ export default function RebalanceServerTableOp({
 
   const handleBackBtnOnClick = () => {
     setRebalanceResponse(null);
+    setShowingDryRunResults(false);
+    setIsDryRun(false);
   }
 
-  return (
-    <Dialog
-      showTitleDivider
-      showFooterDivider
-      size='md'
-      okBtnDisabled={pending}
-      open={true}
-      handleClose={hideModal}
-      title={<RebalanceServerDialogHeader />}
-      handleSave={handleSave}
-      btnOkText='Rebalance'
-      showOkBtn={!rebalanceResponse}
-      moreActions={
-        !rebalanceResponse ?
-            <DryRunAction disabled={pending} handleOnRun={handleDryRun} /> :
-            <BackAction onClick={handleBackBtnOnClick} />
-      }
-    >
-        {!rebalanceResponse ?
-          <Box flexDirection="column">
-            <RebalanceServerSection sectionTitle='Before you begin'>
-              <Alert color='info' icon={<InfoOutlinedIcon fontSize='small' />}>
-                <Typography variant='body2'>
-                  It is strongly recommended to run once via "Dry Run" with the options enabled prior to running the actual "Rebalance" operation.
-                  This is needed to verify that rebalance will do what's expected.
-                </Typography>
-              </Alert>
-            </RebalanceServerSection>
-            <Divider style={{ marginBottom: 20 }} />
-            <RebalanceServerSection sectionTitle='Basic Options'>
-              <Grid container spacing={2}>
-                {rebalanceServerOptions.filter(option => !option.isAdvancedConfig && !option.isStatsGatheringConfig).map((option) => (
-                    <Grid item xs={12} key={`basic-options-${option.name}`}>
-                      <RebalanceServerConfigurationOption rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />
-                    </Grid>
-                ))}
-              </Grid>
-            </RebalanceServerSection>
-            <Divider style={{ marginBottom: 20 }}/>
-            <RebalanceServerSection sectionTitle='Advanced Options' canHideSection showSectionByDefault={false}>
-              <Grid container spacing={2}>
-                {rebalanceServerOptions.filter(option => option.isAdvancedConfig).map((option) => (
-                    <Grid item xs={12} key={`advanced-options-${option.name}`}>
-                      <RebalanceServerConfigurationOption rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />
-                    </Grid>
-                ))}
-              </Grid>
-            </RebalanceServerSection>
+  const handleJobIdClick = (jobId: string) => {
+    setSelectedJobId(jobId);
+    setShowJobStatusDialog(true);
+  }
+
+  const handleCloseJobStatusDialog = () => {
+    setShowJobStatusDialog(false);
+    setSelectedJobId(null);
+  }
+
+  const getDialogActions = () => {
+    if (!showingDryRunResults && !rebalanceResponse) {
+      return <DryRunAction disabled={pending} handleOnRun={handleDryRun} />;
+    }
+    
+    if (showingDryRunResults) {
+      return (
+        <Box display="flex">
+          <BackAction onClick={handleBackBtnOnClick} />
+          <Box ml={1}>
+            <RebalanceAction disabled={pending} handleOnRun={handleSave} />
           </Box>
-        : 
-          <React.Fragment>
-            <RebalanceResponse response={rebalanceResponse} />
-          </React.Fragment>
-        }
-    </Dialog>
+        </Box>
+      );
+    }
+    
+    return <BackAction onClick={handleBackBtnOnClick} />;
+  };
+
+  return (
+    <React.Fragment>
+      <Dialog
+        showTitleDivider
+        showFooterDivider
+        size='md'
+        okBtnDisabled={pending}
+        open={true}
+        handleClose={hideModal}
+        title={<RebalanceServerDialogHeader />}
+        showOkBtn={false}
+        moreActions={getDialogActions()}
+      >
+          {!showingDryRunResults && !rebalanceResponse && (
+            <Box flexDirection="column">
+              <RebalanceServerSection sectionTitle='Basic Options'>
+                <Grid container spacing={2}>
+                  {rebalanceServerOptions.filter(option => !option.isAdvancedConfig && !option.isStatsGatheringConfig).map((option) => (
+                      <Grid item xs={12} key={`basic-options-${option.name}`}>
+                        <RebalanceServerConfigurationOption rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />
+                      </Grid>
+                  ))}
+                </Grid>
+              </RebalanceServerSection>
+              <Divider style={{ marginBottom: 20 }}/>
+              <RebalanceServerSection sectionTitle='Advanced Options' canHideSection showSectionByDefault={false}>
+                <Grid container spacing={2}>
+                  {rebalanceServerOptions.filter(option => option.isAdvancedConfig).map((option) => (
+                      <Grid item xs={12} key={`advanced-options-${option.name}`}>
+                        <RebalanceServerConfigurationOption rebalanceConfig={rebalanceConfig} option={option} handleConfigChange={handleConfigChange} />
+                      </Grid>
+                  ))}
+                </Grid>
+              </RebalanceServerSection>
+            </Box>
+          )}
+
+          {showingDryRunResults && dryRunResponse && (
+            <React.Fragment>
+              <RebalanceResponse response={dryRunResponse} onJobIdClick={handleJobIdClick} />
+            </React.Fragment>
+          )}
+
+          {rebalanceResponse && !showingDryRunResults && (
+            <React.Fragment>
+              <RebalanceResponse response={rebalanceResponse} onJobIdClick={handleJobIdClick} />
+            </React.Fragment>
+          )}
+      </Dialog>
+      {showJobStatusDialog && (
+        <RebalanceServerStatusOp
+          tableName={tableName}
+          hideModal={handleCloseJobStatusDialog}
+          initialJobId={selectedJobId}
+        />
+      )}
+    </React.Fragment>
   );
 }

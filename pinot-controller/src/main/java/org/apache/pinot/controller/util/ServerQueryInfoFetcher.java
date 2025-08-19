@@ -27,6 +27,8 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -34,6 +36,7 @@ import org.apache.pinot.spi.utils.InstanceTypeUtils;
  * repeated ZK access. This class is NOT thread-safe.
  */
 public class ServerQueryInfoFetcher {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ServerQueryInfoFetcher.class);
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final Map<String, ServerQueryInfo> _cache;
 
@@ -51,6 +54,7 @@ public class ServerQueryInfoFetcher {
   private ServerQueryInfo getServerQueryInfoOndemand(String instanceId) {
     InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceId);
     if (instanceConfig == null || !InstanceTypeUtils.isServer(instanceId)) {
+      LOGGER.warn("Instance config for instanceId {} is null or not a server instance", instanceId);
       return null;
     }
     List<String> tags = instanceConfig.getTags();
@@ -59,7 +63,8 @@ public class ServerQueryInfoFetcher {
     boolean queriesDisabled = record.getBooleanField(CommonConstants.Helix.QUERIES_DISABLED, false);
     boolean shutdownInProgress = record.getBooleanField(CommonConstants.Helix.IS_SHUTDOWN_IN_PROGRESS, false);
 
-    return new ServerQueryInfo(instanceId, tags, null, helixEnabled, queriesDisabled, shutdownInProgress);
+    return new ServerQueryInfo(
+        instanceId, tags, null, helixEnabled, queriesDisabled, shutdownInProgress);
   }
 
   public static class ServerQueryInfo {
@@ -90,6 +95,16 @@ public class ServerQueryInfoFetcher {
 
     public boolean isShutdownInProgress() {
       return _shutdownInProgress;
+    }
+
+    @Override
+    public String toString() {
+      return "ServerQueryInfo{"
+          + "instanceName='" + _instanceName + '\''
+          + ", helixEnabled=" + _helixEnabled
+          + ", queriesDisabled=" + _queriesDisabled
+          + ", shutdownInProgress=" + _shutdownInProgress
+          + '}';
     }
   }
 }

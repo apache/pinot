@@ -78,6 +78,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
   }
 
   public enum Mode {
+    /// Sends stats only if all the cluster participants use the same known version.
     SAFE {
       @Override
       public SendStatsPredicate create(HelixManager helixManager) {
@@ -210,6 +211,8 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
         } else {
           LOGGER.warn("Send MSE stats is now disabled (problematic versions: {})", _problematicVersionsById);
         }
+      } else if (!_sendStats) {
+        LOGGER.info("Send MSE stats is still disabled (problematic versions: {})", _problematicVersionsById);
       }
     }
 
@@ -223,10 +226,6 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
       return instanceConfig.getRecord().getStringField(CommonConstants.Helix.Instance.PINOT_VERSION_KEY, null);
     }
 
-    /// Returns true if the version is problematic
-    ///
-    /// Ideally [PinotVersion] should have a way to extract versions in comparable format, but given it doesn't we
-    /// need to parse the string here. In case version doesn't match `1\.x\..*`, we treat is as a problematic version
     private boolean isProblematicVersion(@Nullable String versionStr) {
       if (versionStr == null) {
         return true;
@@ -234,27 +233,7 @@ public abstract class SendStatsPredicate implements InstanceConfigChangeListener
       if (versionStr.equals(PinotVersion.UNKNOWN)) {
         return true;
       }
-      if (versionStr.equals(PinotVersion.VERSION)) {
-        return false;
-      }
-      // Lets try to parse 1.x versions
-      String[] splits = versionStr.trim().split("\\.");
-      if (splits.length < 2) {
-        return true;
-      }
-      // Versions less than 1.x are problematic for sure
-      if (!splits[0].equals("1")) {
-        return true;
-      }
-      try {
-        // Versions less than 1.4 are problematic
-        if (Integer.parseInt(splits[1]) < 4) {
-          return true;
-        }
-      } catch (NumberFormatException e) {
-        return true;
-      }
-      return false;
+      return !versionStr.equals(PinotVersion.VERSION);
     }
   }
 }

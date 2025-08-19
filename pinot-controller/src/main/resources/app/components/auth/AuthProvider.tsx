@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }) => {
             // basic auth is handled by login page
         }
 
-        // set OIDC auth details 
+        // set OIDC auth details
         if (authWorkFlowInternal === AuthWorkflow.OIDC) {
             const issuer =
                 authInfoResponse && authInfoResponse.issuer ? authInfoResponse.issuer : '';
@@ -121,7 +121,7 @@ export const AuthProvider = ({ children }) => {
             setAccessToken(accessToken);
             setAuthUserName(PinotMethodUtils.getAuthUserNameFromAccessToken(accessToken.replace("Bearer ", "")))
             setAuthUserEmail(PinotMethodUtils.getAuthUserEmailFromAccessToken(accessToken.replace("Bearer ", "")))
-            
+
             initAxios(accessToken);
             setAuthenticated(true);
 

@@ -77,9 +77,15 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.LongMsgOffsetFactory;
+import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
 import org.apache.pinot.spi.stream.PartitionGroupMetadata;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
+import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
@@ -91,6 +97,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.apache.zookeeper.data.Stat;
 import org.joda.time.Interval;
+import org.mockito.MockedStatic;
 import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
@@ -122,6 +129,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   static final String CRC = Long.toString(RANDOM.nextLong() & 0xFFFFFFFFL);
   static final SegmentVersion SEGMENT_VERSION = RANDOM.nextBoolean() ? SegmentVersion.v1 : SegmentVersion.v3;
   static final int NUM_DOCS = RANDOM.nextInt(Integer.MAX_VALUE) + 1;
+  static final long LATEST_OFFSET = PARTITION_OFFSET.getOffset() * 2 + NUM_DOCS;
   static final int SEGMENT_SIZE_IN_BYTES = 100000000;
   @AfterClass
   public void tearDown()
@@ -323,6 +331,139 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     consumingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(consumingSegment);
     assertNull(consumingSegmentZKMetadata);
+  }
+
+  @Test
+  public void testCommitSegmentWithOffsetAutoResetOnOffset()
+      throws Exception {
+    // Set up a new table with 2 replicas, 5 instances, 4 partition
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(segmentManager._tableConfig).get(0);
+    streamConfigMap.put(StreamConfigProperties.ENABLE_OFFSET_AUTO_RESET, String.valueOf(true));
+    streamConfigMap.put(StreamConfigProperties.OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY, "100");
+    segmentManager.makeTableConfig(streamConfigMap);
+
+    StreamConsumerFactory mockConsumerFactory = mock(StreamConsumerFactory.class);
+    StreamMetadataProvider mockMetadataProvider = mock(StreamMetadataProvider.class);
+    when(mockConsumerFactory.createPartitionMetadataProvider(anyString(), anyInt())).thenReturn(mockMetadataProvider);
+    when(mockConsumerFactory.createStreamMsgOffsetFactory()).thenReturn(new LongMsgOffsetFactory());
+    when(mockMetadataProvider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA),
+        anyLong())).thenReturn(new LongMsgOffset(LATEST_OFFSET));
+    when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong(), anyLong())).thenReturn(PARTITION_OFFSET);
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedStaticProvider = mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+
+      mockedStaticProvider.when(() -> StreamConsumerFactoryProvider.create(segmentManager._streamConfigs.get(0)))
+          .thenReturn(mockConsumerFactory);
+
+      // Commit a segment for partition group 0
+      String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+      String endOffset = new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString();
+      CommittingSegmentDescriptor committingSegmentDescriptor =
+          new CommittingSegmentDescriptor(committingSegment, endOffset, SEGMENT_SIZE_IN_BYTES);
+      committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+
+      // Verify instance states for committed segment and new consuming segment
+      Map<String, String> committedSegmentInstanceStateMap = instanceStatesMap.get(committingSegment);
+      assertNotNull(committedSegmentInstanceStateMap);
+      assertEquals(new HashSet<>(committedSegmentInstanceStateMap.values()),
+          Collections.singleton(SegmentStateModel.ONLINE));
+
+      String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+      Map<String, String> consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
+      assertNotNull(consumingSegmentInstanceStateMap);
+      assertEquals(new HashSet<>(consumingSegmentInstanceStateMap.values()),
+          Collections.singleton(SegmentStateModel.CONSUMING));
+
+      // Verify segment ZK metadata for committed segment and new consuming segment
+      SegmentZKMetadata committedSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+      assertEquals(committedSegmentZKMetadata.getStatus(), Status.DONE);
+      assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
+      assertEquals(committedSegmentZKMetadata.getEndOffset(), endOffset);
+      assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
+      assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
+      assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
+      assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
+      assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
+
+      SegmentZKMetadata consumingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(consumingSegment);
+      assertEquals(consumingSegmentZKMetadata.getStatus(), Status.IN_PROGRESS);
+      assertEquals(consumingSegmentZKMetadata.getStartOffset(), String.valueOf(LATEST_OFFSET));
+      assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
+    }
+  }
+
+  @Test
+  public void testCommitSegmentWithOffsetAutoResetOnTime()
+      throws Exception {
+    // Set up a new table with 2 replicas, 5 instances, 4 partition
+    PinotHelixResourceManager mockHelixResourceManager = mock(PinotHelixResourceManager.class);
+    FakePinotLLCRealtimeSegmentManager segmentManager =
+        new FakePinotLLCRealtimeSegmentManager(mockHelixResourceManager);
+    setUpNewTable(segmentManager, 2, 5, 4);
+    Map<String, Map<String, String>> instanceStatesMap = segmentManager._idealState.getRecord().getMapFields();
+    Map<String, String> streamConfigMap = IngestionConfigUtils.getStreamConfigMaps(segmentManager._tableConfig).get(0);
+    streamConfigMap.put(StreamConfigProperties.ENABLE_OFFSET_AUTO_RESET, String.valueOf(true));
+    streamConfigMap.put(StreamConfigProperties.OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY, "1800");
+    segmentManager.makeTableConfig(streamConfigMap);
+
+    StreamConsumerFactory mockConsumerFactory = mock(StreamConsumerFactory.class);
+    StreamMetadataProvider mockMetadataProvider = mock(StreamMetadataProvider.class);
+    when(mockConsumerFactory.createPartitionMetadataProvider(anyString(), anyInt())).thenReturn(mockMetadataProvider);
+    when(mockConsumerFactory.createStreamMsgOffsetFactory()).thenReturn(new LongMsgOffsetFactory());
+    when(mockMetadataProvider.fetchStreamPartitionOffset(eq(OffsetCriteria.LARGEST_OFFSET_CRITERIA),
+        anyLong())).thenReturn(new LongMsgOffset(LATEST_OFFSET));
+    when(mockMetadataProvider.getOffsetAtTimestamp(eq(0), anyLong(), anyLong())).thenReturn(
+        new LongMsgOffset(PARTITION_OFFSET.getOffset() + 1L));
+
+    try (MockedStatic<StreamConsumerFactoryProvider> mockedStaticProvider = mockStatic(
+        StreamConsumerFactoryProvider.class)) {
+
+      mockedStaticProvider.when(() -> StreamConsumerFactoryProvider.create(segmentManager._streamConfigs.get(0)))
+          .thenReturn(mockConsumerFactory);
+
+      // Commit a segment for partition group 0
+      String committingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 0, CURRENT_TIME_MS).getSegmentName();
+      String endOffset = new LongMsgOffset(PARTITION_OFFSET.getOffset() + NUM_DOCS).toString();
+      CommittingSegmentDescriptor committingSegmentDescriptor =
+          new CommittingSegmentDescriptor(committingSegment, endOffset, SEGMENT_SIZE_IN_BYTES);
+      committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
+      segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
+
+      // Verify instance states for committed segment and new consuming segment
+      Map<String, String> committedSegmentInstanceStateMap = instanceStatesMap.get(committingSegment);
+      assertNotNull(committedSegmentInstanceStateMap);
+      assertEquals(new HashSet<>(committedSegmentInstanceStateMap.values()),
+          Collections.singleton(SegmentStateModel.ONLINE));
+
+      String consumingSegment = new LLCSegmentName(RAW_TABLE_NAME, 0, 1, CURRENT_TIME_MS).getSegmentName();
+      Map<String, String> consumingSegmentInstanceStateMap = instanceStatesMap.get(consumingSegment);
+      assertNotNull(consumingSegmentInstanceStateMap);
+      assertEquals(new HashSet<>(consumingSegmentInstanceStateMap.values()),
+          Collections.singleton(SegmentStateModel.CONSUMING));
+
+      // Verify segment ZK metadata for committed segment and new consuming segment
+      SegmentZKMetadata committedSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(committingSegment);
+      assertEquals(committedSegmentZKMetadata.getStatus(), Status.DONE);
+      assertEquals(committedSegmentZKMetadata.getStartOffset(), PARTITION_OFFSET.toString());
+      assertEquals(committedSegmentZKMetadata.getEndOffset(), endOffset);
+      assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
+      assertEquals(committedSegmentZKMetadata.getCrc(), Long.parseLong(CRC));
+      assertEquals(committedSegmentZKMetadata.getIndexVersion(), SEGMENT_VERSION.name());
+      assertEquals(committedSegmentZKMetadata.getTotalDocs(), NUM_DOCS);
+      assertEquals(committedSegmentZKMetadata.getSizeInBytes(), SEGMENT_SIZE_IN_BYTES);
+
+      SegmentZKMetadata consumingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(consumingSegment);
+      assertEquals(consumingSegmentZKMetadata.getStatus(), Status.IN_PROGRESS);
+      assertEquals(consumingSegmentZKMetadata.getStartOffset(), String.valueOf(LATEST_OFFSET));
+      assertEquals(committedSegmentZKMetadata.getCreationTime(), CURRENT_TIME_MS);
+    }
   }
 
   /**
@@ -1722,6 +1863,13 @@ public class PinotLLCRealtimeSegmentManagerTest {
       _tableConfig =
           new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(_numReplicas)
               .setStreamConfigs(streamConfigs).build();
+      _streamConfigs = IngestionConfigUtils.getStreamConfigs(_tableConfig);
+    }
+
+    void makeTableConfig(Map<String, String> streamConfigMap) {
+      _tableConfig =
+          new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME).setNumReplicas(_numReplicas)
+              .setStreamConfigs(streamConfigMap).build();
       _streamConfigs = IngestionConfigUtils.getStreamConfigs(_tableConfig);
     }
 

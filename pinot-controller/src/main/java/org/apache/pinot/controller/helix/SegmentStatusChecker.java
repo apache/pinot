@@ -287,6 +287,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       return;
     }
 
+    long evSnapshotTimestamp = System.currentTimeMillis();
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
     if (externalView != null) {
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.EXTERNALVIEW_ZNODE_SIZE,
@@ -313,6 +314,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     List<String> partialOnlineSegments = new ArrayList<>();
     List<String> segmentsInvalidStartTime = new ArrayList<>();
     List<String> segmentsInvalidEndTime = new ArrayList<>();
+
+    // Track unavailable segments by reason for batched logging
+    List<String> unavailableSegmentsByState = new ArrayList<>();
+    List<String> unavailableSegmentsByInstance = new ArrayList<>();
+
     for (String segment : segments) {
       // Number of replicas in ideal state that is in ONLINE/CONSUMING state
       int numISReplicasUp = 0;
@@ -344,9 +350,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       //       the ZK metadata; for pushed segments, we use push time from the ZK metadata. Both of them are the time
       //       when segment is newly created. For committed segments from real-time table, push time doesn't exist, and
       //       creationTimeMs will be Long.MIN_VALUE, which is fine because we want to include them in the check.
+      //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
+      //       with many segments, the status check can take several minutes. A segment updated after
+      //       the EV snapshot was taken but before this individual segment check runs could be incorrectly flagged as
+      //       OFFLINE when using current time.
       long creationTimeMs = segmentZKMetadata.getStatus() == Status.IN_PROGRESS ? segmentZKMetadata.getCreationTime()
           : segmentZKMetadata.getPushTime();
-      if (creationTimeMs > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000L) {
+      if (creationTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
       }
 
@@ -366,9 +376,15 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
           for (Map.Entry<String, String> entry : stateMap.entrySet()) {
             String serverInstanceId = entry.getKey();
             String segmentState = entry.getValue();
-            if ((segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING))
-                && isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
-              numEVReplicasUp++;
+            if (segmentState.equals(SegmentStateModel.ONLINE) || segmentState.equals(SegmentStateModel.CONSUMING)) {
+              if (isServerQueryable(serverQueryInfoFetcher.getServerQueryInfo(serverInstanceId))) {
+                numEVReplicasUp++;
+              } else {
+                unavailableSegmentsByInstance.add(segment
+                    + " (state: " + segmentState + " on unavailable " + serverInstanceId + ")");
+              }
+            } else {
+              unavailableSegmentsByState.add(segment + " (state: " + segmentState + " on " + serverInstanceId + ")");
             }
             if (segmentState.equals(SegmentStateModel.ERROR)) {
               errorSegments.add(Pair.of(segment, entry.getKey()));
@@ -389,6 +405,16 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       // Total number of replicas in ideal state (including ERROR/OFFLINE states)
       int numISReplicasTotal = Math.max(idealState.getInstanceStateMap(segment).entrySet().size(), 1);
       minEVReplicasUpPercent = Math.min(minEVReplicasUpPercent, numEVReplicasUp * 100 / numISReplicasTotal);
+    }
+
+    // Log unavailable segments in batches
+    if (!unavailableSegmentsByState.isEmpty()) {
+      LOGGER.warn("Table {} has {} segments marked unavailable due to non-ONLINE/CONSUMING states: {}",
+          tableNameWithType, unavailableSegmentsByState.size(), logSegments(unavailableSegmentsByState));
+    }
+    if (!unavailableSegmentsByInstance.isEmpty()) {
+      LOGGER.warn("Table {} has {} segments marked unavailable due to unavailable instances: {}",
+          tableNameWithType, unavailableSegmentsByInstance.size(), logSegments(unavailableSegmentsByInstance));
     }
 
     if (maxISReplicasUp == Integer.MIN_VALUE) {

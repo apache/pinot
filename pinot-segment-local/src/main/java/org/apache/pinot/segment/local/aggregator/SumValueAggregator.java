@@ -18,11 +18,12 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
-public class SumValueAggregator implements ValueAggregator<Number, Double> {
+public class SumValueAggregator implements ValueAggregator<Object, Double> {
   public static final DataType AGGREGATED_VALUE_TYPE = DataType.DOUBLE;
 
   @Override
@@ -36,13 +37,16 @@ public class SumValueAggregator implements ValueAggregator<Number, Double> {
   }
 
   @Override
-  public Double getInitialAggregatedValue(Number rawValue) {
-    return rawValue.doubleValue();
+  public Double getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return 0.0;
+    }
+    return ValueAggregatorUtils.toDouble(rawValue);
   }
 
   @Override
-  public Double applyRawValue(Double value, Number rawValue) {
-    return value + rawValue.doubleValue();
+  public Double applyRawValue(Double value, Object rawValue) {
+    return value + ValueAggregatorUtils.toDouble(rawValue);
   }
 
   @Override
@@ -53,6 +57,11 @@ public class SumValueAggregator implements ValueAggregator<Number, Double> {
   @Override
   public Double cloneAggregatedValue(Double value) {
     return value;
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   @Override

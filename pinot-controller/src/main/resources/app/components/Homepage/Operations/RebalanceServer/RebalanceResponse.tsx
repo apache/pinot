@@ -54,7 +54,7 @@ const CopyJobIdToClipboardButton = ({ jobId }: { jobId: string }) => {
         </>
     );
 };
-export const RebalanceResponse = ({ response }) => {
+export const RebalanceResponse = ({ response, onJobIdClick }) => {
     const responseSectionsToShow = [
         {
             name: 'Segment Assignment',
@@ -81,9 +81,25 @@ export const RebalanceResponse = ({ response }) => {
                             <Grid item xs={6}>
                                 <Typography color='textSecondary' variant='caption'>Job Id</Typography>
                                 <Box flexDirection="row" display="flex" alignItems="center" marginTop={-1.25}>
-                                    <Typography style={{ fontWeight: 600 }} variant='body2'>
-                                        {response.jobId}
-                                    </Typography>
+                                    {response.status === 'IN_PROGRESS' && onJobIdClick ? (
+                                        <Typography 
+                                            style={{ 
+                                                fontWeight: 600, 
+                                                cursor: 'pointer', 
+                                                color: '#1976d2',
+                                                textDecoration: 'underline'
+                                            }} 
+                                            variant='body2'
+                                            onClick={() => onJobIdClick(response.jobId)}
+                                            title="Click to view job details"
+                                        >
+                                            {response.jobId}
+                                        </Typography>
+                                    ) : (
+                                        <Typography style={{ fontWeight: 600 }} variant='body2'>
+                                            {response.jobId}
+                                        </Typography>
+                                    )}
                                     <CopyJobIdToClipboardButton jobId={response.jobId} />
                                 </Box>
                             </Grid>

@@ -25,20 +25,20 @@ import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryManagerMXBean;
 import java.lang.management.MemoryUsage;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
-import java.lang.management.ThreadMXBean;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.Obfuscator;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
 
 /**
@@ -126,12 +126,9 @@ public class PinotAppConfigs {
   }
 
   private RuntimeConfig buildRuntimeConfig() {
-    MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
-    MemoryUsage heapMemoryUsage = memoryMXBean.getHeapMemoryUsage();
-
-    ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
-    return new RuntimeConfig(threadMXBean.getTotalStartedThreadCount(), threadMXBean.getThreadCount(),
-        FileUtils.byteCountToDisplaySize(heapMemoryUsage.getMax()),
+    MemoryUsage heapMemoryUsage = ResourceUsageUtils.getHeapMemoryUsage();
+    return new RuntimeConfig(ThreadResourceUsageProvider.getTotalStartedThreadCount(),
+        ThreadResourceUsageProvider.getThreadCount(), FileUtils.byteCountToDisplaySize(heapMemoryUsage.getMax()),
         FileUtils.byteCountToDisplaySize(heapMemoryUsage.getUsed()));
   }
 

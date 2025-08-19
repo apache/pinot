@@ -84,7 +84,7 @@ public class StarTreeProjectPlanNode implements PlanNode {
 
     // TODO: figure out a way to close this operator, as it may hold reader context
     ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator);
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator, _queryContext);
     // NOTE: Here we do not put aggregation expressions into TransformOperator based on the following assumptions:
     //       - They are all columns (not functions or constants), where no transform is required
     //       - We never call TransformOperator.getResultColumnContext() on them

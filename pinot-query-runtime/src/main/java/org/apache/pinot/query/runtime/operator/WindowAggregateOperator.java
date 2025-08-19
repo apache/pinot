@@ -43,6 +43,7 @@ import org.apache.pinot.query.runtime.operator.window.WindowFunction;
 import org.apache.pinot.query.runtime.operator.window.WindowFunctionFactory;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner.WindowOverFlowMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -230,6 +231,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       for (Object[] row : container) {
         // TODO: Revisit null direction handling for all query types
         Key key = AggregationUtils.extractRowKey(row, _keys);
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(_numRows);
         partitionRows.computeIfAbsent(key, k -> new ArrayList<>()).add(row);
       }
       _numRows += containerSize;
@@ -253,6 +255,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
       for (WindowFunction windowFunction : _windowFunctions) {
         List<Object> processRows = windowFunction.processRows(rowList);
         assert processRows.size() == rowList.size();
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(windowFunctionResults.size());
         windowFunctionResults.add(processRows);
       }
 
@@ -265,6 +268,7 @@ public class WindowAggregateOperator extends MultiStageOperator {
         }
         // Convert the results from WindowFunction to the desired type
         TypeUtils.convertRow(row, resultStoredTypes);
+        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
         rows.add(row);
       }
     }

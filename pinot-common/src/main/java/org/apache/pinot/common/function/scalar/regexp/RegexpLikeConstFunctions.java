@@ -54,7 +54,7 @@ public class RegexpLikeConstFunctions {
   public boolean like(String inputStr, String likePatternStr) {
     if (_matcher == null) {
       String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
-      _matcher = PatternFactory.compile(regexPatternStr).matcher("");
+      _matcher = PatternFactory.compile(regexPatternStr, true).matcher("");
     }
 
     return _matcher.reset(inputStr).find();

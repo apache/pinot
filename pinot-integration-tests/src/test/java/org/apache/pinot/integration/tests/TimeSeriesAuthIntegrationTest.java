@@ -49,6 +49,7 @@ public class TimeSeriesAuthIntegrationTest extends TimeSeriesIntegrationTest {
 
   @Override
   protected void overrideControllerConf(Map<String, Object> properties) {
+    super.overrideControllerConf(properties);
     BasicAuthTestUtils.addControllerConfiguration(properties);
   }
 

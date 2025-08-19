@@ -143,18 +143,23 @@ public class GroupByCombineOperator extends BaseSingleBlockCombineOperator<Group
           AggregationGroupByResult aggregationGroupByResult = resultsBlock.getAggregationGroupByResult();
           if (aggregationGroupByResult != null) {
             // Iterate over the group-by keys, for each key, update the group-by result in the indexedTable
-            Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
-            while (dicGroupKeyIterator.hasNext()) {
-              GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
-              Object[] keys = groupKey._keys;
-              Object[] values = Arrays.copyOf(keys, _numColumns);
-              int groupId = groupKey._groupId;
-              for (int i = 0; i < _numAggregationFunctions; i++) {
-                values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+            try {
+              Iterator<GroupKeyGenerator.GroupKey> dicGroupKeyIterator = aggregationGroupByResult.getGroupKeyIterator();
+              while (dicGroupKeyIterator.hasNext()) {
+                GroupKeyGenerator.GroupKey groupKey = dicGroupKeyIterator.next();
+                Object[] keys = groupKey._keys;
+                Object[] values = Arrays.copyOf(keys, _numColumns);
+                int groupId = groupKey._groupId;
+                for (int i = 0; i < _numAggregationFunctions; i++) {
+                  values[_numGroupByExpressions + i] = aggregationGroupByResult.getResultForGroupId(i, groupId);
+                }
+                _indexedTable.upsert(new Key(keys), new Record(values));
+                Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
+                mergedKeys++;
               }
-              _indexedTable.upsert(new Key(keys), new Record(values));
-              Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(mergedKeys);
-              mergedKeys++;
+            } finally {
+              // Release the resources used by the group key generator
+              aggregationGroupByResult.closeGroupKeyGenerator();
             }
           }
         } else {

@@ -263,13 +263,24 @@ abstract class BaseSingleTreeBuilder implements SingleTreeBuilder {
       int[] dimensions = Arrays.copyOf(segmentRecord._dimensions, _numDimensions);
       Object[] metrics = new Object[_numMetrics];
       for (int i = 0; i < _numMetrics; i++) {
-        metrics[i] = _valueAggregators[i].getInitialAggregatedValue(segmentRecord._metrics[i]);
+        Object rawValue = segmentRecord._metrics[i];
+        if (rawValue != null) {
+          metrics[i] = _valueAggregators[i].getInitialAggregatedValue(rawValue);
+        } else {
+          assert _valueAggregators[i].getAggregationType() == AggregationFunctionType.COUNT;
+          metrics[i] = 1L;
+        }
       }
       return new Record(dimensions, metrics);
     } else {
       for (int i = 0; i < _numMetrics; i++) {
-        aggregatedRecord._metrics[i] =
-            _valueAggregators[i].applyRawValue(aggregatedRecord._metrics[i], segmentRecord._metrics[i]);
+        Object rawValue = segmentRecord._metrics[i];
+        if (rawValue != null) {
+          aggregatedRecord._metrics[i] = _valueAggregators[i].applyRawValue(aggregatedRecord._metrics[i], rawValue);
+        } else {
+          assert _valueAggregators[i].getAggregationType() == AggregationFunctionType.COUNT;
+          aggregatedRecord._metrics[i] = ((long) aggregatedRecord._metrics[i]) + 1;
+        }
       }
       return aggregatedRecord;
     }

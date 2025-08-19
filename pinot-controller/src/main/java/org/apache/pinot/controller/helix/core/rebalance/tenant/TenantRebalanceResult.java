@@ -504,8 +504,8 @@ public class TenantRebalanceResult {
     int totalNumConsumingSegmentsToBeMoved = 0;
 
     // Create maps to store all segments by offset and age
-    Map<String, Integer> consumingSegmentsWithMostOffsetsPerTable = new HashMap<>();
-    Map<String, Integer> consumingSegmentsWithOldestAgePerTable = new HashMap<>();
+    Map<String, Long> consumingSegmentsWithMostOffsetsPerTable = new HashMap<>();
+    Map<String, Long> consumingSegmentsWithOldestAgePerTable = new HashMap<>();
 
     // Aggregate ConsumingSegmentSummaryPerServer by server name across all tables
     Map<String, AggregatedConsumingSegmentSummaryPerServer> serverAggregates = new HashMap<>();
@@ -516,7 +516,7 @@ public class TenantRebalanceResult {
       // Add one segment with offsets for each table
       if (summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp() != null
           && !summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().isEmpty()) {
-        Map.Entry<String, Integer> consumingSegmentWithMostOffsetsToCatchUp =
+        Map.Entry<String, Long> consumingSegmentWithMostOffsetsToCatchUp =
             summary.getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp().entrySet().iterator().next();
         consumingSegmentsWithMostOffsetsPerTable.put(consumingSegmentWithMostOffsetsToCatchUp.getKey(),
             consumingSegmentWithMostOffsetsToCatchUp.getValue());
@@ -525,7 +525,7 @@ public class TenantRebalanceResult {
       // Add all segments with ages
       if (summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes() != null
           && !summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes().isEmpty()) {
-        Map.Entry<String, Integer> consumingSegmentWithOldestAge =
+        Map.Entry<String, Long> consumingSegmentWithOldestAge =
             summary.getConsumingSegmentsToBeMovedWithOldestAgeInMinutes().entrySet().iterator().next();
         consumingSegmentsWithOldestAgePerTable.put(consumingSegmentWithOldestAge.getKey(),
             consumingSegmentWithOldestAge.getValue());
@@ -548,14 +548,14 @@ public class TenantRebalanceResult {
     }
 
     // Sort consuming segments (top one from each table) by offsets and age
-    Map<String, Integer> sortedConsumingSegmentsWithMostOffsetsPerTable = new LinkedHashMap<>();
+    Map<String, Long> sortedConsumingSegmentsWithMostOffsetsPerTable = new LinkedHashMap<>();
     consumingSegmentsWithMostOffsetsPerTable.entrySet().stream()
-        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
         .forEach(entry -> sortedConsumingSegmentsWithMostOffsetsPerTable.put(entry.getKey(), entry.getValue()));
 
-    Map<String, Integer> sortedConsumingSegmentsWithOldestAgePerTable = new LinkedHashMap<>();
+    Map<String, Long> sortedConsumingSegmentsWithOldestAgePerTable = new LinkedHashMap<>();
     consumingSegmentsWithOldestAgePerTable.entrySet().stream()
-        .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+        .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
         .forEach(entry -> sortedConsumingSegmentsWithOldestAgePerTable.put(entry.getKey(), entry.getValue()));
 
     // Convert aggregated server data to final ConsumingSegmentSummaryPerServer map

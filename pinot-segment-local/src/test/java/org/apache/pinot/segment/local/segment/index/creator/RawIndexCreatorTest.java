@@ -169,8 +169,8 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   public void testStringRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_COLUMN);
-    try (
-        ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(indexBuffer, DataType.STRING,
+    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
+        .createRawIndexReader(indexBuffer, DataType.STRING,
             true); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       for (int row = 0; row < NUM_ROWS; row++) {
@@ -207,8 +207,8 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   public void testStringMVRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(STRING_MV_COLUMN);
-    try (
-        ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(indexBuffer, DataType.STRING,
+    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
+        .createRawIndexReader(indexBuffer, DataType.STRING,
             false); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues =
@@ -240,7 +240,8 @@ public class RawIndexCreatorTest implements PinotBuffersAfterClassCheckRule {
   public void testBytesMVRawIndexCreator()
       throws Exception {
     PinotDataBuffer indexBuffer = getIndexBufferForColumn(BYTES_MV_COLUMN);
-    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.createRawIndexReader(indexBuffer, DataType.BYTES,
+    try (ForwardIndexReader rawIndexReader = ForwardIndexReaderFactory.getInstance()
+        .createRawIndexReader(indexBuffer, DataType.BYTES,
         false); ForwardIndexReaderContext readerContext = rawIndexReader.createContext()) {
       _recordReader.rewind();
       int maxNumberOfMultiValues =

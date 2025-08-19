@@ -175,7 +175,7 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       }
 
       int numTasks = 0;
-      int maxTasks = getMaxTasks(taskType, tableNameWithType, taskConfigs);
+      int maxTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableNameWithType);
       for (SegmentZKMetadata segment : segmentSelectionResult.getSegmentsForCompaction()) {
         if (numTasks == maxTasks) {
           break;
@@ -285,20 +285,6 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
       }
     }
     return completedSegments;
-  }
-
-  @VisibleForTesting
-  public static int getMaxTasks(String taskType, String tableNameWithType, Map<String, String> taskConfigs) {
-    int maxTasks = Integer.MAX_VALUE;
-    String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
-    if (tableMaxNumTasksConfig != null) {
-      try {
-        maxTasks = Integer.parseInt(tableMaxNumTasksConfig);
-      } catch (Exception e) {
-        LOGGER.warn("MaxNumTasks have been wrongly set for table : {}, and task {}", tableNameWithType, taskType);
-      }
-    }
-    return maxTasks;
   }
 
   @Override

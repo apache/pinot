@@ -123,7 +123,6 @@ public class PinotTaskRestletResourceTest {
     return instanceConfig;
   }
 
-
   @Test
   public void testGetSubtaskWithGivenStateProgressWithException()
       throws JsonProcessingException {

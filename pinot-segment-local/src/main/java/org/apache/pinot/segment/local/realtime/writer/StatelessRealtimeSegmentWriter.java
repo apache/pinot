@@ -63,6 +63,7 @@ import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamDataDecoderResult;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -263,8 +264,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
           for (int i = 0; i < messageCount; i++) {
             StreamMessage streamMessage = messageBatch.getStreamMessage(i);
-            if (streamMessage.getMetadata() != null && streamMessage.getMetadata().getOffset() != null
-                && streamMessage.getMetadata().getOffset().compareTo(_endOffset) >= 0) {
+            StreamMessageMetadata metadata = streamMessage.getMetadata();
+            if (metadata.getOffset().compareTo(_endOffset) >= 0) {
               _logger.info("Reached end offset: {} for partition group: {}", _endOffset, _partitionGroupId);
               break;
             }
@@ -277,7 +278,7 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
               assert row != null;
               TransformPipeline.Result result = _transformPipeline.processRow(row);
               for (GenericRow transformedRow : result.getTransformedRows()) {
-                _realtimeSegment.index(transformedRow, streamMessage.getMetadata());
+                _realtimeSegment.index(transformedRow, metadata);
               }
             } else {
               _logger.warn("Failed to decode message at offset {}: {}", _currentOffset, decodedResult.getException());

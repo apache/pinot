@@ -37,6 +37,6 @@ ReactDOM.render(
                 </AuthProvider>
             </NotificationContextProvider>
         </MuiThemeProvider>
-    </HashRouter>, 
+    </HashRouter>,
     document.getElementById('app')
 );

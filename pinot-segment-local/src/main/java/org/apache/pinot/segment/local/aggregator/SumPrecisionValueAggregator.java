@@ -21,6 +21,7 @@ package org.apache.pinot.segment.local.aggregator;
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
@@ -58,7 +59,10 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   }
 
   @Override
-  public BigDecimal getInitialAggregatedValue(Object rawValue) {
+  public BigDecimal getInitialAggregatedValue(@Nullable Object rawValue) {
+    if (rawValue == null) {
+      return BigDecimal.ZERO;
+    }
     BigDecimal initialValue = toBigDecimal(rawValue);
     if (_fixedSize < 0) {
       _maxByteSize = Math.max(_maxByteSize, BigDecimalUtils.byteSize(initialValue));
@@ -98,6 +102,11 @@ public class SumPrecisionValueAggregator implements ValueAggregator<Object, BigD
   public BigDecimal cloneAggregatedValue(BigDecimal value) {
     // NOTE: No need to clone because BigDecimal is immutable
     return value;
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return _fixedSize > 0;
   }
 
   @Override

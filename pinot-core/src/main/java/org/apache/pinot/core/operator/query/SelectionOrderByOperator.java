@@ -283,7 +283,8 @@ public class SelectionOrderByOperator extends BaseOperator<SelectionResultsBlock
     }
 
     try (ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows))) {
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, new BitmapDocIdSetOperator(docIds, numRows),
+            _queryContext)) {
       TransformOperator transformOperator =
           new TransformOperator(_queryContext, projectionOperator, nonOrderByExpressions);
 

@@ -45,7 +45,7 @@ public class IFSTBasedRegexpPredicateEvaluatorFactory {
     return new IFSTBasedRegexpPredicateEvaluator(regexpLikePredicate, ifstIndexReader, dictionary);
   }
 
-  private static class IFSTBasedRegexpPredicateEvaluator extends BaseDictionaryBasedPredicateEvaluator {
+  private static class IFSTBasedRegexpPredicateEvaluator extends BaseDictIdBasedRegexpLikePredicateEvaluator {
     final ImmutableRoaringBitmap _matchingDictIdBitmap;
 
     public IFSTBasedRegexpPredicateEvaluator(RegexpLikePredicate regexpLikePredicate,

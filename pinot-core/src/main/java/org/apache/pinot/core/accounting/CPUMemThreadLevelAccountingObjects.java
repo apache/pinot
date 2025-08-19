@@ -76,6 +76,7 @@ public class CPUMemThreadLevelAccountingObjects {
       _currentThreadCPUTimeSampleMS = 0;
       // clear memory usage
       _currentThreadMemoryAllocationSampleBytes = 0;
+      _errorStatus.set(null);
     }
 
     /**
@@ -107,15 +108,8 @@ public class CPUMemThreadLevelAccountingObjects {
       return taskEntry == null ? -1 : taskEntry.getTaskId();
     }
 
-    @Override
-    public ThreadExecutionContext.TaskType getTaskType() {
-      TaskEntry taskEntry = _currentThreadTaskStatus.get();
-      return taskEntry == null ? ThreadExecutionContext.TaskType.UNKNOWN : taskEntry.getTaskType();
-    }
-
-    public void setThreadTaskStatus(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-        Thread anchorThread, String workloadName) {
-      _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, taskType, anchorThread, workloadName));
+    public void setThreadTaskStatus(String queryId, int taskId, Thread anchorThread, String workloadName) {
+      _currentThreadTaskStatus.set(new TaskEntry(queryId, taskId, anchorThread, workloadName));
       _threadResourceSnapshot.reset();
     }
 
@@ -142,7 +136,6 @@ public class CPUMemThreadLevelAccountingObjects {
     private final String _queryId;
     private final int _taskId;
     private final Thread _anchorThread;
-    private final TaskType _taskType;
 
     private final String _workloadName;
 
@@ -150,11 +143,10 @@ public class CPUMemThreadLevelAccountingObjects {
       return _taskId == CommonConstants.Accounting.ANCHOR_TASK_ID;
     }
 
-    public TaskEntry(String queryId, int taskId, TaskType taskType, Thread anchorThread, String workloadName) {
+    public TaskEntry(String queryId, int taskId, Thread anchorThread, String workloadName) {
       _queryId = queryId;
       _taskId = taskId;
       _anchorThread = anchorThread;
-      _taskType = taskType;
       _workloadName = workloadName;
     }
 
@@ -170,20 +162,14 @@ public class CPUMemThreadLevelAccountingObjects {
       return _anchorThread;
     }
 
-    @Override
-    public TaskType getTaskType() {
-      return _taskType;
-    }
-
-
     public String getWorkloadName() {
       return _workloadName;
     }
 
     @Override
     public String toString() {
-      return "TaskEntry{" + "_queryId='" + _queryId + '\'' + ", _taskId=" + _taskId + ", _rootThread=" + _anchorThread
-          + ", _taskType=" + _taskType + ", _workloadName=" + _workloadName + '}';
+      return "TaskEntry{" + "_queryId='" + _queryId + '\'' + ", _taskId=" + _taskId + ", _anchorThread=" + _anchorThread
+          + ", _workloadName='" + _workloadName + '\'' + '}';
     }
   }
 }

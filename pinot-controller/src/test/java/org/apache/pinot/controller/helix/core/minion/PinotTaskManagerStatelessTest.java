@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +44,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -122,19 +124,187 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     stopController();
   }
 
+  @Test
+  public void testCreateTaskWithMaxNumSubTasksLimit()
+      throws Exception {
+    setupTest();
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    addTableConfig(tableConfig, "TASK");
+
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+    PinotHelixTaskResourceManager taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
+
+    // Register task generator that generates more tasks than the limit allows
+    String taskType = "TestTaskType";
+    int maxSubTasks = 3;
+    int generatedTasks = 5;
+
+    taskManager.registerTaskGenerator(createFakeTaskGenerator(taskType, maxSubTasks, generatedTasks));
+
+    taskResourceManager.ensureTaskQueueExists(taskType);
+
+    // Test adhoc task creation. This should throw a RuntimeException
+    // if the number of subtasks exceeds the maxSubTasks limit.
+    try {
+      taskManager.createTask(taskType, RAW_TABLE_NAME, null, new HashMap<>());
+      fail("Expected RuntimeException due to exceeding maxSubTasks limit");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage().contains("greater than the maximum number of tasks"));
+    }
+
+    // Verify that increasing max subtasks limit allows task creation
+    taskType = "TestTaskType2";
+    maxSubTasks = 5;
+    generatedTasks = 5;
+    taskManager.registerTaskGenerator(createFakeTaskGenerator(taskType, maxSubTasks, generatedTasks));
+    Map<String, String> result = taskManager.createTask(taskType, RAW_TABLE_NAME, null, new HashMap<>());
+
+    // Verify task was created but limited to maxSubTasks
+    assertNotNull(result);
+    assertEquals(result.size(), 1);
+    String taskName = result.get(TABLE_NAME_WITH_TYPE);
+    assertNotNull(taskName);
+
+    // Verify the number of subtasks is limited to maxSubTasks
+    List<PinotTaskConfig> subtaskConfigs = taskResourceManager.getSubtaskConfigs(taskName);
+    assertEquals(subtaskConfigs.size(), maxSubTasks,
+        "Expected " + maxSubTasks + " subtasks but got " + subtaskConfigs.size());
+
+    dropOfflineTable(RAW_TABLE_NAME);
+    stopFakeInstances();
+    stopController();
+  }
+
+  @Test
+  public void testScheduleTaskWithMaxNumSubTasksLimit()
+      throws Exception {
+    setupTest();
+
+    String taskType = "TestScheduleTaskType";
+
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME).setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of(taskType, new HashMap<>()))).build();
+    waitForEVToDisappear(tableConfig.getTableName());
+    addTableConfig(tableConfig, "TASK");
+
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+    PinotHelixTaskResourceManager taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
+
+    // Register task generator that generates more tasks than the limit allows
+    int maxSubTasks = 2;
+    int generatedTasks = 7;
+
+    taskManager.registerTaskGenerator(createFakeTaskGenerator(taskType, maxSubTasks, generatedTasks));
+
+    taskResourceManager.ensureTaskQueueExists(taskType);
+
+    // Test scheduled task creation - should limit to maxSubTasks
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(Collections.singleton(TABLE_NAME_WITH_TYPE))
+        .setTasksToSchedule(Collections.singleton(taskType));
+
+    Map<String, TaskSchedulingInfo> result = taskManager.scheduleTasks(context);
+
+    // Verify task was scheduled but limited to maxSubTasks
+    assertNotNull(result);
+    assertTrue(result.containsKey(taskType));
+    TaskSchedulingInfo schedulingInfo = result.get(taskType);
+    assertNotNull(schedulingInfo.getScheduledTaskNames());
+    assertEquals(schedulingInfo.getScheduledTaskNames().size(), 1);
+
+    String taskName = schedulingInfo.getScheduledTaskNames().get(0);
+
+    // Verify the number of subtasks is limited to maxSubTasks
+    List<PinotTaskConfig> subtaskConfigs = taskResourceManager.getSubtaskConfigs(taskName);
+    assertEquals(subtaskConfigs.size(), maxSubTasks,
+        "Expected " + maxSubTasks + " subtasks but got " + subtaskConfigs.size());
+
+    // Verify that setting triggered by in context to adhoc should result in task schedule failure
+    context.setTriggeredBy(CommonConstants.TaskTriggers.ADHOC_TRIGGER.name());
+    try {
+      taskManager.scheduleTasks(context);
+      fail("Expected RuntimeException due to exceeding maxSubTasks limit");
+    } catch (RuntimeException e) {
+      assertTrue(e.getMessage().contains("greater than the maximum number of tasks"));
+    }
+
+    dropOfflineTable(RAW_TABLE_NAME);
+    stopFakeInstances();
+    stopController();
+  }
+
+  @Test
+  public void testMaxNumSubTasksWithMultipleTables()
+      throws Exception {
+    setupTest();
+    // Create two schemas and tables
+    String rawTableName1 = "testTable1";
+    String rawTableName2 = "testTable2";
+    String tableNameWithType1 = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName1);
+    String tableNameWithType2 = TableNameBuilder.OFFLINE.tableNameWithType(rawTableName2);
+
+    Schema schema1 = new Schema.SchemaBuilder().setSchemaName(rawTableName1)
+        .addSingleValueDimension("col1", FieldSpec.DataType.STRING).build();
+    Schema schema2 = new Schema.SchemaBuilder().setSchemaName(rawTableName2)
+        .addSingleValueDimension("col2", FieldSpec.DataType.STRING).build();
+    addSchema(schema1);
+    addSchema(schema2);
+
+    String taskType = "TestMultiTableTaskType";
+
+    TableConfig tableConfig1 = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName1).setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of(taskType, new HashMap<>()))).build();
+    TableConfig tableConfig2 = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName2).setTaskConfig(
+        new TableTaskConfig(ImmutableMap.of(taskType, new HashMap<>()))).build();
+    waitForEVToDisappear(tableConfig1.getTableName());
+    waitForEVToDisappear(tableConfig2.getTableName());
+    addTableConfig(tableConfig1, "TASK");
+    addTableConfig(tableConfig2, "TASK");
+
+    PinotTaskManager taskManager = _controllerStarter.getTaskManager();
+    PinotHelixTaskResourceManager taskResourceManager = _controllerStarter.getHelixTaskResourceManager();
+
+    // Register task generator that generates tasks for each table
+
+    int maxSubTasks = 4;
+    int tasksPerTable = 6;
+
+    taskManager.registerTaskGenerator(createFakeTaskGenerator(taskType, maxSubTasks, tasksPerTable));
+
+    taskResourceManager.ensureTaskQueueExists(taskType);
+
+    // Test scheduled task creation for both tables - should limit total to maxSubTasks across all tables
+    TaskSchedulingContext context = new TaskSchedulingContext()
+        .setTablesToSchedule(Set.of(tableNameWithType1, tableNameWithType2))
+        .setTasksToSchedule(Collections.singleton(taskType));
+
+    Map<String, TaskSchedulingInfo> result = taskManager.scheduleTasks(context);
+
+    // Verify task was scheduled but limited to maxSubTasks total
+    assertNotNull(result);
+    assertTrue(result.containsKey(taskType));
+    TaskSchedulingInfo schedulingInfo = result.get(taskType);
+    assertNotNull(schedulingInfo.getScheduledTaskNames());
+    assertEquals(schedulingInfo.getScheduledTaskNames().size(), 1);
+
+    String taskName = schedulingInfo.getScheduledTaskNames().get(0);
+
+    // Verify the total number of subtasks is limited to maxSubTasks across all tables
+    List<PinotTaskConfig> subtaskConfigs = taskResourceManager.getSubtaskConfigs(taskName);
+    assertEquals(subtaskConfigs.size(), maxSubTasks,
+        "Expected " + maxSubTasks + " total subtasks across all tables but got " + subtaskConfigs.size());
+
+    dropOfflineTable(rawTableName1);
+    dropOfflineTable(rawTableName2);
+    stopFakeInstances();
+    stopController();
+  }
+
   private void testValidateTaskGeneration(Function<PinotTaskManager, Void> validateFunction)
       throws Exception {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
-    startController(properties);
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeMinionInstancesToAutoJoinHelixCluster(1);
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("complexMapStr", FieldSpec.DataType.STRING).build();
-    addSchema(schema);
+    setupTest();
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     Scheduler scheduler = taskManager.getScheduler();
     assertNotNull(scheduler);
@@ -226,17 +396,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   @Test
   public void testPinotTaskManagerSchedulerWithUpdate()
       throws Exception {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
-    startController(properties);
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeMinionInstancesToAutoJoinHelixCluster(1);
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("complexMapStr", FieldSpec.DataType.STRING).build();
-    addSchema(schema);
+    setupTest();
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     Scheduler scheduler = taskManager.getScheduler();
     assertNotNull(scheduler);
@@ -293,17 +453,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
   @Test
   public void testPinotTaskManagerSchedulerWithRestart()
       throws Exception {
-    Map<String, Object> properties = getDefaultControllerConfiguration();
-    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
-    startController(properties);
-    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
-    addFakeMinionInstancesToAutoJoinHelixCluster(1);
-    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
-        .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
-        .addSingleValueDimension("complexMapStr", FieldSpec.DataType.STRING).build();
-    addSchema(schema);
+    setupTest();
     PinotTaskManager taskManager = _controllerStarter.getTaskManager();
     Scheduler scheduler = taskManager.getScheduler();
     assertNotNull(scheduler);
@@ -446,6 +596,68 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
+  }
+
+  private BaseTaskGenerator createFakeTaskGenerator(String taskType, int maxSubTasks, int generatedTasks) {
+    return new BaseTaskGenerator() {
+      @Override
+      public String getTaskType() {
+        return taskType;
+      }
+
+      @Override
+      public int getMaxAllowedSubTasksPerTask() {
+        return maxSubTasks;
+      }
+
+      @Override
+      public long getTaskTimeoutMs() {
+        return 10000; // 10 seconds
+      }
+
+      @Override
+      public int getNumConcurrentTasksPerInstance() {
+        return 5;
+      }
+
+      @Override
+      public int getMaxAttemptsPerTask() {
+        return 5;
+      }
+
+      @Override
+      public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+        List<PinotTaskConfig> configs = new ArrayList<>();
+        for (TableConfig tableConfig : tableConfigs) {
+          for (int i = 0; i < generatedTasks; i++) {
+            Map<String, String> config = new HashMap<>();
+            config.put("taskId", tableConfig.getTableName() + "_task_" + i);
+            configs.add(new PinotTaskConfig(taskType, config));
+          }
+        }
+        return configs;
+      }
+
+      @Override
+      public List<PinotTaskConfig> generateTasks(TableConfig tableConfig, Map<String, String> taskConfigs) {
+        return generateTasks(List.of(tableConfig));
+      }
+    };
+  }
+
+  private void setupTest()
+      throws Exception {
+    Map<String, Object> properties = getDefaultControllerConfiguration();
+    properties.put(ControllerConf.ControllerPeriodicTasksConf.PINOT_TASK_MANAGER_SCHEDULER_ENABLED, true);
+    startController(properties);
+    addFakeBrokerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeServerInstancesToAutoJoinHelixCluster(1, true);
+    addFakeMinionInstancesToAutoJoinHelixCluster(1);
+    Schema schema = new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME)
+        .addSingleValueDimension("myMap", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("myMapStr", FieldSpec.DataType.STRING)
+        .addSingleValueDimension("complexMapStr", FieldSpec.DataType.STRING).build();
+    addSchema(schema);
   }
 
   @AfterClass

@@ -50,7 +50,7 @@ import org.apache.pinot.controller.helix.core.periodictask.ControllerPeriodicTas
 import org.apache.pinot.controller.helix.core.retention.strategy.RetentionStrategy;
 import org.apache.pinot.controller.helix.core.retention.strategy.TimeRetentionStrategy;
 import org.apache.pinot.controller.util.BrokerServiceHelper;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -75,6 +75,7 @@ import org.slf4j.LoggerFactory;
  * <p>It is scheduled to run only on leader controller.
  */
 public class RetentionManager extends ControllerPeriodicTask<Void> {
+  public static final String TASK_NAME = "RetentionManager";
   public static final long OLD_LLC_SEGMENTS_RETENTION_IN_MILLIS = TimeUnit.DAYS.toMillis(5L);
   public static final int DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE = 100;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
@@ -87,7 +88,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   public RetentionManager(PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ControllerConf config, ControllerMetrics controllerMetrics,
       BrokerServiceHelper brokerServiceHelper) {
-    super("RetentionManager", config.getRetentionControllerFrequencyInSeconds(),
+    super(TASK_NAME, config.getRetentionControllerFrequencyInSeconds(),
         config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
     _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();

@@ -95,6 +95,7 @@ import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentImp
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.ImmutableSegment;
 import org.apache.pinot.segment.spi.IndexSegment;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -752,12 +753,14 @@ public class TablesResource {
       String validDocIdsTypeStr) {
     if (validDocIdsTypeStr == null) {
       // By default, we read the valid doc ids from snapshot.
-      return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+      return Pair.of(ValidDocIdsType.SNAPSHOT,
+          ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
     ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
     switch (validDocIdsType) {
       case SNAPSHOT:
-        return Pair.of(validDocIdsType, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+        return Pair.of(validDocIdsType,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
       case IN_MEMORY:
         return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
       case IN_MEMORY_WITH_DELETE:
@@ -766,7 +769,8 @@ public class TablesResource {
         // By default, we read the valid doc ids from snapshot.
         LOGGER.warn("Invalid validDocIdsType: {}. Using default validDocIdsType: {}", validDocIdsType,
             ValidDocIdsType.SNAPSHOT);
-        return Pair.of(ValidDocIdsType.SNAPSHOT, ((ImmutableSegmentImpl) indexSegment).loadValidDocIdsFromSnapshot());
+        return Pair.of(ValidDocIdsType.SNAPSHOT,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
     }
   }
 

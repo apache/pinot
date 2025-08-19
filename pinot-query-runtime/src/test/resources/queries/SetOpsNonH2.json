@@ -1,0 +1,175 @@
+{
+  "set_op_test_non_h2": {
+    "tables": {
+      "tbl1": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "longCol", "type": "LONG"},
+          {"name": "floatCol", "type": "FLOAT"},
+          {"name": "doubleCol", "type": "DOUBLE"},
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, 8, 3.0, 5.176518e16, "lyons"],
+          [2, 9, 4.0, 4.608155e11, "onan"],
+          [3, 14, 5.0, 1.249261e11, "rudvalis"],
+          [4, 21, 6.0, 8.677557e19, "janko"],
+          [1, 41, 2.0, 4.15478e33, "baby"],
+          [2, 46, 1.0, 8.08017e53, "monster"]
+        ]
+      },
+      "tbl2": {
+        "schema":[
+          {"name": "intCol", "type": "INT"},
+          {"name": "strCol", "type": "STRING"}
+        ],
+        "inputs": [
+          [1, "foo"],
+          [2, "bar"],
+          [1, "bar"]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "INTERSECT ALL is not supported by H2, so we use hardcoded output to validate the query",
+        "sql": "SELECT intCol FROM {tbl1} INTERSECT ALL SELECT intCol FROM {tbl2}",
+        "outputs": [
+          [1],
+          [2],
+          [1]
+        ]
+      },
+      {
+        "description": "EXCEPT ALL is not supported by H2, so we use hardcoded output to validate the query",
+        "sql": "SELECT intCol FROM {tbl1} EXCEPT ALL SELECT intCol FROM {tbl2}",
+        "outputs": [
+          [3],
+          [4],
+          [2]
+        ]
+      },
+      {
+        "description": "MINUS ALL is not supported by H2, so we use hardcoded output to validate the query",
+        "sql": "SELECT intCol FROM {tbl1} MINUS ALL SELECT intCol FROM {tbl2}",
+        "outputs": [
+          [3],
+          [4],
+          [2]
+        ]
+      },
+      {
+        "description": "INTERSECT ALL with UNION",
+        "sql": "SELECT intCol FROM {tbl1} INTERSECT ALL SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [1],
+          [2],
+          [3],
+          [4]
+        ],
+        "ignoreV2Optimizer":  true
+      },
+      {
+        "description": "INTERSECT ALL with UNION",
+        "sql": "SET skipPlannerRules='UnionToDistinct'; SELECT intCol FROM {tbl1} INTERSECT ALL SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [1],
+          [2],
+          [3],
+          [4]
+        ],
+        "ignoreV2Optimizer":  true
+      },
+      {
+        "description": "INTERSECT ALL with UNION ALL",
+        "sql": "SELECT intCol FROM {tbl1} INTERSECT ALL SELECT intCol FROM {tbl2} UNION ALL SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [1],
+          [2],
+          [1],
+          [1],
+          [2],
+          [3],
+          [4],
+          [1],
+          [2]
+        ]
+      },
+      {
+        "description": "INTERSECT ALL with INTERSECT",
+        "sql": "SELECT intCol FROM {tbl1} INTERSECT ALL SELECT intCol FROM {tbl2} INTERSECT SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [1],
+          [2]
+        ]
+      },
+      {
+        "description": "INTERSECT ALL with EXCEPT",
+        "sql": "SELECT intCol FROM {tbl1} INTERSECT ALL SELECT intCol FROM {tbl2} EXCEPT SELECT intCol FROM {tbl1}",
+        "outputs": [
+        ]
+      },
+      {
+        "description": "EXCEPT ALL with UNION",
+        "sql": "SELECT intCol FROM {tbl1} EXCEPT ALL SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [3],
+          [4],
+          [1],
+          [2]
+        ],
+        "ignoreV2Optimizer":  true
+      },
+      {
+        "description": "EXCEPT ALL with UNION",
+        "sql": "SET skipPlannerRules='UnionToDistinct'; SELECT intCol FROM {tbl1} EXCEPT ALL SELECT intCol FROM {tbl2} UNION SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [3],
+          [4],
+          [1],
+          [2]
+        ]
+      },
+      {
+        "description": "EXCEPT ALL with UNION ALL",
+        "sql": "SELECT intCol FROM {tbl1} EXCEPT ALL SELECT intCol FROM {tbl2} UNION ALL SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [3],
+          [4],
+          [2],
+          [1],
+          [2],
+          [3],
+          [4],
+          [1],
+          [2]
+        ]
+      },
+      {
+        "description": "MINUS ALL with INTERSECT",
+        "sql": "SELECT intCol FROM {tbl1} MINUS ALL SELECT intCol FROM {tbl2} INTERSECT SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [3],
+          [4],
+          [1],
+          [2]
+        ]
+      },
+      {
+        "description": "MINUS ALL with EXCEPT",
+        "sql": "SELECT intCol FROM {tbl1} MINUS ALL SELECT intCol FROM {tbl2} EXCEPT SELECT intCol FROM {tbl1}",
+        "outputs": [
+        ]
+      },
+      {
+        "description": "MINUS ALL with INTERSECT ALL",
+        "sql": "SELECT intCol FROM {tbl1} MINUS ALL SELECT intCol FROM {tbl2} INTERSECT ALL SELECT intCol FROM {tbl1}",
+        "outputs": [
+          [3],
+          [4],
+          [2]
+        ]
+      }
+    ]
+  }
+}

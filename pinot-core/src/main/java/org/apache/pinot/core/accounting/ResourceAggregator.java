@@ -21,39 +21,35 @@ package org.apache.pinot.core.accounting;
 import java.util.List;
 
 
-/**
- * Interface for aggregating CPU and memory usage of threads.
- */
+/// Interface for aggregating CPU and memory usage of threads.
 public interface ResourceAggregator {
 
-  /**
-   * Update CPU usage for one-off cases where identifier is known before-hand. For example: broker inbound netty
-   * thread where queryId and workloadName are already known.
-   *
-   * @param name identifier name - workload name, queryId, etc.
-   * @param cpuTimeNs CPU time in nanoseconds
-   */
-  public void updateConcurrentCpuUsage(String name, long cpuTimeNs);
+  /// Updates CPU usage for one-off cases where identifier is known beforehand. For example: broker inbound netty thread
+  /// where queryId and workloadName are already known.
+  ///
+  /// @param name identifier name - queryId, workload name, etc.
+  /// @param cpuTimeNs CPU time in nanoseconds
+  void updateConcurrentCpuUsage(String name, long cpuTimeNs);
 
-  /**
-   * Update CPU usage for one-off cases where identifier is known before-hand. For example: broker inbound netty
-   * @param name identifier name - workload name, queryId, etc.
-   * @param memBytes memory usage in bytes
-   */
-  public void updateConcurrentMemUsage(String name, long memBytes);
+  /// Updates memory usage for one-off cases where identifier is known beforehand. For example: broker inbound netty
+  /// thread where queryId and workloadName are already known.
+  ///
+  /// @param name identifier name - queryId, workload name, etc.
+  /// @param memBytes memory usage in bytes
+  void updateConcurrentMemUsage(String name, long memBytes);
 
-  // Cleanup of state after periodic aggregation is complete.
-  public void cleanUpPostAggregation();
+  /// Cleans up state after periodic aggregation is complete.
+  void cleanUpPostAggregation();
 
-  // Sleep time between aggregations.
-  public int getAggregationSleepTimeMs();
+  /// Sleep time between aggregations.
+  int getAggregationSleepTimeMs();
 
-  // Pre-aggregation step to be called before the aggregation of all thread entries.
-  public void preAggregate(List<CPUMemThreadLevelAccountingObjects.ThreadEntry> anchorThreadEntries);
+  /// Pre-aggregation step to be called before the aggregation of all thread entries.
+  void preAggregate(List<CPUMemThreadLevelAccountingObjects.ThreadEntry> anchorThreadEntries);
 
-  // Aggregation of each thread entry
-  public void aggregate(Thread thread, CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry);
+  /// Aggregates on a thread entry.
+  void aggregate(Thread thread, CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry);
 
-  // Post-aggregation step to be called after the aggregation of all thread entries.
-  public void postAggregate();
+  /// Post-aggregation step to be called after the aggregation of all thread entries.
+  void postAggregate();
 }

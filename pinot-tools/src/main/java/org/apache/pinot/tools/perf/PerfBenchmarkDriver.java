@@ -212,7 +212,7 @@ public class PerfBenchmarkDriver {
   private Map<String, Object> getControllerProperties() {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     properties.put(ControllerConf.CONTROLLER_HOST, _controllerHost);
     properties.put(ControllerConf.CONTROLLER_PORT, String.valueOf(_controllerPort));
     properties.put(ControllerConf.DATA_DIR, _controllerDataDir);
@@ -247,7 +247,7 @@ public class PerfBenchmarkDriver {
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_ID, brokerInstanceName);
     properties.put(CommonConstants.Broker.CONFIG_OF_BROKER_TIMEOUT_MS, BROKER_TIMEOUT_MS);
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
 
     LOGGER.info("Starting broker instance: {}", brokerInstanceName);
 
@@ -269,7 +269,7 @@ public class PerfBenchmarkDriver {
     properties.put(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, "localhost");
     properties.put(CommonConstants.Server.CONFIG_OF_INSTANCE_ID, _serverInstanceName);
     properties.put(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME, _clusterName);
-    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER, _zkAddress);
+    properties.put(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER, _zkAddress);
     if (_segmentFormatVersion != null) {
       properties.put(CommonConstants.Server.CONFIG_OF_SEGMENT_FORMAT_VERSION, _segmentFormatVersion);
     }

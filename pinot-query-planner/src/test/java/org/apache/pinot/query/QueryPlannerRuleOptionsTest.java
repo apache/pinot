@@ -470,4 +470,64 @@ public class QueryPlannerRuleOptionsTest extends QueryEnvironmentTestBase {
             + "          PinotLogicalTableScan(table=[[default, b]])\n");
     //@formatter:on
   }
+
+  @Test
+  public void testAggregateUnionAggregateDisabledByDefault() {
+    // Verify that the AggregateUnionAggregateRule is disabled by default
+    //@formatter:off
+    String query = "EXPLAIN PLAN FOR "
+        + "SELECT * FROM "
+        + "(SELECT DISTINCT col1 FROM a) "
+        + "UNION "
+        + "(SELECT DISTINCT col1 FROM b)";
+    //@formatter:on
+
+    String explain = _queryEnvironment.explainQuery(query, RANDOM_REQUEST_ID_GEN.nextLong());
+
+    // The aggregates above the table scans should not be merged into the one above the UNION ALL
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+            + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+            + "      LogicalUnion(all=[true])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+            + "            PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "              PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+            + "                PinotLogicalTableScan(table=[[default, a]])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+            + "            PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "              PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+            + "                PinotLogicalTableScan(table=[[default, b]])\n");
+  }
+
+  @Test
+  public void testAggregateUnionAggregateEnabled() {
+    // Verify that the AggregateUnionAggregateRule is disabled by default
+    //@formatter:off
+    String query = "EXPLAIN PLAN FOR "
+        + "SELECT * FROM "
+        + "(SELECT DISTINCT col1 FROM a) "
+        + "UNION "
+        + "(SELECT DISTINCT col1 FROM b)";
+    //@formatter:on
+
+    String explain = explainQueryWithRuleEnabled(query, PlannerRuleNames.AGGREGATE_UNION_AGGREGATE);
+
+    // There shouldn't be aggregates above the table scans since they should be merged into the one above the UNION ALL
+    assertEquals(explain,
+        "Execution Plan\n"
+            + "PinotLogicalAggregate(group=[{0}], aggType=[FINAL])\n"
+            + "  PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "    PinotLogicalAggregate(group=[{0}], aggType=[LEAF])\n"
+            + "      LogicalUnion(all=[true])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          LogicalProject(col1=[$0])\n"
+            + "            PinotLogicalTableScan(table=[[default, a]])\n"
+            + "        PinotLogicalExchange(distribution=[hash[0]])\n"
+            + "          LogicalProject(col1=[$0])\n"
+            + "            PinotLogicalTableScan(table=[[default, b]])\n");
+  }
 }

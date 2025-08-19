@@ -49,7 +49,6 @@ public class BitmapInvertedIndexReader implements InvertedIndexReader<ImmutableR
     _firstOffset = getOffset(0);
   }
 
-  @SuppressWarnings("unchecked")
   @Override
   public ImmutableRoaringBitmap getDocIds(int dictId) {
     long offset = getOffset(dictId);

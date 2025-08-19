@@ -32,7 +32,9 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
-import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.ImplicitHybridTableRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
+import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.slf4j.Logger;
@@ -85,9 +87,9 @@ public class QueryRouter {
 
   public AsyncQueryResponse submitQuery(long requestId, String rawTableName,
       @Nullable BrokerRequest offlineBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> offlineRoutingTable,
+      @Nullable Map<ServerInstance, SegmentsToQuery> offlineRoutingTable,
       @Nullable BrokerRequest realtimeBrokerRequest,
-      @Nullable Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable, long timeoutMs) {
+      @Nullable Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable, long timeoutMs) {
     TableRouteInfo tableRouteInfo = new ImplicitHybridTableRouteInfo(offlineBrokerRequest, realtimeBrokerRequest,
         offlineRoutingTable, realtimeRoutingTable);
 

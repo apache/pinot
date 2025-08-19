@@ -25,6 +25,8 @@ import SimpleAccordion from '../components/SimpleAccordion';
 import PinotMethodUtils from '../utils/PinotMethodUtils';
 import { TaskProgressStatus } from 'Models';
 import moment from 'moment';
+import { formatTimeInTimezone } from '../utils/TimezoneUtils';
+import { useTimezone } from '../contexts/TimezoneContext';
 
 const jsonoptions = {
   lineNumbers: true,
@@ -69,14 +71,15 @@ const useStyles = makeStyles(() => ({
     '& .CodeMirror': { maxHeight: 400 },
   },
   taskDetailContainer: {
-    overflow: "auto", 
-    whiteSpace: "pre", 
+    overflow: "auto",
+    whiteSpace: "pre",
     height: 600
   }
 }));
 
 const TaskDetail = (props) => {
   const classes = useStyles();
+  const { currentTimezone } = useTimezone();
   const { subTaskID, taskID } = props.match.params;
   const [taskDebugData, setTaskDebugData] = useState({});
   const [taskProgressData, setTaskProgressData] = useState<TaskProgressStatus[] | string>("");
@@ -95,7 +98,7 @@ const TaskDetail = (props) => {
   useEffect(() => {
     fetchTaskDebugData();
     fetchTaskProgressData();
-  }, []);
+  }, [currentTimezone]);
 
   return (
     <Grid item xs className={classes.gridContainer}>
@@ -107,12 +110,16 @@ const TaskDetail = (props) => {
           <Grid item xs={12}>
             <strong>Status:</strong> {get(taskDebugData, 'state', '')}
           </Grid>
-          <Grid item xs={12}>
-            <strong>Start Time:</strong> {get(taskDebugData, 'startTime', '')}
-          </Grid>
-          <Grid item xs={12}>
-            <strong>Finish Time:</strong> {get(taskDebugData, 'finishTime', '')}
-          </Grid>
+          {get(taskDebugData, 'startTime') && (
+            <Grid item xs={12}>
+              <strong>Start Time:</strong> {formatTimeInTimezone(get(taskDebugData, 'startTime'), 'MMMM Do YYYY, HH:mm:ss z')}
+            </Grid>
+          )}
+          {get(taskDebugData, 'finishTime') && (
+            <Grid item xs={12}>
+              <strong>Finish Time:</strong> {formatTimeInTimezone(get(taskDebugData, 'finishTime'), 'MMMM Do YYYY, HH:mm:ss z')}
+            </Grid>
+          )}
           <Grid item xs={12}>
             <strong>Triggered By:</strong> {get(taskDebugData, 'triggeredBy', '')}
           </Grid>
@@ -165,9 +172,9 @@ const TaskDetail = (props) => {
                   {typeof taskProgressData !== "string" && taskProgressData.map((data, index) => (
                     <div key={index}>
                       <ListItem >
-                        <ListItemText 
-                          primary={moment(+data.ts).format('YYYY-MM-DD HH:mm:ss')} 
-                          secondary={<Typography variant='body2'>{data.status}</Typography>} 
+                        <ListItemText
+                          primary={formatTimeInTimezone(+data.ts, 'YYYY-MM-DD HH:mm:ss z')}
+                          secondary={<Typography variant='body2'>{data.status}</Typography>}
                         />
                       </ListItem>
                       <Divider />

@@ -130,15 +130,18 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
  *   <li>DELETE '/tasks/{taskType}': Delete all tasks (as well as the task queue) for the given task type</li>
  * </ul>
  */
-@Api(tags = Constants.TASK_TAG, authorizations = {@Authorization(value = SWAGGER_AUTHORIZATION_KEY),
-    @Authorization(value = DATABASE)})
+@Api(tags = Constants.TASK_TAG, authorizations = {
+    @Authorization(value = SWAGGER_AUTHORIZATION_KEY),
+    @Authorization(value = DATABASE)
+})
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = {
     @ApiKeyAuthDefinition(name = HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER,
         key = SWAGGER_AUTHORIZATION_KEY,
         description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```"),
     @ApiKeyAuthDefinition(name = DATABASE, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = DATABASE,
         description = "Database context passed through http header. If no context is provided 'default' database "
-            + "context will be considered.")}))
+            + "context will be considered.")
+}))
 @Path("/")
 public class PinotTaskRestletResource {
   public static final Logger LOGGER = LoggerFactory.getLogger(PinotTaskRestletResource.class);
@@ -267,8 +270,21 @@ public class PinotTaskRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation("Fetch count of sub-tasks for each of the tasks for the given task type")
   public Map<String, PinotHelixTaskResourceManager.TaskCount> getTaskCounts(
-      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType) {
-    return _pinotHelixTaskResourceManager.getTaskCounts(taskType);
+      @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
+      @ApiParam(value = "Task state(s) to filter by. Can be single state or comma-separated multiple states "
+          + "(NOT_STARTED, IN_PROGRESS, STOPPED, STOPPING, FAILED, COMPLETED, ABORTED, TIMED_OUT, TIMING_OUT, "
+          + "FAILING). Example: 'IN_PROGRESS' or 'IN_PROGRESS,FAILED,STOPPING'")
+      @QueryParam("state") @Nullable String state,
+      @ApiParam(value = "Table name with type (e.g., 'myTable_OFFLINE') to filter tasks by table. "
+          + "Only tasks that have subtasks for this table will be returned.")
+      @QueryParam("table") @Nullable String table, @Context HttpHeaders headers) {
+    String tableNameWithType = table != null ? DatabaseUtils.translateTableName(table, headers) : null;
+
+    if (StringUtils.isNotEmpty(state) || StringUtils.isNotEmpty(tableNameWithType)) {
+      return _pinotHelixTaskResourceManager.getTaskCounts(taskType, state, tableNameWithType);
+    } else {
+      return _pinotHelixTaskResourceManager.getTaskCounts(taskType);
+    }
   }
 
   @GET
@@ -293,7 +309,7 @@ public class PinotTaskRestletResource {
   public Map<String, PinotHelixTaskResourceManager.TaskDebugInfo> getTasksDebugInfo(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType,
+      String tableNameWithType,
       @ApiParam(value = "verbosity (Prints information for all the tasks for the given task type and table."
           + "By default, only prints subtask details for running and error tasks. "
           + "Value of > 0 prints subtask details for all tasks)")
@@ -310,9 +326,9 @@ public class PinotTaskRestletResource {
   public String getTaskGenerationDebugInto(
       @ApiParam(value = "Task type", required = true) @PathParam("taskType") String taskType,
       @ApiParam(value = "Table name with type", required = true) @PathParam("tableNameWithType")
-          String tableNameWithType,
+      String tableNameWithType,
       @ApiParam(value = "Whether to only lookup local cache for logs", defaultValue = "false") @QueryParam("localOnly")
-          boolean localOnly, @Context HttpHeaders httpHeaders)
+      boolean localOnly, @Context HttpHeaders httpHeaders)
       throws JsonProcessingException {
     tableNameWithType = DatabaseUtils.translateTableName(tableNameWithType, httpHeaders);
     if (localOnly) {
@@ -430,7 +446,7 @@ public class PinotTaskRestletResource {
   public Map<String, PinotTaskConfig> getSubtaskConfigs(
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
-          String subtaskNames) {
+      String subtaskNames) {
     return _pinotHelixTaskResourceManager.getSubtaskConfigs(taskName, subtaskNames);
   }
 
@@ -442,7 +458,7 @@ public class PinotTaskRestletResource {
   public String getSubtaskProgress(@Context HttpHeaders httpHeaders,
       @ApiParam(value = "Task name", required = true) @PathParam("taskName") String taskName,
       @ApiParam(value = "Sub task names separated by comma") @QueryParam("subtaskNames") @Nullable
-          String subtaskNames) {
+      String subtaskNames) {
     // Relying on original schema that was used to query the controller
     String scheme = _uriInfo.getRequestUri().getScheme();
     List<InstanceConfig> workers = _pinotHelixResourceManager.getAllMinionInstanceConfigs();
@@ -482,7 +498,7 @@ public class PinotTaskRestletResource {
       @ApiParam(value = "Subtask state (UNKNOWN,IN_PROGRESS,SUCCEEDED,CANCELLED,ERROR)", required = true)
       @QueryParam("subTaskState") String subTaskState,
       @ApiParam(value = "Minion worker IDs separated by comma") @QueryParam("minionWorkerIds") @Nullable
-          String minionWorkerIds) {
+      String minionWorkerIds) {
     Set<String> selectedMinionWorkers = new HashSet<>();
     if (StringUtils.isNotEmpty(minionWorkerIds)) {
       selectedMinionWorkers.addAll(

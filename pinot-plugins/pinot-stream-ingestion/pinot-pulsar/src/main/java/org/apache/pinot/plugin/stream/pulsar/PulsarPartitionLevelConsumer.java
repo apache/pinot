@@ -25,7 +25,6 @@ import java.util.Objects;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -87,11 +86,8 @@ public class PulsarPartitionLevelConsumer extends PulsarPartitionLevelConnection
     if (messages.isEmpty()) {
       offsetOfNextBatch = (MessageIdStreamOffset) startOffset;
     } else {
-      StreamMessageMetadata lastMessageMetadata = messages.get(messages.size() - 1).getMetadata();
-      assert lastMessageMetadata != null;
-      offsetOfNextBatch = (MessageIdStreamOffset) lastMessageMetadata.getNextOffset();
+      offsetOfNextBatch = (MessageIdStreamOffset) messages.get(messages.size() - 1).getMetadata().getNextOffset();
     }
-    assert offsetOfNextBatch != null;
     _nextMessageId = offsetOfNextBatch.getMessageId();
     return new PulsarMessageBatch(messages, offsetOfNextBatch, _reader.hasReachedEndOfTopic());
   }

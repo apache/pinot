@@ -73,7 +73,6 @@ const Layout = (props) => {
     setOpenSidebar(newSidebarState);
   };
 
-  
 
   return (
     <Grid container direction="column">

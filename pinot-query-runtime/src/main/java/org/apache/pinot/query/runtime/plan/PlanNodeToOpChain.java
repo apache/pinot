@@ -25,6 +25,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -41,26 +42,28 @@ import org.apache.pinot.query.planner.plannode.ValueNode;
 import org.apache.pinot.query.planner.plannode.WindowNode;
 import org.apache.pinot.query.runtime.operator.AggregateOperator;
 import org.apache.pinot.query.runtime.operator.AsofJoinOperator;
+import org.apache.pinot.query.runtime.operator.EnrichedHashJoinOperator;
 import org.apache.pinot.query.runtime.operator.ErrorOperator;
 import org.apache.pinot.query.runtime.operator.FilterOperator;
 import org.apache.pinot.query.runtime.operator.HashJoinOperator;
-import org.apache.pinot.query.runtime.operator.IntersectAllOperator;
-import org.apache.pinot.query.runtime.operator.IntersectOperator;
 import org.apache.pinot.query.runtime.operator.LeafOperator;
 import org.apache.pinot.query.runtime.operator.LiteralValueOperator;
 import org.apache.pinot.query.runtime.operator.LookupJoinOperator;
 import org.apache.pinot.query.runtime.operator.MailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
-import org.apache.pinot.query.runtime.operator.MinusAllOperator;
-import org.apache.pinot.query.runtime.operator.MinusOperator;
 import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.NonEquiJoinOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.SortOperator;
 import org.apache.pinot.query.runtime.operator.SortedMailboxReceiveOperator;
 import org.apache.pinot.query.runtime.operator.TransformOperator;
-import org.apache.pinot.query.runtime.operator.UnionOperator;
 import org.apache.pinot.query.runtime.operator.WindowAggregateOperator;
+import org.apache.pinot.query.runtime.operator.set.IntersectAllOperator;
+import org.apache.pinot.query.runtime.operator.set.IntersectOperator;
+import org.apache.pinot.query.runtime.operator.set.MinusAllOperator;
+import org.apache.pinot.query.runtime.operator.set.MinusOperator;
+import org.apache.pinot.query.runtime.operator.set.UnionAllOperator;
+import org.apache.pinot.query.runtime.operator.set.UnionOperator;
 import org.apache.pinot.query.runtime.plan.server.ServerPlanRequestContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 
@@ -171,7 +174,9 @@ public class PlanNodeToOpChain {
         }
         switch (setOpNode.getSetOpType()) {
           case UNION:
-            return new UnionOperator(context, inputOperators, setOpNode.getInputs().get(0).getDataSchema());
+            return setOpNode.isAll() ? new UnionAllOperator(context, inputOperators,
+                setOpNode.getInputs().get(0).getDataSchema())
+                : new UnionOperator(context, inputOperators, setOpNode.getInputs().get(0).getDataSchema());
           case INTERSECT:
             return setOpNode.isAll() ? new IntersectAllOperator(context, inputOperators,
                 setOpNode.getInputs().get(0).getDataSchema())
@@ -231,6 +236,39 @@ public class PlanNodeToOpChain {
             return new AsofJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
           default:
             throw new IllegalStateException("Unsupported JoinStrategy: " + joinStrategy);
+        }
+      } catch (Exception e) {
+        List<MultiStageOperator> children = Stream.of(leftOperator, rightOperator)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+        return new ErrorOperator(context, QueryErrorCode.QUERY_EXECUTION, e.getMessage(), children);
+      }
+    }
+
+    @Override
+    public MultiStageOperator visitEnrichedJoin(EnrichedJoinNode node, OpChainExecutionContext context) {
+      MultiStageOperator leftOperator = null;
+      MultiStageOperator rightOperator = null;
+      try {
+        List<PlanNode> inputs = node.getInputs();
+        PlanNode left = inputs.get(0);
+        leftOperator = visit(left, context);
+        PlanNode right = inputs.get(1);
+        rightOperator = visit(right, context);
+        JoinNode.JoinStrategy joinStrategy = node.getJoinStrategy();
+        switch (joinStrategy) {
+          case HASH:
+            if (node.getLeftKeys().isEmpty()) {
+              throw new UnsupportedOperationException("NonEquiJoin yet to be supported for EnrichedJoin");
+            } else {
+              return new EnrichedHashJoinOperator(context, leftOperator, left.getDataSchema(), rightOperator, node);
+            }
+          case LOOKUP:
+            throw new UnsupportedOperationException("LookupJoin yet to be supported for EnrichedJoin");
+          case ASOF:
+            throw new UnsupportedOperationException("AsOfJoin yet to be supported for EnrichedJoin");
+          default:
+            throw new IllegalStateException("Unsupported JoinStrategy for EnrichedJoin: " + joinStrategy);
         }
       } catch (Exception e) {
         List<MultiStageOperator> children = Stream.of(leftOperator, rightOperator)

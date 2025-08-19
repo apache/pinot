@@ -68,6 +68,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS("rows", false),
   METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
   UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
+  UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("segments", false),
   UPSERT_PRELOAD_FAILURE("count", false),
   ROWS_WITH_ERRORS("rows", false),
   LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
@@ -212,7 +213,9 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   /**
    * Approximate heap bytes used by the mutable JSON index at the time of index close.
    */
-  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false);
+  MUTABLE_JSON_INDEX_MEMORY_USAGE("bytes", false),
+  // Workload Budget exceeded counter
+  WORKLOAD_BUDGET_EXCEEDED("workloadBudgetExceeded", false, "Number of times workload budget exceeded");
 
   private final String _meterName;
   private final String _unit;

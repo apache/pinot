@@ -204,19 +204,27 @@ public class SegmentConversionUtils {
   public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId,
       int socketTimeoutMs, @Nullable AuthProvider authProvider)
       throws Exception {
-    endSegmentReplace(tableNameWithType, uploadURL, null, segmentLineageEntryId, socketTimeoutMs, authProvider);
+    endSegmentReplace(tableNameWithType, uploadURL, null, segmentLineageEntryId,
+        socketTimeoutMs, authProvider, false);
+  }
+
+  public static void endSegmentReplace(String tableNameWithType, String uploadURL, String segmentLineageEntryId,
+      int socketTimeoutMs, @Nullable AuthProvider authProvider, boolean cleanup)
+      throws Exception {
+    endSegmentReplace(tableNameWithType, uploadURL, null, segmentLineageEntryId,
+        socketTimeoutMs, authProvider, cleanup);
   }
 
   public static void endSegmentReplace(String tableNameWithType, String uploadURL,
       @Nullable EndReplaceSegmentsRequest endReplaceSegmentsRequest, String segmentLineageEntryId, int socketTimeoutMs,
-      @Nullable AuthProvider authProvider)
+      @Nullable AuthProvider authProvider, boolean cleanup)
       throws Exception {
     String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableNameWithType);
     SSLContext sslContext = MinionContext.getInstance().getSSLContext();
     try (FileUploadDownloadClient fileUploadDownloadClient = new FileUploadDownloadClient(sslContext)) {
       URI uri = FileUploadDownloadClient.getEndReplaceSegmentsURI(new URI(uploadURL), rawTableName, tableType.name(),
-          segmentLineageEntryId);
+          segmentLineageEntryId, cleanup);
       SimpleHttpResponse response =
           fileUploadDownloadClient.endReplaceSegments(uri, socketTimeoutMs, endReplaceSegmentsRequest, authProvider);
       LOGGER.info("Got response {}: {} while sending end replace segment request for table: {}, uploadURL: {}, request:"

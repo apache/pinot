@@ -84,7 +84,7 @@ public class PredownloadScheduler {
       throws Exception {
     _properties = properties;
     _clusterName = properties.getString(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
-    _zkAddress = properties.getString(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    _zkAddress = properties.getString(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _instanceId = properties.getString(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
     _pinotConfig = new PinotConfiguration(properties);
     _instanceDataManagerConfig =

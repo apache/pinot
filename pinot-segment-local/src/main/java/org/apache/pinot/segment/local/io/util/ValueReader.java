@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.io.util;
 
 import java.io.Closeable;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import org.apache.pinot.spi.utils.BigDecimalUtils;
 import org.apache.pinot.spi.utils.hash.MurmurHashFunctions;
 
@@ -63,7 +64,7 @@ public interface ValueReader extends Closeable {
    */
   default String getUnpaddedString(int index, int numBytesPerValue, byte[] buffer) {
     int length = readUnpaddedBytes(index, numBytesPerValue, buffer);
-    return new String(buffer, 0, length);
+    return new String(buffer, 0, length, StandardCharsets.UTF_8);
   }
 
   /**

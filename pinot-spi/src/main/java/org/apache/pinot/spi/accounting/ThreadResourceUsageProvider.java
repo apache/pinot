@@ -31,6 +31,9 @@ import org.slf4j.LoggerFactory;
  * and allocateBytes (JVM heap) for the current thread.
  */
 public class ThreadResourceUsageProvider {
+  private ThreadResourceUsageProvider() {
+  }
+
   private static final Logger LOGGER = LoggerFactory.getLogger(ThreadResourceUsageProvider.class);
 
   // used for getting the memory allocation function in hotspot jvm through reflection
@@ -51,14 +54,12 @@ public class ThreadResourceUsageProvider {
   private static boolean _isThreadCpuTimeMeasurementEnabled = false;
   private static boolean _isThreadMemoryMeasurementEnabled = false;
 
-  @Deprecated
-  public long getThreadTimeNs() {
-    return 0;
+  public static int getThreadCount() {
+    return MX_BEAN.getThreadCount();
   }
 
-  @Deprecated
-  public long getThreadAllocatedBytes() {
-    return 0;
+  public static long getTotalStartedThreadCount() {
+    return MX_BEAN.getTotalStartedThreadCount();
   }
 
   public static long getCurrentThreadCpuTime() {

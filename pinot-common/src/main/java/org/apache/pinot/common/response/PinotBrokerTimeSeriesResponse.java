@@ -25,11 +25,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.broker.ResultTable;
+import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 
@@ -106,6 +112,61 @@ public class PinotBrokerTimeSeriesResponse {
       throw new UnsupportedOperationException("Non-bucketed series block not supported yet");
     }
     return convertBucketedSeriesBlock(seriesBlock);
+  }
+
+  public BrokerResponse toBrokerResponse() {
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    if (_errorType != null) {
+      // TODO: Introduce proper error code based exception handling for timeseries.
+      brokerResponse.addException(new QueryProcessingException(QueryErrorCode.UNKNOWN, _errorType + ": "
+          + _error));
+      return brokerResponse;
+    }
+    DataSchema dataSchema = deriveBrokerResponseDataSchema(_data);
+    ResultTable resultTable = new ResultTable(dataSchema, deriveBrokerResponseRows(_data, dataSchema.getColumnNames()));
+    brokerResponse.setResultTable(resultTable);
+    return brokerResponse;
+  }
+
+  private List<Object[]> deriveBrokerResponseRows(Data data, String[] columnNames) {
+    List<Object[]> rows = new ArrayList<>();
+    if (columnNames.length == 0) {
+      return rows;
+    }
+    for (Value value : data.getResult()) {
+      Long[] ts = Arrays.stream(value.getValues()).map(entry -> (Long) entry[0]).toArray(Long[]::new);
+      Double[] values = Arrays.stream(value.getValues())
+          .map(entry -> entry[1] == null ? null : Double.valueOf(String.valueOf(entry[1])))
+          .toArray(Double[]::new);
+
+      Object[] row = new Object[columnNames.length];
+      int index = 0;
+      for (String columnName : columnNames) {
+        if ("ts".equals(columnName)) {
+          row[index] = ts;
+        } else if ("values".equals(columnName)) {
+          row[index] = values;
+        } else {
+          row[index] = value.getMetric().getOrDefault(columnName, null);
+        }
+        index++;
+      }
+      rows.add(row);
+    }
+    return rows;
+  }
+
+  private DataSchema deriveBrokerResponseDataSchema(Data data) {
+    List<String> columnNames = new ArrayList<>(List.of("ts", "values", "__name__"));
+    List<DataSchema.ColumnDataType> columnTypes = new ArrayList<>(List.of(
+        DataSchema.ColumnDataType.LONG_ARRAY, DataSchema.ColumnDataType.DOUBLE_ARRAY));
+    if (!data.getResult().isEmpty()) {
+      data.getResult().get(0).getMetric().forEach((key, value) -> {
+        columnNames.add(key);
+        columnTypes.add(DataSchema.ColumnDataType.STRING);
+      });
+    }
+    return new DataSchema(columnNames.toArray(new String[0]), columnTypes.toArray(new DataSchema.ColumnDataType[0]));
   }
 
   private static PinotBrokerTimeSeriesResponse convertBucketedSeriesBlock(TimeSeriesBlock seriesBlock) {

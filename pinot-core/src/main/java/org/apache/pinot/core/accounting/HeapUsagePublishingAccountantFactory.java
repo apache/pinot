@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.core.accounting;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.util.Timer;
 import java.util.TimerTask;
 import org.apache.pinot.common.metrics.ServerGauge;
@@ -30,6 +28,7 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
 
 /**
@@ -46,7 +45,6 @@ public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFac
   }
 
   public static class HeapUsagePublishingResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
-    static final MemoryMXBean MEMORY_MX_BEAN = ManagementFactory.getMemoryMXBean();
     private final Timer _timer;
     private final int _period;
 
@@ -56,8 +54,7 @@ public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFac
     }
 
     public void publishHeapUsageMetrics() {
-      ServerMetrics.get()
-          .setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed());
+      ServerMetrics.get().setValueOfGlobalGauge(ServerGauge.JVM_HEAP_USED_BYTES, ResourceUsageUtils.getUsedHeapSize());
     }
 
     @Override

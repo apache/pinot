@@ -21,7 +21,7 @@ package org.apache.pinot.segment.local.upsert.merger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.MapUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.segment.local.segment.readers.LazyRow;
 import org.apache.pinot.segment.local.upsert.merger.columnar.ForceOverwriteMerger;
 import org.apache.pinot.segment.local.upsert.merger.columnar.OverwriteMerger;

@@ -25,6 +25,8 @@ import CheckIcon from '@material-ui/icons/Check';
 import { TableData, TableSegmentJobs } from 'Models';
 import TabPanel from '../../TabPanel';
 import moment from 'moment';
+import { formatTimeInTimezone } from '../../../utils/TimezoneUtils';
+import { useTimezone } from '../../../contexts/TimezoneContext';
 import CustomDialog from '../../CustomDialog';
 import PinotMethodUtils from '../../../utils/PinotMethodUtils';
 import CustomCodemirror from '../../CustomCodemirror';
@@ -78,6 +80,7 @@ export default function ReloadStatusOp({
   tableJobsData,
   hideModal
 }: Props) {
+  const { currentTimezone } = useTimezone();
   const classes = useStyles();
   const reloadStatusKey = "columnToIndexesCount"
   const indexes = reloadStatusData && reloadStatusData[reloadStatusKey];
@@ -103,13 +106,13 @@ export default function ReloadStatusOp({
           job.jobId,
           job.messageCount,
           job.jobType,
-          moment(+job.submissionTimeMs).format("MMMM Do YYYY, HH:mm:ss"),
+          formatTimeInTimezone(+job.submissionTimeMs, "MMMM Do YYYY, HH:mm:ss"),
         ]),
     };
 
     setSegmentJobsTableData(segmentJobsTableData);
     setFilteredSegmentJobsTableData(segmentJobsTableData);
-  }, [tableJobsData]);
+  }, [tableJobsData, currentTimezone]);
 
   useEffect(() => {
     if(!selectedJobId) {
@@ -258,10 +261,10 @@ export default function ReloadStatusOp({
               <DialogContentText>No reload status found in table.</DialogContentText>
             }
           </TabPanel>
-          <CustomDialog 
-            showOkBtn={false} 
-            title="Segment Job Details" 
-            open={jobDetailsDialogOpen} 
+          <CustomDialog
+            showOkBtn={false}
+            title="Segment Job Details"
+            open={jobDetailsDialogOpen}
             handleClose={handleJobDetailsDialogClose}
           >
             {segmentJobDetails ? (

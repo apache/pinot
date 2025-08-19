@@ -19,6 +19,7 @@
 package org.apache.pinot.common.function.scalar.string;
 
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.Strings;
 import org.apache.pinot.spi.annotations.ScalarFunction;
 
 
@@ -54,35 +55,28 @@ public class StringFunctions {
   }
 
   /**
-   * @param input
-   * @param searchString       target substring to replace
-   * @param substitute new substring to be replaced with target
-   * @see String#replaceAll(String, String)
+   * @see Strings#replace(String, String, String)
    */
   @ScalarFunction
-  public String replace(String input, String searchString, String substitute) {
-    if (StringUtils.isEmpty(input) || StringUtils.isEmpty(searchString) || substitute == null) {
-      return input;
+  public String replace(String text, String searchString, String replacement) {
+    if (text.isEmpty() || searchString.isEmpty()) {
+      return text;
     }
     int start = 0;
-    int end = StringUtils.indexOf(input, searchString, start);
+    int end = Strings.CS.indexOf(text, searchString, start);
     if (end == StringUtils.INDEX_NOT_FOUND) {
-      return input;
+      return text;
     }
     final int replLength = searchString.length();
-    int increase = Math.max(substitute.length() - replLength, 0) * 16;
+    int increase = Math.max(replacement.length() - replLength, 0) * 16;
     _buffer.setLength(0);
-    _buffer.ensureCapacity(input.length() + increase);
-    int max = -1;
+    _buffer.ensureCapacity(text.length() + increase);
     while (end != StringUtils.INDEX_NOT_FOUND) {
-      _buffer.append(input, start, end).append(substitute);
+      _buffer.append(text, start, end).append(replacement);
       start = end + replLength;
-      if (--max == 0) {
-        break;
-      }
-      end = StringUtils.indexOf(input, searchString, start);
+      end = Strings.CS.indexOf(text, searchString, start);
     }
-    _buffer.append(input, start, input.length());
+    _buffer.append(text, start, text.length());
     return _buffer.toString();
   }
 }

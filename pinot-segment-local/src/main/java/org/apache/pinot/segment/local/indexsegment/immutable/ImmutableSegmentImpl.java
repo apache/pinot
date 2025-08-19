@@ -44,7 +44,6 @@ import org.apache.pinot.segment.local.upsert.PartitionUpsertMetadataManager;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.FetchContext;
 import org.apache.pinot.segment.spi.ImmutableSegment;
-import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.IndexReader;
 import org.apache.pinot.segment.spi.index.IndexType;
@@ -135,69 +134,66 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
   }
 
   @Nullable
-  public MutableRoaringBitmap loadValidDocIdsFromSnapshot() {
-    File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
-    if (validDocIdsSnapshotFile.exists()) {
+  public MutableRoaringBitmap loadDocIdsFromSnapshot(String fileName) {
+    File docIdsSnapshotFile = getSnapshotFile(fileName);
+    if (docIdsSnapshotFile.exists()) {
       try {
-        byte[] bytes = FileUtils.readFileToByteArray(validDocIdsSnapshotFile);
-        MutableRoaringBitmap validDocIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
-        LOGGER.info("Loaded validDocIds for segment: {} with: {} valid docs", getSegmentName(),
-            validDocIds.getCardinality());
-        return validDocIds;
+        byte[] bytes = FileUtils.readFileToByteArray(docIdsSnapshotFile);
+        MutableRoaringBitmap docIds = new ImmutableRoaringBitmap(ByteBuffer.wrap(bytes)).toMutableRoaringBitmap();
+        LOGGER.info("Loaded docIds from snapshot for segment: {} with: {} docs", getSegmentName(),
+            docIds.getCardinality());
+        return docIds;
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while loading validDocIds from snapshot file: {}, ignoring the snapshot",
-            validDocIdsSnapshotFile);
+        LOGGER.warn("Caught exception while loading docIds from snapshot file: {}, ignoring the snapshot",
+            docIdsSnapshotFile);
       }
     }
     return null;
   }
 
-  public void persistValidDocIdsSnapshot() {
-    File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
+  public void persistDocIdsSnapshot(String fileName, ThreadSafeMutableRoaringBitmap docIds) {
+    File docIdsSnapshotFile = getSnapshotFile(fileName);
     try {
-      File tmpFile = new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
-          V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME + "_tmp");
+      File tmpFile =
+          new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()), fileName + "_tmp");
       if (tmpFile.exists()) {
         LOGGER.warn("Previous snapshot was not taken cleanly. Remove tmp file: {}", tmpFile);
         FileUtils.deleteQuietly(tmpFile);
       }
-      MutableRoaringBitmap validDocIdsSnapshot = _validDocIds.getMutableRoaringBitmap();
+      MutableRoaringBitmap docIdsSnapshot = docIds.getMutableRoaringBitmap();
       try (DataOutputStream dataOutputStream = new DataOutputStream(new FileOutputStream(tmpFile))) {
-        validDocIdsSnapshot.serialize(dataOutputStream);
+        docIdsSnapshot.serialize(dataOutputStream);
       }
-      Preconditions.checkState(tmpFile.renameTo(validDocIdsSnapshotFile),
-          "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, validDocIdsSnapshotFile);
-      LOGGER.info("Persisted validDocIds for segment: {} with: {} valid docs", getSegmentName(),
-          validDocIdsSnapshot.getCardinality());
+      Preconditions.checkState(tmpFile.renameTo(docIdsSnapshotFile),
+          "Failed to rename tmp snapshot file: %s to snapshot file: %s", tmpFile, docIdsSnapshotFile);
+      LOGGER.info("Persisted docIds for segment: {} with: {}", getSegmentName(), docIdsSnapshot.getCardinality());
     } catch (Exception e) {
-      LOGGER.warn("Caught exception while persisting validDocIds to snapshot file: {}, skipping",
-          validDocIdsSnapshotFile, e);
+      LOGGER.warn("Caught exception while persisting docIds to snapshot file: {}, skipping",
+          docIdsSnapshotFile, e);
     }
   }
 
-  public boolean hasValidDocIdsSnapshotFile() {
-    return getValidDocIdsSnapshotFile().exists();
-  }
-
-  public void deleteValidDocIdsSnapshot() {
-    File validDocIdsSnapshotFile = getValidDocIdsSnapshotFile();
-    if (validDocIdsSnapshotFile.exists()) {
+  public void deleteSnapshotFile(String fileName) {
+    File snapshotFile = getSnapshotFile(fileName);
+    if (snapshotFile.exists()) {
       try {
-        if (!FileUtils.deleteQuietly(validDocIdsSnapshotFile)) {
-          LOGGER.warn("Cannot delete old validDocIds snapshot file: {}, skipping", validDocIdsSnapshotFile);
+        if (!FileUtils.deleteQuietly(snapshotFile)) {
+          LOGGER.warn("Cannot delete old snapshot file: {}, skipping", snapshotFile);
           return;
         }
-        LOGGER.info("Deleted validDocIds snapshot for segment: {}", getSegmentName());
+        LOGGER.info("Deleted snapshot for segment: {}", getSegmentName());
       } catch (Exception e) {
-        LOGGER.warn("Caught exception while deleting validDocIds snapshot file: {}, skipping",
-            validDocIdsSnapshotFile);
+        LOGGER.warn("Caught exception while deleting snapshot file: {}, skipping", snapshotFile);
       }
     }
   }
 
-  private File getValidDocIdsSnapshotFile() {
-    return new File(SegmentDirectoryPaths.findSegmentDirectory(_segmentMetadata.getIndexDir()),
-        V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
+  private File getSnapshotFile(String fileName) {
+    return new File(SegmentDirectoryPaths.findSegmentDirectory(getSegmentMetadata().getIndexDir()), fileName);
+  }
+
+  public boolean hasSnapshotFile(String fileName) {
+    return getSnapshotFile(fileName).exists();
   }
 
   /**

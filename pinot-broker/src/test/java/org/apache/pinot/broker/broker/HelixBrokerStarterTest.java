@@ -34,7 +34,7 @@ import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.utils.SegmentMetadataMockUtils;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -84,7 +84,7 @@ public class HelixBrokerStarterTest extends ControllerTest {
     Map<String, Object> properties = new HashMap<>();
     properties.put(Helix.KEY_OF_BROKER_QUERY_PORT, 18099);
     properties.put(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
-    properties.put(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    properties.put(Helix.CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     properties.put(Broker.CONFIG_OF_ENABLE_QUERY_LIMIT_OVERRIDE, true);
     properties.put(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
     properties.put(Broker.CONFIG_OF_BROKER_DEFAULT_QUERY_LIMIT, 1000);

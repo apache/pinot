@@ -27,9 +27,11 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import javax.annotation.Nullable;
+import org.apache.avro.Conversions;
 import org.apache.avro.Schema.Field;
 import org.apache.avro.SchemaBuilder;
 import org.apache.avro.file.DataFileStream;
+import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -46,6 +48,21 @@ import org.apache.pinot.spi.data.readers.RecordReaderUtils;
  * Utils for handling Avro records
  */
 public class AvroUtils {
+  private static final GenericData GENERIC_DATA = new GenericData();
+
+  static {
+    // Decimal without scale and precision. Deserialized as BigDecimal, serialized as bytes.
+    GENERIC_DATA.addLogicalTypeConversion(new Conversions.BigDecimalConversion());
+    // Decimal with scale and precision. Deserialized as BigDecimal, serialized as bytes.
+    GENERIC_DATA.addLogicalTypeConversion(new Conversions.DecimalConversion());
+    // TODO: Other interesting standard conversions we may want to add. First we need to make sure that we support
+    //  the corresponding data types in Pinot (ie can we read UUIDs or Instant?).
+    // UUID is deserialized as java.util.UUID, serialized as string.
+    //GENERIC_DATA.addLogicalTypeConversion(new Conversions.UUIDConversion());
+    // Instant is deserialized as java.time.Instant, serialized as long (epoch millis).
+    //GENERIC_DATA.addLogicalTypeConversion(new TimeConversions.TimestampMillisConversion());
+  }
+
   private AvroUtils() {
   }
 
@@ -210,15 +227,20 @@ public class AvroUtils {
     return fieldAssembler.endRecord();
   }
 
+  public static GenericData getGenericData() {
+    return GENERIC_DATA;
+  }
+
   /**
    * Get the Avro file reader for the given file.
    */
   public static DataFileStream<GenericRecord> getAvroReader(File avroFile)
       throws IOException {
+    GenericDatumReader<GenericRecord> datumReader = new GenericDatumReader<>(null, null, GENERIC_DATA);
     if (RecordReaderUtils.isGZippedFile(avroFile)) {
-      return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)), new GenericDatumReader<>());
+      return new DataFileStream<>(new GZIPInputStream(new FileInputStream(avroFile)), datumReader);
     } else {
-      return new DataFileStream<>(new FileInputStream(avroFile), new GenericDatumReader<>());
+      return new DataFileStream<>(new FileInputStream(avroFile), datumReader);
     }
   }
 

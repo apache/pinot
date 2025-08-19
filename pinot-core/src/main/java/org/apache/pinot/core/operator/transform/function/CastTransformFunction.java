@@ -57,10 +57,6 @@ public class CastTransformFunction extends BaseTransformFunction {
     if (castFormatTransformFunction instanceof LiteralTransformFunction) {
       String targetType = ((LiteralTransformFunction) castFormatTransformFunction).getStringLiteral().toUpperCase();
       switch (targetType) {
-        case "BYTES":
-        case "VARBINARY":
-          _resultMetadata = sourceSV ? BYTES_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
-          break;
         case "INT":
         case "INTEGER":
           _resultMetadata = sourceSV ? INT_SV_NO_DICTIONARY_METADATA : INT_MV_NO_DICTIONARY_METADATA;
@@ -93,6 +89,13 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "VARCHAR":
           _resultMetadata = sourceSV ? STRING_SV_NO_DICTIONARY_METADATA : STRING_MV_NO_DICTIONARY_METADATA;
           break;
+        case "JSON":
+          _resultMetadata = sourceSV ? JSON_SV_NO_DICTIONARY_METADATA : JSON_MV_NO_DICTIONARY_METADATA;
+          break;
+        case "BYTES":
+        case "VARBINARY":
+          _resultMetadata = sourceSV ? BYTES_SV_NO_DICTIONARY_METADATA : BYTES_MV_NO_DICTIONARY_METADATA;
+          break;
         case "INT_ARRAY":
         case "INTEGER_ARRAY":
           _resultMetadata = INT_MV_NO_DICTIONARY_METADATA;
@@ -109,9 +112,6 @@ public class CastTransformFunction extends BaseTransformFunction {
         case "STRING_ARRAY":
         case "VARCHAR_ARRAY":
           _resultMetadata = STRING_MV_NO_DICTIONARY_METADATA;
-          break;
-        case "JSON":
-          _resultMetadata = sourceSV ? JSON_SV_NO_DICTIONARY_METADATA : JSON_MV_NO_DICTIONARY_METADATA;
           break;
         default:
           throw new IllegalArgumentException("Unable to cast expression to type - " + targetType);

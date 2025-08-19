@@ -62,4 +62,9 @@ public class DoubleLookupTable extends PrimitiveLookupTable {
   public Set<Map.Entry<Object, Object>> notNullKeyEntrySet() {
     return (Set) _lookupTable.double2ObjectEntrySet();
   }
+
+  @Override
+  public int size() {
+    return _lookupTable.size();
+  }
 }

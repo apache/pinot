@@ -71,18 +71,18 @@ import org.slf4j.LoggerFactory;
 public class MutableJsonIndexImpl implements MutableJsonIndex {
   private static final Logger LOGGER = LoggerFactory.getLogger(MutableJsonIndexImpl.class);
   private final JsonIndexConfig _jsonIndexConfig;
-  private final TreeMap<String, RoaringBitmap> _postingListMap;
-  private final IntList _docIdMapping;
-  private final ReentrantReadWriteLock.ReadLock _readLock;
-  private final ReentrantReadWriteLock.WriteLock _writeLock;
   private final String _segmentName;
   private final String _columnName;
+  private final TreeMap<String, RoaringBitmap> _postingListMap;
+  private final IntList _docIdMapping;
   private final long _maxBytesSize;
+  private final ReentrantReadWriteLock.ReadLock _readLock;
+  private final ReentrantReadWriteLock.WriteLock _writeLock;
+  private final ServerMetrics _serverMetrics;
 
   private int _nextDocId;
   private int _nextFlattenedDocId;
   private long _bytesSize;
-  private ServerMetrics _serverMetrics;
 
   public MutableJsonIndexImpl(JsonIndexConfig jsonIndexConfig, String segmentName, String columnName) {
     _jsonIndexConfig = jsonIndexConfig;
@@ -164,14 +164,17 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     if (!(filterObj instanceof FilterContext)) {
       throw new BadQueryRequestException("Invalid json match filter: " + filterObj);
     }
-    FilterContext filter = (FilterContext) filterObj;
+    return getMatchingDocIds((FilterContext) filterObj);
+  }
 
+  private MutableRoaringBitmap getMatchingDocIds(FilterContext filter) {
     _readLock.lock();
     try {
-      if (filter.getType() == FilterContext.Type.PREDICATE && isExclusive(filter.getPredicate().getType())) {
+      Predicate predicate = filter.getPredicate();
+      if (predicate != null && isExclusive(predicate.getType())) {
         // Handle exclusive predicate separately because the flip can only be applied to the unflattened doc ids in
         // order to get the correct result, and it cannot be nested
-        LazyBitmap flattenedDocIds = getMatchingFlattenedDocIds(filter.getPredicate());
+        LazyBitmap flattenedDocIds = getMatchingFlattenedDocIds(predicate);
         MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
         flattenedDocIds.forEach(flattenedDocId -> matchingDocIds.add(_docIdMapping.getInt(flattenedDocId)));
         matchingDocIds.flip(0, (long) _nextDocId);
@@ -198,86 +201,131 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
    * It stores either a bitmap from posting list that must be cloned before mutating (readOnly=true)
    * or an already  cloned bitmap.
    */
-  static class LazyBitmap {
-
-    final static LazyBitmap EMPTY_BITMAP = new LazyBitmap(null);
+  private static class LazyBitmap {
+    final static LazyBitmap EMPTY_BITMAP = createImmutable(new RoaringBitmap());
 
     // value should be null only for EMPTY
-    @Nullable
-    RoaringBitmap _value;
+    final RoaringBitmap _value;
 
     // if readOnly then bitmap needs to be cloned before applying mutating operations
-    boolean _readOnly;
+    final boolean _mutable;
 
-    LazyBitmap(RoaringBitmap bitmap) {
+    LazyBitmap(RoaringBitmap bitmap, boolean mutable) {
       _value = bitmap;
-      _readOnly = true;
+      _mutable = mutable;
     }
 
-    LazyBitmap(RoaringBitmap bitmap, boolean isReadOnly) {
-      _value = bitmap;
-      _readOnly = isReadOnly;
+    static LazyBitmap createMutable(RoaringBitmap bitmap) {
+      return new LazyBitmap(bitmap, true);
+    }
+
+    static LazyBitmap createImmutable(RoaringBitmap bitmap) {
+      return new LazyBitmap(bitmap, false);
     }
 
     boolean isMutable() {
-      return !_readOnly;
+      return _mutable;
     }
 
     LazyBitmap toMutable() {
-      if (_readOnly) {
-        if (_value == null) {
-          return new LazyBitmap(new RoaringBitmap(), false);
-        }
-
-        _value = _value.clone();
-        _readOnly = false;
+      if (_mutable) {
+        return this;
       }
-
-      return this;
+      return createMutable(_value.clone());
     }
 
-    void and(LazyBitmap bitmap) {
-      assert isMutable();
-
-      _value.and(bitmap._value);
+    LazyBitmap and(LazyBitmap other) {
+      if (isEmpty() || other.isEmpty()) {
+        return LazyBitmap.EMPTY_BITMAP;
+      }
+      if (isMutable()) {
+        _value.and(other._value);
+        return this;
+      }
+      if (other.isMutable()) {
+        other._value.and(_value);
+        return other;
+      }
+      return createMutable(RoaringBitmap.and(_value, other._value));
     }
 
     LazyBitmap and(RoaringBitmap bitmap) {
-      LazyBitmap mutable = toMutable();
-      mutable._value.and(bitmap);
-      return mutable;
+      if (isEmpty() || bitmap.isEmpty()) {
+        return EMPTY_BITMAP;
+      }
+      if (isMutable()) {
+        _value.and(bitmap);
+        return this;
+      }
+      return createMutable(RoaringBitmap.and(_value, bitmap));
     }
 
-    LazyBitmap andNot(RoaringBitmap bitmap) {
-      LazyBitmap mutable = toMutable();
-      mutable._value.andNot(bitmap);
-      return mutable;
-    }
-
-    void or(LazyBitmap bitmap) {
-      assert isMutable();
-
-      _value.or(bitmap._value);
+    LazyBitmap or(LazyBitmap other) {
+      if (isEmpty()) {
+        return other;
+      }
+      if (other.isEmpty()) {
+        return this;
+      }
+      if (isMutable()) {
+        _value.or(other._value);
+        return this;
+      }
+      if (other.isMutable()) {
+        other._value.or(_value);
+        return other;
+      }
+      return createMutable(RoaringBitmap.or(_value, other._value));
     }
 
     LazyBitmap or(RoaringBitmap bitmap) {
-      LazyBitmap mutable = toMutable();
-      mutable._value.or(bitmap);
-      return mutable;
+      if (isEmpty()) {
+        return createImmutable(bitmap);
+      }
+      if (bitmap.isEmpty()) {
+        return this;
+      }
+      if (isMutable()) {
+        _value.or(bitmap);
+        return this;
+      }
+      return createMutable(RoaringBitmap.or(_value, bitmap));
+    }
+
+    LazyBitmap andNot(LazyBitmap other) {
+      if (isEmpty()) {
+        return EMPTY_BITMAP;
+      }
+      if (other.isEmpty()) {
+        return this;
+      }
+      if (isMutable()) {
+        _value.andNot(other._value);
+        return this;
+      }
+      return createMutable(RoaringBitmap.andNot(_value, other._value));
+    }
+
+    LazyBitmap andNot(RoaringBitmap bitmap) {
+      if (isEmpty()) {
+        return EMPTY_BITMAP;
+      }
+      if (bitmap.isEmpty()) {
+        return this;
+      }
+      if (isMutable()) {
+        _value.andNot(bitmap);
+        return this;
+      }
+      return createMutable(RoaringBitmap.andNot(_value, bitmap));
     }
 
     boolean isEmpty() {
-      if (_value == null) {
-        return true;
-      } else {
-        return _value.isEmpty();
-      }
+      return _value.isEmpty();
     }
 
     void forEach(IntConsumer ic) {
-      if (_value != null) {
-        _value.forEach(ic);
-      }
+      _value.forEach(ic);
     }
 
     LazyBitmap flip(long rangeStart, long rangeEnd) {
@@ -287,11 +335,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     }
 
     RoaringBitmap getValue() {
-      if (_value == null) {
-        return new RoaringBitmap();
-      } else {
-        return _value;
-      }
+      return _value;
     }
   }
 
@@ -305,30 +349,19 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         LazyBitmap matchingDocIds = getMatchingFlattenedDocIds(filters.get(0));
         for (int i = 1, numFilters = filters.size(); i < numFilters; i++) {
           if (matchingDocIds.isEmpty()) {
-            break;
+            return LazyBitmap.EMPTY_BITMAP;
           }
-
           LazyBitmap filterDocIds = getMatchingFlattenedDocIds(filters.get(i));
-          if (filterDocIds.isEmpty()) {
-            return filterDocIds;
-          } else {
-            matchingDocIds = and(matchingDocIds, filterDocIds);
-          }
+          matchingDocIds = matchingDocIds.and(filterDocIds);
         }
         return matchingDocIds;
       }
       case OR: {
         List<FilterContext> filters = filter.getChildren();
         LazyBitmap matchingDocIds = getMatchingFlattenedDocIds(filters.get(0));
-
         for (int i = 1, numFilters = filters.size(); i < numFilters; i++) {
           LazyBitmap filterDocIds = getMatchingFlattenedDocIds(filters.get(i));
-          // avoid having to convert matchingDocIds to mutable map
-          if (filterDocIds.isEmpty()) {
-            continue;
-          }
-
-          matchingDocIds = or(matchingDocIds, filterDocIds);
+          matchingDocIds = matchingDocIds.or(filterDocIds);
         }
         return matchingDocIds;
       }
@@ -353,109 +386,100 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
     Preconditions.checkArgument(lhs.getType() == ExpressionContext.Type.IDENTIFIER,
         "Left-hand side of the predicate must be an identifier, got: %s (%s). Put double quotes around the identifier"
             + " if needed.", lhs, lhs.getType());
-    String key = lhs.getIdentifier();
 
     // Support 2 formats:
     // - JSONPath format (e.g. "$.a[1].b"='abc', "$[0]"=1, "$"='abc')
     // - Legacy format (e.g. "a[1].b"='abc')
+    String key = lhs.getIdentifier();
     if (key.charAt(0) == '$') {
       key = key.substring(1);
     } else {
       key = JsonUtils.KEY_SEPARATOR + key;
     }
+
     Pair<String, LazyBitmap> pair = getKeyAndFlattenedDocIds(key);
     key = pair.getLeft();
-    LazyBitmap matchingDocIds = pair.getRight();
-    if (matchingDocIds != null && matchingDocIds.isEmpty()) {
+    LazyBitmap matchingDocIdsForKey = pair.getRight();
+    if (matchingDocIdsForKey != null && matchingDocIdsForKey.isEmpty()) {
       return LazyBitmap.EMPTY_BITMAP;
     }
+    LazyBitmap matchingDocIdsForKeyValue = getMatchingFlattenedDocIdsForKeyValue(predicate, key);
+    if (matchingDocIdsForKey == null) {
+      return matchingDocIdsForKeyValue;
+    } else {
+      return matchingDocIdsForKeyValue.and(matchingDocIdsForKey);
+    }
+  }
 
+  private LazyBitmap getMatchingFlattenedDocIdsForKeyValue(Predicate predicate, String key) {
     Predicate.Type predicateType = predicate.getType();
     switch (predicateType) {
       case EQ: {
         String value = ((EqPredicate) predicate).getValue();
-        String keyValuePair = key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value;
-        RoaringBitmap result = _postingListMap.get(keyValuePair);
-        return filter(result, matchingDocIds);
+        RoaringBitmap docIds = _postingListMap.get(key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value);
+        return docIds != null ? LazyBitmap.createImmutable(docIds) : LazyBitmap.EMPTY_BITMAP;
       }
 
       case NOT_EQ: {
-        String notEqualValue = ((NotEqPredicate) predicate).getValue();
-        LazyBitmap result = null;
-
         RoaringBitmap allDocIds = _postingListMap.get(key);
-        if (allDocIds != null && !allDocIds.isEmpty()) {
-          result = new LazyBitmap(allDocIds);
-
-          RoaringBitmap notEqualDocIds =
-              _postingListMap.get(key + JsonIndexCreator.KEY_VALUE_SEPARATOR + notEqualValue);
-
-          if (notEqualDocIds != null && !notEqualDocIds.isEmpty()) {
-            result = result.andNot(notEqualDocIds);
-          }
+        if (allDocIds == null) {
+          return LazyBitmap.EMPTY_BITMAP;
         }
-
-        return filter(result, matchingDocIds);
+        LazyBitmap result = LazyBitmap.createImmutable(allDocIds);
+        String value = ((NotEqPredicate) predicate).getValue();
+        RoaringBitmap docIds = _postingListMap.get(key + JsonIndexCreator.KEY_VALUE_SEPARATOR + value);
+        if (docIds != null) {
+          return result.andNot(docIds);
+        } else {
+          return result;
+        }
       }
 
       case IN: {
-        List<String> values = ((InPredicate) predicate).getValues();
-        LazyBitmap result = null;
-
         StringBuilder buffer = new StringBuilder(key);
         buffer.append(JsonIndexCreator.KEY_VALUE_SEPARATOR);
         int pos = buffer.length();
-
+        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
+        List<String> values = ((InPredicate) predicate).getValues();
         for (String value : values) {
           buffer.setLength(pos);
           buffer.append(value);
-          String keyValue = buffer.toString();
-
-          RoaringBitmap docIds = _postingListMap.get(keyValue);
-
-          if (docIds != null && !docIds.isEmpty()) {
-            if (result == null) {
-              result = new LazyBitmap(docIds);
-            } else {
-              result = result.or(docIds);
-            }
+          RoaringBitmap docIds = _postingListMap.get(buffer.toString());
+          if (docIds != null) {
+            result = result.or(docIds);
           }
         }
-
-        return filter(result, matchingDocIds);
+        return result;
       }
 
       case NOT_IN: {
-        List<String> notInValues = ((NotInPredicate) predicate).getValues();
-        LazyBitmap result = null;
-
         RoaringBitmap allDocIds = _postingListMap.get(key);
-        if (allDocIds != null && !allDocIds.isEmpty()) {
-          result = new LazyBitmap(allDocIds);
-
-          StringBuilder buffer = new StringBuilder(key);
-          buffer.append(JsonIndexCreator.KEY_VALUE_SEPARATOR);
-          int pos = buffer.length();
-
-          for (String notInValue : notInValues) {
-            buffer.setLength(pos);
-            buffer.append(notInValue);
-            String keyValuePair = buffer.toString();
-
-            RoaringBitmap docIds = _postingListMap.get(keyValuePair);
-            if (docIds != null && !docIds.isEmpty()) {
-              result = result.andNot(docIds);
-            }
+        if (allDocIds == null) {
+          return LazyBitmap.EMPTY_BITMAP;
+        }
+        StringBuilder buffer = new StringBuilder(key);
+        buffer.append(JsonIndexCreator.KEY_VALUE_SEPARATOR);
+        int pos = buffer.length();
+        LazyBitmap result = LazyBitmap.createImmutable(allDocIds);
+        List<String> values = ((NotInPredicate) predicate).getValues();
+        for (String value : values) {
+          if (result.isEmpty()) {
+            return LazyBitmap.EMPTY_BITMAP;
+          }
+          buffer.setLength(pos);
+          buffer.append(value);
+          RoaringBitmap docIds = _postingListMap.get(buffer.toString());
+          if (docIds != null) {
+            result = result.andNot(docIds);
           }
         }
-
-        return filter(result, matchingDocIds);
+        return result;
       }
 
       case IS_NOT_NULL:
       case IS_NULL: {
-        RoaringBitmap result = _postingListMap.get(key);
-        return filter(result, matchingDocIds);
+        RoaringBitmap docIds = _postingListMap.get(key);
+        return docIds != null ? LazyBitmap.createImmutable(docIds) : LazyBitmap.EMPTY_BITMAP;
       }
 
       case REGEXP_LIKE: {
@@ -463,32 +487,20 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         if (subMap.isEmpty()) {
           return LazyBitmap.EMPTY_BITMAP;
         }
-
         Pattern pattern = ((RegexpLikePredicate) predicate).getPattern();
         Matcher matcher = pattern.matcher("");
-        LazyBitmap result = null;
+        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
         StringBuilder value = new StringBuilder();
-
+        int valueStart = key.length() + 1;
         for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
           String keyValue = entry.getKey();
           value.setLength(0);
-          value.append(keyValue, key.length() + 1, keyValue.length());
-
-          if (!matcher.reset(value).matches()) {
-            continue;
-          }
-
-          RoaringBitmap docIds = entry.getValue();
-          if (docIds != null && !docIds.isEmpty()) {
-            if (result == null) {
-              result = new LazyBitmap(docIds);
-            } else {
-              result = result.or(docIds);
-            }
+          value.append(keyValue, valueStart, keyValue.length());
+          if (matcher.reset(value).matches()) {
+            result = result.or(entry.getValue());
           }
         }
-
-        return filter(result, matchingDocIds);
+        return result;
       }
 
       case RANGE: {
@@ -496,8 +508,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         if (subMap.isEmpty()) {
           return LazyBitmap.EMPTY_BITMAP;
         }
-
-        LazyBitmap result = null;
         RangePredicate rangePredicate = (RangePredicate) predicate;
         FieldSpec.DataType rangeDataType = rangePredicate.getRangeDataType();
         // Simplify to only support numeric and string types
@@ -506,16 +516,16 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
         } else {
           rangeDataType = FieldSpec.DataType.STRING;
         }
-
         boolean lowerUnbounded = rangePredicate.getLowerBound().equals(RangePredicate.UNBOUNDED);
         boolean upperUnbounded = rangePredicate.getUpperBound().equals(RangePredicate.UNBOUNDED);
         boolean lowerInclusive = lowerUnbounded || rangePredicate.isLowerInclusive();
         boolean upperInclusive = upperUnbounded || rangePredicate.isUpperInclusive();
         Object lowerBound = lowerUnbounded ? null : rangeDataType.convert(rangePredicate.getLowerBound());
         Object upperBound = upperUnbounded ? null : rangeDataType.convert(rangePredicate.getUpperBound());
-
+        LazyBitmap result = LazyBitmap.EMPTY_BITMAP;
+        int valueStart = key.length() + 1;
         for (Map.Entry<String, RoaringBitmap> entry : subMap.entrySet()) {
-          Object valueObj = rangeDataType.convert(entry.getKey().substring(key.length() + 1));
+          Object valueObj = rangeDataType.convert(entry.getKey().substring(valueStart));
           boolean lowerCompareResult =
               lowerUnbounded || (lowerInclusive ? rangeDataType.compare(valueObj, lowerBound) >= 0
                   : rangeDataType.compare(valueObj, lowerBound) > 0);
@@ -523,15 +533,10 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
               upperUnbounded || (upperInclusive ? rangeDataType.compare(valueObj, upperBound) <= 0
                   : rangeDataType.compare(valueObj, upperBound) < 0);
           if (lowerCompareResult && upperCompareResult) {
-            if (result == null) {
-              result = new LazyBitmap(entry.getValue());
-            } else {
-              result = result.or(entry.getValue());
-            }
+            result = result.or(entry.getValue());
           }
         }
-
-        return filter(result, matchingDocIds);
+        return result;
       }
 
       default:
@@ -651,7 +656,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
 
         if (docIds != null) {
           if (matchingDocIds == null) {
-            matchingDocIds = new LazyBitmap(docIds);
+            matchingDocIds = LazyBitmap.createImmutable(docIds);
           } else {
             matchingDocIds = matchingDocIds.and(docIds);
           }
@@ -671,8 +676,7 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
-  public String[][] getValuesMV(int[] docIds, int length,
-      Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
+  public String[][] getValuesMV(int[] docIds, int length, Map<String, RoaringBitmap> valueToMatchingFlattenedDocs) {
     String[][] result = new String[length][];
     List<PriorityQueue<Pair<String, Integer>>> docIdToFlattenedDocIdsAndValues = new ArrayList<>();
     for (int i = 0; i < length; i++) {
@@ -752,6 +756,11 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
   }
 
   @Override
+  public boolean canAddMore() {
+    return _bytesSize < _maxBytesSize;
+  }
+
+  @Override
   public void close() {
     try {
       String tableName = SegmentUtils.getTableNameFromSegmentName(_segmentName);
@@ -761,72 +770,6 @@ public class MutableJsonIndexImpl implements MutableJsonIndex {
       LOGGER.warn(
           "Caught exception while updating mutable json index memory usage for segment: {}, column: {}, value: {}",
           _segmentName, _columnName, _bytesSize, e);
-    }
-  }
-
-  @Override
-  public boolean canAddMore() {
-    return _bytesSize < _maxBytesSize;
-  }
-
-  // AND given bitmaps, optionally converting first one to mutable (if it's not already)
-  private static LazyBitmap and(LazyBitmap target, LazyBitmap other) {
-    if (target.isMutable()) {
-      target.and(other);
-      return target;
-    } else if (other.isMutable()) {
-      other.and(target);
-      return other;
-    } else {
-      LazyBitmap mutableTarget = target.toMutable();
-      mutableTarget.and(other);
-      return mutableTarget;
-    }
-  }
-
-  private static LazyBitmap and(LazyBitmap target, RoaringBitmap other) {
-    if (target.isMutable()) {
-      target.and(other);
-      return target;
-    } else {
-      LazyBitmap mutableTarget = target.toMutable();
-      mutableTarget.and(other);
-      return mutableTarget;
-    }
-  }
-
-  // OR given bitmaps, optionally converting first one to mutable (if it's not already)
-  private static LazyBitmap or(LazyBitmap target, LazyBitmap other) {
-    if (target.isMutable()) {
-      target.or(other);
-      return target;
-    } else if (other.isMutable()) {
-      other.or(target);
-      return other;
-    } else {
-      LazyBitmap mutableTarget = target.toMutable();
-      mutableTarget.or(other);
-      return mutableTarget;
-    }
-  }
-
-  private static LazyBitmap filter(LazyBitmap result, LazyBitmap matchingDocIds) {
-    if (result == null) {
-      return LazyBitmap.EMPTY_BITMAP;
-    } else if (matchingDocIds == null) {
-      return result;
-    } else {
-      return and(matchingDocIds, result);
-    }
-  }
-
-  private static LazyBitmap filter(RoaringBitmap result, LazyBitmap matchingDocIds) {
-    if (result == null) {
-      return LazyBitmap.EMPTY_BITMAP;
-    } else if (matchingDocIds == null) {
-      return new LazyBitmap(result);
-    } else {
-      return and(matchingDocIds, result);
     }
   }
 }

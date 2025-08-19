@@ -47,7 +47,7 @@ const mainReducer = ({ type, message, show, hide }, action) => ({
   show: notificationReducer(action.show),
   hide: notificationReducer(action.hide)
 });
-  
+
 
 const NotificationContextProvider: React.FC  = (props) =>{
   const [state, dispatch] = useReducer(mainReducer, NotificationContextValue);

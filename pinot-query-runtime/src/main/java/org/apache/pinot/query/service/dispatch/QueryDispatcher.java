@@ -456,7 +456,7 @@ public class QueryDispatcher {
     requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.TIMEOUT_MS,
         Long.toString(deadline.timeRemaining(TimeUnit.MILLISECONDS)));
     requestMetadata.put(CommonConstants.Broker.Request.QueryOptionKey.EXTRA_PASSIVE_TIMEOUT_MS,
-        Long.toString(QueryThreadContext.getPassiveDeadlineMs()));
+        Long.toString(QueryThreadContext.getPassiveDeadlineMs() - QueryThreadContext.getActiveDeadlineMs()));
     requestMetadata.putAll(queryOptions);
     return requestMetadata;
   }

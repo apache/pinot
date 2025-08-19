@@ -19,13 +19,20 @@ package org.apache.pinot.query.context;
  * under the License.
  */
 
+import it.unimi.dsi.fastutil.Pair;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.calcite.plan.RelOptListener;
 import org.apache.calcite.plan.RelOptRule;
+import org.apache.calcite.plan.RelOptRuleCall;
+import org.apache.calcite.plan.RelOptUtil;
+import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.sql.SqlExplainFormat;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,9 +44,13 @@ public class RuleTimingPlannerListener implements RelOptListener {
   private final PlannerContext _plannerContext;
   private final Map<RelOptRule, Long> _ruleStartTimes = new HashMap<>();
   private final Map<RelOptRule, Long> _ruleDurations = new HashMap<>();
+  private final boolean _traceRuleProductions;
+  private final List<Pair<RelOptRuleCall, RelNode>> _ruleProductions;
 
   public RuleTimingPlannerListener(PlannerContext plannerContext) {
     _plannerContext = plannerContext;
+    _traceRuleProductions = QueryOptionsUtils.isTraceRuleProductions(plannerContext.getOptions());
+    _ruleProductions = _traceRuleProductions ? new ArrayList<>() : null;
   }
 
   @Override
@@ -58,6 +69,9 @@ public class RuleTimingPlannerListener implements RelOptListener {
 
   @Override
   public void ruleProductionSucceeded(RuleProductionEvent event) {
+    if (_traceRuleProductions && !event.isBefore()) {
+      _ruleProductions.add(Pair.of(event.getRuleCall(), event.getRel()));
+    }
   }
 
   @Override
@@ -103,6 +117,35 @@ public class RuleTimingPlannerListener implements RelOptListener {
           pw.println("\t</Rule>");
         }
         pw.println("</RuleExecutionTimes>");
+        if (_traceRuleProductions) {
+          pw.println("<RuleProductions>");
+          for (Pair<RelOptRuleCall, RelNode> entry : _ruleProductions) {
+            String ruleName = entry.first().getRule().toString()
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&apos;");
+            String beforeRel = RelOptUtil.toString(entry.first().rel(0))
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&apos;");
+            String afterRel = RelOptUtil.toString(entry.second())
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&apos;");
+            pw.println("\t<Rule>");
+            pw.println("\t\t<Name>" + ruleName + "</Name>");
+            pw.println("\t\t<Before>" + beforeRel + "</Before>");
+            pw.println("\t\t<After>" + afterRel + "</After>");
+            pw.println("\t</Rule>");
+          }
+          pw.println("</RuleProductions>");
+        }
         break;
       case JSON:
         pw.println("{");
@@ -133,6 +176,54 @@ public class RuleTimingPlannerListener implements RelOptListener {
         }
         pw.println("  ]");
         pw.println("}");
+        if (_traceRuleProductions) {
+          pw.println(",");
+          pw.println("{");
+          pw.println("  \"ruleProductions\": [");
+          firstEntry = true;
+          for (Pair<RelOptRuleCall, RelNode> entry : _ruleProductions) {
+            if (!firstEntry) {
+              pw.println(",");
+            }
+            firstEntry = false;
+            // Escape special JSON characters
+            String ruleName = entry.first().getRule().toString()
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+            String beforeRel = RelOptUtil.toString(entry.first().rel(0))
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+            String afterRel = RelOptUtil.toString(entry.second())
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+            pw.println("    {");
+            pw.print("      \"rule\": \"");
+            pw.print(ruleName);
+            pw.println("\", ");
+            pw.print("      \"before\": ");
+            pw.printf(beforeRel); // Format to 2 decimal places
+            pw.print("      \"after\": ");
+            pw.printf(afterRel); // Format to 2 decimal places
+            pw.print("    }");
+          }
+          pw.println("  ]");
+          pw.println("}");
+        }
         break;
       case DOT:
         pw.println("digraph PlannerTimings {");
@@ -143,6 +234,18 @@ public class RuleTimingPlannerListener implements RelOptListener {
           pw.println(entry.getValue() / 1_000_000.0);
         }
         pw.println("}");
+        if (_traceRuleProductions) {
+          pw.println("\ndigraph RuleProductions {");
+          for (Pair<RelOptRuleCall, RelNode> entry : _ruleProductions) {
+            pw.print("Rule: ");
+            pw.print(entry.first().getRule());
+            pw.print("\nBefore:\n");
+            pw.println(RelOptUtil.toString(entry.first().rel(0)).strip());
+            pw.print("After:\n");
+            pw.println(RelOptUtil.toString(entry.second()));
+          }
+          pw.println("}");
+        }
         break;
       default:
         pw.println("Rule Execution Times");
@@ -151,6 +254,17 @@ public class RuleTimingPlannerListener implements RelOptListener {
           pw.print(entry.getKey());
           pw.print(" -> Time: ");
           pw.println(entry.getValue() / 1_000_000.0);
+        }
+        if (_traceRuleProductions) {
+          pw.println("\nRule Productions");
+          for (Pair<RelOptRuleCall, RelNode> entry : _ruleProductions) {
+            pw.print("Rule: ");
+            pw.print(entry.first().getRule());
+            pw.print("\nBefore:\n");
+            pw.println(RelOptUtil.toString(entry.first().rel(0)).strip());
+            pw.print("After:\n");
+            pw.println(RelOptUtil.toString(entry.second()));
+          }
         }
         break;
     }

@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -33,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.StatMap;
@@ -52,7 +52,6 @@ import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.executor.ResultsBlockStreamer;
 import org.apache.pinot.core.query.logger.ServerQueryLogger;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
-import org.apache.pinot.core.query.request.context.ExplainMode;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
@@ -63,6 +62,7 @@ import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
@@ -77,22 +77,30 @@ import org.slf4j.LoggerFactory;
 public class LeafOperator extends MultiStageOperator {
   private static final Logger LOGGER = LoggerFactory.getLogger(LeafOperator.class);
   private static final String EXPLAIN_NAME = "LEAF";
+  private static final ErrorMseBlock CANCELLED_BLOCK =
+      ErrorMseBlock.fromError(QueryErrorCode.QUERY_CANCELLATION, "Cancelled while waiting for leaf results");
+  private static final ErrorMseBlock TIMEOUT_BLOCK =
+      ErrorMseBlock.fromError(QueryErrorCode.EXECUTION_TIMEOUT, "Timed out waiting for leaf results");
 
   // Use a special results block to indicate that this is the last results block
-  private static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock();
+  @VisibleForTesting
+  static final MetadataResultsBlock LAST_RESULTS_BLOCK = new MetadataResultsBlock();
 
   private final List<ServerQueryRequest> _requests;
   private final DataSchema _dataSchema;
   private final QueryExecutor _queryExecutor;
   private final ExecutorService _executorService;
+  private final String _tableName;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+  private final AtomicReference<ErrorMseBlock> _errorBlock = new AtomicReference<>();
 
   // Use a limit-sized BlockingQueue to store the results blocks and apply back pressure to the single-stage threads
-  private final BlockingQueue<BaseResultsBlock> _blockingQueue;
+  @VisibleForTesting
+  final BlockingQueue<BaseResultsBlock> _blockingQueue;
 
   @Nullable
-  private volatile Future<Void> _executionFuture;
-  private volatile Map<Integer, String> _exceptions;
-  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+  private volatile Future<?> _executionFuture;
+  private volatile boolean _terminated;
 
   public LeafOperator(OpChainExecutionContext context, List<ServerQueryRequest> requests, DataSchema dataSchema,
       QueryExecutor queryExecutor, ExecutorService executorService) {
@@ -103,11 +111,12 @@ public class LeafOperator extends MultiStageOperator {
     _dataSchema = dataSchema;
     _queryExecutor = queryExecutor;
     _executorService = executorService;
+    _tableName = context.getStageMetadata().getTableName();
+    Preconditions.checkArgument(_tableName != null, "Table name must be set in the stage metadata");
+    _statMap.merge(StatKey.TABLE, _tableName);
     Integer maxStreamingPendingBlocks = QueryOptionsUtils.getMaxStreamingPendingBlocks(context.getOpChainMetadata());
     _blockingQueue = new ArrayBlockingQueue<>(maxStreamingPendingBlocks != null ? maxStreamingPendingBlocks
         : QueryOptionValue.DEFAULT_MAX_STREAMING_PENDING_BLOCKS);
-    String tableName = context.getLeafStageContext().getStagePlan().getStageMetadata().getTableName();
-    _statMap.merge(StatKey.TABLE, tableName);
   }
 
   public List<ServerQueryRequest> getRequests() {
@@ -136,7 +145,7 @@ public class LeafOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.emptyList();
+    return List.of();
   }
 
   @Override
@@ -145,32 +154,90 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   @Override
-  protected MseBlock getNextBlock()
-      throws InterruptedException, TimeoutException {
+  protected MseBlock getNextBlock() {
     if (_executionFuture == null) {
       _executionFuture = startExecution();
     }
     if (_isEarlyTerminated) {
+      terminateAndClearResultsBlocks();
       return SuccessMseBlock.INSTANCE;
     }
-    // Here we use passive deadline because we end up waiting for the SSE operators
-    // which can timeout by their own
-    BaseResultsBlock resultsBlock =
-        _blockingQueue.poll(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-    if (resultsBlock == null) {
-      throw new TimeoutException("Timed out waiting for results block");
+    BaseResultsBlock resultsBlock;
+    try {
+      // Here we use passive deadline because we end up waiting for the SSE operators which can timeout by their own.
+      resultsBlock =
+          _blockingQueue.poll(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+    } catch (InterruptedException e) {
+      terminateAndClearResultsBlocks();
+      return CANCELLED_BLOCK;
     }
-    // Terminate when receiving exception block
-    Map<Integer, String> exceptions = _exceptions;
-    if (exceptions != null) {
-      return ErrorMseBlock.fromMap(QueryErrorCode.fromKeyMap(exceptions));
+    if (resultsBlock == null) {
+      terminateAndClearResultsBlocks();
+      return TIMEOUT_BLOCK;
+    }
+    // Terminate when there is error block
+    ErrorMseBlock errorBlock = getErrorBlock();
+    if (errorBlock != null) {
+      terminateAndClearResultsBlocks();
+      return errorBlock;
     }
     if (resultsBlock == LAST_RESULTS_BLOCK) {
+      _terminated = true;
       return SuccessMseBlock.INSTANCE;
     } else {
       // Regular data block
       return composeMseBlock(resultsBlock);
     }
+  }
+
+  public ExplainedNode explain() {
+    if (_executionFuture == null) {
+      _executionFuture = startExecution();
+    }
+    List<PlanNode> childNodes = new ArrayList<>();
+    while (true) {
+      if (_isEarlyTerminated) {
+        terminateAndClearResultsBlocks();
+        break;
+      }
+      BaseResultsBlock resultsBlock;
+      try {
+        // Here we use passive deadline because we end up waiting for the SSE operators which can timeout by their own.
+        resultsBlock =
+            _blockingQueue.poll(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        terminateAndClearResultsBlocks();
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted while waiting for results block", e);
+      }
+      if (resultsBlock == null) {
+        terminateAndClearResultsBlocks();
+        throw new RuntimeException("Timed out waiting for results block");
+      }
+      // Terminate when there is error block
+      ErrorMseBlock errorBlock = getErrorBlock();
+      if (errorBlock != null) {
+        terminateAndClearResultsBlocks();
+        throw new RuntimeException("Received error block: " + errorBlock.getErrorMessages());
+      }
+      if (resultsBlock == LAST_RESULTS_BLOCK) {
+        _terminated = true;
+        break;
+      }
+      if (resultsBlock instanceof ExplainV2ResultBlock) {
+        ExplainV2ResultBlock block = (ExplainV2ResultBlock) resultsBlock;
+        for (ExplainInfo physicalPlan : block.getPhysicalPlans()) {
+          childNodes.add(asNode(physicalPlan));
+        }
+      } else {
+        terminateAndClearResultsBlocks();
+        throw new IllegalArgumentException("Expected ExplainV2ResultBlock, got: " + resultsBlock.getClass().getName());
+      }
+    }
+    Map<String, Plan.ExplainNode.AttributeValue> attributes =
+        Map.of("table", Plan.ExplainNode.AttributeValue.newBuilder().setString(_tableName).build());
+    return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes, "LeafStageCombineOperator",
+        attributes);
   }
 
   @Override
@@ -180,188 +247,136 @@ public class LeafOperator extends MultiStageOperator {
 
   @Override
   protected void earlyTerminate() {
-    super.earlyTerminate();
+    _isEarlyTerminated = true;
     cancelSseTasks();
   }
 
   @Override
   public void cancel(Throwable e) {
-    super.cancel(e);
+    cancelSseTasks();
+  }
+
+  @Override
+  public void close() {
     cancelSseTasks();
   }
 
   @VisibleForTesting
-  protected void cancelSseTasks() {
-    Future<Void> executionFuture = _executionFuture;
+  void cancelSseTasks() {
+    Future<?> executionFuture = _executionFuture;
     if (executionFuture != null) {
       executionFuture.cancel(true);
     }
   }
 
-  private void mergeExecutionStats(@Nullable Map<String, String> executionStats) {
-    if (executionStats != null) {
-      for (Map.Entry<String, String> entry : executionStats.entrySet()) {
-        DataTable.MetadataKey key = DataTable.MetadataKey.getByName(entry.getKey());
-        if (key == null) {
-          LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
-          continue;
-        }
-        switch (key) {
-          case UNKNOWN:
-            LOGGER.debug("Skipping unknown execution stat: {}", entry.getKey());
-            break;
-          case TABLE:
-            _statMap.merge(StatKey.TABLE, entry.getValue());
-            break;
-          case NUM_DOCS_SCANNED:
-            _statMap.merge(StatKey.NUM_DOCS_SCANNED, Long.parseLong(entry.getValue()));
-            break;
-          case NUM_ENTRIES_SCANNED_IN_FILTER:
-            _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_IN_FILTER, Long.parseLong(entry.getValue()));
-            break;
-          case NUM_ENTRIES_SCANNED_POST_FILTER:
-            _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_POST_FILTER, Long.parseLong(entry.getValue()));
-            break;
-          case NUM_SEGMENTS_QUERIED:
-            _statMap.merge(StatKey.NUM_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
-            break;
-          case NUM_SEGMENTS_PROCESSED:
-            _statMap.merge(StatKey.NUM_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
-            break;
-          case NUM_SEGMENTS_MATCHED:
-            _statMap.merge(StatKey.NUM_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
-            break;
-          case NUM_CONSUMING_SEGMENTS_QUERIED:
-            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
-            break;
-          case MIN_CONSUMING_FRESHNESS_TIME_MS:
-            _statMap.merge(StatKey.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.parseLong(entry.getValue()));
-            break;
-          case TOTAL_DOCS:
-            _statMap.merge(StatKey.TOTAL_DOCS, Long.parseLong(entry.getValue()));
-            break;
-          case GROUPS_TRIMMED:
-            _statMap.merge(StatKey.GROUPS_TRIMMED, Boolean.parseBoolean(entry.getValue()));
-            break;
-          case NUM_GROUPS_LIMIT_REACHED:
-            _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
-            break;
-          case NUM_GROUPS_WARNING_LIMIT_REACHED:
-            _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
-            break;
-          case TIME_USED_MS:
-            _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
-            break;
-          case TRACE_INFO:
-            LOGGER.debug("Skipping trace info: {}", entry.getValue());
-            break;
-          case REQUEST_ID:
-            LOGGER.debug("Skipping request ID: {}", entry.getValue());
-            break;
-          case NUM_RESIZES:
-            _statMap.merge(StatKey.NUM_RESIZES, Integer.parseInt(entry.getValue()));
-            break;
-          case RESIZE_TIME_MS:
-            _statMap.merge(StatKey.RESIZE_TIME_MS, Long.parseLong(entry.getValue()));
-            break;
-          case THREAD_CPU_TIME_NS:
-            _statMap.merge(StatKey.THREAD_CPU_TIME_NS, Long.parseLong(entry.getValue()));
-            break;
-          case SYSTEM_ACTIVITIES_CPU_TIME_NS:
-            _statMap.merge(StatKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, Long.parseLong(entry.getValue()));
-            break;
-          case RESPONSE_SER_CPU_TIME_NS:
-            _statMap.merge(StatKey.RESPONSE_SER_CPU_TIME_NS, Long.parseLong(entry.getValue()));
-            break;
-          case THREAD_MEM_ALLOCATED_BYTES:
-            _statMap.merge(StatKey.THREAD_MEM_ALLOCATED_BYTES, Long.parseLong(entry.getValue()));
-            break;
-          case RESPONSE_SER_MEM_ALLOCATED_BYTES:
-            _statMap.merge(StatKey.RESPONSE_SER_MEM_ALLOCATED_BYTES, Long.parseLong(entry.getValue()));
-            break;
-          case NUM_SEGMENTS_PRUNED_BY_SERVER:
-            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER, Integer.parseInt(entry.getValue()));
-            break;
-          case NUM_SEGMENTS_PRUNED_INVALID:
-            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_INVALID, Integer.parseInt(entry.getValue()));
-            break;
-          case NUM_SEGMENTS_PRUNED_BY_LIMIT:
-            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, Integer.parseInt(entry.getValue()));
-            break;
-          case NUM_SEGMENTS_PRUNED_BY_VALUE:
-            _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE, Integer.parseInt(entry.getValue()));
-            break;
-          case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
-            LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
-            break;
-          case EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS:
-            LOGGER.debug("Skipping match all filter segments: {}", entry.getValue());
-            break;
-          case NUM_CONSUMING_SEGMENTS_PROCESSED:
-            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
-            break;
-          case NUM_CONSUMING_SEGMENTS_MATCHED:
-            _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
-            break;
-          case SORTED:
-            break;
-          default: {
-            throw new IllegalArgumentException("Unhandled V1 execution stat: " + entry.getKey());
-          }
-        }
+  private synchronized void mergeExecutionStats(Map<String, String> executionStats) {
+    for (Map.Entry<String, String> entry : executionStats.entrySet()) {
+      String key = entry.getKey();
+      DataTable.MetadataKey metadataKey = DataTable.MetadataKey.getByName(key);
+      if (metadataKey == null || metadataKey == DataTable.MetadataKey.UNKNOWN) {
+        LOGGER.debug("Skipping unknown execution stat: {}", key);
+        continue;
+      }
+      switch (metadataKey) {
+        case TABLE:
+          _statMap.merge(StatKey.TABLE, entry.getValue());
+          break;
+        case NUM_DOCS_SCANNED:
+          _statMap.merge(StatKey.NUM_DOCS_SCANNED, Long.parseLong(entry.getValue()));
+          break;
+        case NUM_ENTRIES_SCANNED_IN_FILTER:
+          _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_IN_FILTER, Long.parseLong(entry.getValue()));
+          break;
+        case NUM_ENTRIES_SCANNED_POST_FILTER:
+          _statMap.merge(StatKey.NUM_ENTRIES_SCANNED_POST_FILTER, Long.parseLong(entry.getValue()));
+          break;
+        case NUM_SEGMENTS_QUERIED:
+          _statMap.merge(StatKey.NUM_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
+          break;
+        case NUM_SEGMENTS_PROCESSED:
+          _statMap.merge(StatKey.NUM_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
+          break;
+        case NUM_SEGMENTS_MATCHED:
+          _statMap.merge(StatKey.NUM_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
+          break;
+        case NUM_CONSUMING_SEGMENTS_QUERIED:
+          _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_QUERIED, Integer.parseInt(entry.getValue()));
+          break;
+        case MIN_CONSUMING_FRESHNESS_TIME_MS:
+          _statMap.merge(StatKey.MIN_CONSUMING_FRESHNESS_TIME_MS, Long.parseLong(entry.getValue()));
+          break;
+        case TOTAL_DOCS:
+          _statMap.merge(StatKey.TOTAL_DOCS, Long.parseLong(entry.getValue()));
+          break;
+        case GROUPS_TRIMMED:
+          _statMap.merge(StatKey.GROUPS_TRIMMED, Boolean.parseBoolean(entry.getValue()));
+          break;
+        case NUM_GROUPS_LIMIT_REACHED:
+          _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
+          break;
+        case NUM_GROUPS_WARNING_LIMIT_REACHED:
+          _statMap.merge(StatKey.NUM_GROUPS_WARNING_LIMIT_REACHED, Boolean.parseBoolean(entry.getValue()));
+          break;
+        case TIME_USED_MS:
+          _statMap.merge(StatKey.EXECUTION_TIME_MS, Long.parseLong(entry.getValue()));
+          break;
+        case TRACE_INFO:
+          LOGGER.debug("Skipping trace info: {}", entry.getValue());
+          break;
+        case REQUEST_ID:
+          LOGGER.debug("Skipping request ID: {}", entry.getValue());
+          break;
+        case NUM_RESIZES:
+          _statMap.merge(StatKey.NUM_RESIZES, Integer.parseInt(entry.getValue()));
+          break;
+        case RESIZE_TIME_MS:
+          _statMap.merge(StatKey.RESIZE_TIME_MS, Long.parseLong(entry.getValue()));
+          break;
+        case THREAD_CPU_TIME_NS:
+          _statMap.merge(StatKey.THREAD_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+          break;
+        case SYSTEM_ACTIVITIES_CPU_TIME_NS:
+          _statMap.merge(StatKey.SYSTEM_ACTIVITIES_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+          break;
+        case RESPONSE_SER_CPU_TIME_NS:
+          _statMap.merge(StatKey.RESPONSE_SER_CPU_TIME_NS, Long.parseLong(entry.getValue()));
+          break;
+        case THREAD_MEM_ALLOCATED_BYTES:
+          _statMap.merge(StatKey.THREAD_MEM_ALLOCATED_BYTES, Long.parseLong(entry.getValue()));
+          break;
+        case RESPONSE_SER_MEM_ALLOCATED_BYTES:
+          _statMap.merge(StatKey.RESPONSE_SER_MEM_ALLOCATED_BYTES, Long.parseLong(entry.getValue()));
+          break;
+        case NUM_SEGMENTS_PRUNED_BY_SERVER:
+          _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_SERVER, Integer.parseInt(entry.getValue()));
+          break;
+        case NUM_SEGMENTS_PRUNED_INVALID:
+          _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_INVALID, Integer.parseInt(entry.getValue()));
+          break;
+        case NUM_SEGMENTS_PRUNED_BY_LIMIT:
+          _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_LIMIT, Integer.parseInt(entry.getValue()));
+          break;
+        case NUM_SEGMENTS_PRUNED_BY_VALUE:
+          _statMap.merge(StatKey.NUM_SEGMENTS_PRUNED_BY_VALUE, Integer.parseInt(entry.getValue()));
+          break;
+        case EXPLAIN_PLAN_NUM_EMPTY_FILTER_SEGMENTS:
+          LOGGER.debug("Skipping empty filter segments: {}", entry.getValue());
+          break;
+        case EXPLAIN_PLAN_NUM_MATCH_ALL_FILTER_SEGMENTS:
+          LOGGER.debug("Skipping match all filter segments: {}", entry.getValue());
+          break;
+        case NUM_CONSUMING_SEGMENTS_PROCESSED:
+          _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_PROCESSED, Integer.parseInt(entry.getValue()));
+          break;
+        case NUM_CONSUMING_SEGMENTS_MATCHED:
+          _statMap.merge(StatKey.NUM_CONSUMING_SEGMENTS_MATCHED, Integer.parseInt(entry.getValue()));
+          break;
+        case SORTED:
+          break;
+        default:
+          throw new IllegalArgumentException("Unhandled leaf execution stat: " + key);
       }
     }
-  }
-
-  public ExplainedNode explain() {
-    Preconditions.checkState(
-        _requests.stream().allMatch(request -> request.getQueryContext().getExplain() == ExplainMode.NODE),
-        "All requests must have explain mode set to ExplainMode.NODE");
-
-    if (_executionFuture == null) {
-      _executionFuture = startExecution();
-    }
-
-    List<PlanNode> childNodes = new ArrayList<>();
-    while (true) {
-      BaseResultsBlock resultsBlock;
-      try {
-        // Here we could use active or passive, given we don't actually execute anything
-        long timeout = _context.getPassiveDeadlineMs() - System.currentTimeMillis();
-        resultsBlock = _blockingQueue.poll(timeout, TimeUnit.MILLISECONDS);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException("Interrupted while waiting for results block", e);
-      }
-      if (resultsBlock == null) {
-        throw new RuntimeException("Timed out waiting for results block");
-      }
-      // Terminate when receiving exception block
-      Map<Integer, String> exceptions = _exceptions;
-      if (exceptions != null) {
-        throw new RuntimeException("Received exception block: " + exceptions);
-      }
-      if (_isEarlyTerminated || resultsBlock == LAST_RESULTS_BLOCK) {
-        break;
-      } else if (!(resultsBlock instanceof ExplainV2ResultBlock)) {
-        throw new IllegalArgumentException("Expected ExplainV2ResultBlock, got: " + resultsBlock.getClass().getName());
-      } else {
-        ExplainV2ResultBlock block = (ExplainV2ResultBlock) resultsBlock;
-        for (ExplainInfo physicalPlan : block.getPhysicalPlans()) {
-          childNodes.add(asNode(physicalPlan));
-        }
-      }
-    }
-    String tableName = _context.getStageMetadata().getTableName();
-    Map<String, Plan.ExplainNode.AttributeValue> attributes;
-    if (tableName == null) { // this should never happen, but let's be paranoid to never fail
-      attributes = Collections.emptyMap();
-    } else {
-      attributes =
-          Collections.singletonMap("table", Plan.ExplainNode.AttributeValue.newBuilder().setString(tableName).build());
-    }
-    return new ExplainedNode(_context.getStageId(), _dataSchema, null, childNodes, "LeafStageCombineOperator",
-        attributes);
   }
 
   private ExplainedNode asNode(ExplainInfo info) {
@@ -374,114 +389,155 @@ public class LeafOperator extends MultiStageOperator {
     return new ExplainedNode(_context.getStageId(), _dataSchema, null, inputs, info.getTitle(), info.getAttributes());
   }
 
-  private Future<Void> startExecution() {
-    ResultsBlockConsumer resultsBlockConsumer = new ResultsBlockConsumer();
-    ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
+  @Nullable
+  private ErrorMseBlock getErrorBlock() {
+    return _errorBlock.get();
+  }
+
+  private void setErrorBlock(ErrorMseBlock errorBlock) {
+    // Keep the first encountered error block
+    _errorBlock.compareAndSet(null, errorBlock);
+  }
+
+  private Future<?> startExecution() {
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     return _executorService.submit(() -> {
       try {
-        if (_requests.size() == 1) {
-          ServerQueryRequest request = _requests.get(0);
-          Tracing.ThreadAccountantOps.setupWorker(1, parentContext);
-
-          InstanceResponseBlock instanceResponseBlock =
-              _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
-          if (queryLogger != null) {
-            queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
-          }
-          // TODO: Revisit if we should treat all exceptions as query failure. Currently MERGE_RESPONSE_ERROR and
-          //       SERVER_SEGMENT_MISSING_ERROR are counted as query failure.
-          Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
-          if (!exceptions.isEmpty()) {
-            _exceptions = exceptions;
-          } else {
-            // NOTE: Instance response block might contain data (not metadata only) when all the segments are pruned.
-            //       Add the results block if it contains data.
-            BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
-            if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
-              addResultsBlock(resultsBlock);
-            }
-            // Collect the execution stats
-            mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
-          }
-        } else {
-          assert _requests.size() == 2;
-          Future<Map<String, String>>[] futures = new Future[2];
-          // TODO: this latch mechanism is not the most elegant. We should change it to use a CompletionService.
-          //  In order to interrupt the execution in case of error, we could different mechanisms like throwing in the
-          //  future, or using a shared volatile variable.
-          CountDownLatch latch = new CountDownLatch(2);
-          for (int i = 0; i < 2; i++) {
-            ServerQueryRequest request = _requests.get(i);
-            int taskId = i;
-            futures[i] = _executorService.submit(() -> {
-              Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
-
-              try {
-                InstanceResponseBlock instanceResponseBlock =
-                    _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
-                if (queryLogger != null) {
-                  queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
-                }
-                Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
-                if (!exceptions.isEmpty()) {
-                  // Drain the latch when receiving exception block and not wait for the other thread to finish
-                  _exceptions = exceptions;
-                  latch.countDown();
-                  return Collections.emptyMap();
-                } else {
-                  // NOTE: Instance response block might contain data (not metadata only) when all the segments are
-                  //       pruned. Add the results block if it contains data.
-                  BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
-                  if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
-                    addResultsBlock(resultsBlock);
-                  }
-                  // Collect the execution stats
-                  return instanceResponseBlock.getResponseMetadata();
-                }
-              } finally {
-                latch.countDown();
-              }
-            });
-          }
-          try {
-            if (!latch.await(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS)) {
-              throw new TimeoutException("Timed out waiting for leaf stage to finish");
-            }
-            // Propagate the exception thrown by the leaf stage
-            for (Future<Map<String, String>> future : futures) {
-              Map<String, String> stats =
-                  future.get(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
-              mergeExecutionStats(stats);
-            }
-          } catch (TimeoutException e) {
-            throw new TimeoutException("Timed out waiting for leaf stage to finish");
-          } finally {
-            for (Future<?> future : futures) {
-              future.cancel(true);
-            }
+        execute(parentContext);
+      } catch (Exception e) {
+        setErrorBlock(
+            ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "Caught exception while executing leaf stage: " + e));
+      } finally {
+        // Always add the last results block to mark the end of the execution and notify the main thread waiting for the
+        // results block.
+        try {
+          addResultsBlock(LAST_RESULTS_BLOCK);
+        } catch (Exception e) {
+          if (!(e instanceof EarlyTerminationException)) {
+            LOGGER.warn("Failed to add the last results block", e);
           }
         }
-        return null;
-      } finally {
-        // Always add the last results block to mark the end of the execution
-        addResultsBlock(LAST_RESULTS_BLOCK);
       }
     });
   }
 
   @VisibleForTesting
+  void execute(ThreadExecutionContext parentContext) {
+    ResultsBlockConsumer resultsBlockConsumer = new ResultsBlockConsumer();
+    ServerQueryLogger queryLogger = ServerQueryLogger.getInstance();
+    if (_requests.size() == 1) {
+      ServerQueryRequest request = _requests.get(0);
+      Tracing.ThreadAccountantOps.setupWorker(1, parentContext);
+
+      InstanceResponseBlock instanceResponseBlock =
+          _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
+      if (queryLogger != null) {
+        queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+      }
+      // Collect the execution stats
+      mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
+      // TODO: Revisit if we should treat all exceptions as query failure. Currently MERGE_RESPONSE_ERROR and
+      //       SERVER_SEGMENT_MISSING_ERROR are counted as query failure.
+      Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
+      if (!exceptions.isEmpty()) {
+        setErrorBlock(ErrorMseBlock.fromMap(QueryErrorCode.fromKeyMap(exceptions)));
+      } else {
+        // NOTE: Instance response block might contain data (not metadata only) when all the segments are pruned.
+        //       Add the results block if it contains data.
+        BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
+        if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
+          try {
+            addResultsBlock(resultsBlock);
+          } catch (InterruptedException e) {
+            setErrorBlock(CANCELLED_BLOCK);
+          } catch (TimeoutException e) {
+            setErrorBlock(TIMEOUT_BLOCK);
+          } catch (Exception e) {
+            if (!(e instanceof EarlyTerminationException)) {
+              LOGGER.warn("Failed to add results block", e);
+            }
+          }
+        }
+      }
+    } else {
+      // Hit 2 physical tables, one REALTIME and one OFFLINE
+      assert _requests.size() == 2;
+      Future<?>[] futures = new Future[2];
+      // TODO: this latch mechanism is not the most elegant. We should change it to use a CompletionService.
+      //  In order to interrupt the execution in case of error, we could different mechanisms like throwing in the
+      //  future, or using a shared volatile variable.
+      CountDownLatch latch = new CountDownLatch(2);
+      for (int i = 0; i < 2; i++) {
+        ServerQueryRequest request = _requests.get(i);
+        int taskId = i;
+        futures[i] = _executorService.submit(() -> {
+          Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
+
+          try {
+            InstanceResponseBlock instanceResponseBlock =
+                _queryExecutor.execute(request, _executorService, resultsBlockConsumer);
+            if (queryLogger != null) {
+              queryLogger.logQuery(request, instanceResponseBlock, "MultistageEngine");
+            }
+            // Collect the execution stats
+            mergeExecutionStats(instanceResponseBlock.getResponseMetadata());
+            Map<Integer, String> exceptions = instanceResponseBlock.getExceptions();
+            if (!exceptions.isEmpty()) {
+              setErrorBlock(ErrorMseBlock.fromMap(QueryErrorCode.fromKeyMap(exceptions)));
+              // Drain the latch when receiving exception block and not wait for the other thread to finish
+              latch.countDown();
+            } else {
+              // NOTE: Instance response block might contain data (not metadata only) when all the segments are
+              //       pruned. Add the results block if it contains data.
+              BaseResultsBlock resultsBlock = instanceResponseBlock.getResultsBlock();
+              if (resultsBlock != null && resultsBlock.getNumRows() > 0) {
+                try {
+                  addResultsBlock(resultsBlock);
+                } catch (InterruptedException e) {
+                  setErrorBlock(CANCELLED_BLOCK);
+                } catch (TimeoutException e) {
+                  setErrorBlock(TIMEOUT_BLOCK);
+                } catch (Exception e) {
+                  if (!(e instanceof EarlyTerminationException)) {
+                    LOGGER.warn("Failed to add results block", e);
+                  }
+                }
+              }
+            }
+          } finally {
+            latch.countDown();
+          }
+        });
+      }
+      try {
+        if (!latch.await(_context.getPassiveDeadlineMs() - System.currentTimeMillis(), TimeUnit.MILLISECONDS)) {
+          setErrorBlock(TIMEOUT_BLOCK);
+        }
+      } catch (InterruptedException e) {
+        setErrorBlock(CANCELLED_BLOCK);
+      } finally {
+        for (Future<?> future : futures) {
+          future.cancel(true);
+        }
+      }
+    }
+  }
+
+  @VisibleForTesting
   void addResultsBlock(BaseResultsBlock resultsBlock)
       throws InterruptedException, TimeoutException {
+    if (_terminated) {
+      throw new EarlyTerminationException("Query has been terminated");
+    }
     if (!_blockingQueue.offer(resultsBlock, _context.getPassiveDeadlineMs() - System.currentTimeMillis(),
         TimeUnit.MILLISECONDS)) {
       throw new TimeoutException("Timed out waiting to add results block");
     }
   }
 
-  @Override
-  public void close() {
-    cancelSseTasks();
+  private void terminateAndClearResultsBlocks() {
+    _terminated = true;
+    _blockingQueue.clear();
   }
 
   /**

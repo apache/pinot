@@ -21,7 +21,9 @@ package org.apache.pinot.query.planner.logical;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelTraitSet;
@@ -47,10 +49,12 @@ import org.apache.calcite.rex.RexWindowExclusion;
 import org.apache.calcite.sql.SqlAggFunction;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.ImmutableBitSet;
+import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.plan.PinotExplainedRelNode;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -160,6 +164,40 @@ public final class PlanNodeToRelConverter {
           _builder.asofJoin(node.getJoinType(), _builder.and(conditions), matchCondition);
         } else {
           _builder.join(node.getJoinType(), conditions);
+        }
+      } catch (RuntimeException e) {
+        LOGGER.warn("Failed to convert join node: {}", node, e);
+        _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "UnknownJoin", Collections.emptyMap(),
+            node.getDataSchema(), readAlreadyPushedChildren(node)));
+      }
+
+      return null;
+    }
+
+    @Override
+    public Void visitEnrichedJoin(EnrichedJoinNode node, Void context) {
+      visitChildren(node);
+
+      try {
+        List<RexNode> conditions = new ArrayList<>(
+            node.getLeftKeys().size() + node.getRightKeys().size() + node.getNonEquiConditions().size());
+        for (Integer leftKey : node.getLeftKeys()) {
+          conditions.add(_builder.field(2, 0, leftKey));
+        }
+        for (Integer rightKey : node.getRightKeys()) {
+          conditions.add(_builder.field(2, 1, rightKey));
+        }
+        for (RexExpression nonEquiCondition : node.getNonEquiConditions()) {
+          conditions.add(RexExpressionUtils.toRexNode(_builder, nonEquiCondition));
+        }
+
+        if (node.getJoinType() == JoinRelType.ASOF || node.getJoinType() == JoinRelType.LEFT_ASOF) {
+          _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedASOFJoin", Collections.emptyMap(),
+              node.getDataSchema(), readAlreadyPushedChildren(node)));
+        } else {
+          Map<String, Plan.ExplainNode.AttributeValue> attributes = new HashMap<>();
+          _builder.push(new PinotExplainedRelNode(_builder.getCluster(), "EnrichedJoin", attributes,
+              node.getDataSchema(), readAlreadyPushedChildren(node)));
         }
       } catch (RuntimeException e) {
         LOGGER.warn("Failed to convert join node: {}", node, e);

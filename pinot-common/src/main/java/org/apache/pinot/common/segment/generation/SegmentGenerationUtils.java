@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -31,15 +32,21 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManagerFactory;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
+import org.apache.pinot.spi.ingestion.batch.spec.TlsSpec;
 import org.apache.pinot.spi.utils.JsonUtils;
 
 
@@ -65,6 +72,10 @@ public class SegmentGenerationUtils {
   }
 
   public static Schema getSchema(String schemaURIString, String authToken) {
+    return getSchema(schemaURIString, authToken, null);
+  }
+
+  public static Schema getSchema(String schemaURIString, String authToken, TlsSpec tlsSpec) {
     URI schemaURI;
     try {
       schemaURIString = sanitizeURIString(schemaURIString);
@@ -90,7 +101,7 @@ public class SegmentGenerationUtils {
     } else {
       // Try to directly read from URI.
       try {
-        schemaJson = fetchUrl(schemaURI.toURL(), authToken);
+        schemaJson = fetchUrl(schemaURI.toURL(), authToken, tlsSpec);
       } catch (IOException e) {
         throw new RuntimeException("Failed to read from Schema URI - '" + schemaURI + "'", e);
       }
@@ -108,6 +119,10 @@ public class SegmentGenerationUtils {
   }
 
   public static TableConfig getTableConfig(String tableConfigURIStr, String authToken) {
+    return getTableConfig(tableConfigURIStr, authToken, null);
+  }
+
+  public static TableConfig getTableConfig(String tableConfigURIStr, String authToken, TlsSpec tlsSpec) {
     URI tableConfigURI;
     try {
       tableConfigURI = new URI(tableConfigURIStr);
@@ -125,7 +140,7 @@ public class SegmentGenerationUtils {
       }
     } else {
       try {
-        tableConfigJson = fetchUrl(tableConfigURI.toURL(), authToken);
+        tableConfigJson = fetchUrl(tableConfigURI.toURL(), authToken, tlsSpec);
       } catch (IOException e) {
         throw new RuntimeException(
             "Failed to read from table config file data stream on Pinot fs - '" + tableConfigURI + "'", e);
@@ -225,21 +240,50 @@ public class SegmentGenerationUtils {
   }
 
   /**
-   * Retrieve a URL via GET request, with an optional authorization token.
+   * Retrieves the content of the given URL using a GET request.
+   * Supports HTTPS connections, including those with self-signed certificates.
    *
-   * @param url target url
-   * @param authToken optional auth token, or null
-   * @return fetched document
-   * @throws IOException on connection problems
+   * @param url The target URL to fetch.
+   * @param authToken Optional authorization token to include in the request header, or null.
+   * @return The response body as a string.
+   * @throws IOException If an error occurs during the connection or reading the response.
    */
-  private static String fetchUrl(URL url, String authToken)
+  public static String fetchUrl(URL url, String authToken, TlsSpec tlsSpec)
       throws IOException {
-    URLConnection connection = url.openConnection();
+    try {
+      URLConnection connection = url.openConnection();
 
-    if (StringUtils.isNotBlank(authToken)) {
-      connection.setRequestProperty("Authorization", authToken);
+      if (connection instanceof HttpsURLConnection) {
+        HttpsURLConnection httpsConn = (HttpsURLConnection) connection;
+
+        if (tlsSpec != null) {
+          TrustManagerFactory tmf = TlsUtils.createTrustManagerFactory(
+              tlsSpec.getTrustStorePath(),
+              tlsSpec.getTrustStorePassword(),
+              tlsSpec.getTrustStoreType());
+
+          SSLContext sslContext = SSLContext.getInstance("TLS");
+          sslContext.init(null, tmf.getTrustManagers(), new SecureRandom());
+
+          httpsConn.setSSLSocketFactory(sslContext.getSocketFactory());
+          httpsConn.setConnectTimeout(tlsSpec.getConnectTimeout());
+          httpsConn.setReadTimeout(tlsSpec.getReadTimeout());
+        }
+        connection = httpsConn;
+      }
+
+      if (StringUtils.isNotBlank(authToken)) {
+        connection.setRequestProperty("Authorization", authToken);
+      }
+
+      if (connection instanceof HttpURLConnection) {
+        ((HttpURLConnection) connection).setRequestMethod("GET");
+      }
+
+      return IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
+    } catch (Exception e) {
+      throw new IOException("Failed to fetch URL: " + url, e);
     }
-    return IOUtils.toString(connection.getInputStream(), StandardCharsets.UTF_8);
   }
 
 

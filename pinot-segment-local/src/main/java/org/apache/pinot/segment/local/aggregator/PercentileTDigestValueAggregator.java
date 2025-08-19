@@ -54,6 +54,8 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
 
   @Override
   public TDigest getInitialAggregatedValue(Object rawValue) {
+    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index.
+    assert rawValue != null;
     TDigest initialValue;
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
@@ -61,7 +63,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
       initialValue = TDigest.createMergingDigest(_compressionFactor);
-      initialValue.add(((Number) rawValue).doubleValue());
+      initialValue.add(ValueAggregatorUtils.toDouble(rawValue));
       _maxByteSize = Math.max(_maxByteSize, initialValue.byteSize());
     }
     return initialValue;
@@ -72,7 +74,7 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
     if (rawValue instanceof byte[]) {
       value.add(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      value.add(((Number) rawValue).doubleValue());
+      value.add(ValueAggregatorUtils.toDouble(rawValue));
     }
     _maxByteSize = Math.max(_maxByteSize, value.byteSize());
     return value;
@@ -88,6 +90,11 @@ public class PercentileTDigestValueAggregator implements ValueAggregator<Object,
   @Override
   public TDigest cloneAggregatedValue(TDigest value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return false;
   }
 
   @Override

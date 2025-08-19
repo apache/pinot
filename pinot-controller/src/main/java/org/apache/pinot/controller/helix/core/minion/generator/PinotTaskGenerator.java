@@ -75,6 +75,20 @@ public interface PinotTaskGenerator {
   }
 
   /**
+   * Returns the max number of subtasks allowed per task.
+   * This overrides individual task level configs like MinionConstants.TABLE_MAX_NUM_TASKS_KEY
+   * Number of subtasks directly impacts the performance of the helix leader and thus the controller
+   * So limiting the number of subtasks helps to avoid performance issues
+   *
+   * Usage
+   * 1. This method is used by the scheduling framework to limit the number of subtasks across task types
+   * 2. This method can also be used by individual task generators to consider the limit while generating subtasks
+   */
+  default int getMaxAllowedSubTasksPerTask() {
+    return MinionConstants.DEFAULT_MINION_MAX_NUM_OF_SUBTASKS_LIMIT;
+  }
+
+  /**
    * Returns the maximum number of attempts per task, 1 by default.
    */
   default int getMaxAttemptsPerTask() {

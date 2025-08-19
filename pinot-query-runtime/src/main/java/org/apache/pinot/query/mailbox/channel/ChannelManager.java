@@ -26,7 +26,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -38,9 +37,11 @@ import org.apache.pinot.spi.utils.CommonConstants;
 public class ChannelManager {
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
   private final TlsConfig _tlsConfig;
+  private final int _maxInboundMessageSize;
 
-  public ChannelManager(@Nullable TlsConfig tlsConfig) {
+  public ChannelManager(@Nullable TlsConfig tlsConfig, int maxInboundMessageSize) {
     _tlsConfig = tlsConfig;
+    _maxInboundMessageSize = maxInboundMessageSize;
   }
 
   public ManagedChannel getChannel(String hostname, int port) {
@@ -49,8 +50,7 @@ public class ChannelManager {
       return _channelMap.computeIfAbsent(Pair.of(hostname, port),
           (k) -> NettyChannelBuilder
               .forAddress(k.getLeft(), k.getRight())
-              .maxInboundMessageSize(
-                  CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
+              .maxInboundMessageSize(_maxInboundMessageSize)
               .sslContext(ServerGrpcQueryClient.buildSslContext(_tlsConfig))
               .build()
       );
@@ -58,8 +58,7 @@ public class ChannelManager {
       return _channelMap.computeIfAbsent(Pair.of(hostname, port),
           (k) -> ManagedChannelBuilder
               .forAddress(k.getLeft(), k.getRight())
-              .maxInboundMessageSize(
-                  CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
+              .maxInboundMessageSize(_maxInboundMessageSize)
               .usePlaintext()
               .build());
     }

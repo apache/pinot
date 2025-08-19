@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.transform.function;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -404,5 +405,9 @@ public class TransformFunctionFactory {
    */
   public static String canonicalize(String functionName) {
     return StringUtils.remove(functionName, '_').toLowerCase();
+  }
+
+  public static Map<String, Class<? extends TransformFunction>> getAllFunctions() {
+    return Collections.unmodifiableMap(TRANSFORM_FUNCTION_MAP);
   }
 }

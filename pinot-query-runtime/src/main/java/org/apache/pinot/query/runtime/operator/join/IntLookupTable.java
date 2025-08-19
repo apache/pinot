@@ -57,4 +57,9 @@ public class IntLookupTable extends PrimitiveLookupTable {
   protected Set<Map.Entry<Object, Object>> notNullKeyEntrySet() {
     return (Set) _lookupTable.int2ObjectEntrySet();
   }
+
+  @Override
+  public int size() {
+    return _lookupTable.size();
+  }
 }

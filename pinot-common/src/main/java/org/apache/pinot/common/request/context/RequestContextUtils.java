@@ -242,7 +242,7 @@ public class RequestContextUtils {
 
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(getExpression(operands.get(0)),
-            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), "i"));
       case TEXT_CONTAINS:
         return FilterContext.forPredicate(
             new TextContainsPredicate(getExpression(operands.get(0)), getStringValue(operands.get(1))));
@@ -418,7 +418,7 @@ public class RequestContextUtils {
         }
       case LIKE:
         return FilterContext.forPredicate(new RegexpLikePredicate(operands.get(0),
-            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1)))));
+            RegexpPatternConverterUtils.likeToRegexpLike(getStringValue(operands.get(1))), "i"));
       case TEXT_CONTAINS:
         return FilterContext.forPredicate(new TextContainsPredicate(operands.get(0), getStringValue(operands.get(1))));
       case TEXT_MATCH:

@@ -63,4 +63,4 @@ export const RebalanceServerConfigurationOptionDouble = (
             </FormControl>
         </Box>
     );
-} 
+}

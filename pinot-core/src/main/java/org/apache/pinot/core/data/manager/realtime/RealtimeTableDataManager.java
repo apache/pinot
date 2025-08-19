@@ -82,8 +82,8 @@ import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DateTimeFormatSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.stream.RowMetadata;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -293,10 +293,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    *
    * @param segmentName name of the consuming segment
    * @param partitionId partition id of the consuming segment (directly passed in to avoid parsing the segment name)
-   * @param ingestionTimeMs ingestion time of the last consumed message (from {@link RowMetadata})
+   * @param ingestionTimeMs ingestion time of the last consumed message (from {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
-   *                                   {@link RowMetadata})
-   * @param currentOffset offset of the last consumed message (from {@link RowMetadata})
+   *                                   {@link StreamMessageMetadata})
+   * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
    * @param latestOffset offset of the latest message in the partition (from {@link StreamMetadataProvider})
    */
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,

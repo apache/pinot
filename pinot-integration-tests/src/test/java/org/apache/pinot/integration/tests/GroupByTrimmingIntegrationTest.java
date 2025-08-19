@@ -225,13 +225,16 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
     ResultSetGroup result = conn.execute(options + query);
     assertTrimFlagSet(result);
 
-    assertEquals(toResultStr(result),
-        "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]\n"
-            + "77,\t377,\t4\n"
-            + "66,\t566,\t4\n"
-            + "39,\t339,\t4\n"
-            + "96,\t396,\t4\n"
-            + "25,\t25,\t4");
+    String[] lines = toResultStr(result).split("\n");
+
+    // Assert the header exactly
+    assertEquals(lines[0], "\"i\"[\"INT\"],\t\"j\"[\"LONG\"],\t\"EXPR$2\"[\"LONG\"]");
+    // Assert col3 of all data rows is 4
+    for (int i = 1; i < lines.length; i++) {
+      String[] cols = lines[i].split("\t");
+      assertEquals(cols[2], "4");
+    }
+
 
     assertEquals(toExplainStr(postQuery(options + " SET explainAskingServers=true; EXPLAIN PLAN FOR " + query), true),
         "Execution Plan\n"

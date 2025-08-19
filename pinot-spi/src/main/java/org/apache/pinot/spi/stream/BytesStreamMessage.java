@@ -23,15 +23,11 @@ import javax.annotation.Nullable;
 
 public class BytesStreamMessage extends StreamMessage<byte[]> {
 
-  public BytesStreamMessage(@Nullable byte[] key, byte[] value, @Nullable StreamMessageMetadata metadata) {
+  public BytesStreamMessage(@Nullable byte[] key, byte[] value, StreamMessageMetadata metadata) {
     super(key, value, value.length, metadata);
   }
 
-  public BytesStreamMessage(byte[] value, @Nullable StreamMessageMetadata metadata) {
+  public BytesStreamMessage(byte[] value, StreamMessageMetadata metadata) {
     this(null, value, metadata);
-  }
-
-  public BytesStreamMessage(byte[] value) {
-    this(value, null);
   }
 }

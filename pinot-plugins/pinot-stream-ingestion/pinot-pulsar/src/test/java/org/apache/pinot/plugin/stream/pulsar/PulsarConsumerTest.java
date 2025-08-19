@@ -51,7 +51,6 @@ import org.testng.annotations.Test;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertTrue;
 
 
@@ -244,11 +243,8 @@ public class PulsarConsumerTest {
   private void verifyMessage(BytesStreamMessage streamMessage, int index, List<MessageId> messageIds) {
     assertEquals(new String(streamMessage.getValue()), MESSAGE_PREFIX + index);
     StreamMessageMetadata messageMetadata = streamMessage.getMetadata();
-    assertNotNull(messageMetadata);
     MessageIdStreamOffset offset = (MessageIdStreamOffset) messageMetadata.getOffset();
-    assertNotNull(offset);
     MessageIdStreamOffset nextOffset = (MessageIdStreamOffset) messageMetadata.getNextOffset();
-    assertNotNull(nextOffset);
     assertEquals(offset.getMessageId(), messageIds.get(index));
     if (index < NUM_RECORDS_PER_PARTITION - 1) {
       assertEquals(nextOffset.getMessageId(), messageIds.get(index + 1));
