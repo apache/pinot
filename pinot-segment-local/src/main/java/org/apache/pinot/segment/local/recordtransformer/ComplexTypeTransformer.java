@@ -138,7 +138,6 @@ public class ComplexTypeTransformer implements RecordTransformer {
       CollectionNotUnnestedToJson collectionNotUnnestedToJson, Map<String, String> prefixesToRename,
       boolean continueOnError) {
     _fieldsToUnnest = fieldsToUnnest;
-    Collections.sort(_fieldsToUnnest);
     _fieldsToUnnestAndKeepOriginalValue = new ArrayList<>(_fieldsToUnnest);
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
