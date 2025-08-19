@@ -105,6 +105,7 @@ public class AuditRequestProcessor {
   }
 
   private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
+    // TODO spyne to be implemented
     return null;
   }
 
