@@ -46,28 +46,12 @@ import org.slf4j.LoggerFactory;
 public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
-  private static final String ANONYMOUS = "anonymous";
 
   // HTTP Headers
   private static final String HEADER_X_FORWARDED_FOR = "X-Forwarded-For";
   private static final String HEADER_X_REAL_IP = "X-Real-IP";
-  private static final String HEADER_AUTHORIZATION = "Authorization";
-  private static final String HEADER_X_USER_ID = "X-User-ID";
-  private static final String HEADER_X_USERNAME = "X-Username";
   private static final String HEADER_X_SERVICE_ID = "X-Service-ID";
   private static final String HEADER_X_SERVICE_NAME = "X-Service-Name";
-
-  // Auth prefixes
-  private static final String AUTH_BASIC_PREFIX = "Basic ";
-  private static final String AUTH_BEARER_PREFIX = "Bearer ";
-
-  // User identification values
-  private static final String BASIC_AUTH_USER = "basic-auth-user";
-  private static final String BEARER_TOKEN_USER = "bearer-token-user";
-
-  // Common values
-  private static final String UNKNOWN = "unknown";
-  private static final String COMMA_SEPARATOR = ",";
 
   @Inject
   private AuditConfigManager _configManager;
@@ -108,18 +92,12 @@ public class AuditRequestProcessor {
         return null;
       }
 
-      String method = requestContext.getMethod();
-      String originIpAddress = extractClientIpAddress(requestContext, remoteAddr);
-      String userId = extractUserId(requestContext);
-
-      // Capture request payload based on configuration
-
       // Log the audit event (service ID will be extracted from headers, not config)
-      return new AuditEvent().setServiceId(extractServiceId(requestContext))
-          .setEndpoint(endpoint)
-          .setMethod(method)
-          .setOriginIpAddress(originIpAddress)
-          .setUserId(userId)
+      return new AuditEvent().setEndpoint(endpoint)
+          .setServiceId(extractServiceId(requestContext))
+          .setMethod(requestContext.getMethod())
+          .setOriginIpAddress(extractClientIpAddress(requestContext, remoteAddr))
+          .setUserId(extractUserId(requestContext))
           .setRequest(captureRequestPayload(requestContext));
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main request
@@ -146,7 +124,7 @@ public class AuditRequestProcessor {
       String xForwardedFor = requestContext.getHeaderString(HEADER_X_FORWARDED_FOR);
       if (StringUtils.isNotBlank(xForwardedFor)) {
         // X-Forwarded-For can contain multiple IPs, take the first one
-        return xForwardedFor.split(COMMA_SEPARATOR)[0].trim();
+        return xForwardedFor.split(",")[0].trim();
       }
 
       String xRealIp = requestContext.getHeaderString(HEADER_X_REAL_IP);
@@ -158,7 +136,7 @@ public class AuditRequestProcessor {
       return remoteAddr;
     } catch (Exception e) {
       LOG.debug("Failed to extract client IP address", e);
-      return UNKNOWN;
+      return null;
     }
   }
 
@@ -170,35 +148,8 @@ public class AuditRequestProcessor {
    * @return the user ID or "anonymous" if not found
    */
   private String extractUserId(ContainerRequestContext requestContext) {
-    try {
-      // Check for common user identification headers
-      String authHeader = requestContext.getHeaderString(HEADER_AUTHORIZATION);
-      if (StringUtils.isNotBlank(authHeader)) {
-        // For basic auth, extract username; for bearer tokens, use a placeholder
-        if (authHeader.startsWith(AUTH_BASIC_PREFIX)) {
-          // Could decode basic auth to get username, but for security keep it as placeholder
-          return BASIC_AUTH_USER;
-        } else if (authHeader.startsWith(AUTH_BEARER_PREFIX)) {
-          return BEARER_TOKEN_USER;
-        }
-      }
-
-      // Check for custom user headers
-      String userHeader = requestContext.getHeaderString(HEADER_X_USER_ID);
-      if (StringUtils.isNotBlank(userHeader)) {
-        return userHeader.trim();
-      }
-
-      userHeader = requestContext.getHeaderString(HEADER_X_USERNAME);
-      if (StringUtils.isNotBlank(userHeader)) {
-        return userHeader.trim();
-      }
-
-      return ANONYMOUS;
-    } catch (Exception e) {
-      LOG.debug("Failed to extract user ID", e);
-      return ANONYMOUS;
-    }
+    // TODO spyne to be implemented
+    return null;
   }
 
   /**
@@ -209,23 +160,8 @@ public class AuditRequestProcessor {
    * @return the service ID or "unknown" if not found
    */
   private String extractServiceId(ContainerRequestContext requestContext) {
-    try {
-      // Check for custom service ID headers
-      String serviceId = requestContext.getHeaderString(HEADER_X_SERVICE_ID);
-      if (StringUtils.isNotBlank(serviceId)) {
-        return serviceId.trim();
-      }
-
-      serviceId = requestContext.getHeaderString(HEADER_X_SERVICE_NAME);
-      if (StringUtils.isNotBlank(serviceId)) {
-        return serviceId.trim();
-      }
-
-      return null;
-    } catch (Exception e) {
-      LOG.debug("Failed to extract service ID", e);
-      return null;
-    }
+    // TODO spyne to be implemented
+    return null;
   }
 
   private AuditEvent.AuditRequestPayload captureRequestPayload(ContainerRequestContext requestContext) {
