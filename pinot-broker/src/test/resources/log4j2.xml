@@ -22,7 +22,8 @@
 <Configuration>
   <Appenders>
     <Console name="console" target="SYSTEM_OUT">
-      <PatternLayout pattern="%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n"/>
+      <!--      <PatternLayout pattern="%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n"/>-->
+      <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss,SSS} [%t] %-5level %logger{36} - %msg [%X{X-Correlation-Id}]%n"/>
     </Console>
   </Appenders>
   <Loggers>
