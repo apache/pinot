@@ -69,40 +69,20 @@ public class AuditRequestProcessor {
   private static final String UNKNOWN = "unknown";
   private static final String COMMA_SEPARATOR = ",";
 
-  // Payload keys
-  private static final String PAYLOAD_QUERY_PARAMETERS = "queryParameters";
-  private static final String PAYLOAD_BODY = "body";
-  private static final String PAYLOAD_HEADERS = "headers";
-  private static final String PAYLOAD_ERROR = "error";
-
-  // Sensitive header keywords
-  private static final String SENSITIVE_AUTH = "auth";
-  private static final String SENSITIVE_PASSWORD = "password";
-  private static final String SENSITIVE_TOKEN = "token";
-  private static final String SENSITIVE_SECRET = "secret";
-
   @Inject
   private AuditConfigManager _configManager;
 
-  private static Map<String, String> toHeaderMap(MultivaluedMap<String, String> headers) {
-    Map<String, String> headerMap = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
-      String headerName = entry.getKey().toLowerCase();
-      // Skip sensitive headers
-      if (!headerName.contains(SENSITIVE_AUTH) && !headerName.contains(SENSITIVE_PASSWORD) && !headerName.contains(
-          SENSITIVE_TOKEN) && !headerName.contains(SENSITIVE_SECRET)) {
-        List<String> values = entry.getValue();
-        if (!values.isEmpty()) {
-          headerMap.put(entry.getKey(), values.get(0));
-        }
-      }
-    }
-    return headerMap;
-  }
-
-  private static Map<String, Object> toQueryParamsMap(MultivaluedMap<String, String> queryParams) {
+  /**
+   * Converts a MultivaluedMap into a Map of query parameters.
+   * If a key in the MultivaluedMap has a single value, that value is added directly to the resulting map.
+   * If a key has multiple values, the list of values is added instead.
+   *
+   * @param multimap the input MultivaluedMap containing keys and their associated values
+   * @return a Map where each key is mapped to either a single value or a list of values
+   */
+  private static Map<String, Object> toMap(MultivaluedMap<String, String> multimap) {
     Map<String, Object> queryMap = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+    for (Map.Entry<String, List<String>> entry : multimap.entrySet()) {
       List<String> values = entry.getValue();
       if (values.size() == 1) {
         queryMap.put(entry.getKey(), values.get(0));
@@ -135,8 +115,7 @@ public class AuditRequestProcessor {
       // Capture request payload based on configuration
 
       // Log the audit event (service ID will be extracted from headers, not config)
-      return new AuditEvent()
-          .setServiceId(extractServiceId(requestContext))
+      return new AuditEvent().setServiceId(extractServiceId(requestContext))
           .setEndpoint(endpoint)
           .setMethod(method)
           .setOriginIpAddress(originIpAddress)
@@ -249,45 +228,39 @@ public class AuditRequestProcessor {
     }
   }
 
-  /**
-   * Captures the request payload for audit logging based on configuration.
-   * Uses dynamic configuration to control what data is captured.
-   *
-   * @param requestContext the request context
-   * @return the captured request payload
-   */
-  private Map<String, Object> captureRequestPayload(ContainerRequestContext requestContext) {
-    Map<String, Object> payload = new HashMap<>();
-
+  private AuditEvent.AuditRequestPayload captureRequestPayload(ContainerRequestContext requestContext) {
     try {
+      AuditEvent.AuditRequestPayload payload = new AuditEvent.AuditRequestPayload();
       UriInfo uriInfo = requestContext.getUriInfo();
       MultivaluedMap<String, String> queryParams = uriInfo.getQueryParameters();
       if (!queryParams.isEmpty()) {
-        payload.put(PAYLOAD_QUERY_PARAMETERS, toQueryParamsMap(queryParams));
+        payload.setQueryParameters(toMap(queryParams));
       }
 
-      // Conditionally capture request body based on configuration
       final AuditConfig config = _configManager.getCurrentConfig();
-      if (config.isCaptureRequestPayload() && requestContext.hasEntity()) {
-        String requestBody = readRequestBody(requestContext, config.getMaxPayloadSize());
-        if (StringUtils.isNotBlank(requestBody)) {
-          payload.put(PAYLOAD_BODY, requestBody);
-        }
-      }
-
-      // Conditionally capture headers based on configuration
       if (config.isCaptureRequestHeaders()) {
         MultivaluedMap<String, String> headers = requestContext.getHeaders();
         if (!headers.isEmpty()) {
-          payload.put(PAYLOAD_HEADERS, toHeaderMap(headers));
+          payload.setHeaders(toMap(headers));
         }
       }
-    } catch (Exception e) {
-      LOG.debug("Failed to capture request payload", e);
-      payload.put(PAYLOAD_ERROR, "Failed to capture payload: " + e.getMessage());
-    }
 
-    return payload.isEmpty() ? null : payload;
+      if (config.isCaptureRequestPayload() && requestContext.hasEntity()) {
+        String requestBody = readRequestBody(requestContext, config.getMaxPayloadSize());
+        if (StringUtils.isNotBlank(requestBody)) {
+          payload.setBody(requestBody);
+        }
+      }
+
+      if (payload.getQueryParameters() == null && payload.getBody() == null && payload.getHeaders() == null) {
+        return null;
+      }
+
+      return payload;
+    } catch (Exception e) {
+      LOG.error("Failed to capture request payload", e);
+      return new AuditEvent.AuditRequestPayload().setError("Failed to capture payload: " + e.getMessage());
+    }
   }
 
   /**

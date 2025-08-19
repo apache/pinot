@@ -19,7 +19,6 @@
 package org.apache.pinot.common.audit;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
@@ -416,11 +415,9 @@ public class AuditRequestProcessorTest {
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
     assertThat(result).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) result.getRequest();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
     assertThat(payload).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> queryParameters = (Map<String, Object>) payload.get("queryParameters");
+    Map<String, Object> queryParameters = payload.getQueryParameters();
     assertThat(queryParameters).containsEntry("param1", "value1");
     assertThat(queryParameters).containsEntry("param2", "value2");
   }
@@ -440,11 +437,9 @@ public class AuditRequestProcessorTest {
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
     assertThat(result).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) result.getRequest();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
     assertThat(payload).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> queryParameters = (Map<String, Object>) payload.get("queryParameters");
+    Map<String, Object> queryParameters = payload.getQueryParameters();
     assertThat(queryParameters).containsEntry("single", "value");
     @SuppressWarnings("unchecked")
     List<String> tags = (List<String>) queryParameters.get("tags");
@@ -452,8 +447,7 @@ public class AuditRequestProcessorTest {
   }
 
   @Test
-  public void testCaptureRequestBodyWhenEnabled()
-      throws IOException {
+  public void testCaptureRequestBodyWhenEnabled() {
     _defaultConfig.setCaptureRequestPayload(true);
     String requestBody = "{\"key\": \"value\"}";
     InputStream entityStream = new ByteArrayInputStream(requestBody.getBytes());
@@ -469,10 +463,9 @@ public class AuditRequestProcessorTest {
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
     assertThat(result).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) result.getRequest();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
     assertThat(payload).isNotNull();
-    assertThat(payload.get("body")).isEqualTo(requestBody);
+    assertThat(payload.getBody()).isEqualTo(requestBody);
     verify(_requestContext).setEntityStream(any(ByteArrayInputStream.class));
   }
 
@@ -489,11 +482,10 @@ public class AuditRequestProcessorTest {
 
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
-    assertThat(result).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) result.getRequest();
+    assertThat(result).isNotNull();  
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
     if (payload != null) {
-      assertThat(payload).doesNotContainKey("body");
+      assertThat(payload.getBody()).isNull();
     }
     verify(_requestContext, times(0)).getEntityStream();
   }
@@ -516,15 +508,14 @@ public class AuditRequestProcessorTest {
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
     assertThat(result).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) result.getRequest();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
     assertThat(payload).isNotNull();
     @SuppressWarnings("unchecked")
-    Map<String, String> capturedHeaders = (Map<String, String>) payload.get("headers");
+    Map<String, Object> capturedHeaders = payload.getHeaders();
     assertThat(capturedHeaders).containsEntry("Content-Type", "application/json");
     assertThat(capturedHeaders).containsEntry("X-Custom-Header", "custom-value");
-    assertThat(capturedHeaders).doesNotContainKey("Authorization");  // Sensitive header filtered
-    assertThat(capturedHeaders).doesNotContainKey("X-Password");     // Sensitive header filtered
+    assertThat(capturedHeaders).containsEntry("Authorization", "Bearer token123");
+    assertThat(capturedHeaders).containsEntry("X-Password", "secret123");
   }
 
   @Test
@@ -541,10 +532,9 @@ public class AuditRequestProcessorTest {
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
     assertThat(result).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) result.getRequest();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
     if (payload != null) {
-      assertThat(payload).doesNotContainKey("headers");
+      assertThat(payload.getHeaders()).isNull();
     }
   }
 
@@ -567,17 +557,15 @@ public class AuditRequestProcessorTest {
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
     assertThat(result).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, Object> payload = (Map<String, Object>) result.getRequest();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
     assertThat(payload).isNotNull();
-    @SuppressWarnings("unchecked")
-    Map<String, String> capturedHeaders = (Map<String, String>) payload.get("headers");
+    Map<String, Object> capturedHeaders = payload.getHeaders();
     assertThat(capturedHeaders).containsEntry("content-type", "application/json");
-    assertThat(capturedHeaders).containsEntry("x-api-key", "key123");  // This one doesn't match filter
-    assertThat(capturedHeaders).doesNotContainKey("authorization");
-    assertThat(capturedHeaders).doesNotContainKey("x-auth-token");
-    assertThat(capturedHeaders).doesNotContainKey("password-header");
-    assertThat(capturedHeaders).doesNotContainKey("api-secret");
+    assertThat(capturedHeaders).containsEntry("authorization", "Bearer token123");
+    assertThat(capturedHeaders).containsEntry("x-auth-token", "token456");
+    assertThat(capturedHeaders).containsEntry("password-header", "pass123");
+    assertThat(capturedHeaders).containsEntry("api-secret", "secret789");
+    assertThat(capturedHeaders).containsEntry("x-api-key", "key123");
   }
 
   @Test

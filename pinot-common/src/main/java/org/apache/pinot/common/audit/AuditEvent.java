@@ -20,6 +20,7 @@ package org.apache.pinot.common.audit;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 
 
 /**
@@ -48,7 +49,7 @@ public class AuditEvent {
   private String _userId;
 
   @JsonProperty("request")
-  private Object _request;
+  private AuditRequestPayload _request;
 
   public String getTimestamp() {
     return _timestamp;
@@ -104,12 +105,68 @@ public class AuditEvent {
     return this;
   }
 
-  public Object getRequest() {
+  public AuditRequestPayload getRequest() {
     return _request;
   }
 
-  public AuditEvent setRequest(Object request) {
+  public AuditEvent setRequest(AuditRequestPayload request) {
     _request = request;
     return this;
+  }
+
+  /**
+   * Strongly-typed data class representing the request payload portion of an audit event.
+   * Contains captured request data such as query parameters, headers, and body content.
+   */
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public static class AuditRequestPayload {
+
+    @JsonProperty("queryParameters")
+    private Map<String, Object> _queryParameters;
+
+    @JsonProperty("headers")
+    private Map<String, Object> _headers;
+
+    @JsonProperty("body")
+    private String _body;
+
+    @JsonProperty("error")
+    private String _error;
+
+    public Map<String, Object> getQueryParameters() {
+      return _queryParameters;
+    }
+
+    public AuditRequestPayload setQueryParameters(Map<String, Object> queryParameters) {
+      _queryParameters = queryParameters;
+      return this;
+    }
+
+    public Map<String, Object> getHeaders() {
+      return _headers;
+    }
+
+    public AuditRequestPayload setHeaders(Map<String, Object> headers) {
+      _headers = headers;
+      return this;
+    }
+
+    public String getBody() {
+      return _body;
+    }
+
+    public AuditRequestPayload setBody(String body) {
+      _body = body;
+      return this;
+    }
+
+    public String getError() {
+      return _error;
+    }
+
+    public AuditRequestPayload setError(String error) {
+      _error = error;
+      return this;
+    }
   }
 }
