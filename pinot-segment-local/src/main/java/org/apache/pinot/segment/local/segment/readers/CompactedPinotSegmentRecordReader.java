@@ -21,8 +21,6 @@ package org.apache.pinot.segment.local.segment.readers;
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.MutableSegment;
@@ -59,8 +57,7 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     this(validDocIds, null);
   }
 
-  public CompactedPinotSegmentRecordReader(RoaringBitmap validDocIds,
-      @Nullable String deleteRecordColumn) {
+  public CompactedPinotSegmentRecordReader(RoaringBitmap validDocIds, @Nullable String deleteRecordColumn) {
     _pinotSegmentRecordReader = new PinotSegmentRecordReader();
     _validDocIdsBitmap = validDocIds;
     _validDocIdsIterator = validDocIds.getIntIterator();
@@ -108,18 +105,17 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
     int[] sortedDocIds = _pinotSegmentRecordReader.getSortedDocIds();
     if (sortedDocIds != null) {
       // Create array of valid document IDs in sorted order
-      List<Integer> sortedValidDocIdsList = new ArrayList<>();
+      _sortedValidDocIds = new int[_validDocIdsBitmap.getCardinality()];
+      int index = 0;
       for (int docId : sortedDocIds) {
         if (_validDocIdsBitmap.contains(docId)) {
-          sortedValidDocIdsList.add(docId);
+          _sortedValidDocIds[index++] = docId;
         }
       }
-      _sortedValidDocIds = sortedValidDocIdsList.stream().mapToInt(Integer::intValue).toArray();
     } else {
       // No sorted order available, use bitmap iteration order (existing behavior)
       _sortedValidDocIds = null;
     }
-    _currentDocIndex = 0;
   }
 
   /**
@@ -164,13 +160,9 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
   private boolean getNextRowFromSortedValidDocIds() {
     while (_currentDocIndex < _sortedValidDocIds.length) {
       int docId = _sortedValidDocIds[_currentDocIndex++];
-      _nextRow.clear();
-      _pinotSegmentRecordReader.getRecord(docId, _nextRow);
-      if (_deleteRecordColumn != null && BooleanUtils.toBoolean(_nextRow.getValue(_deleteRecordColumn))) {
-        continue;
+      if (processAndValidateRecord(docId)) {
+        return true;
       }
-      _nextRowReturned = false;
-      return true;
     }
     return false;
   }
@@ -181,15 +173,26 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
   private boolean getNextRowFromBitmapIterator() {
     while (_validDocIdsIterator.hasNext()) {
       int docId = _validDocIdsIterator.next();
-      _nextRow.clear();
-      _pinotSegmentRecordReader.getRecord(docId, _nextRow);
-      if (_deleteRecordColumn != null && BooleanUtils.toBoolean(_nextRow.getValue(_deleteRecordColumn))) {
-        continue;
+      if (processAndValidateRecord(docId)) {
+        return true;
       }
-      _nextRowReturned = false;
-      return true;
     }
     return false;
+  }
+
+  /**
+   * Common method to process and validate a record for the given document ID.
+   * @param docId The document ID to process
+   * @return true if the record is valid and should be returned, false if it should be skipped
+   */
+  private boolean processAndValidateRecord(int docId) {
+    _nextRow.clear();
+    _pinotSegmentRecordReader.getRecord(docId, _nextRow);
+    if (_deleteRecordColumn != null && BooleanUtils.toBoolean(_nextRow.getValue(_deleteRecordColumn))) {
+      return false; // Skip delete records
+    }
+    _nextRowReturned = false;
+    return true;
   }
 
   @Override

@@ -20,6 +20,9 @@ package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import java.util.HashMap;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.MapColumnPreIndexStatsCollector;
+import org.apache.pinot.segment.local.segment.index.map.MutableMapDataSource;
 import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
@@ -27,7 +30,10 @@ import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReader;
+import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.spi.data.readers.RecordReader;
+import org.roaringbitmap.PeekableIntIterator;
 
 
 /**
@@ -38,28 +44,22 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
   private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
   private final int _totalDocCount;
 
-  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, int[] sortedDocIds,
+  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
       StatsCollectorConfig statsCollectorConfig) {
     this(mutableSegment, sortedDocIds, statsCollectorConfig, null);
   }
 
-  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, int[] sortedDocIds,
-      StatsCollectorConfig statsCollectorConfig, RecordReader recordReader) {
+  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
+      StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader) {
     _mutableSegment = mutableSegment;
 
     // Determine if we're using compacted reader
     boolean isUsingCompactedReader = recordReader instanceof CompactedPinotSegmentRecordReader;
 
     // Determine the correct total document count based on whether compaction is being used
-    if (isUsingCompactedReader) {
-      // When using CompactedPinotSegmentRecordReader, use the valid document count
-      if (mutableSegment.getValidDocIds() != null) {
-        _totalDocCount = mutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
-      } else {
-        _totalDocCount = mutableSegment.getNumDocsIndexed();
-      }
+    if (isUsingCompactedReader && mutableSegment.getValidDocIds() != null) {
+      _totalDocCount = mutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
     } else {
-      // Use the original total document count for non-compacted readers
       _totalDocCount = mutableSegment.getNumDocsIndexed();
     }
 
@@ -70,8 +70,28 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
 
     for (String columnName : mutableSegment.getPhysicalColumnNames()) {
       DataSource dataSource = mutableSegment.getDataSource(columnName);
-
-      if (dataSource.getDictionary() != null) {
+      if (dataSource instanceof MutableMapDataSource) {
+        ForwardIndexReader reader = dataSource.getForwardIndex();
+        MapColumnPreIndexStatsCollector mapColumnPreIndexStatsCollector =
+            new MapColumnPreIndexStatsCollector(dataSource.getColumnName(), statsCollectorConfig);
+        if (useCompactedStatistics && validDocIds != null) {
+          // COMPACTED: Only process valid documents for commit-time compaction
+          PeekableIntIterator iterator = validDocIds.getMutableRoaringBitmap().toRoaringBitmap().getIntIterator();
+          ForwardIndexReaderContext readerContext = reader.createContext();
+          while (iterator.hasNext()) {
+            int docId = iterator.next();
+            mapColumnPreIndexStatsCollector.collect(reader.getMap(docId, readerContext));
+          }
+        } else {
+          int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
+          ForwardIndexReaderContext readerContext = reader.createContext();
+          for (int row = 0; row < numDocs; row++) {
+            mapColumnPreIndexStatsCollector.collect(reader.getMap(row, readerContext));
+          }
+        }
+        mapColumnPreIndexStatsCollector.seal();
+        _columnStatisticsMap.put(columnName, mapColumnPreIndexStatsCollector);
+      } else if (dataSource.getDictionary() != null) {
         // Dictionary columns
         if (useCompactedStatistics) {
           if (dataSource.getForwardIndex().isDictionaryEncoded()) {

@@ -28,6 +28,7 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
 import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
+import org.roaringbitmap.PeekableIntIterator;
 
 
 /**
@@ -62,11 +63,11 @@ public class CompactedDictEncodedColumnStatistics extends MutableColumnStatistic
     MutableForwardIndex forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
     Dictionary dictionary = dataSource.getDictionary();
 
-    // Iterate through valid document IDs
-    int[] validDocIdsArray = validDocIds.getMutableRoaringBitmap().toArray();
+    // Iterate through valid document IDs using bitmap iterator
     boolean isSingleValue = forwardIndex.isSingleValue();
-
-    for (int docId : validDocIdsArray) {
+    PeekableIntIterator iterator = validDocIds.getMutableRoaringBitmap().toRoaringBitmap().getIntIterator();
+    while (iterator.hasNext()) {
+      int docId = iterator.next();
       if (isSingleValue) {
         // Single-value column: use getDictId()
         int dictId = forwardIndex.getDictId(docId);
@@ -96,23 +97,25 @@ public class CompactedDictEncodedColumnStatistics extends MutableColumnStatistic
     // Create compacted unique values array with only used dictionary values
     Object originalValues = dictionary.getSortedValues();
 
-    // Extract the used values and sort them by value (not by dictionary ID)
-    List<ValueWithOriginalId<Comparable<Object>>> usedValuesWithIds = new ArrayList<>();
+    /* Extract the used values and sort them by value (not by dictionary ID).
+    Note: We cannot simply iterate getSortedValues() and filter by _usedDictIds because that would require calling
+    dictionary.indexOf() for each value, resulting in O(n²) complexity for mutable dictionaries. Instead, we collect
+    the used values directly using the known dictionary IDs and sort them. */
+    List<Comparable<Object>> usedValues = new ArrayList<>();
     for (Integer dictId : _usedDictIds) {
       Comparable<Object> value = (Comparable<Object>) dictionary.get(dictId);
-      usedValuesWithIds.add(new ValueWithOriginalId<>(value, dictId));
+      usedValues.add(value);
     }
 
     // Sort by values to ensure the compacted array is value-sorted
-    usedValuesWithIds.sort(Comparator.comparing(a -> a._value));
+    usedValues.sort(Comparator.naturalOrder());
 
     // Create a compacted array containing only the used dictionary values in sorted order by value
     Class<?> componentType = originalValues.getClass().getComponentType();
     Object compacted = Array.newInstance(componentType, _compactedCardinality);
 
     for (int i = 0; i < _compactedCardinality; i++) {
-      ValueWithOriginalId<Comparable<Object>> entry = usedValuesWithIds.get(i);
-      Array.set(compacted, i, entry._value);
+      Array.set(compacted, i, usedValues.get(i));
     }
     _compactedUniqueValues = compacted;
   }
@@ -145,19 +148,6 @@ public class CompactedDictEncodedColumnStatistics extends MutableColumnStatistic
   @Override
   public Object getMaxValue() {
     return _maxValue;
-  }
-
-  /**
-   * Wrapper class to hold a value with its original dictionary ID for type-safe sorting.
-   */
-  class ValueWithOriginalId<T extends Comparable<? super T>> {
-    final T _value;
-    final int _originalId;
-
-    ValueWithOriginalId(T value, int originalId) {
-      _value = value;
-      _originalId = originalId;
-    }
   }
 
   private void updateMinMaxValue(Object value) {

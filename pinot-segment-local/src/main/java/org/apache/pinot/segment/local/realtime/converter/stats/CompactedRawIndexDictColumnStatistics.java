@@ -31,8 +31,7 @@ import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.utils.ByteArray;
-
-
+import org.roaringbitmap.PeekableIntIterator;
 
 
 /**
@@ -58,16 +57,16 @@ public class CompactedRawIndexDictColumnStatistics extends MutableColumnStatisti
       ThreadSafeMutableRoaringBitmap validDocIds) {
     super(dataSource, sortedDocIds);
 
-    String columnName = dataSource.getDataSourceMetadata().getFieldSpec().getName();
     Dictionary dictionary = dataSource.getDictionary();
     MutableForwardIndex forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
 
     // Since forward index is not dictionary-encoded, we need to read raw values and map them to dictionary IDs
     _usedDictIds = new HashSet<>();
-    int[] validDocIdsArray = validDocIds.getMutableRoaringBitmap().toArray();
 
-    // Read raw values from valid documents and find corresponding dictionary IDs
-    for (int docId : validDocIdsArray) {
+    // Read raw values from valid documents and find corresponding dictionary IDs using iterator
+    PeekableIntIterator iterator = validDocIds.getMutableRoaringBitmap().toRoaringBitmap().getIntIterator();
+    while (iterator.hasNext()) {
+      int docId = iterator.next();
       Object rawValue = getRawValue(forwardIndex, docId);
       if (rawValue != null) {
         // Find the dictionary ID for this raw value using type-specific lookup
@@ -84,17 +83,17 @@ public class CompactedRawIndexDictColumnStatistics extends MutableColumnStatisti
     Object originalValues = dictionary.getSortedValues();
     Class<?> componentType = originalValues.getClass().getComponentType();
     // The cast is safe because dictionary values are always Comparable
-    List<ValueWithOriginalId<Comparable<Object>>> usedValuesWithIds = new ArrayList<>();
+    List<Comparable<Object>> usedValues = new ArrayList<>();
     for (Integer dictId : _usedDictIds) {
       Comparable<Object> value = (Comparable<Object>) dictionary.get(dictId);
-      usedValuesWithIds.add(new ValueWithOriginalId<>(value, dictId));
+      usedValues.add(value);
     }
     // Sort by values to ensure the compacted array is value-sorted
-    usedValuesWithIds.sort(Comparator.comparing(a -> a._value));
+    usedValues.sort(Comparator.naturalOrder());
     // Create a compacted array containing only the used dictionary values in sorted order by value
     Object compacted = Array.newInstance(componentType, _compactedCardinality);
     for (int i = 0; i < _compactedCardinality; i++) {
-      Array.set(compacted, i, usedValuesWithIds.get(i)._value);
+      Array.set(compacted, i, usedValues.get(i));
     }
     _compactedUniqueValues = compacted;
   }
@@ -149,18 +148,5 @@ public class CompactedRawIndexDictColumnStatistics extends MutableColumnStatisti
   @Override
   public Object getUniqueValuesSet() {
     return _compactedUniqueValues;
-  }
-
-  /**
-   * Wrapper class to hold a value with its original dictionary ID for type-safe sorting.
-   */
-  class ValueWithOriginalId<T extends Comparable<? super T>> {
-    final T _value;
-    final int _originalId;
-
-    ValueWithOriginalId(T value, int originalId) {
-      _value = value;
-      _originalId = originalId;
-    }
   }
 }
