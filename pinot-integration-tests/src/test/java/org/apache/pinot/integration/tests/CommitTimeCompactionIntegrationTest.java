@@ -134,8 +134,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Verify initial state - both tables should show the same upserted data count (3 unique records)
     long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
     long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long initialPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long initialPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
 
     assertEquals(initialLogicalCountCompacted, 3, "Compacted table should have 3 logical records initially");
     assertEquals(initialLogicalCountNormal, 3, "Normal table should have 3 logical records initially");
@@ -156,8 +154,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Verify state before commit - both tables should still show the same logical result (3 unique records)
     long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
     long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long preCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long preCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
 
     assertEquals(preCommitLogicalCountCompacted, 3, "Both tables should show 3 logical records before commit");
     assertEquals(preCommitLogicalCountNormal, 3, "Both tables should show 3 logical records before commit");
@@ -512,8 +508,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Verify initial state - both tables should show same logical record count (3 unique players after upserts)
     long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
     long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long initialPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long initialPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
 
     // Verify logical counts match initially
     assertEquals(initialLogicalCountCompacted, 3, "Compacted table should show 3 logical records initially");
@@ -686,8 +680,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Verify state before commit - both tables should still show the same logical result (3 unique records)
     long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
     long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long preCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long preCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
 
     assertEquals(preCommitLogicalCountCompacted, 3, "Both tables should show 3 logical records before commit");
     assertEquals(preCommitLogicalCountNormal, 3, "Both tables should show 3 logical records before commit");
@@ -913,8 +905,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Verify initial state - both tables should show correct logical record count
     long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
     long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long initialPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long initialPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
 
     // Verify logical counts are identical initially
     assertEquals(initialLogicalCountCompacted, 3, "Compacted table should show 3 logical records initially");
