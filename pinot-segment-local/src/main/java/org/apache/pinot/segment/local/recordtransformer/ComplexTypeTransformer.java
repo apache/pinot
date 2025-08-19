@@ -189,7 +189,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   public void withInputColumnsForDownstreamTransformers(Set<String> columns) {
     // The input columns passed in from the downstream transformers have their name in the context of names after
     // prefix-renaming, while the fields to unnest are before prefix-renaming.
-      _fieldsToUnnestAndKeepOriginalValue.removeIf(field -> !columns.contains(renamePrefix(field)));
+    _fieldsToUnnestAndKeepOriginalValue.removeIf(field -> !columns.contains(renamePrefix(field)));
   }
 
   @Override
@@ -213,12 +213,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
           for (String field : _fieldsToUnnest) {
             unnestedRecords = unnestCollection(unnestedRecords, field);
           }
-          unnestedRecords.forEach(unnestedRecord -> {
-            Map<String, Object> values = unnestedRecord.getFieldToValueMap();
-            for (Map.Entry<String, Object> entry : originalValues.entrySet()) {
-              values.putIfAbsent(entry.getKey(), entry.getValue());
-            }
-          });
+          if (!_fieldsToUnnestAndKeepOriginalValue.isEmpty()) {
+            unnestedRecords.forEach(unnestedRecord -> {
+              Map<String, Object> values = unnestedRecord.getFieldToValueMap();
+              for (Map.Entry<String, Object> entry : originalValues.entrySet()) {
+                values.putIfAbsent(entry.getKey(), entry.getValue());
+              }
+            });
+          }
           if (record.isIncomplete()) {
             unnestedRecords.forEach(GenericRow::markIncomplete);
           }
@@ -288,6 +290,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   private GenericRow flattenCollectionItem(GenericRow record, Object obj, String column) {
+    // TODO: During the unnesting, there are columns added to the record which are not needed in downstream
+    //  transformers. We should avoid adding those columns to the record to save memory. All columns needed in
+    //  downstream are passed in through the `withInputColumnsForDownstreamTransformers` method.
     GenericRow copy = record.copy();
     if (obj instanceof Map) {
       Map<String, Object> map = (Map<String, Object>) obj;
@@ -307,6 +312,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
    */
   @VisibleForTesting
   protected void flattenMap(GenericRow record, List<String> columns) {
+    // TODO: During the flattening, there are columns added to the record which are not needed in downstream
+    //  transformers. We should avoid adding those columns to the record to save memory. All columns needed in
+    //  downstream are passed in through the `withInputColumnsForDownstreamTransformers` method.
     for (String column : columns) {
       Object value = record.getValue(column);
       if (value instanceof Map) {
