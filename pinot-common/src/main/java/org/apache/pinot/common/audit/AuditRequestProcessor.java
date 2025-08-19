@@ -50,8 +50,6 @@ public class AuditRequestProcessor {
   // HTTP Headers
   private static final String HEADER_X_FORWARDED_FOR = "X-Forwarded-For";
   private static final String HEADER_X_REAL_IP = "X-Real-IP";
-  private static final String HEADER_X_SERVICE_ID = "X-Service-ID";
-  private static final String HEADER_X_SERVICE_NAME = "X-Service-Name";
 
   @Inject
   private AuditConfigManager _configManager;
