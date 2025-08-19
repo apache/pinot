@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.upsert;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -79,11 +78,11 @@ public class PartialUpsertHandlerTest {
   @Test
   public void testCustomPartialUpsertMergerWithNonNullResult() {
     GenericRow newRecord = initGenericRow(new GenericRow(),
-        ImmutableMap.of("pk", "pk1", "field1", 3L, "field2", "inc", "hoursSinceEpoch", 2L));
+        Map.of("pk", "pk1", "field1", 3L, "field2", "inc", "hoursSinceEpoch", 2L));
     LazyRow prevRecord = mock(LazyRow.class);
-    mockLazyRow(prevRecord, ImmutableMap.of("pk", "pk1", "field1", 5L, "field2", "set", "hoursSinceEpoch", 2L));
+    mockLazyRow(prevRecord, Map.of("pk", "pk1", "field1", 5L, "field2", "set", "hoursSinceEpoch", 2L));
     GenericRow expectedRecord = initGenericRow(new GenericRow(),
-        ImmutableMap.of("pk", "pk1", "field1", 8L, "field2", "inc", "hoursSinceEpoch", 2L));
+        Map.of("pk", "pk1", "field1", 8L, "field2", "inc", "hoursSinceEpoch", 2L));
 
     testCustomMerge(prevRecord, newRecord, expectedRecord, getCustomMerger());
   }

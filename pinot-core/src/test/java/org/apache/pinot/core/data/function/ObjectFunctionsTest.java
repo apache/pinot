@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.function;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
@@ -50,43 +49,43 @@ public class ObjectFunctionsTest {
     GenericRow nullRows = new GenericRow();
     nullRows.putValue("null0", null);
     nullRows.putValue("null1", null);
-    inputs.add(new Object[]{"isDistinctFrom(null0,null1)", Lists.newArrayList("null0", "null1"), nullRows, false});
-    inputs.add(new Object[]{"isNotDistinctFrom(null0,null1)", Lists.newArrayList("null0", "null1"), nullRows, true});
+    inputs.add(new Object[]{"isDistinctFrom(null0,null1)", List.of("null0", "null1"), nullRows, false});
+    inputs.add(new Object[]{"isNotDistinctFrom(null0,null1)", List.of("null0", "null1"), nullRows, true});
 
     // Left null
     GenericRow leftNull = new GenericRow();
     leftNull.putValue("null0", null);
     leftNull.putValue("value", 1);
-    inputs.add(new Object[]{"isDistinctFrom(null0,value)", Lists.newArrayList("null0", "value"), leftNull, true});
-    inputs.add(new Object[]{"isNotDistinctFrom(null0,value)", Lists.newArrayList("null0", "value"), leftNull, false});
+    inputs.add(new Object[]{"isDistinctFrom(null0,value)", List.of("null0", "value"), leftNull, true});
+    inputs.add(new Object[]{"isNotDistinctFrom(null0,value)", List.of("null0", "value"), leftNull, false});
 
     // Right null
     GenericRow rightNull = new GenericRow();
     rightNull.putValue("value", 1);
     rightNull.putValue("null0", null);
-    inputs.add(new Object[]{"isDistinctFrom(value,null0)", Lists.newArrayList("value", "null0"), rightNull, true});
-    inputs.add(new Object[]{"isNotDistinctFrom(value,null0)", Lists.newArrayList("value", "null0"), rightNull, false});
+    inputs.add(new Object[]{"isDistinctFrom(value,null0)", List.of("value", "null0"), rightNull, true});
+    inputs.add(new Object[]{"isNotDistinctFrom(value,null0)", List.of("value", "null0"), rightNull, false});
 
     // Both not null and not equal
     GenericRow notEqual = new GenericRow();
     notEqual.putValue("value1", 1);
     notEqual.putValue("value2", 2);
-    inputs.add(new Object[]{"isDistinctFrom(value1,value2)", Lists.newArrayList("value1", "value2"), notEqual, true});
+    inputs.add(new Object[]{"isDistinctFrom(value1,value2)", List.of("value1", "value2"), notEqual, true});
     inputs.add(
-        new Object[]{"isNotDistinctFrom(value1,value2)", Lists.newArrayList("value1", "value2"), notEqual, false});
+        new Object[]{"isNotDistinctFrom(value1,value2)", List.of("value1", "value2"), notEqual, false});
 
     // Both not null and equal
     GenericRow equal = new GenericRow();
     equal.putValue("value1", 1);
     equal.putValue("value2", 1);
-    inputs.add(new Object[]{"isDistinctFrom(value1,value2)", Lists.newArrayList("value1", "value2"), equal, false});
-    inputs.add(new Object[]{"isNotDistinctFrom(value1,value2)", Lists.newArrayList("value1", "value2"), equal, true});
+    inputs.add(new Object[]{"isDistinctFrom(value1,value2)", List.of("value1", "value2"), equal, false});
+    inputs.add(new Object[]{"isNotDistinctFrom(value1,value2)", List.of("value1", "value2"), equal, true});
 
     // all nulls
     GenericRow nullRows2 = new GenericRow();
     nullRows2.putValue("null0", null);
     nullRows2.putValue("null1", null);
-    inputs.add(new Object[]{"coalesce(null0,null1)", Lists.newArrayList("null0", "null1"), nullRows, null});
+    inputs.add(new Object[]{"coalesce(null0,null1)", List.of("null0", "null1"), nullRows, null});
 
     // one not null
     GenericRow oneValue = new GenericRow();
@@ -97,7 +96,7 @@ public class ObjectFunctionsTest {
     oneValue.putValue("value2", null);
 
     inputs.add(new Object[]{
-        "coalesce(null0, null1, null2, value1, value2)", Lists.newArrayList("null0", "null1", "null2", "value1",
+        "coalesce(null0, null1, null2, value1, value2)", List.of("null0", "null1", "null2", "value1",
         "value2"), oneValue, 1
     });
 
@@ -110,7 +109,7 @@ public class ObjectFunctionsTest {
     allValues.putValue("value5", 5);
 
     inputs.add(new Object[]{
-        "coalesce(value1,value2,value3,value4,value5)", Lists.newArrayList("value1", "value2", "value3", "value4",
+        "coalesce(value1,value2,value3,value4,value5)", List.of("value1", "value2", "value3", "value4",
         "value5"), allValues, "1"
     });
 
@@ -118,21 +117,21 @@ public class ObjectFunctionsTest {
     GenericRow caseWhenCaseValueOne = new GenericRow();
     caseWhenCaseValueOne.putValue("value1", 1);
     inputs.add(new Object[]{
-        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", Lists.newArrayList("value1",
+        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", List.of("value1",
         "value1"), caseWhenCaseValueOne, "one"
     });
 
     GenericRow caseWhenCaseValueTwo = new GenericRow();
     caseWhenCaseValueTwo.putValue("value1", 2);
     inputs.add(new Object[]{
-        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", Lists.newArrayList("value1",
+        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", List.of("value1",
         "value1"), caseWhenCaseValueTwo, "two"
     });
 
     GenericRow caseWhenCaseValueThree = new GenericRow();
     caseWhenCaseValueThree.putValue("value1", 3);
     inputs.add(new Object[]{
-        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", Lists.newArrayList("value1",
+        "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', 'other')", List.of("value1",
         "value1"), caseWhenCaseValueThree, "other"
     });
 
@@ -141,7 +140,7 @@ public class ObjectFunctionsTest {
     inputs.add(new Object[]{
         "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', value1 = 3, 'three', value1 = 4, 'four', value1 = 5, 'five', "
             + "value1 = 6, 'six', value1 = 7, 'seven', value1 = 8, 'eight', value1 = 9, 'nine', value1 = 10, 'ten', "
-            + "'other')", Lists.newArrayList("value1", "value1", "value1", "value1", "value1", "value1", "value1",
+            + "'other')", List.of("value1", "value1", "value1", "value1", "value1", "value1", "value1",
         "value1", "value1", "value1"), caseWhenCaseMultipleExpression, "ten"
     });
 
@@ -151,7 +150,7 @@ public class ObjectFunctionsTest {
         "CASEWHEN(value1 = 1, 'one', value1 = 2, 'two', value1 = 3, 'three', value1 = 4, 'four', value1 = 5, 'five', "
             + "value1 = 6, 'six', value1 = 7, 'seven', value1 = 8, 'eight', value1 = 9, 'nine', value1 = 10, 'ten', "
             + "value1 = 11, 'eleven', value1 = 12, 'twelve', value1 = 13, 'thirteen', value1 = 14, 'fourteen', value1"
-            + " = 15, 'fifteen'," + "'other')", Lists.newArrayList("value1", "value1", "value1", "value1", "value1",
+            + " = 15, 'fifteen'," + "'other')", List.of("value1", "value1", "value1", "value1", "value1",
         "value1", "value1", "value1", "value1", "value1", "value1", "value1", "value1", "value1",
         "value1"), caseWhenCaseMultipleExpression2, "fifteen"
     });
@@ -160,22 +159,22 @@ public class ObjectFunctionsTest {
     GenericRow nullIf = new GenericRow();
     nullIf.putValue("value1", 1);
     nullIf.putValue("value2", 1);
-    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf, null});
+    inputs.add(new Object[]{"NULLIF(value1, value2)", List.of("value1", "value2"), nullIf, null});
 
     GenericRow nullIf2 = new GenericRow();
     nullIf2.putValue("value1", 1);
     nullIf2.putValue("value2", 2);
-    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf2, 1});
+    inputs.add(new Object[]{"NULLIF(value1, value2)", List.of("value1", "value2"), nullIf2, 1});
 
     GenericRow nullIf3 = new GenericRow();
     nullIf3.putValue("value1", null);
     nullIf3.putValue("value2", 2);
-    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf3, null});
+    inputs.add(new Object[]{"NULLIF(value1, value2)", List.of("value1", "value2"), nullIf3, null});
 
     GenericRow nullIf4 = new GenericRow();
     nullIf4.putValue("value1", 1);
     nullIf4.putValue("value2", null);
-    inputs.add(new Object[]{"NULLIF(value1, value2)", Lists.newArrayList("value1", "value2"), nullIf4, 1});
+    inputs.add(new Object[]{"NULLIF(value1, value2)", List.of("value1", "value2"), nullIf4, 1});
 
     return inputs.toArray(new Object[0][]);
   }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -148,7 +147,7 @@ public class DynamicBrokerSelectorTest {
 
   @Test
   public void testGetBrokers() {
-    assertEquals(_dynamicBrokerSelectorUnderTest.getBrokers(), ImmutableList.of("broker1"));
+    assertEquals(_dynamicBrokerSelectorUnderTest.getBrokers(), List.of("broker1"));
   }
 
   @Test

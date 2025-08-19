@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.memory;
 
-import com.google.common.collect.Lists;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -38,7 +37,7 @@ import java.util.List;
 public class ByteBufferUtil {
 
   private static final ByteBufferCreator CREATOR;
-  private static final List<CreatorSupplier> _SUPPLIERS = Lists.newArrayList(
+  private static final List<CreatorSupplier> _SUPPLIERS = List.of(
       // From Java 21
       () -> {
         Class<?> memorySegmentProxyClass = Class.forName("java.lang.foreign.MemorySegment");

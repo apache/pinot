@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.function;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.segment.local.function.InbuiltFunctionEvaluator;
@@ -53,11 +52,11 @@ public class LogicalFunctionsTest {
 
     GenericRow row0 = new GenericRow();
     row0.putValue("a", true);
-    inputs.add(new Object[]{"not a", Lists.newArrayList("a"), row0, false});
+    inputs.add(new Object[]{"not a", List.of("a"), row0, false});
 
     GenericRow row1 = new GenericRow();
     row1.putValue("b", false);
-    inputs.add(new Object[]{"not b", Lists.newArrayList("b"), row1, true});
+    inputs.add(new Object[]{"not b", List.of("b"), row1, true});
 
     return inputs.toArray(new Object[0][]);
   }

@@ -21,7 +21,6 @@ package org.apache.pinot.tools.streams;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableList;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -133,7 +132,7 @@ public class RsvpSourceGenerator implements PinotSourceDataGenerator {
         key = null;
         break;
     }
-    return ImmutableList.of(new StreamDataProducer.RowWithKey(key, msg.getPayload().toString().getBytes(UTF_8)));
+    return List.of(new StreamDataProducer.RowWithKey(key, msg.getPayload().toString().getBytes(UTF_8)));
   }
 
   @Override

@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -141,7 +140,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     if (currentNodeExchange != null) {
       // Update current node with its distribution, and update currentNodeExchange to point to the new current node.
       currentNode = currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
-      currentNodeExchange = currentNodeExchange.with(ImmutableList.of(currentNode),
+      currentNodeExchange = currentNodeExchange.with(List.of(currentNode),
           currentNodeExchange.getPinotDataDistributionOrThrow());
       return currentNodeExchange;
     }

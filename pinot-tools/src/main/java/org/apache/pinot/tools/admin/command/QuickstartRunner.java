@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.admin.command;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -276,7 +275,7 @@ public class QuickstartRunner {
 
   public static void registerDefaultPinotFS() {
     registerPinotFS("s3", "org.apache.pinot.plugin.filesystem.S3PinotFS",
-        ImmutableMap.of("region", System.getProperty("AWS_REGION", "us-west-2")));
+        Map.of("region", System.getProperty("AWS_REGION", "us-west-2")));
   }
 
   public static void registerPinotFS(String scheme, String fsClassName, Map<String, Object> configs) {

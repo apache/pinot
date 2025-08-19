@@ -19,7 +19,6 @@
 package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -237,7 +236,7 @@ public class TableConfigSerDeUtilsTest {
       properties.put("foo", "bar");
       properties.put("foobar", "potato");
       List<FieldConfig> fieldConfigList = Arrays.asList(new FieldConfig("column1", FieldConfig.EncodingType.DICTIONARY,
-              Lists.newArrayList(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, properties),
+              List.of(FieldConfig.IndexType.INVERTED, FieldConfig.IndexType.RANGE), null, properties),
           new FieldConfig("column2", null, Collections.emptyList(), null, null),
           new FieldConfig("column3", FieldConfig.EncodingType.RAW, Collections.emptyList(),
               FieldConfig.CompressionCodec.SNAPPY, null));
@@ -327,12 +326,12 @@ public class TableConfigSerDeUtilsTest {
     }
     {
       // With tier config
-      List<TierConfig> tierConfigList = Lists.newArrayList(
+      List<TierConfig> tierConfigList = List.of(
           new TierConfig("tierA", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "10d", null,
               TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierA_tag_OFFLINE", null, null),
           new TierConfig("tierB", TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "30d", null,
               TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null),
-          new TierConfig("tier0", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, Lists.newArrayList("seg0"),
+          new TierConfig("tier0", TierFactory.FIXED_SEGMENT_SELECTOR_TYPE, null, List.of("seg0"),
               TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierB_tag_OFFLINE", null, null));
       TableConfig tableConfig = tableConfigBuilder.setTierConfigList(tierConfigList).build();
 
@@ -353,7 +352,7 @@ public class TableConfigSerDeUtilsTest {
       Map<String, String> props = new HashMap<>();
       props.put("key", "value");
       TunerConfig tunerConfig = new TunerConfig(name, props);
-      TableConfig tableConfig = tableConfigBuilder.setTunerConfigList(Lists.newArrayList(tunerConfig)).build();
+      TableConfig tableConfig = tableConfigBuilder.setTunerConfigList(List.of(tunerConfig)).build();
 
       // Serialize then de-serialize
       TableConfig tableConfigToCompare = JsonUtils.stringToObject(tableConfig.toJsonString(), TableConfig.class);
@@ -510,7 +509,7 @@ public class TableConfigSerDeUtilsTest {
     assertEquals(tierConfigsList.get(2).getName(), "tier0");
     assertEquals(tierConfigsList.get(2).getSegmentSelectorType(), TierFactory.FIXED_SEGMENT_SELECTOR_TYPE);
     assertNull(tierConfigsList.get(2).getSegmentAge());
-    assertEquals(tierConfigsList.get(2).getSegmentList(), Lists.newArrayList("seg0"));
+    assertEquals(tierConfigsList.get(2).getSegmentList(), List.of("seg0"));
     assertEquals(tierConfigsList.get(2).getStorageType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);
     assertEquals(tierConfigsList.get(2).getServerTag(), "tierB_tag_OFFLINE");
   }

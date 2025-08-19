@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.physical.v2.opt.rules;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -175,7 +174,7 @@ public class AggregatePushdownRule extends PRelOptRule {
       int numArguments = argList.size();
       List<RexNode> rexList;
       if (numArguments <= 1) {
-        rexList = ImmutableList.of(inputRef);
+        rexList = List.of(inputRef);
       } else {
         rexList = new ArrayList<>(numArguments);
         rexList.add(inputRef);
@@ -216,9 +215,9 @@ public class AggregatePushdownRule extends PRelOptRule {
       int numArguments = argList.size();
       List<RexNode> rexList;
       if (numArguments == 0) {
-        rexList = ImmutableList.of();
+        rexList = List.of();
       } else if (numArguments == 1) {
-        rexList = ImmutableList.of(RexInputRef.of(argList.get(0), input.getRowType()));
+        rexList = List.of(RexInputRef.of(argList.get(0), input.getRowType()));
       } else {
         rexList = new ArrayList<>(numArguments);
         rexList.add(RexInputRef.of(argList.get(0), input.getRowType()));
@@ -273,7 +272,7 @@ public class AggregatePushdownRule extends PRelOptRule {
     SqlAggFunction sqlAggFunction =
         new PinotSqlAggFunction(functionName, kind, returnTypeInference, operandTypeChecker, functionCategory);
     return AggregateCall.create(sqlAggFunction, false, orgAggCall.isApproximate(), orgAggCall.ignoreNulls(), rexList,
-        ImmutableList.of(), aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg, orgAggCall.distinctKeys,
+        List.of(), aggType.isInputIntermediateFormat() ? -1 : orgAggCall.filterArg, orgAggCall.distinctKeys,
         orgAggCall.collation, numGroups, input, returnType, null);
   }
 

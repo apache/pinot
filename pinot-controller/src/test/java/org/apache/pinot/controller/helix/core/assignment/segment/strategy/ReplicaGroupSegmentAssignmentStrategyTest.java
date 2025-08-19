@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -358,8 +357,8 @@ public class ReplicaGroupSegmentAssignmentStrategyTest {
     String instance1 = INSTANCE_NAME_PREFIX + "1";
     String instance2 = INSTANCE_NAME_PREFIX + "2";
     Map<String, Map<String, String>> unbalancedAssignment = new TreeMap<>();
-    SEGMENTS.forEach(segName -> unbalancedAssignment.put(segName, ImmutableMap
-        .of(instance0, SegmentStateModel.ONLINE, instance1, SegmentStateModel.ONLINE, instance2,
+    SEGMENTS.forEach(segName -> unbalancedAssignment.put(segName,
+        Map.of(instance0, SegmentStateModel.ONLINE, instance1, SegmentStateModel.ONLINE, instance2,
             SegmentStateModel.ONLINE)));
     Map<String, Map<String, String>> balancedAssignment =
         _segmentAssignmentWithPartition.rebalanceTable(unbalancedAssignment, _instancePartitionsMapWithoutPartition,

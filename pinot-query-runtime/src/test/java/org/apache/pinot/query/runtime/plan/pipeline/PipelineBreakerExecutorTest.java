@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
@@ -71,11 +69,11 @@ public class PipelineBreakerExecutorTest {
   private final ExecutorService _executor = Executors.newCachedThreadPool();
   private final OpChainSchedulerService _scheduler = new OpChainSchedulerService(_executor);
   private final MailboxInfos _mailboxInfos =
-      new SharedMailboxInfos(new MailboxInfo("localhost", 123, ImmutableList.of(0)));
+      new SharedMailboxInfos(new MailboxInfo("localhost", 123, List.of(0)));
   private final WorkerMetadata _workerMetadata =
-      new WorkerMetadata(0, ImmutableMap.of(1, _mailboxInfos, 2, _mailboxInfos), ImmutableMap.of());
+      new WorkerMetadata(0, Map.of(1, _mailboxInfos, 2, _mailboxInfos), Map.of());
   private final StageMetadata _stageMetadata =
-      new StageMetadata(0, ImmutableList.of(_workerMetadata), ImmutableMap.of());
+      new StageMetadata(0, List.of(_workerMetadata), Map.of());
 
   private AutoCloseable _mocks;
   @Mock
@@ -133,7 +131,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+            Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should have single PB result, receive 2 data blocks, EOS block shouldn't be included
@@ -172,7 +170,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+            Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should have two PB result, receive 2 data blocks, one each, EOS block shouldn't be included
@@ -200,7 +198,7 @@ public class PipelineBreakerExecutorTest {
     // when
     PipelineBreakerResult pipelineBreakerResult =
         executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+            Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should return empty block list
@@ -228,7 +226,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, System.currentTimeMillis() + 100);
+            Map.of(), 0, System.currentTimeMillis() + 100);
 
     // then
     // should contain only failure error blocks
@@ -263,7 +261,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+            Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should pass when one PB returns result, the other returns empty.
@@ -298,7 +296,7 @@ public class PipelineBreakerExecutorTest {
 
     PipelineBreakerResult pipelineBreakerResult =
         executePipelineBreakers(_scheduler, _mailboxService, _workerMetadata, stagePlan,
-            ImmutableMap.of(), 0, Long.MAX_VALUE);
+            Map.of(), 0, Long.MAX_VALUE);
 
     // then
     // should fail even if one of the 2 PB doesn't contain error block from sender.

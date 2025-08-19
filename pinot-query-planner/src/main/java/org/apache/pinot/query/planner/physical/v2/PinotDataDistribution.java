@@ -19,7 +19,6 @@
 package org.apache.pinot.query.planner.physical.v2;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -78,7 +77,7 @@ public class PinotDataDistribution {
   }
 
   public static PinotDataDistribution singleton(String worker, @Nullable RelCollation collation) {
-    List<String> workers = ImmutableList.of(worker);
+    List<String> workers = List.of(worker);
     return new PinotDataDistribution(RelDistribution.Type.SINGLETON, workers, workers.hashCode(), null,
         collation);
   }

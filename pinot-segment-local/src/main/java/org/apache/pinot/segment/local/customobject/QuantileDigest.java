@@ -226,7 +226,7 @@ public class QuantileDigest {
    * Gets the value at the specified quantile +/- maxError. The quantile must be in the range [0, 1]
    */
   public long getQuantile(double quantile) {
-    return getQuantiles(ImmutableList.of(quantile)).get(0);
+    return getQuantiles(List.of(quantile)).get(0);
   }
 
   /**

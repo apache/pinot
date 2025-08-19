@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests.window.utils;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +50,7 @@ public class WindowFunnelUtils {
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(URL_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null),

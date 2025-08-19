@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.planner.physical.v2;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.calcite.rel.RelCollation;
@@ -39,7 +38,7 @@ public class PinotDataDistributionTest {
     {
       // Case-1: Singleton distribution with multiple workers.
       try {
-        new PinotDataDistribution(RelDistribution.Type.SINGLETON, ImmutableList.of("0@0", "1@0"), 0L, null, null);
+        new PinotDataDistribution(RelDistribution.Type.SINGLETON, List.of("0@0", "1@0"), 0L, null, null);
         fail();
       } catch (IllegalStateException ignored) {
       }
@@ -47,7 +46,7 @@ public class PinotDataDistributionTest {
     {
       // Case-2: Hash distribution with empty hash distribution desc.
       try {
-        new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED, ImmutableList.of("0@0"), 0L,
+        new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED, List.of("0@0"), 0L,
             Collections.emptySet(), null);
         fail();
       } catch (IllegalStateException ignored) {
@@ -65,13 +64,13 @@ public class PinotDataDistributionTest {
     {
       // Case-2: Singleton constraint / Non-singleton actual distribution.
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.BROADCAST_DISTRIBUTED,
-          ImmutableList.of("0@0", "1@0"), 0L, null, null);
+          List.of("0@0", "1@0"), 0L, null, null);
       assertFalse(distribution.satisfies(RelDistributions.SINGLETON));
     }
     {
       // Case-3: Broadcast constraint / Broadcast distribution across multiple workers.
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.BROADCAST_DISTRIBUTED,
-          ImmutableList.of("0@0", "1@0"), 0L, null, null);
+          List.of("0@0", "1@0"), 0L, null, null);
       assertTrue(distribution.satisfies(RelDistributions.BROADCAST_DISTRIBUTED));
     }
     {
@@ -82,36 +81,36 @@ public class PinotDataDistributionTest {
     {
       // Case-5: Any constraint / Any distribution
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.ANY,
-          ImmutableList.of("0@0", "1@0"), 0L, null, null);
+          List.of("0@0", "1@0"), 0L, null, null);
       assertTrue(distribution.satisfies(RelDistributions.ANY));
     }
     {
       // Case-6: Any constraint / Non-any distribution
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.BROADCAST_DISTRIBUTED,
-          ImmutableList.of("0@0", "1@0"), 0L, null, null);
+          List.of("0@0", "1@0"), 0L, null, null);
       assertTrue(distribution.satisfies(RelDistributions.ANY));
     }
     {
       // Case-7: Hash constraint / Hash distribution
-      final List<Integer> keys = ImmutableList.of(1, 3);
+      final List<Integer> keys = List.of(1, 3);
       final int numPartitions = 8;
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
-          ImmutableList.of("0@0", "1@0"), 0L, Collections.singleton(
+          List.of("0@0", "1@0"), 0L, Collections.singleton(
               new HashDistributionDesc(keys,
                   DistHashFunction.valueOf(MURMUR_HASH_FUNCTION.toUpperCase()), numPartitions)), null);
       assertTrue(distribution.satisfies(RelDistributions.hash(keys)));
     }
     {
       // Case-8: Hash constraint / Non-hash distribution across multiple workers
-      final List<Integer> keys = ImmutableList.of(1, 3);
+      final List<Integer> keys = List.of(1, 3);
       final int numPartitions = 8;
       PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.BROADCAST_DISTRIBUTED,
-          ImmutableList.of("0@0", "1@0"), 0L, null, null);
+          List.of("0@0", "1@0"), 0L, null, null);
       assertFalse(distribution.satisfies(RelDistributions.hash(keys)));
     }
     {
       // Case-9: Hash constraint / Non-hash distribution but single worker
-      final List<Integer> keys = ImmutableList.of(1, 3);
+      final List<Integer> keys = List.of(1, 3);
       PinotDataDistribution distribution = PinotDataDistribution.singleton("0@0", null);
       assertTrue(distribution.satisfies(RelDistributions.hash(keys)));
     }
@@ -120,16 +119,16 @@ public class PinotDataDistributionTest {
   @Test
   public void testSatisfiesHashDistributionDesc() {
     PinotDataDistribution distribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
-        ImmutableList.of("0@0", "1@0"), 0L, Collections.singleton(
-            new HashDistributionDesc(ImmutableList.of(1, 3),
+        List.of("0@0", "1@0"), 0L, Collections.singleton(
+            new HashDistributionDesc(List.of(1, 3),
                 DistHashFunction.valueOf(MURMUR_HASH_FUNCTION.toUpperCase()), 8)), null);
     {
       // Case-1: Hash distribution desc with different keys.
-      assertNull(distribution.satisfiesHashDistributionDesc(ImmutableList.of(1, 2)));
+      assertNull(distribution.satisfiesHashDistributionDesc(List.of(1, 2)));
     }
     {
       // Case-2: Hash distribution desc with same keys, hash function and number of partitions.
-      assertNotNull(distribution.satisfiesHashDistributionDesc(ImmutableList.of(1, 3)));
+      assertNotNull(distribution.satisfiesHashDistributionDesc(List.of(1, 3)));
     }
   }
 

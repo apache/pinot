@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests.custom;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Base64;
@@ -93,7 +92,7 @@ public class BytesTypeTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(HEX_STR, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING),
             null, null),
         new org.apache.avro.Schema.Field(HEX_BYTES, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BYTES),

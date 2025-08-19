@@ -18,9 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance;
 
-import com.google.common.collect.Lists;
 import it.unimi.dsi.fastutil.ints.IntIntPair;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1517,9 +1515,9 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
 
     // add tier config
-    ArrayList<String> fixedTierSegments =
-        Lists.newArrayList(SEGMENT_NAME_PREFIX + 6, SEGMENT_NAME_PREFIX + 3, SEGMENT_NAME_PREFIX + 1);
-    tableConfig.setTierConfigsList(Lists.newArrayList(
+    List<String> fixedTierSegments =
+        List.of(SEGMENT_NAME_PREFIX + 6, SEGMENT_NAME_PREFIX + 3, SEGMENT_NAME_PREFIX + 1);
+    tableConfig.setTierConfigsList(List.of(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "7d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, TIER_A_NAME + "_OFFLINE", null, null),
         new TierConfig(TIER_B_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "15d", null,
@@ -1697,7 +1695,7 @@ public class TableRebalancerClusterStatelessTest extends ControllerTest {
     assertEquals(rebalanceResult.getSegmentAssignment(), oldSegmentAssignment);
 
     // add tier config
-    tableConfig.setTierConfigsList(Lists.newArrayList(
+    tableConfig.setTierConfigsList(List.of(
         new TierConfig(TIER_A_NAME, TierFactory.TIME_SEGMENT_SELECTOR_TYPE, "0d", null,
             TierFactory.PINOT_SERVER_STORAGE_TYPE, "replicaAssignment" + TIER_A_NAME + "_OFFLINE", null, null)));
     _helixResourceManager.updateTableConfig(tableConfig);

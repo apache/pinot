@@ -19,9 +19,9 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.List;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 import static org.testng.Assert.*;
 
@@ -102,8 +102,8 @@ public class JsonIndexConfigTest {
     assertFalse(config.isDisabled(), "Unexpected disabled");
     assertTrue(config.isExcludeArray(), "Unexpected excludeArray");
     assertTrue(config.isDisableCrossArrayUnnest(), "Unexpected disableCrossArrayUnnest");
-    assertEquals(config.getIncludePaths(), Lists.newArrayList("a"), "Unexpected includePaths");
-    assertEquals(config.getExcludePaths(), Lists.newArrayList("b"), "Unexpected excludePaths");
-    assertEquals(config.getExcludeFields(), Lists.newArrayList("c"), "Unexpected excludeFields");
+    assertEquals(config.getIncludePaths(), List.of("a"), "Unexpected includePaths");
+    assertEquals(config.getExcludePaths(), List.of("b"), "Unexpected excludePaths");
+    assertEquals(config.getExcludeFields(), List.of("c"), "Unexpected excludeFields");
   }
 }

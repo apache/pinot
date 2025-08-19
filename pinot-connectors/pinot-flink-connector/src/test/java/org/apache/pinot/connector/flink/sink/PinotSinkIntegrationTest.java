@@ -19,7 +19,6 @@
 package org.apache.pinot.connector.flink.sink;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
@@ -89,7 +88,7 @@ public class PinotSinkIntegrationTest extends BaseClusterIntegrationTest {
     _schema =
         new Schema.SchemaBuilder().setSchemaName(RAW_TABLE_NAME).addSingleValueDimension("a", FieldSpec.DataType.INT)
             .addSingleValueDimension("b", FieldSpec.DataType.LONG)
-            .addSingleValueDimension("c", FieldSpec.DataType.STRING).setPrimaryKeyColumns(Lists.newArrayList("a"))
+            .addSingleValueDimension("c", FieldSpec.DataType.STRING).setPrimaryKeyColumns(List.of("a"))
             .build();
 
     addSchema(_schema);

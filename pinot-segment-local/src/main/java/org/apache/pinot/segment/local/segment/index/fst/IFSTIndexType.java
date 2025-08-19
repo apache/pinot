@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index.fst;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +54,7 @@ import org.apache.pinot.spi.data.Schema;
 public class IFSTIndexType extends AbstractIndexType<FstIndexConfig, TextIndexReader, FSTIndexCreator> {
   public static final String INDEX_DISPLAY_NAME = "ifst";
   private static final List<String> EXTENSIONS =
-      ImmutableList.of(V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION);
+      List.of(V1Constants.Indexes.LUCENE_V912_IFST_INDEX_FILE_EXTENSION);
 
   protected IFSTIndexType() {
     super(StandardIndexes.IFST_ID);

@@ -58,6 +58,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+
 public class PinotWindowSplitRuleTest {
   private static final TypeFactory TYPE_FACTORY = new TypeFactory();
   private static final RexBuilder REX_BUILDER = new RexBuilder(TYPE_FACTORY);
@@ -286,9 +287,9 @@ public class PinotWindowSplitRuleTest {
     for (int i = 0; i < groups.size(); i++) {
       final int aggIdx = i;
       windowFields.add(new RelDataTypeFieldImpl(
-        "agg_field" + aggIdx,
-        inputFields.size() + aggIdx,
-        intType
+          "agg_field" + aggIdx,
+          inputFields.size() + aggIdx,
+          intType
       ));
     }
     RelDataType windowRowType = TYPE_FACTORY.createStructType(windowFields);
@@ -301,9 +302,9 @@ public class PinotWindowSplitRuleTest {
     List<RelDataTypeField> fields = new ArrayList<>();
     for (int i = 0; i < count; i++) {
       fields.add(new RelDataTypeFieldImpl(
-        "field" + i,
-        i,
-        TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)
+          "field" + i,
+          i,
+          TYPE_FACTORY.createSqlType(SqlTypeName.INTEGER)
       ));
     }
     return fields;

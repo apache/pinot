@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.creator;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -53,10 +52,8 @@ public class SegmentGenerationWithFilterRecordsTest implements PinotBuffersAfter
   private static final long[] LONG_VALUES =
       {1588316400000L, 1588489200000L, 1588662000000L, 1588834800000L, 1589007600000L};
   private static final String MV_INT_COLUMN = "col3";
-  private static final ArrayList[] MV_INT_VALUES = {
-      Lists.newArrayList(1, 2, 3), Lists.newArrayList(4), Lists.newArrayList(5, 1), Lists.newArrayList(2),
-      Lists.newArrayList(3, 4, 5)
-  };
+  private static final List[] MV_INT_VALUES =
+      {List.of(1, 2, 3), List.of(4), List.of(5, 1), List.of(2), List.of(3, 4, 5)};
   private static final String SEGMENT_DIR_NAME =
       FileUtils.getTempDirectoryPath() + File.separator + "segmentFilterRecordsTest";
   private static final String SEGMENT_NAME = "testSegment";

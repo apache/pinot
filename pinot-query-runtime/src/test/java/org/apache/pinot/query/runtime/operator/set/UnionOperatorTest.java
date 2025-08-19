@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.collect.ImmutableList;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -51,7 +51,7 @@ public class UnionOperatorTest {
         .buildWithEos();
 
     UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new UnionOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     List<Object[]> resultRows = new ArrayList<>();
     MseBlock result = unionOperator.nextBlock();
@@ -81,7 +81,7 @@ public class UnionOperatorTest {
         .buildWithError(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
 
     UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new UnionOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     MseBlock result = unionOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
@@ -104,7 +104,7 @@ public class UnionOperatorTest {
         .buildWithEos();
 
     UnionOperator unionOperator =
-        new UnionOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new UnionOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     MseBlock result = unionOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block

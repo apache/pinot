@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.dedup;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.spi.config.table.DedupConfig;
@@ -51,7 +51,7 @@ public class TableDedupMetadataManagerFactoryTest {
     Schema schema = new Schema.SchemaBuilder()
         .setSchemaName("mytable")
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-        .setPrimaryKeyColumns(Lists.newArrayList("myCol"))
+        .setPrimaryKeyColumns(List.of("myCol"))
         .build();
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("mytable").setDedupConfig(dedupConfig).build();

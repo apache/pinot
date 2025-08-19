@@ -20,7 +20,6 @@ package org.apache.pinot.query.planner.logical;
 
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -241,7 +240,7 @@ public class StagesTestBase {
     default SimpleChildBuilder<P> withHints(String key, Map<String, String> values) {
       return (stageId, dataSchema, hints1) -> {
         PlanNode.NodeHint myHints = hints1 == null
-            ? new PlanNode.NodeHint(ImmutableMap.of(key, values))
+            ? new PlanNode.NodeHint(Map.of(key, values))
             : hints1.with(key, values);
         return build(stageId, dataSchema, myHints);
       };

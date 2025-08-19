@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.recordtransformer;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -361,7 +360,7 @@ public class ComplexTypeTransformerTest {
     GenericRow genericRow = new GenericRow();
     Map<String, Object> map = new HashMap<>();
     Object[] array1 = new Object[1];
-    array1[0] = ImmutableMap.of("b", "v1");
+    array1[0] = Map.of("b", "v1");
     map.put("array1", array1);
     Object[] array = new Object[1];
     array[0] = map;
@@ -440,7 +439,7 @@ public class ComplexTypeTransformerTest {
     genericRow = new GenericRow();
     map = new HashMap<>();
     array1 = new Object[1];
-    array1[0] = ImmutableMap.of("b", "v1");
+    array1[0] = Map.of("b", "v1");
     map.put("array1", array1);
     genericRow.putValue("t", map);
     transformer =

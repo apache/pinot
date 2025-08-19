@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -52,7 +50,7 @@ public class ConnectionFactoryTest {
 
       @Override
       public List<String> getBrokers() {
-        return ImmutableList.of(givenBrokerInfo);
+        return List.of(givenBrokerInfo);
       }
     });
 
@@ -64,7 +62,7 @@ public class ConnectionFactoryTest {
             pinotClientTransport);
 
     // Check that the broker list has the right length and has the same servers
-    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of(givenBrokerInfo));
+    Assert.assertEquals(connection.getBrokerList(), List.of(givenBrokerInfo));
   }
 
   @Test
@@ -77,7 +75,7 @@ public class ConnectionFactoryTest {
     Connection connection = ConnectionFactory.fromProperties(properties);
 
     // Check that the broker list has the right length and has the same servers
-    Assert.assertEquals(connection.getBrokerList(), ImmutableList.of("127.0.0.1:1234", "localhost:2345"));
+    Assert.assertEquals(connection.getBrokerList(), List.of("127.0.0.1:1234", "localhost:2345"));
   }
 
   @Test
@@ -88,16 +86,16 @@ public class ConnectionFactoryTest {
     Connection connection = ConnectionFactory.fromHostList(broker1, broker2);
 
     // Check that the broker list has the right length and has the same servers
-    List<String> brokers = ImmutableList.of(broker1, broker2);
+    List<String> brokers = List.of(broker1, broker2);
     Assert.assertEquals(connection.getBrokerList(), brokers);
   }
 
   @Test
   public void testBrokerListWithHeaders() {
     // Create the connection
-    List<String> brokers = ImmutableList.of("127.0.0.1:1234", "localhost:2345");
+    List<String> brokers = List.of("127.0.0.1:1234", "localhost:2345");
 
-    Map<String, String> headers = ImmutableMap.of("Caller", "curl");
+    Map<String, String> headers = Map.of("Caller", "curl");
 
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     factory.setHeaders(headers);

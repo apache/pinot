@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
-import com.google.common.collect.ImmutableList;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +40,7 @@ public class TimeSeriesExchangeReceiveOperatorTest {
   private static final int NUM_SERVERS_QUERIED = 3;
   private static final AggInfo SUM_AGG_INFO = new AggInfo("SUM", false, Collections.emptyMap());
   private static final TimeBuckets TIME_BUCKETS = TimeBuckets.ofSeconds(1000, Duration.ofSeconds(200), 4);
-  private static final List<String> TAG_NAMES = ImmutableList.of("city", "zip");
+  private static final List<String> TAG_NAMES = List.of("city", "zip");
   private static final Object[] CHICAGO_SERIES_VALUES = new Object[]{"Chicago", "60605"};
   private static final Object[] SF_SERIES_VALUES = new Object[]{"San Francisco", "94107"};
   private static final Long CHICAGO_SERIES_HASH = TimeSeries.hash(CHICAGO_SERIES_VALUES);
@@ -128,13 +127,13 @@ public class TimeSeriesExchangeReceiveOperatorTest {
     List<TimeSeriesBlock> seriesBlocks = new ArrayList<>();
     {
       Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
-      seriesMap.put(CHICAGO_SERIES_HASH, ImmutableList.of(createChicagoSeries(new Double[]{10.0, 10.0, 10.0, 10.0})));
-      seriesMap.put(SF_SERIES_HASH, ImmutableList.of(createSanFranciscoSeries(new Double[]{10.0, 10.0, 10.0, 10.0})));
+      seriesMap.put(CHICAGO_SERIES_HASH, List.of(createChicagoSeries(new Double[]{10.0, 10.0, 10.0, 10.0})));
+      seriesMap.put(SF_SERIES_HASH, List.of(createSanFranciscoSeries(new Double[]{10.0, 10.0, 10.0, 10.0})));
       seriesBlocks.add(new TimeSeriesBlock(TIME_BUCKETS, seriesMap));
     }
     {
       Map<Long, List<TimeSeries>> seriesMap = new HashMap<>();
-      seriesMap.put(CHICAGO_SERIES_HASH, ImmutableList.of(createChicagoSeries(new Double[]{10.0, 10.0, 10.0, 10.0})));
+      seriesMap.put(CHICAGO_SERIES_HASH, List.of(createChicagoSeries(new Double[]{10.0, 10.0, 10.0, 10.0})));
       seriesBlocks.add(new TimeSeriesBlock(TIME_BUCKETS, seriesMap));
     }
     {

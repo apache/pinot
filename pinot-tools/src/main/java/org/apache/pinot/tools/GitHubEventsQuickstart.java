@@ -19,7 +19,6 @@
 package org.apache.pinot.tools;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.net.URL;
 import java.util.Arrays;
@@ -117,7 +116,7 @@ public class GitHubEventsQuickstart extends QuickStartBase {
     Preconditions.checkState(tempDir.mkdirs());
     QuickstartTableRequest request = new QuickstartTableRequest(quickStartDataDir.getAbsolutePath());
     final QuickstartRunner runner =
-        new QuickstartRunner(Lists.newArrayList(request), 1, 1, 1, 1, tempDir, getConfigOverrides());
+        new QuickstartRunner(List.of(request), 1, 1, 1, 1, tempDir, getConfigOverrides());
 
     printStatus(Color.CYAN, String.format("***** Starting %s *****", streamSourceType));
     startStreamServer();

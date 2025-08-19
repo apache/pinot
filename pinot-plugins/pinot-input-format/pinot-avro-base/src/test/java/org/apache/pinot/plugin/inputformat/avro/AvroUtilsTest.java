@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.config.table.ingestion.ComplexTypeConfig;
@@ -29,7 +29,6 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 import static org.testng.Assert.assertEquals;
 
@@ -58,9 +57,13 @@ public class AvroUtilsTest {
     org.apache.avro.Schema avroSchema =
         new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_SCHEMA));
     Map<String, FieldSpec.FieldType> fieldSpecMap =
-        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-            .put("d2", FieldType.DIMENSION).put("d3", FieldType.DIMENSION).put("hoursSinceEpoch", FieldType.DATE_TIME)
-            .put("m1", FieldType.METRIC).put("m2", FieldType.METRIC).build();
+        Map.of(
+            "d1", FieldType.DIMENSION,
+            "d2", FieldType.DIMENSION,
+            "d3", FieldType.DIMENSION,
+            "hoursSinceEpoch", FieldType.DATE_TIME,
+            "m1", FieldType.METRIC,
+            "m2", FieldType.METRIC);
     Schema inferredPinotSchema = AvroUtils.getPinotSchemaFromAvroSchema(avroSchema, fieldSpecMap, TimeUnit.HOURS);
     Schema expectedSchema = new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING)
         .addSingleValueDimension("d2", DataType.LONG).addSingleValueDimension("d3", DataType.STRING)
@@ -76,8 +79,10 @@ public class AvroUtilsTest {
     org.apache.avro.Schema avroSchema =
         new org.apache.avro.Schema.Parser().parse(ClassLoader.getSystemResourceAsStream(AVRO_NESTED_SCHEMA));
     Map<String, FieldSpec.FieldType> fieldSpecMap =
-        new ImmutableMap.Builder<String, FieldSpec.FieldType>().put("d1", FieldType.DIMENSION)
-            .put("hoursSinceEpoch", FieldType.DATE_TIME).put("m1", FieldType.METRIC).build();
+        Map.of(
+            "d1", FieldType.DIMENSION,
+            "hoursSinceEpoch", FieldType.DATE_TIME,
+            "m1", FieldType.METRIC);
     Schema inferredPinotSchema =
         AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
             new ArrayList<>(), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
@@ -92,7 +97,7 @@ public class AvroUtilsTest {
     // unnest collection entries
     inferredPinotSchema =
         AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList("entries"), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
+            List.of("entries"), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     expectedSchema =
         new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
             .addSingleValueDimension("tuple.streetaddress", DataType.STRING)
@@ -104,7 +109,7 @@ public class AvroUtilsTest {
     // change delimiter
     inferredPinotSchema =
         AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList(), "_", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
+            List.of(), "_", ComplexTypeConfig.CollectionNotUnnestedToJson.NON_PRIMITIVE);
     expectedSchema =
         new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
             .addSingleValueDimension("tuple_streetaddress", DataType.STRING)
@@ -116,7 +121,7 @@ public class AvroUtilsTest {
     // change the handling of collection-to-json option, d2 will become string
     inferredPinotSchema =
         AvroUtils.getPinotSchemaFromAvroSchemaWithComplexTypeHandling(avroSchema, fieldSpecMap, TimeUnit.HOURS,
-            Lists.newArrayList("entries"), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
+            List.of("entries"), ".", ComplexTypeConfig.CollectionNotUnnestedToJson.ALL);
     expectedSchema =
         new Schema.SchemaBuilder().addSingleValueDimension("d1", DataType.STRING).addMetric("m1", DataType.INT)
             .addSingleValueDimension("tuple.streetaddress", DataType.STRING)

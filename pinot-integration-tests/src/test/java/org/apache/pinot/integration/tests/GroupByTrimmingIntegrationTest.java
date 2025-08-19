@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.integration.tests;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
@@ -109,7 +108,7 @@ public class GroupByTrimmingIntegrationTest extends BaseClusterIntegrationTestSe
 
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(I_COL,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.INT), null, null),
         new org.apache.avro.Schema.Field(J_COL,

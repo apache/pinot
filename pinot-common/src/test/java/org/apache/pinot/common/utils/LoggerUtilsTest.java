@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.utils;
 
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import org.apache.logging.log4j.LogManager;
@@ -65,7 +64,7 @@ public class LoggerUtilsTest {
     Map<String, String> pinotLoggerInfo = LoggerUtils.getLoggerInfo(PINOT);
     assertNotNull(pinotLoggerInfo);
     assertEquals(pinotLoggerInfo.get("level"), "WARN");
-    for (String level : ImmutableList.of("TRACE", "DEBUG", "INFO", "ERROR", "WARN")) {
+    for (String level : List.of("TRACE", "DEBUG", "INFO", "ERROR", "WARN")) {
       LoggerUtils.setLoggerLevel(PINOT, level);
       checkLogLevel(level);
       pinotLoggerInfo = LoggerUtils.getLoggerInfo(PINOT);

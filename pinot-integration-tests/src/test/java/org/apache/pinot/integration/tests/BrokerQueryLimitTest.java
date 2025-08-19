@@ -17,10 +17,9 @@
  * under the License.
  */
 package org.apache.pinot.integration.tests;
-
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
+import java.util.List;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
@@ -111,7 +110,7 @@ public class BrokerQueryLimitTest extends BaseClusterIntegrationTest {
   public File createAvroFile()
       throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(LONG_COLUMN, org.apache.avro.Schema.create(org.apache.avro.Schema.Type.LONG),
             null, null)));
 

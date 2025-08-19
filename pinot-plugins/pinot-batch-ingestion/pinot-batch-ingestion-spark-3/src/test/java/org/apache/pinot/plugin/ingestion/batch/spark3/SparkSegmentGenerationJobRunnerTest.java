@@ -18,12 +18,12 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark3;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
@@ -62,7 +62,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
     File inputFile = new File(inputDir, "input.csv");
-    FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile, List.of("col1,col2", "value1,1", "value2,2"));
 
     File outputDir = new File(testDir, "output");
     final String outputFilename = "myTable_OFFLINE_0.tar.gz";
@@ -120,8 +120,8 @@ public class SparkSegmentGenerationJobRunnerTest {
     // Create two input files
     File inputFile1 = new File(inputDir, "input1.csv");
     File inputFile2 = new File(inputDir, "input2.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value3,3", "value4,4"));
 
     File outputDir = new File(testDir, "output");
     final String schemaName = "myTable";
@@ -252,10 +252,10 @@ public class SparkSegmentGenerationJobRunnerTest {
     inputSubDir2.mkdirs();
 
     File inputFile1 = new File(inputSubDir1, "input.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value1,1", "value2,2"));
 
     File inputFile2 = new File(inputSubDir2, "input.csv");
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value3,3", "value4,4"));
 
     File outputDir = new File(testDir, "output");
 

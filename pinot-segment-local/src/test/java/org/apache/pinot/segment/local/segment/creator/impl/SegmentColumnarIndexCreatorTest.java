@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.creator.impl;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -117,7 +116,7 @@ public class SegmentColumnarIndexCreatorTest implements PinotBuffersAfterClassCh
 
       GenericRow row = new GenericRow();
       row.putValue(timeColumn, testDateTime);
-      List<GenericRow> rows = ImmutableList.of(row);
+      List<GenericRow> rows = List.of(row);
 
       SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
       driver.init(config, new GenericRowRecordReader(rows));

@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.sun.net.httpserver.HttpHandler;
 import java.io.IOException;
@@ -89,7 +88,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     partitionToOffset0.put("0", "150");
     Map<String, String> partitionToOffset1 = new HashMap<>();
     partitionToOffset1.put("1", "150");
-    FakeConsumingInfoServer s0 = new FakeConsumingInfoServer(Lists.newArrayList(
+    FakeConsumingInfoServer s0 = new FakeConsumingInfoServer(List.of(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Collections.emptyMap(),
                 Collections.emptyMap(), Collections.emptyMap())),
@@ -100,7 +99,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     _serverMap.put("server0", s0);
 
     // server1 - 1 consumer each for p0 and p1. CONSUMING.
-    FakeConsumingInfoServer s1 = new FakeConsumingInfoServer(Lists.newArrayList(
+    FakeConsumingInfoServer s1 = new FakeConsumingInfoServer(List.of(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Collections.emptyMap(),
                 Collections.emptyMap(), Collections.emptyMap())),
@@ -111,7 +110,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     _serverMap.put("server1", s1);
 
     // server2 - p1 consumer CONSUMING. p0 consumer NOT_CONSUMING
-    FakeConsumingInfoServer s2 = new FakeConsumingInfoServer(Lists.newArrayList(
+    FakeConsumingInfoServer s2 = new FakeConsumingInfoServer(List.of(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "NOT_CONSUMING", 0, partitionToOffset0,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Collections.emptyMap(),
                 Collections.emptyMap(), Collections.emptyMap())),
@@ -122,7 +121,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     _serverMap.put("server2", s2);
 
     // server3 - 1 consumer for p1. No consumer for p0
-    FakeConsumingInfoServer s3 = new FakeConsumingInfoServer(Lists.newArrayList(
+    FakeConsumingInfoServer s3 = new FakeConsumingInfoServer(List.of(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_1, "CONSUMING", 0, partitionToOffset1,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset1, Collections.emptyMap(),
                 Collections.emptyMap(), Collections.emptyMap()))));
@@ -130,7 +129,7 @@ public class ConsumingSegmentInfoReaderStatelessTest {
     _serverMap.put("server3", s3);
 
     // server4 - unreachable/error/timeout
-    FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(Lists.newArrayList(
+    FakeConsumingInfoServer s4 = new FakeConsumingInfoServer(List.of(
         new SegmentConsumerInfo(SEGMENT_NAME_PARTITION_0, "CONSUMING", 0, partitionToOffset0,
             new SegmentConsumerInfo.PartitionOffsetInfo(partitionToOffset0, Collections.emptyMap(),
                 Collections.emptyMap(), Collections.emptyMap())),

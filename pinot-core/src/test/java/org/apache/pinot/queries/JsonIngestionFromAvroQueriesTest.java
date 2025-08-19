@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -170,8 +169,8 @@ public class JsonIngestionFromAvroQueriesTest extends BaseQueriesTest {
     Schema enumSchema = createEnum("direction", null, null, Arrays.asList("UP", "DOWN", "LEFT", "RIGHT"));
     Schema fixedSchema = createFixed("fixed", null, null, 4);
     List<Field> fields = Arrays.asList(
-        new Field(INT_COLUMN, createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
-        new Field(STRING_COLUMN, createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
+        new Field(INT_COLUMN, createUnion(List.of(create(Type.INT), create(Type.NULL))), null, null),
+        new Field(STRING_COLUMN, createUnion(List.of(create(Type.STRING), create(Type.NULL))), null, null),
         new Field(JSON_COLUMN_1,
             createUnion(
                 createArray(create(Type.STRING)),

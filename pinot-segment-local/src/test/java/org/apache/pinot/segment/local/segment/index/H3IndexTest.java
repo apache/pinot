@@ -20,11 +20,11 @@ package org.apache.pinot.segment.local.segment.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -306,7 +306,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
           + "     }\n"
           + " }");
 
-      assertEquals(new H3IndexConfig(new H3IndexResolution(Lists.newArrayList(3))));
+      assertEquals(new H3IndexConfig(new H3IndexResolution(List.of(3))));
     }
 
     @Test
@@ -321,7 +321,7 @@ public class H3IndexTest implements PinotBuffersAfterMethodCheckRule {
           + "       }\n"
           + "    }\n"
           + " }");
-      assertEquals(new H3IndexConfig(new H3IndexResolution(Lists.newArrayList(3))));
+      assertEquals(new H3IndexConfig(new H3IndexResolution(List.of(3))));
     }
 
     @Test

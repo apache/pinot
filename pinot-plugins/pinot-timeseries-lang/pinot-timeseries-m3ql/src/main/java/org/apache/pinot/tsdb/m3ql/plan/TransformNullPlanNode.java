@@ -21,7 +21,6 @@ package org.apache.pinot.tsdb.m3ql.plan;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.List;
 import org.apache.pinot.tsdb.m3ql.operator.TransformNullOperator;
 import org.apache.pinot.tsdb.spi.operator.BaseTimeSeriesOperator;
@@ -63,6 +62,6 @@ public class TransformNullPlanNode extends BaseTimeSeriesPlanNode {
     Preconditions.checkState(_inputs.size() == 1,
         "TransformNullPlanNode should have only 1 child, got: %s", _inputs.size());
     BaseTimeSeriesOperator childOperator = _inputs.get(0).run();
-    return new TransformNullOperator(_defaultValue, ImmutableList.of(childOperator));
+    return new TransformNullOperator(_defaultValue, List.of(childOperator));
   }
 }

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.queries;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -110,7 +109,7 @@ public class FirstWithTimeQueriesTest extends BaseQueriesTest {
       .addSingleValueDimension(TIME_COLUMN, DataType.LONG).build();
   private static final TableConfig TABLE_CONFIG = new TableConfigBuilder(TableType.OFFLINE).setTableName(RAW_TABLE_NAME)
       .setNoDictionaryColumns(
-          Lists.newArrayList(INT_NO_DICT_COLUMN, LONG_NO_DICT_COLUMN, FLOAT_NO_DICT_COLUMN, DOUBLE_NO_DICT_COLUMN))
+          List.of(INT_NO_DICT_COLUMN, LONG_NO_DICT_COLUMN, FLOAT_NO_DICT_COLUMN, DOUBLE_NO_DICT_COLUMN))
       .build();
 
   private Boolean _expectedResultFirstBoolean;

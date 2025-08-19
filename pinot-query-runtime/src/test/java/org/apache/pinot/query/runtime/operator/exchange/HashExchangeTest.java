@@ -17,10 +17,9 @@
  * under the License.
  */
 package org.apache.pinot.query.runtime.operator.exchange;
-
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import java.util.Iterator;
+import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
@@ -50,7 +49,7 @@ public class HashExchangeTest {
   public void setUp() {
     _mocks = MockitoAnnotations.openMocks(this);
     _block = new RowHeapDataBlock(
-        ImmutableList.of(new Object[]{0}, new Object[]{1}, new Object[]{2}),
+        List.of(new Object[]{0}, new Object[]{1}, new Object[]{2}),
         new DataSchema(new String[]{"col1"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.INT}));
   }
 
@@ -65,7 +64,7 @@ public class HashExchangeTest {
       throws Exception {
     // Given:
     TestSelector selector = new TestSelector(Iterators.forArray(2, 0, 1));
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
 
     // When:
     new HashExchange(destinations, selector, BlockSplitter.DEFAULT).route(destinations, _block);

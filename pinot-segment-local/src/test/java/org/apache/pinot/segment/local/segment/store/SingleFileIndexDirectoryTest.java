@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.store;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
@@ -28,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -105,7 +105,7 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       }
     }
 
-    Mockito.when(_segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(Arrays.asList("foo")));
+    Mockito.when(_segmentMetadata.getAllColumns()).thenReturn(new TreeSet<>(List.of("foo")));
     try (SingleFileIndexDirectory directoryReader = new SingleFileIndexDirectory(TEMP_DIR, _segmentMetadata,
         ReadMode.mmap);
         PinotDataBuffer readBuffer = directoryReader.getBuffer("foo", StandardIndexes.dictionary())) {
@@ -311,8 +311,8 @@ public class SingleFileIndexDirectoryTest implements PinotBuffersAfterMethodChec
       FileUtils.touch(srcTmp);
     }
     File dstTmp = new File(TEMP_DIR, UUID.randomUUID().toString());
-    TreeMap<IndexKey, IndexEntry> indicesToCopy = new TreeMap<>(ImmutableMap
-        .of(new IndexKey("foo", StandardIndexes.inverted()),
+    TreeMap<IndexKey, IndexEntry> indicesToCopy = new TreeMap<>(
+        Map.of(new IndexKey("foo", StandardIndexes.inverted()),
             new IndexEntry(new IndexKey("foo", StandardIndexes.inverted()), 0, 0),
             new IndexKey("foo", StandardIndexes.forward()),
             new IndexEntry(new IndexKey("foo", StandardIndexes.forward()), 0, 0),

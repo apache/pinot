@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -51,7 +50,7 @@ public class MinusOperatorTest {
         .buildWithEos();
 
     MinusOperator minusOperator =
-        new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new MinusOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = minusOperator.nextBlock();
@@ -91,7 +90,7 @@ public class MinusOperatorTest {
         .buildWithEos();
 
     MinusOperator minusOperator =
-        new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new MinusOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = minusOperator.nextBlock();
@@ -119,7 +118,7 @@ public class MinusOperatorTest {
         .buildWithError(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
 
     MinusOperator minusOperator =
-        new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new MinusOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     MseBlock result = minusOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
@@ -142,7 +141,7 @@ public class MinusOperatorTest {
         .buildWithEos();
 
     MinusOperator minusOperator =
-        new MinusOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new MinusOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     MseBlock result = minusOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block

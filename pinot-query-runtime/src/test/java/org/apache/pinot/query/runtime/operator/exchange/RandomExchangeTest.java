@@ -17,9 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.query.runtime.operator.exchange;
-
-import com.google.common.collect.ImmutableList;
 import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.SendingMailbox;
 import org.apache.pinot.query.runtime.blocks.BlockSplitter;
@@ -60,7 +59,7 @@ public class RandomExchangeTest {
   public void shouldRouteRandomly()
       throws Exception {
     // Given:
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox2);
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox2);
 
     // When:
     new RandomExchange(destinations, size -> 1, BlockSplitter.NO_OP).route(destinations, _block);

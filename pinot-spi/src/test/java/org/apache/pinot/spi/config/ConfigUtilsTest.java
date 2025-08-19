@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.spi.config;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -40,7 +39,7 @@ public class ConfigUtilsTest {
   @Test
   public void testIndexing() {
     Map<String, String> environment =
-        ImmutableMap.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
+        Map.of("LOAD_MODE", "MMAP", "AWS_ACCESS_KEY", "default_aws_access_key", "AWS_SECRET_KEY",
             "default_aws_secret_key");
     testIndexingWithConfig(environment);
   }

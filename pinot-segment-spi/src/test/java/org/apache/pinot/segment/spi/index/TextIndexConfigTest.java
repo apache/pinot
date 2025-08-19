@@ -19,10 +19,10 @@
 package org.apache.pinot.segment.spi.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.List;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 import static org.testng.Assert.*;
 
@@ -116,8 +116,8 @@ public class TextIndexConfigTest {
     assertEquals(config.getRawValueForTextIndex(), "fakeValue", "Unexpected rawValue");
     assertTrue(config.isEnableQueryCache(), "Unexpected queryCache");
     assertTrue(config.isUseANDForMultiTermQueries(), "Unexpected useANDForMultiTermQueries");
-    assertEquals(config.getStopWordsInclude(), Lists.newArrayList("a"), "Unexpected stopWordsInclude");
-    assertEquals(config.getStopWordsExclude(), Lists.newArrayList("b"), "Unexpected stopWordsExclude");
+    assertEquals(config.getStopWordsInclude(), List.of("a"), "Unexpected stopWordsInclude");
+    assertEquals(config.getStopWordsExclude(), List.of("b"), "Unexpected stopWordsExclude");
     assertFalse(config.isLuceneUseCompoundFile(), "Unexpected luceneUseCompoundFile");
     assertEquals(config.getLuceneMaxBufferSizeMB(), 1024, "Unexpected luceneMaxBufferSize");
   }

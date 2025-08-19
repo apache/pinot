@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -49,7 +48,7 @@ public class IntersectAllOperatorTest {
         .buildWithEos();
 
     IntersectAllOperator intersectOperator =
-        new IntersectAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new IntersectAllOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = intersectOperator.nextBlock();
@@ -85,7 +84,7 @@ public class IntersectAllOperatorTest {
         .buildWithEos();
 
     IntersectAllOperator intersectOperator =
-        new IntersectAllOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new IntersectAllOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = intersectOperator.nextBlock();

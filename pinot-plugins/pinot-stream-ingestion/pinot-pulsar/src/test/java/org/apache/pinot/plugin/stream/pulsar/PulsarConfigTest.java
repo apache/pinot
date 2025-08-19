@@ -17,12 +17,11 @@
  * under the License.
  */
 package org.apache.pinot.plugin.stream.pulsar;
-
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -64,7 +63,7 @@ public class PulsarConfigTest {
         pulsarConfig.getMetadataFields();
     Assert.assertEquals(metadataFieldsToExtract.size(), 6);
     Assert.assertTrue(metadataFieldsToExtract.containsAll(
-        ImmutableList.of(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID,
+        List.of(PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID,
             PulsarStreamMessageMetadata.PulsarMessageMetadataValue.MESSAGE_ID_BYTES_B64,
             PulsarStreamMessageMetadata.PulsarMessageMetadataValue.PUBLISH_TIME,
             PulsarStreamMessageMetadata.PulsarMessageMetadataValue.EVENT_TIME,

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.routing;
 
-import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -106,9 +105,9 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
   @DataProvider(name = "offlineTableList")
   public Object[][] offlineTableList() {
     return new Object[][]{
-        {ImmutableList.of("b_OFFLINE")}, {ImmutableList.of("b_OFFLINE", "c_OFFLINE")}, {
-        ImmutableList.of("b_OFFLINE", "c_OFFLINE", "d_OFFLINE")
-    }, {ImmutableList.of("b_OFFLINE", "c_OFFLINE", "d_OFFLINE", "e_OFFLINE")},
+        {List.of("b_OFFLINE")}, {List.of("b_OFFLINE", "c_OFFLINE")}, {
+        List.of("b_OFFLINE", "c_OFFLINE", "d_OFFLINE")
+    }, {List.of("b_OFFLINE", "c_OFFLINE", "d_OFFLINE", "e_OFFLINE")},
     };
   }
 
@@ -165,8 +164,8 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
   @DataProvider(name = "realtimeTableList")
   public Object[][] realtimeTableList() {
     return new Object[][]{
-        {ImmutableList.of("a_REALTIME")}, {ImmutableList.of("a_REALTIME", "b_REALTIME")}, {
-        ImmutableList.of("a_REALTIME", "b_REALTIME", "e_REALTIME")
+        {List.of("a_REALTIME")}, {List.of("a_REALTIME", "b_REALTIME")}, {
+        List.of("a_REALTIME", "b_REALTIME", "e_REALTIME")
     }
     };
   }
@@ -238,11 +237,11 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
   @DataProvider(name = "offlineTableWithOtherTables")
   public Object[][] offlineTableMixedList() {
     return new Object[][]{
-        {ImmutableList.of("b_OFFLINE", "a_REALTIME")}, {
-        ImmutableList.of("b_OFFLINE", "hybrid_o_disabled_REALTIME")
-    }, {ImmutableList.of("b_OFFLINE", "no_route_table_O_REALTIME")}, {
-        ImmutableList.of("b_OFFLINE", "no_route_table_R_OFFLINE")
-    }, {ImmutableList.of("b_OFFLINE", "o_disabled_REALTIME")}, {ImmutableList.of("b_OFFLINE", "r_disabled_OFFLINE")},
+        {List.of("b_OFFLINE", "a_REALTIME")}, {
+        List.of("b_OFFLINE", "hybrid_o_disabled_REALTIME")
+    }, {List.of("b_OFFLINE", "no_route_table_O_REALTIME")}, {
+        List.of("b_OFFLINE", "no_route_table_R_OFFLINE")
+    }, {List.of("b_OFFLINE", "o_disabled_REALTIME")}, {List.of("b_OFFLINE", "r_disabled_OFFLINE")},
     };
   }
 
@@ -277,11 +276,11 @@ public class LogicalTableRouteProviderGetRouteTest extends BaseTableRouteTest {
   @DataProvider(name = "realTimeTableWithOtherTables")
   public Object[][] physicalTableMixedList() {
     return new Object[][]{
-        {ImmutableList.of("a_REALTIME", "b_OFFLINE")}, {
-        ImmutableList.of("a_REALTIME", "hybrid_o_disabled_OFFLINE")
-    }, {ImmutableList.of("a_REALTIME", "no_route_table_O_OFFLINE")}, {
-        ImmutableList.of("a_REALTIME", "no_route_table_R_REALTIME")
-    }, {ImmutableList.of("a_REALTIME", "o_disabled_OFFLINE")}, {ImmutableList.of("a_REALTIME", "r_disabled_REALTIME")},
+        {List.of("a_REALTIME", "b_OFFLINE")}, {
+        List.of("a_REALTIME", "hybrid_o_disabled_OFFLINE")
+    }, {List.of("a_REALTIME", "no_route_table_O_OFFLINE")}, {
+        List.of("a_REALTIME", "no_route_table_R_REALTIME")
+    }, {List.of("a_REALTIME", "o_disabled_OFFLINE")}, {List.of("a_REALTIME", "r_disabled_REALTIME")},
     };
   }
 

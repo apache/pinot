@@ -143,13 +143,22 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   private static final Expression STAR = RequestUtils.getIdentifierExpression("*");
   private static final int MAX_UNAVAILABLE_SEGMENTS_TO_PRINT_IN_QUERY_EXCEPTION = 10;
   private static final Map<String, String> DISTINCT_MV_COL_FUNCTION_OVERRIDE_MAP =
-      ImmutableMap.<String, String>builder().put("distinctcount", "distinctcountmv")
-          .put("distinctcountbitmap", "distinctcountbitmapmv").put("distinctcounthll", "distinctcounthllmv")
-          .put("distinctcountrawhll", "distinctcountrawhllmv").put("distinctsum", "distinctsummv")
-          .put("distinctavg", "distinctavgmv").put("count", "countmv").put("min", "minmv").put("max", "maxmv")
-          .put("avg", "avgmv").put("sum", "summv").put("minmaxrange", "minmaxrangemv")
+      ImmutableMap.<String, String>builder()
+          .put("distinctcount", "distinctcountmv")
+          .put("distinctcountbitmap", "distinctcountbitmapmv")
+          .put("distinctcounthll", "distinctcounthllmv")
+          .put("distinctcountrawhll", "distinctcountrawhllmv")
+          .put("distinctsum", "distinctsummv")
+          .put("distinctavg", "distinctavgmv")
+          .put("count", "countmv")
+          .put("min", "minmv")
+          .put("max", "maxmv")
+          .put("avg", "avgmv")
+          .put("sum", "summv")
+          .put("minmaxrange", "minmaxrangemv")
           .put("distinctcounthllplus", "distinctcounthllplusmv")
-          .put("distinctcountrawhllplus", "distinctcountrawhllplusmv").build();
+          .put("distinctcountrawhllplus", "distinctcountrawhllplusmv")
+          .build();
 
   protected final QueryOptimizer _queryOptimizer = new QueryOptimizer();
   protected final boolean _disableGroovy;

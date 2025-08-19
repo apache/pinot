@@ -19,7 +19,6 @@
 package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -273,7 +272,7 @@ public class OfflineClusterCPUTimeResourceUsageAccountantTest extends BaseCluste
 
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(STRING_DIM_SV1,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.STRING), null, null),
         new org.apache.avro.Schema.Field(STRING_DIM_SV2,

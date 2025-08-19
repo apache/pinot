@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.metadata;
 
-import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -196,7 +195,7 @@ public class SegmentZKMetadataTest {
     record.setSimpleField(CommonConstants.Segment.DOWNLOAD_URL, "http://localhost:8000/testTable_O_3000_4000");
     record.setLongField(CommonConstants.Segment.PUSH_TIME, 4000);
     record.setLongField(CommonConstants.Segment.REFRESH_TIME, 8000);
-    record.setMapField(CommonConstants.Segment.CUSTOM_MAP, ImmutableMap.of("k1", "v1", "k2", "v2"));
+    record.setMapField(CommonConstants.Segment.CUSTOM_MAP, Map.of("k1", "v1", "k2", "v2"));
     return record;
   }
 
@@ -213,7 +212,7 @@ public class SegmentZKMetadataTest {
     offlineSegmentMetadata.setDownloadUrl("http://localhost:8000/testTable_O_3000_4000");
     offlineSegmentMetadata.setPushTime(4000);
     offlineSegmentMetadata.setRefreshTime(8000);
-    offlineSegmentMetadata.setCustomMap(ImmutableMap.of("k1", "v1", "k2", "v2"));
+    offlineSegmentMetadata.setCustomMap(Map.of("k1", "v1", "k2", "v2"));
     return offlineSegmentMetadata;
   }
 }

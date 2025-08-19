@@ -19,13 +19,13 @@
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.segment.local.utils.nativefst.utils.RealTimeRegexpMatcher;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 import static org.apache.pinot.segment.local.utils.nativefst.mutablefst.utils.MutableFSTUtils.regexQueryNrHitsForRealTimeFST;
 import static org.testng.Assert.assertEquals;
@@ -50,19 +50,18 @@ public class MutableFSTImplTest {
 
   @Test
   public void shouldCompactNulls1() {
-    List<Integer> listGood = Lists.newArrayList(1, 2, 3, 4, 5, 6, 7, 8, 9);
-    List<Integer> listBad = Lists.newArrayList(null, 1, 2, null, 3, 4, null, 5, 6, null, 7, 8, 9, null);
+    List<Integer> listGood = List.of(1, 2, 3, 4, 5, 6, 7, 8, 9);
+    List<Integer> listBad = new ArrayList<>(Arrays.asList(null, 1, 2, null, 3, 4, null, 5, 6, null, 7, 8, 9, null));
     MutableFSTImpl.compactNulls((ArrayList) listBad);
     assertEquals(listBad, listGood);
   }
 
   @Test
   public void shouldCompactNulls2() {
-    ArrayList<Integer> listBad = (ArrayList) Lists.newArrayList(1);
+    ArrayList<Integer> listBad = new ArrayList<>(List.of(1));
     MutableFSTImpl.compactNulls(listBad);
-    assertEquals(listBad, Lists.newArrayList(1));
+    assertEquals(listBad, List.of(1));
   }
-
 
   @Test
   public void testRegexMatcherPrefix() {

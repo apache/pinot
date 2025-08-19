@@ -18,11 +18,11 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.spark;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReaderConfig;
@@ -64,7 +64,7 @@ public class SparkSegmentGenerationJobRunnerTest {
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
     File inputFile = new File(inputDir, "input.csv");
-    FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile, List.of("col1,col2", "value1,1", "value2,2"));
 
     // Create an output directory, with two empty files in it. One we'll overwrite,
     // and one we'll leave alone.
@@ -162,10 +162,10 @@ public class SparkSegmentGenerationJobRunnerTest {
     inputSubDir2.mkdirs();
 
     File inputFile1 = new File(inputSubDir1, "input.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value1,1", "value2,2"));
 
     File inputFile2 = new File(inputSubDir2, "input.csv");
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value3,3", "value4,4"));
 
     File outputDir = new File(testDir, "output");
 

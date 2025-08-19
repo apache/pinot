@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tsdb.spi.plan;
 
-import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
@@ -36,7 +35,7 @@ public class LeafTimeSeriesPlanNodeTest {
   private static final String TIME_COLUMN = "orderTime";
   private static final TimeUnit TIME_UNIT = TimeUnit.SECONDS;
   private static final int SERIES_LIMIT = 10;
-  private static final Map<String, String> QUERY_OPTIONS = ImmutableMap.of("numGroupsLimit", "100000");
+  private static final Map<String, String> QUERY_OPTIONS = Map.of("numGroupsLimit", "100000");
 
   @Test
   public void testGetEffectiveFilter() {

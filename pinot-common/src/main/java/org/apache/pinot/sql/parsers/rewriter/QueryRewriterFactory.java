@@ -38,7 +38,7 @@ public class QueryRewriterFactory {
   //   (reference) into the group-by list, but the alias should not be applied to the reference.
   //   E.g. SELECT a + 1 AS a FROM table GROUP BY 1
   public static final List<String> DEFAULT_QUERY_REWRITERS_CLASS_NAMES =
-      ImmutableList.of(CompileTimeFunctionsInvoker.class.getName(), SelectionsRewriter.class.getName(),
+      List.of(CompileTimeFunctionsInvoker.class.getName(), SelectionsRewriter.class.getName(),
           PredicateComparisonRewriter.class.getName(), AliasApplier.class.getName(), OrdinalsUpdater.class.getName(),
           NonAggregationGroupByToDistinctQueryRewriter.class.getName(), RlsFiltersRewriter.class.getName());
 

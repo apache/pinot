@@ -21,7 +21,6 @@ package org.apache.pinot.integration.tests.custom;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.List;
 import org.apache.avro.file.DataFileWriter;
@@ -877,7 +876,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
       throws Exception {
     // create avro schema
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
         new org.apache.avro.Schema.Field(BOOLEAN_COLUMN,
             org.apache.avro.Schema.create(org.apache.avro.Schema.Type.BOOLEAN),
             null, null),
@@ -943,11 +942,11 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
               record.put(STRING_COLUMN, RandomStringUtils.random(finalI));
               record.put(TIMESTAMP_COLUMN, finalI);
               record.put(GROUP_BY_COLUMN, String.valueOf(finalI % 10));
-              record.put(BOOLEAN_ARRAY_COLUMN, ImmutableList.of(true, true, false, false));
-              record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, ImmutableList.of(1, 1, 0, 0));
-              record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, ImmutableList.of("true", "true", "false", "false"));
-              record.put(LONG_ARRAY_COLUMN, ImmutableList.of(0, 1, 2, 3));
-              record.put(DOUBLE_ARRAY_COLUMN, ImmutableList.of(0.0, 0.1, 0.2, 0.3));
+              record.put(BOOLEAN_ARRAY_COLUMN, List.of(true, true, false, false));
+              record.put(BOOLEAN_FROM_INT_ARRAY_COLUMN, List.of(1, 1, 0, 0));
+              record.put(BOOLEAN_FROM_STRING_ARRAY_COLUMN, List.of("true", "true", "false", "false"));
+              record.put(LONG_ARRAY_COLUMN, List.of(0, 1, 2, 3));
+              record.put(DOUBLE_ARRAY_COLUMN, List.of(0.0, 0.1, 0.2, 0.3));
               return record;
             }
         ));

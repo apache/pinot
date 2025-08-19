@@ -19,7 +19,6 @@
 package org.apache.pinot.tools.streams.githubevents;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -102,10 +101,10 @@ public class PullRequestMergedEvent {
     JsonNode mergedBy = _pullRequest.get("merged_by");
     _mergedBy = mergedBy.get("login").asText();
     _assignees = extractAssignees();
-    _committers = Lists.newArrayList(extractCommitters());
-    _authors = Lists.newArrayList(extractAuthors());
-    _reviewers = Lists.newArrayList(extractReviewers());
-    _commenters = Lists.newArrayList(extractCommenters());
+    _committers = List.copyOf(extractCommitters());
+    _authors = List.copyOf(extractAuthors());
+    _reviewers = List.copyOf(extractReviewers());
+    _commenters = List.copyOf(extractCommenters());
     _requestedReviewers = extractRequestedReviewers();
     _requestedTeams = extractRequestedTeams();
     JsonNode repo = event.get("repo");

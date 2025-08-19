@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.util;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +76,7 @@ public class TaskConfigUtilsTest {
   @Test(expectedExceptions = RuntimeException.class)
   public void testValidateTableTaskConfigsValidationException() {
     TableTaskConfig tableTaskConfig =
-        new TableTaskConfig(ImmutableMap.of(TEST_TASK_TYPE, ImmutableMap.of("schedule", "0 */10 * ? * * *")));
+        new TableTaskConfig(Map.of(TEST_TASK_TYPE, Map.of("schedule", "0 */10 * ? * * *")));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(tableTaskConfig).build();
     TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null);
@@ -86,7 +85,7 @@ public class TaskConfigUtilsTest {
   @Test(expectedExceptions = RuntimeException.class)
   public void testValidateTableTaskConfigsUnknownTaskType() {
     TableTaskConfig tableTaskConfig =
-        new TableTaskConfig(ImmutableMap.of("otherTask", ImmutableMap.of("schedule", "0 */10 * ? * * *")));
+        new TableTaskConfig(Map.of("otherTask", Map.of("schedule", "0 */10 * ? * * *")));
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(tableTaskConfig).build();
     TaskConfigUtils.validateTaskConfigs(tableConfig, new Schema(), _mockTaskManager, null);
@@ -98,7 +97,7 @@ public class TaskConfigUtilsTest {
     HashMap<String, String> invalidScheduleConfig = new HashMap<>();
     invalidScheduleConfig.put("schedule", "invalidSchedule");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of(TEST_TASK_TYPE, invalidScheduleConfig))).build();
+        new TableTaskConfig(Map.of(TEST_TASK_TYPE, invalidScheduleConfig))).build();
 
     try {
       TaskConfigUtils.doCommonTaskValidations(tableConfig, TEST_TASK_TYPE, invalidScheduleConfig);
@@ -111,7 +110,7 @@ public class TaskConfigUtilsTest {
     HashMap<String, String> invalidAllowDownloadFromServerConfig = new HashMap<>();
     invalidAllowDownloadFromServerConfig.put("allowDownloadFromServer", "true");
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TEST_TABLE_NAME).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of(TEST_TASK_TYPE, invalidAllowDownloadFromServerConfig))).build();
+        new TableTaskConfig(Map.of(TEST_TASK_TYPE, invalidAllowDownloadFromServerConfig))).build();
     try {
       TaskConfigUtils.doCommonTaskValidations(tableConfig, TEST_TASK_TYPE, invalidAllowDownloadFromServerConfig);
       Assert.fail();

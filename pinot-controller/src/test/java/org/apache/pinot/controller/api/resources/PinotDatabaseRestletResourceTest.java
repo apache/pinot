@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.resources;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -42,7 +41,7 @@ import static org.testng.Assert.assertTrue;
 
 public class PinotDatabaseRestletResourceTest {
   private static final String DATABASE = "db";
-  private static final List<String> TABLES = Lists.newArrayList("a_REALTIME", "b_OFFLINE", "c_REALTIME", "d_OFFLINE");
+  private static final List<String> TABLES = List.of("a_REALTIME", "b_OFFLINE", "c_REALTIME", "d_OFFLINE");
 
   @Mock
   PinotHelixResourceManager _resourceManager;

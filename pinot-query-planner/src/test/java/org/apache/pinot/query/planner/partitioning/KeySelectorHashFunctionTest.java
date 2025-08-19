@@ -17,7 +17,6 @@
  * under the License.
  */
 package org.apache.pinot.query.planner.partitioning;
-
 import org.testng.Assert;
 import org.testng.annotations.Test;
 

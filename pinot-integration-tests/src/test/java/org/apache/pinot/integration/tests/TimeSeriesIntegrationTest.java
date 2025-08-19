@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -381,7 +380,7 @@ public class TimeSeriesIntegrationTest extends BaseClusterIntegrationTest {
   public File createAvroFile()
     throws Exception {
     org.apache.avro.Schema avroSchema = org.apache.avro.Schema.createRecord("myRecord", null, null, false);
-    avroSchema.setFields(ImmutableList.of(
+    avroSchema.setFields(List.of(
       createAvroField(TS_COLUMN, org.apache.avro.Schema.Type.LONG),
       createAvroField(DAYS_SINCE_FIRST_TRIP_COLUMN, org.apache.avro.Schema.Type.LONG),
       createAvroField(DEVICE_OS_COLUMN, org.apache.avro.Schema.Type.STRING),

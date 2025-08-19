@@ -48,7 +48,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 import static org.testng.Assert.fail;
 
@@ -87,12 +86,12 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
 
   private TableConfig createOfflineTunerTableConfig(String tableName) {
     return getBaseTableConfigBuilder(tableName, TableType.OFFLINE).setTunerConfigList(
-        Lists.newArrayList(new TunerConfig("realtimeAutoIndexTuner", null))).build();
+        List.of(new TunerConfig("realtimeAutoIndexTuner", null))).build();
   }
 
   private TableConfig createRealtimeTunerTableConfig(String tableName) {
     return getBaseTableConfigBuilder(tableName, TableType.REALTIME).setTunerConfigList(
-        Lists.newArrayList(new TunerConfig("realtimeAutoIndexTuner", null))).build();
+        List.of(new TunerConfig("realtimeAutoIndexTuner", null))).build();
   }
 
   private TableConfig createOfflineDimTableConfig(String tableName) {
@@ -191,7 +190,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // table validation fails
     try {
       TableConfig invalidTableConfig = createOfflineTableConfig(tableName);
-      invalidTableConfig.getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("nonExistent"));
+      invalidTableConfig.getIndexingConfig().setInvertedIndexColumns(List.of("nonExistent"));
       tableConfigs = new TableConfigs(tableName, schema, invalidTableConfig, null);
       sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
       fail("Creation of an TableConfigs with invalid table config should have failed");
@@ -221,7 +220,7 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     // table validation fails
     try {
       TableConfig invalidTableConfig = createRealtimeTableConfig(tableName);
-      invalidTableConfig.getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("nonExistent"));
+      invalidTableConfig.getIndexingConfig().setInvertedIndexColumns(List.of("nonExistent"));
       tableConfigs = new TableConfigs(tableName, schema, null, invalidTableConfig);
       sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
       fail("Creation of an TableConfigs with invalid table config should have failed");
@@ -521,8 +520,8 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     Assert.assertEquals(tableConfigsResponse.getSchema().getSchemaName(), schema.getSchemaName());
     Assert.assertTrue(tableConfigsResponse.getSchema().getMetricNames().contains("newMetric"));
 
-    tableConfigsResponse.getOffline().getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("dimA"));
-    tableConfigsResponse.getRealtime().getIndexingConfig().setInvertedIndexColumns(Lists.newArrayList("dimA"));
+    tableConfigsResponse.getOffline().getIndexingConfig().setInvertedIndexColumns(List.of("dimA"));
+    tableConfigsResponse.getRealtime().getIndexingConfig().setInvertedIndexColumns(List.of("dimA"));
     tableConfigs =
         new TableConfigs(tableName, schema, tableConfigsResponse.getOffline(), tableConfigsResponse.getRealtime());
     sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsUpdate(tableName),

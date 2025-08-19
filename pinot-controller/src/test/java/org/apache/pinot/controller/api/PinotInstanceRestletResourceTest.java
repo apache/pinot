@@ -20,7 +20,6 @@ package org.apache.pinot.controller.api;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -139,10 +138,10 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
 
     // Test Instance updateTags API
     String brokerInstanceUpdateTagsUrl =
-        _urlBuilder.forInstanceUpdateTags(brokerInstanceId, Lists.newArrayList("tag_BROKER", "newTag_BROKER"));
+        _urlBuilder.forInstanceUpdateTags(brokerInstanceId, List.of("tag_BROKER", "newTag_BROKER"));
     sendPutRequest(brokerInstanceUpdateTagsUrl);
     String serverInstanceUpdateTagsUrl = _urlBuilder.forInstanceUpdateTags(serverInstanceId,
-        Lists.newArrayList("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
+        List.of("tag_REALTIME", "newTag_OFFLINE", "newTag_REALTIME"));
     sendPutRequest(serverInstanceUpdateTagsUrl);
     checkInstanceInfo(brokerInstanceId, "1.2.3.4", 1234, new String[]{"tag_BROKER", "newTag_BROKER"}, null, -1, -1, -1,
         -1, false);
@@ -243,7 +242,7 @@ public class PinotInstanceRestletResourceTest extends ControllerTest {
           || instance.startsWith(Helix.PREFIX_OF_BROKER_INSTANCE)) {
         InstanceTagUpdateRequest payload = new InstanceTagUpdateRequest();
         payload.setInstanceName(instance);
-        payload.setNewTags(Lists.newArrayList());
+        payload.setNewTags(List.of());
         request.add(payload);
       }
     });
