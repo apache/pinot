@@ -722,6 +722,28 @@ public class PinotTaskRestletResource {
     }
   }
 
+  @DELETE
+  @Path("/tasks/lock/forceRelease")
+  @Authorize(targetType = TargetType.TABLE, action = Actions.Table.FORCE_RELEASE_TASK_GENERATION_LOCK,
+      paramName = "tableNameWithType")
+  @Produces(MediaType.APPLICATION_JSON)
+  @Authenticate(AccessType.DELETE)
+  @ApiOperation("Force releases the task generation lock for a given table and task type")
+  public SuccessResponse cleanUpTaskGenerationLock(
+      @ApiParam(value = "Task type.") @QueryParam("taskType") @Nullable
+      String taskType,
+      @ApiParam(value = "Table name (with type suffix).")
+      @QueryParam("tableNameWithType") @Nullable String tableNameWithType) {
+    boolean lockReleased = _pinotTaskManager.forceReleaseLock(tableNameWithType, taskType);
+    if (lockReleased) {
+      return new SuccessResponse("Successfully released task generation lock on table " + tableNameWithType
+          + " for task type: " + taskType);
+    } else {
+      return new SuccessResponse("Unable to release lock on table " + tableNameWithType + " for task type: " + taskType
+          + ". Try again later");
+    }
+  }
+
   @PUT
   @Path("/tasks/{taskType}/cleanup")
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.CLEANUP_TASK)

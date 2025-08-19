@@ -26,32 +26,26 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.helix.AccessOption;
-import org.apache.helix.store.HelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.controller.helix.ControllerTest;
-import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 
-public class MinionTaskGenerationLockManagerTest extends ControllerTest {
+public class TaskGenerationLockTest extends ControllerTest {
   private static final String TABLE_NAME_WITH_TYPE = "testTable_OFFLINE";
   private static final String TASK_TYPE = "TestTaskType";
 
-  private MinionTaskGenerationLockManager _lockManager;
-  private PinotHelixResourceManager _helixResourceManager;
-  private HelixPropertyStore<ZNRecord> _propertyStore;
+  private PinotTaskManager _taskManager;
 
   @BeforeMethod
   public void setUp() throws Exception {
     startZk();
     startController();
-    _helixResourceManager = _controllerStarter.getHelixResourceManager();
-    _propertyStore = _helixResourceManager.getPropertyStore();
-    _lockManager = new MinionTaskGenerationLockManager(_helixResourceManager);
+    _taskManager = _controllerStarter.getTaskManager();
   }
 
   @AfterMethod
@@ -69,7 +63,7 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
       return null;
     };
 
-    _lockManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
+    _taskManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
 
     Assert.assertTrue(taskExecuted.get());
 
@@ -86,7 +80,7 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
     };
 
     try {
-      _lockManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, failingTask);
+      _taskManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, failingTask);
       Assert.fail("Expected RuntimeException");
     } catch (Exception e) {
       Assert.assertEquals(e.getMessage(), "Task failed");
@@ -104,7 +98,7 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
         TABLE_NAME_WITH_TYPE, TASK_TYPE);
 
     ZNRecord existingLock = new ZNRecord("existing-lock");
-    existingLock.setLongField(MinionTaskGenerationLockManager.ACQUIRED_AT, System.currentTimeMillis());
+    existingLock.setLongField(PinotTaskManager.ACQUIRED_AT, System.currentTimeMillis());
     _propertyStore.create(lockPath, existingLock, AccessOption.PERSISTENT);
 
     AtomicBoolean taskExecuted = new AtomicBoolean(false);
@@ -114,7 +108,7 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
     };
 
     try {
-      _lockManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
+      _taskManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
       Assert.fail("Expected RuntimeException for lock acquisition failure");
     } catch (RuntimeException e) {
       Assert.assertTrue(e.getMessage().contains("Unable to acquire task generation lock"));
@@ -129,9 +123,9 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
     String lockPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskGenerationLock(
         TABLE_NAME_WITH_TYPE, TASK_TYPE);
 
-    long expiredTime = System.currentTimeMillis() - MinionTaskGenerationLockManager.TASK_GENERATION_LOCK_TTL - 1000;
+    long expiredTime = System.currentTimeMillis() - PinotTaskManager.TASK_GENERATION_LOCK_TTL - 1000;
     ZNRecord expiredLock = new ZNRecord("expired-lock");
-    expiredLock.setLongField(MinionTaskGenerationLockManager.ACQUIRED_AT, expiredTime);
+    expiredLock.setLongField(PinotTaskManager.ACQUIRED_AT, expiredTime);
     _propertyStore.create(lockPath, expiredLock, AccessOption.PERSISTENT);
 
     AtomicBoolean taskExecuted = new AtomicBoolean(false);
@@ -140,7 +134,7 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
       return null;
     };
 
-    _lockManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
+    _taskManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
 
     Assert.assertTrue(taskExecuted.get());
 
@@ -153,9 +147,9 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
     String lockPath = ZKMetadataProvider.constructPropertyStorePathForMinionTaskGenerationLock(
         TABLE_NAME_WITH_TYPE, TASK_TYPE);
 
-    long boundaryTime = System.currentTimeMillis() - MinionTaskGenerationLockManager.TASK_GENERATION_LOCK_TTL + 1000;
+    long boundaryTime = System.currentTimeMillis() - PinotTaskManager.TASK_GENERATION_LOCK_TTL + 1000;
     ZNRecord boundaryLock = new ZNRecord("boundary-lock");
-    boundaryLock.setLongField(MinionTaskGenerationLockManager.ACQUIRED_AT, boundaryTime);
+    boundaryLock.setLongField(PinotTaskManager.ACQUIRED_AT, boundaryTime);
     _propertyStore.create(lockPath, boundaryLock, AccessOption.PERSISTENT);
 
     AtomicBoolean taskExecuted = new AtomicBoolean(false);
@@ -165,7 +159,7 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
     };
 
     try {
-      _lockManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
+      _taskManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
       Assert.fail("Expected RuntimeException for non-expired lock");
     } catch (RuntimeException e) {
       Assert.assertTrue(e.getMessage().contains("Unable to acquire task generation lock"));
@@ -189,7 +183,7 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
       return null;
     };
 
-    _lockManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
+    _taskManager.generateWithLock(TABLE_NAME_WITH_TYPE, TASK_TYPE, task);
 
     Assert.assertTrue(taskExecuted.get());
 
@@ -241,7 +235,7 @@ public class MinionTaskGenerationLockManagerTest extends ControllerTest {
       Callable<Void> task1) {
     futures.add(executorService.submit(() -> {
       try {
-        _lockManager.generateWithLock(table1, taskType1, task1);
+        _taskManager.generateWithLock(table1, taskType1, task1);
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
