@@ -143,6 +143,29 @@ public class SegmentMetadataImpl implements SegmentMetadata {
     }
   }
 
+  public SegmentMetadataImpl(List<File> files) throws ConfigurationException, IOException {
+    File metadataFile = SegmentMetadataUtils.findMetadataFile(files);
+    if (metadataFile == null) {
+      throw new RuntimeException("Required metadata.properties file not found in segment files");
+    }
+
+    File creationMetaFile = SegmentMetadataUtils.findCreationMetaFile(files);
+
+    _indexDir = null;
+    _columnMetadataMap = new TreeMap<>();
+    _schema = new Schema();
+
+    PropertiesConfiguration segmentMetadataPropertiesConfiguration =
+            CommonsConfigurationUtils.fromFile(metadataFile);
+    init(segmentMetadataPropertiesConfiguration);
+    setTimeInfo(segmentMetadataPropertiesConfiguration);
+    _totalDocs = segmentMetadataPropertiesConfiguration.getInt(Segment.SEGMENT_TOTAL_DOCS);
+
+    if (creationMetaFile != null) {
+      loadCreationMeta(creationMetaFile);
+    }
+  }
+
   /**
    * For REALTIME consuming segments.
    */
