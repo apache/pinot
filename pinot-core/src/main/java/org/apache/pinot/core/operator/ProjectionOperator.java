@@ -31,26 +31,31 @@ import org.apache.pinot.core.common.DataFetcher;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.trace.Tracing;
 
 
 public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> implements AutoCloseable {
-  private static final String EXPLAIN_NAME = "PROJECT";
+  protected static final String EXPLAIN_NAME = "PROJECT";
 
-  private final Map<String, DataSource> _dataSourceMap;
-  private final BaseOperator<DocIdSetBlock> _docIdSetOperator;
-  private final DataBlockCache _dataBlockCache;
-  private final Map<String, ColumnContext> _columnContextMap;
+  protected final Map<String, DataSource> _dataSourceMap;
+  protected final BaseOperator<DocIdSetBlock> _docIdSetOperator;
+  protected final DataFetcher _dataFetcher;
+  protected final DataBlockCache _dataBlockCache;
+  protected final Map<String, ColumnContext> _columnContextMap;
+  protected final QueryContext _queryContext;
 
   public ProjectionOperator(Map<String, DataSource> dataSourceMap,
-      @Nullable BaseOperator<DocIdSetBlock> docIdSetOperator) {
+      @Nullable BaseOperator<DocIdSetBlock> docIdSetOperator, QueryContext queryContext) {
     _dataSourceMap = dataSourceMap;
     _docIdSetOperator = docIdSetOperator;
-    _dataBlockCache = new DataBlockCache(new DataFetcher(dataSourceMap));
+    _dataFetcher = new DataFetcher(dataSourceMap);
+    _dataBlockCache = new DataBlockCache(_dataFetcher);
     _columnContextMap = new HashMap<>(HashUtil.getHashMapCapacity(dataSourceMap.size()));
     dataSourceMap.forEach(
         (column, dataSource) -> _columnContextMap.put(column, ColumnContext.fromDataSource(dataSource)));
+    _queryContext = queryContext;
   }
 
   @Override

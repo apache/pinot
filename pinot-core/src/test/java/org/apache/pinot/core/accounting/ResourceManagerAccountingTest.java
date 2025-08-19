@@ -20,18 +20,15 @@ package org.apache.pinot.core.accounting;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.apache.commons.io.FileUtils;
 import org.apache.log4j.Level;
@@ -59,7 +56,9 @@ import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.JsonIndexCreator;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -99,13 +98,14 @@ public class ResourceManagerAccountingTest {
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, true);
-    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
+    PinotConfiguration pinotCfg = new PinotConfiguration(configs);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg,
+        "testCPUtimeProvider", InstanceType.SERVER);
+    Tracing.ThreadAccountantOps.startThreadAccountant();
+
+    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs, accountant);
     Future[] futures = new Future[2000];
     AtomicInteger atomicInteger = new AtomicInteger();
-    PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testCPUtimeProvider",
-        InstanceType.SERVER);
-    Tracing.ThreadAccountantOps.startThreadAccountant();
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
@@ -164,11 +164,12 @@ public class ResourceManagerAccountingTest {
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
-    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testCPUtimeProvider",
-        InstanceType.SERVER);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg,
+        "testCPUtimeProvider", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
+
+    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs, accountant);
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
@@ -241,13 +242,13 @@ public class ResourceManagerAccountingTest {
 
     String workloadName = CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME;
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testWorkloadMemoryAccounting",
-        InstanceType.SERVER);
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg,
+        "testWorkloadMemoryAccounting", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
     WorkloadBudgetManager workloadBudgetManager =
         Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
     workloadBudgetManager.addOrUpdateWorkload(workloadName, 88_000_000, 27_000_000);
-    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
+    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs, accountant);
 
     for (int k = 0; k < 30; k++) {
       int finalK = k;
@@ -294,56 +295,6 @@ public class ResourceManagerAccountingTest {
     Thread.sleep(1000_000);
   }
 
-
-  /**
-   * Test the mechanism of worker thread checking for runnerThread's interruption flag
-   */
-  @Test
-  public void testWorkerThreadInterruption()
-      throws Exception {
-    ResourceManager rm = getResourceManager(2, 5, 1, 3, Collections.emptyMap());
-    AtomicReference<Future>[] futures = new AtomicReference[5];
-    for (int i = 0; i < 5; i++) {
-      futures[i] = new AtomicReference<>();
-    }
-    ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
-    AtomicReference<Thread> runnerThread = new AtomicReference<>();
-    rm.getQueryRunners().submit(() -> {
-      Thread thread = Thread.currentThread();
-      runnerThread.set(thread);
-      for (int j = 0; j < 5; j++) {
-        futures[j].set(rm.getQueryWorkers().submit(() -> {
-          for (int i = 0; i < 1000000; i++) {
-            try {
-              Thread.sleep(5);
-            } catch (InterruptedException ignored) {
-            }
-            if (thread.isInterrupted()) {
-              throw new EarlyTerminationException();
-            }
-          }
-        }));
-      }
-      while (true) {
-      }
-    });
-    Thread.sleep(50);
-    runnerThread.get().interrupt();
-
-    for (int i = 0; i < 5; i++) {
-      try {
-        futures[i].get().get();
-      } catch (ExecutionException e) {
-        Assert.assertFalse(futures[i].get().isCancelled());
-        Assert.assertTrue(futures[i].get().isDone());
-        Assert.assertTrue(e.getMessage().contains("EarlyTerminationException"),
-            "Error message should contain EarlyTerminationException, found: " + e.getMessage());
-        return;
-      }
-    }
-    Assert.fail("Expected EarlyTerminationException to be thrown");
-  }
-
   /**
    * Test instrumentation during {@link DataTable} creation
    */
@@ -379,10 +330,12 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
-    ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testSelect", InstanceType.SERVER);
+    Tracing.unregisterThreadAccountant();
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config,
+        "testSelect", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
+    ResourceManager rm = getResourceManager(20, 2, 1, 1, configs, accountant);
 
     CountDownLatch latch = new CountDownLatch(100);
     AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
@@ -404,7 +357,7 @@ public class ResourceManagerAccountingTest {
         }
       });
     }
-    latch.await();
+    latch.await(1, java.util.concurrent.TimeUnit.MINUTES);
     // assert that EarlyTerminationException was thrown in at least one runner thread
     Assert.assertTrue(earlyTerminationOccurred.get());
   }
@@ -450,10 +403,13 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     PinotConfiguration config = getConfig(20, 2, configs);
 
-    ResourceManager rm = getResourceManager(20, 2, 1, 1, configs);
     // init accountant and start watcher task
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testGroupBy", InstanceType.SERVER);
+    Tracing.unregisterThreadAccountant();
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config,
+        "testGroupBy", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
+
+    ResourceManager rm = getResourceManager(20, 2, 1, 1, configs, accountant);
 
     CountDownLatch latch = new CountDownLatch(100);
     AtomicBoolean earlyTerminationOccurred = new AtomicBoolean(false);
@@ -475,7 +431,7 @@ public class ResourceManagerAccountingTest {
         }
       });
     }
-    latch.await();
+    latch.await(1, java.util.concurrent.TimeUnit.MINUTES);
     // assert that EarlyTerminationException was thrown in at least one runner thread
     Assert.assertTrue(earlyTerminationOccurred.get());
   }
@@ -507,11 +463,13 @@ public class ResourceManagerAccountingTest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO, 0.00f);
 
     PinotConfiguration config = getConfig(2, 2, configs);
-    ResourceManager rm = getResourceManager(2, 2, 1, 1, configs);
     // init accountant and start watcher task
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(config, "testJsonIndexExtractMapOOM",
-        InstanceType.SERVER);
+    Tracing.unregisterThreadAccountant();
+    ThreadResourceUsageAccountant accountant = Tracing.ThreadAccountantOps.createThreadAccountant(config,
+        "testJsonIndexExtractMapOOM", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
+
+    ResourceManager rm = getResourceManager(2, 2, 1, 1, configs, accountant);
 
     Supplier<String> randomJsonValue = () -> {
       Random random = new Random();
@@ -575,7 +533,7 @@ public class ResourceManagerAccountingTest {
         }
       });
 
-      latch.await();
+      latch.await(1, java.util.concurrent.TimeUnit.MINUTES);
       Assert.assertTrue(mutableEarlyTerminationOccurred.get(),
           "Expected early termination reading the mutable index");
       Assert.assertTrue(immutableEarlyTerminationOccurred.get(),
@@ -602,7 +560,7 @@ public class ResourceManagerAccountingTest {
         "org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory");
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
     configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
-    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs);
+    ResourceManager rm = getResourceManager(20, 40, 1, 1, configs, new Tracing.DefaultThreadResourceUsageAccountant());
     Future[] futures = new Future[30];
 
     for (int k = 0; k < 4; k++) {
@@ -651,9 +609,9 @@ public class ResourceManagerAccountingTest {
   }
 
   private ResourceManager getResourceManager(int runners, int workers, final int softLimit, final int hardLimit,
-      Map<String, Object> map) {
+      Map<String, Object> map, ThreadResourceUsageAccountant accountant) {
 
-    return new ResourceManager(getConfig(runners, workers, map), new Tracing.DefaultThreadResourceUsageAccountant()) {
+    return new ResourceManager(getConfig(runners, workers, map), accountant) {
 
       @Override
       public QueryExecutorService getExecutorService(ServerQueryRequest query, SchedulerGroupAccountant accountant) {

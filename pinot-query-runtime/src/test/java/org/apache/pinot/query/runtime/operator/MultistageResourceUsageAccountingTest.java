@@ -37,6 +37,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.set.IntersectOperator;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
@@ -56,10 +57,12 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.MockitoAnnotations.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultistageResourceUsageAccountingTest implements ITest {
@@ -91,13 +94,15 @@ public class MultistageResourceUsageAccountingTest implements ITest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION, true);
     // init accountant and start watcher task
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
+    Tracing.unregisterThreadAccountant();
+    Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     // Setup Thread Context
-    Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);
+    Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest",
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
     ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-    Tracing.ThreadAccountantOps.setupWorker(1, ThreadExecutionContext.TaskType.MSE, threadExecutionContext);
+    Tracing.ThreadAccountantOps.setupWorker(1, threadExecutionContext);
   }
 
   @BeforeMethod

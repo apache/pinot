@@ -45,7 +45,7 @@
         "sql": "EXPLAIN PLAN FOR SELECT timestampDiff(DAY, CAST(ts as TIMESTAMP), CAST(dateTrunc('MONTH', FROMDATETIME('1997-02-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')) as TIMESTAMP)) FROM d",
         "output": [
           "Execution Plan",
-          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($7):TIMESTAMP(0) NOT NULL, CAST(854755200000:BIGINT):TIMESTAMP(0) NOT NULL)])",
+          "\nLogicalProject(EXPR$0=[TIMESTAMPDIFF(FLAG(DAY), CAST($7):TIMESTAMP(0) NOT NULL, 1997-02-01 00:00:00)])",
           "\n  PinotLogicalTableScan(table=[[default, d]])",
           "\n"
         ]
@@ -250,6 +250,36 @@
           "\n    PinotLogicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[LEAF])",
           "\n      LogicalFilter(condition=[>(CAST($0):BIGINT NOT NULL, 14)])",
           "\n        PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "filter with implicit cast",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE col3 > '10.5'",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[>($2, 10)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "filter with explicit cast",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE col3 > CAST('10.5' AS INT)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[>($2, 10)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "filter with nested explicit casts",
+        "sql": "EXPLAIN PLAN FOR SELECT * FROM a WHERE col3 > CAST(CAST('10.5' AS LONG) AS INT)",
+        "output": [
+          "Execution Plan",
+          "\nLogicalFilter(condition=[>($2, 10)])",
+          "\n  PinotLogicalTableScan(table=[[default, a]])",
           "\n"
         ]
       },

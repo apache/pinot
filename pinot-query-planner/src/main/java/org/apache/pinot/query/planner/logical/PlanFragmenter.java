@@ -29,6 +29,7 @@ import org.apache.pinot.calcite.rel.logical.PinotRelExchangeType;
 import org.apache.pinot.query.planner.PlanFragment;
 import org.apache.pinot.query.planner.SubPlan;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -124,6 +125,11 @@ public class PlanFragmenter implements PlanNodeVisitor<PlanNode, PlanFragmenter.
   @Override
   public PlanNode visitJoin(JoinNode node, Context context) {
     return process(node, context);
+  }
+
+  @Override
+  public PlanNode visitEnrichedJoin(EnrichedJoinNode node, Context context) {
+    return visitJoin(node, context);
   }
 
   @Override

@@ -31,6 +31,7 @@ import {
   TableSchema,
   SQLResult,
   ClusterName,
+  PackageVersions,
   ZKGetList,
   ZKConfig,
   OperationResponse,
@@ -54,12 +55,12 @@ import {
   PauseStatusDetails
 } from 'Models';
 
+import { baseApi, baseApiWithErrors, transformApi } from '../utils/axios-config';
+
 const headers = {
   'Content-Type': 'application/json; charset=UTF-8',
   'Accept': 'text/plain, */*; q=0.01'
 };
-
-import { baseApi, baseApiWithErrors, transformApi } from '../utils/axios-config';
 
 export const getTenants = (): Promise<AxiosResponse<Tenants>> =>
   baseApi.get('/tenants');
@@ -87,7 +88,7 @@ export const getSchema = (name: string): Promise<AxiosResponse<OperationResponse
 
 export const putSchema = (name: string, params: string, reload?: boolean): Promise<AxiosResponse<OperationResponse>> => {
   let queryParams = {};
-  
+
   if(reload) {
     queryParams["reload"] = reload;
   }
@@ -198,10 +199,10 @@ export const executeTask = (data): Promise<AxiosResponse<OperationResponse>> =>
 
 export const getJobDetail = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/scheduler/jobDetails?tableName=${tableName}&taskType=${taskType}`, { headers: { ...headers, Accept: 'application/json' } });
-  
+
 export const getMinionMeta = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/${tableName}/metadata`, { headers: { ...headers, Accept: 'application/json' } });
-  
+
 export const getTasks = (tableName: string, taskType: string): Promise<AxiosResponse<OperationResponse>> =>
   baseApi.get(`/tasks/${taskType}/${tableName}/state`, { headers: { ...headers, Accept: 'application/json' } });
 
@@ -238,8 +239,14 @@ export const getQueryResult = (params: Object): Promise<AxiosResponse<SQLResult>
 export const getTimeSeriesQueryResult = (params: Object): Promise<AxiosResponse<any>> =>
   transformApi.get(`/timeseries/api/v1/query_range`, { params });
 
+export const getTimeSeriesLanguages = (): Promise<AxiosResponse<string[]>> =>
+  baseApi.get('/timeseries/languages');
+
 export const getClusterInfo = (): Promise<AxiosResponse<ClusterName>> =>
   baseApi.get('/cluster/info');
+
+export const getVersions = (): Promise<AxiosResponse<PackageVersions>> =>
+  baseApi.get('/version');
 
 export const zookeeperGetList = (params: string): Promise<AxiosResponse<ZKGetList>> =>
   baseApi.get(`/zk/ls?path=${params}`);

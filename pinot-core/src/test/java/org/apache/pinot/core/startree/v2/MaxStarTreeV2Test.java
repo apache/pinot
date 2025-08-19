@@ -26,10 +26,10 @@ import org.apache.pinot.spi.data.FieldSpec.DataType;
 import static org.testng.Assert.assertEquals;
 
 
-public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
+public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Object, Double> {
 
   @Override
-  ValueAggregator<Number, Double> getValueAggregator() {
+  ValueAggregator<Object, Double> getValueAggregator() {
     return new MaxValueAggregator();
   }
 
@@ -39,7 +39,7 @@ public class MaxStarTreeV2Test extends BaseStarTreeV2Test<Number, Double> {
   }
 
   @Override
-  Number getRandomRawValue(Random random) {
+  Object getRandomRawValue(Random random) {
     return random.nextDouble();
   }
 

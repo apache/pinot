@@ -32,11 +32,11 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.core.routing.MockRoutingManagerFactory;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo;
 import org.apache.pinot.core.routing.TablePartitionReplicatedServersInfo.PartitionInfo;
 import org.apache.pinot.query.routing.WorkerManager;
-import org.apache.pinot.query.testutils.MockRoutingManagerFactory;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -286,6 +286,7 @@ public class QueryEnvironmentTestBase {
         // Verify type coercion in standard functions
         new Object[]{"SELECT DATEADD('DAY', 1, col7) FROM a"},
         new Object[]{"SELECT TIMESTAMPADD(DAY, 10, NOW() - 100) FROM a"},
+        new Object[]{"SELECT ts FROM a WHERE ts <= '2025-08-14 00:00:00.000000'"}
     };
   }
 

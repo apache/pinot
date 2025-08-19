@@ -20,6 +20,7 @@ package org.apache.pinot.core.operator.query;
 
 import com.clearspring.analytics.stream.cardinality.HyperLogLog;
 import com.clearspring.analytics.stream.cardinality.HyperLogLogPlus;
+import com.dynatrace.hash4j.distinctcount.UltraLogLog;
 import it.unimi.dsi.fastutil.doubles.DoubleOpenHashSet;
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
@@ -42,8 +43,11 @@ import org.apache.pinot.core.query.aggregation.function.DistinctCountOffHeapAggr
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountRawHLLPlusAggregationFunction;
 import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartHLLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountSmartULLAggregationFunction;
+import org.apache.pinot.core.query.aggregation.function.DistinctCountULLAggregationFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.customobject.MinMaxRangePair;
+import org.apache.pinot.segment.local.utils.UltraLogLogUtils;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -54,10 +58,11 @@ import org.apache.pinot.spi.utils.ByteArray;
  * Aggregation operator that utilizes dictionary or column metadata for serving aggregation queries to avoid scanning.
  * The scanless operator is selected in the plan maker, if the query is of aggregation type min, max, minmaxrange,
  * distinctcount, distinctcounthll, distinctcountrawhll, segmentpartitioneddistinctcount, distinctcountsmarthll,
- * distinctcounthllplus, distinctcountrawhllplus, and the column has a dictionary, or has column metadata with min and
- * max value defined. It also supports count(*) if the query has no filter.
- * We don't use this operator if the segment has star tree,
- * as the dictionary will have aggregated values for the metrics, and dimensions will have star node value.
+ * distinctcounthllplus, distinctcountrawhllplus, distinctcountUll, distinctcountsmartUll and the column has a
+ * dictionary, or has column metadata with min and max value defined. It also supports count(*) if the query has
+ * no filter.
+ * We don't use this operator if the segment has star tree, as the dictionary will have aggregated values for the
+ * metrics, and dimensions will have star node value.
  *
  * For min value, we use the first value from the dictionary, falling back to the column metadata min value if there
  * is no dictionary.
@@ -143,6 +148,18 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
         case DISTINCTCOUNTSMARTHLL:
           result = getDistinctCountSmartHLLResult(Objects.requireNonNull(dataSource.getDictionary()),
               (DistinctCountSmartHLLAggregationFunction) aggregationFunction);
+          break;
+        case DISTINCTCOUNTULL:
+          result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
+              (DistinctCountULLAggregationFunction) aggregationFunction);
+          break;
+        case DISTINCTCOUNTSMARTULL:
+          result = getDistinctCountSmartULLResult(Objects.requireNonNull(dataSource.getDictionary()),
+              (DistinctCountSmartULLAggregationFunction) aggregationFunction);
+          break;
+        case DISTINCTCOUNTRAWULL:
+          result = getDistinctCountULLResult(Objects.requireNonNull(dataSource.getDictionary()),
+              (DistinctCountULLAggregationFunction) aggregationFunction);
           break;
         default:
           throw new IllegalStateException(
@@ -234,6 +251,16 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     return hll;
   }
 
+  private static UltraLogLog getDistinctValueULL(Dictionary dictionary, int p) {
+    UltraLogLog ull = UltraLogLog.create(p);
+    int length = dictionary.length();
+    for (int i = 0; i < length; i++) {
+      Object value = dictionary.get(i);
+      UltraLogLogUtils.hashObject(value).ifPresent(ull::add);
+    }
+    return ull;
+  }
+
   private static HyperLogLogPlus getDistinctValueHLLPlus(Dictionary dictionary, int p, int sp) {
     HyperLogLogPlus hllPlus = new HyperLogLogPlus(p, sp);
     int length = dictionary.length();
@@ -286,6 +313,34 @@ public class NonScanBasedAggregationOperator extends BaseOperator<AggregationRes
     if (dictionary.length() > function.getThreshold()) {
       // Store values into a HLL when the dictionary size exceeds the conversion threshold
       return getDistinctValueHLL(dictionary, function.getLog2m());
+    } else {
+      return getDistinctValueSet(dictionary);
+    }
+  }
+
+  private static UltraLogLog getDistinctCountULLResult(Dictionary dictionary,
+      DistinctCountULLAggregationFunction function) {
+    if (dictionary.getValueType() == FieldSpec.DataType.BYTES) {
+      // Treat BYTES value as serialized UltraLogLog and merge
+      try {
+        UltraLogLog ull = ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(0));
+        int length = dictionary.length();
+        for (int i = 1; i < length; i++) {
+          ull.add(ObjectSerDeUtils.ULTRA_LOG_LOG_OBJECT_SER_DE.deserialize(dictionary.getBytesValue(i)));
+        }
+        return ull;
+      } catch (Exception e) {
+        throw new RuntimeException("Caught exception while merging UltraLogLogs", e);
+      }
+    } else {
+      return getDistinctValueULL(dictionary, function.getP());
+    }
+  }
+
+  private static Object getDistinctCountSmartULLResult(Dictionary dictionary,
+      DistinctCountSmartULLAggregationFunction function) {
+    if (dictionary.length() > function.getThreshold()) {
+      return getDistinctValueULL(dictionary, function.getP());
     } else {
       return getDistinctValueSet(dictionary);
     }

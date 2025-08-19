@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
@@ -693,5 +693,13 @@ public class ControllerRequestURLBuilder {
 
   public String forTableTimeBoundary(String tableName) {
     return StringUtil.join("/", _baseUrl, "tables", tableName, "timeBoundary");
+  }
+
+  public String forClusterConfigUpdate() {
+    return StringUtil.join("/", _baseUrl, "cluster", "configs");
+  }
+
+  public String forClusterConfigDelete(String config) {
+    return StringUtil.join("/", _baseUrl, "cluster", "configs", config);
   }
 }

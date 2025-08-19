@@ -44,6 +44,8 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
 
   @Override
   public QuantileDigest getInitialAggregatedValue(Object rawValue) {
+    // NOTE: rawValue cannot be null because this aggregator can only be used for star-tree index.
+    assert rawValue != null;
     QuantileDigest initialValue;
     if (rawValue instanceof byte[]) {
       byte[] bytes = (byte[]) rawValue;
@@ -51,7 +53,7 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
       _maxByteSize = Math.max(_maxByteSize, bytes.length);
     } else {
       initialValue = new QuantileDigest(DEFAULT_MAX_ERROR);
-      initialValue.add(((Number) rawValue).longValue());
+      initialValue.add(toLong(rawValue));
       _maxByteSize = Math.max(_maxByteSize, initialValue.getByteSize());
     }
     return initialValue;
@@ -62,10 +64,22 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
     if (rawValue instanceof byte[]) {
       value.merge(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      value.add(((Number) rawValue).longValue());
+      value.add(toLong(rawValue));
     }
     _maxByteSize = Math.max(_maxByteSize, value.getByteSize());
     return value;
+  }
+
+  private static long toLong(Object rawValue) {
+    if (rawValue instanceof Number) {
+      return ((Number) rawValue).longValue();
+    }
+    String stringValue = rawValue.toString();
+    try {
+      return Long.parseLong(stringValue);
+    } catch (NumberFormatException e) {
+      return (long) Double.parseDouble(stringValue);
+    }
   }
 
   @Override
@@ -78,6 +92,11 @@ public class PercentileEstValueAggregator implements ValueAggregator<Object, Qua
   @Override
   public QuantileDigest cloneAggregatedValue(QuantileDigest value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return false;
   }
 
   @Override

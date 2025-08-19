@@ -18,20 +18,11 @@
  */
 package org.apache.pinot.plugin.stream.kafka;
 
-import java.util.Map;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.data.readers.GenericRow;
-import org.apache.pinot.spi.stream.StreamMessageMetadata;
+public class KafkaStreamMessageMetadata {
+  private KafkaStreamMessageMetadata() {
+  }
 
-// TODO: Make it a util class
-public class KafkaStreamMessageMetadata extends StreamMessageMetadata {
   public static final String METADATA_OFFSET_KEY = "offset";
   public static final String RECORD_TIMESTAMP_KEY = "recordTimestamp";
   public static final String METADATA_PARTITION_KEY = "partition";
-
-  @Deprecated
-  public KafkaStreamMessageMetadata(long recordIngestionTimeMs, @Nullable GenericRow headers,
-      Map<String, String> metadata) {
-    super(recordIngestionTimeMs, headers, metadata);
-  }
 }

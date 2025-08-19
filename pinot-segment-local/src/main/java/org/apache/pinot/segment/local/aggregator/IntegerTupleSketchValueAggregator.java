@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.aggregator;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.datasketches.tuple.Sketch;
 import org.apache.datasketches.tuple.Union;
 import org.apache.datasketches.tuple.aninteger.IntegerSummary;
@@ -60,9 +61,12 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
   }
 
   @Override
-  public Object getInitialAggregatedValue(byte[] rawValue) {
-    Sketch<IntegerSummary> initialValue = deserializeAggregatedValue(rawValue);
+  public Object getInitialAggregatedValue(@Nullable byte[] rawValue) {
     Union tupleUnion = new Union<>(_nominalEntries, new IntegerSummarySetOperations(_mode, _mode));
+    if (rawValue == null) {
+      return tupleUnion;
+    }
+    Sketch<IntegerSummary> initialValue = deserializeAggregatedValue(rawValue);
     tupleUnion.union(initialValue);
     return tupleUnion;
   }
@@ -112,6 +116,11 @@ public class IntegerTupleSketchValueAggregator implements ValueAggregator<byte[]
   @Override
   public Object cloneAggregatedValue(Object value) {
     return deserializeAggregatedValue(serializeAggregatedValue(value));
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   /**

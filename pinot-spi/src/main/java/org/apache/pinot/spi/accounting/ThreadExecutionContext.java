@@ -24,17 +24,6 @@ package org.apache.pinot.spi.accounting;
 public interface ThreadExecutionContext {
 
    /**
-    * SSE: Single Stage Engine
-    * MSE: Multi Stage Engine
-    * UNKNOWN: Default
-    */
-   enum TaskType {
-      SSE,
-      MSE,
-      UNKNOWN
-   }
-
-   /**
     * get query id of the execution context
     * @return query id in string
     */
@@ -45,8 +34,6 @@ public interface ThreadExecutionContext {
     * @return get the anchor thread of execution context
     */
    Thread getAnchorThread();
-
-   TaskType getTaskType();
 
    String getWorkloadName();
 }

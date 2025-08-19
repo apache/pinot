@@ -23,11 +23,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.data.Segment;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
 import org.apache.pinot.core.common.MinionConstants;
@@ -74,19 +76,8 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       long purgeDeltaMs = TimeUtils.convertPeriodToMillis(deltaTimePeriod);
 
       LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
-      // Get max number of tasks for this table
-      int tableMaxNumTasks;
-      String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
-      if (tableMaxNumTasksConfig != null) {
-        try {
-          tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
-        } catch (Exception e) {
-          tableMaxNumTasks = Integer.MAX_VALUE;
-          LOGGER.warn("MaxNumTasks have been wrongly set for table : {}, and task {}", tableName, taskType);
-        }
-      } else {
-        tableMaxNumTasks = Integer.MAX_VALUE;
-      }
+      // Get max number of subtasks for this table
+      int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableName);
       List<SegmentZKMetadata> segmentsZKMetadata =
           tableConfig.getTableType() == TableType.OFFLINE
               ? getSegmentsZKMetadataForTable(tableName)
@@ -96,7 +87,6 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       List<SegmentZKMetadata> notpurgedSegmentsZKMetadata = new ArrayList<>();
 
       for (SegmentZKMetadata segmentMetadata : segmentsZKMetadata) {
-
         if (segmentMetadata.getCustomMap() != null && segmentMetadata.getCustomMap()
             .containsKey(MinionConstants.PurgeTask.TASK_TYPE + MinionConstants.TASK_TIME_SUFFIX)) {
           purgedSegmentsZKMetadata.add(segmentMetadata);
@@ -113,8 +103,24 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       int tableNumTasks = 0;
       Set<Segment> runningSegments =
           TaskGeneratorUtils.getRunningSegments(MinionConstants.PurgeTask.TASK_TYPE, _clusterInfoAccessor);
+      List<String> segmentsForDeletion = new ArrayList<>();
+      // For realtime tables, build a map of partition to latest segment to avoid deleting last segments
+      Set<String> lastLLCSegmentPerPartition = new HashSet<>();
+      if (tableConfig.getTableType() == TableType.REALTIME) {
+        lastLLCSegmentPerPartition = getLastLLCSegmentPerPartition(segmentsZKMetadata);
+      }
       for (SegmentZKMetadata segmentZKMetadata : notpurgedSegmentsZKMetadata) {
         String segmentName = segmentZKMetadata.getSegmentName();
+        if (segmentZKMetadata.getTotalDocs() == 0L) {
+          // Check if this empty segment is the last segment of a partition
+          if (lastLLCSegmentPerPartition.contains(segmentName)) {
+            LOGGER.info("Skipping deletion of empty segment {} as it is the last segment of its partition",
+                segmentName);
+          } else {
+            segmentsForDeletion.add(segmentName);
+          }
+          continue;
+        }
         Map<String, String> configs = new HashMap<>(getBaseTaskConfigs(tableConfig, List.of(segmentName)));
         Long tsLastPurge;
         if (segmentZKMetadata.getCustomMap() != null) {
@@ -141,9 +147,38 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
         pinotTaskConfigs.add(new PinotTaskConfig(taskType, configs));
         tableNumTasks++;
       }
+      if (!segmentsForDeletion.isEmpty()) {
+        _clusterInfoAccessor.getPinotHelixResourceManager().deleteSegments(tableName, segmentsForDeletion,
+            "0d");
+        LOGGER.info(
+            "Deleted segments containing no records for table: {}, number of segments to be deleted: {}",
+            tableName, segmentsForDeletion.size());
+      }
       LOGGER.info("Finished generating {} tasks configs for table: {} " + "for task: {}", tableNumTasks, tableName,
           taskType);
     }
     return pinotTaskConfigs;
+  }
+
+  private Set<String> getLastLLCSegmentPerPartition(List<SegmentZKMetadata> segmentsZKMetadata) {
+    Map<Integer, LLCSegmentName> latestLLCSegmentNameMap = new HashMap<>();
+    for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+      // Skip UPLOADED segments that don't conform to the LLC segment name
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentZKMetadata.getSegmentName());
+      if (llcSegmentName != null) {
+        latestLLCSegmentNameMap.compute(llcSegmentName.getPartitionGroupId(), (k, latestLLCSegmentName) -> {
+          if (latestLLCSegmentName == null
+              || llcSegmentName.getSequenceNumber() > latestLLCSegmentName.getSequenceNumber()) {
+            return llcSegmentName;
+          } else {
+            return latestLLCSegmentName;
+          }
+        });
+      }
+    }
+    Set<String> lastLLCSegmentPerPartition = new HashSet<>();
+    latestLLCSegmentNameMap.forEach((ignored, value) ->
+        lastLLCSegmentPerPartition.add(value.getSegmentName()));
+    return lastLLCSegmentPerPartition;
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import java.util.Set;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -131,5 +132,10 @@ public class TaskSchedulingContext {
   public TaskSchedulingContext setLeader(boolean leader) {
     _isLeader = leader;
     return this;
+  }
+
+  public static boolean isUserTriggeredTask(String triggeredBy) {
+    return CommonConstants.TaskTriggers.MANUAL_TRIGGER.toString().equals(triggeredBy)
+        || CommonConstants.TaskTriggers.ADHOC_TRIGGER.toString().equals(triggeredBy);
   }
 }

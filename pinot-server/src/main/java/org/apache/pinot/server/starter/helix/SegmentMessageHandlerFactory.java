@@ -282,26 +282,39 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
   private static class QueryWorkloadRefreshMessageHandler extends DefaultMessageHandler {
     final String _queryWorkloadName;
     final InstanceCost _instanceCost;
+    final String _messageType;
 
     QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
                                        ServerMetrics metrics, NotificationContext context) {
       super(queryWorkloadRefreshMessage, metrics, context);
       _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadName();
       _instanceCost = queryWorkloadRefreshMessage.getInstanceCost();
+      _messageType = queryWorkloadRefreshMessage.getMsgSubType();
     }
 
     @Override
     public HelixTaskResult handleMessage() {
-      LOGGER.info("Handling refresh message: {}", _message);
+      LOGGER.info("Handling query workload message: {}", _message);
       try {
-        Tracing.ThreadAccountantOps.getWorkloadBudgetManager()
+        if (_messageType.equals(QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+          Tracing.ThreadAccountantOps.getWorkloadBudgetManager().deleteWorkload(_queryWorkloadName);
+        } else if (_messageType.equals(QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+          if (_instanceCost == null) {
+            throw new IllegalStateException(
+                "Instance cost is not provided for refreshing query workload: " + _queryWorkloadName);
+          }
+          Tracing.ThreadAccountantOps.getWorkloadBudgetManager()
             .addOrUpdateWorkload(_queryWorkloadName, _instanceCost.getCpuCostNs(), _instanceCost.getMemoryCostBytes());
+        } else {
+          throw new IllegalStateException("Unknown message type: " + _messageType);
+        }
+        HelixTaskResult result = new HelixTaskResult();
+        result.setSuccess(true);
+        return result;
       } catch (Exception e) {
-        LOGGER.info("Failed to refresh query workload: {}", _queryWorkloadName, e);
+        LOGGER.warn("Failed to handle query workload message: {}", _queryWorkloadName, e);
+        throw e;
       }
-      HelixTaskResult result = new HelixTaskResult();
-      result.setSuccess(true);
-      return result;
     }
 
     @Override

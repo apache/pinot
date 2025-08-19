@@ -524,7 +524,8 @@ public class PinotTableRestletResource {
         continue;
       }
       for (String taskName : taskStates.keySet()) {
-        if (TaskState.IN_PROGRESS.equals(taskStates.get(taskName))) {
+        if (TaskState.IN_PROGRESS.equals(taskStates.get(taskName))
+            && pinotHelixTaskResourceManager.getTaskCount(taskName).getRunning() > 0) {
           pendingTasks.add(taskName);
         } else {
           pinotHelixTaskResourceManager.deleteTask(taskName, true);
@@ -703,6 +704,8 @@ public class PinotTableRestletResource {
       boolean dryRun,
       @ApiParam(value = "Whether to enable pre-checks for table, must be in dry-run mode to enable")
       @DefaultValue("false") @QueryParam("preChecks") boolean preChecks,
+      @ApiParam(value = "Whether to disable summary calculation")
+      @DefaultValue("false") @QueryParam("disableSummary") boolean disableSummary,
       @ApiParam(value = "Whether to reassign instances before reassigning segments") @DefaultValue("true")
       @QueryParam("reassignInstances") boolean reassignInstances,
       @ApiParam(value = "Whether to reassign CONSUMING segments for real-time table") @DefaultValue("true")
@@ -715,6 +718,13 @@ public class PinotTableRestletResource {
       @DefaultValue("false") @QueryParam("bootstrap") boolean bootstrap,
       @ApiParam(value = "Whether to allow downtime for the rebalance") @DefaultValue("false") @QueryParam("downtime")
       boolean downtime,
+      @ApiParam(value = "This flag only applies to peer-download enabled tables undergoing downtime=true or "
+          + "minAvailableReplicas=0 rebalance (both of which can result in possible data loss scenarios). If enabled, "
+          + "this flag will allow the rebalance to continue even in cases where data loss scenarios have been "
+          + "detected, otherwise the rebalance will be failed and user action will be required to rebalance again. "
+          + "This flag should be used with caution and only used in scenarios where data loss is acceptable")
+      @DefaultValue("false") @QueryParam("allowPeerDownloadDataLoss")
+      boolean allowPeerDownloadDataLoss,
       @ApiParam(value = "For no-downtime rebalance, minimum number of replicas to keep alive during rebalance, or "
           + "maximum number of replicas allowed to be unavailable if value is negative") @DefaultValue("-1")
       @QueryParam("minAvailableReplicas") int minAvailableReplicas,
@@ -773,11 +783,13 @@ public class PinotTableRestletResource {
     RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setDryRun(dryRun);
     rebalanceConfig.setPreChecks(preChecks);
+    rebalanceConfig.setDisableSummary(disableSummary);
     rebalanceConfig.setReassignInstances(reassignInstances);
     rebalanceConfig.setIncludeConsuming(includeConsuming);
     rebalanceConfig.setMinimizeDataMovement(minimizeDataMovement);
     rebalanceConfig.setBootstrap(bootstrap);
     rebalanceConfig.setDowntime(downtime);
+    rebalanceConfig.setAllowPeerDownloadDataLoss(allowPeerDownloadDataLoss);
     rebalanceConfig.setMinAvailableReplicas(minAvailableReplicas);
     rebalanceConfig.setLowDiskMode(lowDiskMode);
     rebalanceConfig.setBestEfforts(bestEfforts);
