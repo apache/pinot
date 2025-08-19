@@ -213,11 +213,12 @@ public class Tracing {
     }
 
     @Override
-    public void setupRunner(@Nullable String queryId, String workloadName) {
+    public void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType, String workloadName) {
     }
 
     @Override
-    public void setupWorker(int taskId, @Nullable ThreadExecutionContext parentContext) {
+    public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nullable ThreadExecutionContext parentContext) {
     }
 
     @Override
@@ -258,7 +259,12 @@ public class Tracing {
     }
 
     public static void setupRunner(String queryId, String workloadName) {
-      Tracing.getThreadAccountant().setupRunner(queryId, workloadName);
+      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE, workloadName);
+    }
+
+    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType, String workloadName) {
+      // Set up the runner thread with the given query ID and workload name
+      Tracing.getThreadAccountant().setupRunner(queryId, taskType, workloadName);
     }
 
     /**
@@ -267,7 +273,17 @@ public class Tracing {
      * @param threadExecutionContext Context holds metadata about the query.
      */
     public static void setupWorker(int taskId, ThreadExecutionContext threadExecutionContext) {
-      Tracing.getThreadAccountant().setupWorker(taskId, threadExecutionContext);
+      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadExecutionContext);
+    }
+
+    /**
+     * Setup metadata of query worker threads.
+     * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
+     * @param threadExecutionContext Context holds metadata about the query.
+     */
+    public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
+        @Nullable ThreadExecutionContext threadExecutionContext) {
+      Tracing.getThreadAccountant().setupWorker(taskId, taskType, threadExecutionContext);
     }
 
     public static void sample() {
