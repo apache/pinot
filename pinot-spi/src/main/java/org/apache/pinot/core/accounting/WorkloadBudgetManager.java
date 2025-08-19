@@ -137,7 +137,7 @@ public class WorkloadBudgetManager {
       // Also print the budget used in the last enforcement window.
       _workloadBudgets.forEach((workload, budget) -> {
         BudgetStats stats = budget.getStats();
-        LOGGER.debug("Workload: {} -> CPU: {}ns, Memory: {} bytes", workload, stats._cpuRemaining,
+        LOGGER.info("Workload: {} -> CPU: {}ns, Memory: {} bytes", workload, stats._cpuRemaining,
             stats._memoryRemaining);
         // Reset the budget.
         budget.reset();
