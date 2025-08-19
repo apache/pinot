@@ -98,9 +98,10 @@ public class MultiStageAccountingTest implements ITest {
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     // Setup Thread Context
-    Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);
+    Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest",
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
     ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-    Tracing.ThreadAccountantOps.setupWorker(1, ThreadExecutionContext.TaskType.MSE, threadExecutionContext);
+    Tracing.ThreadAccountantOps.setupWorker(1, threadExecutionContext);
   }
 
   @BeforeMethod

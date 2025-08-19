@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.testng.annotations.Test;
 
@@ -71,8 +70,8 @@ public class PerQueryCPUMemAccountantTest {
     // New Task
     CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = workerEntry._threadEntry;
     threadEntry._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, ThreadExecutionContext.TaskType.SSE,
-            anchorThread._workerThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
+        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, anchorThread._workerThread,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     threadEntry._currentThreadMemoryAllocationSampleBytes = 1500;
 
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
@@ -101,8 +100,8 @@ public class PerQueryCPUMemAccountantTest {
     // New Task
     CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = workerEntry._threadEntry;
     threadEntry._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, ThreadExecutionContext.TaskType.SSE,
-            anchorThread._workerThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
+        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, anchorThread._workerThread,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     threadEntry.setToIdle();
 
     Map<String, ? extends QueryResourceTracker> queryResourceTrackerMap = accountant.getQueryResources();
@@ -136,8 +135,8 @@ public class PerQueryCPUMemAccountantTest {
     // New Task
     CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = workerEntry._threadEntry;
     threadEntry._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, ThreadExecutionContext.TaskType.SSE,
-            anchorThread._workerThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
+        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, anchorThread._workerThread,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     threadEntry._currentThreadMemoryAllocationSampleBytes = 1500;
 
     accountant.reapFinishedTasks();
@@ -204,8 +203,8 @@ public class PerQueryCPUMemAccountantTest {
     // New Task
     CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = workerEntry._threadEntry;
     threadEntry._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, ThreadExecutionContext.TaskType.SSE,
-            anchorThread._workerThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
+        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, 5, anchorThread._workerThread,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     threadEntry._currentThreadMemoryAllocationSampleBytes = 1500;
 
     accountant.reapFinishedTasks();
@@ -250,8 +249,8 @@ public class PerQueryCPUMemAccountantTest {
     // New Task
     CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = workerEntry._threadEntry;
     threadEntry._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(newQueryId, 5, ThreadExecutionContext.TaskType.SSE,
-            anchorThread._workerThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
+        new CPUMemThreadLevelAccountingObjects.TaskEntry(newQueryId, 5, anchorThread._workerThread,
+            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     threadEntry._currentThreadMemoryAllocationSampleBytes = 3500;
 
     accountant.reapFinishedTasks();

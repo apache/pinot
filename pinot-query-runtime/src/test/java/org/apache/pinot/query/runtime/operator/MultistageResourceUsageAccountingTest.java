@@ -57,10 +57,12 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Factory;
 import org.testng.annotations.Test;
 
-import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.MockitoAnnotations.*;
-import static org.testng.Assert.*;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.DOUBLE;
+import static org.apache.pinot.common.utils.DataSchema.ColumnDataType.INT;
+import static org.mockito.Mockito.when;
+import static org.mockito.MockitoAnnotations.openMocks;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultistageResourceUsageAccountingTest implements ITest {
@@ -97,9 +99,10 @@ public class MultistageResourceUsageAccountingTest implements ITest {
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     // Setup Thread Context
-    Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);
+    Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest",
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
     ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-    Tracing.ThreadAccountantOps.setupWorker(1, ThreadExecutionContext.TaskType.MSE, threadExecutionContext);
+    Tracing.ThreadAccountantOps.setupWorker(1, threadExecutionContext);
   }
 
   @BeforeMethod
