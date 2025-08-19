@@ -541,7 +541,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    * Can be overridden to create a custom WorkloadBudgetManager.
    */
   protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration brokerConf) {
-    return new DefaultWorkloadBudgetManager(brokerConf);
+    return new WorkloadBudgetManager(brokerConf);
   }
 
   private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {
