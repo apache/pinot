@@ -48,8 +48,70 @@ public class AuditRequestProcessor {
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
   private static final String ANONYMOUS = "anonymous";
 
+  // HTTP Headers
+  private static final String HEADER_X_FORWARDED_FOR = "X-Forwarded-For";
+  private static final String HEADER_X_REAL_IP = "X-Real-IP";
+  private static final String HEADER_AUTHORIZATION = "Authorization";
+  private static final String HEADER_X_USER_ID = "X-User-ID";
+  private static final String HEADER_X_USERNAME = "X-Username";
+  private static final String HEADER_X_SERVICE_ID = "X-Service-ID";
+  private static final String HEADER_X_SERVICE_NAME = "X-Service-Name";
+
+  // Auth prefixes
+  private static final String AUTH_BASIC_PREFIX = "Basic ";
+  private static final String AUTH_BEARER_PREFIX = "Bearer ";
+
+  // User identification values
+  private static final String BASIC_AUTH_USER = "basic-auth-user";
+  private static final String BEARER_TOKEN_USER = "bearer-token-user";
+
+  // Common values
+  private static final String UNKNOWN = "unknown";
+  private static final String COMMA_SEPARATOR = ",";
+
+  // Payload keys
+  private static final String PAYLOAD_QUERY_PARAMETERS = "queryParameters";
+  private static final String PAYLOAD_BODY = "body";
+  private static final String PAYLOAD_HEADERS = "headers";
+  private static final String PAYLOAD_ERROR = "error";
+
+  // Sensitive header keywords
+  private static final String SENSITIVE_AUTH = "auth";
+  private static final String SENSITIVE_PASSWORD = "password";
+  private static final String SENSITIVE_TOKEN = "token";
+  private static final String SENSITIVE_SECRET = "secret";
+
   @Inject
   private AuditConfigManager _configManager;
+
+  private static Map<String, String> toHeaderMap(MultivaluedMap<String, String> headers) {
+    Map<String, String> headerMap = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+      String headerName = entry.getKey().toLowerCase();
+      // Skip sensitive headers
+      if (!headerName.contains(SENSITIVE_AUTH) && !headerName.contains(SENSITIVE_PASSWORD) && !headerName.contains(
+          SENSITIVE_TOKEN) && !headerName.contains(SENSITIVE_SECRET)) {
+        List<String> values = entry.getValue();
+        if (!values.isEmpty()) {
+          headerMap.put(entry.getKey(), values.get(0));
+        }
+      }
+    }
+    return headerMap;
+  }
+
+  private static Map<String, Object> toQueryParamsMap(MultivaluedMap<String, String> queryParams) {
+    Map<String, Object> queryMap = new HashMap<>();
+    for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+      List<String> values = entry.getValue();
+      if (values.size() == 1) {
+        queryMap.put(entry.getKey(), values.get(0));
+      } else {
+        queryMap.put(entry.getKey(), values);
+      }
+    }
+    return queryMap;
+  }
 
   public AuditEvent processRequest(ContainerRequestContext requestContext, String remoteAddr) {
     // Check if auditing is enabled (if config manager is available)
@@ -71,11 +133,15 @@ public class AuditRequestProcessor {
       String userId = extractUserId(requestContext);
 
       // Capture request payload based on configuration
-      Object requestPayload = captureRequestPayload(requestContext);
 
       // Log the audit event (service ID will be extracted from headers, not config)
-      return new AuditEvent(extractServiceId(requestContext), endpoint, method, originIpAddress, userId,
-          requestPayload);
+      return new AuditEvent()
+          .setServiceId(extractServiceId(requestContext))
+          .setEndpoint(endpoint)
+          .setMethod(method)
+          .setOriginIpAddress(originIpAddress)
+          .setUserId(userId)
+          .setRequest(captureRequestPayload(requestContext));
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main request
       LOG.warn("Failed to process audit logging for request", e);
@@ -98,13 +164,13 @@ public class AuditRequestProcessor {
   private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
     try {
       // Check for proxy headers first
-      String xForwardedFor = requestContext.getHeaderString("X-Forwarded-For");
+      String xForwardedFor = requestContext.getHeaderString(HEADER_X_FORWARDED_FOR);
       if (StringUtils.isNotBlank(xForwardedFor)) {
         // X-Forwarded-For can contain multiple IPs, take the first one
-        return xForwardedFor.split(",")[0].trim();
+        return xForwardedFor.split(COMMA_SEPARATOR)[0].trim();
       }
 
-      String xRealIp = requestContext.getHeaderString("X-Real-IP");
+      String xRealIp = requestContext.getHeaderString(HEADER_X_REAL_IP);
       if (StringUtils.isNotBlank(xRealIp)) {
         return xRealIp.trim();
       }
@@ -113,7 +179,7 @@ public class AuditRequestProcessor {
       return remoteAddr;
     } catch (Exception e) {
       LOG.debug("Failed to extract client IP address", e);
-      return "unknown";
+      return UNKNOWN;
     }
   }
 
@@ -127,24 +193,24 @@ public class AuditRequestProcessor {
   private String extractUserId(ContainerRequestContext requestContext) {
     try {
       // Check for common user identification headers
-      String authHeader = requestContext.getHeaderString("Authorization");
+      String authHeader = requestContext.getHeaderString(HEADER_AUTHORIZATION);
       if (StringUtils.isNotBlank(authHeader)) {
         // For basic auth, extract username; for bearer tokens, use a placeholder
-        if (authHeader.startsWith("Basic ")) {
+        if (authHeader.startsWith(AUTH_BASIC_PREFIX)) {
           // Could decode basic auth to get username, but for security keep it as placeholder
-          return "basic-auth-user";
-        } else if (authHeader.startsWith("Bearer ")) {
-          return "bearer-token-user";
+          return BASIC_AUTH_USER;
+        } else if (authHeader.startsWith(AUTH_BEARER_PREFIX)) {
+          return BEARER_TOKEN_USER;
         }
       }
 
       // Check for custom user headers
-      String userHeader = requestContext.getHeaderString("X-User-ID");
+      String userHeader = requestContext.getHeaderString(HEADER_X_USER_ID);
       if (StringUtils.isNotBlank(userHeader)) {
         return userHeader.trim();
       }
 
-      userHeader = requestContext.getHeaderString("X-Username");
+      userHeader = requestContext.getHeaderString(HEADER_X_USERNAME);
       if (StringUtils.isNotBlank(userHeader)) {
         return userHeader.trim();
       }
@@ -166,20 +232,20 @@ public class AuditRequestProcessor {
   private String extractServiceId(ContainerRequestContext requestContext) {
     try {
       // Check for custom service ID headers
-      String serviceId = requestContext.getHeaderString("X-Service-ID");
+      String serviceId = requestContext.getHeaderString(HEADER_X_SERVICE_ID);
       if (StringUtils.isNotBlank(serviceId)) {
         return serviceId.trim();
       }
 
-      serviceId = requestContext.getHeaderString("X-Service-Name");
+      serviceId = requestContext.getHeaderString(HEADER_X_SERVICE_NAME);
       if (StringUtils.isNotBlank(serviceId)) {
         return serviceId.trim();
       }
 
-      return "unknown";
+      return null;
     } catch (Exception e) {
       LOG.debug("Failed to extract service ID", e);
-      return "unknown";
+      return null;
     }
   }
 
@@ -190,34 +256,22 @@ public class AuditRequestProcessor {
    * @param requestContext the request context
    * @return the captured request payload
    */
-  private Object captureRequestPayload(ContainerRequestContext requestContext) {
-    // Get current configuration (fallback to defaults if no config manager)
-    AuditConfig config = _configManager != null ? _configManager.getCurrentConfig() : new AuditConfig();
-
+  private Map<String, Object> captureRequestPayload(ContainerRequestContext requestContext) {
     Map<String, Object> payload = new HashMap<>();
 
     try {
-      // Always capture query parameters (lightweight)
       UriInfo uriInfo = requestContext.getUriInfo();
       MultivaluedMap<String, String> queryParams = uriInfo.getQueryParameters();
       if (!queryParams.isEmpty()) {
-        Map<String, Object> queryMap = new HashMap<>();
-        for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
-          List<String> values = entry.getValue();
-          if (values.size() == 1) {
-            queryMap.put(entry.getKey(), values.get(0));
-          } else {
-            queryMap.put(entry.getKey(), values);
-          }
-        }
-        payload.put("queryParameters", queryMap);
+        payload.put(PAYLOAD_QUERY_PARAMETERS, toQueryParamsMap(queryParams));
       }
 
       // Conditionally capture request body based on configuration
+      final AuditConfig config = _configManager.getCurrentConfig();
       if (config.isCaptureRequestPayload() && requestContext.hasEntity()) {
         String requestBody = readRequestBody(requestContext, config.getMaxPayloadSize());
         if (StringUtils.isNotBlank(requestBody)) {
-          payload.put("body", requestBody);
+          payload.put(PAYLOAD_BODY, requestBody);
         }
       }
 
@@ -225,26 +279,12 @@ public class AuditRequestProcessor {
       if (config.isCaptureRequestHeaders()) {
         MultivaluedMap<String, String> headers = requestContext.getHeaders();
         if (!headers.isEmpty()) {
-          Map<String, String> headerMap = new HashMap<>();
-          for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
-            String headerName = entry.getKey().toLowerCase();
-            // Skip sensitive headers
-            if (!headerName.contains("auth") && !headerName.contains("password") && !headerName.contains("token")
-                && !headerName.contains("secret")) {
-              List<String> values = entry.getValue();
-              if (!values.isEmpty()) {
-                headerMap.put(entry.getKey(), values.get(0));
-              }
-            }
-          }
-          if (!headerMap.isEmpty()) {
-            payload.put("headers", headerMap);
-          }
+          payload.put(PAYLOAD_HEADERS, toHeaderMap(headers));
         }
       }
     } catch (Exception e) {
       LOG.debug("Failed to capture request payload", e);
-      payload.put("error", "Failed to capture payload: " + e.getMessage());
+      payload.put(PAYLOAD_ERROR, "Failed to capture payload: " + e.getMessage());
     }
 
     return payload.isEmpty() ? null : payload;

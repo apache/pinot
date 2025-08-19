@@ -374,7 +374,7 @@ public class AuditRequestProcessorTest {
   }
 
   @Test
-  public void testExtractServiceIdReturnsUnknown() {
+  public void testExtractServiceIdReturnsNull() {
     MultivaluedMap<String, String> headers = new MultivaluedHashMap<>();
     when(_requestContext.getHeaders()).thenReturn(headers);
     when(_requestContext.getHeaderString("X-Service-ID")).thenReturn(null);
@@ -386,7 +386,7 @@ public class AuditRequestProcessorTest {
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
     assertThat(result).isNotNull();
-    assertThat(result.getServiceId()).isEqualTo("unknown");
+    assertThat(result.getServiceId()).isNull();
   }
 
   @Test
@@ -399,7 +399,7 @@ public class AuditRequestProcessorTest {
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
     assertThat(result).isNotNull();
-    assertThat(result.getServiceId()).isEqualTo("unknown");
+    assertThat(result.getServiceId()).isNull();
   }
 
   // Payload Capture Tests
