@@ -34,6 +34,7 @@ import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.TestFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.local.indexsegment.immutable.ImmutableSegmentLoader;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
 import org.apache.pinot.segment.local.segment.readers.GenericRowRecordReader;
@@ -222,7 +223,8 @@ public class RawIndexBenchmark {
     BaseFilterOperator filterOperator =
         new TestFilterOperator(docIds, segment.getDataSource(column).getDataSourceMetadata().getNumDocs());
     DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
-    ProjectionOperator projectionOperator = new ProjectionOperator(buildDataSourceMap(segment), docIdSetOperator);
+    ProjectionOperator projectionOperator =
+        new ProjectionOperator(buildDataSourceMap(segment), docIdSetOperator, new QueryContext.Builder().build());
 
     long start = System.currentTimeMillis();
     ProjectionBlock projectionBlock;

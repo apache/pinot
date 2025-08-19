@@ -30,8 +30,8 @@ import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.TrackingScope;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
@@ -199,17 +199,6 @@ public class Tracing {
     }
 
     @Override
-    public void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-                                       @Nullable ThreadExecutionContext parentContext) {
-    }
-
-    @Deprecated
-    public void createExecutionContextInner(@Nullable String queryId, int taskId,
-                                            ThreadExecutionContext.TaskType taskType,
-                                            @Nullable ThreadExecutionContext parentContext) {
-    }
-
-    @Override
     public void clear() {
     }
 
@@ -218,41 +207,17 @@ public class Tracing {
     }
 
     @Override
-    public void sampleUsageMSE() {
-    }
-
-    @Deprecated
-    public void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider) {
-    }
-
-    @Override
-    @Deprecated
-    public void updateQueryUsageConcurrently(String queryId) {
-      // No-op for default accountant
-    }
-
-    @Override
-    public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes) {
-      // No-op for default accountant
-    }
-
-    @Override
     public void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes,
-                                             TrackingScope trackingScope) {
+        TrackingScope trackingScope) {
       // No-op for default accountant
     }
 
     @Override
-    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType) {
+    public void setupRunner(@Nullable String queryId, String workloadName) {
     }
 
     @Override
-    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, String workloadName) {
-    }
-
-    @Override
-    public void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-                            @Nullable ThreadExecutionContext parentContext) {
+    public void setupWorker(int taskId, @Nullable ThreadExecutionContext parentContext) {
     }
 
     @Override
@@ -292,22 +257,8 @@ public class Tracing {
     private ThreadAccountantOps() {
     }
 
-    @Deprecated
-    public static void setupRunner(String queryId) {
-    }
-
-    @Deprecated
-    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType) {
-    }
-
     public static void setupRunner(String queryId, String workloadName) {
-      setupRunner(queryId, ThreadExecutionContext.TaskType.SSE, workloadName);
-    }
-
-    public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType, String workloadName) {
-      // Set up the runner thread with the given query ID and workload name
-      Tracing.getThreadAccountant().setupRunner(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType,
-          workloadName);
+      Tracing.getThreadAccountant().setupRunner(queryId, workloadName);
     }
 
     /**
@@ -316,39 +267,20 @@ public class Tracing {
      * @param threadExecutionContext Context holds metadata about the query.
      */
     public static void setupWorker(int taskId, ThreadExecutionContext threadExecutionContext) {
-      setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, threadExecutionContext);
-    }
-
-    /**
-     * Setup metadata of query worker threads.
-     * @param taskId Query task ID of the thread. In SSE, ID is an incrementing counter. In MSE, id is the stage id.
-     * @param threadExecutionContext Context holds metadata about the query.
-     */
-    public static void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-        @Nullable ThreadExecutionContext threadExecutionContext) {
-      Tracing.getThreadAccountant().setupWorker(taskId, taskType, threadExecutionContext);
+      Tracing.getThreadAccountant().setupWorker(taskId, threadExecutionContext);
     }
 
     public static void sample() {
       Tracing.getThreadAccountant().sampleUsage();
     }
 
-    public static void sampleMSE() {
-      Tracing.getThreadAccountant().sampleUsageMSE();
-    }
-
     public static void clear() {
       Tracing.getThreadAccountant().clear();
     }
 
-    public static void initializeThreadAccountant(PinotConfiguration config, String instanceId,
-        InstanceType instanceType) {
-      createThreadAccountant(config, instanceId, instanceType, new WorkloadBudgetManager(config));
-    }
-
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
-        InstanceType instanceType) {
-      return createThreadAccountant(config, instanceId, instanceType, new (config));
+                                                                       InstanceType instanceType) {
+      return createThreadAccountant(config, instanceId, instanceType, new WorkloadBudgetManager(config));
     }
 
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
@@ -402,22 +334,9 @@ public class Tracing {
       accountant.sampleUsage();
     }
 
-    @Deprecated
-    public static void updateQueryUsageConcurrently(String queryId) {
-    }
-
-    @Deprecated
-    public static void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes) {
-      Tracing.getThreadAccountant().updateQueryUsageConcurrently(queryId, cpuTimeNs, allocatedBytes);
-    }
-
     public static void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes,
         TrackingScope trackingScope) {
       Tracing.getThreadAccountant().updateQueryUsageConcurrently(queryId, cpuTimeNs, allocatedBytes, trackingScope);
-    }
-
-    @Deprecated
-    public static void setThreadResourceUsageProvider() {
     }
 
     // Check for thread interruption, every time after merging 8192 keys

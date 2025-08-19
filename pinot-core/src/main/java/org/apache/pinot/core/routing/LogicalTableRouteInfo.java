@@ -25,24 +25,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.InstanceRequest;
 import org.apache.pinot.common.request.TableSegmentsInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryStrategy;
-import org.apache.pinot.core.transport.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 
-public class LogicalTableRouteInfo extends BaseTableRouteInfo {
+public class LogicalTableRouteInfo implements TableRouteInfo {
   private String _logicalTableName;
   private List<ImplicitHybridTableRouteInfo> _offlineTables;
   private List<ImplicitHybridTableRouteInfo> _realtimeTables;
@@ -66,7 +63,7 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
     if (_offlineTables != null) {
       for (TableRouteInfo physicalTableRoute : _offlineTables) {
         if (physicalTableRoute.getOfflineRoutingTable() != null) {
-          for (Map.Entry<ServerInstance, ServerRouteInfo> entry : physicalTableRoute.getOfflineRoutingTable()
+          for (Map.Entry<ServerInstance, SegmentsToQuery> entry : physicalTableRoute.getOfflineRoutingTable()
               .entrySet()) {
             TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
             tableSegmentsInfo.setTableName(physicalTableRoute.getOfflineTableName());
@@ -84,7 +81,7 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
     if (_realtimeTables != null) {
       for (TableRouteInfo physicalTableRoute : _realtimeTables) {
         if (physicalTableRoute.getRealtimeRoutingTable() != null) {
-          for (Map.Entry<ServerInstance, ServerRouteInfo> entry : physicalTableRoute.getRealtimeRoutingTable()
+          for (Map.Entry<ServerInstance, SegmentsToQuery> entry : physicalTableRoute.getRealtimeRoutingTable()
               .entrySet()) {
             TableSegmentsInfo tableSegmentsInfo = new TableSegmentsInfo();
             tableSegmentsInfo.setTableName(physicalTableRoute.getRealtimeTableName());
@@ -118,16 +115,8 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
 
   private InstanceRequest getInstanceRequest(long requestId, String brokerId, BrokerRequest brokerRequest,
       List<TableSegmentsInfo> tableSegmentsInfoList) {
-    InstanceRequest instanceRequest = new InstanceRequest();
-    instanceRequest.setRequestId(requestId);
-    instanceRequest.setCid(QueryThreadContext.getCid());
-    instanceRequest.setQuery(brokerRequest);
-    Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
-    if (queryOptions != null) {
-      instanceRequest.setEnableTrace(Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.TRACE)));
-    }
+    InstanceRequest instanceRequest = TableRouteInfo.createInstanceRequest(brokerRequest, brokerId, requestId);
     instanceRequest.setTableSegmentsInfoList(tableSegmentsInfoList);
-    instanceRequest.setBrokerId(brokerId);
     return instanceRequest;
   }
 
@@ -182,7 +171,7 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
       Set<ServerInstance> offlineExecutionServers = new HashSet<>();
       for (TableRouteInfo offlineTable : _offlineTables) {
         if (offlineTable.isOfflineRouteExists()) {
-          Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = offlineTable.getOfflineRoutingTable();
+          Map<ServerInstance, SegmentsToQuery> offlineRoutingTable = offlineTable.getOfflineRoutingTable();
           if (offlineRoutingTable != null) {
             offlineExecutionServers.addAll(offlineRoutingTable.keySet());
           }
@@ -199,7 +188,7 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
       Set<ServerInstance> realtimeExecutionServers = new HashSet<>();
       for (TableRouteInfo realtimeTable : _realtimeTables) {
         if (realtimeTable.isRealtimeRouteExists()) {
-          Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = realtimeTable.getRealtimeRoutingTable();
+          Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable = realtimeTable.getRealtimeRoutingTable();
           if (realtimeRoutingTable != null) {
             realtimeExecutionServers.addAll(realtimeRoutingTable.keySet());
           }
@@ -212,13 +201,13 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
 
   @Nullable
   @Override
-  public Map<ServerInstance, ServerRouteInfo> getOfflineRoutingTable() {
+  public Map<ServerInstance, SegmentsToQuery> getOfflineRoutingTable() {
     throw new UnsupportedOperationException();
   }
 
   @Nullable
   @Override
-  public Map<ServerInstance, ServerRouteInfo> getRealtimeRoutingTable() {
+  public Map<ServerInstance, SegmentsToQuery> getRealtimeRoutingTable() {
     throw new UnsupportedOperationException();
   }
 
@@ -258,6 +247,7 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
     return _realtimeBrokerRequest;
   }
 
+  @Override
   public boolean isOfflineRouteExists() {
     if (_offlineTables != null) {
       for (TableRouteInfo offlineTable : _offlineTables) {
@@ -269,6 +259,7 @@ public class LogicalTableRouteInfo extends BaseTableRouteInfo {
     return false;
   }
 
+  @Override
   public boolean isRealtimeRouteExists() {
     if (_realtimeTables != null) {
       for (TableRouteInfo realtimeTable : _realtimeTables) {

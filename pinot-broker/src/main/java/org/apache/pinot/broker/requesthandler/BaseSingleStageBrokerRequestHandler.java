@@ -57,7 +57,6 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
@@ -92,6 +91,7 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
+import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.routing.TableRouteProvider;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
@@ -99,7 +99,6 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
@@ -170,7 +169,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected LogicalTableRouteProvider _logicalTableRouteProvider;
 
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
-      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
+      RoutingManager routingManager, AccessControlFactory accessControlFactory,
       QueryQuotaManager queryQuotaManager, TableCache tableCache, ThreadResourceUsageAccountant accountant) {
     super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
@@ -321,12 +320,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
+    QueryThreadContext.setQueryEngine("sse");
     _queryLogger.log(requestId, query);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
     String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
-    _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), CommonConstants.Accounting.ANCHOR_TASK_ID,
-        ThreadExecutionContext.TaskType.SSE, workloadName);
+    _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), workloadName);
 
     try {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
@@ -744,6 +743,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverBrokerRequest.getPinotQuery().getQueryOptions()
               .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
         }
+        // Optionally set ignoreMissingSegments based on broker config
+        setIgnoreMissingSegmentsIfConfigured(queryOptions);
       }
     }
     if (realtimeBrokerRequest != null) {
@@ -757,6 +758,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverBrokerRequest.getPinotQuery().getQueryOptions()
               .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
         }
+        // Optionally set ignoreMissingSegments based on broker config
+        setIgnoreMissingSegmentsIfConfigured(queryOptions);
       }
     }
 
@@ -1042,7 +1045,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @Override
   protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
     super.onQueryStart(requestId, clientRequestId, query, extras);
-    QueryThreadContext.setQueryEngine("sse");
     if (isQueryCancellationEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
       _serversById.put(requestId, (QueryServers) extras[0]);
     }
@@ -1945,10 +1947,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Use query-level timeout if exists
       queryTimeoutMs = queryLevelTimeoutMs;
     } else {
-      Long tableLevelTimeoutMs = _routingManager.getQueryTimeoutMs(tableNameWithType);
-      if (tableLevelTimeoutMs != null) {
+      TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+      if (tableConfig != null
+          && tableConfig.getQueryConfig() != null
+          && tableConfig.getQueryConfig().getTimeoutMs() != null) {
         // Use table-level timeout if exists
-        queryTimeoutMs = tableLevelTimeoutMs;
+        queryTimeoutMs = tableConfig.getQueryConfig().getTimeoutMs();
       } else if (logicalTableQueryTimeout != null) {
         queryTimeoutMs = logicalTableQueryTimeout;
       } else {
@@ -2078,6 +2082,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private String getGlobalQueryId(long requestId) {
     return _brokerId + "_" + requestId;
+  }
+
+  private void setIgnoreMissingSegmentsIfConfigured(Map<String, String> queryOptions) {
+    if (_config.getProperty(CommonConstants.Broker.CONFIG_OF_IGNORE_MISSING_SEGMENTS,
+        CommonConstants.Broker.DEFAULT_IGNORE_MISSING_SEGMENTS)) {
+      queryOptions.putIfAbsent(QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+    }
   }
 
   /**

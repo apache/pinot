@@ -37,6 +37,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.set.IntersectOperator;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
@@ -92,14 +93,15 @@ public class MultiStageAccountingTest implements ITest {
     configs.put(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
     // init accountant and start watcher task
     Tracing.unregisterThreadAccountant();
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(new PinotConfiguration(configs), "testGroupBy",
+    Tracing.ThreadAccountantOps.createThreadAccountant(new PinotConfiguration(configs), "testGroupBy",
         InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     // Setup Thread Context
-    Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest", ThreadExecutionContext.TaskType.MSE, null);
+    Tracing.ThreadAccountantOps.setupRunner("MultiStageAccountingTest",
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
     ThreadExecutionContext threadExecutionContext = Tracing.getThreadAccountant().getThreadExecutionContext();
-    Tracing.ThreadAccountantOps.setupWorker(1, ThreadExecutionContext.TaskType.MSE, threadExecutionContext);
+    Tracing.ThreadAccountantOps.setupWorker(1, threadExecutionContext);
   }
 
   @BeforeMethod

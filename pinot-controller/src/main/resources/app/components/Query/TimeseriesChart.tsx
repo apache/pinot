@@ -22,7 +22,7 @@ import ReactECharts from 'echarts-for-react';
 import { makeStyles } from '@material-ui/core/styles';
 import { Typography, Paper } from '@material-ui/core';
 import { ChartSeries } from 'Models';
-import { getSeriesColor, MAX_SERIES_LIMIT, CHART_PADDING_PERCENTAGE } from '../../utils/ChartConstants';
+import { getSeriesColor, CHART_PADDING_PERCENTAGE } from '../../utils/ChartConstants';
 
 // Define proper types for ECharts parameters
 interface EChartsTooltipParams {
@@ -33,9 +33,7 @@ interface EChartsTooltipParams {
 
 // Extract chart configuration functions
 const createChartSeries = (series: ChartSeries[], selectedMetric?: string) => {
-  const limitedSeries = series.slice(0, MAX_SERIES_LIMIT);
-
-  return limitedSeries.map((s, index) => {
+  return series.map((s, index) => {
     const isSelected = selectedMetric ? s.name === selectedMetric : true;
 
     return {
@@ -85,8 +83,7 @@ const createTooltipFormatter = (selectedMetric?: string) => {
 };
 
 const getTimeRange = (series: ChartSeries[]) => {
-  const limitedSeries = series.slice(0, MAX_SERIES_LIMIT);
-  const allTimestamps = limitedSeries.flatMap(s => s.data.map(dp => dp.timestamp));
+  const allTimestamps = series.flatMap(s => s.data.map(dp => dp.timestamp));
   const minTime = Math.min(...allTimestamps);
   const maxTime = Math.max(...allTimestamps);
   return { minTime, maxTime };
@@ -234,18 +231,11 @@ const TimeseriesChart: React.FC<TimeseriesChartProps> = ({
     );
   }
 
-  const hasMoreSeries = series.length > MAX_SERIES_LIMIT;
-
   return (
     <Paper className={classes.chartContainer} style={{ height: `${height}px` }}>
-      {hasMoreSeries && (
-        <Typography variant="body2" color="textSecondary" style={{ padding: '8px 16px', backgroundColor: '#fff3cd', borderBottom: '1px solid #ffeaa7' }}>
-          Showing first {MAX_SERIES_LIMIT} of {series.length} series. Consider filtering your query to improve performance.
-        </Typography>
-      )}
       <ReactECharts
         option={chartOption}
-        style={{ height: hasMoreSeries ? 'calc(100% - 40px)' : '100%', width: '100%' }}
+        style={{ height: '100%', width: '100%' }}
         opts={{ renderer: 'canvas' }}
       />
     </Paper>

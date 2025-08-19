@@ -344,8 +344,8 @@ public class RebalanceSummaryResult {
   public static class ConsumingSegmentToBeMovedSummary {
     private final int _numConsumingSegmentsToBeMoved;
     private final int _numServersGettingConsumingSegmentsAdded;
-    private final Map<String, Integer> _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
-    private final Map<String, Integer> _consumingSegmentsToBeMovedWithOldestAgeInMinutes;
+    private final Map<String, Long> _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
+    private final Map<String, Long> _consumingSegmentsToBeMovedWithOldestAgeInMinutes;
     private final Map<String, ConsumingSegmentSummaryPerServer> _serverConsumingSegmentSummary;
 
     /**
@@ -381,9 +381,9 @@ public class RebalanceSummaryResult {
         @JsonProperty("numConsumingSegmentsToBeMoved") int numConsumingSegmentsToBeMoved,
         @JsonProperty("numServersGettingConsumingSegmentsAdded") int numServersGettingConsumingSegmentsAdded,
         @JsonProperty("consumingSegmentsToBeMovedWithMostOffsetsToCatchUp") @Nullable
-        Map<String, Integer> consumingSegmentsToBeMovedWithMostOffsetsToCatchUp,
+        Map<String, Long> consumingSegmentsToBeMovedWithMostOffsetsToCatchUp,
         @JsonProperty("consumingSegmentsToBeMovedWithOldestAgeInMinutes") @Nullable
-        Map<String, Integer> consumingSegmentsToBeMovedWithOldestAgeInMinutes,
+        Map<String, Long> consumingSegmentsToBeMovedWithOldestAgeInMinutes,
         @JsonProperty("serverConsumingSegmentSummary") @Nullable
         Map<String, ConsumingSegmentSummaryPerServer> serverConsumingSegmentSummary) {
       _numConsumingSegmentsToBeMoved = numConsumingSegmentsToBeMoved;
@@ -404,12 +404,12 @@ public class RebalanceSummaryResult {
     }
 
     @JsonProperty
-    public Map<String, Integer> getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp() {
+    public Map<String, Long> getConsumingSegmentsToBeMovedWithMostOffsetsToCatchUp() {
       return _consumingSegmentsToBeMovedWithMostOffsetsToCatchUp;
     }
 
     @JsonProperty
-    public Map<String, Integer> getConsumingSegmentsToBeMovedWithOldestAgeInMinutes() {
+    public Map<String, Long> getConsumingSegmentsToBeMovedWithOldestAgeInMinutes() {
       return _consumingSegmentsToBeMovedWithOldestAgeInMinutes;
     }
 
@@ -420,7 +420,7 @@ public class RebalanceSummaryResult {
 
     public static class ConsumingSegmentSummaryPerServer {
       protected int _numConsumingSegmentsToBeAdded;
-      protected int _totalOffsetsToCatchUpAcrossAllConsumingSegments;
+      protected long _totalOffsetsToCatchUpAcrossAllConsumingSegments;
 
       /**
        * Constructor for ConsumingSegmentSummaryPerServer
@@ -437,7 +437,7 @@ public class RebalanceSummaryResult {
       public ConsumingSegmentSummaryPerServer(
           @JsonProperty("numConsumingSegmentsToBeAdded") int numConsumingSegmentsToBeAdded,
           @JsonProperty("totalOffsetsToCatchUpAcrossAllConsumingSegments")
-          int totalOffsetsToCatchUpAcrossAllConsumingSegments) {
+          long totalOffsetsToCatchUpAcrossAllConsumingSegments) {
         _numConsumingSegmentsToBeAdded = numConsumingSegmentsToBeAdded;
         _totalOffsetsToCatchUpAcrossAllConsumingSegments = totalOffsetsToCatchUpAcrossAllConsumingSegments;
       }
@@ -448,7 +448,7 @@ public class RebalanceSummaryResult {
       }
 
       @JsonProperty
-      public int getTotalOffsetsToCatchUpAcrossAllConsumingSegments() {
+      public long getTotalOffsetsToCatchUpAcrossAllConsumingSegments() {
         return _totalOffsetsToCatchUpAcrossAllConsumingSegments;
       }
 

@@ -128,6 +128,14 @@ public class BrokerReduceService extends BaseReduceService {
     // Set execution statistics and Update broker metrics.
     aggregator.setStats(rawTableName, brokerResponseNative, brokerMetrics);
 
+    // If configured, filter out SERVER_SEGMENT_MISSING exceptions emitted by servers. This must happen after
+    // aggregator.setStats(), because the aggregator appends server exceptions during setStats.
+    Map<String, String> brokerQueryOptions = brokerRequest.getPinotQuery().getQueryOptions();
+    if (brokerQueryOptions != null && QueryOptionsUtils.isIgnoreMissingSegments(brokerQueryOptions)) {
+      brokerResponseNative.getExceptions().removeIf(
+          ex -> ex.getErrorCode() == QueryErrorCode.SERVER_SEGMENT_MISSING.getId());
+    }
+
     // Report the servers with conflicting data schema.
     if (!serversWithConflictingDataSchema.isEmpty()) {
       QueryErrorCode errorCode = QueryErrorCode.MERGE_RESPONSE;

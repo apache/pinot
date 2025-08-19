@@ -84,7 +84,7 @@ public class ProjectPlanNode implements PlanNode {
 
     // TODO: figure out a way to close this operator, as it may hold reader context
     ProjectionOperator projectionOperator =
-        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator);
+        ProjectionOperatorUtils.getProjectionOperator(dataSourceMap, docIdSetOperator, _queryContext);
     return hasNonIdentifierExpression ? new TransformOperator(_queryContext, projectionOperator, _expressions)
         : projectionOperator;
   }

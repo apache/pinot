@@ -241,6 +241,8 @@ public class CommonConstants {
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
+    public static final String CONFIG_OF_ZOOKEEPER_SERVER = "pinot.zk.server";
+    @Deprecated(since = "1.5.0", forRemoval = true)
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
 
     public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
@@ -456,6 +458,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
+
+      // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
+      // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
+      public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =
+          "pinot.broker.query.ignore.missing.segments";
+      public static final boolean DEFAULT_IGNORE_MISSING_SEGMENTS = false;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -554,6 +562,8 @@ public class CommonConstants {
       public static final String SQL_V2 = "sqlV2";
       public static final String TRACE = "trace";
       public static final String QUERY_OPTIONS = "queryOptions";
+      public static final String LANGUAGE = "language";
+      public static final String QUERY = "query";
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
@@ -585,6 +595,16 @@ public class CommonConstants {
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
+
+        // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
+        public static final String SORT_AGGREGATE_LIMIT_THRESHOLD = "sortAggregateLimitThreshold";
+
+        /**
+         * When safeTrim (ORDER BY groupKeys without HAVING clause),
+         * do single-threaded sort aggregate when num of segments is below this value
+         */
+        public static final String SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD =
+            "sortAggregateSingleThreadedNumSegmentsThreshold";
 
         /**
          * This will help in getting accurate and correct result for queries
@@ -636,6 +656,9 @@ public class CommonConstants {
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
         public static final String SKIP_INDEXES = "skipIndexes";
 
+        // Query option key used to trace rule productions
+        public static final String TRACE_RULE_PRODUCTIONS = "traceRuleProductions";
+
         // Query option key used to skip a given set of rules
         public static final String SKIP_PLANNER_RULES = "skipPlannerRules";
 
@@ -684,6 +707,10 @@ public class CommonConstants {
 
         // If query submission causes an exception, still continue to submit the query to other servers
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
+
+        // Ignore server-side segment missing errors and proceed without marking the query as failed.
+        // When set to true, SERVER_SEGMENT_MISSING exceptions are filtered out on the broker.
+        public static final String IGNORE_MISSING_SEGMENTS = "ignoreMissingSegments";
 
         // Indicates that a query belongs to a secondary workload when using the BinaryWorkloadScheduler. The
         // BinaryWorkloadScheduler divides queries into two workloads, primary and secondary. Primary workloads are
@@ -781,7 +808,7 @@ public class CommonConstants {
       public static final String EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteral";
       public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressions";
       public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoin";
-      public static final String SEMIN_JOIN_DISTINCT_PROJECT = "SeminJoinDistinctProject";
+      public static final String SEMI_JOIN_DISTINCT_PROJECT = "SemiJoinDistinctProject";
       public static final String UNION_TO_DISTINCT = "UnionToDistinct";
       public static final String AGGREGATE_REMOVE = "AggregateRemove";
       public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
@@ -805,6 +832,7 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
+      public static final String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
     }
 
     /**
@@ -818,7 +846,9 @@ public class CommonConstants {
     public static final Set<String> DEFAULT_DISABLED_RULES = Set.of(
         PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
         PlannerRuleNames.SORT_JOIN_TRANSPOSE,
-        PlannerRuleNames.SORT_JOIN_COPY
+        PlannerRuleNames.SORT_JOIN_COPY,
+        PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
+        PlannerRuleNames.JOIN_TO_ENRICHED_JOIN
     );
 
     public static class FailureDetector {
@@ -1100,6 +1130,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUPBY_TRIM_THRESHOLD;
     public static final int DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+    // Do sort-aggregation when LIMIT is below this threshold
+    public static final int DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD = 10_000;
+    // Use sequential instead of pair-wise combine for sort-aggr when numSegments is below this threshold
+    // Sequential combine utilizes N + 1 threads, N for processing and 1 for merge. Pair-wise only uses N.
+    public static final int DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD =
+        Runtime.getRuntime().availableProcessors();
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
@@ -1538,9 +1574,6 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
     public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
 
-    public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = "accounting.enable.thread.sampling.mse.debug";
-    public static final Boolean DEFAULT_ENABLE_THREAD_SAMPLING_MSE = true;
-
     public static final String CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE = "accounting.cancel.callback.cache.max.size";
     public static final int DEFAULT_CANCEL_CALLBACK_CACHE_MAX_SIZE = 500;
 
@@ -1600,6 +1633,11 @@ public class CommonConstants {
     public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
 
     public static final String DEFAULT_WORKLOAD_NAME = "default";
+    public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
+    public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
+    public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
+        "accounting.secondary.workload.cpu.percentage";
+    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
   }
 
   public static class ExecutorService {

@@ -26,9 +26,9 @@ export const CHART_COLORS = [
 ];
 
 /**
- * Maximum number of series that can be rendered in the chart
+ * Default number of series that can be rendered in the chart
  */
-export const MAX_SERIES_LIMIT = 20;
+export const DEFAULT_SERIES_LIMIT = 40;
 
 /**
  * Chart padding percentage for time axis and series

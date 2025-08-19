@@ -20,6 +20,8 @@
 import React, { useEffect, useState, useContext } from 'react';
 import { get, keys, last } from 'lodash';
 import moment from 'moment';
+import { formatTimeInTimezone } from '../utils/TimezoneUtils';
+import { useTimezone } from '../contexts/TimezoneContext';
 import { UnControlled as CodeMirror } from 'react-codemirror2';
 import { Grid, makeStyles, Box } from '@material-ui/core';
 import { NotificationContext } from '../components/Notification/NotificationContext';
@@ -78,6 +80,7 @@ const useStyles = makeStyles(() => ({
 
 const TaskQueueTable = (props) => {
   const classes = useStyles();
+  const { currentTimezone } = useTimezone();
   const { taskType, queueTableName: tableName } = props.match.params;
 
   const {dispatch} = useContext(NotificationContext);
@@ -104,7 +107,7 @@ const TaskQueueTable = (props) => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [currentTimezone]);
 
   const handleScheduleNow = async () => {
     const res = await PinotMethodUtils.scheduleTaskAction(tableName, taskType);
@@ -139,7 +142,7 @@ const TaskQueueTable = (props) => {
         show: true
       });
     }
-    
+
     await fetchData();
     scheduleNowConfirm.setConfirmDialog(false);
   };
@@ -189,10 +192,10 @@ const TaskQueueTable = (props) => {
             <strong>Cron Schedule :</strong> {cronExpression}
           </Grid>
           <Grid item xs={12}>
-            <strong>Previous Fire Time: </strong> {previousFireTime ? moment(previousFireTime).toString() : '-'}
+            <strong>Previous Fire Time: </strong> {previousFireTime ? formatTimeInTimezone(previousFireTime) : '-'}
           </Grid>
           <Grid item xs={12}>
-            <strong>Next Fire Time: </strong> {nextFireTime ? moment(nextFireTime).toString() : '-'}
+            <strong>Next Fire Time: </strong> {nextFireTime ? formatTimeInTimezone(nextFireTime) : '-'}
           </Grid>
         </Grid>
       </div>

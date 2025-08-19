@@ -77,8 +77,6 @@ import org.apache.pinot.common.utils.regex.PatternFactory;
 import org.apache.pinot.common.utils.tls.PinotInsecureMode;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
-import org.apache.pinot.core.accounting.DefaultWorkloadBudgetManager;
-import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.core.common.datatable.DataTableBuilderFactory;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeConsumptionRateManager;
@@ -106,6 +104,7 @@ import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -181,7 +180,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
       throws Exception {
     // Make a clone so that changes to the config won't propagate to the caller
     _serverConf = serverConf.clone();
-    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPR_SERVER);
+    _zkAddress = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_ZOOKEEPER_SERVER);
     _helixClusterName = _serverConf.getProperty(CommonConstants.Helix.CONFIG_OF_CLUSTER_NAME);
     ServiceStartableUtils.applyClusterConfig(_serverConf, _zkAddress, _helixClusterName, ServiceRole.SERVER);
     applyCustomConfigs(_serverConf);
@@ -691,6 +690,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
     instanceDataManager.setSupplierOfIsServerReadyToServeQueries(() -> _isServerReadyToServeQueries);
 
+    // Enable Server level realtime ingestion rate limier
+    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
+    PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
+        new ServerRateLimitConfigChangeListener(serverMetrics);
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
+
     initSegmentFetcher(_serverConf);
     StateModelFactory<?> stateModelFactory =
         new SegmentOnlineOfflineStateModelFactory(_instanceId, instanceDataManager);
@@ -782,12 +787,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
 
     preServeQueries();
 
-    // Enable Server level realtime ingestion rate limier
-    RealtimeConsumptionRateManager.getInstance().createServerRateLimiter(_serverConf, serverMetrics);
-    PinotClusterConfigChangeListener serverRateLimitConfigChangeListener =
-        new ServerRateLimitConfigChangeListener(serverMetrics);
-    _clusterConfigChangeHandler.registerClusterConfigChangeListener(serverRateLimitConfigChangeListener);
-
     // Start the thread accountant
     Tracing.ThreadAccountantOps.startThreadAccountant();
     PinotClusterConfigChangeListener threadAccountantListener =
@@ -804,7 +803,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
         Collections.singletonMap(Helix.IS_SHUTDOWN_IN_PROGRESS, Boolean.toString(false)));
     _isServerReadyToServeQueries = true;
     // Throttling for realtime consumption is disabled up to this point to allow maximum consumption during startup time
-    RealtimeConsumptionRateManager.getInstance().enableThrottling();
+    RealtimeConsumptionRateManager.getInstance().enablePartitionRateLimiter();
 
     LOGGER.info("Pinot server ready");
 
@@ -910,7 +909,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
    * Can be overridden to create a custom WorkloadBudgetManager.
    */
   protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration config) {
-    return new DefaultWorkloadBudgetManager(config);
+    return new WorkloadBudgetManager(config);
   }
 
   @Override

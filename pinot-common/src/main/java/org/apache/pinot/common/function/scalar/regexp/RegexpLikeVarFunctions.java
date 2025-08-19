@@ -45,6 +45,6 @@ public class RegexpLikeVarFunctions {
   @ScalarFunction
   public static boolean likeVar(String inputStr, String likePatternStr) {
     String regexPatternStr = RegexpPatternConverterUtils.likeToRegexpLike(likePatternStr);
-    return regexpLikeVar(inputStr, regexPatternStr);
+    return PatternFactory.compile(regexPatternStr, true).matcher(inputStr).find(); // Case insensitive by default
   }
 }
