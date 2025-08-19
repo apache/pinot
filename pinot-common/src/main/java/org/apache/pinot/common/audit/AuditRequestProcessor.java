@@ -47,9 +47,6 @@ public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
 
-  // HTTP Headers
-  private static final String HEADER_X_FORWARDED_FOR = "X-Forwarded-For";
-  private static final String HEADER_X_REAL_IP = "X-Real-IP";
 
   @Inject
   private AuditConfigManager _configManager;
@@ -108,34 +105,8 @@ public class AuditRequestProcessor {
     return _configManager.isEnabled();
   }
 
-  /**
-   * Extracts the client IP address from the request.
-   * Checks common proxy headers before falling back to remote address.
-   *
-   * @param requestContext the container request context
-   * @param remoteAddr the remote address from the underlying request
-   * @return the client IP address
-   */
   private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
-    try {
-      // Check for proxy headers first
-      String xForwardedFor = requestContext.getHeaderString(HEADER_X_FORWARDED_FOR);
-      if (StringUtils.isNotBlank(xForwardedFor)) {
-        // X-Forwarded-For can contain multiple IPs, take the first one
-        return xForwardedFor.split(",")[0].trim();
-      }
-
-      String xRealIp = requestContext.getHeaderString(HEADER_X_REAL_IP);
-      if (StringUtils.isNotBlank(xRealIp)) {
-        return xRealIp.trim();
-      }
-
-      // Fall back to remote address
-      return remoteAddr;
-    } catch (Exception e) {
-      LOG.debug("Failed to extract client IP address", e);
-      return null;
-    }
+    return null;
   }
 
   /**

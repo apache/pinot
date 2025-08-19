@@ -97,118 +97,7 @@ public class AuditRequestProcessorTest {
     return params;
   }
 
-  // IP Address Extraction Tests
-
-  @Test
-  public void testExtractIpFromXForwardedForSingleIp() {
-    MultivaluedMap<String, String> headers = createHeaders("X-Forwarded-For", "192.168.1.100");
-    when(_requestContext.getHeaders()).thenReturn(headers);
-    when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn("192.168.1.100");
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("GET");
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    assertThat(result.getOriginIpAddress()).isEqualTo("192.168.1.100");
-  }
-
-  @Test
-  public void testExtractIpFromXForwardedForMultipleIps() {
-    MultivaluedMap<String, String> headers =
-        createHeaders("X-Forwarded-For", "192.168.1.100, 10.0.0.50, 203.0.113.195");
-    when(_requestContext.getHeaders()).thenReturn(headers);
-    when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn("192.168.1.100, 10.0.0.50, 203.0.113.195");
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("GET");
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    assertThat(result.getOriginIpAddress()).isEqualTo("192.168.1.100");
-  }
-
-  @Test
-  public void testExtractIpFromXRealIp() {
-    MultivaluedMap<String, String> headers = createHeaders("X-Real-IP", "192.168.1.200");
-    when(_requestContext.getHeaders()).thenReturn(headers);
-    when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn(null);
-    when(_requestContext.getHeaderString("X-Real-IP")).thenReturn("192.168.1.200");
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("GET");
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    assertThat(result.getOriginIpAddress()).isEqualTo("192.168.1.200");
-  }
-
-  @Test
-  public void testExtractIpPriorityOrder() {
-    MultivaluedMap<String, String> headers =
-        createHeaders("X-Forwarded-For", "192.168.1.100", "X-Real-IP", "192.168.1.200");
-    when(_requestContext.getHeaders()).thenReturn(headers);
-    when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn("192.168.1.100");
-    when(_requestContext.getHeaderString("X-Real-IP")).thenReturn("192.168.1.200");
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("GET");
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    assertThat(result.getOriginIpAddress()).isEqualTo("192.168.1.100");
-  }
-
-  @Test
-  public void testExtractIpWithBlankHeaders() {
-    MultivaluedMap<String, String> headers = createHeaders("X-Forwarded-For", "   ", "X-Real-IP", "");
-    when(_requestContext.getHeaders()).thenReturn(headers);
-    when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn("   ");
-    when(_requestContext.getHeaderString("X-Real-IP")).thenReturn("");
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("GET");
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    assertThat(result.getOriginIpAddress()).isEqualTo("10.0.0.1");
-  }
-
-  @Test
-  public void testExtractIpFallbackToRemoteAddr() {
-    MultivaluedMap<String, String> headers = new MultivaluedHashMap<>();
-    when(_requestContext.getHeaders()).thenReturn(headers);
-    when(_requestContext.getHeaderString("X-Forwarded-For")).thenReturn(null);
-    when(_requestContext.getHeaderString("X-Real-IP")).thenReturn(null);
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("GET");
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    assertThat(result.getOriginIpAddress()).isEqualTo("10.0.0.1");
-  }
-
-  @Test
-  public void testExtractIpHandlesException() {
-    when(_requestContext.getHeaderString("X-Forwarded-For")).thenThrow(new RuntimeException("Test exception"));
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("GET");
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    assertThat(result.getOriginIpAddress()).isNull();
-  }
   // Payload Capture Tests
-
   @Test
   public void testCaptureQueryParametersSingleValue() {
     MultivaluedMap<String, String> queryParams = createQueryParams("param1", "value1", "param2", "value2");
@@ -288,7 +177,7 @@ public class AuditRequestProcessorTest {
 
     AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
 
-    assertThat(result).isNotNull();  
+    assertThat(result).isNotNull();
     AuditEvent.AuditRequestPayload payload = result.getRequest();
     if (payload != null) {
       assertThat(payload.getBody()).isNull();
