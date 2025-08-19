@@ -70,47 +70,71 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
 
     for (String columnName : mutableSegment.getPhysicalColumnNames()) {
       DataSource dataSource = mutableSegment.getDataSource(columnName);
+
+      // Handle map columns
       if (dataSource instanceof MutableMapDataSource) {
-        ForwardIndexReader reader = dataSource.getForwardIndex();
-        MapColumnPreIndexStatsCollector mapColumnPreIndexStatsCollector =
-            new MapColumnPreIndexStatsCollector(dataSource.getColumnName(), statsCollectorConfig);
-        if (useCompactedStatistics && validDocIds != null) {
-          // COMPACTED: Only process valid documents for commit-time compaction
-          PeekableIntIterator iterator = validDocIds.getMutableRoaringBitmap().toRoaringBitmap().getIntIterator();
-          ForwardIndexReaderContext readerContext = reader.createContext();
-          while (iterator.hasNext()) {
-            int docId = iterator.next();
-            mapColumnPreIndexStatsCollector.collect(reader.getMap(docId, readerContext));
-          }
-        } else {
-          int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
-          ForwardIndexReaderContext readerContext = reader.createContext();
-          for (int row = 0; row < numDocs; row++) {
-            mapColumnPreIndexStatsCollector.collect(reader.getMap(row, readerContext));
-          }
-        }
-        mapColumnPreIndexStatsCollector.seal();
-        _columnStatisticsMap.put(columnName, mapColumnPreIndexStatsCollector);
-      } else if (dataSource.getDictionary() != null) {
-        // Dictionary columns
-        if (useCompactedStatistics) {
-          if (dataSource.getForwardIndex().isDictionaryEncoded()) {
-            // Safe to use getDictId() - forward index supports dictionary operations
-            _columnStatisticsMap.put(columnName,
-                new CompactedDictEncodedColumnStatistics(dataSource, sortedDocIds, validDocIds));
-          } else {
-            // Forward index doesn't support getDictId() - use raw value scanning
-            _columnStatisticsMap.put(columnName,
-                new CompactedRawIndexDictColumnStatistics(dataSource, sortedDocIds, validDocIds));
-          }
-        } else {
-          // Regular case: non-compacted readers or no valid doc IDs available
-          _columnStatisticsMap.put(columnName, new MutableColumnStatistics(dataSource, sortedDocIds));
-        }
-      } else {
-        // No dictionary columns
-        _columnStatisticsMap.put(columnName, new MutableNoDictionaryColStatistics(dataSource));
+        _columnStatisticsMap.put(columnName,
+            createMapColumnStatistics(dataSource, useCompactedStatistics, validDocIds, statsCollectorConfig));
+        continue;
       }
+
+      // Handle dictionary columns
+      if (dataSource.getDictionary() != null) {
+        _columnStatisticsMap.put(columnName,
+            createDictionaryColumnStatistics(dataSource, sortedDocIds, useCompactedStatistics, validDocIds));
+        continue;
+      }
+
+      // Handle no dictionary columns
+      _columnStatisticsMap.put(columnName, new MutableNoDictionaryColStatistics(dataSource));
+    }
+  }
+
+  /**
+   * Creates column statistics for map columns.
+   */
+  private ColumnStatistics createMapColumnStatistics(DataSource dataSource, boolean useCompactedStatistics,
+      ThreadSafeMutableRoaringBitmap validDocIds, StatsCollectorConfig statsCollectorConfig) {
+    ForwardIndexReader reader = dataSource.getForwardIndex();
+    MapColumnPreIndexStatsCollector mapColumnPreIndexStatsCollector =
+        new MapColumnPreIndexStatsCollector(dataSource.getColumnName(), statsCollectorConfig);
+
+    if (useCompactedStatistics && validDocIds != null) {
+      // COMPACTED: Only process valid documents for commit-time compaction
+      PeekableIntIterator iterator = validDocIds.getMutableRoaringBitmap().toRoaringBitmap().getIntIterator();
+      ForwardIndexReaderContext readerContext = reader.createContext();
+      while (iterator.hasNext()) {
+        int docId = iterator.next();
+        mapColumnPreIndexStatsCollector.collect(reader.getMap(docId, readerContext));
+      }
+    } else {
+      int numDocs = dataSource.getDataSourceMetadata().getNumDocs();
+      ForwardIndexReaderContext readerContext = reader.createContext();
+      for (int row = 0; row < numDocs; row++) {
+        mapColumnPreIndexStatsCollector.collect(reader.getMap(row, readerContext));
+      }
+    }
+
+    mapColumnPreIndexStatsCollector.seal();
+    return mapColumnPreIndexStatsCollector;
+  }
+
+  /**
+   * Creates column statistics for dictionary columns.
+   */
+  private ColumnStatistics createDictionaryColumnStatistics(DataSource dataSource, int[] sortedDocIds,
+      boolean useCompactedStatistics, ThreadSafeMutableRoaringBitmap validDocIds) {
+    if (useCompactedStatistics) {
+      if (dataSource.getForwardIndex().isDictionaryEncoded()) {
+        // Safe to use getDictId() - forward index supports dictionary operations
+        return new CompactedDictEncodedColumnStatistics(dataSource, sortedDocIds, validDocIds);
+      } else {
+        // Forward index doesn't support getDictId() - use raw value scanning
+        return new CompactedRawIndexDictColumnStatistics(dataSource, sortedDocIds, validDocIds);
+      }
+    } else {
+      // Regular case: non-compacted readers or no valid doc IDs available
+      return new MutableColumnStatistics(dataSource, sortedDocIds);
     }
   }
 
