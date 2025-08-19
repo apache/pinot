@@ -164,7 +164,7 @@ public class GenericRow implements Serializable {
   /**
    * @return a deep copy of the generic row for the given fields
    */
-  public GenericRow copy(List<String> fieldsToCopy) {
+  public GenericRow copy(Collection<String> fieldsToCopy) {
     GenericRow copy = new GenericRow();
     for (String field : fieldsToCopy) {
       copy.putValue(field, copy(getValue(field)));
