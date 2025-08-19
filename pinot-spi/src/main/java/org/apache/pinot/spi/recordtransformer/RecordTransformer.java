@@ -41,9 +41,14 @@ public interface RecordTransformer extends Serializable {
     return List.of();
   }
 
-  /// Provides hint to the transformer that which columns are required as input across all the downstream transformers
-  /// in the TransformPipeline.
-  default void withInputColumnsForDownstreamTransformers(Set<String> inputColumnsOfDownstream) {
+  /**
+   * Provides a hint to the transformer about which columns are required as input across all downstream transformers
+   * in the TransformPipeline. This can be used for optimization or to ensure necessary fields are available.
+   *
+   * @param inputColumns Set of column names that are required by all downstream transformers as their input columns.
+   *                     This set is mutable, implementations should make a copy if they need to preserve the set.
+   */
+  default void withInputColumnsForDownstreamTransformers(Set<String> inputColumns) {
   }
 
   /// Transforms and returns records based on some custom rules. Implement this method when the transformer can produce

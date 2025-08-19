@@ -22,13 +22,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.SortedSet;
-import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -95,12 +93,12 @@ public class ComplexTypeTransformer implements RecordTransformer {
   public static final String DEFAULT_DELIMITER = ".";
   public static final CollectionNotUnnestedToJson DEFAULT_COLLECTION_TO_JSON_MODE =
       CollectionNotUnnestedToJson.NON_PRIMITIVE;
-  private final SortedSet<String> _fieldsToUnnest;
+  private final List<String> _fieldsToUnnest;
   private final String _delimiter;
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
   private final Map<String, String> _prefixesToRename;
   private final boolean _continueOnError;
-  private final Set<String> _fieldsToUnnestAndKeepOriginalValue;
+  private final List<String> _fieldsToUnnestAndKeepOriginalValue;
 
   private ComplexTypeTransformer(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
@@ -110,13 +108,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
 
     List<String> fieldsToUnnestFromConfig = complexTypeConfig.getFieldsToUnnest();
     if (fieldsToUnnestFromConfig != null) {
+      _fieldsToUnnest = new ArrayList<>(fieldsToUnnestFromConfig);
       // NOTE: Sort the unnest fields to achieve topological sort of the collections, so that the parent collection
       // (e.g. foo) is unnested before the child collection (e.g. foo.bar).
-      _fieldsToUnnest = new TreeSet<>(fieldsToUnnestFromConfig);
+      Collections.sort(_fieldsToUnnest);
     } else {
-      _fieldsToUnnest = new TreeSet<>();
+      _fieldsToUnnest = List.of();
     }
-    _fieldsToUnnestAndKeepOriginalValue = new HashSet<>(_fieldsToUnnest);
+    _fieldsToUnnestAndKeepOriginalValue = new ArrayList<>(_fieldsToUnnest);
 
     _delimiter = Objects.requireNonNullElse(complexTypeConfig.getDelimiter(), DEFAULT_DELIMITER);
     _collectionNotUnnestedToJson =
@@ -138,8 +137,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private ComplexTypeTransformer(List<String> fieldsToUnnest, String delimiter,
       CollectionNotUnnestedToJson collectionNotUnnestedToJson, Map<String, String> prefixesToRename,
       boolean continueOnError) {
-    _fieldsToUnnest = new TreeSet<>(fieldsToUnnest);
-    _fieldsToUnnestAndKeepOriginalValue = new HashSet<>(_fieldsToUnnest);
+    _fieldsToUnnest = fieldsToUnnest;
+    Collections.sort(_fieldsToUnnest);
+    _fieldsToUnnestAndKeepOriginalValue = new ArrayList<>(_fieldsToUnnest);
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
@@ -189,11 +189,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
   public void withInputColumnsForDownstreamTransformers(Set<String> columns) {
     // The input columns passed in from the downstream transformers have their name in the context of names after
     // prefix-renaming, while the fields to unnest are before prefix-renaming.
-    _fieldsToUnnestAndKeepOriginalValue.removeIf(field -> !columns.contains(renamePrefix(field)));
+    _fieldsToUnnestAndKeepOriginalValue.removeIf(field -> {
+      String renamedField = renamePrefix(field);
+      return !columns.contains(renamedField == null ? field : renamedField);
+    });
   }
 
   @Override
-  public Set<String> getInputColumns() {
+  public List<String> getInputColumns() {
     return _fieldsToUnnest;
   }
 
@@ -207,13 +210,14 @@ public class ComplexTypeTransformer implements RecordTransformer {
           flattenMap(record, columns);
           transformedRecords.add(record);
         } else {
-          Map<String, Object> originalValues = record.copy(_fieldsToUnnestAndKeepOriginalValue).getFieldToValueMap();
+          Map<String, Object> originalValues = _fieldsToUnnestAndKeepOriginalValue.isEmpty() ? null
+              : record.copy(_fieldsToUnnestAndKeepOriginalValue).getFieldToValueMap();
           flattenMap(record, columns);
           List<GenericRow> unnestedRecords = List.of(record);
           for (String field : _fieldsToUnnest) {
             unnestedRecords = unnestCollection(unnestedRecords, field);
           }
-          if (!_fieldsToUnnestAndKeepOriginalValue.isEmpty()) {
+          if (originalValues != null) {
             unnestedRecords.forEach(unnestedRecord -> {
               Map<String, Object> values = unnestedRecord.getFieldToValueMap();
               for (Map.Entry<String, Object> entry : originalValues.entrySet()) {
@@ -380,7 +384,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     List<String> fields = new ArrayList<>(record.getFieldToValueMap().keySet());
     for (String field : fields) {
       String newName = renamePrefix(field);
-      if (newName.equals(field)) {
+      if (newName == null) {
         continue;
       }
       Object value = record.removeValue(field);
@@ -401,7 +405,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
         return replacementPrefix + remainingColumnName;
       }
     }
-    return field;
+    return null;
   }
 
   private boolean containPrimitives(Object[] value) {
