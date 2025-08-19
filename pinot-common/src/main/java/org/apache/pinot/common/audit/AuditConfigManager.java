@@ -36,6 +36,7 @@ public final class AuditConfigManager {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditConfigManager.class);
 
+  // TODO spyne Hardcoded stub code. Wire this up with ClusterConfiguration
   private final AuditConfig _currentConfig = new AuditConfig();
 
   /**

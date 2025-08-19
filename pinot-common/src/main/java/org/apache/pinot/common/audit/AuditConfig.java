@@ -24,7 +24,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Pure data class for audit logging configuration.
- * Uses Jackson annotations for automatic JSON mapping.
+ * Uses Jackson annotations for automatic JSON mapping from ClusterConfiguration.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class AuditConfig {

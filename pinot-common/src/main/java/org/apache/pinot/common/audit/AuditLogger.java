@@ -52,6 +52,7 @@ public final class AuditLogger {
     }
 
     try {
+      // Log the JSON to a single line (follow ndjson standard)
       String jsonLog = OBJECT_MAPPER.writeValueAsString(auditEvent);
       AUDIT_LOGGER.info(jsonLog);
     } catch (Exception e) {

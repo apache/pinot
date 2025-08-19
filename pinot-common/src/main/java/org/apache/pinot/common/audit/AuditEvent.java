@@ -18,14 +18,15 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.time.Instant;
 
 
 /**
  * Data class representing an audit event for Pinot Controller API requests.
  * Contains all required fields as specified in the Phase 1 audit logging specification.
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class AuditEvent {
 
   @JsonProperty("timestamp")
@@ -48,21 +49,6 @@ public class AuditEvent {
 
   @JsonProperty("request")
   private Object _request;
-
-  public AuditEvent() {
-    // Default constructor for Jackson
-  }
-
-  public AuditEvent(String serviceId, String endpoint, String method, String originIpAddress, String userId,
-      Object request) {
-    _timestamp = Instant.now().toString();
-    _serviceId = serviceId;
-    _endpoint = endpoint;
-    _method = method;
-    _originIpAddress = originIpAddress;
-    _userId = userId;
-    _request = request;
-  }
 
   public String getTimestamp() {
     return _timestamp;
