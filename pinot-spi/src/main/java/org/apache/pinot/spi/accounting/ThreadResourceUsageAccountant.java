@@ -49,19 +49,16 @@ public interface ThreadResourceUsageAccountant {
   /**
    * Set up the thread execution context for an anchor a.k.a runner thread.
    * @param queryId query id string
-   * @param taskType the type of the task - SSE or MSE
    * @param workloadName the name of the workload, can be null
    */
-  void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType, String workloadName);
+  void setupRunner(@Nullable String queryId, String workloadName);
 
   /**
    * Set up the thread execution context for a worker thread.
    * @param taskId a unique task id
-   * @param taskType the type of the task - SSE or MSE
    * @param parentContext the parent execution context
    */
-  void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-      @Nullable ThreadExecutionContext parentContext);
+  void setupWorker(int taskId, @Nullable ThreadExecutionContext parentContext);
 
   /**
    * get the executon context of current thread

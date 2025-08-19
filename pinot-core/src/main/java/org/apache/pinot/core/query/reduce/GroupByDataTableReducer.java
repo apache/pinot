@@ -268,7 +268,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          _resourceUsageAccountant.setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, parentContext);
+          _resourceUsageAccountant.setupWorker(taskId, parentContext);
           try {
             for (DataTable dataTable : reduceGroup) {
               boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();

@@ -287,8 +287,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     String workloadName = QueryOptionsUtils.getWorkloadName(reqMetadata);
     //TODO: Verify if this matches with what OOM protection expects. This method will not block for the query to
     // finish, so it may be breaking some of the OOM protection assumptions.
-    Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.MSE,
-        workloadName);
+    Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), workloadName);
     ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
 
     try {

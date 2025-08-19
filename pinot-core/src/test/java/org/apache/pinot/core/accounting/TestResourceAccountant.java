@@ -21,7 +21,6 @@ package org.apache.pinot.core.accounting;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -43,8 +42,7 @@ class TestResourceAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPU
     CPUMemThreadLevelAccountingObjects.ThreadEntry anchorEntry = new CPUMemThreadLevelAccountingObjects.ThreadEntry();
     anchorEntry._currentThreadTaskStatus.set(
         new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID,
-            ThreadExecutionContext.TaskType.SSE, anchorThread._workerThread,
-            CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
+            anchorThread._workerThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     anchorEntry._currentThreadMemoryAllocationSampleBytes = 1000;
     threadEntries.put(anchorThread._workerThread, anchorEntry);
 
@@ -59,9 +57,8 @@ class TestResourceAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPU
 
   private static TaskThread getTaskThread(String queryId, int taskId, CountDownLatch threadLatch, Thread anchorThread) {
     CPUMemThreadLevelAccountingObjects.ThreadEntry worker1 = new CPUMemThreadLevelAccountingObjects.ThreadEntry();
-    worker1._currentThreadTaskStatus.set(
-        new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, taskId, ThreadExecutionContext.TaskType.SSE,
-            anchorThread, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
+    worker1._currentThreadTaskStatus.set(new CPUMemThreadLevelAccountingObjects.TaskEntry(queryId, taskId, anchorThread,
+        CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME));
     Thread workerThread1 = new Thread(() -> {
       try {
         threadLatch.await();
