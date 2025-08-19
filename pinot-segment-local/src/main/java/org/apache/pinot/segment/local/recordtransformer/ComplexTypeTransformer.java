@@ -396,6 +396,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     }
   }
 
+  @Nullable
   private String renamePrefix(String field) {
     for (Map.Entry<String, String> entry : _prefixesToRename.entrySet()) {
       String prefix = entry.getKey();
