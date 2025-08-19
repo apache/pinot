@@ -47,7 +47,6 @@ public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
 
-
   @Inject
   private AuditConfigManager _configManager;
 
