@@ -104,6 +104,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
   private final ClusterInfoAccessor _clusterInfoAccessor;
   private final TaskGeneratorRegistry _taskGeneratorRegistry;
   private final ResourceUtilizationManager _resourceUtilizationManager;
+  private final MinionTaskGenerationLockManager _taskGenerationLockManager;
 
   // For cron-based scheduling
   private final Scheduler _scheduler;
@@ -132,6 +133,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         controllerMetrics);
     _helixTaskResourceManager = helixTaskResourceManager;
     _resourceUtilizationManager = resourceUtilizationManager;
+    _taskGenerationLockManager = new MinionTaskGenerationLockManager(helixResourceManager);
     _taskManagerStatusCache = taskManagerStatusCache;
     _clusterInfoAccessor =
         new ClusterInfoAccessor(helixResourceManager, helixTaskResourceManager, controllerConf, controllerMetrics,
@@ -238,8 +240,11 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       // This can be used by the generator to appropriately set the subtask configs
       // Example usage in BaseTaskGenerator.getNumSubTasks()
       taskConfigs.put(MinionConstants.TRIGGERED_BY, CommonConstants.TaskTriggers.ADHOC_TRIGGER.name());
-
-      List<PinotTaskConfig> pinotTaskConfigs = taskGenerator.generateTasks(tableConfig, taskConfigs);
+      List<PinotTaskConfig> pinotTaskConfigs = new ArrayList<>();
+      _taskGenerationLockManager.generateWithLock(tableName, taskType, () -> {
+        pinotTaskConfigs.addAll(taskGenerator.generateTasks(tableConfig, taskConfigs));
+        return null;
+      });
       if (pinotTaskConfigs.isEmpty()) {
         LOGGER.warn("No ad-hoc task generated for task type: {}", taskType);
         continue;
@@ -765,8 +770,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           tableTaskConfig.getConfigsForTaskType(taskType).put(MinionConstants.TRIGGERED_BY, triggeredBy);
         }
 
-        taskGenerator.generateTasks(List.of(tableConfig), presentTaskConfig);
+        _taskGenerationLockManager.generateWithLock(tableName, taskType, () -> {
+          taskGenerator.generateTasks(List.of(tableConfig), presentTaskConfig);
+          return null;
+        });
         int maxNumberOfSubTasks = taskGenerator.getMaxAllowedSubTasksPerTask();
+        List<PinotTaskConfig> finalTaskConfigs = presentTaskConfig;
         if (presentTaskConfig.size() > maxNumberOfSubTasks) {
           String message = String.format(
               "Number of tasks generated for task type: %s for table: %s is %d, which is greater than the "
@@ -782,12 +791,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           }
           // For scheduled tasks, we log a warning and limit the number of tasks
           LOGGER.warn(message + "Only the first {} tasks will be scheduled", maxNumberOfSubTasks);
-          presentTaskConfig = new ArrayList<>(presentTaskConfig.subList(0, maxNumberOfSubTasks));
+          finalTaskConfigs = new ArrayList<>(presentTaskConfig.subList(0, maxNumberOfSubTasks));
           // Provide user visibility to the maximum number of subtasks that were used for the task
-          presentTaskConfig.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
+          finalTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
               .put(MinionConstants.TABLE_MAX_NUM_TASKS_KEY, String.valueOf(maxNumberOfSubTasks)));
         }
-        minionInstanceTagToTaskConfigs.put(minionInstanceTag, presentTaskConfig);
+        minionInstanceTagToTaskConfigs.put(minionInstanceTag, finalTaskConfigs);
         long successRunTimestamp = System.currentTimeMillis();
         _taskManagerStatusCache.saveTaskGeneratorInfo(tableName, taskType,
             taskGeneratorMostRecentRunInfo -> taskGeneratorMostRecentRunInfo.addSuccessRunTs(successRunTimestamp));
