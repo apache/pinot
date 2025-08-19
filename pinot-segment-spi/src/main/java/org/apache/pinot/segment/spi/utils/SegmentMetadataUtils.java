@@ -20,10 +20,13 @@ package org.apache.pinot.segment.spi.utils;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.commons.configuration2.PropertiesConfiguration;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.SegmentMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.segment.spi.store.SegmentDirectoryPaths;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
@@ -66,5 +69,25 @@ public class SegmentMetadataUtils {
     // TODO: Revisit if we can save the overhead of reloading the metadata when invoked from ForwardIndexHandler
     segmentDirectory.reloadMetadata();
     return segmentDirectory.getSegmentMetadata();
+  }
+
+  @Nullable
+  public static File findMetadataFile(List<File> files) {
+    for (File file : files) {
+      if (V1Constants.MetadataKeys.METADATA_FILE_NAME.equals(file.getName())) {
+        return file;
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  public static File findCreationMetaFile(List<File> files) {
+    for (File file : files) {
+      if (V1Constants.SEGMENT_CREATION_META.equals(file.getName())) {
+        return file;
+      }
+    }
+    return null;
   }
 }
