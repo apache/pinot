@@ -35,6 +35,7 @@ import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
@@ -82,7 +83,8 @@ public class OpChainSchedulerService {
         // try-with-resources to ensure that the operator chain is closed
         // TODO: Change the code so we ownership is expressed in the code in a better way
         try (OpChain closeMe = operatorChain) {
-          Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(), operatorChain.getParentContext());
+          Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
+              ThreadExecutionContext.TaskType.MSE, operatorChain.getParentContext());
           LOGGER.trace("({}): Executing", operatorChain);
           MseBlock result = operatorChain.getRoot().nextBlock();
           while (result.isData()) {
