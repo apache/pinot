@@ -58,9 +58,10 @@ public class AndFilterOperator extends BaseFilterOperator {
       if (optimizedDocIdSet instanceof EmptyDocIdSet) {
         return new AndDocIdSet(blockDocIdSets, _queryOptions, true);
       }
-      if (!(optimizedDocIdSet instanceof MatchAllDocIdSet)) {
-        blockDocIdSets.add(optimizedDocIdSet);
+      if (optimizedDocIdSet instanceof MatchAllDocIdSet) {
+        continue;
       }
+      blockDocIdSets.add(optimizedDocIdSet);
     }
     return new AndDocIdSet(blockDocIdSets, _queryOptions);
   }

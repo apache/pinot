@@ -52,7 +52,15 @@ public class OrFilterOperator extends BaseFilterOperator {
     Tracing.activeRecording().setNumChildren(_filterOperators.size());
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      blockDocIdSets.add(filterOperator.getTrues());
+      BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
+      BlockDocIdSet optimizedDocIdSet = blockDocIdSet.getOptimizedDocIdSet();
+      if (optimizedDocIdSet instanceof MatchAllDocIdSet) {
+        return new MatchAllDocIdSet(_numDocs);
+      }
+      if (optimizedDocIdSet instanceof EmptyDocIdSet) {
+        continue;
+      }
+      blockDocIdSets.add(optimizedDocIdSet);
     }
     return new OrDocIdSet(blockDocIdSets, _numDocs);
   }

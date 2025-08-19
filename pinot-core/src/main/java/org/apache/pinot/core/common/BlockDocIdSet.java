@@ -64,9 +64,6 @@ public interface BlockDocIdSet {
    */
   default BlockDocIdSet toNonScanDocIdSet() {
     BlockDocIdIterator docIdIterator = iterator();
-    if (docIdIterator instanceof EmptyDocIdIterator) {
-      return EmptyDocIdSet.getInstance();
-    }
     // NOTE: AND and OR DocIdIterator might contain scan-based DocIdIterator
     // TODO: This scan is not counted in the execution stats
     if (docIdIterator instanceof ScanBasedDocIdIterator || docIdIterator instanceof AndDocIdIterator
@@ -87,6 +84,9 @@ public interface BlockDocIdSet {
     }
     if (docIdIterator instanceof BitmapDocIdIterator) {
       return new BitmapDocIdSet((BitmapDocIdIterator) docIdIterator);
+    }
+    if (docIdIterator instanceof EmptyDocIdIterator) {
+      return EmptyDocIdSet.getInstance();
     }
 
     return this;
