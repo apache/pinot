@@ -1209,4 +1209,164 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
       }
     }
   }
+
+  @Test
+  public void testCommitTimeCompactionMutableMapDataSourceFix()
+      throws Exception {
+    // Test Case: MAP Column Commit-Time Compaction
+    // Goal: Ensure commit-time compaction correctly handles MAP columns by only processing
+    // valid documents when collecting statistics, avoiding inflated cardinality and key frequencies
+    // from obsolete records that should be excluded during compaction.
+
+    String kafkaTopicNameCompacted = getKafkaTopic() + "-map-compaction-enabled";
+    String kafkaTopicNameNormal = getKafkaTopic() + "-map-compaction-disabled";
+
+    // Create test data with MAP columns - using simplified JSON format for map values
+    // Format: "playerId,name,game,score,timestampInEpoch,deleted,userAttributes"
+    // Note: Using simple key-value pairs without commas to avoid CSV parsing conflicts
+    List<String> testRecords = List.of(
+        "400,Player400,game1,85.5,1681054200000,false,"
+            + "{\"level\":10}",
+        "401,Player401,game2,92.0,1681054300000,false,"
+            + "{\"level\":15}",
+        "402,Player402,game3,78.0,1681054400000,false,"
+            + "{\"level\":8}",
+        // Updates to create obsolete records with different MAP values
+        "400,Player400Updated,game1,90.0,1681154200000,false,"
+            + "{\"level\":12}",
+        "401,Player401Updated,game2,95.0,1681154300000,false,"
+            + "{\"level\":18}"
+    );
+
+    // Set up Kafka topics with MAP test data
+    pushCsvIntoKafka(testRecords, kafkaTopicNameCompacted, 0);
+    pushCsvIntoKafka(testRecords, kafkaTopicNameNormal, 0);
+
+    // TABLE 1: With commit-time compaction ENABLED
+    String tableNameWithCompaction = "gameScoresMapCompactionEnabled";
+
+    // Create schema with MAP column
+    Schema mapSchemaCompacted = createSchema();
+    mapSchemaCompacted.setSchemaName(tableNameWithCompaction);
+    mapSchemaCompacted.addField(new DimensionFieldSpec("userAttributes", FieldSpec.DataType.JSON, true));
+    addSchema(mapSchemaCompacted);
+
+    UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);
+
+    Map<String, String> csvDecoderProperties =
+        getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,userAttributes");
+    TableConfig tableConfigWithCompaction =
+        createCSVUpsertTableConfig(tableNameWithCompaction, kafkaTopicNameCompacted, getNumKafkaPartitions(),
+            csvDecoderProperties, upsertConfigWithCompaction, PRIMARY_KEY_COL);
+
+    tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    addTableConfig(tableConfigWithCompaction);
+
+    // TABLE 2: With commit-time compaction DISABLED
+    String tableNameWithoutCompaction = "gameScoresMapCompactionDisabled";
+
+    // Create separate schema for normal table
+    Schema mapSchemaNormal = createSchema();
+    mapSchemaNormal.setSchemaName(tableNameWithoutCompaction);
+    mapSchemaNormal.addField(new DimensionFieldSpec("userAttributes", FieldSpec.DataType.JSON, true));
+    addSchema(mapSchemaNormal);
+
+    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);
+
+    Map<String, String> csvDecoderPropertiesNormal =
+        getCSVDecoderProperties(CSV_DELIMITER, "playerId,name,game,score,timestampInEpoch,deleted,userAttributes");
+    TableConfig tableConfigWithoutCompaction =
+        createCSVUpsertTableConfig(tableNameWithoutCompaction, kafkaTopicNameNormal, getNumKafkaPartitions(),
+            csvDecoderPropertiesNormal, upsertConfigWithoutCompaction, PRIMARY_KEY_COL);
+
+    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    addTableConfig(tableConfigWithoutCompaction);
+
+    // Wait for data to load
+    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 5);
+    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 5);
+
+    // Verify initial state - both tables should show same logical record count (3 unique players after upserts)
+    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+
+    // Verify logical counts match initially
+    assertEquals(initialLogicalCountCompacted, 3, "Compacted table should show 3 logical records initially");
+    assertEquals(initialLogicalCountNormal, 3, "Normal table should show 3 logical records initially");
+
+    // Test JSON queries work correctly before commit
+    String jsonQuery = String.format(
+        "SELECT playerId, JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') as level FROM %s WHERE "
+            + "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10 ORDER BY playerId",
+        tableNameWithCompaction);
+    ResultSet resultSet = getPinotConnection().execute(jsonQuery).getResultSet(0);
+    assertTrue(resultSet.getRowCount() > 0, "Should find records with level > 10");
+
+    // Verify data integrity before commit
+    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+
+    // Force commit segments to trigger commit-time compaction
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
+
+    // Wait for commit completion
+    waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
+
+    // Check final results after commit
+    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
+    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+
+    // KEY VALIDATIONS: Verify commit time compaction is working as expected for MAP columns
+    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal,
+        String.format("Commit time compaction should reduce physical records for MAP columns: compacted=%d < normal=%d",
+            postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
+
+    // Both tables should still have the same logical record count
+    assertEquals(postCommitLogicalCountCompacted, 3,
+        "Compacted table should still show 3 logical records after commit");
+    assertEquals(postCommitLogicalCountNormal, 3, "Normal table should still show 3 logical records after commit");
+    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
+        "Both tables should have identical logical results after commit");
+
+    // Verify data integrity is maintained after commit-time compaction for MAP columns
+    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+
+    // Verify JSON queries still work correctly after compaction
+    resultSet = getPinotConnection().execute(jsonQuery).getResultSet(0);
+    assertTrue(resultSet.getRowCount() > 0, "Should still find records with level > 10 after compaction");
+
+    // Test specific JSON path queries to ensure MAP column statistics are correctly computed
+    String levelQuery = String.format(
+        "SELECT COUNT(*) FROM %s WHERE JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') > 10",
+        tableNameWithCompaction);
+    ResultSet levelResult = getPinotConnection().execute(levelQuery).getResultSet(0);
+    assertTrue(levelResult.getInt(0, 0) > 0, "Should find records with level > 10 after compaction");
+
+    // Verify that obsolete MAP values are not affecting queries - test uniqueness
+    String uniqueQuery = String.format(
+        "SELECT COUNT(DISTINCT playerId) FROM %s WHERE "
+            + "JSON_EXTRACT_SCALAR(userAttributes, '$.level', 'INT') IS NOT NULL",
+        tableNameWithCompaction);
+    ResultSet uniqueResult = getPinotConnection().execute(uniqueQuery).getResultSet(0);
+    assertEquals(uniqueResult.getInt(0, 0), 3,
+        "Should find exactly 3 unique players with level data (after compaction)");
+
+    // Calculate and log compaction efficiency for MAP columns
+    double compressionRatio = (double) postCommitPhysicalCountCompacted / postCommitPhysicalCountNormal;
+    int invalidRecordsRemoved = (int) (postCommitPhysicalCountNormal - postCommitPhysicalCountCompacted);
+
+    assertTrue(compressionRatio < 1.0, "Compaction should remove some physical records for MAP columns");
+    assertTrue(invalidRecordsRemoved >= 1,
+        "At least 1 obsolete record should be removed during MAP column compaction");
+
+    // Clean up
+    dropRealtimeTable(tableNameWithCompaction);
+    dropRealtimeTable(tableNameWithoutCompaction);
+    deleteSchema(tableNameWithCompaction);
+    deleteSchema(tableNameWithoutCompaction);
+  }
 }
