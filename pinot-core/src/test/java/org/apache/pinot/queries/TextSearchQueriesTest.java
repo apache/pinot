@@ -2340,4 +2340,64 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
             "Failed while searching the text index"),
         "Expected error related to leading wildcard or text search failure, got: " + errorMsg);
   }
+
+  // ===== TEST CASES FOR MINIMUM_SHOULD_MATCH PARSER =====
+  @Test
+  public void testTextSearchWithMinimumShouldMatchParser()
+      throws Exception {
+    // Test 1: Positive integer minimum_should_match - require at least 2 out of 3 terms
+    List<Object[]> expectedMin2Of3 = new ArrayList<>();
+    expectedMin2Of3.add(new Object[]{
+        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+        + "storage, concurrency, multi-threading"
+    });
+    expectedMin2Of3.add(new Object[]{
+        1018,
+        "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
+            + "multi-threading, C++,"
+    });
+    expectedMin2Of3.add(new Object[]{
+        1019,
+        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
+            + "distributed storage, concurrency, multi-threading, apache airflow"
+    });
+
+    String queryMin2Of3 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java realtime streaming', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=2') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin2Of3, expectedMin2Of3.size(), false, expectedMin2Of3);
+
+    // Test 2: Percentage minimum_should_match - require at least 80% (2 out of 3 terms)
+    String queryMin80Percent =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java realtime streaming', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=80%') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin80Percent, expectedMin2Of3.size(), false, expectedMin2Of3);
+
+    // Test 3: Single term query (minimum_should_match should be ignored)
+    List<Object[]> expectedSingleTerm = new ArrayList<>();
+    expectedSingleTerm.add(new Object[]{
+        1005,
+        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
+            + "learning, spark, Kubernetes, transaction processing"
+    });
+    expectedSingleTerm.add(new Object[]{
+        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
+        + "storage, concurrency, multi-threading"
+    });
+    expectedSingleTerm.add(new Object[]{
+        1017,
+        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
+            + " concurrency, multi-threading, C++, CPU processing, Java"
+    });
+    expectedSingleTerm.add(new Object[]{
+        1019,
+        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
+            + "distributed storage, concurrency, multi-threading, apache airflow"
+    });
+
+    String querySingleTerm =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Java', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=2') LIMIT 50000";
+    testTextSearchSelectQueryHelper(querySingleTerm, expectedSingleTerm.size(), false, expectedSingleTerm);
+  }
 }
