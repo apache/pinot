@@ -58,6 +58,7 @@ import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.NettyConfig;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.ZkTableCache;
 import org.apache.pinot.common.cursors.AbstractResponseStore;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.failuredetector.FailureDetectorFactory;
@@ -333,7 +334,7 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     FunctionRegistry.init();
     boolean caseInsensitive =
         _brokerConf.getProperty(Helix.ENABLE_CASE_INSENSITIVE_KEY, Helix.DEFAULT_ENABLE_CASE_INSENSITIVE);
-    TableCache tableCache = new TableCache(_propertyStore, caseInsensitive);
+    TableCache tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
 
     LOGGER.info("Initializing Broker Event Listener Factory");
     BrokerQueryEventListenerFactory.init(_brokerConf.subset(Broker.EVENT_LISTENER_CONFIG_PREFIX));
