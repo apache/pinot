@@ -120,20 +120,23 @@ public class RealtimeNgramFilteringIndex implements MutableTextIndex {
     if (!ngrams.iterator().hasNext()) {
       return null; // No n-grams generated, return null.
     }
-    MutableRoaringBitmap resultBitmap = null;
+    ArrayList<MutableRoaringBitmap> bitmapLst = new ArrayList<>();
     try {
       for (String ngram : ngrams) {
         int dictId = _ngramToDictIdMapping.getInt(ngram);
-        if (resultBitmap == null) {
-          resultBitmap = _invertedIndex.getDocIds(dictId);
-        } else {
-          resultBitmap.and(_invertedIndex.getDocIds(dictId));
-        }
+        bitmapLst.add(_invertedIndex.getDocIds(dictId));
       }
+      if (bitmapLst.isEmpty()) {
+        return null; // No n-grams found in the index.
+      }
+      MutableRoaringBitmap resultBitmap = bitmapLst.get(0);
+      for (int i = 1; i < bitmapLst.size(); i++) {
+        resultBitmap.and(bitmapLst.get(i));
+      }
+      return resultBitmap;
     } finally {
       _readLock.unlock();
     }
-    return resultBitmap;
   }
 
   /**
