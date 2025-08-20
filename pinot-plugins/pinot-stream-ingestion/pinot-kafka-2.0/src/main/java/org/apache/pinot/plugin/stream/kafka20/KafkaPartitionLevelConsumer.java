@@ -83,7 +83,9 @@ public class KafkaPartitionLevelConsumer extends KafkaPartitionLevelConnectionHa
           String key = record.key();
           byte[] keyBytes = key != null ? key.getBytes(StandardCharsets.UTF_8) : null;
           filteredRecords.add(new BytesStreamMessage(keyBytes, message.get(), messageMetadata));
-          batchSizeInBytes += messageMetadata.getRecordSerializedSize();
+          if (messageMetadata.getRecordSerializedSize() > 0) {
+            batchSizeInBytes += messageMetadata.getRecordSerializedSize();
+          }
         } else if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("Tombstone message at offset: {}", record.offset());
         }
