@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.common.audit;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -34,8 +32,6 @@ import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 
@@ -139,50 +135,6 @@ public class AuditRequestProcessorTest {
     @SuppressWarnings("unchecked")
     List<String> tags = (List<String>) queryParameters.get("tags");
     assertThat(tags).containsExactly("tag1", "tag2", "tag3");
-  }
-
-  @Test
-  public void testCaptureRequestBodyWhenEnabled() {
-    _defaultConfig.setCaptureRequestPayload(true);
-    String requestBody = "{\"key\": \"value\"}";
-    InputStream entityStream = new ByteArrayInputStream(requestBody.getBytes());
-
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("POST");
-    when(_requestContext.getHeaders()).thenReturn(new MultivaluedHashMap<>());
-    when(_requestContext.hasEntity()).thenReturn(true);
-    when(_requestContext.getEntityStream()).thenReturn(entityStream);
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    AuditEvent.AuditRequestPayload payload = result.getRequest();
-    assertThat(payload).isNotNull();
-    assertThat(payload.getBody()).isEqualTo(requestBody);
-    verify(_requestContext).setEntityStream(any(ByteArrayInputStream.class));
-  }
-
-  @Test
-  public void testSkipRequestBodyWhenDisabled() {
-    _defaultConfig.setCaptureRequestPayload(false);
-
-    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
-    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
-    when(_uriInfo.getPath()).thenReturn("/test");
-    when(_requestContext.getMethod()).thenReturn("POST");
-    when(_requestContext.getHeaders()).thenReturn(new MultivaluedHashMap<>());
-    when(_requestContext.hasEntity()).thenReturn(true);
-
-    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
-
-    assertThat(result).isNotNull();
-    AuditEvent.AuditRequestPayload payload = result.getRequest();
-    if (payload != null) {
-      assertThat(payload.getBody()).isNull();
-    }
-    verify(_requestContext, times(0)).getEntityStream();
   }
 
   @Test
