@@ -18,10 +18,18 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import javax.inject.Singleton;
+import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.helix.NotificationContext;
+import org.apache.helix.api.listeners.ClusterConfigChangeListener;
+import org.apache.helix.model.ClusterConfig;
+import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,12 +40,10 @@ import org.slf4j.LoggerFactory;
  * Self-registers with the provided cluster config provider.
  */
 @Singleton
-public final class AuditConfigManager {
-
+public final class AuditConfigManager implements ClusterConfigChangeListener {
   private static final Logger LOG = LoggerFactory.getLogger(AuditConfigManager.class);
 
-  // TODO spyne Hardcoded stub code. Wire this up with ClusterConfiguration
-  private final AuditConfig _currentConfig = new AuditConfig();
+  private AuditConfig _currentConfig = new AuditConfig();
 
   /**
    * Checks if the given endpoint should be excluded from audit logging.
@@ -99,6 +105,24 @@ public final class AuditConfigManager {
     return false;
   }
 
+  @VisibleForTesting
+  static AuditConfig buildFromClusterConfig(ClusterConfig clusterConfig) {
+    return mapPrefixedConfigToObject(clusterConfig.getRecord().getSimpleFields(),
+        CommonConstants.AuditLogConstants.PREFIX, AuditConfig.class);
+  }
+
+  /**
+   * Maps cluster configuration properties with a common prefix to a POJO using Jackson.
+   * Uses PinotConfiguration.subset() to extract properties with the given prefix and
+   * Jackson's convertValue() for automatic object mapping.
+   */
+  private static <T> T mapPrefixedConfigToObject(Map<String, String> clusterConfigs, String prefix,
+      Class<T> configClass) {
+    final MapConfiguration mapConfig = new MapConfiguration(clusterConfigs);
+    final PinotConfiguration subsetConfig = new PinotConfiguration(mapConfig).subset(prefix);
+    return AuditLogger.OBJECT_MAPPER.convertValue(subsetConfig.toMap(), configClass);
+  }
+
   /**
    * Gets the current audit configuration.
    * This method is thread-safe and lock-free.
@@ -127,5 +151,15 @@ public final class AuditConfigManager {
    */
   public boolean isEndpointExcluded(String endpoint) {
     return isEndpointExcluded(endpoint, _currentConfig.getExcludedEndpoints());
+  }
+
+  @Override
+  public void onClusterConfigChange(ClusterConfig clusterConfig, NotificationContext context) {
+    try {
+      _currentConfig = buildFromClusterConfig(clusterConfig);
+      LOG.info("Successfully updated audit configuration");
+    } catch (Exception e) {
+      LOG.error("Failed to update audit configuration from cluster configs", e);
+    }
   }
 }

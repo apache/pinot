@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 public final class AuditLogger {
 
   private static final String PINOT_AUDIT_LOGGER_NAME = "org.apache.pinot.audit";
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+  static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   // Default Pinot logger. For logging failures in audit logging itself
   private static final Logger LOG = LoggerFactory.getLogger(AuditLogger.class);
   private static final Logger AUDIT_LOGGER = LoggerFactory.getLogger(PINOT_AUDIT_LOGGER_NAME);
