@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.index.creator;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.util.ArrayList;
@@ -86,14 +85,14 @@ public class SegmentGenerationWithMultipleRecordsTest {
 
     GenericRow genericRow1 = new GenericRow();
     genericRow1.putValue(GenericRow.MULTIPLE_RECORDS_KEY,
-        Lists.newArrayList(getRandomArrayElement(), getRandomArrayElement(), getRandomArrayElement()));
+        List.of(getRandomArrayElement(), getRandomArrayElement(), getRandomArrayElement()));
     rows.add(genericRow1);
     GenericRow genericRow2 = new GenericRow();
-    genericRow2.putValue(GenericRow.MULTIPLE_RECORDS_KEY, Lists.newArrayList(getRandomArrayElement()));
+    genericRow2.putValue(GenericRow.MULTIPLE_RECORDS_KEY, List.of(getRandomArrayElement()));
     rows.add(genericRow2);
     GenericRow genericRow3 = new GenericRow();
     genericRow3.putValue(GenericRow.MULTIPLE_RECORDS_KEY,
-        Lists.newArrayList(getRandomArrayElement(), getRandomArrayElement()));
+        List.of(getRandomArrayElement(), getRandomArrayElement()));
     rows.add(genericRow3);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();

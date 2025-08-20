@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.filter;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -139,14 +138,14 @@ public class FilterOperatorUtilsTest {
     when(prioritizedBetweenSortedAndBitmap.getPriority())
         .thenReturn(OptionalInt.empty());
 
-    List<? extends List<? extends BaseFilterOperator>> expectedOrder = Lists.newArrayList(
-        Lists.newArrayList(sorted, notWithHighPriority),
-        Lists.newArrayList(bitmap),
-        Lists.newArrayList(range, textContains, textMatch, jsonMatch, h3, h3Inclusion),
-        Lists.newArrayList(andFilterOperator),
-        Lists.newArrayList(orFilterOperator, notWithLowPriority),
-        Lists.newArrayList(expression),
-        Lists.newArrayList(unknown, notPrioritized)
+    List<? extends List<? extends BaseFilterOperator>> expectedOrder = List.of(
+        List.of(sorted, notWithHighPriority),
+        List.of(bitmap),
+        List.of(range, textContains, textMatch, jsonMatch, h3, h3Inclusion),
+        List.of(andFilterOperator),
+        List.of(orFilterOperator, notWithLowPriority),
+        List.of(expression),
+        List.of(unknown, notPrioritized)
     );
 
     List<Object[]> cases = new ArrayList<>();
@@ -156,7 +155,7 @@ public class FilterOperatorUtilsTest {
         for (int j = i + 1; j < expectedOrder.size(); j++) {
           List<? extends BaseFilterOperator> lowerPriorityOps = expectedOrder.get(j);
           for (BaseFilterOperator lowerPriorityOp : lowerPriorityOps) {
-            cases.add(new Object[] {highPriorityOp, lowerPriorityOp});
+            cases.add(new Object[]{highPriorityOp, lowerPriorityOp});
           }
         }
       }
@@ -166,21 +165,21 @@ public class FilterOperatorUtilsTest {
 
   @Test(dataProvider = "priorities")
   public void testPriority(BaseFilterOperator highPriorty, BaseFilterOperator lowerPriorty) {
-    ArrayList<BaseFilterOperator> unsorted = Lists.newArrayList(lowerPriorty, highPriorty);
+    List<BaseFilterOperator> unsorted = List.of(lowerPriorty, highPriorty);
     BaseFilterOperator filterOperator =
         FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, unsorted, NUM_DOCS);
     assertTrue(filterOperator instanceof AndFilterOperator);
     List<Operator> actualChildOperators = ((AndFilterOperator) filterOperator).getChildOperators();
-    assertEquals(actualChildOperators, Lists.newArrayList(highPriorty, lowerPriorty), "Filter " + highPriorty
+    assertEquals(actualChildOperators, List.of(highPriorty, lowerPriorty), "Filter " + highPriorty
         + " should have more priority than filter " + lowerPriorty);
   }
 
   private void assertOrder(BaseFilterOperator first, BaseFilterOperator second) {
     BaseFilterOperator filterOperator =
-        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, Lists.newArrayList(second, first), NUM_DOCS);
+        FilterOperatorUtils.getAndFilterOperator(QUERY_CONTEXT, List.of(second, first), NUM_DOCS);
     assertTrue(filterOperator instanceof AndFilterOperator);
     List<Operator> actualChildOperators = ((AndFilterOperator) filterOperator).getChildOperators();
-    assertEquals(actualChildOperators, Lists.newArrayList(first, second), "Filter " + first + " should have "
+    assertEquals(actualChildOperators, List.of(first, second), "Filter " + first + " should have "
         + "more priority than filter " + second);
   }
 

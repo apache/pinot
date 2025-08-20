@@ -20,7 +20,6 @@ package org.apache.pinot.controller.helix.core.realtime;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -757,7 +756,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     committingSegmentDescriptor.setSegmentMetadata(mockSegmentMetadata());
     segmentManager.commitSegmentMetadata(REALTIME_TABLE_NAME, committingSegmentDescriptor);
     // ONLINE in IS and metadata DONE, but end of shard (not present in partition group list), so don't repair
-    testRepairs(segmentManager, Lists.newArrayList(1));
+    testRepairs(segmentManager, List.of(1));
 
     // make the last ONLINE segment of the shard as CONSUMING (failed between step1 and 3)
     segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout1;
@@ -765,7 +764,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
     turnNewConsumingSegmentConsuming(instanceStatesMap, consumingSegment);
 
     // makes the IS to ONLINE, but creates no new entries, because end of shard.
-    testRepairs(segmentManager, Lists.newArrayList(1));
+    testRepairs(segmentManager, List.of(1));
   }
 
   /**

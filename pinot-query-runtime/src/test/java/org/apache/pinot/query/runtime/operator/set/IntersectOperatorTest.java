@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
@@ -50,7 +49,7 @@ public class IntersectOperatorTest {
         .buildWithEos();
 
     IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = intersectOperator.nextBlock();
@@ -88,7 +87,7 @@ public class IntersectOperatorTest {
         .buildWithEos();
 
     IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
 
     MseBlock result = intersectOperator.nextBlock();
@@ -116,7 +115,7 @@ public class IntersectOperatorTest {
         .buildWithError(ErrorMseBlock.fromException(new RuntimeException("Error in right operator")));
 
     IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     MseBlock result = intersectOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block
@@ -139,7 +138,7 @@ public class IntersectOperatorTest {
         .buildWithEos();
 
     IntersectOperator intersectOperator =
-        new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+        new IntersectOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
             schema);
     MseBlock result = intersectOperator.nextBlock();
     // Keep calling nextBlock until we get an EoS block

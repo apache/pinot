@@ -19,13 +19,13 @@
 package org.apache.pinot.connector.flink.sink;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
@@ -249,7 +249,7 @@ public class FlinkSegmentWriter implements SegmentWriter {
       batchConfigMapOverride.put(BatchConfigProperties.OUTPUT_DIR_URI, segmentDir.getAbsolutePath());
       batchConfigMapOverride.put(BatchConfigProperties.INPUT_FORMAT, BUFFER_FILE_FORMAT.toString());
       batchConfigMapOverride.put(BatchConfigProperties.SEQUENCE_ID, Integer.toString(_seqId));
-      BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(Lists.newArrayList(batchConfigMapOverride),
+      BatchIngestionConfig batchIngestionConfig = new BatchIngestionConfig(List.of(batchConfigMapOverride),
           _batchIngestionConfig.getSegmentIngestionType(), _batchIngestionConfig.getSegmentIngestionFrequency(),
           _batchIngestionConfig.getConsistentDataPush());
 

@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.blocks.results;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -43,7 +42,7 @@ public class ExplainV2ResultBlock extends BaseResultsBlock {
       new DataSchema(new String[]{"Plan"}, new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING});
 
   public ExplainV2ResultBlock(QueryContext queryContext, ExplainInfo physicalPlan) {
-    this(queryContext, Lists.newArrayList(physicalPlan));
+    this(queryContext, List.of(physicalPlan));
   }
 
   public ExplainV2ResultBlock(QueryContext queryContext, List<ExplainInfo> physicalPlan) {

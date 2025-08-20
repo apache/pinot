@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
@@ -64,21 +63,21 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
 
     // simple record - contains a string, long and double array
     _simpleRecordSchema = createRecord("simpleRecord", null, null, false);
-    _simpleRecordSchema.setFields(Lists.newArrayList(new Field("simpleField1", create(Type.STRING), null, null),
+    _simpleRecordSchema.setFields(List.of(new Field("simpleField1", create(Type.STRING), null, null),
         new Field("simpleField2", create(Type.LONG), null, null),
         new Field("simpleList", createArray(create(Type.DOUBLE)), null, null)));
 
     // complex record - contains a string, a complex field (contains int and long)
     _complexRecordSchema = createRecord("complexRecord", null, null, false);
     _complexFieldSchema = createRecord("complexField", null, null, false);
-    _complexFieldSchema.setFields(Lists.newArrayList(new Field("field1", create(Type.INT), null, null),
+    _complexFieldSchema.setFields(List.of(new Field("field1", create(Type.INT), null, null),
         new Field("field2", create(Type.LONG), null, null)));
-    _complexRecordSchema.setFields(Lists.newArrayList(new Field("simpleField", create(Type.STRING), null, null),
+    _complexRecordSchema.setFields(List.of(new Field("simpleField", create(Type.STRING), null, null),
         new Field("complexField", _complexFieldSchema, null, null)));
 
     // complex list element - each element contains a record of int and long
     _complexListSchema = createRecord("complexList", null, null, false);
-    _complexListSchema.setFields(Lists.newArrayList(new Field("field1", create(Type.INT), null, null),
+    _complexListSchema.setFields(List.of(new Field("field1", create(Type.INT), null, null),
         new Field("field2", create(Type.LONG), null, null)));
 
     Field map1Field = new Field("map1", _intStringMapAvroSchema, null, null);
@@ -89,7 +88,7 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
 
     _avroSchema = createRecord("manyComplexTypes", null, null, false);
     _avroSchema
-        .setFields(Lists.newArrayList(map1Field, map2Field, simpleRecordField, complexRecordField, complexListField));
+        .setFields(List.of(map1Field, map2Field, simpleRecordField, complexRecordField, complexListField));
 
     List<Map<String, Object>> inputRecords = new ArrayList<>(2);
     inputRecords.add(getRecord1());

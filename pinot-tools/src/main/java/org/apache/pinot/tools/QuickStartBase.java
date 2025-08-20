@@ -285,7 +285,7 @@ public abstract class QuickStartBase {
 
   protected Map<String, Object> getConfigOverrides() {
     try {
-      return StringUtils.isEmpty(_configFilePath) ? ImmutableMap.of()
+      return StringUtils.isEmpty(_configFilePath) ? Map.of()
           : PinotConfigUtils.readConfigFromFile(_configFilePath);
     } catch (ConfigurationException e) {
       throw new RuntimeException(e);

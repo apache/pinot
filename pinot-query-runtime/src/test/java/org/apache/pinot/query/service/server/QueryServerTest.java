@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.service.server;
 
-import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
@@ -83,7 +82,7 @@ public class QueryServerTest extends QueryTestSet {
       _queryRunnerMap.put(availablePort, queryRunner);
     }
 
-    List<Integer> portList = Lists.newArrayList(_queryServerMap.keySet());
+    List<Integer> portList = List.copyOf(_queryServerMap.keySet());
 
     // reducer port doesn't matter, we are testing the worker instance not GRPC.
     _queryEnvironment = QueryEnvironmentTestBase.getQueryEnvironment(1, portList.get(0), portList.get(1),

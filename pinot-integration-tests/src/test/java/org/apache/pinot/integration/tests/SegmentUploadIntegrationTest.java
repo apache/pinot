@@ -20,7 +20,6 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Function;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
@@ -136,7 +135,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     PinotFSSpec fsSpec = new PinotFSSpec();
     fsSpec.setScheme("file");
     fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
-    jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
+    jobSpec.setPinotFSSpecs(List.of(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName());
@@ -235,7 +234,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     PinotFSSpec fsSpec = new PinotFSSpec();
     fsSpec.setScheme("file");
     fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
-    jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
+    jobSpec.setPinotFSSpecs(List.of(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName() + "_OFFLINE");
@@ -308,7 +307,7 @@ public class SegmentUploadIntegrationTest extends BaseClusterIntegrationTest {
     PinotFSSpec fsSpec = new PinotFSSpec();
     fsSpec.setScheme("file");
     fsSpec.setClassName("org.apache.pinot.spi.filesystem.LocalPinotFS");
-    jobSpec.setPinotFSSpecs(Lists.newArrayList(fsSpec));
+    jobSpec.setPinotFSSpecs(List.of(fsSpec));
     jobSpec.setOutputDirURI(_tarDir.getAbsolutePath());
     TableSpec tableSpec = new TableSpec();
     tableSpec.setTableName(getTableName());

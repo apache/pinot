@@ -17,9 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.query.runtime.operator.exchange;
-
-import com.google.common.collect.ImmutableList;
 import java.util.Collections;
+import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.GrpcSendingMailbox;
 import org.apache.pinot.query.mailbox.InMemorySendingMailbox;
@@ -65,7 +64,7 @@ public class SingletonExchangeTest {
   public void shouldRouteSingleton()
       throws Exception {
     // Given:
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1);
+    List<SendingMailbox> destinations = List.of(_mailbox1);
 
     // When:
     new SingletonExchange(destinations, BlockSplitter.NO_OP).route(destinations, _block);
@@ -81,7 +80,7 @@ public class SingletonExchangeTest {
   public void shouldThrowWhenSingletonWithMultipleMailboxes()
       throws Exception {
     // Given:
-    ImmutableList<SendingMailbox> destinations = ImmutableList.of(_mailbox1, _mailbox3);
+    List<SendingMailbox> destinations = List.of(_mailbox1, _mailbox3);
 
     // When:
     new SingletonExchange(destinations, BlockSplitter.NO_OP).route(destinations, _block);

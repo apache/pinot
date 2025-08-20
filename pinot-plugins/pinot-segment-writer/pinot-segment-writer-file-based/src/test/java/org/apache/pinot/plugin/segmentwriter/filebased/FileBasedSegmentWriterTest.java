@@ -19,7 +19,6 @@
 package org.apache.pinot.plugin.segmentwriter.filebased;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -399,7 +398,7 @@ public class FileBasedSegmentWriterTest {
     simpleMap.put("phoneNumber", 9090909090L);
     row.putValue("aSimpleMap", simpleMap);
     Map<String, Object> advancedMap = new HashMap<>();
-    advancedMap.put("list", Lists.newArrayList("p", "q", "r"));
+    advancedMap.put("list", List.of("p", "q", "r"));
     advancedMap.put("map", simpleMap);
     row.putValue("anAdvancedMap", advancedMap);
     row.putValue("nullString", null);

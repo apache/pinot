@@ -20,7 +20,6 @@
 package org.apache.pinot.segment.local.segment.index.dictionary;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
@@ -413,10 +412,10 @@ public class DictionaryIndexType
   protected void handleIndexSpecificCleanup(TableConfig tableConfig) {
     IndexingConfig indexingConfig = tableConfig.getIndexingConfig();
     List<String> noDictionaryColumns = indexingConfig.getNoDictionaryColumns() == null
-        ? Lists.newArrayList()
+        ? new ArrayList<>()
         : indexingConfig.getNoDictionaryColumns();
     List<FieldConfig> fieldConfigList = tableConfig.getFieldConfigList() == null
-        ? Lists.newArrayList()
+        ? new ArrayList<>()
         : tableConfig.getFieldConfigList();
 
     List<FieldConfig> configsToUpdate = new ArrayList<>();

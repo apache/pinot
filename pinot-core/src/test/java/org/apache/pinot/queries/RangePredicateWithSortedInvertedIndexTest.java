@@ -45,7 +45,6 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertNotNull;
@@ -144,18 +143,18 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
   public void testInnerSegmentQuery() {
     String query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 LIMIT 100000";
     Pairs.IntPair pair = new Pairs.IntPair(20000, 29999);
-    runQuery(query, 10000, Lists.newArrayList(pair), 2);
+    runQuery(query, 10000, List.of(pair), 2);
 
     // test with sorted column without dictionary
     // FilterOperatorUtils code should correctly create scan operator for INT_COL_RAW
     // else this test will fail
     query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL_RAW >= 20000 LIMIT 100000";
     pair = new Pairs.IntPair(20000, 29999);
-    runQuery(query, 10000, Lists.newArrayList(pair), 2);
+    runQuery(query, 10000, List.of(pair), 2);
 
     query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL <= 23666 LIMIT 100000";
     pair = new Pairs.IntPair(20000, 23666);
-    runQuery(query, 3667, Lists.newArrayList(pair), 2);
+    runQuery(query, 3667, List.of(pair), 2);
 
     // test with sorted column without dictionary
     // FilterOperatorUtils code should correctly create scan operator for INT_COL_RAW
@@ -163,24 +162,24 @@ public class RangePredicateWithSortedInvertedIndexTest extends BaseQueriesTest {
     query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL >= 20000 AND INT_COL <= 23666 AND "
         + "INT_COL_RAW <= 23666 LIMIT 100000";
     pair = new Pairs.IntPair(20000, 23666);
-    runQuery(query, 3667, Lists.newArrayList(pair), 2);
+    runQuery(query, 3667, List.of(pair), 2);
 
     query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL <= 20000 LIMIT 100000";
     pair = new Pairs.IntPair(0, 20000);
-    runQuery(query, 20001, Lists.newArrayList(pair), 2);
+    runQuery(query, 20001, List.of(pair), 2);
 
     // test with sorted column without dictionary
     // FilterOperatorUtils code should correctly create scan operator for INT_COL_RAW
     // else this test will fail
     query = "SELECT STRING_COL, INT_COL FROM testTable WHERE INT_COL_RAW = 20000 LIMIT 100000";
     pair = new Pairs.IntPair(20000, 20000);
-    runQuery(query, 1, Lists.newArrayList(pair), 2);
+    runQuery(query, 1, List.of(pair), 2);
 
     String filter = "WHERE (INT_COL >= 15000 AND INT_COL <= 16665) OR (INT_COL >= 18000 AND INT_COL <= 19887)";
     query = "SELECT STRING_COL, INT_COL FROM testTable " + filter + " LIMIT 100000";
     pair = new Pairs.IntPair(15000, 16665);
     Pairs.IntPair pair1 = new Pairs.IntPair(18000, 19987);
-    runQuery(query, 3554, Lists.newArrayList(pair, pair1), 2);
+    runQuery(query, 3554, List.of(pair, pair1), 2);
 
     // range predicate on sorted column which will use sorted inverted index based iterator
     // along with range predicate on unsorted column that uses scan based iterator

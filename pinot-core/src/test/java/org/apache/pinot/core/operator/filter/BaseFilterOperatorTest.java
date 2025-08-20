@@ -17,9 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.core.operator.filter;
-
-import com.google.common.collect.ImmutableList;
 import java.util.Collections;
+import java.util.List;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
@@ -32,8 +31,8 @@ public class BaseFilterOperatorTest {
     int[] docIds = new int[]{0, 1, 2, 3};
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, numDocs);
 
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), ImmutableList.of(0, 1, 2, 3));
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), ImmutableList.of(4, 5, 6, 7, 8, 9));
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), List.of(0, 1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), List.of(4, 5, 6, 7, 8, 9));
   }
 
   @Test
@@ -43,7 +42,7 @@ public class BaseFilterOperatorTest {
     int[] nullDocIds = new int[]{4, 5, 6, 7, 8, 9};
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, nullDocIds, numDocs);
 
-    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), ImmutableList.of(0, 1, 2, 3));
+    Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), List.of(0, 1, 2, 3));
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), Collections.emptyList());
   }
 
@@ -53,7 +52,7 @@ public class BaseFilterOperatorTest {
     int[] docIds = new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, numDocs);
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()),
-        ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+        List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()), Collections.emptyList());
   }
 
@@ -64,7 +63,7 @@ public class BaseFilterOperatorTest {
     TestFilterOperator testFilterOperator = new TestFilterOperator(docIds, numDocs);
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getTrues()), Collections.emptyList());
     Assert.assertEquals(TestUtils.getDocIds(testFilterOperator.getFalses()),
-        ImmutableList.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+        List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
   }
 
   @Test

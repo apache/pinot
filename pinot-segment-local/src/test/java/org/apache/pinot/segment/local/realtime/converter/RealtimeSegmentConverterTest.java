@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.realtime.converter;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
@@ -136,11 +135,11 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
-            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
-            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
-            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).setColumnMajorSegmentBuilderEnabled(false)
+            .setInvertedIndexColumns(List.of(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
+            .setRangeIndexColumns(List.of(STRING_COLUMN2))
+            .setNoDictionaryColumns(List.of(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(List.of(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(List.of(LONG_COLUMN3)).setColumnMajorSegmentBuilderEnabled(false)
             .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
@@ -203,12 +202,12 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
             .setTimeColumnName(DATE_TIME_COLUMN)
-            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1, LONG_COLUMN1))
+            .setInvertedIndexColumns(List.of(STRING_COLUMN1, LONG_COLUMN1))
             .setSortedColumn(LONG_COLUMN1)
-            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
-            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3))
+            .setRangeIndexColumns(List.of(STRING_COLUMN2))
+            .setNoDictionaryColumns(List.of(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(List.of(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(List.of(LONG_COLUMN3))
             .setColumnMajorSegmentBuilderEnabled(false)
             .build();
     Schema schema = new Schema.SchemaBuilder()
@@ -287,11 +286,11 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     File tmpDir = new File(TMP_DIR, "tmp_" + System.currentTimeMillis());
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
-            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
-            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
-            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).setColumnMajorSegmentBuilderEnabled(true)
+            .setInvertedIndexColumns(List.of(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
+            .setRangeIndexColumns(List.of(STRING_COLUMN2))
+            .setNoDictionaryColumns(List.of(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(List.of(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(List.of(LONG_COLUMN3)).setColumnMajorSegmentBuilderEnabled(true)
             .build();
     Schema schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)
@@ -355,12 +354,12 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
             .setTimeColumnName(DATE_TIME_COLUMN)
-            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1, LONG_COLUMN1))
+            .setInvertedIndexColumns(List.of(STRING_COLUMN1, LONG_COLUMN1))
             .setSortedColumn(LONG_COLUMN1)
-            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
-            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3))
+            .setRangeIndexColumns(List.of(STRING_COLUMN2))
+            .setNoDictionaryColumns(List.of(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(List.of(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(List.of(LONG_COLUMN3))
             .setColumnMajorSegmentBuilderEnabled(true)
             .build();
     Schema schema = new Schema.SchemaBuilder()
@@ -594,8 +593,8 @@ public class RealtimeSegmentConverterTest implements PinotBuffersAfterMethodChec
     List<FieldConfig> fieldConfigList = Collections.singletonList(textIndexFieldConfig);
     TableConfig tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
-            .setInvertedIndexColumns(Lists.newArrayList(LONG_COLUMN1))
-            .setNoDictionaryColumns(Lists.newArrayList(STRING_COLUMN1))
+            .setInvertedIndexColumns(List.of(LONG_COLUMN1))
+            .setNoDictionaryColumns(List.of(STRING_COLUMN1))
             .setSortedColumn(sortedColumn)
             .setColumnMajorSegmentBuilderEnabled(columnMajorSegmentBuilder)
             .setFieldConfigList(fieldConfigList)

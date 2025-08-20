@@ -19,7 +19,6 @@
 package org.apache.pinot.controller.helix.core;
 
 import com.google.common.collect.BiMap;
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -687,7 +686,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
 
     // Minion instance tag set but no minion present
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, upsertCompactionTask)));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, upsertCompactionTask)));
 
     assertThrows(InvalidTableConfigException.class, () -> {
       try {
@@ -706,11 +705,11 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
     //Untag minion instance
     untagMinions();
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig)));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig)));
     _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
 
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig2)));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, segmentGenerationAndPushTaskConfig2)));
     assertThrows(InvalidTableConfigException.class, () -> {
       try {
         _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
@@ -725,7 +724,7 @@ public class PinotHelixResourceManagerStatelessTest extends ControllerTest {
         Map.of("tableMaxNumTasks", "1", "validDocIdsType", "SNAPSHOT",
             "minionInstanceTag", "anotherMinionTenant");
     realtimeTableConfig.setTaskConfig(new TableTaskConfig(
-        ImmutableMap.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskWithWrongTenantButNotScheduled)));
+        Map.of(MinionConstants.RealtimeToOfflineSegmentsTask.TASK_TYPE, taskWithWrongTenantButNotScheduled)));
     _helixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
   }
 

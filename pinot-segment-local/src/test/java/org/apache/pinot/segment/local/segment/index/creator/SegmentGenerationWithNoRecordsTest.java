@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.segment.local.segment.index.creator;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
@@ -65,11 +65,11 @@ public class SegmentGenerationWithNoRecordsTest implements PinotBuffersAfterMeth
   public void setup() {
     _tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").setTimeColumnName(DATE_TIME_COLUMN)
-            .setInvertedIndexColumns(Lists.newArrayList(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
-            .setRangeIndexColumns(Lists.newArrayList(STRING_COLUMN2))
-            .setNoDictionaryColumns(Lists.newArrayList(LONG_COLUMN2))
-            .setVarLengthDictionaryColumns(Lists.newArrayList(STRING_COLUMN3))
-            .setOnHeapDictionaryColumns(Lists.newArrayList(LONG_COLUMN3)).build();
+            .setInvertedIndexColumns(List.of(STRING_COLUMN1)).setSortedColumn(LONG_COLUMN1)
+            .setRangeIndexColumns(List.of(STRING_COLUMN2))
+            .setNoDictionaryColumns(List.of(LONG_COLUMN2))
+            .setVarLengthDictionaryColumns(List.of(STRING_COLUMN3))
+            .setOnHeapDictionaryColumns(List.of(LONG_COLUMN3)).build();
     _tableConfig.getIndexingConfig().setEnableDefaultStarTree(true);
     _schema = new Schema.SchemaBuilder().addSingleValueDimension(STRING_COLUMN1, FieldSpec.DataType.STRING)
         .addSingleValueDimension(STRING_COLUMN2, FieldSpec.DataType.STRING)

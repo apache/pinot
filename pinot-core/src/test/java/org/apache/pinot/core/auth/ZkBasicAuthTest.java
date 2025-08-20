@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.auth;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.List;
@@ -71,6 +70,6 @@ public class ZkBasicAuthTest {
     Assert.assertEquals(new ZkBasicAuthPrincipal("name", "token", "password",
         ComponentType.CONTROLLER.name(), RoleType.ADMIN.name(), ImmutableSet.of("myTable"),
         Collections.emptySet(), ImmutableSet.of("read"), Map.of("myTable", List.of("cityID > 100"))).getRLSFilters(
-        "myTable").get(), ImmutableList.of("cityID > 100"));
+        "myTable").get(), List.of("cityID > 100"));
   }
 }

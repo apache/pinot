@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.tools;
 
-import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -74,9 +73,7 @@ public class RealtimeQuickStartWithMinion extends HybridQuickstart {
 
   @Override
   protected Map<String, String> getDefaultStreamTableDirectories() {
-    return ImmutableMap.<String, String>builder()
-        .put("githubEvents", "examples/minions/stream/githubEvents")
-        .build();
+    return Map.of("githubEvents", "examples/minions/stream/githubEvents");
   }
 
   @Override

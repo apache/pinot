@@ -17,13 +17,11 @@
  * under the License.
  */
 package org.apache.pinot.controller.api.resources;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
@@ -76,7 +74,7 @@ public class PinotTaskRestletResourceTest {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(null);
     assertEquals(minionWorkerEndpoints,
-        ImmutableMap.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
+        Map.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
   }
 
   @Test
@@ -86,7 +84,7 @@ public class PinotTaskRestletResourceTest {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(" minion1 , minion2 ");
     assertEquals(minionWorkerEndpoints,
-        ImmutableMap.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
+        Map.of("minion1", "http://minion1:9514", "minion2", "http://minion2:9514"));
   }
 
   @Test
@@ -95,7 +93,7 @@ public class PinotTaskRestletResourceTest {
     Map<String, String> minionWorkerEndpoints
         = invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints("minion1");
     assertEquals(minionWorkerEndpoints,
-        ImmutableMap.of("minion1", "http://minion1:9514"));
+        Map.of("minion1", "http://minion1:9514"));
   }
 
   private Map<String, String> invokeGetSubtaskWithGivenStateProgressAndReturnCapturedMinionWorkerEndpoints(
@@ -103,7 +101,7 @@ public class PinotTaskRestletResourceTest {
       throws JsonProcessingException {
     InstanceConfig minion1 = createInstanceConfig("minion1", "minion1", "9514");
     InstanceConfig minion2 = createInstanceConfig("minion2", "minion2", "9514");
-    when(_pinotHelixResourceManager.getAllMinionInstanceConfigs()).thenReturn(ImmutableList.of(minion1, minion2));
+    when(_pinotHelixResourceManager.getAllMinionInstanceConfigs()).thenReturn(List.of(minion1, minion2));
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
     when(httpHeaders.getRequestHeaders()).thenReturn(new MultivaluedHashMap<>());
     ArgumentCaptor<Map<String, String>> minionWorkerEndpointsCaptor = ArgumentCaptor.forClass(Map.class);

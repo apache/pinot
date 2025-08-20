@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.calcite.rel.rules;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -102,7 +101,7 @@ public class PinotWindowSplitRule extends RelOptRule {
           currentInput,
           originalWindow.getConstants(),
           newWindowRowType,
-          ImmutableList.of(group));
+          List.of(group));
     }
     call.transformTo(currentInput);
   }

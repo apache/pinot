@@ -19,7 +19,7 @@
 package org.apache.pinot.segment.local.segment.index;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.Lists;
+import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.pinot.segment.local.segment.index.range.RangeIndexPlugin;
 import org.apache.pinot.segment.local.segment.index.range.RangeIndexType;
@@ -39,7 +39,7 @@ public class RangeIndexTest {
 
     @Test
     public void oldToNewConfConversion() {
-      _tableConfig.getIndexingConfig().setRangeIndexColumns(Lists.newArrayList("dimInt"));
+      _tableConfig.getIndexingConfig().setRangeIndexColumns(List.of("dimInt"));
       convertToUpdatedFormat();
       assertNotNull(_tableConfig.getFieldConfigList());
       assertFalse(_tableConfig.getFieldConfigList().isEmpty());

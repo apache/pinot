@@ -19,7 +19,6 @@
 package org.apache.pinot.query.runtime;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import io.grpc.stub.StreamObserver;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -416,7 +415,7 @@ public class QueryRunner {
             TimeSeriesBlock seriesBlock = fragmentOpChain.nextBlock();
             Worker.TimeSeriesResponse response = Worker.TimeSeriesResponse.newBuilder()
                 .setPayload(TimeSeriesBlockSerde.serializeTimeSeriesBlock(seriesBlock))
-                .putAllMetadata(ImmutableMap.of(WorkerResponseMetadataKeys.PLAN_ID, currentPlanId))
+                .putAllMetadata(Map.of(WorkerResponseMetadataKeys.PLAN_ID, currentPlanId))
                 .build();
             responseObserver.onNext(response);
           }

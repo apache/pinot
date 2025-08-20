@@ -19,7 +19,6 @@
 package org.apache.pinot.segment.local.segment.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
@@ -1044,7 +1043,7 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       config.setMaxLevels(2);
       configs.put("dimStr", config);
       _tableConfig.getIndexingConfig().setJsonIndexConfigs(configs);
-      _tableConfig.getIndexingConfig().setJsonIndexColumns(Lists.newArrayList("dimStr2"));
+      _tableConfig.getIndexingConfig().setJsonIndexColumns(List.of("dimStr2"));
       convertToUpdatedFormat();
       assertNotNull(_tableConfig.getFieldConfigList());
       assertFalse(_tableConfig.getFieldConfigList().isEmpty());

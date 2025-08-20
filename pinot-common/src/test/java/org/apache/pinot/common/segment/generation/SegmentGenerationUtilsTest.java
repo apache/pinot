@@ -19,7 +19,6 @@
 
 package org.apache.pinot.common.segment.generation;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -148,10 +147,10 @@ public class SegmentGenerationUtilsTest {
     inputSubDir1.mkdirs();
 
     File inputFile1 = new File(inputDir, "input.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value1,1", "value2,2"));
 
     File inputFile2 = new File(inputSubDir1, "input.csv");
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value3,3", "value4,4"));
     URI inputDirURI = new URI(inputDir.getAbsolutePath());
     if (inputDirURI.getScheme() == null) {
       inputDirURI = new File(inputDir.getAbsolutePath()).toURI();
@@ -173,10 +172,10 @@ public class SegmentGenerationUtilsTest {
     inputSubDir1.mkdirs();
 
     File inputFile1 = new File(inputDir, "input.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value1,1", "value2,2"));
 
     File inputFile2 = new File(inputSubDir1, "input.csv");
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value3,3", "value4,4"));
     URI inputDirURI = new URI(inputDir.getAbsolutePath());
     if (inputDirURI.getScheme() == null) {
       inputDirURI = new File(inputDir.getAbsolutePath()).toURI();
@@ -200,10 +199,10 @@ public class SegmentGenerationUtilsTest {
     inputSubDir1.mkdirs();
 
     File inputFile1 = new File(inputDir, "input1.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value1,1", "value2,2"));
 
     File inputFile2 = new File(inputSubDir1, "input2.csv");
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value3,3", "value4,4"));
     URI inputDirURI = new URI(inputDir.getAbsolutePath());
     if (inputDirURI.getScheme() == null) {
       inputDirURI = new File(inputDir.getAbsolutePath()).toURI();
@@ -228,10 +227,10 @@ public class SegmentGenerationUtilsTest {
     inputSubDir1.mkdirs();
 
     File inputFile1 = new File(inputDir, "input1.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value1,1", "value2,2"));
 
     File inputFile2 = new File(inputSubDir1, "input2.csv");
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value3,3", "value4,4"));
     URI inputDirURI = new File(inputDir.getAbsolutePath()).toURI();
     PinotFS inputDirFS = PinotFSFactory.create(inputDirURI.getScheme());
     String includePattern = "glob:" + inputDir.getAbsolutePath() + "/**.json";

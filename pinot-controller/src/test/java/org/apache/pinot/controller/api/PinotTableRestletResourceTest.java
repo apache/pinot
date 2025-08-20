@@ -21,8 +21,6 @@ package org.apache.pinot.controller.api;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -258,8 +256,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(rawTableName);
     // Failed to create a table
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "* * * * * * *")))).build();
+        new TableTaskConfig(Map.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "* * * * * * *")))).build();
     try {
       sendPostRequest(_createTableUrl, tableConfig.toJsonString());
       fail("Creation of an OFFLINE table with an invalid cron expression does not fail");
@@ -270,8 +268,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Succeed to create a table
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
+        new TableTaskConfig(Map.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *")))).build();
     try {
       String response = sendPostRequest(_createTableUrl, tableConfig.toJsonString());
       assertEquals(response,
@@ -283,8 +281,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // Failed to update the table
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(rawTableName).setTaskConfig(
-        new TableTaskConfig(ImmutableMap.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "5 5 5 5 5 5 5")))).build();
+        new TableTaskConfig(Map.of(MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "5 5 5 5 5 5 5")))).build();
     try {
       sendPutRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forUpdateTableConfig(rawTableName),
           tableConfig.toJsonString());
@@ -330,7 +328,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     String tableName = "myDimTable_basic";
     Schema schema =
         new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+            .setPrimaryKeyColumns(List.of("myCol")).build();
     DEFAULT_INSTANCE.addSchema(schema);
 
     TableConfig tableConfig =
@@ -344,7 +342,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     tableName = "myDimTable_broken";
     schema =
         new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+            .setPrimaryKeyColumns(List.of("myCol")).build();
     DEFAULT_INSTANCE.addSchema(schema);
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true)
         .setQuotaConfig(new QuotaConfig("500G", null)).build();
@@ -359,7 +357,7 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     tableName = "myDimTable_good";
     schema =
         new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
-            .setPrimaryKeyColumns(Lists.newArrayList("myCol")).build();
+            .setPrimaryKeyColumns(List.of("myCol")).build();
     DEFAULT_INSTANCE.addSchema(schema);
     String goodQuota = "100M";
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(tableName).setIsDimTable(true)
@@ -458,33 +456,33 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // list
     tables = getTableNames(_createTableUrl);
-    assertEquals(tables, Lists.newArrayList("abc", "pqr"));
+    assertEquals(tables, List.of("abc", "pqr"));
     tables = getTableNames(_createTableUrl + "?sortAsc=false");
-    assertEquals(tables, Lists.newArrayList("pqr", "abc"));
+    assertEquals(tables, List.of("pqr", "abc"));
     tables = getTableNames(_createTableUrl + "?sortType=creationTime");
-    assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "pqr_REALTIME", "abc_OFFLINE"));
+    assertEquals(tables, List.of("pqr_OFFLINE", "pqr_REALTIME", "abc_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?sortType=creationTime&sortAsc=false");
-    assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_REALTIME", "pqr_OFFLINE"));
+    assertEquals(tables, List.of("abc_OFFLINE", "pqr_REALTIME", "pqr_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime");
-    assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "pqr_REALTIME", "abc_OFFLINE"));
+    assertEquals(tables, List.of("pqr_OFFLINE", "pqr_REALTIME", "abc_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime&sortAsc=false");
-    assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_REALTIME", "pqr_OFFLINE"));
+    assertEquals(tables, List.of("abc_OFFLINE", "pqr_REALTIME", "pqr_OFFLINE"));
 
     // type
     tables = getTableNames(_createTableUrl + "?type=realtime");
-    assertEquals(tables, Lists.newArrayList("pqr_REALTIME"));
+    assertEquals(tables, List.of("pqr_REALTIME"));
     tables = getTableNames(_createTableUrl + "?type=offline");
-    assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
+    assertEquals(tables, List.of("abc_OFFLINE", "pqr_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?type=offline&sortAsc=false");
-    assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    assertEquals(tables, List.of("pqr_OFFLINE", "abc_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?type=offline&sortType=creationTime");
-    assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    assertEquals(tables, List.of("pqr_OFFLINE", "abc_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?type=offline&sortType=creationTime&sortAsc=false");
-    assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
+    assertEquals(tables, List.of("abc_OFFLINE", "pqr_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?type=offline&sortType=lastModifiedTime");
-    assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    assertEquals(tables, List.of("pqr_OFFLINE", "abc_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?type=offline&sortType=lastModifiedTime&sortAsc=false");
-    assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
+    assertEquals(tables, List.of("abc_OFFLINE", "pqr_OFFLINE"));
 
     // update taskType for abc_OFFLINE
     Map<String, Map<String, String>> taskTypeMap = new HashMap<>();
@@ -503,15 +501,15 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // list lastModified, taskType
     tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime");
-    assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE", "pqr_REALTIME"));
+    assertEquals(tables, List.of("pqr_OFFLINE", "abc_OFFLINE", "pqr_REALTIME"));
     tables = getTableNames(_createTableUrl + "?sortType=lastModifiedTime&sortAsc=false");
-    assertEquals(tables, Lists.newArrayList("pqr_REALTIME", "abc_OFFLINE", "pqr_OFFLINE"));
+    assertEquals(tables, List.of("pqr_REALTIME", "abc_OFFLINE", "pqr_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask");
-    assertEquals(tables, Lists.newArrayList("abc_OFFLINE"));
+    assertEquals(tables, List.of("abc_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&type=realtime");
     assertTrue(tables.isEmpty());
     tables = getTableNames(_createTableUrl + "?taskType=RealtimeToOfflineSegmentsTask");
-    assertEquals(tables, Lists.newArrayList("pqr_REALTIME"));
+    assertEquals(tables, List.of("pqr_REALTIME"));
 
     // update taskType for pqr_OFFLINE
     taskTypeMap = new HashMap<>();
@@ -523,11 +521,11 @@ public class PinotTableRestletResourceTest extends ControllerTest {
 
     // list lastModified, taskType
     tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask");
-    assertEquals(tables, Lists.newArrayList("abc_OFFLINE", "pqr_OFFLINE"));
+    assertEquals(tables, List.of("abc_OFFLINE", "pqr_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&sortAsc=false");
-    assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    assertEquals(tables, List.of("pqr_OFFLINE", "abc_OFFLINE"));
     tables = getTableNames(_createTableUrl + "?taskType=MergeRollupTask&sortType=creationTime");
-    assertEquals(tables, Lists.newArrayList("pqr_OFFLINE", "abc_OFFLINE"));
+    assertEquals(tables, List.of("pqr_OFFLINE", "abc_OFFLINE"));
   }
 
   private List<String> getTableNames(String url)
@@ -1059,8 +1057,8 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
-            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, ImmutableMap.of())))
+        .setTaskConfig(new TableTaskConfig(Map.of(
+            MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE, Map.of())))
         .build();
 
     // Should succeed when no dangling tasks exist
@@ -1079,9 +1077,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
                 CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
         .build();
 
@@ -1140,9 +1138,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
                 CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
         .build();
 
@@ -1190,9 +1188,9 @@ public class PinotTableRestletResourceTest extends ControllerTest {
     DEFAULT_INSTANCE.addDummySchema(tableName);
 
     TableConfig offlineTableConfig = getOfflineTableBuilder(tableName)
-        .setTaskConfig(new TableTaskConfig(ImmutableMap.of(
+        .setTaskConfig(new TableTaskConfig(Map.of(
             MinionConstants.SegmentGenerationAndPushTask.TASK_TYPE,
-            ImmutableMap.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
+            Map.of(PinotTaskManager.SCHEDULE_KEY, "0 */10 * ? * * *",
                 CommonConstants.TABLE_NAME, tableName + "_OFFLINE"))))
         .build();
 

@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -115,7 +114,7 @@ public class FieldConfig extends BaseJsonConfig {
     _name = name;
     _encodingType = encodingType == null ? EncodingType.DICTIONARY : encodingType;
     _indexTypes =
-        indexTypes != null ? indexTypes : (indexType == null ? Lists.newArrayList() : Lists.newArrayList(indexType));
+        indexTypes != null ? indexTypes : (indexType == null ? List.of() : List.of(indexType));
     _compressionCodec = compressionCodec;
     _timestampConfig = timestampConfig;
     _properties = properties;

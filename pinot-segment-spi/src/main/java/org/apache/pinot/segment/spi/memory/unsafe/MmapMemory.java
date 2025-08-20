@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.spi.memory.unsafe;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -210,7 +209,7 @@ public class MmapMemory implements Memory {
 
     static MapFun find()
         throws ClassNotFoundException, NoSuchMethodException {
-      List<Finder<? extends MapFun>> candidates = Lists.newArrayList(
+      List<Finder<? extends MapFun>> candidates = List.of(
           new Map0Fun.ChronicleCore(),
           new Map0Fun.Java11(),
           new Map0Fun.Java17(),

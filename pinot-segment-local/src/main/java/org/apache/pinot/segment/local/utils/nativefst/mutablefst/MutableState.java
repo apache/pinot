@@ -19,7 +19,6 @@
 
 package org.apache.pinot.segment.local.utils.nativefst.mutablefst;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.List;
@@ -52,12 +51,12 @@ public class MutableState {
    * Default Constructor
    */
   public MutableState() {
-    _arcs = Lists.newArrayList();
+    _arcs = new ArrayList<>();
   }
 
   public MutableState(boolean isStartState) {
     _isStartState = isStartState;
-    _arcs = Lists.newArrayList();
+    _arcs = new ArrayList<>();
   }
 
   public boolean isTerminal() {
@@ -108,8 +107,8 @@ public class MutableState {
 
   // adds an arc but should only be used by MutableFst
   void addArc(MutableArc arc) {
-      _arcs.add(arc);
-    }
+    _arcs.add(arc);
+  }
 
   void addIncomingState(MutableState inState) {
     if (inState == this) {

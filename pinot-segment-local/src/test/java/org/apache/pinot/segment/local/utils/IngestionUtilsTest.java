@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.utils;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -122,7 +121,7 @@ public class IngestionUtilsTest {
     schema.addField(dimensionFieldSpec);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig, schema));
     Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestamp")));
+    Assert.assertTrue(extract.containsAll(List.of("tenMinutesSinceEpoch", "timestamp")));
 
     // inbuilt functions on DateTimeFieldSpec
     schema = new Schema();
@@ -132,7 +131,7 @@ public class IngestionUtilsTest {
     schema.addField(dateTimeFieldSpec);
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig, schema));
     Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("date", "timestamp")));
+    Assert.assertTrue(extract.containsAll(List.of("date", "timestamp")));
   }
 
   @Test
@@ -184,7 +183,7 @@ public class IngestionUtilsTest {
         new TransformConfig("tenMinutesSinceEpoch", "toEpochMinutesBucket(timestampColumn, 10)")));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig, schema));
     Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("tenMinutesSinceEpoch", "timestampColumn")));
+    Assert.assertTrue(extract.containsAll(List.of("tenMinutesSinceEpoch", "timestampColumn")));
 
     // inbuilt functions on DateTimeFieldSpec
     schema = new Schema.SchemaBuilder().addDateTime("dateColumn", FieldSpec.DataType.STRING,
@@ -193,7 +192,7 @@ public class IngestionUtilsTest {
         Collections.singletonList(new TransformConfig("dateColumn", "toDateTime(timestampColumn, 'yyyy-MM-dd')")));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig, schema));
     Assert.assertEquals(extract.size(), 2);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("dateColumn", "timestampColumn")));
+    Assert.assertTrue(extract.containsAll(List.of("dateColumn", "timestampColumn")));
 
     // filter + transform configs + schema fields  + schema transform
     schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)
@@ -203,7 +202,7 @@ public class IngestionUtilsTest {
     ingestionConfig.setFilterConfig(new FilterConfig("Groovy({d1 == \"10\"}, d1)"));
     extract = new ArrayList<>(IngestionUtils.getFieldsForRecordExtractor(tableConfig, schema));
     Assert.assertEquals(extract.size(), 6);
-    Assert.assertTrue(extract.containsAll(Lists.newArrayList("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn")));
+    Assert.assertTrue(extract.containsAll(List.of("d1", "d2", "m1", "dateColumn", "xy", "timestampColumn")));
 
     // filter + transform configs + schema fields  + schema transform + complex type configs
     schema = new Schema.SchemaBuilder().addSingleValueDimension("d1", FieldSpec.DataType.STRING)

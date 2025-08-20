@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -88,8 +86,8 @@ public class MultiStageReplicaGroupSelectorTest {
   @Test
   public void testBasicReplicaGroupSelection() {
     // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
-    List<String> replicaGroup0 = ImmutableList.of("instance-0", "instance-1");
-    List<String> replicaGroup1 = ImmutableList.of("instance-2", "instance-3");
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
     InstancePartitions instancePartitions = createInstancePartitions(replicaGroup0, replicaGroup1);
     MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
 
@@ -121,8 +119,8 @@ public class MultiStageReplicaGroupSelectorTest {
   @Test
   public void testInstanceFailureHandling() {
     // Create instance-partitions with two replica-groups and 1 partition. Each replica-group has 2 instances.
-    List<String> replicaGroup0 = ImmutableList.of("instance-0", "instance-1");
-    List<String> replicaGroup1 = ImmutableList.of("instance-2", "instance-3");
+    List<String> replicaGroup0 = List.of("instance-0", "instance-1");
+    List<String> replicaGroup1 = List.of("instance-2", "instance-3");
     InstancePartitions instancePartitions = createInstancePartitions(replicaGroup0, replicaGroup1);
     MultiStageReplicaGroupSelector multiStageSelector = createMultiStageSelector(instancePartitions);
 
@@ -157,11 +155,11 @@ public class MultiStageReplicaGroupSelectorTest {
   @Test
   public void testErrorSegmentHandling() {
     // Create instance-partitions with two replica-groups and 2 partitions. Each replica-group has 2 instances.
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of(
-        "0_0", ImmutableList.of("instance-0"),
-        "0_1", ImmutableList.of("instance-2"),
-        "1_0", ImmutableList.of("instance-1"),
-        "1_1", ImmutableList.of("instance-3"));
+    Map<String, List<String>> partitionToInstances = Map.of(
+        "0_0", List.of("instance-0"),
+        "0_1", List.of("instance-2"),
+        "1_0", List.of("instance-1"),
+        "1_1", List.of("instance-3"));
     InstancePartitions instancePartitions = new InstancePartitions(TABLE_NAME);
     instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
     instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));
@@ -219,7 +217,7 @@ public class MultiStageReplicaGroupSelectorTest {
   }
 
   private InstancePartitions createInstancePartitions(List<String> replicaGroup0, List<String> replicaGroup1) {
-    Map<String, List<String>> partitionToInstances = ImmutableMap.of("0_0", replicaGroup0, "0_1", replicaGroup1);
+    Map<String, List<String>> partitionToInstances = Map.of("0_0", replicaGroup0, "0_1", replicaGroup1);
     InstancePartitions instancePartitions = new InstancePartitions(TABLE_NAME);
     instancePartitions.setInstances(0, 0, partitionToInstances.get("0_0"));
     instancePartitions.setInstances(0, 1, partitionToInstances.get("0_1"));

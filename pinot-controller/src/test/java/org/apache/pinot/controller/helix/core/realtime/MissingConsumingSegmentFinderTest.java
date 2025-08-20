@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.realtime;
 
-import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -45,21 +44,21 @@ public class MissingConsumingSegmentFinderTest {
 
     Map<String, Map<String, String>> idealStateMap = new HashMap<>();
     // partition 0
-    idealStateMap.put("tableA__0__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__0__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 1
-    idealStateMap.put("tableA__1__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__1__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__1__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__1__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 2
-    idealStateMap.put("tableA__2__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__2__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 3
-    idealStateMap.put("tableA__3__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__3__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
 
     Instant now = Instant.parse("2022-06-01T18:00:00.00Z");
     MissingConsumingSegmentFinder finder = new MissingConsumingSegmentFinder("tableA", null, new HashMap<>(), null);
@@ -75,23 +74,23 @@ public class MissingConsumingSegmentFinderTest {
 
     Map<String, Map<String, String>> idealStateMap = new HashMap<>();
     // partition 0
-    idealStateMap.put("tableA__0__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__0__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 1
-    idealStateMap.put("tableA__1__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__1__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__1__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__1__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 2
-    idealStateMap.put("tableA__2__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__2__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 3
-    idealStateMap.put("tableA__3__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__3__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
 
-    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = ImmutableMap.of(
+    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = Map.of(
         0, new LongMsgOffset(1000),
         1, new LongMsgOffset(1001),
         2, new LongMsgOffset(1002),
@@ -114,21 +113,21 @@ public class MissingConsumingSegmentFinderTest {
 
     Map<String, Map<String, String>> idealStateMap = new HashMap<>();
     // partition 0
-    idealStateMap.put("tableA__0__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__0__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 1 (has reached end of life)
-    idealStateMap.put("tableA__1__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__1__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     // partition 2
-    idealStateMap.put("tableA__2__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__2__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 3 (has reached end of life)
-    idealStateMap.put("tableA__3__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
 
-    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = ImmutableMap.of(
+    Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = Map.of(
         0, new LongMsgOffset(1000),
         1, new LongMsgOffset(701),
         2, new LongMsgOffset(1002),
@@ -164,26 +163,26 @@ public class MissingConsumingSegmentFinderTest {
 
     Map<String, Map<String, String>> idealStateMap = new HashMap<>();
     // partition 0
-    idealStateMap.put("tableA__0__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__0__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 1 (has reached end of life)
-    idealStateMap.put("tableA__1__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__1__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     // partition 2
-    idealStateMap.put("tableA__2__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__2__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 3
-    idealStateMap.put("tableA__3__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__3__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 4 (has reached end of life)
-    idealStateMap.put("tableA__4__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__4__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     // partition 5
-    idealStateMap.put("tableA__5__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__5__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__5__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__5__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__5__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__5__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
 
     // setup segment metadata fetcher
     MissingConsumingSegmentFinder.SegmentMetadataFetcher metadataFetcher =
@@ -207,26 +206,26 @@ public class MissingConsumingSegmentFinderTest {
 
     Map<String, Map<String, String>> idealStateMap = new HashMap<>();
     // partition 0
-    idealStateMap.put("tableA__0__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__0__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 1 (missing consuming segment)
-    idealStateMap.put("tableA__1__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__1__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     // partition 2
-    idealStateMap.put("tableA__2__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__2__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 3
-    idealStateMap.put("tableA__3__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__3__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 4 (missing consuming segment)
-    idealStateMap.put("tableA__4__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__4__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     // partition 5
-    idealStateMap.put("tableA__5__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__5__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__5__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__5__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__5__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__5__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 6 is a new partition and there's no consuming segment in ideal states for it
 
     Map<Integer, StreamPartitionMsgOffset> partitionGroupIdToLargestStreamOffsetMap = new HashMap<>();
@@ -265,26 +264,26 @@ public class MissingConsumingSegmentFinderTest {
 
     Map<String, Map<String, String>> idealStateMap = new HashMap<>();
     // partition 0
-    idealStateMap.put("tableA__0__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__0__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__0__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__0__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 1 (missing consuming segment)
-    idealStateMap.put("tableA__1__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__1__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__1__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     // partition 2
-    idealStateMap.put("tableA__2__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__2__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__2__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__2__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 3
-    idealStateMap.put("tableA__3__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__3__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__3__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__3__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 4 (missing consuming segment)
-    idealStateMap.put("tableA__4__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__4__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
     // partition 5
-    idealStateMap.put("tableA__5__0__20220601T0900Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__5__1__20220601T1200Z", ImmutableMap.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
-    idealStateMap.put("tableA__5__2__20220601T1500Z", ImmutableMap.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
+    idealStateMap.put("tableA__5__0__20220601T0900Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__5__1__20220601T1200Z", Map.of("ServerX", "ONLINE", "ServerY", "ONLINE"));
+    idealStateMap.put("tableA__5__2__20220601T1500Z", Map.of("ServerX", "CONSUMING", "ServerY", "CONSUMING"));
     // partition 6 is a new partition and there's no consuming segment in ideal states for it
 
     // setup segment metadata fetcher

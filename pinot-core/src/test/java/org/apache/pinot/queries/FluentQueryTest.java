@@ -20,7 +20,6 @@
 package org.apache.pinot.queries;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -731,7 +730,7 @@ public class FluentQueryTest {
       if (_segments2.isEmpty()) {
         return super.getDistinctInstances();
       }
-      return Lists.newArrayList(_segments1, _segments2);
+      return List.of(_segments1, _segments2);
     }
   }
 }

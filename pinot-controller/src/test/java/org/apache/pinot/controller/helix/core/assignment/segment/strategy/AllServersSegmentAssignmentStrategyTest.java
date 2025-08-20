@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.helix.core.assignment.segment.strategy;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -100,7 +99,7 @@ public class AllServersSegmentAssignmentStrategyTest {
     List<HelixProperty> instanceConfigList = new ArrayList<>();
     for (String instance : INSTANCES) {
       ZNRecord znRecord = new ZNRecord(instance);
-      znRecord.setListField(TAG_LIST.name(), ImmutableList.of(OFFLINE_SERVER_TAG, REALTIME_SERVER_TAG));
+      znRecord.setListField(TAG_LIST.name(), List.of(OFFLINE_SERVER_TAG, REALTIME_SERVER_TAG));
       instanceConfigList.add(new InstanceConfig(znRecord));
     }
     HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);
@@ -119,7 +118,7 @@ public class AllServersSegmentAssignmentStrategyTest {
     instances.stream().forEach(instance -> segment1Assginment.put(instance, "ONLINE"));
     currentAssignment.put(SEGMENT_NAME, segment1Assginment);
     ZNRecord znRecord = new ZNRecord(instanceConfigList.get(0).getId());
-    znRecord.setListField(TAG_LIST.name(), ImmutableList.of(BROKER_TAG));
+    znRecord.setListField(TAG_LIST.name(), List.of(BROKER_TAG));
     InstanceConfig newInstanceConfig = new InstanceConfig(znRecord);
     instanceConfigList.set(0, newInstanceConfig);
     when(dataAccessor.getChildValues(builder.instanceConfigs(), true)).thenReturn(instanceConfigList);
@@ -134,7 +133,7 @@ public class AllServersSegmentAssignmentStrategyTest {
     List<HelixProperty> instanceConfigList = new ArrayList<>();
     for (String instance : INSTANCES) {
       ZNRecord znRecord = new ZNRecord(instance);
-      znRecord.setListField(TAG_LIST.name(), ImmutableList.of(REALTIME_SERVER_TAG));
+      znRecord.setListField(TAG_LIST.name(), List.of(REALTIME_SERVER_TAG));
       instanceConfigList.add(new InstanceConfig(znRecord));
     }
     HelixDataAccessor dataAccessor = mock(HelixDataAccessor.class);

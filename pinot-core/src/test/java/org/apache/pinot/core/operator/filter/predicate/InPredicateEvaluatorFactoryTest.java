@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.operator.filter.predicate;
 
-import com.google.common.collect.Lists;
 import java.math.BigDecimal;
+import java.util.List;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.predicate.InPredicate;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -91,7 +91,7 @@ public class InPredicateEvaluatorFactoryTest {
     MultiValueVisitor<Integer> valueLengthVisitor = Mockito.spy(createValueLengthVisitor());
 
     // When int predicate is used
-    InPredicate predicate = new InPredicate(ExpressionContext.forIdentifier("ident"), Lists.newArrayList("1", "2"));
+    InPredicate predicate = new InPredicate(ExpressionContext.forIdentifier("ident"), List.of("1", "2"));
 
     InPredicateEvaluatorFactory.InRawPredicateEvaluator intEvaluator =
         InPredicateEvaluatorFactory.newRawValueBasedEvaluator(predicate, FieldSpec.DataType.INT);

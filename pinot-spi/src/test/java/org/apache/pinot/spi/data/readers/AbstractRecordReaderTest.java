@@ -39,7 +39,6 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 
 public abstract class AbstractRecordReaderTest {
@@ -69,7 +68,7 @@ public abstract class AbstractRecordReaderTest {
 
   protected static List<Object[]> generatePrimaryKeys(List<Map<String, Object>> records,
       List<String> primaryKeyColumns) {
-    List<Object[]> primaryKeys = Lists.newArrayList();
+    List<Object[]> primaryKeys = new ArrayList<>();
     for (Map<String, Object> record : records) {
       Object[] primaryKey = new Object[primaryKeyColumns.size()];
       for (int i = 0; i < primaryKeyColumns.size(); i++) {
@@ -156,7 +155,7 @@ public abstract class AbstractRecordReaderTest {
   }
 
   protected List<String> getPrimaryKeyColumns() {
-    return Lists.newArrayList("dim_sv_int", "dim_sv_string");
+    return List.of("dim_sv_int", "dim_sv_string");
   }
 
   protected Set<String> getSourceFields(Schema schema) {

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -227,7 +226,7 @@ public class MultiStageAccountingTest implements ITest {
         .thenReturn(OperatorTestUtil.block(schema, new Object[]{1, "AA"}, new Object[]{2, "BB"}, new Object[]{4, "DD"}))
         .thenReturn(SuccessMseBlock.INSTANCE);
 
-    return new IntersectOperator(OperatorTestUtil.getTracingContext(), ImmutableList.of(leftOperator, rightOperator),
+    return new IntersectOperator(OperatorTestUtil.getTracingContext(), List.of(leftOperator, rightOperator),
         schema);
   }
 

@@ -18,9 +18,9 @@
  */
 package org.apache.pinot.tools.admin.command;
 
-import com.google.common.collect.Lists;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.tools.Command;
@@ -102,7 +102,7 @@ public class AnonymizeDataCommand extends AbstractBaseAdminCommand implements Co
 
     Set<String> columnsToRetainDataFor = new HashSet<>();
     if (_columnsToRetainDataFor != null) {
-      columnsToRetainDataFor.addAll(Lists.newArrayList(_columnsToRetainDataFor));
+      columnsToRetainDataFor.addAll(List.of(_columnsToRetainDataFor));
     }
 
     Set<String> filterColumns = new HashSet<>();

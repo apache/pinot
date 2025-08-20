@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.blocks;
 
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -39,7 +38,7 @@ public class BlockSplitterTest {
   private static final int TOTAL_ROW_COUNT = 50;
   private static final int TEST_EST_BYTES_PER_COLUMN = 8;
   private static final List<ColumnDataType> EXCLUDE_DATA_TYPES =
-      ImmutableList.of(ColumnDataType.OBJECT, ColumnDataType.JSON, ColumnDataType.BYTES, ColumnDataType.BYTES_ARRAY);
+      List.of(ColumnDataType.OBJECT, ColumnDataType.JSON, ColumnDataType.BYTES, ColumnDataType.BYTES_ARRAY);
 
   private static DataSchema getDataSchema() {
     ColumnDataType[] allDataTypes = ColumnDataType.values();

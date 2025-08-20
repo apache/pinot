@@ -18,13 +18,12 @@
  */
 
 package org.apache.pinot.queries;
-
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.core.common.Operator;
@@ -160,7 +159,7 @@ public class BooleanAggQueriesTest extends BaseQueriesTest {
     PinotQuery pinotQuery = CalciteSqlParser.compileToPinotQuery(query);
 
     pinotQuery.setQueryOptions(
-        ImmutableMap.of(
+        Map.of(
             CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING,
             String.valueOf(enableNullHandling)));
 

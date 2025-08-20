@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.util;
 
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,13 +62,13 @@ public class SchemaUtilsTest {
     // offline table
     // null timeColumnName
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+    SchemaUtils.validate(schema, List.of(tableConfig));
 
     // schema doesn't have timeColumnName
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
     try {
-      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      SchemaUtils.validate(schema, List.of(tableConfig));
       Assert.fail("Should fail schema validation, as timeColumn is absent");
     } catch (IllegalStateException e) {
       // expected
@@ -81,7 +80,7 @@ public class SchemaUtilsTest {
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
     try {
-      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      SchemaUtils.validate(schema, List.of(tableConfig));
       Assert.fail("Should fail schema validation, as timeColumn is not present as time spec");
     } catch (IllegalStateException e) {
       // expected
@@ -92,7 +91,7 @@ public class SchemaUtilsTest {
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS").build();
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
-    SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+    SchemaUtils.validate(schema, List.of(tableConfig));
 
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).build();
@@ -101,7 +100,7 @@ public class SchemaUtilsTest {
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setIngestionConfig(ingestionConfig).build();
     try {
-      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      SchemaUtils.validate(schema, List.of(tableConfig));
       Assert.fail("Should fail schema validation, as colA is not present in schema");
     } catch (IllegalStateException e) {
       // expected
@@ -109,7 +108,7 @@ public class SchemaUtilsTest {
 
     schema =
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("colA", DataType.STRING).build();
-    SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+    SchemaUtils.validate(schema, List.of(tableConfig));
 
     // realtime table
     // schema doesn't have timeColumnName
@@ -117,7 +116,7 @@ public class SchemaUtilsTest {
     tableConfig =
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
     try {
-      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      SchemaUtils.validate(schema, List.of(tableConfig));
       Assert.fail("Should fail schema validation, as timeColumn is absent");
     } catch (IllegalStateException e) {
       // expected
@@ -129,7 +128,7 @@ public class SchemaUtilsTest {
     tableConfig =
         new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).setTimeColumnName(TIME_COLUMN).build();
     try {
-      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      SchemaUtils.validate(schema, List.of(tableConfig));
       Assert.fail("Should fail schema validation, as timeColumn is not present as time spec");
     } catch (IllegalStateException e) {
       // expected
@@ -142,7 +141,7 @@ public class SchemaUtilsTest {
         new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
             .setStreamConfigs(getStreamConfigs())
             .setTimeColumnName(TIME_COLUMN).build();
-    SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+    SchemaUtils.validate(schema, List.of(tableConfig));
 
     // schema doesn't have destination columns from transformConfigs
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
@@ -152,7 +151,7 @@ public class SchemaUtilsTest {
         .setTimeColumnName(TIME_COLUMN)
         .setIngestionConfig(ingestionConfig).build();
     try {
-      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      SchemaUtils.validate(schema, List.of(tableConfig));
       Assert.fail("Should fail schema validation, as colA is not present in schema");
     } catch (IllegalStateException e) {
       // expected
@@ -161,12 +160,12 @@ public class SchemaUtilsTest {
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME)
         .addDateTime(TIME_COLUMN, DataType.LONG, "1:MILLISECONDS:EPOCH", "1:HOURS")
         .addSingleValueDimension("colA", DataType.STRING).build();
-    SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+    SchemaUtils.validate(schema, List.of(tableConfig));
 
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("double", DataType.DOUBLE, "NaN").build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      SchemaUtils.validate(schema, List.of(tableConfig));
       Assert.fail("Should fail schema validation, as double has NaN default value");
     } catch (IllegalStateException e) {
       // expected
@@ -176,7 +175,7 @@ public class SchemaUtilsTest {
     schema = new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addMetric("float", DataType.FLOAT, "NaN").build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
     try {
-      SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+      SchemaUtils.validate(schema, List.of(tableConfig));
       Assert.fail("Should fail schema validation, as float has NaN default value");
     } catch (IllegalStateException e) {
       // expected
@@ -187,7 +186,7 @@ public class SchemaUtilsTest {
         new Schema.SchemaBuilder().setSchemaName(TABLE_NAME).addSingleValueDimension("string", DataType.STRING, "NaN")
             .build();
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME).build();
-    SchemaUtils.validate(schema, Lists.newArrayList(tableConfig));
+    SchemaUtils.validate(schema, List.of(tableConfig));
   }
 
   private Map<String, String> getStreamConfigs() {
@@ -339,14 +338,14 @@ public class SchemaUtilsTest {
     pinotSchema =
         new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
                 new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
-            .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(Lists.newArrayList("test")).build();
+            .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(List.of("test")).build();
     checkValidationFails(pinotSchema);
 
     // valid primary key
     pinotSchema =
         new Schema.SchemaBuilder().addTime(new TimeGranularitySpec(DataType.LONG, TimeUnit.MILLISECONDS, "incoming"),
                 new TimeGranularitySpec(DataType.INT, TimeUnit.DAYS, "outgoing"))
-            .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(Lists.newArrayList("col")).build();
+            .addSingleValueDimension("col", DataType.INT).setPrimaryKeyColumns(List.of("col")).build();
     SchemaUtils.validate(pinotSchema);
   }
 

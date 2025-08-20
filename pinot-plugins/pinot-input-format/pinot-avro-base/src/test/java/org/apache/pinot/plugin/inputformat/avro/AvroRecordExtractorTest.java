@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.inputformat.avro;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -84,10 +83,10 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
 
     Schema avroSchema = createRecord("eventsRecord", null, null, false);
     List<Field> fields = Arrays.asList(
-        new Field("user_id", createUnion(Lists.newArrayList(create(Type.INT), create(Type.NULL))), null, null),
-        new Field("firstName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
-        new Field("lastName", createUnion(Lists.newArrayList(create(Type.STRING), create(Type.NULL))), null, null),
-        new Field("bids", createUnion(Lists.newArrayList(createArray(create(Type.INT)), create(Type.NULL))), null,
+        new Field("user_id", createUnion(List.of(create(Type.INT), create(Type.NULL))), null, null),
+        new Field("firstName", createUnion(List.of(create(Type.STRING), create(Type.NULL))), null, null),
+        new Field("lastName", createUnion(List.of(create(Type.STRING), create(Type.NULL))), null, null),
+        new Field("bids", createUnion(List.of(createArray(create(Type.INT)), create(Type.NULL))), null,
             null), new Field("campaignInfo", create(Type.STRING), null, null),
         new Field("cost", create(Type.DOUBLE), null, null), new Field("timestamp", create(Type.LONG), null, null),
         new Field("xarray", createArray(create(Type.STRING))), new Field("xmap", createMap(create(Type.STRING))));
@@ -167,24 +166,23 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     avroRecordExtractor.init(null, config);
 
     String schemaString =
-        new StringBuilder().append("{").append("  \"type\": \"record\",").append("  \"name\": \"test\",")
-            .append("  \"fields\": [{").append("    \"name\": \"column1\",").append("    \"type\": \"bytes\"")
-            .append("  },{").append("    \"name\": \"column2\",").append("    \"type\": {")
-            .append("      \"type\": \"bytes\",").append("      \"logicalType\": \"decimal\",")
-            .append("      \"precision\": 64,").append("      \"scale\": 10").append("    }").append("  },{")
-            .append("    \"name\": \"column3\",").append("    \"type\": {").append("      \"type\": \"string\",")
-            .append("      \"logicalType\": \"uuid\"").append("    }").append("  },{")
-            .append("    \"name\": \"column4\",").append("    \"type\": {").append("      \"type\": \"int\",")
-            .append("      \"logicalType\": \"date\"").append("    }").append("  },{")
-            .append("    \"name\": \"column5\",").append("    \"type\": {").append("      \"type\": \"int\",")
-            .append("      \"logicalType\": \"time-millis\"").append("    }").append("  },{")
-            .append("    \"name\": \"column6\",").append("    \"type\": {").append("      \"type\": \"long\",")
-            .append("      \"logicalType\": \"time-micros\"").append("    }").append("  },{")
-            .append("    \"name\": \"column7\",").append("    \"type\": {").append("      \"type\": \"long\",")
-            .append("      \"logicalType\": \"timestamp-millis\"").append("    }").append("  },{")
-            .append("    \"name\": \"column8\",").append("    \"type\": {").append("      \"type\": \"long\",")
-            .append("      \"logicalType\": \"timestamp-micros\"").append("    }").append("  }]").append("}")
-            .toString();
+        "{" + "  \"type\": \"record\"," + "  \"name\": \"test\","
+            + "  \"fields\": [{" + "    \"name\": \"column1\"," + "    \"type\": \"bytes\""
+            + "  },{" + "    \"name\": \"column2\"," + "    \"type\": {"
+            + "      \"type\": \"bytes\"," + "      \"logicalType\": \"decimal\","
+            + "      \"precision\": 64," + "      \"scale\": 10" + "    }" + "  },{"
+            + "    \"name\": \"column3\"," + "    \"type\": {" + "      \"type\": \"string\","
+            + "      \"logicalType\": \"uuid\"" + "    }" + "  },{"
+            + "    \"name\": \"column4\"," + "    \"type\": {" + "      \"type\": \"int\","
+            + "      \"logicalType\": \"date\"" + "    }" + "  },{"
+            + "    \"name\": \"column5\"," + "    \"type\": {" + "      \"type\": \"int\","
+            + "      \"logicalType\": \"time-millis\"" + "    }" + "  },{"
+            + "    \"name\": \"column6\"," + "    \"type\": {" + "      \"type\": \"long\","
+            + "      \"logicalType\": \"time-micros\"" + "    }" + "  },{"
+            + "    \"name\": \"column7\"," + "    \"type\": {" + "      \"type\": \"long\","
+            + "      \"logicalType\": \"timestamp-millis\"" + "    }" + "  },{"
+            + "    \"name\": \"column8\"," + "    \"type\": {" + "      \"type\": \"long\","
+            + "      \"logicalType\": \"timestamp-micros\"" + "    }" + "  }]" + "}";
     Schema schema = new Schema.Parser().parse(schemaString);
     GenericRecord genericRecord = new GenericData.Record(schema);
     genericRecord.put(bytesColName, bytesColValue);
@@ -252,7 +250,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
   public void testGenericFixedDataType() {
     Schema avroSchema = createRecord("EventRecord", null, null, false);
     Schema fixedSchema = createFixed("FixedSchema", "", "", 4);
-    avroSchema.setFields(Lists.newArrayList(new Schema.Field("fixedData", fixedSchema)));
+    avroSchema.setFields(List.of(new Schema.Field("fixedData", fixedSchema)));
     GenericRecord genericRecord = new GenericData.Record(avroSchema);
     genericRecord.put("fixedData", new GenericData.Fixed(fixedSchema, new byte[]{0, 1, 2, 3}));
     GenericRow genericRow = new GenericRow();

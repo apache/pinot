@@ -19,7 +19,6 @@
 
 package org.apache.pinot.plugin.inputformat.csv;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -154,7 +153,7 @@ public class CSVMessageDecoderTest {
   @Test
   public void testDefaultProps()
       throws Exception {
-    Map<String, String> decoderProps = ImmutableMap.of();
+    Map<String, String> decoderProps = Map.of();
     CSVMessageDecoder messageDecoder = new CSVMessageDecoder();
     messageDecoder.init(decoderProps, ImmutableSet.of("name", "age", "gender", "subjects"), "");
     String incomingRecord = "name,age,gender,subjects\nAlice,18,F,maths";

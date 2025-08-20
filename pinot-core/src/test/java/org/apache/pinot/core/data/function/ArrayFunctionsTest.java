@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.data.function;
 
-import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -157,28 +156,28 @@ public class ArrayFunctionsTest {
     });
 
     inputs.add(new Object[]{
-        "array_union_int(intArray, intArray)", Lists.newArrayList("intArray", "intArray"), row,
+        "array_union_int(intArray, intArray)", List.of("intArray", "intArray"), row,
         new int[]{3, 2, 10, 6, 1, 12}
     });
     inputs.add(new Object[]{
-        "array_union_int(integerArray, integerArray)", Lists.newArrayList("integerArray", "integerArray"), row,
+        "array_union_int(integerArray, integerArray)", List.of("integerArray", "integerArray"), row,
         new int[]{3, 2, 10, 6, 1, 12}
     });
     inputs.add(new Object[]{
-        "array_union_string(stringArray, stringArray)", Lists.newArrayList("stringArray", "stringArray"), row,
+        "array_union_string(stringArray, stringArray)", List.of("stringArray", "stringArray"), row,
         new String[]{"3", "2", "10", "6", "1", "12"}
     });
 
     inputs.add(new Object[]{
-        "array_concat_int(intArray, intArray)", Lists.newArrayList("intArray", "intArray"), row,
+        "array_concat_int(intArray, intArray)", List.of("intArray", "intArray"), row,
         new int[]{3, 2, 10, 6, 1, 12, 3, 2, 10, 6, 1, 12}
     });
     inputs.add(new Object[]{
-        "array_concat_int(integerArray, integerArray)", Lists.newArrayList("integerArray", "integerArray"), row,
+        "array_concat_int(integerArray, integerArray)", List.of("integerArray", "integerArray"), row,
         new int[]{3, 2, 10, 6, 1, 12, 3, 2, 10, 6, 1, 12}
     });
     inputs.add(new Object[]{
-        "array_concat_string(stringArray, stringArray)", Lists.newArrayList("stringArray", "stringArray"), row,
+        "array_concat_string(stringArray, stringArray)", List.of("stringArray", "stringArray"), row,
         new String[]{"3", "2", "10", "6", "1", "12", "3", "2", "10", "6", "1", "12"}
     });
     inputs.add(new Object[]{

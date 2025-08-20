@@ -18,10 +18,8 @@
  */
 package org.apache.pinot.common.restlet.resources;
 
-import com.google.common.collect.ImmutableMap;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
-import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
@@ -88,10 +86,10 @@ public class SystemResourceInfo {
    * @return Map of field names to values
    */
   public Map<String, String> toMap() {
-    Map<String, String> map = new HashMap<>();
-    map.put(NUM_CORES_KEY, Integer.toString(_numCores));
-    map.put(TOTAL_MEMORY_MB_KEY, Long.toString(_totalMemoryMB));
-    map.put(MAX_HEAP_SIZE_MB_KEY, Long.toString(_maxHeapSizeMB));
-    return ImmutableMap.copyOf(map);
+    return Map.of(
+        NUM_CORES_KEY, Integer.toString(_numCores),
+        TOTAL_MEMORY_MB_KEY, Long.toString(_totalMemoryMB),
+        MAX_HEAP_SIZE_MB_KEY, Long.toString(_maxHeapSizeMB)
+    );
   }
 }

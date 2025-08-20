@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -125,7 +124,7 @@ public class RealtimeToOfflineSegmentsTaskExecutorTest {
             .addMetric(M1, FieldSpec.DataType.INT)
             .addDateTime(T_TRX, FieldSpec.DataType.INT, "1:HOURS:SIMPLE_DATE_FORMAT:yyyyMMddHH", "1:HOURS").build();
 
-    List<String> d1 = Lists.newArrayList("foo", "bar", "foo", "foo", "bar");
+    List<String> d1 = List.of("foo", "bar", "foo", "foo", "bar");
     List<List<GenericRow>> rows = new ArrayList<>(NUM_SEGMENTS);
     // times 1600468000000 1600496800000 1600525600000 1600554400000 1600583200000
     for (int i = 0; i < NUM_SEGMENTS; i++) {

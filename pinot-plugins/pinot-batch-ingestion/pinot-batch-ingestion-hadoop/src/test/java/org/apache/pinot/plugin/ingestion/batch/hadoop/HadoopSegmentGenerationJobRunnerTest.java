@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.hadoop;
 
-import com.google.common.collect.Lists;
 import com.google.gson.Gson;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -46,10 +46,12 @@ import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+
 public class HadoopSegmentGenerationJobRunnerTest {
 
   @Test
-  public void testSegmentGeneration() throws Exception {
+  public void testSegmentGeneration()
+      throws Exception {
     File testDir = Files.createTempDirectory("testSegmentGeneration-").toFile();
     testDir.delete();
     testDir.mkdirs();
@@ -57,7 +59,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
     File inputFile = new File(inputDir, "input.csv");
-    FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile, List.of("col1,col2", "value1,1", "value2,2"));
 
     final String outputFilename = "myTable_OFFLINE_0.tar.gz";
     final String otherFilename = "myTable_OFFLINE_100.tar.gz";
@@ -69,18 +71,18 @@ public class HadoopSegmentGenerationJobRunnerTest {
     final String schemaName = "myTable";
     File schemaFile = new File(testDir, "myTable.schema");
     Schema schema = new SchemaBuilder()
-      .setSchemaName(schemaName)
-      .addSingleValueDimension("col1", DataType.STRING)
-      .addMetric("col2", DataType.INT)
-      .build();
+        .setSchemaName(schemaName)
+        .addSingleValueDimension("col1", DataType.STRING)
+        .addMetric("col2", DataType.INT)
+        .build();
     FileUtils.write(schemaFile, schema.toPrettyJsonString(), StandardCharsets.UTF_8);
 
     // Set up table config file.
     File tableConfigFile = new File(testDir, "myTable.table");
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-      .setTableName("myTable")
-      .setNumReplicas(1)
-      .build();
+        .setTableName("myTable")
+        .setNumReplicas(1)
+        .build();
     FileUtils.write(tableConfigFile, tableConfig.toJsonString(), StandardCharsets.UTF_8);
 
     File stagingDir = new File(testDir, "staging");
@@ -153,7 +155,7 @@ public class HadoopSegmentGenerationJobRunnerTest {
     File newSegmentFile = new File(outputDir, outputFilename);
     Assert.assertTrue(newSegmentFile.exists());
     Assert.assertTrue(newSegmentFile.isFile());
-    Assert.assertTrue(newSegmentFile.length() == 0);
+    Assert.assertEquals(newSegmentFile.length(), 0);
 
     // Now run again, but this time with overwriting of output files, and confirm we got a valid segment file.
     jobSpec.setOverwriteOutput(true);

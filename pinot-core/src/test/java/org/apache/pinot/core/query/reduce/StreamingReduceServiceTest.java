@@ -17,9 +17,8 @@
  * under the License.
  */
 package org.apache.pinot.core.query.reduce;
-
-import com.google.common.collect.ImmutableMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -66,7 +65,7 @@ public class StreamingReduceServiceTest {
     assertTrue(verifyException(() -> {
           StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
               threadPoolService,
-              ImmutableMap.of(routingInstance, mockedResponse),
+              Map.of(routingInstance, mockedResponse),
               1000,
               mock(ExecutionStatsAggregator.class));
           return null;
@@ -95,7 +94,7 @@ public class StreamingReduceServiceTest {
     assertTrue(verifyException(() -> {
           StreamingReduceService.processIterativeServerResponse(mock(StreamingReducer.class),
               threadPoolService,
-              ImmutableMap.of(routingInstance, mockedResponse),
+              Map.of(routingInstance, mockedResponse),
               10,
               mock(ExecutionStatsAggregator.class));
           return null;

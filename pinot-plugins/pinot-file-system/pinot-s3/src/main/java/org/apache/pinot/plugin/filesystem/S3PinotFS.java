@@ -21,7 +21,6 @@ package org.apache.pinot.plugin.filesystem;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -906,7 +905,7 @@ public class S3PinotFS extends BasePinotFS {
 
       String path = sanitizePath(uri.getPath());
       CopyObjectRequest request = generateCopyObjectRequest(encodedUrl, uri, path,
-          ImmutableMap.of("lastModified", String.valueOf(System.currentTimeMillis())));
+          Map.of("lastModified", String.valueOf(System.currentTimeMillis())));
       retryWithS3CredentialRefresh(() -> _s3Client.copyObject(request));
       long newUpdateTime = getS3ObjectMetadata(uri).lastModified().toEpochMilli();
       return newUpdateTime > s3ObjectMetadata.lastModified().toEpochMilli();

@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.api.upload;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.net.URI;
 import java.util.HashMap;
@@ -124,7 +123,7 @@ public class ZKOperatorTest {
     config.setSegmentName(SEGMENT_NAME);
     GenericRow row = new GenericRow();
     row.putValue("colA", "100");
-    List<GenericRow> rows = ImmutableList.of(row);
+    List<GenericRow> rows = List.of(row);
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
     driver.init(config, new GenericRowRecordReader(rows));

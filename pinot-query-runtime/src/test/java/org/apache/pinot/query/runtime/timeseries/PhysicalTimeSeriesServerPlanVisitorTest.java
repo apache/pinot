@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.timeseries;
 
-import com.google.common.collect.ImmutableMap;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Map;
@@ -80,7 +79,7 @@ public class PhysicalTimeSeriesServerPlanVisitorTest {
     }
     // Case-2: With offset, complex group-by expression, complex value, non-empty filter, 0 limit, query options.
     {
-      Map<String, String> queryOptions = ImmutableMap.of("numGroupsLimit", "1000");
+      Map<String, String> queryOptions = Map.of("numGroupsLimit", "1000");
       TimeSeriesExecutionContext context =
           new TimeSeriesExecutionContext(LANGUAGE, TimeBuckets.ofSeconds(1000L, Duration.ofSeconds(10), 100),
               DUMMY_DEADLINE_MS, Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());

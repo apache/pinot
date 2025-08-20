@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.data.TimeGranularitySpec.TimeFormat;
 import org.apache.pinot.spi.utils.BytesUtils;
@@ -32,7 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 
 @SuppressWarnings("deprecation")
@@ -109,7 +109,7 @@ public class SchemaTest {
         .addMetric("metric", FieldSpec.DataType.INT).addMetric("metricWithDefault", FieldSpec.DataType.INT, 5)
         .addTime(new TimeGranularitySpec(FieldSpec.DataType.LONG, TimeUnit.DAYS, "time"), null)
         .addDateTime("dateTime", FieldSpec.DataType.LONG, "1:HOURS:EPOCH", "1:HOURS")
-        .setPrimaryKeyColumns(Lists.newArrayList("svDimension")).build();
+        .setPrimaryKeyColumns(List.of("svDimension")).build();
 
     DimensionFieldSpec dimensionFieldSpec = schema.getDimensionSpec("svDimension");
     Assert.assertNotNull(dimensionFieldSpec);
@@ -203,7 +203,7 @@ public class SchemaTest {
     Assert.assertEquals(dateTimeFieldSpec.getFormat(), "1:HOURS:EPOCH");
     Assert.assertEquals(dateTimeFieldSpec.getGranularity(), "1:HOURS");
 
-    Assert.assertEquals(schema.getPrimaryKeyColumns(), Lists.newArrayList("svDimension"));
+    Assert.assertEquals(schema.getPrimaryKeyColumns(), List.of("svDimension"));
   }
 
   @Test
@@ -659,7 +659,7 @@ public class SchemaTest {
         .setEnableColumnBasedNullHandling(true)
         .addMetricField("metric", FieldSpec.DataType.INT)
         .addField(virtualField)
-        .setPrimaryKeyColumns(Lists.newArrayList("metric"))
+        .setPrimaryKeyColumns(List.of("metric"))
         .build();
 
     Schema withoutVirtualColumns = schema.withoutVirtualColumns();
@@ -686,7 +686,7 @@ public class SchemaTest {
         .setEnableColumnBasedNullHandling(true)
         .addMetricField("metric", FieldSpec.DataType.INT)
         .addField(virtualField)
-        .setPrimaryKeyColumns(Lists.newArrayList("metric", virtualField.getName()))
+        .setPrimaryKeyColumns(List.of("metric", virtualField.getName()))
         .build();
 
     Schema withoutVirtualColumns = schema.withoutVirtualColumns();

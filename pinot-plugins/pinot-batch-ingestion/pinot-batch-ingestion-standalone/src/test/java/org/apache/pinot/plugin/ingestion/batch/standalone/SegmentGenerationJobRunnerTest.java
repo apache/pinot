@@ -18,13 +18,13 @@
  */
 package org.apache.pinot.plugin.ingestion.batch.standalone;
 
-import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Collections;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.plugin.ingestion.batch.common.SegmentGenerationTaskRunner;
 import org.apache.pinot.plugin.inputformat.csv.CSVRecordReader;
@@ -63,7 +63,7 @@ public class SegmentGenerationJobRunnerTest {
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
     File inputFile = new File(inputDir, "input.csv");
-    FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile, List.of("col1,col2", "value1,1", "value2,2"));
 
     // Create an output directory, with two empty files in it. One we'll overwrite,
     // and one we'll leave alone.
@@ -117,7 +117,7 @@ public class SegmentGenerationJobRunnerTest {
     File inputDir = new File(testDir, "input");
     inputDir.mkdirs();
     File inputFile = new File(inputDir, "input.csv");
-    FileUtils.writeLines(inputFile, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile, List.of("col1,col2", "value1,1", "value2,2"));
 
     // Create an output directory
     File outputDir = new File(testDir, "output");
@@ -146,10 +146,10 @@ public class SegmentGenerationJobRunnerTest {
     inputSubDir2.mkdirs();
 
     File inputFile1 = new File(inputSubDir1, "input.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value1,1", "value2,2"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value1,1", "value2,2"));
 
     File inputFile2 = new File(inputSubDir2, "input.csv");
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value3,3", "value4,4"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value3,3", "value4,4"));
 
     File outputDir = new File(testDir, "output");
 
@@ -182,13 +182,13 @@ public class SegmentGenerationJobRunnerTest {
     inputDir.mkdirs();
 
     File inputFile1 = new File(inputDir, "input1.csv");
-    FileUtils.writeLines(inputFile1, Lists.newArrayList("col1,col2", "value11,11", "value12,12"));
+    FileUtils.writeLines(inputFile1, List.of("col1,col2", "value11,11", "value12,12"));
 
     File inputFile2 = new File(inputDir, "input2.csv");
-    FileUtils.writeLines(inputFile2, Lists.newArrayList("col1,col2", "value21,notanint", "value22,22"));
+    FileUtils.writeLines(inputFile2, List.of("col1,col2", "value21,notanint", "value22,22"));
 
     File inputFile3 = new File(inputDir, "input3.csv");
-    FileUtils.writeLines(inputFile3, Lists.newArrayList("col1,col2", "value31,31", "value32,32"));
+    FileUtils.writeLines(inputFile3, List.of("col1,col2", "value31,31", "value32,32"));
 
     File outputDir = new File(testDir, "output");
 

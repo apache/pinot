@@ -28,7 +28,6 @@ import org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-import org.testng.collections.Lists;
 
 import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedImports;
 import static org.apache.pinot.segment.local.function.GroovyStaticAnalyzerConfig.getDefaultAllowedReceivers;
@@ -145,7 +144,7 @@ public class GroovyFunctionEvaluatorTest {
 
     GenericRow genericRow1 = new GenericRow();
     genericRow1.putValue("userID", 101);
-    entries.add(new Object[]{"Groovy({userID}, userID)", Lists.newArrayList("userID"), genericRow1, 101});
+    entries.add(new Object[]{"Groovy({userID}, userID)", List.of("userID"), genericRow1, 101});
 
     GenericRow genericRow2 = new GenericRow();
     Map<String, Integer> map1 = new HashMap<>();
@@ -154,19 +153,19 @@ public class GroovyFunctionEvaluatorTest {
     map1.put("abc", 40);
     genericRow2.putValue("map1", map1);
     entries.add(new Object[]{
-        "Groovy({map1.sort()*.value}, map1)", Lists.newArrayList("map1"), genericRow2, Lists.newArrayList(40, 10, 30)
+        "Groovy({map1.sort()*.value}, map1)", List.of("map1"), genericRow2, List.of(40, 10, 30)
     });
 
     GenericRow genericRow3 = new GenericRow();
     genericRow3.putValue("campaigns", new Object[]{3, 2});
     entries.add(new Object[]{
-        "Groovy({campaigns.max{ it.toBigDecimal() }}, campaigns)", Lists.newArrayList("campaigns"), genericRow3, 3
+        "Groovy({campaigns.max{ it.toBigDecimal() }}, campaigns)", List.of("campaigns"), genericRow3, 3
     });
 
     GenericRow genericRow4 = new GenericRow();
     genericRow4.putValue("millis", "1584040201500");
     entries.add(new Object[]{
-        "Groovy({(long)(Long.parseLong(millis)/(1000*60*60))}, millis)", Lists.newArrayList("millis"), genericRow4,
+        "Groovy({(long)(Long.parseLong(millis)/(1000*60*60))}, millis)", List.of("millis"), genericRow4,
         440011L
     });
 
@@ -174,26 +173,26 @@ public class GroovyFunctionEvaluatorTest {
     genericRow5.putValue("firstName", "John");
     genericRow5.putValue("lastName", "Doe");
     entries.add(new Object[]{
-        "Groovy({firstName + ' ' + lastName}, firstName, lastName)", Lists.newArrayList("firstName", "lastName"),
+        "Groovy({firstName + ' ' + lastName}, firstName, lastName)", List.of("firstName", "lastName"),
         genericRow5, "John Doe"
     });
 
     GenericRow genericRow6 = new GenericRow();
     genericRow6.putValue("eventType", "IMPRESSION");
     entries.add(new Object[]{
-        "Groovy({eventType == 'IMPRESSION' ? 1: 0}, eventType)", Lists.newArrayList("eventType"), genericRow6, 1
+        "Groovy({eventType == 'IMPRESSION' ? 1: 0}, eventType)", List.of("eventType"), genericRow6, 1
     });
 
     GenericRow genericRow7 = new GenericRow();
     genericRow7.putValue("eventType", "CLICK");
     entries.add(new Object[]{
-        "Groovy({eventType == 'IMPRESSION' ? 1: 0}, eventType)", Lists.newArrayList("eventType"), genericRow7, 0
+        "Groovy({eventType == 'IMPRESSION' ? 1: 0}, eventType)", List.of("eventType"), genericRow7, 0
     });
 
     GenericRow genericRow8 = new GenericRow();
     genericRow8.putValue("ssn", "123-45-6789");
     entries.add(new Object[]{
-        "Groovy({org.apache.commons.codec.digest.DigestUtils.sha256Hex(ssn)}, ssn)", Lists.newArrayList("ssn"),
+        "Groovy({org.apache.commons.codec.digest.DigestUtils.sha256Hex(ssn)}, ssn)", List.of("ssn"),
         genericRow8, "01a54629efb952287e554eb23ef69c52097a75aecc0e3a93ca0855ab6d7a31a0"
     });
 
@@ -202,7 +201,7 @@ public class GroovyFunctionEvaluatorTest {
     genericRow9.putValue("ArrTimeV2", null);
     entries.add(new Object[]{
         "Groovy({ArrTimeV2 != null ? ArrTimeV2: ArrTime }, ArrTime, ArrTimeV2)",
-        Lists.newArrayList("ArrTime", "ArrTimeV2"), genericRow9, 101
+        List.of("ArrTime", "ArrTimeV2"), genericRow9, 101
     });
 
     GenericRow genericRow10 = new GenericRow();
@@ -210,7 +209,7 @@ public class GroovyFunctionEvaluatorTest {
     genericRow10.putValue("jello", jello);
     entries.add(new Object[]{
         "Groovy({jello != null ? jello.length() : \"Jello\" }, jello)",
-        Lists.newArrayList("jello"), genericRow10, 5
+        List.of("jello"), genericRow10, 5
     });
 
     //Invalid groovy script
@@ -218,7 +217,7 @@ public class GroovyFunctionEvaluatorTest {
     genericRow11.putValue("nullValue", null);
     entries.add(new Object[]{
         "Groovy({nullValue == null ? nullValue.length() : \"Jello\" }, nullValue)",
-        Lists.newArrayList("nullValue"), genericRow11, null
+        List.of("nullValue"), genericRow11, null
     });
     return entries.toArray(new Object[entries.size()][]);
   }
