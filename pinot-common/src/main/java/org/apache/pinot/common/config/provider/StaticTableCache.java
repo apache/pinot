@@ -92,20 +92,22 @@ public class StaticTableCache implements TableCacheProvider {
       _columnNameMaps.put(schemaName, Collections.unmodifiableMap(columnNameMap));
     }
 
-    for (LogicalTableConfig logicalTableConfig : logicalTableConfigs) {
-      String logicalTableName = logicalTableConfig.getTableName();
-      _logicalTableConfigMap.put(logicalTableName, logicalTableConfig);
+    if (logicalTableConfigs != null) {
+      for (LogicalTableConfig logicalTableConfig : logicalTableConfigs) {
+        String logicalTableName = logicalTableConfig.getTableName();
+        _logicalTableConfigMap.put(logicalTableName, logicalTableConfig);
 
-      if (_ignoreCase) {
-        _logicalTableNameMap.put(logicalTableName.toLowerCase(), logicalTableName);
-      } else {
-        _logicalTableNameMap.put(logicalTableName, logicalTableName);
+        if (_ignoreCase) {
+          _logicalTableNameMap.put(logicalTableName.toLowerCase(), logicalTableName);
+        } else {
+          _logicalTableNameMap.put(logicalTableName, logicalTableName);
+        }
       }
     }
 
     LOGGER.info(
         "Initialized QueryValidator with {} table configs, {} schemas, {} logical table configs (ignoreCase: {})",
-        tableConfigs.size(), schemas.size(), logicalTableConfigs.size(), ignoreCase);
+        _tableConfigMap.size(), _schemaMap.size(), _logicalTableNameMap.size(), ignoreCase);
   }
 
   @Override
