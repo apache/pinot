@@ -832,6 +832,8 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
               }
               break;
             case CPUTimeBasedKilling:
+              LOGGER.info("Entering CPU time based killing mode, killing queries that exceed threshold (ns): {}",
+                  config.getCpuTimeBasedKillingThresholdNS());
               if (!_isThreadCPUSamplingEnabled) {
                 LOGGER.error("Unable to terminate queries as CPU time tracking is not enabled");
               }
@@ -839,8 +841,11 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             case HeapMemoryAlarmingVerbose:
               LOGGER.debug("Heap used bytes: {} exceeds alarming level: {}", _usedBytes, config.getAlarmingLevel());
               break;
-            default:
+            case Normal:
+              LOGGER.info("Heap used bytes: {} drops to safe zone, entering to normal mode", _usedBytes);
               break;
+            default:
+              throw new IllegalStateException("Unsupported triggering level: " + _triggeringLevel);
           }
         }
       }
