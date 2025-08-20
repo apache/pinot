@@ -50,37 +50,103 @@ public class MinimumShouldMatchQueryParserTest {
   @Test
   public void testPositiveCases()
       throws ParseException {
-    // Case 1: setMinimumShouldMatch("3") - requires at least 3 matches
-    Query result1 = parseQueryWithMinimumShouldMatch("java OR python OR scala OR kotlin OR rust", "3");
+    // Test 1: MUST_SHOULD_80_percent - OpenSearch AND (one OR two OR three OR four) with minimumShouldMatch=80%
+    Query result1 = parseQueryWithMinimumShouldMatch("OpenSearch AND (one OR two OR three OR four)", "80%");
     Assert.assertTrue(result1 instanceof BooleanQuery);
     BooleanQuery booleanQuery1 = (BooleanQuery) result1;
-    Assert.assertEquals(booleanQuery1.clauses().size(), 5);
-    Assert.assertEquals(booleanQuery1.getMinimumNumberShouldMatch(), 3);
+    // Should have 2 clauses: MUST(OpenSearch) and MUST(nested BooleanQuery)
+    Assert.assertEquals(booleanQuery1.clauses().size(), 2);
+    // The nested BooleanQuery should have minimumShouldMatch=3 (80% of 4 = 3.2, rounded down to 3)
+    BooleanQuery nestedQuery1 = (BooleanQuery) booleanQuery1.clauses().get(1).getQuery();
+    Assert.assertEquals(nestedQuery1.getMinimumNumberShouldMatch(), 3);
 
-    // Case 2: setMinimumShouldMatch("-1") - allows at most 1 to be missing
-    Query result2 = parseQueryWithMinimumShouldMatch("java OR python OR scala OR kotlin", "-1");
+    // Test 2: MUST_SHOULD_negative_20_percent - OpenSearch AND (one OR two OR three OR four) with
+    // minimumShouldMatch=-20%
+    Query result2 = parseQueryWithMinimumShouldMatch("OpenSearch AND (one OR two OR three OR four)", "-20%");
     Assert.assertTrue(result2 instanceof BooleanQuery);
     BooleanQuery booleanQuery2 = (BooleanQuery) result2;
-    Assert.assertEquals(booleanQuery2.clauses().size(), 4);
-    // -1 means at most 1 can be missing, so 3 must match (4 - 1 = 3)
-    Assert.assertEquals(booleanQuery2.getMinimumNumberShouldMatch(), 3);
+    Assert.assertEquals(booleanQuery2.clauses().size(), 2);
+    // The nested BooleanQuery should have minimumShouldMatch=3 (100+(-20)=80% of 4 = 3.2, rounded down to 3)
+    BooleanQuery nestedQuery2 = (BooleanQuery) booleanQuery2.clauses().get(1).getQuery();
+    Assert.assertEquals(nestedQuery2.getMinimumNumberShouldMatch(), 3);
 
-    // Case 3: setMinimumShouldMatch("80%") - requires at least 80% matches
-    Query result3 = parseQueryWithMinimumShouldMatch("java OR python OR scala OR kotlin OR rust", "80%");
+    // Test 3: SHOULD_only_default_one - one OR two OR three OR four without minimumShouldMatch
+    Query result3 = parseQueryWithMinimumShouldMatch("one OR two OR three OR four", null);
     Assert.assertTrue(result3 instanceof BooleanQuery);
     BooleanQuery booleanQuery3 = (BooleanQuery) result3;
-    Assert.assertEquals(booleanQuery3.clauses().size(), 5);
-    // 80% of 5 = 4 matches required
-    Assert.assertEquals(booleanQuery3.getMinimumNumberShouldMatch(), 4);
+    Assert.assertEquals(booleanQuery3.clauses().size(), 4);
+    // Default minimumShouldMatch should be 1 for SHOULD-only queries
+    Assert.assertEquals(booleanQuery3.getMinimumNumberShouldMatch(), 1);
 
-    // Case 4: setMinimumShouldMatch("-20%") - allows at most 20% to be missing
-    Query result4 = parseQueryWithMinimumShouldMatch("java OR python OR scala OR kotlin OR rust", "-20%");
+    // Test 4: SHOULD_minimum_2 - one OR two OR three OR four with minimumShouldMatch=2
+    Query result4 = parseQueryWithMinimumShouldMatch("one OR two OR three OR four", "2");
     Assert.assertTrue(result4 instanceof BooleanQuery);
     BooleanQuery booleanQuery4 = (BooleanQuery) result4;
-    Assert.assertEquals(booleanQuery4.clauses().size(), 5);
-    // -20% means at most 20% can be missing, so 80% must match
-    // 80% of 5 = 4 matches required
-    Assert.assertEquals(booleanQuery4.getMinimumNumberShouldMatch(), 4);
+    Assert.assertEquals(booleanQuery4.clauses().size(), 4);
+    Assert.assertEquals(booleanQuery4.getMinimumNumberShouldMatch(), 2);
+
+    // Test 5: SHOULD_75_percent - one OR two OR three OR four with minimumShouldMatch=75%
+    Query result5 = parseQueryWithMinimumShouldMatch("one OR two OR three OR four", "75%");
+    Assert.assertTrue(result5 instanceof BooleanQuery);
+    BooleanQuery booleanQuery5 = (BooleanQuery) result5;
+    Assert.assertEquals(booleanQuery5.clauses().size(), 4);
+    // 75% of 4 = 3 matches required
+    Assert.assertEquals(booleanQuery5.getMinimumNumberShouldMatch(), 3);
+
+    // Test 6: SHOULD_100_percent - one OR two OR three OR four with minimumShouldMatch=100%
+    Query result6 = parseQueryWithMinimumShouldMatch("one OR two OR three OR four", "100%");
+    Assert.assertTrue(result6 instanceof BooleanQuery);
+    BooleanQuery booleanQuery6 = (BooleanQuery) result6;
+    Assert.assertEquals(booleanQuery6.clauses().size(), 4);
+    // 100% of 4 = 4 matches required
+    Assert.assertEquals(booleanQuery6.getMinimumNumberShouldMatch(), 4);
+
+    // Test 7: SHOULD_25_percent - one OR two OR three OR four with minimumShouldMatch=25%
+    Query result7 = parseQueryWithMinimumShouldMatch("one OR two OR three OR four", "25%");
+    Assert.assertTrue(result7 instanceof BooleanQuery);
+    BooleanQuery booleanQuery7 = (BooleanQuery) result7;
+    Assert.assertEquals(booleanQuery7.clauses().size(), 4);
+    // 25% of 4 = 1 match required
+    Assert.assertEquals(booleanQuery7.getMinimumNumberShouldMatch(), 1);
+
+    // Test 8: single_term_query - OpenSearch with minimumShouldMatch=1
+    Query result8 = parseQueryWithMinimumShouldMatch("OpenSearch", "1");
+    Assert.assertTrue(result8 instanceof BooleanQuery);
+    BooleanQuery booleanQuery8 = (BooleanQuery) result8;
+    Assert.assertEquals(booleanQuery8.clauses().size(), 1);
+    Assert.assertEquals(booleanQuery8.getMinimumNumberShouldMatch(), 1);
+
+    // Test 9: SHOULD_negative_50_percent - one OR two OR three OR four with minimumShouldMatch=-50%
+    Query result9 = parseQueryWithMinimumShouldMatch("one OR two OR three OR four", "-50%");
+    Assert.assertTrue(result9 instanceof BooleanQuery);
+    BooleanQuery booleanQuery9 = (BooleanQuery) result9;
+    Assert.assertEquals(booleanQuery9.clauses().size(), 4);
+    // -50% means 50% must match, so 50% of 4 = 2 matches required
+    Assert.assertEquals(booleanQuery9.getMinimumNumberShouldMatch(), 2);
+
+    // Test 10: Deep nested query - OpenSearch AND ((one OR two) AND (three OR four OR five)) with
+    // minimumShouldMatch=60%
+    Query result10 = parseQueryWithMinimumShouldMatch(
+        "OpenSearch AND ((one OR two) AND (three OR four OR five))", "60%");
+    Assert.assertTrue(result10 instanceof BooleanQuery);
+    BooleanQuery booleanQuery10 = (BooleanQuery) result10;
+    Assert.assertEquals(booleanQuery10.clauses().size(), 2);
+
+    // Get the nested BooleanQuery: ((one OR two) AND (three OR four OR five))
+    BooleanQuery nestedQuery10 = (BooleanQuery) booleanQuery10.clauses().get(1).getQuery();
+    Assert.assertEquals(nestedQuery10.clauses().size(), 2);
+
+    // Get the first sub-nested BooleanQuery: (one OR two)
+    BooleanQuery subNested1 = (BooleanQuery) nestedQuery10.clauses().get(0).getQuery();
+    Assert.assertEquals(subNested1.clauses().size(), 2);
+    // 60% of 2 = 1.2, rounded down to 1
+    Assert.assertEquals(subNested1.getMinimumNumberShouldMatch(), 1);
+
+    // Get the second sub-nested BooleanQuery: (three OR four OR five)
+    BooleanQuery subNested2 = (BooleanQuery) nestedQuery10.clauses().get(1).getQuery();
+    Assert.assertEquals(subNested2.clauses().size(), 3);
+    // 60% of 3 = 1.8, rounded down to 1
+    Assert.assertEquals(subNested2.getMinimumNumberShouldMatch(), 1);
   }
 
   @Test
@@ -149,27 +215,7 @@ public class MinimumShouldMatchQueryParserTest {
       // Expected
     }
 
-    // Case 8: Single term query should work with explicit minimum_should_match
-    try {
-      Query result8 = parseQueryWithMinimumShouldMatch("java", "1");
-      Assert.assertTrue(result8 instanceof BooleanQuery);
-      BooleanQuery booleanQuery8 = (BooleanQuery) result8;
-      Assert.assertEquals(booleanQuery8.clauses().size(), 1);
-      Assert.assertEquals(booleanQuery8.getMinimumNumberShouldMatch(), 1);
-    } catch (ParseException e) {
-      Assert.fail("Single term query should work with minimum_should_match: " + e.getMessage());
-    }
 
-    // Case 8b: Single term query should work without minimum_should_match (defaults to 1)
-    try {
-      Query result8b = parseQueryWithMinimumShouldMatch("java", null);
-      Assert.assertTrue(result8b instanceof BooleanQuery);
-      BooleanQuery booleanQuery8b = (BooleanQuery) result8b;
-      Assert.assertEquals(booleanQuery8b.clauses().size(), 1);
-      Assert.assertEquals(booleanQuery8b.getMinimumNumberShouldMatch(), 1);
-    } catch (ParseException e) {
-      Assert.fail("Single term query should work without minimum_should_match: " + e.getMessage());
-    }
 
     // Case 9: Non-Boolean query (phrase query)
     try {
@@ -191,6 +237,8 @@ public class MinimumShouldMatchQueryParserTest {
           "Error message should mention Boolean queries, got: " + e.getMessage());
     }
   }
+
+
 
   @Test
   public void testEdgeCases()

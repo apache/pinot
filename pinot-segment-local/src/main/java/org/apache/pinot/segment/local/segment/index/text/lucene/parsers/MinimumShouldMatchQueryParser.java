@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.segment.local.segment.index.text.lucene.parsers;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.lucene.analysis.Analyzer;
@@ -116,8 +118,6 @@ public class MinimumShouldMatchQueryParser extends QueryParserBase {
     }
 
     String value = minimumShouldMatch.trim();
-
-    // Validate the format but store as string for dynamic calculation
     Matcher matcher = PERCENTAGE_PATTERN.matcher(value);
     if (matcher.matches()) {
       int percentage = Integer.parseInt(matcher.group(1));
@@ -226,40 +226,46 @@ public class MinimumShouldMatchQueryParser extends QueryParserBase {
    * @return the modified BooleanQuery with minimum_should_match applied
    */
   private Query applyMinimumShouldMatch(BooleanQuery booleanQuery) {
-    int shouldClauseCount = 0;
-    boolean hasMustOrFilterClauses = false;
+    return applyMinimumShouldMatch(booleanQuery, new HashSet<>());
+  }
 
-    for (BooleanClause clause : booleanQuery.clauses()) {
-      if (clause.getOccur() == BooleanClause.Occur.SHOULD) {
-        shouldClauseCount++;
-      } else if (clause.getOccur() == BooleanClause.Occur.MUST || clause.getOccur() == BooleanClause.Occur.FILTER) {
-        hasMustOrFilterClauses = true;
-      }
-    }
-
-    // If no should clauses, return the original query
-    if (shouldClauseCount == 0) {
+  /**
+   * Applies minimum_should_match behavior to a BooleanQuery with infinite loop protection.
+   *
+   * @param booleanQuery the BooleanQuery to modify
+   * @param visitedQueries set of already visited BooleanQueries to prevent infinite loops
+   * @return the modified BooleanQuery with minimum_should_match applied
+   */
+  private Query applyMinimumShouldMatch(BooleanQuery booleanQuery, Set<BooleanQuery> visitedQueries) {
+    if (visitedQueries.contains(booleanQuery)) {
       return booleanQuery;
     }
+    visitedQueries.add(booleanQuery);
 
-    int minimumShouldMatch;
-    if (hasMustOrFilterClauses) {
-      minimumShouldMatch = 0;
-    } else {
-      minimumShouldMatch = 1;
-    }
-
-    // Override with configured minimum_should_match if set
-    if (!_minimumShouldMatch.equals("1")) {
-      minimumShouldMatch = calculateMinimumShouldMatch(shouldClauseCount, _minimumShouldMatch);
-    }
-
-    // Create a new BooleanQuery with the minimum should match
     BooleanQuery.Builder builder = new BooleanQuery.Builder();
+
     for (BooleanClause clause : booleanQuery.clauses()) {
-      builder.add(clause);
+      Query processedQuery = clause.getQuery();
+
+      // Recursively apply minimum_should_match if this clause's query is another BooleanQuery
+      if (processedQuery instanceof BooleanQuery) {
+        processedQuery = applyMinimumShouldMatch((BooleanQuery) processedQuery, visitedQueries);
+      }
+
+      builder.add(processedQuery, clause.getOccur());
     }
-    builder.setMinimumNumberShouldMatch(minimumShouldMatch);
+
+    // After processing clauses, apply minimum_should_match at this level if there are SHOULD clauses
+    int shouldClauseCount = 0;
+    for (BooleanClause clause : builder.build().clauses()) {
+      if (clause.getOccur() == BooleanClause.Occur.SHOULD) {
+        shouldClauseCount++;
+      }
+    }
+    if (shouldClauseCount > 0 && _minimumShouldMatch != null && !_minimumShouldMatch.trim().isEmpty()) {
+      int minimumShouldMatch = calculateMinimumShouldMatch(shouldClauseCount, _minimumShouldMatch);
+      builder.setMinimumNumberShouldMatch(minimumShouldMatch);
+    }
 
     return builder.build();
   }
