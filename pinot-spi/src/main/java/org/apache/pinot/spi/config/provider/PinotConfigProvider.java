@@ -16,63 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.config.provider;
+package org.apache.pinot.spi.config.provider;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import javax.annotation.Nullable;
-import org.apache.commons.collections4.MapUtils;
-import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
-import org.apache.pinot.spi.config.provider.PinotConfigProvider;
-import org.apache.pinot.spi.config.provider.SchemaChangeListener;
-import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
-import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
-public interface TableCacheProvider extends PinotConfigProvider {
-  Logger LOGGER = LoggerFactory.getLogger(TableCacheProvider.class);
-  boolean isIgnoreCase();
-
-  @Nullable
-  String getActualTableName(String tableName);
-
-
-  @Nullable
-  String getActualLogicalTableName(String logicalTableName);
-
-
-  Map<String, String> getTableNameMap();
-
-
-  Map<String, String> getLogicalTableNameMap();
-
-
-  List<String> getAllDimensionTables();
-
-
-  Map<String, String> getColumnNameMap(String rawTableName);
-
-
-  Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName);
-
-
-  Set<String> getTimestampIndexColumns(String tableNameWithType);
-
-
-  List<LogicalTableConfig> getLogicalTableConfigs();
-
-
-  boolean isLogicalTable(String logicalTableName);
+/**
+ * An interface for the provider of pinot table configs and schemas.
+ */
+public interface PinotConfigProvider {
 
   /**
    * Returns the table config for the given table name with type suffix.
@@ -118,29 +73,4 @@ public interface TableCacheProvider extends PinotConfigProvider {
    *         registered.
    */
   boolean registerLogicalTableConfigChangeListener(LogicalTableConfigChangeListener logicalTableConfigChangeListener);
-
-  static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
-      QueryConfig queryConfig) {
-    Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
-    if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
-      for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
-        try {
-          Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
-          Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
-          expressionOverrideMap.put(srcExp, destExp);
-        } catch (Exception e) {
-          LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
-              entry.getKey(), entry.getValue(), physicalOrLogicalTableName);
-        }
-      }
-      int mapSize = expressionOverrideMap.size();
-      if (mapSize == 1) {
-        Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
-        return Collections.singletonMap(entry.getKey(), entry.getValue());
-      } else if (mapSize > 1) {
-        return expressionOverrideMap;
-      }
-    }
-    return null;
-  }
 }

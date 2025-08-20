@@ -1800,10 +1800,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testValidateQueryApiWithIgnoreCaseOption()
       throws Exception {
-    JsonNode tableConfigsNode = JsonUtils.stringToJsonNode(
-        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
-    JsonNode schemaNode = JsonUtils.stringToJsonNode(
-        sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+    JsonNode tableConfigsNode =
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
+    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
 
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME"); // might be null
@@ -1814,8 +1813,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Test case-sensitive mode (default)
     String query = String.format(
         "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s], "
-        + "\"ignoreCase\": false}",
-        offlineJson, realtimeJson, schemaNode.toString());
+            + "\"ignoreCase\": false}", offlineJson, realtimeJson, schemaNode.toString());
 
     JsonNode result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", query, null));
@@ -1826,14 +1824,10 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     // Test case-insensitive mode
     query = String.format(
         "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s], "
-        + "\"ignoreCase\": true}",
-        offlineJson,
-        realtimeJson,
-        schemaNode.toString());
+            + "\"ignoreCase\": true}", offlineJson, realtimeJson, schemaNode.toString());
 
     result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", query, null));
-
     assertTrue(result.get("compiledSuccessfully").asBoolean(), "Query should compile successfully: " + query);
     assertTrue(result.get("errorCode").isNull(), "Error code should be null for: " + query);
     assertTrue(result.get("errorMessage").isNull(), "Error message should be null for: " + query);

@@ -202,7 +202,8 @@ public class PinotQueryResource {
           }
         }
 
-        boolean ignoreCase = false;
+        // default is not case sensitive
+        boolean ignoreCase = true;
         if (requestJson.has("ignoreCase")) {
           ignoreCase = requestJson.get("ignoreCase").asBoolean();
         }
