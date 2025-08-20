@@ -128,15 +128,10 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     updateTableConfig(tableConfigWithoutCompaction);
 
     // Wait for both tables to load the same initial data (3 unique records after upserts)
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 10);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 10);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 10);
 
     // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    assertEquals(initialLogicalCountCompacted, 3, "Compacted table should have 3 logical records initially");
-    assertEquals(initialLogicalCountNormal, 3, "Normal table should have 3 logical records initially");
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
     // Create update patterns to generate invalid records - simplified for faster test execution
     // Use playerIds that match the initial data to ensure consistent partitioning
@@ -145,65 +140,18 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "100,Zook-Updated2,valorant,1500,1681300003000,false", "101,Alice-Updated2,lol,2500,1681300004000,false");
 
     // Push all updates at once to reduce wait times and ensure consistent partitioning
-    pushCsvIntoKafkaWithKey(updateRecords, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafkaWithKey(updateRecords, kafkaTopicNameNormal, 0);
+    pushDataWithKeyToBothTopics(updateRecords, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
     // Wait for all additional records to be processed (3 unique records after all upserts)
-    waitForAllDocsLoaded(tableNameWithCompaction, 90_000L, 15);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 90_000L, 15);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 90_000L, 15);
 
     // Verify state before commit - both tables should still show the same logical result (3 unique records)
-    long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+    validatePreCommitState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
-    assertEquals(preCommitLogicalCountCompacted, 3, "Both tables should show 3 logical records before commit");
-    assertEquals(preCommitLogicalCountNormal, 3, "Both tables should show 3 logical records before commit");
+    // Perform commit and wait for completion
+    performCommitAndWait(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 4, 2);
 
-    // Verify both tables have the same data row by row
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
-
-    // Force commit segments on both tables to trigger commit-time behavior
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
-
-    // Wait for segments to be committed
-    waitForNumQueriedSegmentsToConverge(tableNameWithCompaction, 30_000L, 4, 2);
-    waitForNumQueriedSegmentsToConverge(tableNameWithoutCompaction, 30_000L, 4, 2);
-
-    // Check the TOTAL document counts after commit (with skipUpsert=true to see all physical records)
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    // If counts are still the same, wait a bit longer for actual commit completion
-    if (postCommitPhysicalCountCompacted == postCommitPhysicalCountNormal) {
-      Thread.sleep(10_000);
-      postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-      postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-      postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-      postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    }
-
-    // Key assertions for commit time compaction
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal, String.format(
-        "Expected table with commit-time compaction (%d docs) to have fewer physical docs than "
-            + "table without compaction (%d docs)", postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
-
-    // Both should still return the same logical upserted results (3 records)
-    assertEquals(postCommitLogicalCountCompacted, 3, "Compacted table should still have 3 logical records");
-    assertEquals(postCommitLogicalCountNormal, 3, "Normal table should still have 3 logical records");
-    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
-        "Both tables should have identical logical results");
-
-    // Verify data integrity - both tables should return identical data row by row
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
-
-    // Calculate and log compaction efficiency
-    double compressionRatio = (double) postCommitPhysicalCountCompacted / postCommitPhysicalCountNormal;
-    int invalidRecordsRemoved = (int) (postCommitPhysicalCountNormal - postCommitPhysicalCountCompacted);
-
-    assertTrue(compressionRatio < 0.95, "Compaction should remove some physical records");
-    assertTrue(invalidRecordsRemoved >= 2, "At least 2 invalid records should be removed (obsolete updates)");
+    // Validate post-commit compaction effectiveness and data integrity
+    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 2, 0.95);
 
     // Clean up
     dropRealtimeTable(tableNameWithCompaction);
@@ -263,14 +211,10 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithoutCompaction);
 
     // Wait for both tables to load the same initial data (3 unique records after upserts)
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 10);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 10);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 10);
 
     // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    assertEquals(initialLogicalCountCompacted, 3, "Both tables should show 3 logical records initially");
-    assertEquals(initialLogicalCountNormal, 3, "Both tables should show 3 logical records initially");
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
     // Push additional updates using standard format to create more obsolete records
     // Add more diverse data with different primary keys and varying scores for better sorting validation
@@ -282,8 +226,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "105,Frank New,soccer,33.1,1681354700000,false"       // Mid-low score
     );
 
-    pushCsvIntoKafka(updateRecords, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafka(updateRecords, kafkaTopicNameNormal, 0);
+    pushDataToBothTopics(updateRecords, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
 
     // Push another round of updates to create more obsolete records
     List<String> moreUpdates = List.of("100,Alice Final,chess,25.7,1681454200000,false",     // Low-mid score
@@ -292,32 +235,16 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "104,Eva Final,golf,67.8,1681454500000,false"         // High score
     );
 
-    pushCsvIntoKafka(moreUpdates, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafka(moreUpdates, kafkaTopicNameNormal, 0);
+    pushDataToBothTopics(moreUpdates, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
 
     // Wait for all updates to be processed (6 unique records after all upserts)
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 20);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 20);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 20);
 
-    // Force commit segments to trigger commit-time compaction
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
+    // Perform simple commit and verify data identity between tables
+    performSimpleCommitAndVerify(tableNameWithCompaction, tableNameWithoutCompaction, 60_000L, 6);
 
-    // Wait for commit completion - longer wait to ensure sorting takes effect
-    waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 6);
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
-
-    // Check results after commit
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    // Assertions
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal,
-        "Compacted table should have fewer physical records than normal table");
-    assertEquals(postCommitLogicalCountCompacted, 6, "Compacted table should still have 6 logical records");
-    assertEquals(postCommitLogicalCountNormal, 6, "Normal table should still have 6 logical records");
+    // Validate post-commit compaction effectiveness and data integrity (expecting 6 records, min 4 removed)
+    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 6, 4, 1.0);
 
     // CRITICAL: Validate segment-level sorting
     validateSegmentLevelSorting(tableNameWithCompaction, true);  // Should be sorted due to sorted column config
@@ -367,52 +294,32 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     updateTableConfig(tableConfigWithoutCompaction);
 
     // Wait for both tables to load the same initial data (3 unique records after upserts)
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 10);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 10);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 10);
 
     // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    assertEquals(initialLogicalCountCompacted, 3, "Both tables should show 3 logical records initially");
-    assertEquals(initialLogicalCountNormal, 3, "Both tables should show 3 logical records initially");
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
     // Push additional updates using standard format to test raw index columns
     List<String> updateRecords =
         List.of("100,Alice Raw,chess,95.5,1681354200000,false", "101,Bob Raw,poker,88.0,1681354300000,false",
             "102,Charlie Raw,chess,82.5,1681354400000,false");
 
-    pushCsvIntoKafka(updateRecords, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafka(updateRecords, kafkaTopicNameNormal, 0);
+    pushDataToBothTopics(updateRecords, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
 
     // Push another round of updates to create more obsolete records
     List<String> moreUpdates =
         List.of("100,Alice NoDict,chess,99.5,1681454200000,false", "101,Bob NoDict,poker,91.0,1681454300000,false");
 
-    pushCsvIntoKafka(moreUpdates, kafkaTopicNameCompacted, 0);
-    pushCsvIntoKafka(moreUpdates, kafkaTopicNameNormal, 0);
+    pushDataToBothTopics(moreUpdates, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
 
     // Wait for all updates to be processed (3 unique records after upserts)
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 15);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 15);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 15);
 
-    // Force commit segments to trigger commit-time compaction
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
+    // Perform simple commit operation
+    performSimpleCommitAndVerify(tableNameWithCompaction, tableNameWithoutCompaction, 60_000L, 3);
 
-    // Wait for commit completion
-    waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
-
-    // Check results after commit
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    // Assertions
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal,
-        "Compacted table should have fewer physical records than normal table");
-    assertEquals(postCommitLogicalCountCompacted, 3, "Compacted table should still have 3 logical records");
-    assertEquals(postCommitLogicalCountNormal, 3, "Normal table should still have 3 logical records");
+    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 2 removed)
+    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 2, 1.0);
 
     // Verify data integrity for no-dictionary columns in compacted table
     ResultSet noDictResult = getPinotConnection().execute(
@@ -422,8 +329,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Verify that no-dictionary configuration is maintained (raw storage for name and game columns)
     ResultSet allData = getPinotConnection().execute("SELECT * FROM " + tableNameWithCompaction).getResultSet(0);
     assertEquals(allData.getRowCount(), 3, "Should have 3 valid records after compaction");
-
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
     // Clean up
     dropRealtimeTable(tableNameWithCompaction);
     dropRealtimeTable(tableNameWithoutCompaction);
@@ -502,16 +407,10 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithoutCompaction);
 
     // Wait for data to load
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 5);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 5);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 5);
 
     // Verify initial state - both tables should show same logical record count (3 unique players after upserts)
-    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    // Verify logical counts match initially
-    assertEquals(initialLogicalCountCompacted, 3, "Compacted table should show 3 logical records initially");
-    assertEquals(initialLogicalCountNormal, 3, "Normal table should show 3 logical records initially");
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
     // Test multi-value column queries work correctly before commit
     String mvQuery =
@@ -523,39 +422,13 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
 
     // Force commit segments to trigger commit-time compaction
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
+    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
 
     // Wait for commit completion
     waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
 
-    // Check final results after commit
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-
-    // KEY VALIDATIONS: Verify commit time compaction is working as expected
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal,
-        String.format("Commit time compaction should reduce physical records: compacted=%d < normal=%d",
-            postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
-
-    // Both tables should still have the same logical record count
-    assertEquals(postCommitLogicalCountCompacted, 3,
-        "Compacted table should still show 3 logical records after commit");
-    assertEquals(postCommitLogicalCountNormal, 3, "Normal table should still show 3 logical records after commit");
-    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
-        "Both tables should have identical logical results after commit");
-
-    // Verify data integrity is maintained after commit-time compaction
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
-
-    // Calculate and log compaction efficiency
-    double compressionRatio = (double) postCommitPhysicalCountCompacted / postCommitPhysicalCountNormal;
-    int invalidRecordsRemoved = (int) (postCommitPhysicalCountNormal - postCommitPhysicalCountCompacted);
-
-    assertTrue(compressionRatio < 1.0, "Compaction should remove some physical records for multi-value columns");
-    assertTrue(invalidRecordsRemoved >= 1, "At least 1 obsolete record should be removed during compaction");
+    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 1 removed)
+    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 1, 1.0);
 
     // Clean up
     dropRealtimeTable(tableNameWithCompaction);
@@ -648,11 +521,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 10);
 
     // Verify initial state - both tables should show the same upserted data count (3 unique records)
-    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    assertEquals(initialLogicalCountCompacted, 3, "Compacted table should have 3 logical records initially");
-    assertEquals(initialLogicalCountNormal, 3, "Normal table should have 3 logical records initially");
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
     // Create partial update patterns to generate invalid records
     // For partial upsert: score uses OVERWRITE strategy, name uses OVERWRITE strategy, game uses UNION strategy
@@ -678,14 +547,7 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     waitForAllDocsLoaded(tableNameWithoutCompaction, 90_000L, 15);
 
     // Verify state before commit - both tables should still show the same logical result (3 unique records)
-    long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    assertEquals(preCommitLogicalCountCompacted, 3, "Both tables should show 3 logical records before commit");
-    assertEquals(preCommitLogicalCountNormal, 3, "Both tables should show 3 logical records before commit");
-
-    // Verify both tables have the same data row by row before commit
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+    validatePreCommitState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
     // Verify partial upsert behavior - check that non-updated columns retain original values
     String partialUpsertQuery =
@@ -706,45 +568,14 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     assertTrue(updatedGame.contains("arcade") && updatedGame.contains("puzzle"),
         "Game should contain merged values from UNION strategy (original + arcade + puzzle), got: " + updatedGame);
 
-    // Force commit segments on both tables to trigger commit-time behavior
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
-
-    // Wait for segments to be committed
-    waitForNumQueriedSegmentsToConverge(tableNameWithCompaction, 20_000L, 4, 2);
-    waitForNumQueriedSegmentsToConverge(tableNameWithoutCompaction, 20_000L, 4, 2);
+    // Perform commit and wait for completion
+    performCommitAndWait(tableNameWithCompaction, tableNameWithoutCompaction, 20_000L, 4, 2);
 
     // Brief wait to ensure all commit operations are complete
     waitForAllDocsLoaded(tableNameWithCompaction, 90_000L, 3);
 
-    // Check the TOTAL document counts after commit (with skipUpsert=true to see all physical records)
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    // If counts are still the same, wait a bit longer for actual commit completion
-    if (postCommitPhysicalCountCompacted == postCommitPhysicalCountNormal) {
-      Thread.sleep(10_000L);
-      postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-      postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-      postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-      postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    }
-
-    // Key assertions for commit time compaction with partial upsert
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal, String.format(
-        "Expected partial upsert table with commit-time compaction (%d docs) to have fewer physical docs than "
-            + "table without compaction (%d docs)", postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
-
-    // Both should still return the same logical upserted results (3 records)
-    assertEquals(postCommitLogicalCountCompacted, 3, "Compacted table should still have 3 logical records");
-    assertEquals(postCommitLogicalCountNormal, 3, "Normal table should still have 3 logical records");
-    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
-        "Both tables should have identical logical results");
-
-    // Verify data integrity - both tables should return identical data row by row after commit
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 2 removed)
+    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 2, 0.95);
 
     // Re-verify partial upsert behavior is maintained after compaction
     partialUpsertQuery =
@@ -761,14 +592,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
         "Game should still contain merged values from UNION strategy after compaction, got: " + postCompactionGame);
     assertEquals(partialResult.getFloat(0, 3), 1500.0f,
         "Score should still be the latest overwritten value after compaction");
-
-    // Calculate and log compaction efficiency for partial upsert
-    double compressionRatio = (double) postCommitPhysicalCountCompacted / postCommitPhysicalCountNormal;
-    int invalidRecordsRemoved = (int) (postCommitPhysicalCountNormal - postCommitPhysicalCountCompacted);
-
-    assertTrue(compressionRatio < 0.95, "Partial upsert compaction should remove some physical records");
-    assertTrue(invalidRecordsRemoved >= 2,
-        "At least 2 obsolete partial update records should be removed (obsolete partial updates)");
 
     // Clean up
     dropRealtimeTable(tableNameWithCompaction);
@@ -899,16 +722,10 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithoutCompaction);
 
     // Wait for data to load
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 5);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 5);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 5);
 
     // Verify initial state - both tables should show correct logical record count
-    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    // Verify logical counts are identical initially
-    assertEquals(initialLogicalCountCompacted, 3, "Compacted table should show 3 logical records initially");
-    assertEquals(initialLogicalCountNormal, 3, "Normal table should show 3 logical records initially");
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
     // Test queries on different column types work correctly before commit:
 
@@ -931,41 +748,13 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
 
     // Force commit segments to trigger commit-time compaction
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
+    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
 
     // Wait for segments to be committed - using simpler wait since partition count is 1
     waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
 
-    // Check final results after commit
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-
-    // If counts are still the same, wait a bit longer for actual commit completion
-    if (postCommitPhysicalCountCompacted == postCommitPhysicalCountNormal) {
-      Thread.sleep(10_000);
-      postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-      postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-      postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-      postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    }
-
-    // KEY VALIDATIONS: Verify commit time compaction is working as expected
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal,
-        String.format("Commit time compaction should reduce physical records: compacted=%d < normal=%d",
-            postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
-
-    // Both tables should still have the same logical record count
-    assertEquals(postCommitLogicalCountCompacted, 3,
-        "Compacted table should still show 3 logical records after commit");
-    assertEquals(postCommitLogicalCountNormal, 3, "Normal table should still show 3 logical records after commit");
-    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
-        "Both tables should have identical logical results after commit");
-
-    // Verify data integrity is maintained after commit-time compaction with mixed column configurations
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 1 removed)
+    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 1, 1.0);
 
     // Verify queries still work correctly on all column types after compaction
     // Re-test dictionary-encoded column
@@ -979,14 +768,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     // Re-test multi-value column
     mvResult = getPinotConnection().execute(mvQuery).getResultSet(0);
     assertTrue(mvResult.getInt(0, 0) > 0, "Should still find records with tag3 after compaction");
-
-    // Calculate and log compaction efficiency
-    double compressionRatio = (double) postCommitPhysicalCountCompacted / postCommitPhysicalCountNormal;
-    int invalidRecordsRemoved = (int) (postCommitPhysicalCountNormal - postCommitPhysicalCountCompacted);
-
-    assertTrue(compressionRatio < 1.0,
-        "Compaction should remove some physical records for mixed column configurations");
-    assertTrue(invalidRecordsRemoved >= 1, "At least 1 obsolete record should be removed during compaction");
 
     // Clean up
     dropRealtimeTable(tableNameWithCompaction);
@@ -1019,6 +800,156 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
   protected long queryCountStarWithoutUpsert(String tableName) {
     return getPinotConnection().execute("SELECT COUNT(*) FROM " + tableName + " OPTION(skipUpsert=true)")
         .getResultSet(0).getLong(0, 0);
+  }
+
+  /**
+   * Validates initial state of both tables - they should have the same logical record count
+   */
+  protected void validateInitialState(String tableNameWithCompaction, String tableNameWithoutCompaction,
+      int expectedRecords) {
+    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+
+    assertEquals(initialLogicalCountCompacted, expectedRecords,
+        "Compacted table should have " + expectedRecords + " logical records initially");
+    assertEquals(initialLogicalCountNormal, expectedRecords,
+        "Normal table should have " + expectedRecords + " logical records initially");
+  }
+
+  /**
+   * Validates pre-commit state of both tables - they should still have the same logical record count
+   */
+  protected void validatePreCommitState(String tableNameWithCompaction, String tableNameWithoutCompaction,
+      int expectedRecords) {
+    long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+
+    assertEquals(preCommitLogicalCountCompacted, expectedRecords,
+        "Both tables should show " + expectedRecords + " logical records before commit");
+    assertEquals(preCommitLogicalCountNormal, expectedRecords,
+        "Both tables should show " + expectedRecords + " logical records before commit");
+
+    // Verify both tables have the same data row by row
+    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+  }
+
+  /**
+   * Comprehensive post-commit validation including compaction effectiveness and data integrity
+   */
+  protected void validatePostCommitCompaction(String tableNameWithCompaction, String tableNameWithoutCompaction,
+      int expectedLogicalRecords, int minExpectedRemovedRecords,
+      double maxCompressionRatio) {
+    // Check the TOTAL document counts after commit (with skipUpsert=true to see all physical records)
+    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
+    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+
+    // If counts are still the same, wait a bit longer for actual commit completion
+    if (postCommitPhysicalCountCompacted == postCommitPhysicalCountNormal) {
+      try {
+        Thread.sleep(10_000);
+        postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
+        postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+        postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+        postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException("Interrupted while waiting for commit completion", e);
+      }
+    }
+
+    // Key assertions for commit time compaction
+    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal, String.format(
+        "Expected table with commit-time compaction (%d docs) to have fewer physical docs than "
+            + "table without compaction (%d docs)", postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
+
+    // Both should still return the same logical upserted results
+    assertEquals(postCommitLogicalCountCompacted, expectedLogicalRecords,
+        "Compacted table should still have " + expectedLogicalRecords + " logical records");
+    assertEquals(postCommitLogicalCountNormal, expectedLogicalRecords,
+        "Normal table should still have " + expectedLogicalRecords + " logical records");
+    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
+        "Both tables should have identical logical results");
+
+    // Verify data integrity - both tables should return identical data row by row
+    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+
+    // Calculate and validate compaction efficiency
+    validateCompactionEfficiency(postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal,
+        minExpectedRemovedRecords, maxCompressionRatio);
+  }
+
+  /**
+   * Validates compaction efficiency metrics
+   */
+  protected void validateCompactionEfficiency(long physicalCountCompacted, long physicalCountNormal,
+      int minExpectedRemovedRecords, double maxCompressionRatio) {
+    double compressionRatio = (double) physicalCountCompacted / physicalCountNormal;
+    int invalidRecordsRemoved = (int) (physicalCountNormal - physicalCountCompacted);
+
+    assertTrue(compressionRatio < maxCompressionRatio,
+        "Compaction should achieve compression ratio better than " + maxCompressionRatio + ", got " + compressionRatio);
+    assertTrue(invalidRecordsRemoved >= minExpectedRemovedRecords,
+        "At least " + minExpectedRemovedRecords + " invalid records should be removed, but only "
+            + invalidRecordsRemoved + " were removed");
+  }
+
+  /**
+   * Performs force commit on both tables
+   */
+  protected void forceCommitBothTables(String tableNameWithCompaction, String tableNameWithoutCompaction)
+      throws Exception {
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
+    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
+  }
+
+  protected void pushDataToBothTopics(List<String> records, String kafkaTopicNameCompacted,
+      String kafkaTopicNameNormal, int partition)
+      throws Exception {
+    pushCsvIntoKafka(records, kafkaTopicNameCompacted, partition);
+    pushCsvIntoKafka(records, kafkaTopicNameNormal, partition);
+  }
+
+  protected void pushDataWithKeyToBothTopics(List<String> records, String kafkaTopicNameCompacted,
+      String kafkaTopicNameNormal, int partition)
+      throws Exception {
+    pushCsvIntoKafkaWithKey(records, kafkaTopicNameCompacted, partition);
+    pushCsvIntoKafkaWithKey(records, kafkaTopicNameNormal, partition);
+  }
+
+  protected void waitForAllDocsLoadedInBothTables(String tableNameWithCompaction, String tableNameWithoutCompaction,
+      long timeoutMs, int expectedRecords)
+      throws Exception {
+    waitForAllDocsLoaded(tableNameWithCompaction, timeoutMs, expectedRecords);
+    waitForAllDocsLoaded(tableNameWithoutCompaction, timeoutMs, expectedRecords);
+  }
+
+  protected void performSimpleCommitAndVerify(String tableNameWithCompaction, String tableNameWithoutCompaction,
+      long waitTimeoutMs, int expectedRecords)
+      throws Exception {
+    // Force commit segments on both tables
+    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
+    waitForAllDocsLoaded(tableNameWithCompaction, waitTimeoutMs, expectedRecords);
+    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+  }
+
+  protected void performCommitAndWait(String tableNameWithCompaction, String tableNameWithoutCompaction,
+      long waitTimeoutMs, int expectedSegments, int expectedConsumingSegments)
+      throws Exception {
+    // Force commit segments on both tables to trigger commit-time behavior
+    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
+
+    // Wait for segments to be committed
+    if (expectedConsumingSegments >= 0) {
+      waitForNumQueriedSegmentsToConverge(tableNameWithCompaction, waitTimeoutMs, expectedSegments,
+          expectedConsumingSegments);
+      waitForNumQueriedSegmentsToConverge(tableNameWithoutCompaction, waitTimeoutMs, expectedSegments,
+          expectedConsumingSegments);
+    } else {
+      waitForNumQueriedSegmentsToConverge(tableNameWithCompaction, waitTimeoutMs, expectedSegments);
+      waitForNumQueriedSegmentsToConverge(tableNameWithoutCompaction, waitTimeoutMs, expectedSegments);
+    }
   }
 
   protected void waitForAllDocsLoaded(String tableName, long timeoutMs, long expectedDocs)
@@ -1285,16 +1216,10 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     addTableConfig(tableConfigWithoutCompaction);
 
     // Wait for data to load
-    waitForAllDocsLoaded(tableNameWithCompaction, 30_000L, 5);
-    waitForAllDocsLoaded(tableNameWithoutCompaction, 30_000L, 5);
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 5);
 
     // Verify initial state - both tables should show same logical record count (3 unique players after upserts)
-    long initialLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long initialLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-
-    // Verify logical counts match initially
-    assertEquals(initialLogicalCountCompacted, 3, "Compacted table should show 3 logical records initially");
-    assertEquals(initialLogicalCountNormal, 3, "Normal table should show 3 logical records initially");
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
 
     // Test JSON queries work correctly before commit
     String jsonQuery = String.format(
@@ -1308,32 +1233,13 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
 
     // Force commit segments to trigger commit-time compaction
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithCompaction));
-    sendPostRequest(_controllerRequestURLBuilder.forTableForceCommit(tableNameWithoutCompaction));
+    forceCommitBothTables(tableNameWithCompaction, tableNameWithoutCompaction);
 
     // Wait for commit completion
     waitForAllDocsLoaded(tableNameWithCompaction, 60_000L, 3);
 
-    // Check final results after commit
-    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
-    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
-    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
-    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
-
-    // KEY VALIDATIONS: Verify commit time compaction is working as expected for MAP columns
-    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal,
-        String.format("Commit time compaction should reduce physical records for MAP columns: compacted=%d < normal=%d",
-            postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
-
-    // Both tables should still have the same logical record count
-    assertEquals(postCommitLogicalCountCompacted, 3,
-        "Compacted table should still show 3 logical records after commit");
-    assertEquals(postCommitLogicalCountNormal, 3, "Normal table should still show 3 logical records after commit");
-    assertEquals(postCommitLogicalCountCompacted, postCommitLogicalCountNormal,
-        "Both tables should have identical logical results after commit");
-
-    // Verify data integrity is maintained after commit-time compaction for MAP columns
-    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+    // Validate post-commit compaction effectiveness and data integrity (expecting 3 records, min 1 removed)
+    validatePostCommitCompaction(tableNameWithCompaction, tableNameWithoutCompaction, 3, 1, 1.0);
 
     // Verify JSON queries still work correctly after compaction
     resultSet = getPinotConnection().execute(jsonQuery).getResultSet(0);
@@ -1354,14 +1260,6 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     ResultSet uniqueResult = getPinotConnection().execute(uniqueQuery).getResultSet(0);
     assertEquals(uniqueResult.getInt(0, 0), 3,
         "Should find exactly 3 unique players with level data (after compaction)");
-
-    // Calculate and log compaction efficiency for MAP columns
-    double compressionRatio = (double) postCommitPhysicalCountCompacted / postCommitPhysicalCountNormal;
-    int invalidRecordsRemoved = (int) (postCommitPhysicalCountNormal - postCommitPhysicalCountCompacted);
-
-    assertTrue(compressionRatio < 1.0, "Compaction should remove some physical records for MAP columns");
-    assertTrue(invalidRecordsRemoved >= 1,
-        "At least 1 obsolete record should be removed during MAP column compaction");
 
     // Clean up
     dropRealtimeTable(tableNameWithCompaction);
