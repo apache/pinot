@@ -295,8 +295,13 @@ public class Tracing {
     }
 
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
-        InstanceType instanceType) {
-      _workloadBudgetManager = new WorkloadBudgetManager(config);
+                                                                       InstanceType instanceType) {
+      return createThreadAccountant(config, instanceId, instanceType, new WorkloadBudgetManager(config));
+    }
+
+    public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
+        InstanceType instanceType, WorkloadBudgetManager workloadBudgetManager) {
+      _workloadBudgetManager = workloadBudgetManager;
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
       ThreadResourceUsageAccountant accountant = null;
       if (factoryName != null) {
