@@ -117,8 +117,8 @@ public class StaticTableCache implements TableCacheProvider {
     return _ignoreCase;
   }
 
-  @Override
   @Nullable
+  @Override
   public String getActualTableName(String tableName) {
     if (_ignoreCase) {
       return _tableNameMap.get(tableName.toLowerCase());
@@ -182,14 +182,14 @@ public class StaticTableCache implements TableCacheProvider {
     return tableConfigInfo != null ? tableConfigInfo._timestampIndexColumns : null;
   }
 
-  @Override
   @Nullable
+  @Override
   public TableConfig getTableConfig(String tableNameWithType) {
     return _tableConfigMap.get(tableNameWithType);
   }
 
-  @Override
   @Nullable
+  @Override
   public LogicalTableConfig getLogicalTableConfig(String logicalTableName) {
     return _logicalTableConfigMap.get(logicalTableName);
   }
@@ -200,8 +200,8 @@ public class StaticTableCache implements TableCacheProvider {
     return false;
   }
 
-  @Override
   @Nullable
+  @Override
   public Schema getSchema(String rawTableName) {
     return _schemaMap.get(rawTableName);
   }

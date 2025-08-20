@@ -78,6 +78,7 @@ public interface TableCacheProvider extends PinotConfigProvider {
   /**
    * Returns the table config for the given table name with type suffix.
    */
+  @Nullable
   TableConfig getTableConfig(String tableNameWithType);
 
   /**
@@ -93,6 +94,7 @@ public interface TableCacheProvider extends PinotConfigProvider {
   /**
    * Returns the schema for the given raw table name.
    */
+  @Nullable
   Schema getSchema(String rawTableName);
 
   /**
