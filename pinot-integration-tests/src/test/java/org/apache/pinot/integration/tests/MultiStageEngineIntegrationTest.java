@@ -1722,45 +1722,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testValidateQueryApiWithStaticConfigs()
-      throws Exception {
-    JsonNode tableConfigsNode = JsonUtils.stringToJsonNode(
-        sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
-    JsonNode schemaNode = JsonUtils.stringToJsonNode(
-        sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
-
-    JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
-    JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
-
-    String offlineJson = offlineConfig != null ? offlineConfig.toString() : "{}";
-    String realtimeJson = realtimeConfig != null ? realtimeConfig.toString() : "{}";
-
-    String requestJson = String.format(
-        "{\"sql\": \"SELECT * FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s]}",
-        offlineJson,
-        realtimeJson,
-        schemaNode.toString());
-
-    JsonNode result = JsonUtils.stringToJsonNode(
-        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
-    assertTrue(result.get("compiledSuccessfully").asBoolean());
-    assertTrue(result.get("errorCode").isNull());
-    assertTrue(result.get("errorMessage").isNull());
-
-    // Test with invalid query
-    String invalidRequestJson = String.format(
-        "{\"sql\": \"SELECT nonExistentColumn FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s]}",
-        offlineConfig,
-        realtimeConfig,
-        schemaNode.toString());
-
-    result = JsonUtils.stringToJsonNode(
-        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", invalidRequestJson, null));
-    assertFalse(result.get("compiledSuccessfully").asBoolean());
-    assertFalse(result.get("errorMessage").isNull());
-  }
-
-  @Test
   public void testValidateQueryApiSuccessfulQueries()
       throws Exception {
     JsonNode tableConfigsNode = JsonUtils.stringToJsonNode(
@@ -1791,35 +1752,48 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
           sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
 
       assertTrue(result.get("compiledSuccessfully").asBoolean(), "Query should compile successfully: " + query);
-      assertTrue(result.get("errorCode").isNull(), "Error code should be null for: " + query);
-      assertTrue(result.get("errorMessage").isNull(), "Error message should be null for: " + query);
+      assertTrue(result.get("errorCode").isNull());
+      assertTrue(result.get("errorMessage").isNull());
     }
   }
 
   @Test
-  public void testValidateQueryApiUnSuccessfulQuery()
+  public void testValidateQueryApiUnsuccessfulQueries()
       throws Exception {
     JsonNode tableConfigsNode =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
     JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
-
-    String query = "SELECT DivAirportSeqIDs FROM mytable WHERE DivAirportSeqIDs > 0 LIMIT 10";
 
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
 
     String offlineJson = offlineConfig != null ? offlineConfig.toString() : "{}";
     String realtimeJson = realtimeConfig != null ? realtimeConfig.toString() : "{}";
-    String requestJson =
+
+    // Test with invalid query
+    String requestJson = String.format(
+        "{\"sql\": \"SELECT nonExistentColumn FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s]}",
+        offlineConfig,
+        realtimeConfig,
+        schemaNode.toString());
+
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+    assertFalse(result.get("compiledSuccessfully").asBoolean());
+    assertEquals(result.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
+
+    String query = "SELECT DivAirportSeqIDs FROM mytable WHERE DivAirportSeqIDs > 0 LIMIT 10";
+
+    requestJson =
         String.format("{\"sql\": \"%s\", \"tableConfigs\": [%s, %s], \"schemas\": [%s], \"ignoreCase\": false}", query,
             offlineJson, realtimeJson, schemaNode.toString());
 
-    JsonNode result = JsonUtils.stringToJsonNode(
+    result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
 
     //  Cannot apply '>' to arguments of type '<INTEGER> to <ARRAY>
     assertFalse(result.get("compiledSuccessfully").asBoolean(), "Query should not compile successfully: " + query);
-    assertFalse(result.get("errorCode").isNull(), "Error code should not be null for: " + query);
+    assertEquals(result.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
     assertFalse(result.get("errorMessage").isNull(), "Error message should not be null for: " + query);
   }
 
@@ -1853,13 +1827,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     query = String.format(
         "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s], "
         + "\"ignoreCase\": true}",
-        offlineConfig,
-        realtimeConfig,
+        offlineJson,
+        realtimeJson,
         schemaNode.toString());
 
     result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", query, null));
-
 
     assertTrue(result.get("compiledSuccessfully").asBoolean(), "Query should compile successfully: " + query);
     assertTrue(result.get("errorCode").isNull(), "Error code should be null for: " + query);

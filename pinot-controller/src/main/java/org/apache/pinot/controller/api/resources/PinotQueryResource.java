@@ -55,8 +55,8 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.provider.StaticTableCache;
 import org.apache.pinot.common.config.provider.TableCacheProvider;
-import org.apache.pinot.common.config.provider.TableCacheQueryValidator;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -207,7 +207,7 @@ public class PinotQueryResource {
           ignoreCase = requestJson.get("ignoreCase").asBoolean();
         }
 
-        tableCache = new TableCacheQueryValidator(tableConfigs, schemas, logicalTableConfigs, ignoreCase);
+        tableCache = new StaticTableCache(tableConfigs, schemas, logicalTableConfigs, ignoreCase);
       } else {
         // Use TableCache from environment
         tableCache = _pinotHelixResourceManager.getTableCache();

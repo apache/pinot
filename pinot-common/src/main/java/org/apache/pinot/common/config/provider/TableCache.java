@@ -20,18 +20,15 @@ package org.apache.pinot.common.config.provider;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -42,10 +39,8 @@ import org.apache.pinot.common.utils.LogicalTableConfigUtils;
 import org.apache.pinot.common.utils.config.SchemaSerDeUtils;
 import org.apache.pinot.common.utils.config.TableConfigSerDeUtils;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
-import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
-import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -55,7 +50,6 @@ import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * The {@code TableCache} caches all the table configs and schemas within the cluster, and listens on ZK changes to keep
  * them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
  */
-public class TableCache implements TableCacheProvider, PinotConfigProvider {
+public class TableCache implements TableCacheProvider {
   private static final Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
   private static final String TABLE_CONFIG_PARENT_PATH = "/CONFIGS/TABLE";
   private static final String TABLE_CONFIG_PATH_PREFIX = "/CONFIGS/TABLE/";
@@ -154,6 +148,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
   /**
    * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
    */
+  @Override
   public boolean isIgnoreCase() {
     return _ignoreCase;
   }
@@ -163,6 +158,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
    * does not exist.
    */
   @Nullable
+  @Override
   public String getActualTableName(String tableName) {
     if (_ignoreCase) {
       return _tableNameMap.get(tableName.toLowerCase());
@@ -177,6 +173,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
    * @return Actual logical table name
    */
   @Nullable
+  @Override
   public String getActualLogicalTableName(String logicalTableName) {
     return _ignoreCase
         ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
@@ -187,6 +184,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
    * Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
    * case.
    */
+  @Override
   public Map<String, String> getTableNameMap() {
     return _tableNameMap;
   }
@@ -196,6 +194,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
    * are in lower case.
    * @return Map from logical table name to actual logical table name
    */
+  @Override
   public Map<String, String> getLogicalTableNameMap() {
     return _logicalTableNameMap;
   }
@@ -204,6 +203,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
    * Get all dimension table names.
    * @return List of dimension table names
    */
+  @Override
   public List<String> getAllDimensionTables() {
     List<String> dimensionTables = new ArrayList<>();
     for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
@@ -219,6 +219,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
    * not exist. For case-insensitive case, the keys of the map are in lower case.
    */
   @Nullable
+  @Override
   public Map<String, String> getColumnNameMap(String rawTableName) {
     SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
@@ -229,6 +230,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
    * configured.
    */
   @Nullable
+  @Override
   public Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName) {
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(physicalOrLogicalTableName);
     if (tableConfigInfo != null) {
@@ -242,6 +244,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
    * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
    */
   @Nullable
+  @Override
   public Set<String> getTimestampIndexColumns(String tableNameWithType) {
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
     return tableConfigInfo != null ? tableConfigInfo._timestampIndexColumns : null;
@@ -479,6 +482,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
     return tableConfigs;
   }
 
+  @Override
   public List<LogicalTableConfig> getLogicalTableConfigs() {
     return _logicalTableConfigInfoMap.values().stream().map(o -> o._logicalTableConfig).collect(Collectors.toList());
   }
@@ -500,6 +504,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
     return schemas;
   }
 
+  @Override
   public boolean isLogicalTable(String logicalTableName) {
     logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     return _logicalTableConfigInfoMap.containsKey(logicalTableName);
@@ -646,31 +651,6 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
     }
   }
 
-  public static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
-      QueryConfig queryConfig) {
-    Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
-    if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
-      for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
-        try {
-          Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
-          Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
-          expressionOverrideMap.put(srcExp, destExp);
-        } catch (Exception e) {
-          LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
-              entry.getKey(), entry.getValue(), physicalOrLogicalTableName);
-        }
-      }
-      int mapSize = expressionOverrideMap.size();
-      if (mapSize == 1) {
-        Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
-        return Collections.singletonMap(entry.getKey(), entry.getValue());
-      } else if (mapSize > 1) {
-        return expressionOverrideMap;
-      }
-    }
-    return null;
-  }
-
   private static class TableConfigInfo {
     final TableConfig _tableConfig;
     final Map<Expression, Expression> _expressionOverrideMap;
@@ -679,7 +659,8 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
 
     private TableConfigInfo(TableConfig tableConfig) {
       _tableConfig = tableConfig;
-      _expressionOverrideMap = createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
+      _expressionOverrideMap =
+          TableCacheProvider.createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
       _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
     }
   }
@@ -700,7 +681,7 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
 
     private LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
       _logicalTableConfig = logicalTableConfig;
-      _expressionOverrideMap = createExpressionOverrideMap(logicalTableConfig.getTableName(),
+      _expressionOverrideMap = TableCacheProvider.createExpressionOverrideMap(logicalTableConfig.getTableName(),
           logicalTableConfig.getQueryConfig());
     }
   }

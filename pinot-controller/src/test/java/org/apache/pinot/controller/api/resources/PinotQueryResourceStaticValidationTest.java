@@ -25,14 +25,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.ws.rs.core.HttpHeaders;
-import org.apache.pinot.common.config.provider.TableCacheQueryValidator;
+import org.apache.pinot.common.config.provider.StaticTableCache;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
-import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -42,9 +40,6 @@ import org.testng.annotations.Test;
  * Unit test for the static table cache functionality in PinotQueryResource.
  */
 public class PinotQueryResourceStaticValidationTest {
-
-  @Mock
-  private HttpHeaders _httpHeaders;
 
   private ObjectMapper _objectMapper;
 
@@ -56,20 +51,16 @@ public class PinotQueryResourceStaticValidationTest {
 
   @Test
   public void testStaticTableCacheProvider() {
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("testTable")
-        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
 
-    Schema schema = new Schema.SchemaBuilder()
-        .setSchemaName("testTable")
+    Schema schema = new Schema.SchemaBuilder().setSchemaName("testTable")
         .addSingleValueDimension("dimensionCol", FieldSpec.DataType.STRING)
-        .addMetric("metricCol", FieldSpec.DataType.LONG)
-        .build();
+        .addMetric("metricCol", FieldSpec.DataType.LONG).build();
 
     List<TableConfig> tableConfigs = Arrays.asList(tableConfig);
     List<Schema> schemas = Arrays.asList(schema);
 
-    TableCacheQueryValidator provider = new TableCacheQueryValidator(tableConfigs, schemas, false);
+    StaticTableCache provider = new StaticTableCache(tableConfigs, schemas, null, false);
 
     Assert.assertFalse(provider.isIgnoreCase());
     Assert.assertEquals(provider.getActualTableName("testTable_OFFLINE"), "testTable_OFFLINE");
@@ -77,26 +68,24 @@ public class PinotQueryResourceStaticValidationTest {
     Assert.assertNotNull(provider.getTableConfig("testTable_OFFLINE"));
     Assert.assertNotNull(provider.getSchema("testTable"));
     Assert.assertNotNull(provider.getColumnNameMap("testTable"));
-    Assert.assertEquals(provider.getColumnNameMap("testTable").size(), 4); // 2 columns + 2 built-in virtual columns
+    Assert.assertEquals(provider.getColumnNameMap("testTable").size(), 5); // 2 columns + 3 built-in virtual columns
 
     Assert.assertTrue(provider.getTableNameMap().containsKey("testTable_OFFLINE"));
     Assert.assertTrue(provider.getTableNameMap().containsKey("testTable"));
   }
 
   @Test
-  public void testRequestSerialization() throws Exception {
+  public void testRequestSerialization()
+      throws Exception {
     Map<String, Object> request = new HashMap<>();
     request.put("sql", "SELECT * FROM testTable");
 
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
-        .setTableName("testTable")
-        .build();
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
     request.put("tableConfigs", Arrays.asList(tableConfig));
 
-    Schema schema = new Schema.SchemaBuilder()
-        .setSchemaName("testTable")
-        .addSingleValueDimension("col1", FieldSpec.DataType.STRING)
-        .build();
+    Schema schema =
+        new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("col1", FieldSpec.DataType.STRING)
+            .build();
     request.put("schemas", Arrays.asList(schema));
     request.put("logicalTableConfigs", Collections.emptyList());
 

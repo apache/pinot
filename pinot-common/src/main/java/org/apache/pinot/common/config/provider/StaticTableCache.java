@@ -31,24 +31,23 @@ import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.jvnet.hk2.annotations.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A static implementation that works with pre-loaded table configs and schemas jsons.
+ * A static implementation that works with pre-loaded table configs and schemas.
  * This is useful for validation scenarios where you want to test query compilation against a specific
  * set of table configs and schemas without needing a live cluster.
  */
-public class TableCacheQueryValidator implements TableCacheProvider {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TableCacheQueryValidator.class);
-
+public class StaticTableCache implements TableCacheProvider {
+  private static final Logger LOGGER = LoggerFactory.getLogger(StaticTableCache.class);
 
   private final boolean _ignoreCase;
   private final Map<String, TableConfig> _tableConfigMap = new HashMap<>();
@@ -58,12 +57,8 @@ public class TableCacheQueryValidator implements TableCacheProvider {
   private final Map<String, String> _logicalTableNameMap = new HashMap<>();
   private final Map<String, Map<String, String>> _columnNameMaps = new HashMap<>();
 
-  public TableCacheQueryValidator(List<TableConfig> tableConfigs, List<Schema> schemas, boolean ignoreCase) {
-    this(tableConfigs, schemas, Collections.emptyList(), ignoreCase);
-  }
-
-  public TableCacheQueryValidator(List<TableConfig> tableConfigs, List<Schema> schemas,
-      List<LogicalTableConfig> logicalTableConfigs, boolean ignoreCase) {
+  public StaticTableCache(List<TableConfig> tableConfigs, List<Schema> schemas,
+      @Optional List<LogicalTableConfig> logicalTableConfigs, boolean ignoreCase) {
     _ignoreCase = ignoreCase;
 
     for (TableConfig tableConfig : tableConfigs) {
@@ -81,7 +76,6 @@ public class TableCacheQueryValidator implements TableCacheProvider {
       }
     }
 
-    // Initialize schemas
     for (Schema schema : schemas) {
       String schemaName = schema.getSchemaName();
       _schemaMap.put(schemaName, schema);
@@ -150,7 +144,7 @@ public class TableCacheQueryValidator implements TableCacheProvider {
   public List<String> getAllDimensionTables() {
     List<String> dimensionTables = new ArrayList<>();
     for (TableConfig tableConfig : _tableConfigMap.values()) {
-      if (tableConfig.getTableType() == TableType.OFFLINE && tableConfig.isDimTable()) {
+      if (tableConfig.isDimTable()) {
         dimensionTables.add(tableConfig.getTableName());
       }
     }
@@ -168,12 +162,13 @@ public class TableCacheQueryValidator implements TableCacheProvider {
     if (isLogicalTable(physicalOrLogicalTableName)) {
       LogicalTableConfig logicalTableConfig = getLogicalTableConfig(physicalOrLogicalTableName);
       if (logicalTableConfig != null) {
-        return TableCache.createExpressionOverrideMap(physicalOrLogicalTableName, logicalTableConfig.getQueryConfig());
+        return TableCacheProvider.createExpressionOverrideMap(physicalOrLogicalTableName,
+            logicalTableConfig.getQueryConfig());
       }
     } else {
       TableConfig tableConfig = getTableConfig(physicalOrLogicalTableName);
       if (tableConfig != null) {
-        return TableCache.createExpressionOverrideMap(physicalOrLogicalTableName, tableConfig.getQueryConfig());
+        return TableCacheProvider.createExpressionOverrideMap(physicalOrLogicalTableName, tableConfig.getQueryConfig());
       }
     }
     return Collections.emptyMap();
@@ -233,13 +228,8 @@ public class TableCacheQueryValidator implements TableCacheProvider {
     return _logicalTableConfigMap.containsKey(logicalTableName);
   }
 
-  /**
-   * Add built-in virtual columns to the column name map.
-   */
   private void addBuiltInVirtualColumns(Map<String, String> columnNameMap) {
-    // Add known built-in virtual columns
-    String[] builtInColumns =
-        {BuiltInVirtualColumn.DOCID, BuiltInVirtualColumn.HOSTNAME, BuiltInVirtualColumn.SEGMENTNAME};
+    Set<String> builtInColumns = BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS;
     for (String columnName : builtInColumns) {
       if (_ignoreCase) {
         columnNameMap.put(columnName.toLowerCase(), columnName);

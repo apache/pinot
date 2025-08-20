@@ -18,78 +18,128 @@
  */
 package org.apache.pinot.common.config.provider;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.common.request.Expression;
-import org.apache.pinot.spi.config.provider.PinotConfigProvider;
+import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
+import org.apache.pinot.spi.config.provider.SchemaChangeListener;
+import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
+import org.apache.pinot.spi.config.table.QueryConfig;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
-public interface TableCacheProvider extends PinotConfigProvider {
-
-  /**
-   * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
-   */
+public interface TableCacheProvider {
+  Logger LOGGER = LoggerFactory.getLogger(TableCacheProvider.class);
   boolean isIgnoreCase();
 
-  /**
-   * Returns the actual table name for the given table name (with or without type suffix),
-   * or {@code null} if the table does not exist.
-   */
   @Nullable
   String getActualTableName(String tableName);
 
-  /**
-   * Returns the actual logical table name for the given table name, or {@code null} if table does not exist.
-   * @param logicalTableName Logical table name
-   * @return Actual logical table name
-   */
+
   @Nullable
   String getActualLogicalTableName(String logicalTableName);
 
-  /**
-   * Returns a map from table name to actual table name. For case-insensitive case,
-   * the keys of the map are in lower case.
-   */
+
   Map<String, String> getTableNameMap();
 
-  /**
-   * Returns a map from logical table name to actual logical table name. For case-insensitive case,
-   * the keys of the map are in lower case.
-   * @return Map from logical table name to actual logical table name
-   */
+
   Map<String, String> getLogicalTableNameMap();
 
-  /**
-   * Returns all dimension tables.
-   */
+
   List<String> getAllDimensionTables();
 
-  /**
-   * Returns a map from column name to actual column name for the given raw table. For case-insensitive case,
-   * the keys of the map are in lower case.
-   */
+
   Map<String, String> getColumnNameMap(String rawTableName);
 
-  /**
-   * Returns a map from expression to override expression for the given physical or logical table name.
-   */
+
   Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName);
 
-  /**
-   * Returns the timestamp index columns for the given table.
-   */
+
   Set<String> getTimestampIndexColumns(String tableNameWithType);
 
-  /**
-   * Returns all logical table configs.
-   */
+
   List<LogicalTableConfig> getLogicalTableConfigs();
 
-  /**
-   * Returns whether the given table name is a logical table.
-   */
+
   boolean isLogicalTable(String logicalTableName);
+
+  /**
+   * Returns the table config for the given table name with type suffix.
+   */
+  TableConfig getTableConfig(String tableNameWithType);
+
+  /**
+   * Registers the {@link TableConfigChangeListener} and notifies it whenever any changes (addition, update, removal)
+   * to any of the table configs are detected. If the listener is successfully registered,
+   * {@link TableConfigChangeListener#onChange(List)} will be invoked with the current table configs.
+   *
+   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
+   *         registered.
+   */
+  boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener);
+
+  /**
+   * Returns the schema for the given raw table name.
+   */
+  Schema getSchema(String rawTableName);
+
+  /**
+   * Registers the {@link SchemaChangeListener} and notifies it whenever any changes (addition, update, removal) to any
+   * of the schemas are detected. If the listener is successfully registered,
+   * {@link SchemaChangeListener#onChange(List)} will be invoked with the current schemas.
+   *
+   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
+   *         registered.
+   */
+  boolean registerSchemaChangeListener(SchemaChangeListener schemaChangeListener);
+
+  /**
+   * Returns the logical table config for the given logical table name.
+   * @param logicalTableName the name of the logical table
+   * @return the logical table
+   */
+  LogicalTableConfig getLogicalTableConfig(String logicalTableName);
+
+  /**
+   * Registers the {@link LogicalTableConfigChangeListener} and notifies it whenever any changes (addition, update,
+   * @param logicalTableConfigChangeListener the listener to be registered
+   * @return {@code true} if the listener is successfully registered, {@code false} if the listener is already
+   *         registered.
+   */
+  boolean registerLogicalTableConfigChangeListener(LogicalTableConfigChangeListener logicalTableConfigChangeListener);
+
+  static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
+      QueryConfig queryConfig) {
+    Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
+    if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
+      for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
+        try {
+          Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
+          Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
+          expressionOverrideMap.put(srcExp, destExp);
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
+              entry.getKey(), entry.getValue(), physicalOrLogicalTableName);
+        }
+      }
+      int mapSize = expressionOverrideMap.size();
+      if (mapSize == 1) {
+        Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
+        return Collections.singletonMap(entry.getKey(), entry.getValue());
+      } else if (mapSize > 1) {
+        return expressionOverrideMap;
+      }
+    }
+    return null;
+  }
 }
