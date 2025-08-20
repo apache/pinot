@@ -34,6 +34,7 @@ import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -142,5 +143,31 @@ public interface TableCacheProvider extends PinotConfigProvider {
       }
     }
     return null;
+  }
+
+  class TableConfigInfo {
+    final TableConfig _tableConfig;
+    final Map<Expression, Expression> _expressionOverrideMap;
+    // All the timestamp with granularity column names
+    final Set<String> _timestampIndexColumns;
+
+    public TableConfigInfo(TableConfig tableConfig) {
+      _tableConfig = tableConfig;
+      _expressionOverrideMap =
+          TableCacheProvider.createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
+      _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
+    }
+  }
+
+
+  class LogicalTableConfigInfo {
+    final LogicalTableConfig _logicalTableConfig;
+    final Map<Expression, Expression> _expressionOverrideMap;
+
+    LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
+      _logicalTableConfig = logicalTableConfig;
+      _expressionOverrideMap = TableCacheProvider.createExpressionOverrideMap(logicalTableConfig.getTableName(),
+          logicalTableConfig.getQueryConfig());
+    }
   }
 }

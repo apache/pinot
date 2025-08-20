@@ -49,7 +49,6 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
-import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -652,20 +651,6 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
     }
   }
 
-  private static class TableConfigInfo {
-    final TableConfig _tableConfig;
-    final Map<Expression, Expression> _expressionOverrideMap;
-    // All the timestamp with granularity column names
-    final Set<String> _timestampIndexColumns;
-
-    private TableConfigInfo(TableConfig tableConfig) {
-      _tableConfig = tableConfig;
-      _expressionOverrideMap =
-          TableCacheProvider.createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
-      _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
-    }
-  }
-
   private static class SchemaInfo {
     final Schema _schema;
     final Map<String, String> _columnNameMap;
@@ -673,17 +658,6 @@ public class TableCache implements TableCacheProvider, PinotConfigProvider {
     private SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
       _schema = schema;
       _columnNameMap = columnNameMap;
-    }
-  }
-
-  private static class LogicalTableConfigInfo {
-    final LogicalTableConfig _logicalTableConfig;
-    final Map<Expression, Expression> _expressionOverrideMap;
-
-    private LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
-      _logicalTableConfig = logicalTableConfig;
-      _expressionOverrideMap = TableCacheProvider.createExpressionOverrideMap(logicalTableConfig.getTableName(),
-          logicalTableConfig.getQueryConfig());
     }
   }
 }

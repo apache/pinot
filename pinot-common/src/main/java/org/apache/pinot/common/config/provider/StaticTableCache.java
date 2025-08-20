@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
@@ -35,7 +36,6 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
-import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.jvnet.hk2.annotations.Optional;
 import org.slf4j.Logger;
@@ -54,6 +54,8 @@ public class StaticTableCache implements TableCacheProvider {
   private final Map<String, Schema> _schemaMap = new HashMap<>();
   private final Map<String, LogicalTableConfig> _logicalTableConfigMap = new HashMap<>();
   private final Map<String, String> _tableNameMap = new HashMap<>();
+  private final Map<String, TableConfigInfo> _tableConfigInfoMap = new ConcurrentHashMap<>();
+  private final Map<String, LogicalTableConfigInfo> _logicalTableConfigInfoMap = new ConcurrentHashMap<>();
   private final Map<String, String> _logicalTableNameMap = new HashMap<>();
   private final Map<String, Map<String, String>> _columnNameMaps = new HashMap<>();
 
@@ -66,7 +68,7 @@ public class StaticTableCache implements TableCacheProvider {
       String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
 
       _tableConfigMap.put(tableNameWithType, tableConfig);
-
+      _tableConfigInfoMap.put(tableNameWithType, new TableConfigInfo(tableConfig));
       if (_ignoreCase) {
         _tableNameMap.put(tableNameWithType.toLowerCase(), tableNameWithType);
         _tableNameMap.put(rawTableName.toLowerCase(), rawTableName);
@@ -96,7 +98,7 @@ public class StaticTableCache implements TableCacheProvider {
       for (LogicalTableConfig logicalTableConfig : logicalTableConfigs) {
         String logicalTableName = logicalTableConfig.getTableName();
         _logicalTableConfigMap.put(logicalTableName, logicalTableConfig);
-
+        _logicalTableConfigInfoMap.put(logicalTableName, new LogicalTableConfigInfo(logicalTableConfig));
         if (_ignoreCase) {
           _logicalTableNameMap.put(logicalTableName.toLowerCase(), logicalTableName);
         } else {
@@ -159,30 +161,25 @@ public class StaticTableCache implements TableCacheProvider {
     return columnNameMap != null ? columnNameMap : Collections.emptyMap();
   }
 
+  @Nullable
   @Override
   public Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName) {
-    if (isLogicalTable(physicalOrLogicalTableName)) {
-      LogicalTableConfig logicalTableConfig = getLogicalTableConfig(physicalOrLogicalTableName);
-      if (logicalTableConfig != null) {
-        return TableCacheProvider.createExpressionOverrideMap(physicalOrLogicalTableName,
-            logicalTableConfig.getQueryConfig());
-      }
-    } else {
-      TableConfig tableConfig = getTableConfig(physicalOrLogicalTableName);
-      if (tableConfig != null) {
-        return TableCacheProvider.createExpressionOverrideMap(physicalOrLogicalTableName, tableConfig.getQueryConfig());
-      }
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(physicalOrLogicalTableName);
+    if (tableConfigInfo != null) {
+      return tableConfigInfo._expressionOverrideMap;
     }
-    return Collections.emptyMap();
+    LogicalTableConfigInfo logicalTableConfigInfo = _logicalTableConfigInfoMap.get(physicalOrLogicalTableName);
+    return logicalTableConfigInfo != null ? logicalTableConfigInfo._expressionOverrideMap : null;
   }
 
+  /**
+   * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
+   */
+  @Nullable
   @Override
   public Set<String> getTimestampIndexColumns(String tableNameWithType) {
-    TableConfig tableConfig = getTableConfig(tableNameWithType);
-    if (tableConfig != null) {
-      return TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
-    }
-    return Collections.emptySet();
+    TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
+    return tableConfigInfo != null ? tableConfigInfo._timestampIndexColumns : null;
   }
 
   @Override
