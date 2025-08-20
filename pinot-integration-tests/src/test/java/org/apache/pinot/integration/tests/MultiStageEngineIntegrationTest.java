@@ -1722,8 +1722,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testValidateQueryApiSuccessfulQueries()
-      throws Exception {
+  public void testValidateQueryApiSuccessfulQueries() throws Exception {
     JsonNode tableConfigsNode = JsonUtils.stringToJsonNode(
         sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
     JsonNode schemaNode = JsonUtils.stringToJsonNode(
@@ -1734,64 +1733,73 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         "SELECT DivAirportSeqIDs, COUNT(*) FROM mytable GROUP BY DivAirportSeqIDs",
         "SELECT DivAirportSeqIDs FROM mytable WHERE arrayToMV(DivAirportSeqIDs) > 0 LIMIT 10",
         "SELECT DivAirportSeqIDs, AirlineID FROM mytable ORDER BY DivAirportSeqIDs LIMIT 5",
-        "SELECT SUM(arrayToMV(DivAirportSeqIDs)) AS total FROM mytable;",
+        "SELECT SUM(arrayToMV(DivAirportSeqIDs)) AS total FROM mytable",
         "SELECT AVG(arrayToMV(DivAirportSeqIDs)) FROM mytable WHERE AirlineID IS NOT NULL"
     };
 
-    for (String query : successfulQueries) {
-      JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
-      JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
+    List<String> configs = new ArrayList<>();
+    JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
+    if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
+      configs.add(offlineConfig.toString());
+    }
+    JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
+    if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
+      configs.add(realtimeConfig.toString());
+    }
+    String tableConfigsJson = String.join(",", configs);
 
-      String offlineJson = offlineConfig != null ? offlineConfig.toString() : "{}";
-      String realtimeJson = realtimeConfig != null ? realtimeConfig.toString() : "{}";
+    for (String query : successfulQueries) {
       String requestJson = String.format(
-          "{\"sql\": \"%s\", \"tableConfigs\": [%s, %s], \"schemas\": [%s], \"ignoreCase\": false}",
-          query, offlineJson, realtimeJson, schemaNode.toString());
+          "{ \"sql\": \"%s\", \"tableConfigs\": [%s], \"schemas\": [%s], \"ignoreCase\": false }",
+          query, tableConfigsJson, schemaNode.toString());
 
       JsonNode result = JsonUtils.stringToJsonNode(
           sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
 
-      assertTrue(result.get("compiledSuccessfully").asBoolean(), "Query should compile successfully: " + query);
+      assertTrue(result.get("compiledSuccessfully").asBoolean(),
+          "Query should compile successfully: " + query);
       assertTrue(result.get("errorCode").isNull());
       assertTrue(result.get("errorMessage").isNull());
     }
   }
 
   @Test
-  public void testValidateQueryApiUnsuccessfulQueries()
-      throws Exception {
+  public void testValidateQueryApiUnsuccessfulQueries() throws Exception {
     JsonNode tableConfigsNode =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
-    JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
+    JsonNode schemaNode =
+        JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
 
+    List<String> configs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
+    if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
+      configs.add(offlineConfig.toString());
+    }
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
+    if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
+      configs.add(realtimeConfig.toString());
+    }
+    String tableConfigsJson = String.join(",", configs);
 
-    String offlineJson = offlineConfig != null ? offlineConfig.toString() : "{}";
-    String realtimeJson = realtimeConfig != null ? realtimeConfig.toString() : "{}";
-
-    // Test with invalid query
+    // ---- invalid column in the query ----
     String requestJson = String.format(
-        "{\"sql\": \"SELECT nonExistentColumn FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s]}",
-        offlineConfig,
-        realtimeConfig,
-        schemaNode.toString());
+        "{\"sql\": \"SELECT nonExistentColumn FROM mytable\", \"tableConfigs\": [%s], \"schemas\": [%s]}",
+        tableConfigsJson, schemaNode.toString());
 
     JsonNode result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
     assertFalse(result.get("compiledSuccessfully").asBoolean());
     assertEquals(result.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
 
+    //  Cannot apply '>' to arguments of type '<INTEGER> to <ARRAY>
     String query = "SELECT DivAirportSeqIDs FROM mytable WHERE DivAirportSeqIDs > 0 LIMIT 10";
-
-    requestJson =
-        String.format("{\"sql\": \"%s\", \"tableConfigs\": [%s, %s], \"schemas\": [%s], \"ignoreCase\": false}", query,
-            offlineJson, realtimeJson, schemaNode.toString());
+    requestJson = String.format(
+        "{\"sql\": \"%s\", \"tableConfigs\": [%s], \"schemas\": [%s], \"ignoreCase\": false}",
+        query, tableConfigsJson, schemaNode.toString());
 
     result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
 
-    //  Cannot apply '>' to arguments of type '<INTEGER> to <ARRAY>
     assertFalse(result.get("compiledSuccessfully").asBoolean(), "Query should not compile successfully: " + query);
     assertEquals(result.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
     assertFalse(result.get("errorMessage").isNull(), "Error message should not be null for: " + query);
@@ -1804,16 +1812,22 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
     JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
 
+    List<String> configs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
-    JsonNode realtimeConfig = tableConfigsNode.get("REALTIME"); // might be null
+    if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
+      configs.add(offlineConfig.toString());
+    }
+    JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
+    if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
+      configs.add(realtimeConfig.toString());
+    }
+    String tableConfigsJson = String.join(",", configs);
 
-    String offlineJson = offlineConfig != null ? offlineConfig.toString() : "{}";
-    String realtimeJson = realtimeConfig != null ? realtimeConfig.toString() : "{}";
-
-    // Test case-sensitive mode (default)
+    // ---- case-sensitive mode ----
     String query = String.format(
-        "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s], "
-            + "\"ignoreCase\": false}", offlineJson, realtimeJson, schemaNode.toString());
+        "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s], \"schemas\": [%s], "
+            + "\"ignoreCase\": false}",
+        tableConfigsJson, schemaNode.toString());
 
     JsonNode result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", query, null));
@@ -1821,10 +1835,11 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(result.get("errorCode").isNull(), "Error code should be null for: " + query);
     assertTrue(result.get("errorMessage").isNull(), "Error message should be null for: " + query);
 
-    // Test case-insensitive mode
+    // ---- case-insensitive mode ----
     query = String.format(
-        "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s, %s], \"schemas\": [%s], "
-            + "\"ignoreCase\": true}", offlineJson, realtimeJson, schemaNode.toString());
+        "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s], \"schemas\": [%s], "
+            + "\"ignoreCase\": true}",
+        tableConfigsJson, schemaNode.toString());
 
     result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", query, null));

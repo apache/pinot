@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.ApiOperation;
@@ -160,7 +162,7 @@ public class PinotQueryResource {
   public MultiStageQueryValidationResponse validateMultiStageQuery(MultiStageQueryValidationRequest request,
       @Context HttpHeaders httpHeaders) {
 
-    if (request.getSql() != null && !request.getSql().trim().isEmpty()) {
+    if (request.getSql() == null || request.getSql().trim().isEmpty()) {
       return new MultiStageQueryValidationResponse(false, "Request is missing the query string field 'sql'", null);
     }
 
@@ -253,12 +255,19 @@ public class PinotQueryResource {
     private final List<LogicalTableConfig> _logicalTableConfigs;
     private final Boolean _ignoreCase;
 
-    public MultiStageQueryValidationRequest(String sql, List<TableConfig> tableConfigs, List<Schema> schemas) {
+    @JsonCreator
+    public MultiStageQueryValidationRequest(
+        @JsonProperty("sql") String sql,
+        @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
+        @JsonProperty("schemas") @Nullable List<Schema> schemas,
+        @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
+        @JsonProperty("ignoreCase") @Nullable Boolean ignoreCase) {
+
       _sql = sql;
       _tableConfigs = tableConfigs;
       _schemas = schemas;
-      _ignoreCase = true;
-      _logicalTableConfigs = new ArrayList<>();
+      _logicalTableConfigs = logicalTableConfigs != null ? logicalTableConfigs : new ArrayList<>();
+      _ignoreCase = ignoreCase != null ? ignoreCase : true;
     }
 
     public String getSql() {
