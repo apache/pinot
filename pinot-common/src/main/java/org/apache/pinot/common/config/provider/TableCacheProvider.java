@@ -27,7 +27,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
-import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -40,7 +39,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public interface TableCacheProvider extends PinotConfigProvider {
+public interface TableCacheProvider {
   Logger LOGGER = LoggerFactory.getLogger(TableCacheProvider.class);
   boolean isIgnoreCase();
 
