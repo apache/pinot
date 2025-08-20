@@ -2341,63 +2341,68 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
         "Expected error related to leading wildcard or text search failure, got: " + errorMsg);
   }
 
-  // ===== TEST CASES FOR MINIMUM_SHOULD_MATCH PARSER =====
   @Test
   public void testTextSearchWithMinimumShouldMatchParser()
       throws Exception {
-    // Test 1: Positive integer minimum_should_match - require at least 2 out of 3 terms
+    // Test 1: Require at least 2 out of 3 terms (minimumShouldMatch=2) - AWS hadoop big
     List<Object[]> expectedMin2Of3 = new ArrayList<>();
     expectedMin2Of3.add(new Object[]{
-        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
-    });
-    expectedMin2Of3.add(new Object[]{
-        1018,
-        "Realtime stream processing, publish subscribe, columnar processing for data warehouses, concurrency, Java, "
-            + "multi-threading, C++,"
-    });
-    expectedMin2Of3.add(new Object[]{
-        1019,
-        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
-            + "distributed storage, concurrency, multi-threading, apache airflow"
+        1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
+        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
     });
 
     String queryMin2Of3 =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'Java realtime streaming', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=2') LIMIT 50000";
+            + ", 'AWS hadoop big', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=2') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryMin2Of3, expectedMin2Of3.size(), false, expectedMin2Of3);
 
-    // Test 2: Percentage minimum_should_match - require at least 80% (2 out of 3 terms)
+    // Test 2: Percentage minimum_should_match - require at least 60% (2 out of 3 terms)
     String queryMin80Percent =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'Java realtime streaming', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=80%') LIMIT 50000";
+            + ", 'AWS hadoop big', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=80%') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryMin80Percent, expectedMin2Of3.size(), false, expectedMin2Of3);
 
-    // Test 3: Single term query (minimum_should_match should be ignored)
-    List<Object[]> expectedSingleTerm = new ArrayList<>();
-    expectedSingleTerm.add(new Object[]{
-        1005,
-        "Distributed systems, Java, C++, Go, distributed query engines for analytics and data warehouses, Machine "
-            + "learning, spark, Kubernetes, transaction processing"
+    // Test 3: Require at least 1 out of 2 terms (minimumShouldMatch=1) - Stanford Tensor
+    List<Object[]> expectedMin1Of2 = new ArrayList<>();
+    expectedMin1Of2.add(new Object[]{
+        1004, "Machine learning, Tensor flow, Java, Stanford university,"
     });
-    expectedSingleTerm.add(new Object[]{
-        1010, "Distributed systems, Java, realtime streaming systems, Machine learning, spark, Kubernetes, distributed "
-        + "storage, concurrency, multi-threading"
+    expectedMin1Of2.add(new Object[]{
+        1007, "C++, Python, Tensor flow, database kernel, storage, indexing and transaction processing, building "
+        + "large scale systems, Machine learning"
     });
-    expectedSingleTerm.add(new Object[]{
-        1017,
-        "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production systems,"
-            + " concurrency, multi-threading, C++, CPU processing, Java"
-    });
-    expectedSingleTerm.add(new Object[]{
-        1019,
-        "C++, Java, Python, realtime streaming systems, Machine learning, spark, Kubernetes, transaction processing, "
-            + "distributed storage, concurrency, multi-threading, apache airflow"
+    expectedMin1Of2.add(new Object[]{
+        1016, "CUDA, GPU processing, Tensor flow, Pandas, Python, Jupyter notebook, spark, Machine learning, building"
+        + " high performance scalable systems"
     });
 
-    String querySingleTerm =
+    String queryMin1Of2 =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'Java', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=2') LIMIT 50000";
-    testTextSearchSelectQueryHelper(querySingleTerm, expectedSingleTerm.size(), false, expectedSingleTerm);
+            + ", 'Stanford Tensor', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=1') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin1Of2, expectedMin1Of2.size(), false, expectedMin1Of2);
+
+    // Test 4: Require at least 3 out of 4 terms (minimumShouldMatch=3) - Apache Kafka publish subscribe
+    List<Object[]> expectedMin3Of4 = new ArrayList<>();
+    expectedMin3Of4.add(new Object[]{
+        1017, "Distributed systems, Apache Kafka, publish-subscribe, building and deploying large scale production "
+        + "systems, concurrency, multi-threading, C++, CPU processing, Java"
+    });
+
+    String queryMin3Of4 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'Apache Kafka publish subscribe', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=3') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin3Of4, expectedMin3Of4.size(), false, expectedMin3Of4);
+
+    // Test 5: Require all 3 terms (minimumShouldMatch=3) - AWS hadoop spark
+    List<Object[]> expectedMin3Of3 = new ArrayList<>();
+    expectedMin3Of3.add(new Object[]{
+        1008, "Amazon EC2, AWS, hadoop, big data, spark, building high performance scalable systems, building and "
+        + "deploying large scale production systems, concurrency, multi-threading, Java, C++, CPU processing"
+    });
+
+    String queryMin3Of3 =
+        "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
+            + ", 'AWS hadoop spark', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=3') LIMIT 50000";
+    testTextSearchSelectQueryHelper(queryMin3Of3, expectedMin3Of3.size(), false, expectedMin3Of3);
   }
 }

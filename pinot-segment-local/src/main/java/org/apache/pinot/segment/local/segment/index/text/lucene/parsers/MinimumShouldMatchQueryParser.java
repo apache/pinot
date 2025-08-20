@@ -18,17 +18,12 @@
  */
 package org.apache.pinot.segment.local.segment.index.text.lucene.parsers;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.lucene.analysis.Analyzer;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.charstream.CharStream;
 import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.queryparser.classic.QueryParserBase;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
@@ -37,9 +32,9 @@ import org.apache.lucene.search.TermQuery;
 
 
 /**
- * A custom query parser that implements OpenSearch's minimum_should_match behavior.
+ * A custom query parser that implements minimum_should_match behavior.
  * This parser creates Boolean queries with should clauses and enforces a minimum
- * number of matches, similar to OpenSearch's minimum_should_match parameter.
+ * number of matches.
  *
  * <p>This parser supports the following minimum_should_match formats:</p>
  * <ul>
@@ -66,7 +61,6 @@ import org.apache.lucene.search.TermQuery;
  *   <li>Single term queries: Returns TermQuery (minimum_should_match is ignored)</li>
  *   <li>Multiple term queries: Returns BooleanQuery with should clauses and minimum match requirement</li>
  *   <li>Null/empty queries: Throws ParseException</li>
- *   <li>Whitespace-only queries: Throws ParseException</li>
  * </ul>
  *
  * <p>This parser extends Lucene's QueryParserBase and implements the required abstract methods.
@@ -102,6 +96,47 @@ public class MinimumShouldMatchQueryParser extends QueryParserBase {
   }
 
   /**
+   * Validates the minimum should match specification.
+   *
+   * <p>This method validates the format and range of the minimum_should_match value:</p>
+   * <ul>
+   *   <li><strong>Positive integer:</strong> "3" - at least 3 should clauses must match</li>
+   *   <li><strong>Negative integer:</strong> "-2" - at most 2 should clauses can be missing</li>
+   *   <li><strong>Positive percentage:</strong> "80%" - at least 80% of should clauses must match</li>
+   *   <li><strong>Negative percentage:</strong> "-20%" - at most 20% of should clauses can be missing</li>
+   * </ul>
+   *
+   * @param minimumShouldMatch the minimum should match specification to validate
+   * @return the validated and trimmed value
+   * @throws IllegalArgumentException if the format is invalid or value is out of range
+   */
+  private String validateMinimumShouldMatch(String minimumShouldMatch) {
+    if (minimumShouldMatch == null || minimumShouldMatch.trim().isEmpty()) {
+      return "1";
+    }
+
+    String value = minimumShouldMatch.trim();
+
+    // Validate the format but store as string for dynamic calculation
+    Matcher matcher = PERCENTAGE_PATTERN.matcher(value);
+    if (matcher.matches()) {
+      int percentage = Integer.parseInt(matcher.group(1));
+      if (percentage < -100 || percentage > 100) {
+        throw new IllegalArgumentException("Percentage must be between -100 and 100: " + percentage);
+      }
+      return value;
+    } else {
+      try {
+        Integer.parseInt(value);
+        return value;
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException("Invalid minimum_should_match format: " + value
+            + ". Expected integer or percentage (e.g., '3', '-2', '80%', '-20%')");
+      }
+    }
+  }
+
+  /**
    * Sets the minimum number of should clauses that must match.
    *
    * <p>This method supports the same formats as OpenSearch's minimum_should_match:</p>
@@ -124,31 +159,7 @@ public class MinimumShouldMatchQueryParser extends QueryParserBase {
    * @throws IllegalArgumentException if the format is invalid or value is out of range
    */
   public void setMinimumShouldMatch(String minimumShouldMatch) {
-    if (minimumShouldMatch == null || minimumShouldMatch.trim().isEmpty()) {
-      _minimumShouldMatch = "1";
-      return;
-    }
-
-    String value = minimumShouldMatch.trim();
-
-    // Validate the format but store as string for dynamic calculation
-    Matcher matcher = PERCENTAGE_PATTERN.matcher(value);
-    if (matcher.matches()) {
-      int percentage = Integer.parseInt(matcher.group(1));
-      if (percentage < -100 || percentage > 100) {
-        throw new IllegalArgumentException("Percentage must be between -100 and 100: " + percentage);
-      }
-      _minimumShouldMatch = value;
-    } else {
-      // Try to parse as integer to validate
-      try {
-        Integer.parseInt(value);
-        _minimumShouldMatch = value;
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException("Invalid minimum_should_match format: " + value
-            + ". Expected integer or percentage (e.g., '3', '-2', '80%', '-20%')");
-      }
-    }
+    _minimumShouldMatch = validateMinimumShouldMatch(minimumShouldMatch);
   }
 
   /**
@@ -166,20 +177,13 @@ public class MinimumShouldMatchQueryParser extends QueryParserBase {
    * <p>This method performs the following steps:</p>
    * <ol>
    *   <li>Validates the input query (null, empty, whitespace-only)</li>
-   *   <li>Tokenizes the query using the configured analyzer</li>
-   *   <li>Creates appropriate Lucene queries based on the number of tokens and minimum_should_match setting</li>
+   *   <li>Parses the query using Lucene's QueryParser</li>
+   *   <li>Applies minimum_should_match behavior to Boolean queries</li>
    * </ol>
-   *
-   * <p><strong>Query Types Returned:</strong></p>
-   * <ul>
-   *   <li><strong>Single term:</strong> TermQuery (minimum_should_match is ignored)</li>
-   *   <li><strong>Multiple terms:</strong> BooleanQuery with should clauses and minimum match requirement</li>
-   * </ul>
    *
    * @param query the query string to parse (must not be null or empty)
    * @return a Lucene Query object representing the parsed query
-   * @throws ParseException if the query is null, empty, or contains no valid tokens after tokenization
-   * @throws RuntimeException if tokenization fails due to an IOException
+   * @throws ParseException if the query is null, empty, or parsing fails
    */
   @Override
   public Query parse(String query)
@@ -192,89 +196,102 @@ public class MinimumShouldMatchQueryParser extends QueryParserBase {
       throw new ParseException("Query cannot be empty");
     }
 
-    // Tokenize the query
-    List<String> tokens = new ArrayList<>();
-    try (TokenStream stream = _analyzer.tokenStream(_field, query)) {
-      stream.reset();
-      CharTermAttribute charTermAttribute = stream.addAttribute(CharTermAttribute.class);
+    // Parse the query using Lucene's QueryParser
+    QueryParser parser = new QueryParser(_field, _analyzer);
+    Query parsedQuery = parser.parse(query);
 
-      while (stream.incrementToken()) {
-        String token = charTermAttribute.toString();
-        if (!token.trim().isEmpty()) {
-          tokens.add(token);
-        }
-      }
-      stream.end();
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to tokenize query: " + query, e);
+    // If it's a Boolean query, apply minimum_should_match behavior
+    if (parsedQuery instanceof BooleanQuery) {
+      return applyMinimumShouldMatch((BooleanQuery) parsedQuery);
     }
 
-    // Check if we have any valid tokens after tokenization
-    if (tokens.isEmpty()) {
-      throw new ParseException("Query tokenization resulted in no valid tokens");
+    // For single term queries, convert to Boolean query with SHOULD clause
+    // For single terms, minimum_should_match should always be 1
+    if (parsedQuery instanceof TermQuery) {
+      BooleanQuery.Builder builder = new BooleanQuery.Builder();
+      builder.add(parsedQuery, BooleanClause.Occur.SHOULD);
+      builder.setMinimumNumberShouldMatch(1);
+      return builder.build();
     }
 
-    // Handle single token case
-    if (tokens.size() == 1) {
-      return new TermQuery(new Term(_field, tokens.get(0)));
-    }
-
-    // Handle multiple tokens case - create BooleanQuery with should clauses
-    BooleanQuery.Builder booleanQueryBuilder = new BooleanQuery.Builder();
-
-    for (String token : tokens) {
-      booleanQueryBuilder.add(new TermQuery(new Term(_field, token)), _defaultOperator);
-    }
-
-    // Calculate the actual minimum should match value
-    int actualMinimumShouldMatch = calculateMinimumShouldMatch(tokens.size());
-
-    // Set the minimum should match on the BooleanQuery
-    booleanQueryBuilder.setMinimumNumberShouldMatch(actualMinimumShouldMatch);
-
-    return booleanQueryBuilder.build();
+    // For other query types, throw exception
+    throw new ParseException("MinimumShouldMatchQueryParser only supports Boolean queries and single term queries. "
+        + "Received: " + parsedQuery.getClass().getSimpleName());
   }
 
-    /**
-   * Calculates the actual minimum should match value based on the number of tokens.
+  /**
+   * Applies minimum_should_match behavior to a BooleanQuery.
    *
-   * <p>This method handles the different formats of minimum_should_match:</p>
-   * <ul>
-   *   <li>Positive integer: returns the value directly</li>
-   *   <li>Negative integer: returns (total tokens + negative value)</li>
-   *   <li>Positive percentage: returns (total tokens * percentage / 100), rounded down</li>
-   *   <li>Negative percentage: returns (total tokens * (100 + percentage) / 100), rounded down</li>
-   * </ul>
+   * @param booleanQuery the BooleanQuery to modify
+   * @return the modified BooleanQuery with minimum_should_match applied
+   */
+  private Query applyMinimumShouldMatch(BooleanQuery booleanQuery) {
+    int shouldClauseCount = 0;
+    boolean hasMustOrFilterClauses = false;
+
+    for (BooleanClause clause : booleanQuery.clauses()) {
+      if (clause.getOccur() == BooleanClause.Occur.SHOULD) {
+        shouldClauseCount++;
+      } else if (clause.getOccur() == BooleanClause.Occur.MUST || clause.getOccur() == BooleanClause.Occur.FILTER) {
+        hasMustOrFilterClauses = true;
+      }
+    }
+
+    // If no should clauses, return the original query
+    if (shouldClauseCount == 0) {
+      return booleanQuery;
+    }
+
+    int minimumShouldMatch;
+    if (hasMustOrFilterClauses) {
+      minimumShouldMatch = 0;
+    } else {
+      minimumShouldMatch = 1;
+    }
+
+    // Override with configured minimum_should_match if set
+    if (!_minimumShouldMatch.equals("1")) {
+      minimumShouldMatch = calculateMinimumShouldMatch(shouldClauseCount, _minimumShouldMatch);
+    }
+
+    // Create a new BooleanQuery with the minimum should match
+    BooleanQuery.Builder builder = new BooleanQuery.Builder();
+    for (BooleanClause clause : booleanQuery.clauses()) {
+      builder.add(clause);
+    }
+    builder.setMinimumNumberShouldMatch(minimumShouldMatch);
+
+    return builder.build();
+  }
+
+  /**
+   * Calculates the actual minimum should match value based on the number of tokens and the specified value.
    *
    * @param totalTokens the total number of tokens in the query
+   * @param minimumShouldMatchValue the minimum should match specification
    * @return the calculated minimum should match value
    */
-  private int calculateMinimumShouldMatch(int totalTokens) {
-    String value = _minimumShouldMatch.trim();
-    
+  private int calculateMinimumShouldMatch(int totalTokens, String minimumShouldMatchValue) {
+    String value = minimumShouldMatchValue.trim();
+
     // Check if it's a percentage
     Matcher matcher = PERCENTAGE_PATTERN.matcher(value);
     if (matcher.matches()) {
       int percentage = Integer.parseInt(matcher.group(1));
       if (percentage > 0) {
-        // Positive percentage: (total * percentage / 100)
         int minimumMatches = (totalTokens * percentage) / 100;
-        return Math.max(1, minimumMatches);
+        return Math.max(0, minimumMatches);
       } else {
-        // Negative percentage: (total * (100 + percentage) / 100)
         int minimumMatches = (totalTokens * (100 + percentage)) / 100;
-        return Math.max(1, minimumMatches);
+        return Math.max(0, minimumMatches);
       }
     } else {
-      // Integer calculation
       int intValue = Integer.parseInt(value);
       if (intValue > 0) {
-        // Positive integer: return the value directly, but cap at total tokens
         return Math.min(intValue, totalTokens);
       } else {
-        // Negative integer: calculate as (total + negative value)
         int minimumMatches = totalTokens + intValue;
-        return Math.max(1, minimumMatches);
+        return Math.max(0, minimumMatches);
       }
     }
   }
