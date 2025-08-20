@@ -111,7 +111,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
     protected final HashMap<String, Long> _finishedTaskCPUStatsAggregator = new HashMap<>();
     protected final HashMap<String, Long> _finishedTaskMemStatsAggregator = new HashMap<>();
 
-    Cache<String, MseCancelCallback> _queryCancelCallbacks;
+    protected final Cache<String, MseCancelCallback> _queryCancelCallbacks;
 
     protected final ThreadLocal<CPUMemThreadLevelAccountingObjects.ThreadEntry> _threadLocalEntry
         = ThreadLocal.withInitial(() -> {
