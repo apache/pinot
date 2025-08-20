@@ -157,65 +157,56 @@ public class PinotQueryResource {
 
   @POST
   @Path("validateMultiStageQuery")
-  public MultiStageQueryValidationResponse validateMultiStageQuery(String requestJsonStr,
+  public MultiStageQueryValidationResponse validateMultiStageQuery(MultiStageQueryValidationRequest request,
       @Context HttpHeaders httpHeaders) {
-    JsonNode requestJson;
-    try {
-      requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while parsing request {}", e.getMessage());
-      return new MultiStageQueryValidationResponse(false, "Failed to parse request JSON: " + e.getMessage(), null);
-    }
 
-    if (!requestJson.has("sql") || requestJson.get("sql").asText().trim().isEmpty()) {
+    if (request.getSql() != null && !request.getSql().trim().isEmpty()) {
       return new MultiStageQueryValidationResponse(false, "Request is missing the query string field 'sql'", null);
     }
 
-    String sqlQuery = requestJson.get("sql").asText();
+    String sqlQuery = request.getSql();
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
 
     try {
       TableCacheProvider tableCache;
-
-      if (requestJson.has("tableConfigs") && requestJson.has("schemas")) {
+      if (request.getTableConfigs() != null && request.getSchemas() != null) {
         List<TableConfig> tableConfigs = new ArrayList<>();
-        for (JsonNode tableConfigNode : requestJson.get("tableConfigs")) {
-          if (tableConfigNode != null && !tableConfigNode.isEmpty()) {
-            tableConfigs.add(JsonUtils.jsonNodeToObject(tableConfigNode, TableConfig.class));
-          }
-        }
-
-        List<Schema> schemas = new ArrayList<>();
-        for (JsonNode schemaNode : requestJson.get("schemas")) {
-          if (schemaNode != null && !schemaNode.isEmpty()) {
-            schemas.add(JsonUtils.jsonNodeToObject(schemaNode, Schema.class));
-          }
-        }
-
-        List<LogicalTableConfig> logicalTableConfigs = new ArrayList<>();
-        if (requestJson.has("logicalTableConfigs")) {
-          for (JsonNode logicalTableConfigNode : requestJson.get("logicalTableConfigs")) {
-            if (logicalTableConfigNode != null && !logicalTableConfigNode.isEmpty()) {
-              logicalTableConfigs.add(JsonUtils.jsonNodeToObject(logicalTableConfigNode, LogicalTableConfig.class));
+        if (request.getTableConfigs() != null) {
+          for (TableConfig tableConfig : request.getTableConfigs()) {
+            if (tableConfig != null) {
+              tableConfigs.add(tableConfig);
             }
           }
         }
-
-        // default is not case sensitive
-        boolean ignoreCase = true;
-        if (requestJson.has("ignoreCase")) {
-          ignoreCase = requestJson.get("ignoreCase").asBoolean();
+        List<Schema> schemas = new ArrayList<>();
+        if (request.getSchemas() != null) {
+          for (Schema schema : request.getSchemas()) {
+            if (schema != null) {
+              schemas.add(schema);
+            }
+          }
         }
-
+        List<LogicalTableConfig> logicalTableConfigs = new ArrayList<>();
+        if (request.getLogicalTableConfigs() != null) {
+          for (LogicalTableConfig logicalTableConfig : request.getLogicalTableConfigs()) {
+            if (logicalTableConfig != null) {
+              logicalTableConfigs.add(logicalTableConfig);
+            }
+          }
+        }
+        boolean ignoreCase = true;
+        if (request.getIgnoreCase() != null) {
+          ignoreCase = request.getIgnoreCase();
+        }
         tableCache = new StaticTableCache(tableConfigs, schemas, logicalTableConfigs, ignoreCase);
       } else {
         // Use TableCache from environment
         tableCache = _pinotHelixResourceManager.getTableCache();
       }
 
-      try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache,
-          null).compile(sqlQuery)) {
+      try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
+          sqlQuery)) {
         return new MultiStageQueryValidationResponse(true, null, null);
       }
     } catch (QueryException e) {
@@ -252,6 +243,44 @@ public class PinotQueryResource {
     @Nullable
     public QueryErrorCode getErrorCode() {
       return _errorCode;
+    }
+  }
+
+  public static class MultiStageQueryValidationRequest {
+    private final String _sql;
+    private final List<TableConfig> _tableConfigs;
+    private final List<Schema> _schemas;
+    private final List<LogicalTableConfig> _logicalTableConfigs;
+    private final Boolean _ignoreCase;
+
+    public MultiStageQueryValidationRequest(String sql, List<TableConfig> tableConfigs, List<Schema> schemas) {
+      _sql = sql;
+      _tableConfigs = tableConfigs;
+      _schemas = schemas;
+      _ignoreCase = true;
+      _logicalTableConfigs = new ArrayList<>();
+    }
+
+    public String getSql() {
+      return _sql;
+    }
+
+    @Nullable
+    public List<TableConfig> getTableConfigs() {
+      return _tableConfigs;
+    }
+
+    @Nullable
+    public List<Schema> getSchemas() {
+      return _schemas;
+    }
+
+    public List<LogicalTableConfig> getLogicalTableConfigs() {
+      return _logicalTableConfigs;
+    }
+
+    public Boolean getIgnoreCase() {
+      return _ignoreCase;
     }
   }
 
