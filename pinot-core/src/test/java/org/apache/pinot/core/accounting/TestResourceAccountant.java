@@ -29,7 +29,7 @@ import org.apache.pinot.spi.utils.CommonConstants;
 
 class TestResourceAccountant extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
   TestResourceAccountant(Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntries) {
-    super(new PinotConfiguration(), false, true, true, new HashSet<>(), "test", InstanceType.SERVER);
+    super(new PinotConfiguration(), false, true, new HashSet<>(), "test", InstanceType.SERVER);
     _threadEntriesMap.putAll(threadEntries);
   }
 

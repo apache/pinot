@@ -34,9 +34,6 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Level;
-import org.apache.log4j.LogManager;
-import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactoryForTest;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -95,8 +92,6 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
   @BeforeClass
   public void setUp()
       throws Exception {
-    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.ERROR);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
 
@@ -130,13 +125,6 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
 
     //Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
-
-    // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterMemBasedBrokerQueryKillingTest.class).setLevel(Level.INFO);
-    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
-    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
   }
 
   protected void startBrokers()
@@ -242,11 +230,10 @@ public class OfflineClusterMemBasedBrokerQueryKillingTest extends BaseClusterInt
         }
     );
     countDownLatch.await();
-    assertTrue(queryResponse1.get().get("exceptions").toString().contains(
-        "Interrupted in broker reduce phase"));
-    assertTrue(queryResponse1.get().get("exceptions").toString().contains("\"errorCode\":"
-        + QueryErrorCode.QUERY_CANCELLATION.getId()));
-    assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed because"));
+    String exceptions = queryResponse1.get().get("exceptions").toString();
+    assertTrue(exceptions.contains("Interrupted in broker reduce phase"));
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()));
+    assertTrue(exceptions.contains("got killed on BROKER"));
     assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
     assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
   }

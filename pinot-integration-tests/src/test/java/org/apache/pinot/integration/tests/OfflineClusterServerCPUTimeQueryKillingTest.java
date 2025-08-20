@@ -34,9 +34,6 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Level;
-import org.apache.log4j.LogManager;
-import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -94,8 +91,6 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
   @BeforeClass
   public void setUp()
       throws Exception {
-    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.ERROR);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
 
@@ -130,13 +125,6 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
 
     //Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
-
-    // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterServerCPUTimeQueryKillingTest.class).setLevel(Level.INFO);
-    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
-    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
   }
 
   protected void startBrokers()
@@ -254,8 +242,9 @@ public class OfflineClusterServerCPUTimeQueryKillingTest extends BaseClusterInte
         }
     );
     countDownLatch.await();
-    assertTrue(queryResponse1.get().get("exceptions").toString().contains("got killed on SERVER"));
-    assertTrue(queryResponse1.get().get("exceptions").toString().contains("CPU time exceeding limit of"));
+    String exceptions = queryResponse1.get().get("exceptions").toString();
+    assertTrue(exceptions.contains("got killed on SERVER"));
+    assertTrue(exceptions.contains("CPU time"));
     assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()));
     assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()));
   }
