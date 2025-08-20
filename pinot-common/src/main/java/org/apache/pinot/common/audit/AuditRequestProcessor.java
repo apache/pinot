@@ -18,11 +18,6 @@
  */
 package org.apache.pinot.common.audit;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -178,58 +173,7 @@ public class AuditRequestProcessor {
    * @return the request body as string (potentially truncated)
    */
   private String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
-    try {
-      InputStream entityStream = requestContext.getEntityStream();
-      if (entityStream == null) {
-        return null;
-      }
-
-      // Read the stream content with size limit
-      ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-      byte[] data = new byte[8192];
-      int bytesRead;
-      int totalBytesRead = 0;
-      boolean truncated = false;
-
-      while ((bytesRead = entityStream.read(data, 0, data.length)) != -1) {
-        if (totalBytesRead + bytesRead > maxPayloadSize) {
-          // Truncate to max payload size
-          int remainingBytes = maxPayloadSize - totalBytesRead;
-          if (remainingBytes > 0) {
-            buffer.write(data, 0, remainingBytes);
-          }
-          truncated = true;
-          break;
-        }
-        buffer.write(data, 0, bytesRead);
-        totalBytesRead += bytesRead;
-      }
-
-      byte[] requestBodyBytes = buffer.toByteArray();
-      String requestBody = new String(requestBodyBytes, StandardCharsets.UTF_8);
-
-      // Add truncation indicator if needed
-      if (truncated) {
-        requestBody += " [TRUNCATED - exceeds " + maxPayloadSize + " byte limit]";
-      }
-
-      // Restore the input stream for downstream processing
-      // Need to read the entire original stream to restore it properly
-      if (truncated) {
-        // Read remaining bytes to fully consume the original stream
-        while (entityStream.read(data) != -1) {
-          // Consume remaining bytes
-        }
-        // Create new stream with original data (this is complex, for now keep the truncated version)
-        requestContext.setEntityStream(new ByteArrayInputStream(requestBodyBytes));
-      } else {
-        requestContext.setEntityStream(new ByteArrayInputStream(requestBodyBytes));
-      }
-
-      return requestBody;
-    } catch (IOException e) {
-      LOG.debug("Failed to read request body", e);
-      return "Failed to read request body: " + e.getMessage();
-    }
+    // TODO spyne to be implemented
+    return null;
   }
 }
