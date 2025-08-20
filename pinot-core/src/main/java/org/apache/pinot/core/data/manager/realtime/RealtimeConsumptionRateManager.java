@@ -89,6 +89,35 @@ public class RealtimeConsumptionRateManager {
     _isThrottlingAllowed = true;
   }
 
+  public static class ServerRateLimitConfig {
+    private final double _serverRateLimit;
+    private final ThrottlingStrategy _throttlingStrategy;
+
+    ServerRateLimitConfig(double serverRateLimit,
+        RealtimeConsumptionRateManager.ThrottlingStrategy throttlingStrategy) {
+      _serverRateLimit = serverRateLimit;
+      _throttlingStrategy = throttlingStrategy;
+    }
+
+    @Override
+    public String toString() {
+      return "ServerRateLimitConfig{"
+          + "serverRateLimit=" + _serverRateLimit
+          + ", throttlingStrategy=" + _throttlingStrategy
+          + '}';
+    }
+  }
+
+  public static ServerRateLimitConfig resolveServerRateLimit(double messageRateLimit, double byteRateLimit) {
+    if (byteRateLimit > 0) {
+      return new ServerRateLimitConfig(byteRateLimit,
+          RealtimeConsumptionRateManager.ByteCountThrottlingStrategy.INSTANCE);
+    } else {
+      return new ServerRateLimitConfig(messageRateLimit,
+          RealtimeConsumptionRateManager.MessageCountThrottlingStrategy.INSTANCE);
+    }
+  }
+
   public ConsumptionRateLimiter createServerRateLimiter(PinotConfiguration serverConfig, ServerMetrics serverMetrics) {
     double messageRateLimit = serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
@@ -96,26 +125,18 @@ public class RealtimeConsumptionRateManager {
         serverConfig.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
             CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT);
 
-    double serverRateLimit;
-    ThrottlingStrategy throttlingStrategy;
-    if (byteRateLimit > 0) {
-      serverRateLimit = byteRateLimit;
-      throttlingStrategy = ByteCountThrottlingStrategy.INSTANCE;
-    } else {
-      serverRateLimit = messageRateLimit;
-      throttlingStrategy = MessageCountThrottlingStrategy.INSTANCE;
-    }
+    ServerRateLimitConfig config = resolveServerRateLimit(messageRateLimit, byteRateLimit);
 
-    createOrUpdateServerRateLimiter(serverRateLimit, serverMetrics, throttlingStrategy);
+    createOrUpdateServerRateLimiter(config, serverMetrics);
     return _serverRateLimiter;
   }
 
-  private void createOrUpdateServerRateLimiter(double serverRateLimit, ServerMetrics serverMetrics,
-      ThrottlingStrategy throttlingStrategy) {
-    LOGGER.info("Setting up ServerRateLimiter with rate limit: {}", serverRateLimit);
+  private void createOrUpdateServerRateLimiter(ServerRateLimitConfig serverRateLimitConfig,
+      ServerMetrics serverMetrics) {
+    LOGGER.info("Setting up ServerRateLimiter with rate limit: {}", serverRateLimitConfig);
     ConsumptionRateLimiter currentRateLimiter = _serverRateLimiter;
 
-    if (serverRateLimit <= 0) {
+    if (serverRateLimitConfig._serverRateLimit <= 0) {
       if (currentRateLimiter instanceof ServerRateLimiter) {
         ((ServerRateLimiter) currentRateLimiter).close();
         _serverRateLimiter = NOOP_RATE_LIMITER;
@@ -129,17 +150,18 @@ public class RealtimeConsumptionRateManager {
 
     if (currentRateLimiter instanceof ServerRateLimiter) {
       ServerRateLimiter existingLimiter = (ServerRateLimiter) _serverRateLimiter;
-      existingLimiter.updateRateLimit(serverRateLimit, throttlingStrategy);
+      existingLimiter.updateRateLimit(serverRateLimitConfig._serverRateLimit,
+          serverRateLimitConfig._throttlingStrategy);
     }
 
-    _serverRateLimiter = new ServerRateLimiter(serverRateLimit, serverMetrics, SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME,
-        throttlingStrategy);
+    _serverRateLimiter = new ServerRateLimiter(serverRateLimitConfig._serverRateLimit, serverMetrics,
+        SERVER_CONSUMPTION_RATE_METRIC_KEY_NAME, serverRateLimitConfig._throttlingStrategy);
   }
 
-  public void updateServerRateLimiter(double newRateLimit, ServerMetrics serverMetrics,
-      ThrottlingStrategy throttlingStrategy) {
-    LOGGER.info("Updating serverRateLimiter from: {} to: {}", _serverRateLimiter, newRateLimit);
-    createOrUpdateServerRateLimiter(newRateLimit, serverMetrics, throttlingStrategy);
+  public void updateServerRateLimiter(ServerRateLimitConfig serverRateLimitConfig, ServerMetrics serverMetrics) {
+    LOGGER.info("Updating serverRateLimiter from: {} to: {}", _serverRateLimiter,
+        serverRateLimitConfig._serverRateLimit);
+    createOrUpdateServerRateLimiter(serverRateLimitConfig, serverMetrics);
   }
 
   public ConsumptionRateLimiter getServerRateLimiter() {
@@ -253,6 +275,7 @@ public class RealtimeConsumptionRateManager {
     void throttle(MessageBatch messageBatch);
   }
 
+  @FunctionalInterface
   public interface ThrottlingStrategy {
     int getUnits(MessageBatch messageBatch);
   }
@@ -270,7 +293,7 @@ public class RealtimeConsumptionRateManager {
   }
 
 
-  static class ByteCountThrottlingStrategy implements ThrottlingStrategy {
+  static final class ByteCountThrottlingStrategy implements ThrottlingStrategy {
     public static final ByteCountThrottlingStrategy INSTANCE = new ByteCountThrottlingStrategy();
 
     private ByteCountThrottlingStrategy() {

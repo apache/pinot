@@ -45,27 +45,36 @@ public class ServerRateLimitConfigChangeListener implements PinotClusterConfigCh
       return;
     }
 
-    String configKey;
-    RealtimeConsumptionRateManager.ThrottlingStrategy throttlingStrategy;
+    double messageRateLimit = CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
+    double byteRateLimit = CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
 
     if (clusterConfigs.containsKey(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES)) {
-      configKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES;
-      throttlingStrategy = RealtimeConsumptionRateManager.ByteCountThrottlingStrategy.INSTANCE;
-    } else {
-      configKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT;
-      throttlingStrategy = RealtimeConsumptionRateManager.MessageCountThrottlingStrategy.INSTANCE;
+      try {
+        byteRateLimit = Double.parseDouble(
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES));
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid rate limit config value: {} of {}. Ignoring the config change",
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES),
+            CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES, e);
+        return;
+      }
     }
 
-    String rateLimitStr = clusterConfigs.get(configKey);
-    double serverRateLimit;
-    try {
-      serverRateLimit = Double.parseDouble(rateLimitStr);
-    } catch (NumberFormatException e) {
-      LOGGER.error("Invalid rate limit config value: {}. Ignoring the config change", rateLimitStr, e);
-      return;
+    if (clusterConfigs.containsKey(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)) {
+      try {
+        messageRateLimit =
+            Double.parseDouble(clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid rate limit config value: {} of {}. Ignoring the config change",
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT),
+            CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, e);
+        return;
+      }
     }
 
-    RealtimeConsumptionRateManager.getInstance()
-        .updateServerRateLimiter(serverRateLimit, _serverMetrics, throttlingStrategy);
+    RealtimeConsumptionRateManager.ServerRateLimitConfig config =
+        RealtimeConsumptionRateManager.resolveServerRateLimit(messageRateLimit, byteRateLimit);
+
+    RealtimeConsumptionRateManager.getInstance().updateServerRateLimiter(config, _serverMetrics);
   }
 }

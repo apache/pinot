@@ -34,11 +34,11 @@ public class KinesisMessageBatch implements MessageBatch<byte[]> {
   private final long _sizeInBytes;
 
   public KinesisMessageBatch(List<BytesStreamMessage> messages, KinesisPartitionGroupOffset offsetOfNextBatch,
-      boolean endOfShard, long batchSizeInBytes) {
+      boolean endOfShard, long sizeInBytes) {
     _messages = messages;
     _offsetOfNextBatch = offsetOfNextBatch;
     _endOfShard = endOfShard;
-    _sizeInBytes = batchSizeInBytes;
+    _sizeInBytes = sizeInBytes;
   }
 
   @Override

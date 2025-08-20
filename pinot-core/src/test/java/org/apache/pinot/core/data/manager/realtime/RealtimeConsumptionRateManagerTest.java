@@ -132,7 +132,8 @@ public class RealtimeConsumptionRateManagerTest {
     rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_4, null);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
 
-    _consumptionRateManager.updateServerRateLimiter(1, null, MessageCountThrottlingStrategy.INSTANCE);
+    ServerRateLimitConfig serverRateLimitConfig = new ServerRateLimitConfig(1, MessageCountThrottlingStrategy.INSTANCE);
+    _consumptionRateManager.updateServerRateLimiter(serverRateLimitConfig, null);
     serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.getServerRateLimiter();
     try {
       assertEquals(serverRateLimiter.getRate(), 1);

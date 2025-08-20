@@ -96,7 +96,5 @@ public interface MessageBatch<T> {
     return false;
   }
 
-  default long getSizeInBytes() {
-    return -1;
-  }
+  long getSizeInBytes();
 }

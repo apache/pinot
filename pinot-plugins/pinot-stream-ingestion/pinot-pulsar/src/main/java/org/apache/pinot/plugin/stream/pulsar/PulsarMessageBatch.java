@@ -33,11 +33,11 @@ public class PulsarMessageBatch implements MessageBatch<byte[]> {
   private final long _sizeInBytes;
 
   public PulsarMessageBatch(List<BytesStreamMessage> messages, MessageIdStreamOffset offsetOfNextBatch,
-      boolean endOfTopic, long batchSizeInBytes) {
+      boolean endOfTopic, long sizeInBytes) {
     _messages = messages;
     _offsetOfNextBatch = offsetOfNextBatch;
     _endOfTopic = endOfTopic;
-    _sizeInBytes = batchSizeInBytes;
+    _sizeInBytes = sizeInBytes;
   }
 
   @Override
