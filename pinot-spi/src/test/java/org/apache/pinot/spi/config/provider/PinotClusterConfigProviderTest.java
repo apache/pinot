@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.common.config;
+package org.apache.pinot.spi.config.provider;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,12 +29,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Unit tests for DefaultClusterConfigChangeHandler focusing on the getChangedProperties method.
  */
-public class DefaultClusterConfigChangeHandlerTest {
+public class PinotClusterConfigProviderTest {
 
   @Test
   public void testGetChangedPropertiesWithBothMapsEmpty() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> oldProperties = new HashMap<>();
     Map<String, String> newProperties = new HashMap<>();
 
@@ -48,7 +48,7 @@ public class DefaultClusterConfigChangeHandlerTest {
   @Test
   public void testGetChangedPropertiesWithOldMapEmpty() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> oldProperties = new HashMap<>();
     Map<String, String> newProperties = new HashMap<>();
     newProperties.put("key1", "value1");
@@ -64,7 +64,7 @@ public class DefaultClusterConfigChangeHandlerTest {
   @Test
   public void testGetChangedPropertiesWithNewMapEmpty() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> oldProperties = new HashMap<>();
     oldProperties.put("key1", "value1");
     oldProperties.put("key2", "value2");
@@ -80,7 +80,7 @@ public class DefaultClusterConfigChangeHandlerTest {
   @Test
   public void testGetChangedPropertiesWithAddedKeys() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> oldProperties = new HashMap<>();
     oldProperties.put("key1", "value1");
     Map<String, String> newProperties = new HashMap<>();
@@ -98,7 +98,7 @@ public class DefaultClusterConfigChangeHandlerTest {
   @Test
   public void testGetChangedPropertiesWithDeletedKeys() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> oldProperties = new HashMap<>();
     oldProperties.put("key1", "value1");
     oldProperties.put("key2", "value2");
@@ -116,7 +116,7 @@ public class DefaultClusterConfigChangeHandlerTest {
   @Test
   public void testGetChangedPropertiesWithUpdatedValues() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> oldProperties = new HashMap<>();
     oldProperties.put("key1", "value1");
     oldProperties.put("key2", "value2");
@@ -134,7 +134,7 @@ public class DefaultClusterConfigChangeHandlerTest {
   @Test
   public void testGetChangedPropertiesWithMixedChanges() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> oldProperties = new HashMap<>();
     oldProperties.put("key1", "value1");
     oldProperties.put("key2", "value2");
@@ -154,7 +154,7 @@ public class DefaultClusterConfigChangeHandlerTest {
   @Test
   public void testGetChangedPropertiesWithNullOldMap() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> newProperties = new HashMap<>();
     newProperties.put("key1", "value1");
 
@@ -168,7 +168,7 @@ public class DefaultClusterConfigChangeHandlerTest {
   @Test
   public void testGetChangedPropertiesWithNullNewMap() {
     // Given
-    DefaultClusterConfigChangeHandler handler = new DefaultClusterConfigChangeHandler();
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
     Map<String, String> oldProperties = new HashMap<>();
     oldProperties.put("key1", "value1");
 
@@ -177,5 +177,17 @@ public class DefaultClusterConfigChangeHandlerTest {
 
     // Then
     assertThat(changedProperties).containsExactlyInAnyOrder("key1");
+  }
+
+  public static class PinotClusterConfigProviderMock implements PinotClusterConfigProvider {
+    @Override
+    public Map<String, String> getClusterConfigs() {
+      return Map.of();
+    }
+
+    @Override
+    public boolean registerClusterConfigChangeListener(PinotClusterConfigChangeListener clusterConfigChangeListener) {
+      return false;
+    }
   }
 }
