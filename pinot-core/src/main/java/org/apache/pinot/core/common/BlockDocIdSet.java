@@ -37,6 +37,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * The {@code BlockDocIdSet} contains the matching document ids returned by the {@link FilterBlock}.
  */
 public interface BlockDocIdSet {
+
   /**
    * Returns an iterator of the matching document ids. The document ids returned from the iterator should be in
    * ascending order.
