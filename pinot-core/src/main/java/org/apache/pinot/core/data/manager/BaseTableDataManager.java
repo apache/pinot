@@ -397,7 +397,7 @@ public abstract class BaseTableDataManager implements TableDataManager {
     setZkCreationTimeIfAvailable(immutableSegment, zkMetadata);
 
     Integer partitionId = SegmentUtils.getSegmentPartitionId(segmentName, _tableNameWithType, _helixManager, null);
-    if(partitionId == null) {
+    if (partitionId == null) {
       partitionId = 0;
     }
     Preconditions.checkNotNull(partitionId, "Failed to get partition id for segment: " + segmentName
