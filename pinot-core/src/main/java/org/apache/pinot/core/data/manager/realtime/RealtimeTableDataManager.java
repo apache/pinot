@@ -337,9 +337,8 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /**
    * Method to handle CONSUMING -> OFFLINE segment state transitions:
-   * We must mark partitions for verification if consuming segment is marked as offline.
-   * This is because before consumer thread dies upon encountering an exception, controller marks it as offline and
-   * there might be no consumer present on the server.
+   * We must stop tracking partitions for ingestion-delay if consuming segment is marked as offline as there won't be
+   * any consumer present on the server for the partition segment is consuming from.
    *
    * @param segmentName name of segment which is transitioning state.
    */
