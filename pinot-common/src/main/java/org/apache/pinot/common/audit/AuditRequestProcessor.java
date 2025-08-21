@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.audit;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +83,8 @@ public class AuditRequestProcessor {
       }
 
       // Log the audit event (service ID will be extracted from headers, not config)
-      return new AuditEvent().setEndpoint(endpoint)
+      return new AuditEvent().setTimestamp(Instant.now().toString())
+          .setEndpoint(endpoint)
           .setServiceId(extractServiceId(requestContext))
           .setMethod(requestContext.getMethod())
           .setOriginIpAddress(extractClientIpAddress(requestContext, remoteAddr))

@@ -38,7 +38,7 @@ public final class AuditConfig {
   @JsonProperty("capture.request.headers")
   private boolean _captureRequestHeaders = false;
 
-  @JsonProperty("max.payload.size")
+  @JsonProperty("payload.size.max.bytes")
   private int _maxPayloadSize = 10_240;
 
   @JsonProperty("excluded.endpoints")
