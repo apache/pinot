@@ -26,6 +26,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -65,15 +66,21 @@ public class MailboxService {
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
+  @Nullable private final QueryAccessControlFactory _accessControlFactory;
   private final int _maxByteStringSize;
 
   private GrpcMailboxServer _grpcMailboxServer;
 
   public MailboxService(String hostname, int port, PinotConfiguration config) {
-    this(hostname, port, config, null);
+    this(hostname, port, config, null, null);
   }
 
   public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig) {
+    this(hostname, port, config, tlsConfig, null);
+  }
+
+  public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig, @Nullable
+  QueryAccessControlFactory accessControlFactory) {
     _hostname = hostname;
     _port = port;
     _config = config;
@@ -83,6 +90,7 @@ public class MailboxService {
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     );
     _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize);
+    _accessControlFactory = accessControlFactory;
     boolean splitBlocks = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
@@ -100,7 +108,7 @@ public class MailboxService {
    */
   public void start() {
     LOGGER.info("Starting GrpcMailboxServer");
-    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig);
+    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _accessControlFactory);
     _grpcMailboxServer.start();
   }
 
