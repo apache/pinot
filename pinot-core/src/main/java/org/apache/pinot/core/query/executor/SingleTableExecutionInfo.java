@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
+import org.apache.pinot.core.data.manager.BaseTableDataManager;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.core.data.manager.realtime.RealtimeTableDataManager;
 import org.apache.pinot.core.query.pruner.SegmentPrunerService;
@@ -81,7 +82,7 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
         indexSegments.add(segmentDataManager.getSegment());
       }
     } else {
-      RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
+      BaseTableDataManager rtdm = (BaseTableDataManager) tableDataManager;
       TableUpsertMetadataManager tumm = rtdm.getTableUpsertMetadataManager();
       boolean isUsingConsistencyMode =
           rtdm.getTableUpsertMetadataManager().getContext().getConsistencyMode() != UpsertConfig.ConsistencyMode.NONE;
@@ -133,8 +134,8 @@ public class SingleTableExecutionInfo implements TableExecutionInfo {
     // into their routing tables, like newly created consuming segment or newly uploaded segments. We should include
     // those segments in the list of segments for query to process on the server, otherwise, the query will see less
     // than expected valid docs from the upsert table.
-    if (tableDataManager instanceof RealtimeTableDataManager) {
-      RealtimeTableDataManager rtdm = (RealtimeTableDataManager) tableDataManager;
+    if (tableDataManager instanceof BaseTableDataManager) {
+      BaseTableDataManager rtdm = (BaseTableDataManager) tableDataManager;
       return rtdm.isUpsertEnabled();
     }
     return false;

@@ -329,16 +329,16 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
-  @Override
-  public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
-      Map<String, String> queryOptions) {
-    List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
-    selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
-    if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
-      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts, queryOptions);
-    }
-    return segmentContexts;
-  }
+//  @Override
+//  public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
+//      Map<String, String> queryOptions) {
+//    List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
+//    selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
+//    if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
+//      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts, queryOptions);
+//    }
+//    return segmentContexts;
+//  }
 
   /**
    * Returns all partitionGroupIds for the partitions hosted by this server for current table.
@@ -779,10 +779,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     return _instanceId;
   }
 
-  @VisibleForTesting
-  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
-    return _tableUpsertMetadataManager;
-  }
 
   @VisibleForTesting
   public TableDedupMetadataManager getTableDedupMetadataManager() {

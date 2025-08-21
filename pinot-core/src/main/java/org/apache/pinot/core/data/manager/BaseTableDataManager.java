@@ -61,6 +61,7 @@ import org.apache.pinot.common.metrics.ServerTimer;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.common.utils.fetcher.SegmentFetcherFactory;
 import org.apache.pinot.core.data.manager.offline.ImmutableSegmentDataManager;
@@ -850,7 +851,15 @@ public abstract class BaseTableDataManager implements TableDataManager {
       Map<String, String> queryOptions) {
     List<SegmentContext> segmentContexts = new ArrayList<>(selectedSegments.size());
     selectedSegments.forEach(s -> segmentContexts.add(new SegmentContext(s)));
+    if (isUpsertEnabled() && !QueryOptionsUtils.isSkipUpsert(queryOptions)) {
+      _tableUpsertMetadataManager.setSegmentContexts(segmentContexts, queryOptions);
+    }
     return segmentContexts;
+  }
+
+  @VisibleForTesting
+  public TableUpsertMetadataManager getTableUpsertMetadataManager() {
+    return _tableUpsertMetadataManager;
   }
 
   private void reloadSegments(List<SegmentDataManager> segmentDataManagers, IndexLoadingConfig indexLoadingConfig,
