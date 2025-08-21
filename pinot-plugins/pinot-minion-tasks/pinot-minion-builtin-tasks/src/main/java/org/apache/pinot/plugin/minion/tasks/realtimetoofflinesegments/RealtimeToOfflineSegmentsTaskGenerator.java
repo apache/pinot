@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks.realtimetoofflinesegments;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,12 +30,18 @@ import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.RealtimeToOfflineSegmentsTaskMetadata;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.ServiceStatus;
+import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.PinotTaskGenerator;
 import org.apache.pinot.controller.helix.core.minion.generator.TaskGeneratorUtils;
+import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.RealtimeToOfflineSegmentsTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
@@ -47,6 +54,7 @@ import org.apache.pinot.spi.config.table.TableTaskConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.UpsertConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +65,9 @@ import org.slf4j.LoggerFactory;
  *
  * These will be generated only for REALTIME tables.
  * At any given time, only 1 task of this type should be generated for a table.
+ *
+ * Supports both regular tables and upsert tables. For upsert tables, performs additional validation
+ * by fetching validDocIds metadata from servers to ensure segment consistency before task execution.
  *
  * Steps:
  *  - The watermarkMs is read from the {@link RealtimeToOfflineSegmentsTaskMetadata} ZNode
@@ -74,6 +85,9 @@ import org.slf4j.LoggerFactory;
  *  - Segment metadata is scanned for all COMPLETED segments,
  *  to pick those containing data in window [windowStartMs, windowEndMs)
  *
+ *  - For upsert tables, segments are validated using validDocIds metadata from servers,
+ *  including CRC validation, server state checks, and empty segment detection
+ *
  *  - There are some special considerations for using last completed segment of a partition.
  *  Such segments will be checked for segment endTime, to ensure there's no overflow into CONSUMING segments
  *
@@ -85,6 +99,7 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
   private static final String DEFAULT_BUCKET_PERIOD = "1d";
   private static final String DEFAULT_BUFFER_PERIOD = "2d";
+  private static final int DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST = 500;
 
   @Override
   public String getTaskType() {
@@ -151,10 +166,18 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       long windowStartMs = getWatermarkMs(realtimeTableName, completedSegmentsZKMetadata, bucketMs);
       long windowEndMs = windowStartMs + bucketMs;
 
+      boolean isUpsertTable = tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE;
+      Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataMap = null;
+      if (isUpsertTable) {
+        // Fetch validDocIds metadata from servers
+        validDocIdsMetadataMap = fetchValidDocIds(realtimeTableName, taskConfigs);
+      }
+
       // Find all COMPLETED segments with data overlapping execution window: windowStart (inclusive) to windowEnd
       // (exclusive)
       List<String> segmentNames = new ArrayList<>();
       List<String> downloadURLs = new ArrayList<>();
+      List<String> segmentCrcList = new ArrayList<>();
       Set<String> lastLLCSegmentPerPartition = new HashSet<>(partitionToLatestLLCSegmentName.values());
       boolean skipGenerate = false;
       while (true) {
@@ -183,8 +206,15 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
               skipGenerate = true;
               break;
             }
-            segmentNames.add(segmentName);
-            downloadURLs.add(segmentZKMetadata.getDownloadUrl());
+            // For upsert tables, validate segments using validDocIds metadata
+            if (!isUpsertTable || validateSegmentForUpsert(segmentName, realtimeTableName, segmentZKMetadata,
+                validDocIdsMetadataMap)) {
+              segmentNames.add(segmentName);
+              downloadURLs.add(segmentZKMetadata.getDownloadUrl());
+              if (isUpsertTable) {
+                segmentCrcList.add(String.valueOf(segmentZKMetadata.getCrc()));
+              }
+            }
           }
         }
         if (skipGenerate || !segmentNames.isEmpty()) {
@@ -204,8 +234,13 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
       Map<String, String> configs = MinionTaskUtils.getPushTaskConfig(realtimeTableName, taskConfigs,
           _clusterInfoAccessor);
       configs.putAll(getBaseTaskConfigs(tableConfig, segmentNames));
-      configs.put(MinionConstants.DOWNLOAD_URL_KEY, StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
+      configs.put(MinionConstants.DOWNLOAD_URL_KEY,
+          StringUtils.join(downloadURLs, MinionConstants.URL_SEPARATOR));
       configs.put(MinionConstants.UPLOAD_URL_KEY, _clusterInfoAccessor.getVipUrl() + "/segments");
+      configs.put(MinionConstants.ORIGINAL_SEGMENT_CRC_KEY, StringUtils.join(segmentCrcList, ","));
+
+      // Store upsert table information to avoid unnecessary table config retrieval in executor
+      configs.put(RealtimeToOfflineSegmentsTask.IS_UPSERT_TABLE, String.valueOf(isUpsertTable));
 
       // Segment processor configs
       configs.put(RealtimeToOfflineSegmentsTask.WINDOW_START_MS_KEY, String.valueOf(windowStartMs));
@@ -316,9 +351,6 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
 
   @Override
   public void validateTaskConfigs(TableConfig tableConfig, Schema schema, Map<String, String> taskConfigs) {
-    // check table is not upsert
-    Preconditions.checkState(tableConfig.getUpsertMode() == UpsertConfig.Mode.NONE,
-        "RealtimeToOfflineTask doesn't support upsert table!");
     // check no malformed period
     TimeUtils.convertPeriodToMillis(
         taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUFFER_TIME_PERIOD_KEY, "2d"));
@@ -326,10 +358,23 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.BUCKET_TIME_PERIOD_KEY, "1d"));
     TimeUtils.convertPeriodToMillis(
         taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.ROUND_BUCKET_TIME_PERIOD_KEY, "1s"));
+
+    String mergeType =
+        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, MergeType.CONCAT.name()).toUpperCase();
+
+    // For upsert tables, validate upsert-specific configurations
+    if (tableConfig.getUpsertMode() != UpsertConfig.Mode.NONE) {
+      // Validate that snapshot is enabled (required since we hardcode SNAPSHOT type)
+      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+      Preconditions.checkState(upsertConfig != null, "UpsertConfig should not be null for upsert table: %s",
+          tableConfig.getTableName());
+      // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level
+      Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
+          "'snapshot' from UpsertConfig must not be 'DISABLE' for %s", RealtimeToOfflineSegmentsTask.TASK_TYPE);
+    }
     // check mergeType is correct
     Preconditions.checkState(ImmutableSet.of(MergeType.CONCAT.name(), MergeType.ROLLUP.name(), MergeType.DEDUP.name())
-        .contains(taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.MERGE_TYPE_KEY, MergeType.CONCAT.name())
-            .toUpperCase()), "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
+        .contains(mergeType), "MergeType must be one of [CONCAT, ROLLUP, DEDUP]!");
     // check schema is not null
     Preconditions.checkNotNull(schema, "Schema should not be null!");
     // check no mis-configured columns
@@ -353,5 +398,81 @@ public class RealtimeToOfflineSegmentsTaskGenerator extends BaseTaskGenerator {
         }
       }
     }
+  }
+
+  private Map<String, List<ValidDocIdsMetadataInfo>> fetchValidDocIds(String realtimeTableName,
+      Map<String, String> taskConfigs) {
+    // Get server to segment mappings
+    PinotHelixResourceManager pinotHelixResourceManager = _clusterInfoAccessor.getPinotHelixResourceManager();
+    Map<String, List<String>> serverToSegments =
+        pinotHelixResourceManager.getServerToOnlineSegmentsMapFromEV(realtimeTableName, true);
+    BiMap<String, String> serverToEndpoints;
+    try {
+      serverToEndpoints = pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    } catch (InvalidConfigException e) {
+      throw new RuntimeException(e);
+    }
+
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_clusterInfoAccessor.getExecutor(),
+            _clusterInfoAccessor.getConnectionManager());
+
+    // Number of segments to query per server request
+    int numSegmentsBatchPerServerRequest = Integer.parseInt(
+        taskConfigs.getOrDefault(RealtimeToOfflineSegmentsTask.NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST,
+            String.valueOf(DEFAULT_NUM_SEGMENTS_BATCH_PER_SERVER_REQUEST)));
+
+    return serverSegmentMetadataReader.getSegmentToValidDocIdsMetadataFromServer(realtimeTableName, serverToSegments,
+        serverToEndpoints, null, 60_000, ValidDocIdsType.SNAPSHOT.toString(), numSegmentsBatchPerServerRequest);
+  }
+
+  private boolean validateSegmentForUpsert(String segmentName, String realtimeTableName,
+      SegmentZKMetadata segmentZKMetadata, Map<String, List<ValidDocIdsMetadataInfo>> validDocIdsMetadataMap) {
+    // Check if we have validDocIds metadata for this segment
+    List<ValidDocIdsMetadataInfo> metadataInfoList = validDocIdsMetadataMap.get(segmentName);
+    if (metadataInfoList == null || metadataInfoList.isEmpty()) {
+      LOGGER.error("No validDocIds metadata found for segment: {} - this would result in data loss since "
+          + "time windows cannot be reprocessed. Failing task generation.", segmentName);
+      throw new IllegalStateException(
+          String.format("Failed to find validDocIds metadata for segment %s for upsert table %s. "
+              + "Task generation aborted to prevent data loss.", segmentName, realtimeTableName));
+    }
+
+    for (ValidDocIdsMetadataInfo validDocIdsMetadata : metadataInfoList) {
+      // Check CRC match - try next server if mismatch (segment may be reloading on this server)
+      if (segmentZKMetadata.getCrc() != Long.parseLong(validDocIdsMetadata.getSegmentCrc())) {
+        LOGGER.warn(
+            "CRC mismatch for segment: {} on server: {}, trying next server (segmentZKMetadata={}, "
+                + "validDocIdsMetadata={})",
+            segmentName, validDocIdsMetadata.getInstanceId(), segmentZKMetadata.getCrc(),
+            validDocIdsMetadata.getSegmentCrc());
+        continue;
+      }
+
+      // Check server state - try next server if not ready (bitmaps would be inconsistent)
+      if (validDocIdsMetadata.getServerStatus() != null && !validDocIdsMetadata.getServerStatus()
+          .equals(ServiceStatus.Status.GOOD)) {
+        LOGGER.warn("Server {} is in {} state for segment: {}, trying next server",
+            validDocIdsMetadata.getInstanceId(), validDocIdsMetadata.getServerStatus(), segmentName);
+        continue;
+      }
+
+      // Check if segment has no valid records - this is acceptable, we can skip such segments
+      long totalInvalidDocs = validDocIdsMetadata.getTotalInvalidDocs();
+      long totalDocs = validDocIdsMetadata.getTotalDocs();
+      if (totalInvalidDocs == totalDocs) {
+        LOGGER.info("Segment {} has no valid records (all {} docs are invalid), skipping for {}",
+            segmentName, totalDocs, RealtimeToOfflineSegmentsTask.TASK_TYPE);
+        return false;
+      } else {
+        return true;
+      }
+    }
+
+    LOGGER.error("Segment {} failed validation on all servers - this would result in data loss since "
+        + "time windows cannot be reprocessed. Failing task generation.", segmentName);
+    throw new IllegalStateException(
+        String.format("Failed to validate segment %s on any server for upsert table %s. "
+            + "Task generation aborted to prevent data loss.", segmentName, realtimeTableName));
   }
 }
