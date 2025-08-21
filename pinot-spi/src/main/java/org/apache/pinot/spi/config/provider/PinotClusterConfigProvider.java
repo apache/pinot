@@ -48,6 +48,7 @@ public interface PinotClusterConfigProvider {
    * @param newProperties map of newly fetched ZK cluster configs
    * @return set of changed (added/deleted/updated) cluster config keys
    */
+  @com.google.common.annotations.VisibleForTesting
   default Set<String> getChangedProperties(Map<String, String> oldProperties, Map<String, String> newProperties) {
     if (MapUtils.isEmpty(oldProperties)) {
       return newProperties.keySet();

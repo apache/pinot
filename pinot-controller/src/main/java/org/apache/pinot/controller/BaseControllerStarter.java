@@ -61,6 +61,7 @@ import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.audit.AuditConfigManager;
 import org.apache.pinot.common.audit.AuditRequestProcessor;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
@@ -221,6 +222,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
   protected AuditConfigManager _auditConfigManager;
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -543,14 +545,20 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
-    // Initialize audit config manager and register as cluster config listener
+    // Initialize cluster config change handler
+    LOGGER.info("Initializing cluster config change handler");
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    try {
+      // Register cluster config change handler with Helix
+      _helixParticipantManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to register cluster config change handler", e);
+    }
+
+    // Initialize audit config manager and register with cluster config change handler
     LOGGER.info("Initializing audit config manager");
     _auditConfigManager = new AuditConfigManager();
-    try {
-      _helixParticipantManager.addClusterfigChangeListener(_auditConfigManager);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to register to cluster config", e);
-    }
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_auditConfigManager);
 
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
