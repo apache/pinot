@@ -380,7 +380,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
   }
 
   @Test
-  public void queryStContainsWithMultipleFilters()
+  public void queryStContainsWithMultipleFiltersFirstFilterEmpty()
       throws Exception {
     List<GenericRow> records = new ArrayList<>(1);
     addRecord(records, -122.0007277, 37.5005785);
@@ -398,6 +398,34 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
         + "             -121.9990325 37.4995294, \n"
         + "             -122.0001268 37.4993506, \n"
         + "             -122.0008564 37.5004316))'), h3Column_geometry) = 0";
+
+    AggregationOperator aggregationOperator = getOperator(query);
+    AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0, 1);
+    List<Object> aggregationResult = resultsBlock.getResults();
+    Assert.assertNotNull(aggregationResult);
+    Assert.assertEquals((long) aggregationResult.get(0), 0);
+  }
+
+  @Test
+  public void queryStContainsWithMultipleFiltersSecondFilterEmpty()
+      throws Exception {
+    List<GenericRow> records = new ArrayList<>(1);
+    addRecord(records, -122.0007277, 37.5005785);
+    setUp(records);
+    // Test point is close to border of a polygon but outside.
+    String query = "SELECT COUNT(*) FROM testTable WHERE ST_Contains(ST_GeomFromText('POLYGON ((\n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506,  \n"
+        + "             -122.0008564 37.5004316))'), h3Column_geometry) = 0 AND "
+        + "             ST_Contains(ST_GeomFromText('POLYGON (( \n"
+        + "             -122.0008564 37.5004316, \n"
+        + "             -121.9991291 37.5005168, \n"
+        + "             -121.9990325 37.4995294, \n"
+        + "             -122.0001268 37.4993506, \n"
+        + "             -122.0008564 37.5004316))'), h3Column_geometry) = 1";
 
     AggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();

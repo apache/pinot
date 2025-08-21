@@ -63,6 +63,12 @@ public class AndFilterOperator extends BaseFilterOperator {
       }
       blockDocIdSets.add(optimizedDocIdSet);
     }
+    if (blockDocIdSets.isEmpty()) {
+      return new MatchAllDocIdSet(_numDocs);
+    }
+    if (blockDocIdSets.size() == 1) {
+      return blockDocIdSets.get(0);
+    }
     return new AndDocIdSet(blockDocIdSets, _queryOptions);
   }
 
