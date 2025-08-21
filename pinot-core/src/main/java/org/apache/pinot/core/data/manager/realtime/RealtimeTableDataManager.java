@@ -335,6 +335,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
+  /**
+   * Method to handle CONSUMING -> OFFLINE segment state transitions:
+   * We must mark partitions for verification if consuming segment is marked as offline.
+   * This is because before consumer thread dies upon encountering an exception, controller marks it as offline and
+   * there might be no consumer present on the server.
+   *
+   * @param segmentName name of segment which is transitioning state.
+   */
+  @Override
+  public void onConsumingToOffline(String segmentName) {
+    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
+  }
+
   @Override
   public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
       Map<String, String> queryOptions) {
