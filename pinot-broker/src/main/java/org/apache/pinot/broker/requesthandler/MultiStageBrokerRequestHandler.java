@@ -418,6 +418,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .tableCache(_tableCache)
         .workerManager(_workerManager)
         .isCaseSensitive(caseSensitive)
+        .isNullHandling(QueryOptionsUtils.isNullHandlingEnabled(queryOptions))
         .defaultInferPartitionHint(inferPartitionHint)
         .defaultUseSpools(defaultUseSpool)
         .defaultUseLeafServerForIntermediateStage(defaultUseLeafServerForIntermediateStage)

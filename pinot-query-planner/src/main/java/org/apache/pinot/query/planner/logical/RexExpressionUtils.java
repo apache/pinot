@@ -48,6 +48,7 @@ import org.apache.calcite.tools.RelBuilder;
 import org.apache.calcite.util.NlsString;
 import org.apache.calcite.util.Sarg;
 import org.apache.calcite.util.TimestampString;
+import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.utils.DataSchema.ColumnDataType;
 import org.apache.pinot.spi.utils.BooleanUtils;
 import org.apache.pinot.spi.utils.ByteArray;
@@ -299,7 +300,7 @@ public class RexExpressionUtils {
         // NOTE: SqlStdOperatorTable.CONCAT has OTHER kind and "||" as name
         return operator.getName().equals("||") ? "CONCAT" : operator.getName();
       case OTHER_FUNCTION:
-        return operator.getName();
+        return FunctionRegistry.canonicalize(operator.getName());
       default:
         return operator.kind.name();
     }

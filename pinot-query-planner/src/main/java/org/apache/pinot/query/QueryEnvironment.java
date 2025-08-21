@@ -147,7 +147,7 @@ public class QueryEnvironment {
     String database = config.getDatabase();
     _catalog = new PinotCatalog(config.getTableCache(), database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
-    _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
+    _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance(config.isNullHandling()))
         .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
@@ -646,6 +646,11 @@ public class QueryEnvironment {
      */
     @Nullable
     TableCache getTableCache();
+
+    @Value.Default
+    default boolean isNullHandling() {
+      return false;
+    }
 
     /**
      * Whether the schema should be considered case-insensitive.

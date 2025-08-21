@@ -21,6 +21,7 @@ package org.apache.pinot.integration.tests;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -34,8 +35,15 @@ public interface ExplainIntegrationTestTrait {
       throws Exception;
 
   default void explainLogical(@Language("sql") String query, String expected) {
+    explainLogical(query, expected, Map.of());
+  }
+
+  default void explainLogical(@Language("sql") String query, String expected, Map<String, String> queryOptions) {
     try {
-      JsonNode jsonNode = postQuery("explain plan without implementation for " + query);
+      String extraOptions = queryOptions.entrySet().stream()
+          .map(entry -> "SET " + entry.getKey() + "=" + entry.getValue() + ";\n")
+          .collect(Collectors.joining());
+      JsonNode jsonNode = postQuery(extraOptions + "explain plan without implementation for " + query);
       JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
 
       Assert.assertEquals(plan.asText(), expected);
