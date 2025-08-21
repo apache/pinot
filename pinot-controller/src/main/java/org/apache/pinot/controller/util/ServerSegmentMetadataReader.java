@@ -217,6 +217,49 @@ public class ServerSegmentMetadataReader {
   }
 
   /**
+   * This method is called when the API request is to fetch segment metadata for all segments of the table.
+   * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
+   * This method accept a list of column names as filter, and will return column metadata for the column in the
+   * list.
+   * This method makes one request per server, rather than one request per segment. Segments OFFLINE in IdealState
+   * will automatically be filtered out on the server side as they have already been offloaded
+   * @return list of segments and their metadata as a JSON string
+   */
+  public List<String> getAllSegmentMetadataFromServer(String tableNameWithType, Set<String> servers,
+      BiMap<String, String> endpoints, List<String> columns, int timeoutMs) {
+    LOGGER.debug("Reading segment metadata for all segments from servers for table {}.", tableNameWithType);
+    List<String> serverURLs = new ArrayList<>();
+    for (String server : servers) {
+      serverURLs.add(generateAllSegmentMetadataServerURL(tableNameWithType, columns, endpoints.get(server)));
+    }
+    BiMap<String, String> endpointsToServers = endpoints.inverse();
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, endpointsToServers);
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverURLs, tableNameWithType, true, timeoutMs);
+
+    List<String> segmentsMetadata = new ArrayList<>();
+    int failedParses = 0;
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      try {
+        List<String> segmentMetadataList =
+            JsonUtils.stringToObject(streamResponse.getValue(), new TypeReference<List<String>>() {
+            });
+        segmentsMetadata.addAll(segmentMetadataList);
+      } catch (Exception e) {
+        failedParses++;
+        LOGGER.error("Unable to parse server {} response due to an error: ", streamResponse.getKey(), e);
+      }
+    }
+    if (failedParses != 0) {
+      LOGGER.error("Unable to parse server {} / {} response due to an error: ", failedParses, serverURLs.size());
+    }
+
+    LOGGER.debug("Retrieved all segment metadata from servers.");
+    return segmentsMetadata;
+  }
+
+  /**
    * This method is called when the API request is to fetch data about segment reload of the table.
    * This method makes a MultiGet call to all servers that host their respective segments and gets the results.
    * This method will return metadata of all the servers along with need reload flag.
@@ -440,6 +483,12 @@ public class ServerSegmentMetadataReader {
     segmentName = URLEncoder.encode(segmentName, StandardCharsets.UTF_8);
     String paramsStr = generateColumnsParam(columns);
     return String.format("%s/tables/%s/segments/%s/metadata?%s", endpoint, tableNameWithType, segmentName, paramsStr);
+  }
+
+  private String generateAllSegmentMetadataServerURL(String tableNameWithType, List<String> columns, String endpoint) {
+    tableNameWithType = URLEncoder.encode(tableNameWithType, StandardCharsets.UTF_8);
+    String paramsStr = generateColumnsParam(columns);
+    return String.format("%s/tables/%s/segments/metadata?%s", endpoint, tableNameWithType, paramsStr);
   }
 
   private String generateCheckReloadSegmentsServerURL(String tableNameWithType, String endpoint) {

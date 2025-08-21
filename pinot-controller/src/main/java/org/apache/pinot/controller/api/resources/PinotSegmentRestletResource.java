@@ -1162,8 +1162,8 @@ public class PinotSegmentRestletResource {
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
-    return tableMetadataReader
-        .getSegmentsMetadata(tableNameWithType, columns, _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
+    return tableMetadataReader.getAllSegmentsMetadata(tableNameWithType, columns,
+        _controllerConf.getServerAdminRequestTimeoutSeconds() * 1000);
   }
 
   @POST

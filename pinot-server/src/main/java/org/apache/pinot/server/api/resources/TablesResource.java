@@ -410,6 +410,53 @@ public class TablesResource {
   }
 
   @GET
+  @Encoded
+  @Path("/tables/{tableName}/segments/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provide segment metadata for all segments not OFFLINE in IdealState",
+      notes = "Provide segments metadata for all segments of a table on the server which aren't OFFLINE in IdealState")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table not found", response = ErrorInfo.class)
+  })
+  public List<String> getAllSegmentsMetadata(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName,
+      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
+      List<String> columns, @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    for (int i = 0; i < columns.size(); i++) {
+      columns.set(i, URIUtils.decode(columns.get(i)));
+    }
+
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    List<SegmentDataManager> segmentDataManagers = tableDataManager.acquireAllSegments();
+    List<String> segmentMetadataList = new ArrayList<>();
+    try {
+      // The SegmentDataManager doesn't exist for OFFLINE segments as this is removed when a segment goes into OFFLINE
+      // state and is offloaded in the Helix state transition callback. So this naturally only returns data for
+      // segments which haven't been offloaded (and are not OFFLINE in IdealState)
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        String segmentName = segmentDataManager.getSegmentName();
+        try {
+          segmentMetadataList.add(SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, columns));
+        } catch (Exception e) {
+          LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentName);
+          throw new WebApplicationException("Failed to convert segment metadata to json",
+              Response.Status.INTERNAL_SERVER_ERROR);
+        }
+      }
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+
+    return segmentMetadataList;
+  }
+
+  @GET
   @Path("/tables/{tableName}/segments/crc")
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Provide segment crc information", notes = "Provide crc information for the segments on server")

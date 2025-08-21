@@ -163,14 +163,45 @@ public class TableMetadataReader {
     return JsonUtils.objectToJsonNode(response);
   }
 
+  private JsonNode getAllSegmentsMetadataInternal(String tableNameWithType, List<String> columns, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    final Map<String, List<String>> serverToSegmentsMap =
+        _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    BiMap<String, String> endpoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegmentsMap.keySet());
+    ServerSegmentMetadataReader serverSegmentMetadataReader =
+        new ServerSegmentMetadataReader(_executor, _connectionManager);
+
+    List<String> segmentsMetadata =
+        serverSegmentMetadataReader.getAllSegmentMetadataFromServer(tableNameWithType, serverToSegmentsMap.keySet(),
+            endpoints, columns, timeoutMs);
+
+    Map<String, JsonNode> response = new HashMap<>();
+    for (String segmentMetadata : segmentsMetadata) {
+      JsonNode responseJson = JsonUtils.stringToJsonNode(segmentMetadata);
+      response.put(responseJson.get("segmentName").asText(), responseJson);
+    }
+    return JsonUtils.objectToJsonNode(response);
+  }
+
   /**
-   * This method retrieves the full segment metadata for a given table.
+   * This method retrieves the full segment metadata for a given table. It creates a separate request per segment.
    * Currently supports only OFFLINE tables.
    * @return a map of segmentName to its metadata
    */
   public JsonNode getSegmentsMetadata(String tableNameWithType, List<String> columns, int timeoutMs)
       throws InvalidConfigException, IOException {
     return getSegmentsMetadataInternal(tableNameWithType, columns, null, timeoutMs);
+  }
+
+  /**
+   * This method retrieves the full segment metadata for a given table. It creates a single request per server.
+   * Currently supports only OFFLINE tables.
+   * @return a map of segmentName to its metadata
+   */
+  public JsonNode getAllSegmentsMetadata(String tableNameWithType, List<String> columns, int timeoutMs)
+      throws InvalidConfigException, IOException {
+    return getAllSegmentsMetadataInternal(tableNameWithType, columns, timeoutMs);
   }
 
   /**
