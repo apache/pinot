@@ -51,6 +51,7 @@ import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
+import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.AfterMethod;
@@ -299,6 +300,7 @@ public class ColumnMetadataTest {
     long hoursSinceEpoch = System.currentTimeMillis() / TimeUnit.HOURS.toMillis(1);
     // Use tolerance of 1 hour to eliminate any flakiness in the test due to time boundaries.
     Assert.assertTrue(hoursSinceEpoch - segmentMetadata.getEndTime() <= 1);
-    Assert.assertEquals(segmentMetadata.getStartTime(), 0);
+    Assert.assertEquals(segmentMetadata.getStartTime(),
+        TimeUnit.MILLISECONDS.toHours(TimeUtils.getValidMinTimeMillis()));
   }
 }
