@@ -182,7 +182,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         new PinotConfiguration(Map.of(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true"));
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
-        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", routingManager,
+        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
             new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
             new Tracing.DefaultThreadResourceUsageAccountant()) {
           @Override
