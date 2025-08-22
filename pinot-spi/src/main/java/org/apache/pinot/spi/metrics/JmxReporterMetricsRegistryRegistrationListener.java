@@ -24,8 +24,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Adapter that causes metrics from a metric registry to be published to JMX.
- *
+ * @deprecated use {@link MetricReporterRegistryRegistrationListener} instead.
  */
+@Deprecated
 public class JmxReporterMetricsRegistryRegistrationListener implements MetricsRegistryRegistrationListener {
   private static final Logger LOGGER = LoggerFactory.getLogger(JmxReporterMetricsRegistryRegistrationListener.class);
 
