@@ -395,6 +395,40 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true"));
   }
 
+  @Test
+  public void isNullAndComparisonWithoutNullHandling() {
+    setUseMultiStageQueryEngine(true);
+    String query = ""
+        + "SELECT 1 \n"
+        + "FROM " + getTableName() + " \n"
+        + "WHERE\n"
+        + "    salary IS NULL \n"
+        + "AND salary <> 0";
+
+    explainLogical(query,
+        "Execution Plan\n"
+            + "LogicalProject(EXPR$0=[1])\n"
+            + "  LogicalFilter(condition=[AND(IS NULL($7), <>($7, 0))])\n"
+            + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
+  }
+
+  @Test
+  public void isNullAndComparisonWithNullHandling() {
+    setUseMultiStageQueryEngine(true);
+    String query = ""
+        + "SELECT 1 \n"
+        + "FROM " + getTableName() + " \n"
+        + "WHERE \n"
+        + "    salary IS NULL "
+        + "AND salary <> 0";
+
+    explainLogical(query,
+        "Execution Plan\n"
+            + "LogicalValues(tuples=[[]])\n",
+        Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true"));
+  }
+
   @Override
   protected void overrideBrokerConf(PinotConfiguration brokerConf) {
     brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_BROKER_QUERY_ENABLE_NULL_HANDLING, "true");
