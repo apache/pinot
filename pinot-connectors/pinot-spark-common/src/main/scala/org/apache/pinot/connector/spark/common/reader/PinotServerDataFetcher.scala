@@ -48,9 +48,32 @@ private[reader] class PinotServerDataFetcher(
   private val metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry
   private val brokerMetrics = new BrokerMetrics(metricsRegistry)
   private val pinotConfig = new PinotConfiguration()
+  
+  // Configure TLS settings if HTTPS is enabled
+  if (dataSourceOptions.useHttps) {
+    // Set Pinot configuration for TLS
+    pinotConfig.setProperty("pinot.broker.client.protocol", "https")
+    pinotConfig.setProperty("pinot.broker.tls.enabled", "true")
+    
+    // Configure keystore if provided
+    dataSourceOptions.keystorePath.foreach { path =>
+      pinotConfig.setProperty("pinot.broker.tls.keystore.path", path)
+    }
+    dataSourceOptions.keystorePassword.foreach { password =>
+      pinotConfig.setProperty("pinot.broker.tls.keystore.password", password)
+    }
+    
+    // Configure truststore if provided
+    dataSourceOptions.truststorePath.foreach { path =>
+      pinotConfig.setProperty("pinot.broker.tls.truststore.path", path)
+    }
+    dataSourceOptions.truststorePassword.foreach { password =>
+      pinotConfig.setProperty("pinot.broker.tls.truststore.password", password)
+    }
+  }
+  
   private val serverRoutingStatsManager = new ServerRoutingStatsManager(pinotConfig, brokerMetrics)
   private val queryRouter = new QueryRouter(brokerId, brokerMetrics, serverRoutingStatsManager)
-  // TODO add support for TLS-secured server
 
   def fetchData(): List[DataTable] = {
     val routingTableForRequest = createRoutingTableForRequest()
@@ -98,7 +121,12 @@ private[reader] class PinotServerDataFetcher(
     val instanceConfig = new InstanceConfig(nullZkId)
     instanceConfig.setHostName(pinotSplit.serverAndSegments.serverHost)
     instanceConfig.setPort(pinotSplit.serverAndSegments.serverPort)
-    // TODO: support netty-sec
+    
+    // Configure TLS for server instance if HTTPS is enabled
+    if (dataSourceOptions.useHttps) {
+      instanceConfig.getRecord.setSimpleField("TLS_PORT", pinotSplit.serverAndSegments.serverPort)
+    }
+    
     val serverInstance = new ServerInstance(instanceConfig)
     Map(
       serverInstance -> new SegmentsToQuery(pinotSplit.serverAndSegments.segments.asJava, List[String]().asJava)

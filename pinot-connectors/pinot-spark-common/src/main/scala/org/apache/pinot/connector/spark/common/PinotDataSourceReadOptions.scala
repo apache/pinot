@@ -38,6 +38,13 @@ object PinotDataSourceReadOptions {
   var CONFIG_USE_GRPC_SERVER = "useGrpcServer"
   val CONFIG_QUERY_OPTIONS = "queryOptions"
   val CONFIG_FAIL_ON_INVALID_SEGMENTS = "failOnInvalidSegments"
+  val CONFIG_USE_HTTPS = "useHttps"
+  val CONFIG_KEYSTORE_PATH = "keystorePath"
+  val CONFIG_KEYSTORE_PASSWORD = "keystorePassword"
+  val CONFIG_TRUSTSTORE_PATH = "truststorePath"
+  val CONFIG_TRUSTSTORE_PASSWORD = "truststorePassword"
+  val CONFIG_AUTH_HEADER = "authHeader"
+  val CONFIG_AUTH_TOKEN = "authToken"
   val QUERY_OPTIONS_DELIMITER = ","
   private[pinot] val DEFAULT_CONTROLLER: String = "localhost:9000"
   private[pinot] val DEFAULT_USE_PUSH_DOWN_FILTERS: Boolean = true
@@ -45,6 +52,7 @@ object PinotDataSourceReadOptions {
   private[pinot] val DEFAULT_PINOT_SERVER_TIMEOUT_MS: Long = 10000
   private[pinot] val DEFAULT_USE_GRPC_SERVER: Boolean = false
   private[pinot] val DEFAULT_FAIL_ON_INVALID_SEGMENTS = false
+  private[pinot] val DEFAULT_USE_HTTPS: Boolean = false
 
   private[pinot] val tableTypes = Seq("OFFLINE", "REALTIME", "HYBRID")
 
@@ -74,9 +82,23 @@ object PinotDataSourceReadOptions {
 
     // pinot cluster options
     val controller = options.getOrDefault(CONFIG_CONTROLLER, DEFAULT_CONTROLLER)
+    // Parse HTTPS configuration early so it can be used for broker discovery
+    val useHttps = options.getBoolean(CONFIG_USE_HTTPS, DEFAULT_USE_HTTPS)
+    val keystorePath = Option(options.get(CONFIG_KEYSTORE_PATH)).filter(_.nonEmpty)
+    val keystorePassword = Option(options.get(CONFIG_KEYSTORE_PASSWORD)).filter(_.nonEmpty)
+    val truststorePath = Option(options.get(CONFIG_TRUSTSTORE_PATH)).filter(_.nonEmpty)
+    val truststorePassword = Option(options.get(CONFIG_TRUSTSTORE_PASSWORD)).filter(_.nonEmpty)
+    val authHeader = Option(options.get(CONFIG_AUTH_HEADER)).filter(_.nonEmpty)
+    val authToken = Option(options.get(CONFIG_AUTH_TOKEN)).filter(_.nonEmpty)
+
+    // Configure HTTPS client if needed
+    if (useHttps) {
+      HttpUtils.configureHttpsClient(keystorePath, keystorePassword, truststorePath, truststorePassword)
+    }
+
     val broker = options.get(PinotDataSourceReadOptions.CONFIG_BROKER) match {
       case s if s == null || s.isEmpty =>
-        val brokerInstances = PinotClusterClient.getBrokerInstances(controller, tableName)
+        val brokerInstances = PinotClusterClient.getBrokerInstances(controller, tableName, useHttps, authHeader, authToken)
         Random.shuffle(brokerInstances).head
       case s => s
     }
@@ -103,6 +125,13 @@ object PinotDataSourceReadOptions {
       useGrpcServer,
       queryOptions,
       failOnInvalidSegments,
+      useHttps,
+      keystorePath,
+      keystorePassword,
+      truststorePath,
+      truststorePassword,
+      authHeader,
+      authToken
     )
   }
 }
@@ -118,4 +147,11 @@ private[pinot] case class PinotDataSourceReadOptions(
     pinotServerTimeoutMs: Long,
     useGrpcServer: Boolean,
     queryOptions: Set[String],
-    failOnInvalidSegments: Boolean)
+    failOnInvalidSegments: Boolean,
+    useHttps: Boolean,
+    keystorePath: Option[String],
+    keystorePassword: Option[String],
+    truststorePath: Option[String],
+    truststorePassword: Option[String],
+    authHeader: Option[String],
+    authToken: Option[String])

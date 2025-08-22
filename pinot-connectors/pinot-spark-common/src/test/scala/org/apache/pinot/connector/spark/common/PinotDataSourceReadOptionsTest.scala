@@ -50,10 +50,121 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
         10000,
         useGrpcServer = false,
         Set("a=1", "b=2"),
-        failOnInvalidSegments = false
+        failOnInvalidSegments = false,
+        useHttps = false,
+        keystorePath = None,
+        keystorePassword = None,
+        truststorePath = None,
+        truststorePassword = None,
+        authHeader = None,
+        authToken = None
       )
 
     pinotDataSourceReadOptions shouldEqual expected
+  }
+
+  test("HTTPS configuration options should be parsed correctly") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
+      PinotDataSourceReadOptions.CONFIG_USE_HTTPS -> "false"  // Don't enable HTTPS to avoid early configuration
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    // Test that HTTPS defaults work correctly
+    pinotDataSourceReadOptions.useHttps shouldEqual false
+    pinotDataSourceReadOptions.keystorePath shouldEqual None
+    pinotDataSourceReadOptions.keystorePassword shouldEqual None
+    pinotDataSourceReadOptions.truststorePath shouldEqual None
+    pinotDataSourceReadOptions.truststorePassword shouldEqual None
+  }
+
+  test("HTTPS configuration should default to false with empty optional values") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000"
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.useHttps shouldEqual false
+    pinotDataSourceReadOptions.keystorePath shouldEqual None
+    pinotDataSourceReadOptions.keystorePassword shouldEqual None
+    pinotDataSourceReadOptions.truststorePath shouldEqual None
+    pinotDataSourceReadOptions.truststorePassword shouldEqual None
+  }
+
+  test("Empty HTTPS configuration values should be filtered out") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
+      PinotDataSourceReadOptions.CONFIG_USE_HTTPS -> "true",
+      PinotDataSourceReadOptions.CONFIG_KEYSTORE_PATH -> "",
+      PinotDataSourceReadOptions.CONFIG_KEYSTORE_PASSWORD -> "",
+      PinotDataSourceReadOptions.CONFIG_TRUSTSTORE_PATH -> "",
+      PinotDataSourceReadOptions.CONFIG_TRUSTSTORE_PASSWORD -> ""
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.useHttps shouldEqual true
+    pinotDataSourceReadOptions.keystorePath shouldEqual None
+    pinotDataSourceReadOptions.keystorePassword shouldEqual None
+    pinotDataSourceReadOptions.truststorePath shouldEqual None
+    pinotDataSourceReadOptions.truststorePassword shouldEqual None
+  }
+
+  test("Authentication header configuration should be parsed correctly") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
+      PinotDataSourceReadOptions.CONFIG_AUTH_HEADER -> "Authorization",
+      PinotDataSourceReadOptions.CONFIG_AUTH_TOKEN -> "Bearer my-token"
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.authHeader shouldEqual Some("Authorization")
+    pinotDataSourceReadOptions.authToken shouldEqual Some("Bearer my-token")
+  }
+
+  test("Authentication should default to empty when not provided") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000"
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.authHeader shouldEqual None
+    pinotDataSourceReadOptions.authToken shouldEqual None
+  }
+
+  test("Empty authentication values should be filtered out") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
+      PinotDataSourceReadOptions.CONFIG_AUTH_HEADER -> "",
+      PinotDataSourceReadOptions.CONFIG_AUTH_TOKEN -> ""
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.authHeader shouldEqual None
+    pinotDataSourceReadOptions.authToken shouldEqual None
   }
 
   test("Method should throw exception if `tableType` option is missing or wrong") {
