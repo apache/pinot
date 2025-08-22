@@ -26,6 +26,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotJmxReporter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
@@ -52,12 +53,23 @@ public class YammerMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  @Deprecated
   public <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
     return new YammerGauge<T>(condition);
   }
 
   @Override
+  public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+    return new YammerGauge<T>(condition);
+  }
+
+  @Override
   public PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
+    return new YammerJmxReporter(metricsRegistry);
+  }
+
+  @Override
+  public PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry) {
     return new YammerJmxReporter(metricsRegistry);
   }
 

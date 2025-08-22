@@ -16,28 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.compound;
+package org.apache.pinot.spi.metrics;
 
-import java.util.List;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
-
-
-/**
- * CompoundPinotJmxReporter is a composite reporter that aggregates multiple PinotJmxReporters.
- * @deprecated Use {@link org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricReporter} instead.
- */
-@Deprecated
-public class CompoundPinotJmxReporter implements PinotJmxReporter {
-  private final List<PinotJmxReporter> _reporters;
-
-  public CompoundPinotJmxReporter(List<PinotJmxReporter> reporters) {
-    _reporters = reporters;
-  }
-
-  @Override
-  public void start() {
-    for (PinotJmxReporter reporter : _reporters) {
-      reporter.start();
-    }
-  }
+public interface PinotMetricReporter extends PinotJmxReporter {
 }

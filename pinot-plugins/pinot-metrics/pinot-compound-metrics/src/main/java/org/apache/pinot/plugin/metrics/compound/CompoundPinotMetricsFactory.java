@@ -35,6 +35,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotJmxReporter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 import org.apache.pinot.spi.plugin.PluginManager;
@@ -144,6 +145,7 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  @Deprecated
   public <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
     List<PinotGauge<T>> gauges = _factories.stream()
         .map(factory -> factory.makePinotGauge(condition))
@@ -152,6 +154,18 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+    List<PinotGauge<T>> gauges = _factories.stream()
+        .map(factory -> factory.makePinotGauge(metricName, condition))
+        .collect(Collectors.toList());
+    return new CompoundPinotGauge<T>(gauges);
+  }
+
+  /**
+   * @deprecated Use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
+   */
+  @Override
+  @Deprecated
   public PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
     CompoundPinotMetricRegistry registry = (CompoundPinotMetricRegistry) metricsRegistry;
     List<PinotMetricsRegistry> subRegistries = registry.getRegistries();
@@ -164,10 +178,28 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
       PinotMetricsFactory subFactory = _factories.get(i);
       PinotMetricsRegistry subRegistry = subRegistries.get(i);
 
-      subJmx.add(subFactory.makePinotJmxReporter(subRegistry));
+      subJmx.add(subFactory.makePinotMetricReporter(subRegistry));
     }
 
     return new CompoundPinotJmxReporter(subJmx);
+  }
+
+  public PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry) {
+    CompoundPinotMetricRegistry registry = (CompoundPinotMetricRegistry) metricsRegistry;
+    List<PinotMetricsRegistry> subRegistries = registry.getRegistries();
+    Preconditions.checkState(subRegistries.size() == _factories.size(),
+        "Number of registries ({}) should be the same than the number of factories ({})",
+        subRegistries.size(), _factories.size());
+
+    ArrayList<PinotMetricReporter> subReporter = new ArrayList<>(_factories.size());
+    for (int i = 0; i < _factories.size(); i++) {
+      PinotMetricsFactory subFactory = _factories.get(i);
+      PinotMetricsRegistry subRegistry = subRegistries.get(i);
+
+      subReporter.add(subFactory.makePinotMetricReporter(subRegistry));
+    }
+
+    return new CompoundPinotMetricReporter(subReporter);
   }
 
   @Override

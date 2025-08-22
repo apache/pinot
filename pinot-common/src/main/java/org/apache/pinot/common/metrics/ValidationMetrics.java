@@ -57,7 +57,7 @@ public class ValidationMetrics {
 
     @Override
     public Object getGauge() {
-      return PinotMetricUtils.makePinotGauge(avoid -> value()).getGauge();
+      return PinotMetricUtils.makePinotGauge(_key, avoid -> value()).getGauge();
     }
 
     @Override
@@ -92,10 +92,9 @@ public class ValidationMetrics {
     public Object getMetric() {
       return getGauge();
     }
-
     @Override
     public Object getGauge() {
-      return PinotMetricUtils.makePinotGauge(avoid -> value()).getGauge();
+      return PinotMetricUtils.makePinotGauge(_key, avoid -> value()).getGauge();
     }
   }
 

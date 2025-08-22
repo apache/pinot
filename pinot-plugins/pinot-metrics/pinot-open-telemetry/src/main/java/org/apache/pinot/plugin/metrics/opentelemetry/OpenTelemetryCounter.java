@@ -16,28 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.compound;
+package org.apache.pinot.plugin.metrics.opentelemetry;
 
-import java.util.List;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import io.opentelemetry.api.metrics.LongCounter;
+import org.apache.pinot.spi.metrics.PinotCounter;
 
 
-/**
- * CompoundPinotJmxReporter is a composite reporter that aggregates multiple PinotJmxReporters.
- * @deprecated Use {@link org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricReporter} instead.
- */
-@Deprecated
-public class CompoundPinotJmxReporter implements PinotJmxReporter {
-  private final List<PinotJmxReporter> _reporters;
+public class OpenTelemetryCounter implements PinotCounter {
+  private final OpenTelemetryMetricName _metricName;
+  private final LongCounter _counter;
 
-  public CompoundPinotJmxReporter(List<PinotJmxReporter> reporters) {
-    _reporters = reporters;
+  public OpenTelemetryCounter(OpenTelemetryMetricName metricName) {
+    _metricName = metricName;
+    _counter = OpenTelemetryMetricsRegistry.OTEL_METER_PROVIDER.counterBuilder(metricName.getOtelMetricName()).build();
   }
 
   @Override
-  public void start() {
-    for (PinotJmxReporter reporter : _reporters) {
-      reporter.start();
-    }
+  public Object getCounter() {
+    return _counter;
+  }
+
+  @Override
+  public Object getMetric() {
+    return _counter;
   }
 }
