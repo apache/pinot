@@ -26,13 +26,18 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * Default implementation of TenantRebalanceContext that includes parallel and sequential queues
- * for managing tenant rebalance operations.
+ * for managing tenant rebalance operations. This context is synchronized to ZK by `ZkBasedTenantRebalanceObserver`
+ * to ensure consistency across controller restarts.
  */
 public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
+  // Ongoing jobs queue and parallel queue are accessed concurrently by multiple threads, where each worker thread
+  // consumes a tenant-table-rebalance-job from the parallel queue, adds it to the ongoing jobs queue, processes it.
+  // On the other hand, only a single thread consumes from the sequential queue.
+  private final ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> _ongoingJobsQueue;
   private final ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> _parallelQueue;
   private final Queue<TenantRebalancer.TenantTableRebalanceJobContext> _sequentialQueue;
-  private final ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> _ongoingJobsQueue;
 
+  // Default constructor for JSON deserialization
   public DefaultTenantRebalanceContext() {
     super();
     _parallelQueue = new ConcurrentLinkedDeque<>();

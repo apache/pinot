@@ -932,7 +932,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         _controllerMetrics, _utilizationCheckers, _executorService, _helixResourceManager);
     periodicTasks.add(resourceUtilizationChecker);
     PeriodicTask tenantRebalanceChecker =
-        new TenantRebalanceChecker(_config, _controllerMetrics, _helixResourceManager, _tenantRebalancer);
+        new TenantRebalanceChecker(_config, _helixResourceManager, _tenantRebalancer);
     periodicTasks.add(tenantRebalanceChecker);
 
     return periodicTasks;

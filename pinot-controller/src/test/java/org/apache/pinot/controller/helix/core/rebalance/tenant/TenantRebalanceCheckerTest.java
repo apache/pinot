@@ -97,7 +97,6 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
 
     _tenantRebalanceChecker = new TenantRebalanceChecker(
         _mockControllerConf,
-        _mockControllerMetrics,
         _mockPinotHelixResourceManager,
         _mockTenantRebalancer
     );
