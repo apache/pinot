@@ -558,29 +558,28 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
         } catch (Exception e) {
           if (!_config.isContinueOnError()) {
             throw e;
-          } else {
-            TimeUnit timeUnit;
-            long now = System.currentTimeMillis();
-            long convertedStartTime;
-            long convertedEndTime;
-            if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
-              convertedEndTime = now;
-              convertedStartTime = TimeUtils.getValidMinTimeMillis();
-              timeUnit = TimeUnit.MILLISECONDS;
-            } else {
-              timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
-              convertedEndTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
-              convertedStartTime = timeUnit.convert(TimeUtils.getValidMinTimeMillis(), TimeUnit.MILLISECONDS);
-            }
-            LOGGER.warn(
-                "Caught exception while writing time metadata for segment: {}, time column: {}, total docs: {}. "
-                    + "Continuing using current time ({}) as the end time, and min valid time ({}) as the start time "
-                    + "for the segment (time unit: {}).",
-                _segmentName, timeColumnName, _totalDocs, convertedEndTime, convertedStartTime, timeUnit, e);
-            properties.setProperty(SEGMENT_START_TIME, convertedStartTime);
-            properties.setProperty(SEGMENT_END_TIME, convertedEndTime);
-            properties.setProperty(TIME_UNIT, timeUnit);
           }
+          TimeUnit timeUnit;
+          long now = System.currentTimeMillis();
+          long convertedStartTime;
+          long convertedEndTime;
+          if (_config.getTimeColumnType() == SegmentGeneratorConfig.TimeColumnType.SIMPLE_DATE) {
+            convertedEndTime = now;
+            convertedStartTime = TimeUtils.getValidMinTimeMillis();
+            timeUnit = TimeUnit.MILLISECONDS;
+          } else {
+            timeUnit = Preconditions.checkNotNull(_config.getSegmentTimeUnit());
+            convertedEndTime = timeUnit.convert(now, TimeUnit.MILLISECONDS);
+            convertedStartTime = timeUnit.convert(TimeUtils.getValidMinTimeMillis(), TimeUnit.MILLISECONDS);
+          }
+          LOGGER.warn(
+              "Caught exception while writing time metadata for segment: {}, time column: {}, total docs: {}. "
+                  + "Continuing using current time ({}) as the end time, and min valid time ({}) as the start time "
+                  + "for the segment (time unit: {}).",
+              _segmentName, timeColumnName, _totalDocs, convertedEndTime, convertedStartTime, timeUnit, e);
+          properties.setProperty(SEGMENT_START_TIME, convertedStartTime);
+          properties.setProperty(SEGMENT_END_TIME, convertedEndTime);
+          properties.setProperty(TIME_UNIT, timeUnit);
         }
       }
     }
