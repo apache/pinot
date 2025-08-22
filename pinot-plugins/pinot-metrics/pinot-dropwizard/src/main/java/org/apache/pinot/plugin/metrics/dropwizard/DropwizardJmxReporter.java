@@ -20,11 +20,13 @@ package org.apache.pinot.plugin.metrics.dropwizard;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.jmx.JmxReporter;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
-
-public class DropwizardJmxReporter implements PinotJmxReporter {
+/**
+ * DropwizardJmxReporter is a metric reporter that exposes metrics to JMX using Dropwizard's JmxReporter.
+ */
+public class DropwizardJmxReporter implements PinotMetricReporter {
   private final JmxReporter _jmxReporter;
 
   public DropwizardJmxReporter(PinotMetricsRegistry metricsRegistry, String domainName) {

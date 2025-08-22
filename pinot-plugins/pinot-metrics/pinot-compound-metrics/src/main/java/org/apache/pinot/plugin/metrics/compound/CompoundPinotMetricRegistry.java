@@ -72,8 +72,8 @@ public class CompoundPinotMetricRegistry implements PinotMetricsRegistry {
       return (PinotGauge<T>) _allMetrics.computeIfAbsent(name,
           key -> new CompoundPinotGauge<>(map(key, (reg, subName) -> reg.newGauge(subName, null))));
     } else {
-      CompoundPinotGauge<T> compoundGauge =
-          (CompoundPinotGauge<T>) PinotMetricUtils.makePinotGauge(avoid -> gauge.value());
+      CompoundPinotGauge<T> compoundGauge = (CompoundPinotGauge<T>) PinotMetricUtils
+              .makePinotGauge(name.getMetricName().toString(), avoid -> gauge.value());
 
       Function<PinotMetricName, CompoundPinotGauge<?>> creator = key -> {
         CompoundPinotMetricName compoundName = (CompoundPinotMetricName) key;
