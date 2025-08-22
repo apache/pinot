@@ -101,7 +101,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
     Queue<TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
     DefaultTenantRebalanceContext tenantRebalanceContext =
-        DefaultTenantRebalanceContext.forInitialRebalance(tenantRebalanceJobId, config, false, parallelQueue,
+        DefaultTenantRebalanceContext.forInitialRebalance(tenantRebalanceJobId, config, parallelQueue,
             sequentialQueue);
 
     ZkBasedTenantRebalanceObserver observer =

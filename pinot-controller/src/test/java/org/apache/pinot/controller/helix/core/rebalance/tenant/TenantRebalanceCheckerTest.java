@@ -150,7 +150,6 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     assertEquals(resumedContext.getOriginalJobId(), ORIGINAL_JOB_ID);
     assertEquals(resumedContext.getAttemptId(), 2); // Should be incremented from 1
     assertEquals(resumedContext.getConfig().getTenantName(), TENANT_NAME);
-    assertTrue(resumedContext.getAllowRetries());
 
     // Verify that the stuck table job context was moved back to parallel queue
     TenantRebalancer.TenantTableRebalanceJobContext firstJobContextInParallelQueue =
@@ -375,7 +374,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     ongoingJobsQueue.add(stuckJobContext);
 
     return new DefaultTenantRebalanceContext(
-        ORIGINAL_JOB_ID, config, 1, false, parallelQueue,
+        ORIGINAL_JOB_ID, config, 1, parallelQueue,
         new ConcurrentLinkedQueue<>(), ongoingJobsQueue);
   }
 
@@ -396,7 +395,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
         new TenantRebalancer.TenantTableRebalanceJobContext(TABLE_NAME_2, STUCK_TABLE_JOB_ID_2, false));
 
     return new DefaultTenantRebalanceContext(
-        ORIGINAL_JOB_ID, config, 1, true, parallelQueue,
+        ORIGINAL_JOB_ID, config, 1, parallelQueue,
         new ConcurrentLinkedQueue<>(), ongoingJobsQueue);
   }
 
@@ -412,7 +411,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     parallelQueue.add(new TenantRebalancer.TenantTableRebalanceJobContext(TABLE_NAME_1, NON_STUCK_TABLE_JOB_ID, false));
 
     return new DefaultTenantRebalanceContext(
-        ORIGINAL_JOB_ID, config, 1, true, parallelQueue,
+        ORIGINAL_JOB_ID, config, 1, parallelQueue,
         new ConcurrentLinkedQueue<>(), new ConcurrentLinkedQueue<>());
   }
 
@@ -428,7 +427,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     ongoing.add(new TenantRebalancer.TenantTableRebalanceJobContext(TABLE_NAME_1, NON_STUCK_TABLE_JOB_ID, false));
 
     return new DefaultTenantRebalanceContext(
-        ORIGINAL_JOB_ID, config, 1, true, new ConcurrentLinkedDeque<>(),
+        ORIGINAL_JOB_ID, config, 1, new ConcurrentLinkedDeque<>(),
         new ConcurrentLinkedQueue<>(), ongoing);
   }
 
@@ -439,7 +438,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     config.setHeartbeatTimeoutInMs(300000L);
 
     return new DefaultTenantRebalanceContext(
-        ORIGINAL_JOB_ID, config, 1, true,
+        ORIGINAL_JOB_ID, config, 1,
         new ConcurrentLinkedDeque<>(), new ConcurrentLinkedQueue<>(), new ConcurrentLinkedQueue<>());
   }
 
@@ -450,7 +449,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     config.setHeartbeatTimeoutInMs(300000L);
 
     return new DefaultTenantRebalanceContext(
-        ORIGINAL_JOB_ID, config, 1, true,
+        ORIGINAL_JOB_ID, config, 1,
         new ConcurrentLinkedDeque<>(), new ConcurrentLinkedQueue<>(), new ConcurrentLinkedQueue<>());
   }
 
