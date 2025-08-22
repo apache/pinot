@@ -35,21 +35,16 @@ public abstract class TenantRebalanceContext {
   private final TenantRebalanceConfig _config;
   @JsonProperty("attemptId")
   private final int _attemptId;
-  // Default to true for all user initiated rebalances, so that they can be retried if they fail or get stuck.
-  @JsonProperty("allowRetries")
-  private final boolean _allowRetries;
 
   public TenantRebalanceContext() {
-    this(null, null, INITIAL_ATTEMPT_ID, true);
+    this(null, null, INITIAL_ATTEMPT_ID);
   }
 
-  protected TenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId,
-      boolean allowRetries) {
+  protected TenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId) {
     _jobId = createAttemptJobId(originalJobId, attemptId);
     _originalJobId = originalJobId;
     _config = config;
     _attemptId = attemptId;
-    _allowRetries = allowRetries;
   }
 
   public int getAttemptId() {
@@ -68,14 +63,10 @@ public abstract class TenantRebalanceContext {
     return _config;
   }
 
-  public boolean getAllowRetries() {
-    return _allowRetries;
-  }
-
   @Override
   public String toString() {
     return "TenantRebalanceContext{" + "_jobId='" + _jobId + '\'' + ", _originalJobId='" + _originalJobId + '\''
-        + ", _config=" + _config + ", _attemptId=" + _attemptId + ", _allowRetries=" + _allowRetries + "}";
+        + ", _config=" + _config + ", _attemptId=" + _attemptId  + "}";
   }
 
   private static String createAttemptJobId(String originalJobId, int attemptId) {

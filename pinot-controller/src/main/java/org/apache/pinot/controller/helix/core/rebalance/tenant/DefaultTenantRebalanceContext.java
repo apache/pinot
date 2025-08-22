@@ -46,19 +46,19 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
   }
 
   public DefaultTenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId,
-      boolean allowRetries, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
+      ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
       ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
-    super(originalJobId, config, attemptId, allowRetries);
+    super(originalJobId, config, attemptId);
     _parallelQueue = new ConcurrentLinkedDeque<>(parallelQueue);
     _sequentialQueue = new LinkedList<>(sequentialQueue);
     _ongoingJobsQueue = new ConcurrentLinkedQueue<>(ongoingJobsQueue);
   }
 
   public static DefaultTenantRebalanceContext forInitialRebalance(String originalJobId, TenantRebalanceConfig config,
-      boolean allowRetries, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
+      ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue) {
-    return new DefaultTenantRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID, allowRetries,
+    return new DefaultTenantRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID,
         parallelQueue, sequentialQueue, new ConcurrentLinkedQueue<>());
   }
 
@@ -66,7 +66,7 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
       int attemptId, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
       ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
-    return new DefaultTenantRebalanceContext(originalJobId, config, attemptId, true,
+    return new DefaultTenantRebalanceContext(originalJobId, config, attemptId,
         parallelQueue, sequentialQueue, ongoingJobsQueue);
   }
 
@@ -85,7 +85,7 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
   @Override
   public String toString() {
     return "DefaultTenantRebalanceContext{" + "jobId='" + getJobId() + '\'' + ", originalJobId='" + getOriginalJobId()
-        + '\'' + ", attemptId=" + getAttemptId() + ", allowRetries=" + getAllowRetries() + ", parallelQueueSize="
+        + '\'' + ", attemptId=" + getAttemptId() + ", parallelQueueSize="
         + getParallelQueue().size() + ", sequentialQueueSize=" + getSequentialQueue().size() + ", ongoingJobsQueueSize="
         + getOngoingJobsQueue().size() + '}';
   }
