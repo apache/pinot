@@ -72,6 +72,38 @@ private[reader] class PinotServerDataFetcher(
     }
   }
   
+  // Configure gRPC settings
+  pinotConfig.setProperty("pinot.broker.grpc.port", dataSourceOptions.grpcPort.toString)
+  pinotConfig.setProperty("pinot.broker.grpc.max.inbound.message.size", dataSourceOptions.grpcMaxInboundMessageSize.toString)
+  pinotConfig.setProperty("pinot.broker.grpc.tls.enabled", (!dataSourceOptions.grpcUsePlainText).toString)
+  
+  // Configure gRPC TLS settings if not using plain text
+  if (!dataSourceOptions.grpcUsePlainText) {
+    pinotConfig.setProperty("pinot.broker.grpc.tls.keystore.type", dataSourceOptions.grpcTlsKeystoreType)
+    dataSourceOptions.grpcTlsKeystorePath.foreach { path =>
+      pinotConfig.setProperty("pinot.broker.grpc.tls.keystore.path", path)
+    }
+    dataSourceOptions.grpcTlsKeystorePassword.foreach { password =>
+      pinotConfig.setProperty("pinot.broker.grpc.tls.keystore.password", password)
+    }
+    pinotConfig.setProperty("pinot.broker.grpc.tls.truststore.type", dataSourceOptions.grpcTlsTruststoreType)
+    dataSourceOptions.grpcTlsTruststorePath.foreach { path =>
+      pinotConfig.setProperty("pinot.broker.grpc.tls.truststore.path", path)
+    }
+    dataSourceOptions.grpcTlsTruststorePassword.foreach { password =>
+      pinotConfig.setProperty("pinot.broker.grpc.tls.truststore.password", password)
+    }
+    pinotConfig.setProperty("pinot.broker.grpc.tls.ssl.provider", dataSourceOptions.grpcTlsSslProvider)
+  }
+  
+  // Configure proxy settings if enabled
+  if (dataSourceOptions.proxyEnabled) {
+    pinotConfig.setProperty("pinot.broker.proxy.enabled", "true")
+    dataSourceOptions.grpcProxyUri.foreach { proxyUri =>
+      pinotConfig.setProperty("pinot.broker.grpc.proxy.uri", proxyUri)
+    }
+  }
+  
   private val serverRoutingStatsManager = new ServerRoutingStatsManager(pinotConfig, brokerMetrics)
   private val queryRouter = new QueryRouter(brokerId, brokerMetrics, serverRoutingStatsManager)
 
@@ -125,6 +157,23 @@ private[reader] class PinotServerDataFetcher(
     // Configure TLS for server instance if HTTPS is enabled
     if (dataSourceOptions.useHttps) {
       instanceConfig.getRecord.setSimpleField("TLS_PORT", pinotSplit.serverAndSegments.serverPort)
+    }
+    
+    // Configure gRPC port
+    instanceConfig.getRecord.setSimpleField("GRPC_PORT", dataSourceOptions.grpcPort.toString)
+    
+    // Configure proxy forwarding if enabled
+    if (dataSourceOptions.proxyEnabled && dataSourceOptions.grpcProxyUri.isDefined) {
+      // When using proxy, the server instance should point to the proxy
+      val proxyUri = dataSourceOptions.grpcProxyUri.get
+      val (proxyHost, proxyPort) = org.apache.pinot.connector.spark.common.NetUtils.parseHostPort(proxyUri, dataSourceOptions.grpcUsePlainText)
+      instanceConfig.setHostName(proxyHost)
+      instanceConfig.setPort(proxyPort)
+      instanceConfig.getRecord.setSimpleField("GRPC_PORT", proxyPort)
+      
+      // Store original target for proxy headers
+      instanceConfig.getRecord.setSimpleField("FORWARD_HOST", pinotSplit.serverAndSegments.serverHost)
+      instanceConfig.getRecord.setSimpleField("FORWARD_PORT", pinotSplit.serverAndSegments.serverPort)
     }
     
     val serverInstance = new ServerInstance(instanceConfig)

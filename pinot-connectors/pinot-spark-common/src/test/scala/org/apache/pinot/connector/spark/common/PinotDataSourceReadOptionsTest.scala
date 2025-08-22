@@ -57,7 +57,19 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
         truststorePath = None,
         truststorePassword = None,
         authHeader = None,
-        authToken = None
+        authToken = None,
+        proxyEnabled = false,
+        grpcPort = 8090,
+        grpcMaxInboundMessageSize = 134217728L,
+        grpcUsePlainText = true,
+        grpcTlsKeystoreType = "JKS",
+        grpcTlsKeystorePath = None,
+        grpcTlsKeystorePassword = None,
+        grpcTlsTruststoreType = "JKS",
+        grpcTlsTruststorePath = None,
+        grpcTlsTruststorePassword = None,
+        grpcTlsSslProvider = "JDK",
+        grpcProxyUri = None
       )
 
     pinotDataSourceReadOptions shouldEqual expected
@@ -165,6 +177,112 @@ class PinotDataSourceReadOptionsTest extends BaseTest {
 
     pinotDataSourceReadOptions.authHeader shouldEqual None
     pinotDataSourceReadOptions.authToken shouldEqual None
+  }
+
+  test("Proxy configuration options should be parsed correctly") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
+      PinotDataSourceReadOptions.CONFIG_PROXY_ENABLED -> "true"
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.proxyEnabled shouldEqual true
+  }
+
+  test("Proxy should default to false when not provided") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000"
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.proxyEnabled shouldEqual false
+  }
+
+  test("gRPC configuration options should be parsed correctly") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
+      PinotDataSourceReadOptions.CONFIG_GRPC_PORT -> "8091",
+      PinotDataSourceReadOptions.CONFIG_GRPC_MAX_INBOUND_MESSAGE_SIZE -> "256000000",
+      PinotDataSourceReadOptions.CONFIG_GRPC_USE_PLAIN_TEXT -> "false",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_KEYSTORE_TYPE -> "PKCS12",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_KEYSTORE_PATH -> "/path/to/grpc/keystore.p12",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_KEYSTORE_PASSWORD -> "grpc-keystore-pass",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_TRUSTSTORE_TYPE -> "PKCS12",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_TRUSTSTORE_PATH -> "/path/to/grpc/truststore.p12",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_TRUSTSTORE_PASSWORD -> "grpc-truststore-pass",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_SSL_PROVIDER -> "OPENSSL",
+      PinotDataSourceReadOptions.CONFIG_GRPC_PROXY_URI -> "proxy-host:8094"
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.grpcPort shouldEqual 8091
+    pinotDataSourceReadOptions.grpcMaxInboundMessageSize shouldEqual 256000000L
+    pinotDataSourceReadOptions.grpcUsePlainText shouldEqual false
+    pinotDataSourceReadOptions.grpcTlsKeystoreType shouldEqual "PKCS12"
+    pinotDataSourceReadOptions.grpcTlsKeystorePath shouldEqual Some("/path/to/grpc/keystore.p12")
+    pinotDataSourceReadOptions.grpcTlsKeystorePassword shouldEqual Some("grpc-keystore-pass")
+    pinotDataSourceReadOptions.grpcTlsTruststoreType shouldEqual "PKCS12"
+    pinotDataSourceReadOptions.grpcTlsTruststorePath shouldEqual Some("/path/to/grpc/truststore.p12")
+    pinotDataSourceReadOptions.grpcTlsTruststorePassword shouldEqual Some("grpc-truststore-pass")
+    pinotDataSourceReadOptions.grpcTlsSslProvider shouldEqual "OPENSSL"
+    pinotDataSourceReadOptions.grpcProxyUri shouldEqual Some("proxy-host:8094")
+  }
+
+  test("gRPC configuration should use default values when not provided") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000"
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.grpcPort shouldEqual 8090
+    pinotDataSourceReadOptions.grpcMaxInboundMessageSize shouldEqual 134217728L // 128MB
+    pinotDataSourceReadOptions.grpcUsePlainText shouldEqual true
+    pinotDataSourceReadOptions.grpcTlsKeystoreType shouldEqual "JKS"
+    pinotDataSourceReadOptions.grpcTlsKeystorePath shouldEqual None
+    pinotDataSourceReadOptions.grpcTlsKeystorePassword shouldEqual None
+    pinotDataSourceReadOptions.grpcTlsTruststoreType shouldEqual "JKS"
+    pinotDataSourceReadOptions.grpcTlsTruststorePath shouldEqual None
+    pinotDataSourceReadOptions.grpcTlsTruststorePassword shouldEqual None
+    pinotDataSourceReadOptions.grpcTlsSslProvider shouldEqual "JDK"
+    pinotDataSourceReadOptions.grpcProxyUri shouldEqual None
+  }
+
+  test("Empty gRPC configuration values should be filtered out") {
+    val options = Map(
+      PinotDataSourceReadOptions.CONFIG_TABLE_NAME -> "tbl",
+      PinotDataSourceReadOptions.CONFIG_TABLE_TYPE -> "offline",
+      PinotDataSourceReadOptions.CONFIG_CONTROLLER -> "localhost:9000",
+      PinotDataSourceReadOptions.CONFIG_BROKER -> "localhost:8000",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_KEYSTORE_PATH -> "",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_KEYSTORE_PASSWORD -> "",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_TRUSTSTORE_PATH -> "",
+      PinotDataSourceReadOptions.CONFIG_GRPC_TLS_TRUSTSTORE_PASSWORD -> "",
+      PinotDataSourceReadOptions.CONFIG_GRPC_PROXY_URI -> ""
+    )
+
+    val pinotDataSourceReadOptions = PinotDataSourceReadOptions.from(options.asJava)
+
+    pinotDataSourceReadOptions.grpcTlsKeystorePath shouldEqual None
+    pinotDataSourceReadOptions.grpcTlsKeystorePassword shouldEqual None
+    pinotDataSourceReadOptions.grpcTlsTruststorePath shouldEqual None
+    pinotDataSourceReadOptions.grpcTlsTruststorePassword shouldEqual None
+    pinotDataSourceReadOptions.grpcProxyUri shouldEqual None
   }
 
   test("Method should throw exception if `tableType` option is missing or wrong") {
