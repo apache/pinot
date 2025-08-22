@@ -135,6 +135,41 @@ private[pinot] object HttpUtils extends Logging {
     executeRequest(requestBuilder.build(), uri.getScheme.toLowerCase == "https")
   }
 
+  /**
+   * Send GET request with proxy headers for forwarding to the actual Pinot service
+   * This method adds FORWARD_HOST and FORWARD_PORT headers as required by Pinot proxy
+   */
+  def sendGetRequestWithProxyHeaders(uri: URI, 
+                                    authHeader: Option[String], 
+                                    authToken: Option[String],
+                                    serviceType: String,
+                                    targetHost: String): String = {
+    val requestBuilder = ClassicRequestBuilder.get(uri)
+    
+    // Add authentication header if provided
+    (authHeader, authToken) match {
+      case (Some(header), Some(token)) =>
+        requestBuilder.addHeader(header, token)
+      case (Some(header), None) =>
+        logWarning(s"Authentication header '$header' provided but no token specified")
+      case (None, Some(token)) =>
+        // Default to Authorization Bearer if only token is provided
+        requestBuilder.addHeader("Authorization", s"Bearer $token")
+      case (None, None) =>
+        // No authentication
+    }
+    
+    // Add proxy forwarding headers as used by Pinot proxy
+    // Parse host and port from targetHost (format: host:port)
+    val Array(host, port) = targetHost.split(":")
+    requestBuilder.addHeader("FORWARD_HOST", host)
+    requestBuilder.addHeader("FORWARD_PORT", port)
+    
+    logDebug(s"Sending proxy request to $uri with forward headers: host=$host, port=$port")
+    
+    executeRequest(requestBuilder.build(), uri.getScheme.toLowerCase == "https")
+  }
+
   private def executeRequest(httpRequest: ClassicHttpRequest, useHttps: Boolean = false): String = {
     val client = if (useHttps) {
       httpsClient.getOrElse {
