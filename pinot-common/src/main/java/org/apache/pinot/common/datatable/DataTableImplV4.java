@@ -381,7 +381,9 @@ public class DataTableImplV4 implements DataTable {
     int numEntriesAdded = 0;
     for (String entry : _stringDictionary) {
       Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(numEntriesAdded);
-      byte[] valueBytes = entry.getBytes(UTF_8);
+      // It is strange to find nulls in the dictionary, but it could happen when
+      // string arrays contain nulls
+      byte[] valueBytes = entry == null ? new byte[0] : entry.getBytes(UTF_8);
       dataOutputStream.writeInt(valueBytes.length);
       dataOutputStream.write(valueBytes);
       numEntriesAdded++;
