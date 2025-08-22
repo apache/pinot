@@ -19,10 +19,7 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.mutable.MutableForwardIndex;
@@ -56,10 +53,10 @@ public class CompactedDictEncodedColumnStatistics extends MutableColumnStatistic
     super(dataSource, sortedDocIds);
     _dataSource = dataSource;
 
-    String columnName = dataSource.getDataSourceMetadata().getFieldSpec().getName();
-
     // Find which dictionary IDs are actually used by valid documents
+    // AND collect the unique values at the same time to avoid duplicate dictionary lookups
     _usedDictIds = new HashSet<>();
+    Set<Comparable<Object>> usedValues = new HashSet<>(); // Store unique values in valid docs (not sorted)
     MutableForwardIndex forwardIndex = (MutableForwardIndex) dataSource.getForwardIndex();
     Dictionary dictionary = dataSource.getDictionary();
 
@@ -69,54 +66,44 @@ public class CompactedDictEncodedColumnStatistics extends MutableColumnStatistic
     while (iterator.hasNext()) {
       int docId = iterator.next();
       if (isSingleValue) {
-        // Single-value column: use getDictId()
         int dictId = forwardIndex.getDictId(docId);
-        _usedDictIds.add(dictId);
         _totalNumberOfEntries++; // Count each valid document
 
-        // Track min/max values
-        Object value = dictionary.get(dictId);
-        updateMinMaxValue(value);
+        if (_usedDictIds.add(dictId)) {
+          Comparable<Object> value = (Comparable<Object>) dictionary.get(dictId);
+          usedValues.add(value);
+          updateMinMaxValue(value);
+        }
       } else {
-        // Multi-value column: use getDictIdMV()
         int[] dictIds = forwardIndex.getDictIdMV(docId);
         _totalNumberOfEntries += dictIds.length; // Count all values in this document
         _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, dictIds.length);
         for (int dictId : dictIds) {
-          _usedDictIds.add(dictId);
-
-          // Track min/max values
-          Object value = dictionary.get(dictId);
-          updateMinMaxValue(value);
+          if (_usedDictIds.add(dictId)) {
+            Comparable<Object> value = (Comparable<Object>) dictionary.get(dictId);
+            usedValues.add(value);
+            updateMinMaxValue(value);
+          }
         }
       }
     }
 
     _compactedCardinality = _usedDictIds.size();
 
-    // Create compacted unique values array with only used dictionary values
+    // Iterate through the already-sorted original values and directly populate the compacted array by keeping the
+    // used values
     Object originalValues = dictionary.getSortedValues();
-
-    /* Extract the used values and sort them by value (not by dictionary ID).
-    Note: We cannot simply iterate getSortedValues() and filter by _usedDictIds because that would require calling
-    dictionary.indexOf() for each value, resulting in O(n²) complexity for mutable dictionaries. Instead, we collect
-    the used values directly using the known dictionary IDs and sort them. */
-    List<Comparable<Object>> usedValues = new ArrayList<>();
-    for (Integer dictId : _usedDictIds) {
-      Comparable<Object> value = (Comparable<Object>) dictionary.get(dictId);
-      usedValues.add(value);
-    }
-
-    // Sort by values to ensure the compacted array is value-sorted
-    usedValues.sort(Comparator.naturalOrder());
-
-    // Create a compacted array containing only the used dictionary values in sorted order by value
     Class<?> componentType = originalValues.getClass().getComponentType();
     Object compacted = Array.newInstance(componentType, _compactedCardinality);
 
-    for (int i = 0; i < _compactedCardinality; i++) {
-      Array.set(compacted, i, usedValues.get(i));
+    int compactedIndex = 0;
+    for (int i = 0; i < Array.getLength(originalValues); i++) {
+      Object value = Array.get(originalValues, i);
+      if (usedValues.contains(value)) {
+        Array.set(compacted, compactedIndex++, value);
+      }
     }
+
     _compactedUniqueValues = compacted;
   }
 
