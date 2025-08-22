@@ -66,7 +66,7 @@ public abstract class TenantRebalanceContext {
   @Override
   public String toString() {
     return "TenantRebalanceContext{" + "_jobId='" + _jobId + '\'' + ", _originalJobId='" + _originalJobId + '\''
-        + ", _config=" + _config + ", _attemptId=" + _attemptId  + "}";
+        + ", _config=" + _config + ", _attemptId=" + _attemptId + "}";
   }
 
   private static String createAttemptJobId(String originalJobId, int attemptId) {
