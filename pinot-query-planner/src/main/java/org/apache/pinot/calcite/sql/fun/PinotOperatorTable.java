@@ -68,8 +68,10 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 @SuppressWarnings("unused") // unused fields are accessed by reflection
 public class PinotOperatorTable implements SqlOperatorTable {
-  private static final Supplier<PinotOperatorTable> WITH_NULL_HANDLING = Suppliers.memoize(() -> new PinotOperatorTable(true));
-  private static final Supplier<PinotOperatorTable> WITHOUT_NULL_HANDLING = Suppliers.memoize(() -> new PinotOperatorTable(false));
+  private static final Supplier<PinotOperatorTable> WITH_NULL_HANDLING =
+      Suppliers.memoize(() -> new PinotOperatorTable(true));
+  private static final Supplier<PinotOperatorTable> WITHOUT_NULL_HANDLING =
+      Suppliers.memoize(() -> new PinotOperatorTable(false));
 
   public static PinotOperatorTable instance(boolean nullHandling) {
     return nullHandling ? WITH_NULL_HANDLING.get() : WITHOUT_NULL_HANDLING.get();
@@ -104,7 +106,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
       new SqlPostfixOperator(
           "IS NOT NULL",
           SqlKind.OTHER_FUNCTION,
-//          SqlKind.IS_NOT_NULL,
           28,
           ReturnTypes.BOOLEAN_NOT_NULL,
           InferTypes.VARCHAR_1024,
@@ -115,7 +116,6 @@ public class PinotOperatorTable implements SqlOperatorTable {
       new SqlPostfixOperator(
           "IS NULL",
           SqlKind.OTHER_FUNCTION,
-//          SqlKind.IS_NULL,
           28,
           ReturnTypes.BOOLEAN_NOT_NULL,
           InferTypes.VARCHAR_1024,
