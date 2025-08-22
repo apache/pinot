@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
@@ -57,14 +58,14 @@ public class QueryWorkloadConfigUtilsTest {
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
 
     // Server node
-    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
-        List.of("value1", "value2"), null);
+    CostSplit costSplit1 = new CostSplit("testId", 50, 50, null);
+    List<CostSplit> costSplits = List.of(costSplit1);
+    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, costSplits);
     NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
         serverPropagationScheme);
 
     // Broker node
-    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
-        List.of("value3", "value4"), null);
+    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT, costSplits);
     NodeConfig brokerNodeConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, validEnforcementProfile,
         brokerPropagationScheme);
 
@@ -125,13 +126,13 @@ public class QueryWorkloadConfigUtilsTest {
 
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
     // Server scheme
-    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
-        List.of("value1", "value2"), null);
+    CostSplit costSplit1 = new CostSplit("testId", 50, 50, null);
+    List<CostSplit> costSplits = List.of(costSplit1);
+    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, costSplits);
     NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
         serverPropagationScheme);
     // Broker scheme
-    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
-        List.of("value3", "value4"), null);
+    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT, costSplits);
     NodeConfig brokerNodeConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, validEnforcementProfile,
         brokerPropagationScheme);
     List<NodeConfig> nodeConfigs = List.of(serverNodeConfig, brokerNodeConfig);
