@@ -237,79 +237,6 @@ public class PinotLLCRealtimeSegmentManager {
         _isDeepStoreLLCSegmentUploadRetryEnabled ? ConcurrentHashMap.newKeySet() : null;
   }
 
-  public static boolean isTablePaused(IdealState idealState) {
-    PauseState pauseState = extractTablePauseState(idealState);
-    if (pauseState != null) {
-      return pauseState.isPaused();
-    }
-    // backward compatibility
-    // TODO : remove this handling after next release.
-    //  Expectation is that all table IS are migrated to the newer representation.
-    return Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_TABLE_PAUSED));
-  }
-
-  private static PauseState extractTablePauseState(IdealState idealState) {
-    String pauseStateStr = idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE);
-    try {
-      if (pauseStateStr != null) {
-        return JsonUtils.stringToObject(pauseStateStr, PauseState.class);
-      }
-    } catch (JsonProcessingException e) {
-      LOGGER.warn("Unable to parse the pause state from ideal state : {}", pauseStateStr);
-    }
-    return null;
-  }
-
-  public static List<String> getCommittingSegments(String realtimeTableName,
-      ZkHelixPropertyStore<ZNRecord> propertyStore) {
-    return getCommittingSegments(realtimeTableName, propertyStore,
-        (t, s) -> ZKMetadataProvider.getSegmentZKMetadata(propertyStore, t, s));
-  }
-
-  /**
-   * Retrieves and filters the list of committing segments for a realtime table from the property store.
-   * This method:
-   * 1. Constructs the ZK path for pauseless debug metadata
-   * 2. Fetches the committing segments record from the property store
-   * 3. Filters out segments that are either deleted or already committed
-   *
-   * @param realtimeTableName The name of the realtime table to fetch committing segments for
-   * @return Filtered list of committing segments
-   */
-  private static List<String> getCommittingSegments(String realtimeTableName,
-      ZkHelixPropertyStore<ZNRecord> propertyStore, BiFunction<String, String, SegmentZKMetadata> zkMetadataProvider) {
-    String pauselessDebugMetadataPath =
-        ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
-    ZNRecord znRecord = propertyStore.get(pauselessDebugMetadataPath, null, AccessOption.PERSISTENT);
-    if (znRecord == null) {
-      return List.of();
-    }
-    List<String> committingSegments = znRecord.getListField(COMMITTING_SEGMENTS);
-    if (committingSegments == null) {
-      return List.of();
-    }
-    return getCommittingSegments(realtimeTableName, committingSegments, zkMetadataProvider);
-  }
-
-  /**
-   * Returns the list of segments that are in COMMITTING state. Filters out segments that are either deleted or no
-   * longer in COMMITTING state.
-   */
-  private static List<String> getCommittingSegments(String realtimeTableName, Collection<String> segmentsToCheck,
-      BiFunction<String, String, SegmentZKMetadata> zkMetadataProvider) {
-    if (segmentsToCheck.isEmpty()) {
-      return List.of();
-    }
-    List<String> committingSegments = new ArrayList<>(segmentsToCheck.size());
-    for (String segment : segmentsToCheck) {
-      SegmentZKMetadata segmentZKMetadata = zkMetadataProvider.apply(realtimeTableName, segment);
-      if (segmentZKMetadata != null && segmentZKMetadata.getStatus() == Status.COMMITTING) {
-        committingSegments.add(segment);
-      }
-    }
-    return committingSegments;
-  }
-
   public boolean isDeepStoreLLCSegmentUploadRetryEnabled() {
     return _isDeepStoreLLCSegmentUploadRetryEnabled;
   }
@@ -1488,6 +1415,79 @@ public class PinotLLCRealtimeSegmentManager {
           isTablePaused(idealState) ? null : newSegmentName, segmentAssignment, instancePartitionsMap);
       return idealState;
     }, DEFAULT_RETRY_POLICY);
+  }
+
+  public static boolean isTablePaused(IdealState idealState) {
+    PauseState pauseState = extractTablePauseState(idealState);
+    if (pauseState != null) {
+      return pauseState.isPaused();
+    }
+    // backward compatibility
+    // TODO : remove this handling after next release.
+    //  Expectation is that all table IS are migrated to the newer representation.
+    return Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_TABLE_PAUSED));
+  }
+
+  private static PauseState extractTablePauseState(IdealState idealState) {
+    String pauseStateStr = idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE);
+    try {
+      if (pauseStateStr != null) {
+        return JsonUtils.stringToObject(pauseStateStr, PauseState.class);
+      }
+    } catch (JsonProcessingException e) {
+      LOGGER.warn("Unable to parse the pause state from ideal state : {}", pauseStateStr);
+    }
+    return null;
+  }
+
+  public static List<String> getCommittingSegments(String realtimeTableName,
+      ZkHelixPropertyStore<ZNRecord> propertyStore) {
+    return getCommittingSegments(realtimeTableName, propertyStore,
+        (t, s) -> ZKMetadataProvider.getSegmentZKMetadata(propertyStore, t, s));
+  }
+
+  /**
+   * Retrieves and filters the list of committing segments for a realtime table from the property store.
+   * This method:
+   * 1. Constructs the ZK path for pauseless debug metadata
+   * 2. Fetches the committing segments record from the property store
+   * 3. Filters out segments that are either deleted or already committed
+   *
+   * @param realtimeTableName The name of the realtime table to fetch committing segments for
+   * @return Filtered list of committing segments
+   */
+  private static List<String> getCommittingSegments(String realtimeTableName,
+      ZkHelixPropertyStore<ZNRecord> propertyStore, BiFunction<String, String, SegmentZKMetadata> zkMetadataProvider) {
+    String pauselessDebugMetadataPath =
+        ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
+    ZNRecord znRecord = propertyStore.get(pauselessDebugMetadataPath, null, AccessOption.PERSISTENT);
+    if (znRecord == null) {
+      return List.of();
+    }
+    List<String> committingSegments = znRecord.getListField(COMMITTING_SEGMENTS);
+    if (committingSegments == null) {
+      return List.of();
+    }
+    return getCommittingSegments(realtimeTableName, committingSegments, zkMetadataProvider);
+  }
+
+  /**
+   * Returns the list of segments that are in COMMITTING state. Filters out segments that are either deleted or no
+   * longer in COMMITTING state.
+   */
+  private static List<String> getCommittingSegments(String realtimeTableName, Collection<String> segmentsToCheck,
+      BiFunction<String, String, SegmentZKMetadata> zkMetadataProvider) {
+    if (segmentsToCheck.isEmpty()) {
+      return List.of();
+    }
+    List<String> committingSegments = new ArrayList<>(segmentsToCheck.size());
+    for (String segment : segmentsToCheck) {
+      SegmentZKMetadata segmentZKMetadata = zkMetadataProvider.apply(realtimeTableName, segment);
+      if (segmentZKMetadata != null && segmentZKMetadata.getStatus() == Status.COMMITTING) {
+        committingSegments.add(segment);
+      }
+    }
+    return committingSegments;
   }
 
   @VisibleForTesting
