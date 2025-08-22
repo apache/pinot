@@ -44,6 +44,9 @@ public interface ExplainIntegrationTestTrait {
           .map(entry -> "SET " + entry.getKey() + "=" + entry.getValue() + ";\n")
           .collect(Collectors.joining());
       JsonNode jsonNode = postQuery(extraOptions + "explain plan without implementation for " + query);
+      if (!jsonNode.get("exceptions").isNull()) {
+        Assert.fail("Exception in response: " + jsonNode.get("exceptions").toString());
+      }
       JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
 
       Assert.assertEquals(plan.asText(), expected);
@@ -62,6 +65,9 @@ public interface ExplainIntegrationTestTrait {
         actualQuery = "SET explainPlanVerbose=true; " + actualQuery;
       }
       JsonNode jsonNode = postQuery(actualQuery);
+      if (!jsonNode.get("exceptions").isNull()) {
+        Assert.fail("Exception in response: " + jsonNode.get("exceptions").toString());
+      }
       JsonNode plan = jsonNode.get("resultTable").get("rows");
       List<String> planAsStrList = (List<String>) JsonUtils.jsonNodeToObject(plan, List.class).stream()
           .map(Object::toString)
@@ -100,6 +106,9 @@ public interface ExplainIntegrationTestTrait {
   default void explain(@Language("sql") String query, String expected) {
     try {
       JsonNode jsonNode = postQuery("explain plan for " + query);
+      if (!jsonNode.get("exceptions").isNull()) {
+        Assert.fail("Exception in response: " + jsonNode.get("exceptions").toString());
+      }
       JsonNode plan = jsonNode.get("resultTable").get("rows").get(0).get(1);
 
       Assert.assertEquals(plan.asText(), expected);
