@@ -67,18 +67,12 @@ public class QueryWorkloadManager {
   public void propagateWorkloadUpdateMessage(QueryWorkloadConfig queryWorkloadConfig) {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
-      // Resolve the instances based on the node type and propagation scheme
-      Set<String> instances = resolveInstances(nodeConfig);
-      if (instances.isEmpty()) {
-        String errorMsg = String.format("No instances found for Workload: %s", queryWorkloadName);
-        LOGGER.warn(errorMsg);
-        continue;
-      }
-      Map<String, InstanceCost> instanceCostMap = _costSplitter.computeInstanceCostMap(nodeConfig, instances);
+      PropagationScheme propagationScheme = _propagationSchemeProvider.getPropagationScheme(
+          nodeConfig.getPropagationScheme().getPropagationType());
+      Map<String, InstanceCost> instanceCostMap = propagationScheme.resolveInstanceCostMap(nodeConfig, _costSplitter);
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
           .collect(Collectors.toMap(Map.Entry::getKey, entry -> new QueryWorkloadRefreshMessage(queryWorkloadName,
               QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE, entry.getValue())));
-      // Send the QueryWorkloadRefreshMessage to the instances
       _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
     }
   }
@@ -98,9 +92,11 @@ public class QueryWorkloadManager {
         LOGGER.warn(errorMsg);
         continue;
       }
+      QueryWorkloadRefreshMessage deleteMessage = new QueryWorkloadRefreshMessage(queryWorkloadName,
+          QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE, new InstanceCost(0, 0));
       Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instances.stream()
-          .collect(Collectors.toMap(instance -> instance, instance -> new QueryWorkloadRefreshMessage(queryWorkloadName,
-              QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE, null)));
+          .collect(Collectors.toMap(instance -> instance, instance -> deleteMessage));
+      // Send the QueryWorkloadRefreshMessage to the instances
       _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
     }
   }
@@ -147,52 +143,56 @@ public class QueryWorkloadManager {
    * @return A map of workload name to {@link InstanceCost} for the given instance and node type
    */
   public Map<String, InstanceCost> getWorkloadToInstanceCostFor(String instanceName) {
-    try {
-      Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
-      List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
-      if (queryWorkloadConfigs.isEmpty()) {
-        LOGGER.warn("No query workload configs found in zookeeper");
-        return workloadToInstanceCostMap;
-      }
-      // Find all the helix tags associated with the instance
-      InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
-      if (instanceConfig == null) {
-        LOGGER.warn("Instance config not found for instance: {}", instanceName);
-        return workloadToInstanceCostMap;
-      }
-      NodeConfig.Type nodeType;
-      if (InstanceTypeUtils.isServer(instanceName)) {
-        nodeType = NodeConfig.Type.SERVER_NODE;
-      } else if (InstanceTypeUtils.isBroker(instanceName)) {
-        nodeType = NodeConfig.Type.BROKER_NODE;
-      } else {
-        LOGGER.warn("Unsupported instance type: {}, cannot compute workload costs", instanceName);
-        return workloadToInstanceCostMap;
-      }
+    Map<String, InstanceCost> workloadToInstanceCostMap = new HashMap<>();
+    List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
+    if (queryWorkloadConfigs.isEmpty()) {
+      LOGGER.warn("No query workload configs found in zookeeper");
+      return workloadToInstanceCostMap;
+    }
 
-      // Find all workloads associated with the helix tags
-      Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
-          PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, instanceConfig.getTags(),
-                  queryWorkloadConfigs);
-      // Calculate the instance cost from each workload
-      for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
-        for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
-          if (nodeConfig.getNodeType() == nodeType) {
-            Set<String> instances = resolveInstances(nodeConfig);
-            InstanceCost instanceCost = _costSplitter.computeInstanceCost(nodeConfig, instances, instanceName);
-            if (instanceCost != null) {
-              workloadToInstanceCostMap.put(queryWorkloadConfig.getQueryWorkloadName(), instanceCost);
-            }
-            break;
+    // Determine node type from instance name
+    NodeConfig.Type nodeType;
+    if (InstanceTypeUtils.isServer(instanceName)) {
+      nodeType = NodeConfig.Type.SERVER_NODE;
+    } else if (InstanceTypeUtils.isBroker(instanceName)) {
+      nodeType = NodeConfig.Type.BROKER_NODE;
+    } else {
+      LOGGER.warn("Unsupported instance type: {}, cannot compute workload costs", instanceName);
+      return workloadToInstanceCostMap;
+    }
+
+    // Find all helix tags for this instance
+    InstanceConfig instanceConfig = _pinotHelixResourceManager.getHelixInstanceConfig(instanceName);
+    if (instanceConfig == null) {
+      LOGGER.warn("Instance config not found for instance: {}", instanceName);
+      return workloadToInstanceCostMap;
+    }
+
+    // Filter workloads by the instance's tags
+    Set<QueryWorkloadConfig> queryWorkloadConfigsForTags =
+        PropagationUtils.getQueryWorkloadConfigsForTags(_pinotHelixResourceManager, instanceConfig.getTags(),
+            queryWorkloadConfigs);
+
+    // For each workload, aggregate contributions across all applicable nodeConfigs and costSplits
+    for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
+      for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
+        if (nodeConfig.getNodeType() == nodeType) {
+          Map<String, InstanceCost> instanceCostMap =
+              _propagationSchemeProvider.getPropagationScheme(nodeConfig.getPropagationScheme().getPropagationType())
+                  .resolveInstanceCostMap(nodeConfig, _costSplitter);
+          InstanceCost instanceCost = instanceCostMap.get(instanceName);
+          if (instanceCost != null) {
+            workloadToInstanceCostMap.put(queryWorkloadConfig.getQueryWorkloadName(), instanceCost);
+          } else {
+            LOGGER.warn("No instance cost found for instance: {} in workload: {}", instanceName,
+                queryWorkloadConfig.getQueryWorkloadName());
           }
+          // There should be only one matching nodeConfig (BROKER_NODE or SERVER_NODE) within a workload
+          break;
         }
       }
-      return workloadToInstanceCostMap;
-    } catch (Exception e) {
-      String errorMsg = String.format("Failed to get workload to instance cost map for instance: %s", instanceName);
-      LOGGER.error(errorMsg, e);
-      throw new RuntimeException(errorMsg, e);
     }
+    return workloadToInstanceCostMap;
   }
 
   private Set<String> resolveInstances(NodeConfig nodeConfig) {

@@ -77,6 +77,11 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.config.workload.CostSplit;
+import org.apache.pinot.spi.config.workload.EnforcementProfile;
+import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationScheme;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -4277,5 +4282,27 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
+  }
+
+  @Test
+  public void testQueryWorkloadConfig() throws Exception {
+    EnforcementProfile enforcementProfile = new EnforcementProfile(1000, 1000);
+    CostSplit costSplit = new CostSplit(DEFAULT_TABLE_NAME + "_OFFLINE", 1000, 1000, null);
+    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(costSplit));
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
+    QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
+    try {
+      getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig("testWorkload");
+          return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 60_000L, "Failed to retrieve the created query workload config");
+    } finally {
+      getControllerRequestClient().deleteQueryWorkloadConfig("testWorkload");
+    }
   }
 }

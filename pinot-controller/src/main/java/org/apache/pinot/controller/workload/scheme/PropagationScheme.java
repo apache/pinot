@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.controller.workload.scheme;
 
+import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.controller.workload.splitter.CostSplitter;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 
 /**
@@ -33,4 +36,6 @@ public interface PropagationScheme {
    * @return The set of instances to propagate the workload
    */
   Set<String> resolveInstances(NodeConfig nodeConfig);
+
+  Map<String, InstanceCost> resolveInstanceCostMap(NodeConfig nodeConfig, CostSplitter costSplitter);
 }

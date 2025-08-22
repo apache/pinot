@@ -33,6 +33,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.TenantConfig;
+import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
@@ -166,9 +167,9 @@ public class PropagationUtils {
     for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigs) {
       for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
         PropagationScheme scheme = nodeConfig.getPropagationScheme();
-
+        List<String> topLevelIds = getTopLevelCostIds(scheme);
         if (scheme.getPropagationType() == PropagationScheme.Type.TENANT) {
-          for (String tenant : scheme.getValues()) {
+          for (String tenant : topLevelIds) {
             Set<String> resolvedTags = TagNameUtils.isOfflineServerTag(tenant)
                     || TagNameUtils.isRealtimeServerTag(tenant) || TagNameUtils.isBrokerTag(tenant)
                 ? Collections.singleton(tenant)
@@ -179,7 +180,7 @@ public class PropagationUtils {
             }
           }
         } else if (scheme.getPropagationType() == PropagationScheme.Type.TABLE) {
-          for (String tableName : scheme.getValues()) {
+          for (String tableName : topLevelIds) {
             TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
             List<String> tablesWithType = (tableType == null)
                 ? Arrays.asList(TableNameBuilder.OFFLINE.tableNameWithType(tableName),
@@ -207,5 +208,15 @@ public class PropagationUtils {
     helixTags.add(TagNameUtils.getOfflineTagForTenant(tenantName));
     helixTags.add(TagNameUtils.getRealtimeTagForTenant(tenantName));
     return helixTags;
+  }
+
+  private static List<String> getTopLevelCostIds(PropagationScheme propagationScheme) {
+    List<String> topLevelCostIds = new ArrayList<>();
+    for (CostSplit costSplit : propagationScheme.getCostSplits()) {
+      if (costSplit.getCostId() != null) {
+        topLevelCostIds.add(costSplit.getCostId());
+      }
+    }
+    return topLevelCostIds;
   }
 }

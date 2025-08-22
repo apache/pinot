@@ -23,11 +23,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.List;
-import java.util.Map;
-
-import org.apache.pinot.spi.config.BaseJsonConfig;
-
 import javax.annotation.Nullable;
+import org.apache.pinot.spi.config.BaseJsonConfig;
 
 /**
  * Defines how configuration settings are propagated across workloads.
@@ -41,9 +38,21 @@ import javax.annotation.Nullable;
  * <pre>
  *   {
  *   "propagationType": "TABLE",
- *   "values": ["table1", "table2"]
+ *   "costSplits":
+ *    [
+ *      {
+ *      "costId": "table1_OFFLINE",
+ *      "cpuCostNs" : 100,
+ *      "memoryCostBytes" : 100
+ *      },
+ *      {
+ *      "costId": "table2_OFFLINE",
+ *      "cpuCostNs" : 200,
+ *      "memoryCostBytes" : 200
+ *      }
+ *    ]
  *   }
- *
+ * </pre>
  * @see QueryWorkloadConfig
  * @see NodeConfig
  */
@@ -104,7 +113,6 @@ public class PropagationScheme extends BaseJsonConfig {
   }
 
   private static final String PROPAGATION_TYPE = "propagationType";
-  private static final String VALUES = "values";
   private static final String COST_SPLITS = "costSplits";
 
   /**
@@ -113,14 +121,8 @@ public class PropagationScheme extends BaseJsonConfig {
   @JsonPropertyDescription("Describes the type of propagation scheme")
   private Type _propagationType;
 
-  /**
-   * The specific identifiers (table names or tenant names) to which settings apply.
-   */
-  @JsonPropertyDescription("Describes the values of the propagation scheme")
-  private List<String> _values;
-
   @JsonPropertyDescription("Describes the cost splits for the propagation scheme")
-  private Map<String, CostSplit> _costSplits;
+  private List<CostSplit> _costSplits;
 
   /**
    * Constructs a PropagationScheme with the given type and target values.
@@ -130,10 +132,8 @@ public class PropagationScheme extends BaseJsonConfig {
    */
   @JsonCreator
   public PropagationScheme(@JsonProperty(PROPAGATION_TYPE) Type propagationType,
-      @JsonProperty(VALUES) List<String> values,
-      @Nullable @JsonProperty(COST_SPLITS) Map<String, CostSplit> costSplits) {
+      @Nullable @JsonProperty(COST_SPLITS) List<CostSplit> costSplits) {
     _propagationType = propagationType;
-    _values = values;
     _costSplits = costSplits;
   }
 
@@ -147,20 +147,11 @@ public class PropagationScheme extends BaseJsonConfig {
   }
 
   /**
-   * Returns the list of target identifiers for propagation.
-   *
-   * @return list of table names or tenant names
-   */
-  public List<String> getValues() {
-    return _values;
-  }
-
-  /**
    * Returns the cost splits for the propagation scheme.
    *
    * @return map of cost splits keyed by cost ID
    */
-  public Map<String, CostSplit> getCostSplits() {
+  public List<CostSplit> getCostSplits() {
     return _costSplits;
   }
 
@@ -174,20 +165,11 @@ public class PropagationScheme extends BaseJsonConfig {
   }
 
   /**
-   * Sets the target identifiers for propagation.
-   *
-   * @param values list of table or tenant names to apply settings to
-   */
-  public void setValues(List<String> values) {
-    _values = values;
-  }
-
-  /**
    * Sets the cost splits for the propagation scheme.
    *
    * @param costSplits list of cost splits to apply
    */
-  public void setCostSplits(Map<String, CostSplit> costSplits) {
+  public void setCostSplits(List<CostSplit> costSplits) {
     _costSplits = costSplits;
   }
 }

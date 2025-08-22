@@ -19,9 +19,6 @@
 package org.apache.pinot.controller.workload.scheme;
 
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.workload.splitter.CostSplitter;
-import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
-import org.apache.pinot.controller.workload.splitter.TableCostSplitter;
 
 public class PropagationSchemeProvider {
 

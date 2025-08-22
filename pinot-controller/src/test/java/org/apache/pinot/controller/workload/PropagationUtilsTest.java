@@ -28,6 +28,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.workload.scheme.PropagationUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
@@ -149,15 +150,22 @@ public class PropagationUtilsTest {
     @Test
     public void getQueryWorkloadConfigsForTagsTest() {
         // Create a list of query workload configurations
+        CostSplit costSplit1 = new CostSplit("table1", 100, 100, null);
+        CostSplit costSplit2 = new CostSplit("table2", 100, 100, null);
         QueryWorkloadConfig workloadConfig1 = createQueryWorkloadConfig("workload1",
-            new PropagationScheme(PropagationScheme.Type.TABLE, List.of("table1", "table2"), null),
-            new PropagationScheme(PropagationScheme.Type.TABLE, List.of("table1", "table2"), null));
+            new PropagationScheme(PropagationScheme.Type.TABLE, List.of(costSplit1, costSplit2)),
+            new PropagationScheme(PropagationScheme.Type.TABLE, List.of(costSplit1, costSplit2)));
+        CostSplit costSplit3 = new CostSplit("serverTag1", 100, 100, null);
+        CostSplit costSplit4 = new CostSplit("brokerTenant1_BROKER", 100, 100, null);
         QueryWorkloadConfig workloadConfig2 = createQueryWorkloadConfig("workload2",
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("serverTag1"), null),
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("brokerTenant1_BROKER"), null));
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of(costSplit3)),
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of(costSplit4)));
+        CostSplit costSplit5 = new CostSplit("serverTag2_REALTIME", 100, 100, null);
+        CostSplit costSplit6 = new CostSplit("brokerTenant2", 100, 100, null);
+        // Create a third workload config with different tags
         QueryWorkloadConfig workloadConfig3 = createQueryWorkloadConfig("workload3",
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("serverTag2_REALTIME"), null),
-            new PropagationScheme(PropagationScheme.Type.TENANT, List.of("brokerTenant2"), null));
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of(costSplit5)),
+            new PropagationScheme(PropagationScheme.Type.TENANT, List.of(costSplit6)));
         List<QueryWorkloadConfig> queryWorkloadConfigs = List.of(workloadConfig1, workloadConfig2, workloadConfig3);
         // Create TableConfig for the workload
         List<TableConfig> tableConfigs = List.of(
@@ -183,7 +191,7 @@ public class PropagationUtilsTest {
         }
     }
 
-    private TableConfig createTableConfig(String tableName, String serverTag, String brokerTenant, TableType type) {
+    public TableConfig createTableConfig(String tableName, String serverTag, String brokerTenant, TableType type) {
         return new TableConfigBuilder(type)
             .setTableName(tableName)
             .setSegmentAssignmentStrategy("BalanceNumSegmentAssignmentStrategy")
