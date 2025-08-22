@@ -55,8 +55,6 @@ public final class IngestionConfigUtils {
   // For partition from different topics, we pad then with an offset to avoid collision. The offset is far higher
   // than the normal max number of partitions on stream (e.g. 512).
   public static final int PARTITION_PADDING_OFFSET = 10000;
-  // For runtime generated ephemeral topics, we pad with additional offset.
-  public static final int EPHEMERAL_TOPIC_PARTITION_PADDING_OFFSET = 10_000_000;
 
   /**
    * Fetches the streamConfig from the given realtime table.

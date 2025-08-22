@@ -53,11 +53,14 @@ public class PartitionGroupMetadata {
   }
 
   public String getTopicName() {
+    if (_topicName == null || _topicName.isEmpty()) {
+      return null;
+    }
     return _topicName;
   }
 
   public String getPartitionGroupTopicAndId() {
-    if (_topicName == null) {
+    if (_topicName == null || _topicName.isEmpty()) {
       return String.valueOf(_partitionGroupId);
     } else {
       return _topicName + SEPARATOR + _partitionGroupId;

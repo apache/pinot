@@ -99,7 +99,11 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private Boolean fetchMultipleStreams()
       throws Exception {
     int numStreams = _streamConfigs.size();
-    int permanentTopicIndex = 0;
+    // In multi-topic ingestion, the order of permanent topics is critical and cannot be changed. Use this index to
+    // record the index of permanent topics. (e.g. if the stream config list is [ephemeral, permanent, ephemeral,
+    // permanent], then the first permanent topic has index 0, and the second permanent topic has index 1)
+    // For ephemeral topics, we do not need to maintain the order, as they are independent of each other.
+    int permanentTopicIndex = -1;
     for (int i = 0; i < numStreams; i++) {
       StreamConfig streamConfig = _streamConfigs.get(i);
       String topicName = streamConfig.getTopicName();
@@ -107,34 +111,44 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
           PartitionGroupMetadataFetcher.class.getSimpleName() + "-" + streamConfig.getTableNameWithType() + "-"
               + topicName;
       StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-      int index = i;
-      int finalPermanentTopicIndex = permanentTopicIndex;
-      // For permanent topics, we use the index of the stream config to get the partition group consumption status.
-      // For ephemeral backfill topics, we use the topic name to filter the partition group consumption status.
-      List<PartitionGroupConsumptionStatus> topicPartitionGroupConsumptionStatusList =
-          _partitionGroupConsumptionStatusList.stream()
-              .filter(partitionGroupConsumptionStatus -> _streamConfigs.get(index).isEphemeralBackfillTopic()
-                  ? _streamConfigs.get(index).getTopicName().equals(partitionGroupConsumptionStatus.getTopicName())
-                  : IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
-                      partitionGroupConsumptionStatus.getPartitionGroupId()) == finalPermanentTopicIndex)
-              .collect(Collectors.toList());
       try (StreamMetadataProvider streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(
           StreamConsumerFactory.getUniqueClientId(clientId))) {
-        // Similarly, for ephemeral backfill topics, we create the partition group metadata with the topic name.
-        _newPartitionGroupMetadataList.addAll(
-            streamMetadataProvider.computePartitionGroupMetadata(clientId,
-                    _streamConfigs.get(i), topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000,
-                    _forceGetOffsetFromStream)
-                .stream()
-                .map(metadata -> new PartitionGroupMetadata(
-                    _streamConfigs.get(finalPermanentTopicIndex).isEphemeralBackfillTopic() ? _streamConfigs.get(index)
-                        .getTopicName() : "",
-                    _streamConfigs.get(finalPermanentTopicIndex).isEphemeralBackfillTopic()
-                        ? metadata.getPartitionGroupId()
-                        : IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(metadata.getPartitionGroupId(),
-                            finalPermanentTopicIndex),
-                    metadata.getStartOffset()))
-                .collect(Collectors.toList()));
+        if (streamConfig.isEphemeralBackfillTopic()) {
+          // For ephemeral backfill topics, we use the topic name to filter the partition group consumption status.
+          // And to construct partition group metadata, we use the topic name and partition group id as is.
+          List<PartitionGroupConsumptionStatus> topicPartitionGroupConsumptionStatusList =
+              _partitionGroupConsumptionStatusList.stream()
+                  .filter(partitionGroupConsumptionStatus -> streamConfig.getTopicName()
+                      .equals(partitionGroupConsumptionStatus.getTopicName()))
+                  .collect(Collectors.toList());
+          _newPartitionGroupMetadataList.addAll(
+              streamMetadataProvider.computePartitionGroupMetadata(clientId, _streamConfigs.get(i),
+                      topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000, _forceGetOffsetFromStream)
+                  .stream()
+                  .map(metadata -> new PartitionGroupMetadata(streamConfig.getTopicName(),
+                      metadata.getPartitionGroupId(), metadata.getStartOffset()))
+                  .collect(Collectors.toList()));
+        } else {
+          // For permanent topics, we use the index of the stream config to get the partition group consumption status.
+          // And to construct partition group metadata, we use null as topic name and convert the partition group id
+          // to Pinot partition id using the stream config index.
+          int index = ++permanentTopicIndex;
+          List<PartitionGroupConsumptionStatus> topicPartitionGroupConsumptionStatusList =
+              _partitionGroupConsumptionStatusList.stream()
+                  .filter(
+                      partitionGroupConsumptionStatus -> IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(
+                          partitionGroupConsumptionStatus.getPartitionGroupId()) == index)
+                  .collect(Collectors.toList());
+          _newPartitionGroupMetadataList.addAll(
+              streamMetadataProvider.computePartitionGroupMetadata(clientId,
+                      streamConfig, topicPartitionGroupConsumptionStatusList, /*maxWaitTimeMs=*/15000,
+                      _forceGetOffsetFromStream)
+                  .stream()
+                  .map(metadata -> new PartitionGroupMetadata(
+                      IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(metadata.getPartitionGroupId(),
+                          index), metadata.getStartOffset()))
+                  .collect(Collectors.toList()));
+        }
         if (_exception != null) {
           // We had at least one failure, but succeeded now. Log an info
           LOGGER.info("Successfully retrieved PartitionGroupMetadata for topic {}", topicName);
@@ -148,7 +162,6 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
         _exception = e;
         throw e;
       }
-      permanentTopicIndex += _streamConfigs.get(i).isEphemeralBackfillTopic() ? 0 : 1;
     }
     return Boolean.TRUE;
   }

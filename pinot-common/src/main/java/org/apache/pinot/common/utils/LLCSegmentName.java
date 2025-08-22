@@ -67,11 +67,11 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     this(tableName, null, partitionGroupId, sequenceNumber, msSinceEpoch);
   }
 
-  public LLCSegmentName(
-      String tableName, @Nullable String topicName, int partitionGroupId, int sequenceNumber, long msSinceEpoch) {
+  public LLCSegmentName(String tableName, @Nullable String topicName, int partitionGroupId, int sequenceNumber,
+      long msSinceEpoch) {
     Preconditions.checkArgument(!tableName.contains(SEPARATOR), "Illegal table name: %s", tableName);
-    Preconditions.checkArgument(topicName == null || !topicName.contains(SEPARATOR),
-        "Illegal topic name: %s", tableName);
+    Preconditions.checkArgument(topicName == null || (!"".equals(topicName) && !topicName.contains(SEPARATOR)),
+        "Illegal topic name: %s", topicName);
     _tableName = tableName;
     _topicName = topicName;
     _partitionGroupId = partitionGroupId;
@@ -87,26 +87,12 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
     }
   }
 
-  private LLCSegmentName(String tableName, int partitionGroupId, int sequenceNumber, String creationTime,
-      String segmentName) {
-    _tableName = tableName;
-    _topicName = "";
-    _partitionGroupId = partitionGroupId;
-    _sequenceNumber = sequenceNumber;
-    _creationTime = creationTime;
-    _segmentName = segmentName;
-  }
-
   /**
    * Returns the {@link LLCSegmentName} for the given segment name, or {@code null} if the given segment name does not
    * represent an LLC segment.
    */
   @Nullable
   public static LLCSegmentName of(String segmentName) {
-    String[] parts = StringUtils.splitByWholeSeparator(segmentName, SEPARATOR);
-    if (parts.length < 4 || parts.length > 5) {
-      return null;
-    }
     try {
       return new LLCSegmentName(segmentName);
     } catch (Exception e) {
@@ -118,7 +104,13 @@ public class LLCSegmentName implements Comparable<LLCSegmentName> {
    * Returns whether the given segment name represents an LLC segment.
    */
   public static boolean isLLCSegment(String segmentName) {
-    return of(segmentName) != null;
+    int numSeparators = 0;
+    int index = 0;
+    while ((index = segmentName.indexOf(SEPARATOR, index)) != -1) {
+      numSeparators++;
+      index += 2; // SEPARATOR.length()
+    }
+    return numSeparators == 3 || numSeparators == 4;
   }
 
   @Deprecated

@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.stream;
 
+import javax.annotation.Nullable;
+
+
 /**
  * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
  * This class contains all information which describes the latest state of a partition group.
@@ -36,6 +39,7 @@ package org.apache.pinot.spi.stream;
  */
 public class PartitionGroupConsumptionStatus {
 
+  @Nullable
   private final String _topicName;
   private final int _partitionGroupId;
   private final int _streamPartitionId;
@@ -57,15 +61,18 @@ public class PartitionGroupConsumptionStatus {
 
   public PartitionGroupConsumptionStatus(int partitionGroupId, int streamPartitionId,
       int sequenceNumber, StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
-    this("", partitionGroupId, streamPartitionId, sequenceNumber, startOffset, endOffset, status);
+    this(null, partitionGroupId, streamPartitionId, sequenceNumber, startOffset, endOffset, status);
   }
 
   public PartitionGroupConsumptionStatus(int partitionGroupId, int sequenceNumber,
       StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
-    this("", partitionGroupId, partitionGroupId, sequenceNumber, startOffset, endOffset, status);
+    this(null, partitionGroupId, partitionGroupId, sequenceNumber, startOffset, endOffset, status);
   }
 
   public String getTopicName() {
+    if (_topicName == null || _topicName.isEmpty()) {
+      return null;
+    }
     return _topicName;
   }
 
