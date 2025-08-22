@@ -16,28 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.compound;
+package org.apache.pinot.spi.metrics;
 
-import java.util.List;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
- * CompoundPinotJmxReporter is a composite reporter that aggregates multiple PinotJmxReporters.
- * @deprecated Use {@link org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricReporter} instead.
+ * Adapter that causes metrics from a metric registry to be published.
  */
-@Deprecated
-public class CompoundPinotJmxReporter implements PinotJmxReporter {
-  private final List<PinotJmxReporter> _reporters;
-
-  public CompoundPinotJmxReporter(List<PinotJmxReporter> reporters) {
-    _reporters = reporters;
-  }
+public class MetricReporterRegistryRegistrationListener implements MetricsRegistryRegistrationListener {
+  private static final Logger LOGGER = LoggerFactory.getLogger(MetricReporterRegistryRegistrationListener.class);
 
   @Override
-  public void start() {
-    for (PinotJmxReporter reporter : _reporters) {
-      reporter.start();
-    }
+  public void onMetricsRegistryRegistered(PinotMetricsRegistry metricsRegistry) {
+    LOGGER.info("Registering MetricReporterRegistryRegistrationListener");
+    PinotMetricUtils.makePinotMetricReporter(metricsRegistry).start();
+    LOGGER.info("Number of metrics in metricsRegistry: {}", metricsRegistry.allMetrics().size());
   }
 }

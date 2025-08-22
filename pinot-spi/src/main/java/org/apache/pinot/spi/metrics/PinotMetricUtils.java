@@ -116,7 +116,7 @@ public class PinotMetricUtils {
   private static void initializeMetrics(PinotConfiguration configuration) {
     synchronized (PinotMetricUtils.class) {
       List<String> listenerClassNames = configuration.getProperty("metricsRegistryRegistrationListeners",
-          Arrays.asList(JmxReporterMetricsRegistryRegistrationListener.class.getName()));
+          Arrays.asList(MetricReporterRegistryRegistrationListener.class.getName()));
 
       // Build each listener using their default constructor and add them
       for (String listenerClassName : listenerClassNames) {
@@ -219,8 +219,19 @@ public class PinotMetricUtils {
     return _pinotMetricsFactory.makePinotMetricName(klass, name);
   }
 
-  public static <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
-    return _pinotMetricsFactory.makePinotGauge(condition);
+  /**
+   * Creates a PinotGauge with the given condition.
+   * @param valueSupplier The valueSupplier to evaluate the value for the gauge
+   * @return A PinotGauge instance
+   * * @deprecated Use {@link #makePinotGauge(String, Function)} instead, which allows specifying a metric name.
+   */
+  @Deprecated
+  public static <T> PinotGauge<T> makePinotGauge(Function<Void, T> valueSupplier) {
+    return _pinotMetricsFactory.makePinotGauge(valueSupplier);
+  }
+
+  public static <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> valueSupplier) {
+    return _pinotMetricsFactory.makePinotGauge(metricName, valueSupplier);
   }
 
   public static <T> PinotGauge<T> makeGauge(PinotMetricsRegistry registry, PinotMetricName name, PinotGauge<T> gauge) {
@@ -241,7 +252,15 @@ public class PinotMetricUtils {
     registry.removeMetric(name);
   }
 
+  /**
+   * @deprecated use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
+   */
+  @Deprecated
   public static PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
     return _pinotMetricsFactory.makePinotJmxReporter(metricsRegistry);
+  }
+
+  public static PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry) {
+    return _pinotMetricsFactory.makePinotMetricReporter(metricsRegistry);
   }
 }

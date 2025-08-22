@@ -24,6 +24,7 @@ import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotJmxReporter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
@@ -50,12 +51,20 @@ public interface PinotMetricsFactory {
   /**
    * Makes a {@link PinotGauge} given a function.
    */
-  <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition);
+  @Deprecated
+  <T> PinotGauge<T> makePinotGauge(Function<Void, T> valueSupplier);
+
+  <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> valueSupplier);
 
   /**
    * Makes a {@link PinotJmxReporter} given a {@link PinotMetricsRegistry}.
+   *
+   * @deprecated Use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
    */
+  @Deprecated
   PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry);
+
+  PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry);
 
   /**
    * Returns the name of metrics factory.
@@ -84,7 +93,21 @@ public interface PinotMetricsFactory {
     }
 
     @Override
+    public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+      return _registry.newGauge();
+    }
+
+    /**
+     * @deprecated Use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
+     */
+    @Override
+    @Deprecated
     public PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
+      return () -> {
+      };
+    }
+
+    public PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry) {
       return () -> {
       };
     }

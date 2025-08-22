@@ -603,7 +603,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
     PinotMetricUtils
         .makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-            PinotMetricUtils.makePinotGauge(avoid -> {
+            PinotMetricUtils.makePinotGauge(_metricPrefix + metricName, avoid -> {
               try {
                 return valueCallback.call();
               } catch (Exception e) {
@@ -680,7 +680,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setOrUpdateGauge(final String metricName, long value) {
     PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-        PinotMetricUtils.makePinotGauge(avoid -> value));
+        PinotMetricUtils.makePinotGauge(_metricPrefix + metricName, avoid -> value));
     pinotGauge.setValue(value);
   }
 
@@ -694,7 +694,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) {
     PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-        PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.get()));
+        PinotMetricUtils.makePinotGauge(_metricPrefix + metricName, avoid -> valueSupplier.get()));
     pinotGauge.setValueSupplier(valueSupplier);
   }
 
@@ -704,7 +704,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setOrUpdateGauge(final String metricName, final LongSupplier valueSupplier) {
     PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
         PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-        PinotMetricUtils.makePinotGauge(avoid -> valueSupplier.getAsLong()));
+        PinotMetricUtils.makePinotGauge(_metricPrefix + metricName, avoid -> valueSupplier.getAsLong()));
     pinotGauge.setValueSupplier((Supplier<Long>) () -> (Long) valueSupplier.getAsLong());
   }
 

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.dropwizard;
+package org.apache.pinot.plugin.metrics.opentelemetry;
 
 import com.google.auto.service.AutoService;
 import java.util.function.Function;
@@ -32,56 +32,56 @@ import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 @AutoService(PinotMetricsFactory.class)
 @MetricsFactory
-public class DropwizardMetricsFactory implements PinotMetricsFactory {
-  public static final String DOMAIN_PROP = "pinot.metrics.dropwizard.domain";
-  // this is the default in Dropwizard, which was used in Pinot before 2023
-  public static final String DEFAULT_DOMAIN_VALUE = "org.apache.pinot.common.metrics";
-  private PinotMetricsRegistry _pinotMetricsRegistry = null;
-  private String _domainName;
+public class OpenTelemetryMetricsFactory implements PinotMetricsFactory {
+  private final PinotMetricsRegistry _pinotMetricsRegistry = new OpenTelemetryMetricsRegistry();
 
   @Override
   public void init(PinotConfiguration metricsConfiguration) {
-    _domainName = metricsConfiguration.getProperty(DOMAIN_PROP, DEFAULT_DOMAIN_VALUE);
   }
 
   @Override
   public PinotMetricsRegistry getPinotMetricsRegistry() {
-    if (_pinotMetricsRegistry == null) {
-      _pinotMetricsRegistry = new DropwizardMetricsRegistry();
-    }
     return _pinotMetricsRegistry;
   }
 
   @Override
   public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
-    return new DropwizardMetricName(klass, name);
+    // It's OK to just throw away the class name. Adding the class name to into pinot metric name will make
+    // the dimension/attribute parsing logic more complicated as not all pinot metric having it.
+    return new OpenTelemetryMetricName(name);
   }
 
   @Override
   @Deprecated
   public <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
-    return new DropwizardGauge<T>(condition);
+    return makePinotGauge("UnknownPinotMetricName", condition);
   }
 
   @Override
   public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
-    return new DropwizardGauge<T>(condition);
+    T value = condition.apply(null);
+    if (value instanceof Integer || value instanceof Long) {
+      return new OpenTelemetryLongGauge<>(new OpenTelemetryMetricName(metricName), condition);
+    }
+    if (value instanceof Double) {
+      return new OpenTelemetryDoubleGauge<>(new OpenTelemetryMetricName(metricName), condition);
+    }
+    throw new IllegalArgumentException("Unsupported supplier type: " + condition.getClass().getName());
   }
 
-  /**
-   * @deprecated Use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
-   */
   @Override
+  @Deprecated
   public PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
-    return new DropwizardJmxReporter(metricsRegistry, _domainName);
+    throw new UnsupportedOperationException("OpenTelemetry does not support JMX reporter");
   }
 
+  @Override
   public PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry) {
-    return new DropwizardJmxReporter(metricsRegistry, _domainName);
+    return new OpenTelemetryHttpReporter();
   }
 
   @Override
   public String getMetricsFactoryName() {
-    return "Dropwizard";
+    return "OpenTelemetry";
   }
 }

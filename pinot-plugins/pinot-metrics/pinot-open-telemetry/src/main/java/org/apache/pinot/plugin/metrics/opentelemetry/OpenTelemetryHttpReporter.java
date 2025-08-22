@@ -16,28 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.compound;
+package org.apache.pinot.plugin.metrics.opentelemetry;
 
-import java.util.List;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import io.opentelemetry.exporter.otlp.http.metrics.OtlpHttpMetricExporter;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 
 
 /**
- * CompoundPinotJmxReporter is a composite reporter that aggregates multiple PinotJmxReporters.
- * @deprecated Use {@link org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricReporter} instead.
+ * OpenTelemetryHttpReporter exports metrics to an OpenTelemetry collector on HTTP endpoint.
  */
-@Deprecated
-public class CompoundPinotJmxReporter implements PinotJmxReporter {
-  private final List<PinotJmxReporter> _reporters;
+public class OpenTelemetryHttpReporter implements PinotMetricReporter {
+  public static final OtlpHttpMetricExporter DEFAULT_HTTP_METRIC_EXPORTER = OtlpHttpMetricExporter
+      .builder()
+      .setEndpoint("http://[::1]:22784/v1/metrics") // default OpenTelemetry collector endpoint
+      .build();
+  public static final int DEFAULT_EXPORT_INTERVAL_SECONDS = 5;
 
-  public CompoundPinotJmxReporter(List<PinotJmxReporter> reporters) {
-    _reporters = reporters;
+  public OpenTelemetryHttpReporter() {
   }
 
   @Override
   public void start() {
-    for (PinotJmxReporter reporter : _reporters) {
-      reporter.start();
-    }
+    // TODO: make the collector endpoint and export interval configurable
+    OpenTelemetryMetricsRegistry.init(DEFAULT_HTTP_METRIC_EXPORTER, DEFAULT_EXPORT_INTERVAL_SECONDS);
   }
 }
