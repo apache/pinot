@@ -36,6 +36,7 @@ Detailed read model documentation is here; [Spark-Pinot Connector Read Model](do
   - Dynamic inference
   - Static analysis of case class
 - Supports query options
+- HTTPS/TLS support for secure connections
 
 ## Quick Start
 ```scala
@@ -58,6 +59,76 @@ val data = spark.read
 
 data.show(100)
 ```
+
+## HTTPS Configuration
+
+The connector supports HTTPS/TLS connections to Pinot clusters. To enable HTTPS, use the following configuration options:
+
+```scala
+val data = spark.read
+  .format("pinot")
+  .option("table", "airlineStats")
+  .option("tableType", "offline")
+  .option("useHttps", "true")
+  .option("keystorePath", "/path/to/keystore.jks")
+  .option("keystorePassword", "keystorePassword")
+  .option("truststorePath", "/path/to/truststore.jks")
+  .option("truststorePassword", "truststorePassword")
+  .load()
+```
+
+### HTTPS Configuration Options
+
+| Option | Description | Required | Default |
+|--------|-------------|----------|---------|
+| `useHttps` | Enable HTTPS connections | No | `false` |
+| `keystorePath` | Path to client keystore file (JKS format) | No | None |
+| `keystorePassword` | Password for the keystore | No | None |
+| `truststorePath` | Path to truststore file (JKS format) | No | None |
+| `truststorePassword` | Password for the truststore | No | None |
+
+**Note:** If no truststore is provided when HTTPS is enabled, the connector will trust all certificates (not recommended for production use).
+
+## Authentication Support
+
+The connector supports custom authentication headers for secure access to Pinot clusters:
+
+```scala
+// Using Bearer token authentication
+val data = spark.read
+  .format("pinot")
+  .option("table", "airlineStats")
+  .option("tableType", "offline")
+  .option("authToken", "my-jwt-token")  // Automatically adds "Authorization: Bearer my-jwt-token"
+  .load()
+
+// Using custom authentication header
+val data = spark.read
+  .format("pinot")
+  .option("table", "airlineStats")
+  .option("tableType", "offline")
+  .option("authHeader", "Authorization")
+  .option("authToken", "Bearer my-custom-token")
+  .load()
+
+// Using API key authentication
+val data = spark.read
+  .format("pinot")
+  .option("table", "airlineStats")
+  .option("tableType", "offline")
+  .option("authHeader", "X-API-Key")
+  .option("authToken", "my-api-key")
+  .load()
+```
+
+### Authentication Configuration Options
+
+| Option | Description | Required | Default |
+|--------|-------------|----------|---------|
+| `authHeader` | Custom authentication header name | No | `Authorization` (when `authToken` is provided) |
+| `authToken` | Authentication token/value | No | None |
+
+**Note:** If only `authToken` is provided without `authHeader`, the connector will automatically use `Authorization: Bearer <token>`.
 
 ## Examples
 

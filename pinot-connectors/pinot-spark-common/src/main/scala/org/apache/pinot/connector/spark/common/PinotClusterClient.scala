@@ -32,17 +32,18 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
  * PinotCusterClient reads metadata from Pinot controller.
  */
 private[pinot] object PinotClusterClient extends Logging {
-  private val TABLE_SCHEMA_TEMPLATE = "http://%s/tables/%s/schema"
-  private val TABLE_BROKER_INSTANCES_TEMPLATE = "http://%s/v2/brokers/tables/%s"
-  private val TIME_BOUNDARY_TEMPLATE = "http://%s/debug/timeBoundary/%s"
-  private val ROUTING_TABLE_TEMPLATE = "http://%s/debug/routingTable/sql?query=%s"
-  private val INSTANCES_API_TEMPLATE = "http://%s/instances/%s"
+  private val TABLE_SCHEMA_TEMPLATE = "%s://%s/tables/%s/schema"
+  private val TABLE_BROKER_INSTANCES_TEMPLATE = "%s://%s/v2/brokers/tables/%s"
+  private val TIME_BOUNDARY_TEMPLATE = "%s://%s/debug/timeBoundary/%s"
+  private val ROUTING_TABLE_TEMPLATE = "%s://%s/debug/routingTable/sql?query=%s"
+  private val INSTANCES_API_TEMPLATE = "%s://%s/instances/%s"
 
-  def getTableSchema(controllerUrl: String, tableName: String): Schema = {
+  def getTableSchema(controllerUrl: String, tableName: String, useHttps: Boolean = false, authHeader: Option[String] = None, authToken: Option[String] = None): Schema = {
     val rawTableName = TableNameBuilder.extractRawTableName(tableName)
     Try {
-      val uri = new URI(String.format(TABLE_SCHEMA_TEMPLATE, controllerUrl, rawTableName))
-      val response = HttpUtils.sendGetRequest(uri)
+      val scheme = if (useHttps) "https" else "http"
+      val uri = new URI(String.format(TABLE_SCHEMA_TEMPLATE, scheme, controllerUrl, rawTableName))
+      val response = HttpUtils.sendGetRequest(uri, authHeader, authToken)
       Schema.fromString(response)
     } match {
       case Success(response) =>
@@ -60,10 +61,11 @@ private[pinot] object PinotClusterClient extends Logging {
    * Get available broker urls(host:port) for given table.
    * This method is used when if broker instances not defined in the datasource options.
    */
-  def getBrokerInstances(controllerUrl: String, tableName: String): List[String] = {
+  def getBrokerInstances(controllerUrl: String, tableName: String, useHttps: Boolean = false, authHeader: Option[String] = None, authToken: Option[String] = None): List[String] = {
     Try {
-      val uri = new URI(String.format(TABLE_BROKER_INSTANCES_TEMPLATE, controllerUrl, tableName))
-      val response = HttpUtils.sendGetRequest(uri)
+      val scheme = if (useHttps) "https" else "http"
+      val uri = new URI(String.format(TABLE_BROKER_INSTANCES_TEMPLATE, scheme, controllerUrl, tableName))
+      val response = HttpUtils.sendGetRequest(uri, authHeader, authToken)
 
       // Define a case class to represent the broker entry
       case class BrokerEntry(host: String, port: Int)
@@ -100,12 +102,13 @@ private[pinot] object PinotClusterClient extends Logging {
    *
    * @return time boundary info if table exist and segments push type is 'append' or None otherwise
    */
-  def getTimeBoundaryInfo(brokerUrl: String, tableName: String): Option[TimeBoundaryInfo] = {
+  def getTimeBoundaryInfo(brokerUrl: String, tableName: String, useHttps: Boolean = false, authHeader: Option[String] = None, authToken: Option[String] = None): Option[TimeBoundaryInfo] = {
     val rawTableName = TableNameBuilder.extractRawTableName(tableName)
     Try {
       // pinot converts the given table name to the offline table name automatically
-      val uri = new URI(String.format(TIME_BOUNDARY_TEMPLATE, brokerUrl, rawTableName))
-      val response = HttpUtils.sendGetRequest(uri)
+      val scheme = if (useHttps) "https" else "http"
+      val uri = new URI(String.format(TIME_BOUNDARY_TEMPLATE, scheme, brokerUrl, rawTableName))
+      val response = HttpUtils.sendGetRequest(uri, authHeader, authToken)
       decodeTo(response, classOf[TimeBoundaryInfo])
     } match {
       case Success(decodedResponse) =>
@@ -145,22 +148,25 @@ private[pinot] object PinotClusterClient extends Logging {
    * @return realtime and/or offline routing table(s)
    */
   def getRoutingTable(brokerUrl: String,
-                      scanQuery: ScanQuery): Map[TableType, Map[String, List[String]]] = {
+                      scanQuery: ScanQuery,
+                      useHttps: Boolean = false,
+                      authHeader: Option[String] = None,
+                      authToken: Option[String] = None): Map[TableType, Map[String, List[String]]] = {
     val routingTables =
       if (scanQuery.isTableOffline) {
         val offlineRoutingTable =
-          getRoutingTableForQuery(brokerUrl, scanQuery.offlineSelectQuery)
+          getRoutingTableForQuery(brokerUrl, scanQuery.offlineSelectQuery, useHttps, authHeader, authToken)
         Map(TableType.OFFLINE -> offlineRoutingTable)
       } else if (scanQuery.isTableRealtime) {
         val realtimeRoutingTable =
-          getRoutingTableForQuery(brokerUrl, scanQuery.realtimeSelectQuery)
+          getRoutingTableForQuery(brokerUrl, scanQuery.realtimeSelectQuery, useHttps, authHeader, authToken)
         Map(TableType.REALTIME -> realtimeRoutingTable)
       } else {
         // hybrid table
         val offlineRoutingTable =
-          getRoutingTableForQuery(brokerUrl, scanQuery.offlineSelectQuery)
+          getRoutingTableForQuery(brokerUrl, scanQuery.offlineSelectQuery, useHttps, authHeader, authToken)
         val realtimeRoutingTable =
-          getRoutingTableForQuery(brokerUrl, scanQuery.realtimeSelectQuery)
+          getRoutingTableForQuery(brokerUrl, scanQuery.realtimeSelectQuery, useHttps, authHeader, authToken)
         Map(
           TableType.OFFLINE -> offlineRoutingTable,
           TableType.REALTIME -> realtimeRoutingTable
@@ -179,10 +185,11 @@ private[pinot] object PinotClusterClient extends Logging {
    *
    * @return InstanceInfo
    */
-  def getInstanceInfo(controllerUrl: String, instance: String): InstanceInfo = {
+  def getInstanceInfo(controllerUrl: String, instance: String, useHttps: Boolean = false, authHeader: Option[String] = None, authToken: Option[String] = None): InstanceInfo = {
     Try {
-      val uri = new URI(String.format(INSTANCES_API_TEMPLATE, controllerUrl, instance))
-      val response = HttpUtils.sendGetRequest(uri)
+      val scheme = if (useHttps) "https" else "http"
+      val uri = new URI(String.format(INSTANCES_API_TEMPLATE, scheme, controllerUrl, instance))
+      val response = HttpUtils.sendGetRequest(uri, authHeader, authToken)
 
       // Use the updated decodeTo function with Jackson
       decodeTo(response, classOf[InstanceInfo])
@@ -197,11 +204,12 @@ private[pinot] object PinotClusterClient extends Logging {
     }
   }
 
-  private def getRoutingTableForQuery(brokerUrl: String, sql: String): Map[String, List[String]] = {
+  private def getRoutingTableForQuery(brokerUrl: String, sql: String, useHttps: Boolean = false, authHeader: Option[String] = None, authToken: Option[String] = None): Map[String, List[String]] = {
     Try {
       val encodedSqlQueryParam = URLEncoder.encode(sql, "UTF-8")
-      val uri = new URI(String.format(ROUTING_TABLE_TEMPLATE, brokerUrl, encodedSqlQueryParam))
-      val response = HttpUtils.sendGetRequest(uri)
+      val scheme = if (useHttps) "https" else "http"
+      val uri = new URI(String.format(ROUTING_TABLE_TEMPLATE, scheme, brokerUrl, encodedSqlQueryParam))
+      val response = HttpUtils.sendGetRequest(uri, authHeader, authToken)
 
       decodeTo(response, classOf[Map[String, List[String]]])
     } match {
