@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.server.starter.helix;
+package org.apache.pinot.common.config;
 
 import java.util.ArrayList;
 import java.util.HashMap;
