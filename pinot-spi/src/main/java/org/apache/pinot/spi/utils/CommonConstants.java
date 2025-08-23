@@ -1801,6 +1801,29 @@ public class CommonConstants {
         public static final String ENABLE_TRACE = "enableTrace";
         public static final String ENABLE_STREAMING = "enableStreaming";
         public static final String PAYLOAD_TYPE = "payloadType";
+
+        public static class TimeSeries {
+          public static final String LANGUAGE = "language";
+          public static final String START_TIME_SECONDS = "startTimeSeconds";
+          public static final String WINDOW_SECONDS = "windowSeconds";
+          public static final String NUM_ELEMENTS = "numElements";
+          public static final String DEADLINE_MS = "deadlineMs";
+
+          public static final String SEGMENT_MAP_ENTRY_PREFIX = "$segmentMapEntry#";
+
+          public static boolean isKeySegmentList(String key) {
+            return key.startsWith(SEGMENT_MAP_ENTRY_PREFIX);
+          }
+
+          public static String encodeSegmentListKey(String planId) {
+            return SEGMENT_MAP_ENTRY_PREFIX + planId;
+          }
+
+          /// Returns the plan-id corresponding to the encoded key.
+          public static String decodeSegmentListKey(String key) {
+            return key.substring(SEGMENT_MAP_ENTRY_PREFIX.length());
+          }
+        }
       }
 
       public static class PayloadType {
@@ -1812,6 +1835,12 @@ public class CommonConstants {
     public static class Response {
       public static class MetadataKeys {
         public static final String RESPONSE_TYPE = "responseType";
+
+        public static class TimeSeries {
+          public static final String PLAN_ID = "planId";
+          public static final String ERROR_TYPE = "errorType";
+          public static final String ERROR_MESSAGE = "error";
+        }
       }
 
       public static class ResponseType {
