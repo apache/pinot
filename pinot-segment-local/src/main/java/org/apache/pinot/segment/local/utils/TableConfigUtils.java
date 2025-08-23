@@ -1439,7 +1439,7 @@ public final class TableConfigUtils {
 
   // enum of all the skip-able validation types.
   public enum ValidationType {
-    ALL, TASK, UPSERT
+    ALL, TASK, UPSERT, TENANT, MINION_INSTANCES, ACTIVE_TASKS
   }
 
   /**
