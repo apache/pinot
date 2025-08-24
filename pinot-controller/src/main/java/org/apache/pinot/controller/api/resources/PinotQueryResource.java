@@ -256,16 +256,14 @@ public class PinotQueryResource {
     private final Boolean _ignoreCase;
 
     @JsonCreator
-    public MultiStageQueryValidationRequest(
-        @JsonProperty("sql") String sql,
+    public MultiStageQueryValidationRequest(@JsonProperty("sql") String sql,
         @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
         @JsonProperty("schemas") @Nullable List<Schema> schemas,
         @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
         @JsonProperty("ignoreCase") @Nullable Boolean ignoreCase) {
-
       _sql = sql;
-      _tableConfigs = tableConfigs;
-      _schemas = schemas;
+      _tableConfigs = tableConfigs != null ? tableConfigs : new ArrayList<>();
+      _schemas = schemas != null ? schemas : new ArrayList<>();
       _logicalTableConfigs = logicalTableConfigs != null ? logicalTableConfigs : new ArrayList<>();
       _ignoreCase = ignoreCase != null ? ignoreCase : true;
     }
