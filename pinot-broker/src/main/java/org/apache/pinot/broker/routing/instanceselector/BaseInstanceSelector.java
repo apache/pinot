@@ -98,6 +98,7 @@ abstract class BaseInstanceSelector implements InstanceSelector {
   final Clock _clock;
   final boolean _useFixedReplica;
   final long _newSegmentExpirationTimeInSeconds;
+  final boolean _emitSinglePoolSegmentsMetric;
   final int _tableNameHashForFixedReplicaRouting;
 
   // These 3 variables are the cached states to help accelerate the change processing
@@ -113,14 +114,15 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
   BaseInstanceSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useFixedReplica, long newSegmentExpirationTimeInSeconds) {
+      InstanceSelectorConfig config) {
     _tableNameWithType = tableNameWithType;
     _propertyStore = propertyStore;
     _brokerMetrics = brokerMetrics;
     _adaptiveServerSelector = adaptiveServerSelector;
     _clock = clock;
-    _useFixedReplica = useFixedReplica;
-    _newSegmentExpirationTimeInSeconds = newSegmentExpirationTimeInSeconds;
+    _useFixedReplica = config.isUseFixedReplica();
+    _newSegmentExpirationTimeInSeconds = config.getNewSegmentExpirationTimeInSeconds();
+    _emitSinglePoolSegmentsMetric = config.shouldEmitSinglePoolSegmentsMetrics();
     // Using raw table name to ensure queries spanning across REALTIME and OFFLINE tables are routed to the same
     // instance
     // Math.abs(Integer.MIN_VALUE) = Integer.MIN_VALUE, so we use & 0x7FFFFFFF to get a positive value
@@ -260,6 +262,8 @@ abstract class BaseInstanceSelector implements InstanceSelector {
 
     Map<String, Map<String, String>> idealStateAssignment = idealState.getRecord().getMapFields();
     Map<String, Map<String, String>> externalViewAssignment = externalView.getRecord().getMapFields();
+    int count = 0;
+    Set<Integer> pools = new HashSet<>();
     for (String segment : onlineSegments) {
       Map<String, String> idealStateInstanceStateMap = idealStateAssignment.get(segment);
       Long newSegmentCreationTimeMs = newSegmentCreationTimeMap.get(segment);
@@ -301,6 +305,18 @@ abstract class BaseInstanceSelector implements InstanceSelector {
           _oldSegmentCandidatesMap.put(segment, candidates);
         }
       }
+      if (_emitSinglePoolSegmentsMetric) {
+        pools.clear();
+        for (String instance : idealStateInstanceStateMap.keySet()) {
+          pools.add(getPool(instance));
+        }
+        if (pools.size() < 2) {
+          count++;
+        }
+      }
+    }
+    if (_emitSinglePoolSegmentsMetric) {
+      _brokerMetrics.addMeteredTableValue(_tableNameWithType, BrokerMeter.SINGLE_POOL_SEGMENTS, count);
     }
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Got _newSegmentStateMap: {}, _oldSegmentCandidatesMap: {}", _newSegmentStateMap.keySet(),
