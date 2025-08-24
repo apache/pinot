@@ -1781,7 +1781,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     }
     String tableConfigsJson = String.join(",", configs);
 
-    // ---- invalid column in the query ----
+    //  Invalid column in the query
     String requestJson = String.format(
         "{\"sql\": \"SELECT nonExistentColumn FROM mytable\", \"tableConfigs\": [%s], \"schemas\": [%s]}",
         tableConfigsJson, schemaNode.toString());
