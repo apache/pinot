@@ -172,7 +172,8 @@ public class PinotQueryResource {
 
     try {
       TableCacheProvider tableCache;
-      if (request.getTableConfigs() != null && request.getSchemas() != null) {
+      if (request.getTableConfigs() != null && !request.getTableConfigs().isEmpty() && request.getSchemas() != null
+          && !request.getSchemas().isEmpty()) {
         List<TableConfig> tableConfigs = new ArrayList<>();
         if (request.getTableConfigs() != null) {
           for (TableConfig tableConfig : request.getTableConfigs()) {
