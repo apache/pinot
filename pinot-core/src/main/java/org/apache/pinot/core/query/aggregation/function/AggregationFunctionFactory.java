@@ -229,6 +229,8 @@ public class AggregationFunctionFactory {
             return new AvgAggregationFunction(arguments, nullHandlingEnabled);
           case MODE:
             return new ModeAggregationFunction(arguments, nullHandlingEnabled);
+          case ANYVALUE:
+            return new AnyValueAggregationFunction(arguments, nullHandlingEnabled);
           case FIRSTWITHTIME: {
             Preconditions.checkArgument(numArguments == 3,
                 "FIRST_WITH_TIME expects 3 arguments, got: %s. The function can be used as "
