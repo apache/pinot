@@ -54,7 +54,7 @@ public class QueryWorkloadRefreshMessage extends Message {
   public QueryWorkloadRefreshMessage(Message message) {
     super(message.getRecord());
     if (!message.getMsgSubType().equals(REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)
-        || !message.getMsgSubType().equals(DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+        && !message.getMsgSubType().equals(DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
       throw new IllegalArgumentException("Unknown message subtype:" + message.getMsgSubType());
     }
   }

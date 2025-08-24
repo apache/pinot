@@ -20,8 +20,8 @@ package org.apache.pinot.controller.workload.splitter;
 
 import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.InstanceCost;
-import org.apache.pinot.spi.config.workload.NodeConfig;
 
 /**
  * Interface for splitting the cost of a workload between instances.
@@ -34,15 +34,5 @@ public interface CostSplitter {
    * @param instances names of all instances involved
    * @return a map from instance identifier to the cost for that instance
    */
-  Map<String, InstanceCost> computeInstanceCostMap(NodeConfig nodeConfig, Set<String> instances);
-
-  /**
-   * Computes the cost for a specific instance.
-   *
-   * @param nodeConfig the node configuration
-   * @param instances names of all instances involved
-   * @param instance the instance identifier for which to compute the cost
-   * @return the cost for the specified instance
-   */
-  InstanceCost computeInstanceCost(NodeConfig nodeConfig, Set<String> instances, String instance);
+  Map<String, InstanceCost> computeInstanceCostMap(CostSplit costSplit, Set<String> instances);
 }
