@@ -62,6 +62,9 @@ public class OrFilterOperator extends BaseFilterOperator {
       }
       blockDocIdSets.add(optimizedDocIdSet);
     }
+    if (blockDocIdSets.isEmpty()) {
+      return new OrDocIdSet(blockDocIdSets, _numDocs, true);
+    }
     return new OrDocIdSet(blockDocIdSets, _numDocs);
   }
 
