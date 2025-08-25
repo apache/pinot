@@ -19,7 +19,9 @@
 package org.apache.pinot.core.metadata;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -31,6 +33,8 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
  */
 public class DefaultMetadataExtractor implements MetadataExtractor {
 
+  static final String SEGMENT_METADATA_DIR_NAME = "segment_metadata";
+
   @Override
   public SegmentMetadata extractMetadata(File tarredSegmentFile, File unzippedSegmentDir)
       throws Exception {
@@ -41,7 +45,20 @@ public class DefaultMetadataExtractor implements MetadataExtractor {
     if (indexDir.isDirectory()) {
       return new SegmentMetadataImpl(indexDir);
     } else {
-      return new SegmentMetadataImpl(untarredFiles);
+      // If the first file is not a directory, create a subdirectory and move all files into it
+      File segmentMetadataDir = new File(unzippedSegmentDir, SEGMENT_METADATA_DIR_NAME);
+      if (!segmentMetadataDir.exists() && !segmentMetadataDir.mkdirs()) {
+        throw new IOException("Failed to create segment_metadata directory: " + segmentMetadataDir.getAbsolutePath());
+      }
+      for (File file : untarredFiles) {
+        File targetFile = new File(segmentMetadataDir, file.getName());
+        if (file.isDirectory()) {
+          FileUtils.moveDirectory(file, targetFile);
+        } else {
+          FileUtils.moveFile(file, targetFile);
+        }
+      }
+      return new SegmentMetadataImpl(segmentMetadataDir);
     }
   }
 }
