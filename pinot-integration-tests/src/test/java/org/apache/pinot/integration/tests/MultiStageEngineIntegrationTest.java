@@ -1835,7 +1835,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(result.get("errorCode").isNull(), "Error code should be null for: " + query);
     assertTrue(result.get("errorMessage").isNull(), "Error message should be null for: " + query);
 
-    // ---- case-insensitive mode ----
+    // Case-insensitive mode
     query = String.format(
         "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s], \"schemas\": [%s], "
             + "\"ignoreCase\": true}",
