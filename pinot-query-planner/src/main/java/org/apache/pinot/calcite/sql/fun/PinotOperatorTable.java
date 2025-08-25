@@ -73,8 +73,8 @@ public class PinotOperatorTable implements SqlOperatorTable {
   private static final Supplier<PinotOperatorTable> WITHOUT_NULL_HANDLING =
       Suppliers.memoize(() -> new PinotOperatorTable(false));
 
-  public static PinotOperatorTable instance(boolean nullHandling) {
-    return nullHandling ? WITH_NULL_HANDLING.get() : WITHOUT_NULL_HANDLING.get();
+  public static PinotOperatorTable instance(boolean nullHandlingEnabled) {
+    return nullHandlingEnabled ? WITH_NULL_HANDLING.get() : WITHOUT_NULL_HANDLING.get();
   }
 
   // The standard Calcite + and - operators don't support operations on TIMESTAMP types. However, Pinot supports these
@@ -326,7 +326,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
   private final Map<String, SqlOperator> _operatorMap;
   private final List<SqlOperator> _operatorList;
 
-  private PinotOperatorTable(boolean nullHandling) {
+  private PinotOperatorTable(boolean nullHandlingEnabled) {
     Map<String, SqlOperator> operatorMap = new HashMap<>();
 
     // Register standard operators
@@ -343,7 +343,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
     // standard Calcite simplifications which are correct in SQL, but incorrect for Pinot. For example, in SQL
     // `col IS NOT NULL AND col <> 0` is simplified to `col <> 0` because `col IS NOT NULL` is always true if
     // `col <> 0` is true. However, in Pinot, `IS NOT NULL` has a special meaning when using basic null handling
-    if (!nullHandling) {
+    if (!nullHandlingEnabled) {
       operatorMap.put(FunctionRegistry.canonicalize(PINOT_IS_NULL.getName()), PINOT_IS_NULL);
       operatorMap.put(FunctionRegistry.canonicalize(PINOT_IS_NOT_NULL.getName()), PINOT_IS_NOT_NULL);
     }

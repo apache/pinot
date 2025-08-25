@@ -149,7 +149,7 @@ public class QueryEnvironment {
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
     _config = Frameworks.newConfigBuilder()
         .traitDefs()
-        .operatorTable(PinotOperatorTable.instance(config.isNullHandling()))
+        .operatorTable(PinotOperatorTable.instance(config.isNullHandlingEnabled()))
         .defaultSchema(rootSchema.plus())
         .sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG)
         .build();
@@ -652,7 +652,7 @@ public class QueryEnvironment {
     TableCache getTableCache();
 
     @Value.Default
-    default boolean isNullHandling() {
+    default boolean isNullHandlingEnabled() {
       return false;
     }
 
