@@ -27,6 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 import org.apache.pinot.core.util.trace.TraceRunnable;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
@@ -37,44 +40,82 @@ import org.apache.pinot.query.runtime.operator.OpChainId;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+/// TODO: Use CID to manage the queries
 public class OpChainSchedulerService {
   private static final Logger LOGGER = LoggerFactory.getLogger(OpChainSchedulerService.class);
+  private static final int NUM_QUERY_LOCKS = 1 << 10; // 1024 locks
+  private static final int QUERY_LOCK_MASK = NUM_QUERY_LOCKS - 1;
 
   private final ExecutorService _executorService;
   private final ConcurrentHashMap<OpChainId, Future<?>> _submittedOpChainMap = new ConcurrentHashMap<>();
   private final Cache<OpChainId, MultiStageOperator> _opChainCache;
-
+  private final ReadWriteLock[] _queryLocks;
+  private final Cache<Long, Boolean> _cancelledQueryCache;
 
   public OpChainSchedulerService(ExecutorService executorService, PinotConfiguration config) {
-    this(
-        executorService,
-        config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_SIZE,
+    this(executorService, config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_SIZE,
             MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_SIZE),
         config.getProperty(MultiStageQueryRunner.KEY_OF_OP_STATS_CACHE_EXPIRE_MS,
-            MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS)
-    );
+            MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS),
+        config.getProperty(MultiStageQueryRunner.KEY_OF_CANCELLED_QUERY_CACHE_SIZE,
+            MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_SIZE),
+        config.getProperty(MultiStageQueryRunner.KEY_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS,
+            MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS));
   }
 
   public OpChainSchedulerService(ExecutorService executorService) {
     this(executorService, MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_SIZE,
-        MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS);
+        MultiStageQueryRunner.DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS,
+        MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_SIZE,
+        MultiStageQueryRunner.DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS);
   }
 
-  public OpChainSchedulerService(ExecutorService executorService, int maxWeight, long expireAfterWriteMs) {
+  public OpChainSchedulerService(ExecutorService executorService, int opStatsCacheSize, long opStatsCacheExpireMs,
+      int cancelledQueryCacheSize, long cancelledQueryCacheExpireMs) {
     _executorService = executorService;
     _opChainCache = CacheBuilder.newBuilder()
         .weigher((OpChainId key, MultiStageOperator value) -> countOperators(value))
-        .maximumWeight(maxWeight)
-        .expireAfterWrite(expireAfterWriteMs, TimeUnit.MILLISECONDS)
+        .maximumWeight(opStatsCacheSize)
+        .expireAfterWrite(opStatsCacheExpireMs, TimeUnit.MILLISECONDS)
+        .build();
+    _queryLocks = new ReadWriteLock[NUM_QUERY_LOCKS];
+    for (int i = 0; i < NUM_QUERY_LOCKS; i++) {
+      _queryLocks[i] = new ReentrantReadWriteLock();
+    }
+    _cancelledQueryCache = CacheBuilder.newBuilder()
+        .maximumSize(cancelledQueryCacheSize)
+        .expireAfterWrite(cancelledQueryCacheExpireMs, TimeUnit.MILLISECONDS)
         .build();
   }
 
   public void register(OpChain operatorChain) {
+    // Acquire read lock for the query to ensure that the query is not cancelled while scheduling the operator chain.
+    long requestId = operatorChain.getId().getRequestId();
+    Lock readLock = getQueryLock(requestId).readLock();
+    readLock.lock();
+    try {
+      // Do not schedule the operator chain if the query has been cancelled.
+      if (_cancelledQueryCache.getIfPresent(requestId) != null) {
+        LOGGER.debug("({}): Query has been cancelled", operatorChain);
+        throw new QueryCancelledException(
+            "Query has been cancelled before op-chain: " + operatorChain.getId() + " being scheduled");
+      } else {
+        registerInternal(operatorChain);
+      }
+    } finally {
+      readLock.unlock();
+    }
+  }
+
+  private void registerInternal(OpChain operatorChain) {
+    OpChainId opChainId = operatorChain.getId();
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
@@ -83,8 +124,8 @@ public class OpChainSchedulerService {
         // try-with-resources to ensure that the operator chain is closed
         // TODO: Change the code so we ownership is expressed in the code in a better way
         try (OpChain closeMe = operatorChain) {
-          Tracing.ThreadAccountantOps.setupWorker(operatorChain.getId().getStageId(),
-              ThreadExecutionContext.TaskType.MSE, operatorChain.getParentContext());
+          Tracing.ThreadAccountantOps.setupWorker(opChainId.getStageId(), ThreadExecutionContext.TaskType.MSE,
+              operatorChain.getParentContext());
           LOGGER.trace("({}): Executing", operatorChain);
           MseBlock result = operatorChain.getRoot().nextBlock();
           while (result.isData()) {
@@ -96,13 +137,13 @@ public class OpChainSchedulerService {
             LOGGER.error("({}): Completed erroneously {} {}", operatorChain, stats, errorBlock.getErrorMessages());
           } else {
             LOGGER.debug("({}): Completed {}", operatorChain, stats);
-            _opChainCache.invalidate(operatorChain.getId());
+            _opChainCache.invalidate(opChainId);
           }
         } catch (Exception e) {
           LOGGER.error("({}): Failed to execute operator chain!", operatorChain, e);
           thrown = e;
         } finally {
-          _submittedOpChainMap.remove(operatorChain.getId());
+          _submittedOpChainMap.remove(opChainId);
           if (errorBlock != null || thrown != null) {
             if (thrown == null) {
               thrown = new RuntimeException("Error block " + errorBlock.getErrorMessages());
@@ -113,11 +154,20 @@ public class OpChainSchedulerService {
         }
       }
     });
-    _opChainCache.put(operatorChain.getId(), operatorChain.getRoot());
-    _submittedOpChainMap.put(operatorChain.getId(), scheduledFuture);
+    _opChainCache.put(opChainId, operatorChain.getRoot());
+    _submittedOpChainMap.put(opChainId, scheduledFuture);
   }
 
   public Map<Integer, MultiStageQueryStats.StageStats.Closed> cancel(long requestId) {
+    // Acquire write lock for the query to ensure that the query is not cancelled while scheduling the operator chain.
+    Lock writeLock = getQueryLock(requestId).writeLock();
+    writeLock.lock();
+    try {
+      _cancelledQueryCache.put(requestId, Boolean.TRUE);
+    } finally {
+      writeLock.unlock();
+    }
+
     // simple cancellation. for leaf stage this cannot be a dangling opchain b/c they will eventually be cleared up
     // via query timeout.
     Iterator<Map.Entry<OpChainId, Future<?>>> iterator = _submittedOpChainMap.entrySet().iterator();
@@ -165,5 +215,9 @@ public class OpChainSchedulerService {
       }
     }
     return result;
+  }
+
+  private ReadWriteLock getQueryLock(long requestId) {
+    return _queryLocks[(int) (requestId & QUERY_LOCK_MASK)];
   }
 }

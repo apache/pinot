@@ -174,7 +174,7 @@ public class LeafStageWorkerAssignmentRule extends PRelOptRule {
       }
       if (!routingTable.getUnavailableSegments().isEmpty()) {
         // Set unavailable segments in context, keyed by PRelNode ID.
-        segmentUnavailableMap.put(TableNameBuilder.forType(TableType.valueOf(tableName)).tableNameWithType(tableName),
+        segmentUnavailableMap.put(TableNameBuilder.forType(TableType.valueOf(tableType)).tableNameWithType(tableName),
             new HashSet<>(routingTable.getUnavailableSegments()));
       }
     }
