@@ -220,6 +220,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
+  protected AuditConfigManager _auditConfigManager;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -542,6 +543,15 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
+    // Initialize audit config manager and register as cluster config listener
+    LOGGER.info("Initializing audit config manager");
+    _auditConfigManager = new AuditConfigManager();
+    try {
+      _helixParticipantManager.addClusterfigChangeListener(_auditConfigManager);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to register to cluster config", e);
+    }
+
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
     _segmentCompletionManager =
@@ -630,7 +640,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
         bind(AuditRequestProcessor.class).to(AuditRequestProcessor.class);
-        bind(AuditConfigManager.class).to(AuditConfigManager.class);
+        bind(_auditConfigManager).to(AuditConfigManager.class);
 
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {

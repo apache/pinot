@@ -101,11 +101,13 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   protected final Map<Long, String> _clientQueryIds;
 
-  public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId, RoutingManager routingManager,
+  public BaseBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       ThreadResourceUsageAccountant resourceUsageAccountant) {
     _config = config;
     _brokerId = brokerId;
+    _requestIdGenerator = requestIdGenerator;
     _routingManager = routingManager;
     _accessControlFactory = accessControlFactory;
     _queryQuotaManager = queryQuotaManager;
@@ -113,7 +115,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     _brokerMetrics = BrokerMetrics.get();
     _brokerQueryEventListener = BrokerQueryEventListenerFactory.getBrokerQueryEventListener();
     _trackedHeaders = BrokerQueryEventListenerFactory.getTrackedHeaders();
-    _requestIdGenerator = new BrokerRequestIdGenerator(brokerId);
     _brokerTimeoutMs = config.getProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, Broker.DEFAULT_BROKER_TIMEOUT_MS);
     _enableRowColumnLevelAuth = config.getProperty(Broker.CONFIG_OF_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH,
         Broker.DEFAULT_BROKER_ENABLE_ROW_COLUMN_LEVEL_AUTH);
