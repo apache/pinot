@@ -19,7 +19,7 @@
 package org.apache.pinot.core.routing.timeboundary;
 
 import java.util.List;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 
@@ -38,7 +38,7 @@ public interface TimeBoundaryStrategy {
    * @param logicalTableConfig The logical table configuration to use for initialization.
    * @param tableCache The table cache to use for initialization.
    */
-  void init(LogicalTableConfig logicalTableConfig, TableCache tableCache);
+  void init(LogicalTableConfig logicalTableConfig, TableCacheProvider tableCache);
 
   /**
    * Computes the time boundary for the given physical table names.

@@ -23,7 +23,7 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.core.routing.LogicalTableRouteInfo;
 import org.apache.pinot.core.routing.LogicalTableRouteProvider;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
@@ -46,9 +46,9 @@ import org.apache.pinot.query.planner.plannode.WindowNode;
 
 public class DispatchablePlanVisitor implements PlanNodeVisitor<Void, DispatchablePlanContext> {
   private final Set<MailboxSendNode> _visited = Collections.newSetFromMap(new IdentityHashMap<>());
-  private final TableCache _tableCache;
+  private final TableCacheProvider _tableCache;
 
-  public DispatchablePlanVisitor(TableCache tableCache) {
+  public DispatchablePlanVisitor(TableCacheProvider tableCache) {
     _tableCache = tableCache;
   }
 

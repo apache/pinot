@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.query.parser.utils;
 
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.query.QueryEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +33,7 @@ public class ParserUtils {
   /**
    * Returns whether the query can be parsed and compiled using the multi-stage query engine.
    */
-  public static boolean canCompileWithMultiStageEngine(String query, String database, TableCache tableCache) {
+  public static boolean canCompileWithMultiStageEngine(String query, String database, TableCacheProvider tableCache) {
     // try to parse and compile the query with the Calcite planner used by the multi-stage query engine
     long compileStartTime = System.currentTimeMillis();
     LOGGER.debug("Trying to compile query `{}` using the multi-stage query engine", query);

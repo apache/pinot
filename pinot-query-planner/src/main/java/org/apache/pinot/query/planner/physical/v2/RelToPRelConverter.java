@@ -38,7 +38,7 @@ import org.apache.pinot.calcite.rel.logical.PinotLogicalAggregate;
 import org.apache.pinot.calcite.rel.logical.PinotLogicalEnrichedJoin;
 import org.apache.pinot.calcite.rel.rules.PinotRuleUtils;
 import org.apache.pinot.calcite.rel.traits.TraitAssignment;
-import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAggregate;
 import org.apache.pinot.query.planner.physical.v2.nodes.PhysicalAsOfJoin;
@@ -67,7 +67,7 @@ public class RelToPRelConverter {
   private RelToPRelConverter() {
   }
 
-  public static PRelNode toPRelNode(RelNode relNode, PhysicalPlannerContext context, TableCache tableCache) {
+  public static PRelNode toPRelNode(RelNode relNode, PhysicalPlannerContext context, TableCacheProvider tableCache) {
     // Step-1: Convert each RelNode to a PRelNode
     PRelNode rootPRelNode = create(relNode, context.getNodeIdGenerator());
     // Step-2: Assign traits

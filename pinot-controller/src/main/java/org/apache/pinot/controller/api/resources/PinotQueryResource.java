@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.swagger.annotations.ApiOperation;
@@ -55,6 +57,8 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.provider.StaticTableCache;
+import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.utils.DatabaseUtils;
@@ -70,7 +74,9 @@ import org.apache.pinot.core.auth.ManualAuthorization;
 import org.apache.pinot.core.query.executor.sql.SqlQueryExecutor;
 import org.apache.pinot.query.QueryEnvironment;
 import org.apache.pinot.query.parser.utils.ParserUtils;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.DatabaseConflictException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.exception.QueryException;
@@ -153,27 +159,66 @@ public class PinotQueryResource {
 
   @POST
   @Path("validateMultiStageQuery")
-  public MultiStageQueryValidationResponse validateMultiStageQuery(String requestJsonStr,
+  public MultiStageQueryValidationResponse validateMultiStageQuery(MultiStageQueryValidationRequest request,
       @Context HttpHeaders httpHeaders) {
-    JsonNode requestJson;
-    try {
-      requestJson = JsonUtils.stringToJsonNode(requestJsonStr);
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while parsing request {}", e.getMessage());
-      return new MultiStageQueryValidationResponse(false, "Failed to parse request JSON: " + e.getMessage(), null);
+
+    if (request.getSql() == null || request.getSql().trim().isEmpty()) {
+      return new MultiStageQueryValidationResponse(false, "Request is missing the query string field 'sql'", null);
     }
-    if (!requestJson.has("sql")) {
-      return new MultiStageQueryValidationResponse(false, "JSON Payload is missing the query string field 'sql'", null);
-    }
-    String sqlQuery = requestJson.get("sql").asText();
+
+    String sqlQuery = request.getSql();
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
-    try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database,
-        _pinotHelixResourceManager.getTableCache(), null).compile(sqlQuery)) {
-      return new MultiStageQueryValidationResponse(true, null, null);
+
+    try {
+      TableCacheProvider tableCache;
+      if (request.getTableConfigs() != null && !request.getTableConfigs().isEmpty() && request.getSchemas() != null
+          && !request.getSchemas().isEmpty()) {
+        List<TableConfig> tableConfigs = new ArrayList<>();
+        if (request.getTableConfigs() != null) {
+          for (TableConfig tableConfig : request.getTableConfigs()) {
+            if (tableConfig != null) {
+              tableConfigs.add(tableConfig);
+            }
+          }
+        }
+        List<Schema> schemas = new ArrayList<>();
+        if (request.getSchemas() != null) {
+          for (Schema schema : request.getSchemas()) {
+            if (schema != null) {
+              schemas.add(schema);
+            }
+          }
+        }
+        List<LogicalTableConfig> logicalTableConfigs = new ArrayList<>();
+        if (request.getLogicalTableConfigs() != null) {
+          for (LogicalTableConfig logicalTableConfig : request.getLogicalTableConfigs()) {
+            if (logicalTableConfig != null) {
+              logicalTableConfigs.add(logicalTableConfig);
+            }
+          }
+        }
+        boolean ignoreCase = true;
+        if (request.getIgnoreCase() != null) {
+          ignoreCase = request.getIgnoreCase();
+        }
+        tableCache = new StaticTableCache(tableConfigs, schemas, logicalTableConfigs, ignoreCase);
+      } else {
+        // Use TableCache from environment
+        tableCache = _pinotHelixResourceManager.getTableCache();
+      }
+
+      try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
+          sqlQuery)) {
+        return new MultiStageQueryValidationResponse(true, null, null);
+      }
     } catch (QueryException e) {
       LOGGER.info("Caught exception while compiling multi-stage query: {}", e.getMessage());
       return new MultiStageQueryValidationResponse(false, e.getMessage(), e.getErrorCode());
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while validating multi-stage query: {}", e.getMessage());
+      return new MultiStageQueryValidationResponse(false, "Unexpected error: " + e.getMessage(),
+          QueryErrorCode.QUERY_VALIDATION);
     }
   }
 
@@ -201,6 +246,49 @@ public class PinotQueryResource {
     @Nullable
     public QueryErrorCode getErrorCode() {
       return _errorCode;
+    }
+  }
+
+  public static class MultiStageQueryValidationRequest {
+    private final String _sql;
+    private final List<TableConfig> _tableConfigs;
+    private final List<Schema> _schemas;
+    private final List<LogicalTableConfig> _logicalTableConfigs;
+    private final Boolean _ignoreCase;
+
+    @JsonCreator
+    public MultiStageQueryValidationRequest(@JsonProperty("sql") String sql,
+        @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
+        @JsonProperty("schemas") @Nullable List<Schema> schemas,
+        @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
+        @JsonProperty("ignoreCase") @Nullable Boolean ignoreCase) {
+      _sql = sql;
+      _tableConfigs = tableConfigs != null ? tableConfigs : new ArrayList<>();
+      _schemas = schemas != null ? schemas : new ArrayList<>();
+      _logicalTableConfigs = logicalTableConfigs != null ? logicalTableConfigs : new ArrayList<>();
+      _ignoreCase = ignoreCase != null ? ignoreCase : true;
+    }
+
+    public String getSql() {
+      return _sql;
+    }
+
+    @Nullable
+    public List<TableConfig> getTableConfigs() {
+      return _tableConfigs;
+    }
+
+    @Nullable
+    public List<Schema> getSchemas() {
+      return _schemas;
+    }
+
+    public List<LogicalTableConfig> getLogicalTableConfigs() {
+      return _logicalTableConfigs;
+    }
+
+    public Boolean getIgnoreCase() {
+      return _ignoreCase;
     }
   }
 
