@@ -23,8 +23,10 @@ import com.google.common.base.Preconditions;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -37,6 +39,7 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
@@ -226,9 +229,201 @@ public class QueryWorkloadConfigUtils {
           if (propagationScheme.getPropagationType() == null) {
             errors.add(prefix + ".propagationScheme.type cannot be null");
           }
+          // Validate CostSplits
+          validateCostSplits(propagationScheme.getCostSplits(), prefix + ".propagationScheme.costSplits", errors);
         }
       }
     }
     return errors;
+  }
+
+  /**
+   * Validates a list of CostSplit objects and their nested sub-allocations.
+   *
+   * @param costSplits the list of CostSplit objects to validate
+   * @param prefix the prefix for error messages
+   * @param errors the list to add validation errors to
+   */
+  private static void validateCostSplits(List<CostSplit> costSplits, String prefix, List<String> errors) {
+    if (costSplits == null) {
+      errors.add(prefix + " cannot be null");
+      return;
+    }
+
+    if (costSplits.isEmpty()) {
+      errors.add(prefix + " cannot be empty");
+      return;
+    }
+
+    Set<String> costIds = new HashSet<>();
+    long totalCpuCost = 0;
+    long totalMemoryCost = 0;
+
+    for (int i = 0; i < costSplits.size(); i++) {
+      CostSplit costSplit = costSplits.get(i);
+      String costSplitPrefix = prefix + "[" + i + "]";
+
+      if (costSplit == null) {
+        errors.add(costSplitPrefix + " cannot be null");
+        continue;
+      }
+
+      // Validate costId
+      String costId = costSplit.getCostId();
+      if (costId == null || costId.trim().isEmpty()) {
+        errors.add(costSplitPrefix + ".costId cannot be null or empty");
+      } else {
+        // Check for duplicate costIds
+        if (costIds.contains(costId)) {
+          errors.add(costSplitPrefix + ".costId '" + costId + "' is duplicated");
+        } else {
+          costIds.add(costId);
+        }
+
+        // Validate costId format (basic validation)
+        if (!isValidCostId(costId)) {
+          errors.add(costSplitPrefix + ".costId '" + costId + "' contains invalid characters");
+        }
+      }
+
+      // Validate CPU cost
+      long cpuCostNs = costSplit.getCpuCostNs();
+      if (cpuCostNs < 0) {
+        errors.add(costSplitPrefix + ".cpuCostNs cannot be negative, got: " + cpuCostNs);
+      } else if (cpuCostNs == 0) {
+        errors.add(costSplitPrefix + ".cpuCostNs should be positive, got: " + cpuCostNs);
+      } else {
+        // Check for potential overflow when summing
+        if (totalCpuCost > Long.MAX_VALUE - cpuCostNs) {
+          errors.add(prefix + " total CPU cost would overflow");
+        } else {
+          totalCpuCost += cpuCostNs;
+        }
+      }
+
+      // Validate memory cost
+      long memoryCostBytes = costSplit.getMemoryCostBytes();
+      if (memoryCostBytes < 0) {
+        errors.add(costSplitPrefix + ".memoryCostBytes cannot be negative, got: " + memoryCostBytes);
+      } else if (memoryCostBytes == 0) {
+        errors.add(costSplitPrefix + ".memoryCostBytes should be positive, got: " + memoryCostBytes);
+      } else {
+        // Check for potential overflow when summing
+        if (totalMemoryCost > Long.MAX_VALUE - memoryCostBytes) {
+          errors.add(prefix + " total memory cost would overflow");
+        } else {
+          totalMemoryCost += memoryCostBytes;
+        }
+      }
+
+      // Validate sub-allocations (recursive validation)
+      List<CostSplit> subAllocations = costSplit.getSubAllocations();
+      if (subAllocations != null && !subAllocations.isEmpty()) {
+        validateCostSplitSubAllocations(subAllocations, costSplitPrefix + ".subAllocations",
+                                      cpuCostNs, memoryCostBytes, errors);
+      }
+    }
+  }
+
+  /**
+   * Validates sub-allocations within a CostSplit to ensure they don't exceed parent limits.
+   *
+   * @param subAllocations the list of sub-allocation CostSplit objects
+   * @param prefix the prefix for error messages
+   * @param parentCpuCostNs the parent's CPU cost limit
+   * @param parentMemoryCostBytes the parent's memory cost limit
+   * @param errors the list to add validation errors to
+   */
+  private static void validateCostSplitSubAllocations(List<CostSplit> subAllocations, String prefix,
+                                                     long parentCpuCostNs, long parentMemoryCostBytes,
+                                                     List<String> errors) {
+    if (subAllocations.isEmpty()) {
+      errors.add(prefix + " cannot be empty when specified");
+      return;
+    }
+
+    Set<String> subCostIds = new HashSet<>();
+    long totalSubCpuCost = 0;
+    long totalSubMemoryCost = 0;
+
+    for (int i = 0; i < subAllocations.size(); i++) {
+      CostSplit subAllocation = subAllocations.get(i);
+      String subPrefix = prefix + "[" + i + "]";
+
+      if (subAllocation == null) {
+        errors.add(subPrefix + " cannot be null");
+        continue;
+      }
+
+      // Validate sub-allocation costId
+      String subCostId = subAllocation.getCostId();
+      if (subCostId == null || subCostId.trim().isEmpty()) {
+        errors.add(subPrefix + ".costId cannot be null or empty");
+      } else {
+        // Check for duplicate sub-allocation costIds
+        if (subCostIds.contains(subCostId)) {
+          errors.add(subPrefix + ".costId '" + subCostId + "' is duplicated within sub-allocations");
+        } else {
+          subCostIds.add(subCostId);
+        }
+
+        if (!isValidCostId(subCostId)) {
+          errors.add(subPrefix + ".costId '" + subCostId + "' contains invalid characters");
+        }
+      }
+
+      // Validate sub-allocation costs
+      long subCpuCostNs = subAllocation.getCpuCostNs();
+      long subMemoryCostBytes = subAllocation.getMemoryCostBytes();
+
+      if (subCpuCostNs < 0) {
+        errors.add(subPrefix + ".cpuCostNs cannot be negative, got: " + subCpuCostNs);
+      } else if (subCpuCostNs == 0) {
+        errors.add(subPrefix + ".cpuCostNs should be positive, got: " + subCpuCostNs);
+      } else {
+        totalSubCpuCost += subCpuCostNs;
+      }
+
+      if (subMemoryCostBytes < 0) {
+        errors.add(subPrefix + ".memoryCostBytes cannot be negative, got: " + subMemoryCostBytes);
+      } else if (subMemoryCostBytes == 0) {
+        errors.add(subPrefix + ".memoryCostBytes should be positive, got: " + subMemoryCostBytes);
+      } else {
+        totalSubMemoryCost += subMemoryCostBytes;
+      }
+
+      // Sub-allocations should not have their own sub-allocations (prevent deep nesting)
+      if (subAllocation.getSubAllocations() != null && !subAllocation.getSubAllocations().isEmpty()) {
+        errors.add(subPrefix + ".subAllocations nested sub-allocations are not supported");
+      }
+    }
+
+    // Validate that sub-allocations don't exceed parent limits
+    if (totalSubCpuCost > parentCpuCostNs) {
+      errors.add(prefix + " total CPU cost (" + totalSubCpuCost
+          + "ns) exceeds parent limit (" + parentCpuCostNs + "ns)");
+    }
+
+    if (totalSubMemoryCost > parentMemoryCostBytes) {
+      errors.add(prefix + " total memory cost (" + totalSubMemoryCost
+          + " bytes) exceeds parent limit (" + parentMemoryCostBytes + " bytes)");
+    }
+  }
+
+  /**
+   * Validates that a costId contains only valid characters.
+   * Cost IDs should be alphanumeric with underscores, hyphens, and dots allowed.
+   *
+   * @param costId the cost ID to validate
+   * @return true if the cost ID is valid, false otherwise
+   */
+  private static boolean isValidCostId(String costId) {
+    if (costId == null || costId.trim().isEmpty()) {
+      return false;
+    }
+
+    // Allow alphanumeric characters, underscores, hyphens, and dots
+    // This covers table names, tenant names, and other common identifiers in Pinot
+    return costId.matches("^[a-zA-Z0-9_.-]+$");
   }
 }

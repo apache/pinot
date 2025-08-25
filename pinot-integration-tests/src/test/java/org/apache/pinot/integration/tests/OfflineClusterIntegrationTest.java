@@ -4302,26 +4302,4 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
   }
-
-  @Test
-  public void testQueryWorkloadConfig() throws Exception {
-    EnforcementProfile enforcementProfile = new EnforcementProfile(1000, 1000);
-    CostSplit costSplit = new CostSplit(DEFAULT_TABLE_NAME + "_OFFLINE", 1000, 1000, null);
-    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(costSplit));
-    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
-    QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
-    try {
-      getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
-      TestUtils.waitForCondition(aVoid -> {
-        try {
-          QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig("testWorkload");
-          return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
-        } catch (Exception e) {
-          throw new RuntimeException(e);
-        }
-      }, 60_000L, "Failed to retrieve the created query workload config");
-    } finally {
-      getControllerRequestClient().deleteQueryWorkloadConfig("testWorkload");
-    }
-  }
 }

@@ -49,10 +49,9 @@ public class TenantPropagationScheme implements PropagationScheme {
     NodeConfig.Type nodeType = nodeConfig.getNodeType();
     for (CostSplit costSplit : nodeConfig.getPropagationScheme().getCostSplits()) {
       Set<String> resolvedInstances = resolveInstances(costSplit, nodeType, helixTagToInstances);
-      if (resolvedInstances.isEmpty()) {
-        throw new IllegalArgumentException("No instances found for CostSplit: " + costSplit);
+      if (!resolvedInstances.isEmpty()) {
+        instances.addAll(resolvedInstances);
       }
-      instances.addAll(resolvedInstances);
     }
     return instances;
   }
@@ -67,6 +66,7 @@ public class TenantPropagationScheme implements PropagationScheme {
       }
       Set<String> instances = resolveInstances(costSplit, nodeConfig.getNodeType(), helixTagToInstances);
       if (instances.isEmpty()) {
+        // This is to ensure cost splits are added for active tenants
         throw new IllegalArgumentException("No instances found for CostSplit: " + costSplit);
       }
       Map<String, InstanceCost> splitCostMap = costSplitter.computeInstanceCostMap(costSplit, instances);

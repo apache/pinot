@@ -113,6 +113,11 @@ public class WorkloadBudgetManager {
         memoryBudgetBytes);
   }
 
+  public void deleteWorkload(String workload) {
+    _workloadBudgets.remove(workload);
+    LOGGER.info("Deleted workload: {}", workload);
+  }
+
   /**
    * Attempts to charge CPU and memory usage against the workload budget (Thread-Safe).
    * Returns the remaining budget for CPU and memory after charge.

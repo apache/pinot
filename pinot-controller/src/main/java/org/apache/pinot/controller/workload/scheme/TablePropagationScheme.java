@@ -34,8 +34,13 @@ import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 /**
- * TablePropagationScheme is used to resolve instances based on the {@link NodeConfig} and {@link NodeConfig.Type}.
- * It resolves the instances based on the table names specified in the node configuration.
+ * A {@code TablePropagationScheme} resolves Pinot instances based on table names in a node
+ * configuration.
+ *
+ * <p>
+ * This scheme looks up Helix tags for offline and realtime tables and maps them to
+ * instances, enabling workload propagation by table.
+ * </p>
  */
 public class TablePropagationScheme implements PropagationScheme {
 
@@ -46,7 +51,11 @@ public class TablePropagationScheme implements PropagationScheme {
   }
 
   /**
-   * Returns the union of instances across all cost splits for the given node config.
+   * Resolves the union of all instances across all cost splits for the given node config.
+   *
+   * @param nodeConfig Node configuration containing propagation scheme and cost splits.
+   * @return A set of instance names that should receive workload messages.
+   * @throws IllegalArgumentException If no instances are found for a cost split.
    */
   public Set<String> resolveInstances(NodeConfig nodeConfig) {
     Set<String> instances = new HashSet<>();
@@ -57,20 +66,30 @@ public class TablePropagationScheme implements PropagationScheme {
 
     NodeConfig.Type nodeType = nodeConfig.getNodeType();
     for (CostSplit costSplit : nodeConfig.getPropagationScheme().getCostSplits()) {
-      Map<String, Set<String>> byTag = resolveInstancesByHelixTag(costSplit, nodeType,
-          tableWithTypeToHelixTags, helixTagToInstances);
-      if (byTag.isEmpty()) {
-        throw new IllegalArgumentException("No instances found for CostSplit: " + costSplit);
-      }
-      for (Set<String> set : byTag.values()) {
-        instances.addAll(set);
+      Map<String, Set<String>> byTag = resolveInstancesByHelixTag(costSplit, nodeType, tableWithTypeToHelixTags,
+          helixTagToInstances);
+      if (!byTag.isEmpty()) {
+        for (Set<String> set : byTag.values()) {
+          instances.addAll(set);
+        }
       }
     }
     return instances;
   }
 
   /**
-   * Computes the per-instance cost map given node config and splitter, supporting sub-allocations for RT servers.
+   * Computes the per-instance cost map for the given node config using the provided splitter.
+   *
+   * <p>
+   * This method supports sub-allocations: the cost-ids in the sub-allocations are the helix tags.
+   * For example, for a realtime table having different consuming and completed servers and different
+   * costs for each, the cost-ids can be "myTable_REALTIME" and "myTableCompleted_OFFLINE".
+   * </p>
+   *
+   * @param nodeConfig Node configuration containing cost splits and scope.
+   * @param costSplitter Strategy used to compute costs per instance.
+   * @return A mapping of instance name to its computed {@link InstanceCost}.
+   * @throws IllegalArgumentException If no instances are found for a cost split.
    */
   public Map<String, InstanceCost> resolveInstanceCostMap(NodeConfig nodeConfig, CostSplitter costSplitter) {
     Map<String, InstanceCost> instanceCostMap = new HashMap<>();
@@ -81,9 +100,12 @@ public class TablePropagationScheme implements PropagationScheme {
 
     NodeConfig.Type nodeType = nodeConfig.getNodeType();
     for (CostSplit costSplit : nodeConfig.getPropagationScheme().getCostSplits()) {
+      // Gives a mapping of helix tag to instances for this cost split
+      // e.g. "myTable_OFFLINE" -> {"Server_1", "Server_2"} we get it this way to check for sub-allocations later
       Map<String, Set<String>> instancesByTag = resolveInstancesByHelixTag(costSplit, nodeType,
           tableWithTypeToHelixTags, helixTagToInstances);
       if (instancesByTag.isEmpty()) {
+        // This is to ensure active table name is passed in the cost split
         throw new IllegalArgumentException("No instances found for CostSplit: " + costSplit);
       }
 
@@ -91,7 +113,7 @@ public class TablePropagationScheme implements PropagationScheme {
         String helixTag = entry.getKey();
         Set<String> instances = entry.getValue();
 
-        // Support sub-allocations for realtime servers
+        // Support sub-allocations based on Helix tag ids
         if (costSplit.getSubAllocations() != null) {
           for (CostSplit split : costSplit.getSubAllocations()) {
             if (helixTag.equals(split.getCostId())) {
@@ -109,16 +131,24 @@ public class TablePropagationScheme implements PropagationScheme {
   }
 
   /**
-   * Single source of truth for resolving instances grouped by Helix tag.
+   * Resolves instances grouped by Helix tag for a given cost split and node type.
+   *
+   * <p>
+   * This is the single source of truth for mapping table → Helix tag → instances. Copies of
+   * instance sets are returned to avoid accidental external mutation.
+   * </p>
+   *
+   * @param costSplit The cost split specifying the table name.
+   * @param nodeType The node type (broker or server).
+   * @param tableWithTypeToHelixTags Precomputed mapping of table → node type → Helix tags.
+   * @param helixTagToInstances Precomputed mapping of Helix tag → instances.
+   * @return A map of Helix tag → set of instances for this cost split.
+   * @throws IllegalArgumentException If the cost split has no table name.
    */
   private Map<String, Set<String>> resolveInstancesByHelixTag(CostSplit costSplit, NodeConfig.Type nodeType,
       Map<String, Map<NodeConfig.Type, Set<String>>> tableWithTypeToHelixTags,
       Map<String, Set<String>> helixTagToInstances) {
     String tableName = costSplit.getCostId();
-    if (tableName == null) {
-      throw new IllegalArgumentException("Table name cannot be null in CostSplit: " + costSplit);
-    }
-
     Map<String, Set<String>> instancesByTag = new HashMap<>();
     for (String tableWithType : expandToTablesWithType(tableName)) {
       Map<NodeConfig.Type, Set<String>> nodeToHelixTags = tableWithTypeToHelixTags.get(tableWithType);
@@ -141,7 +171,15 @@ public class TablePropagationScheme implements PropagationScheme {
   }
 
   /**
-   * Returns [OFFLINE, REALTIME] variants if type is absent; otherwise returns the provided table name as-is.
+   * Expands a raw table name into type-qualified names.
+   *
+   * <p>
+   * If the input lacks a type suffix, both {@code OFFLINE} and {@code REALTIME} variants are
+   * returned. Otherwise, the name is returned as-is.
+   * </p>
+   *
+   * @param tableName The raw or type-qualified table name.
+   * @return A list of table names with type.
    */
   private static List<String> expandToTablesWithType(String tableName) {
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
@@ -154,9 +192,15 @@ public class TablePropagationScheme implements PropagationScheme {
     return Collections.singletonList(tableName);
   }
 
-  private static void mergeCosts(Map<String, InstanceCost> into, Map<String, InstanceCost> delta) {
+  /**
+   * Merges the delta cost map into the target map by summing CPU and memory costs.
+   *
+   * @param target The target map to merge into.
+   * @param delta The delta map whose values are added.
+   */
+  private static void mergeCosts(Map<String, InstanceCost> target, Map<String, InstanceCost> delta) {
     for (Map.Entry<String, InstanceCost> e : delta.entrySet()) {
-      into.merge(e.getKey(), e.getValue(), (oldCost, newCost) ->
+      target.merge(e.getKey(), e.getValue(), (oldCost, newCost) ->
           new InstanceCost(
               oldCost.getCpuCostNs() + newCost.getCpuCostNs(),
               oldCost.getMemoryCostBytes() + newCost.getMemoryCostBytes()));

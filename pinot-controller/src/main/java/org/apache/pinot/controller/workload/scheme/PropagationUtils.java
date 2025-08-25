@@ -38,33 +38,66 @@ import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
- * This class provides utility methods for workload propagation.
+ * Provides utility methods for workload propagation in Pinot.
+ *
+ * <p>
+ * This class centralizes logic for resolving Helix tags, instance mappings, and matching query
+ * workload configs to their applicable propagation scope.
+ * </p>
  */
 public class PropagationUtils {
-
+  private static final Logger LOGGER = LoggerFactory.getLogger(PropagationUtils.class);
   private PropagationUtils() {
   }
 
   /**
-   * Get the mapping tableNameWithType → {BROKER_NODE→brokerTag, SERVER_NODE→(serverTag + overrides)}
-   * 1. Get all table configs from the PinotHelixResourceManager
-   * 2. For each table config, extract the tenant config
-   * 3. For each tenant config, get the broker and server tags
-   * 4. Populate the helix tags for BROKER_NODE and SERVER_NODE separately
+   * Builds a mapping from table name with type to Helix tags per node type.
+   *
+   * <p>For each table:</p>
+   * <ol>
+   *   <li>Fetch the {@link TenantConfig}.</li>
+   *   <li>Derive broker and server tags from the tenant configuration.</li>
+   *   <li>Associate {@link NodeConfig.Type#BROKER_NODE} with broker tags.</li>
+   *   <li>Associate {@link NodeConfig.Type#SERVER_NODE} with server tags (consuming and/or completed
+   *       for realtime, or offline for batch).</li>
+   * </ol>
+   *
+   * @param pinotResourceManager Resource manager used to fetch table configs.
+   * @return A mapping of tableNameWithType to node type → Helix tags.
    */
   public static Map<String, Map<NodeConfig.Type, Set<String>>> getTableToHelixTags(
           PinotHelixResourceManager pinotResourceManager) {
     Map<String, Map<NodeConfig.Type, Set<String>>> tableToTags = new HashMap<>();
-    for (TableConfig tableConfig : pinotResourceManager.getAllTableConfigs()) {
+    List<TableConfig> tableConfigs = pinotResourceManager.getAllTableConfigs();
+    if (tableConfigs == null) {
+      LOGGER.warn("No table configs found, returning empty mapping");
+      return tableToTags;
+    }
+    for (TableConfig tableConfig : tableConfigs) {
+      if (tableConfig == null) {
+        LOGGER.warn("Skipping null table config");
+        continue;
+      }
       TenantConfig tenantConfig = tableConfig.getTenantConfig();
       TableType tableType = tableConfig.getTableType();
+      if (tenantConfig == null || tableType == null) {
+        LOGGER.warn("Skipping table config with null tenant config or table type: {}", tableConfig.getTableName());
+        continue;
+      }
 
       // Gather all relevant tags for this tenant
       List<String> tenantTags = new ArrayList<>();
-      collectHelixTagsForTable(tenantTags, tenantConfig, tableType);
+      try {
+        collectHelixTagsForTable(tenantTags, tenantConfig, tableType);
+      } catch (Exception e) {
+        LOGGER.error("Failed to collect Helix tags for table: {}", tableConfig.getTableName(), e);
+        continue;
+      }
 
       // Populate the helix tags for BROKER_NODE and SERVER_NODE separately to provide flexibility
       // in workload propagation to direct the workload to only specific node types
@@ -83,6 +116,18 @@ public class PropagationUtils {
     return tableToTags;
   }
 
+  /**
+   * Collects all Helix tags for a given table.
+   *
+   * <p>
+   * For offline tables, only the offline server tag is included. For realtime tables, consuming and
+   * completed tags are both added if they differ; otherwise, a single realtime tag is added.
+   * </p>
+   *
+   * @param tags The list to populate with resolved tags.
+   * @param tenantConfig Tenant configuration containing tenant names.
+   * @param tableType The type of the table (OFFLINE or REALTIME).
+   */
   private static void collectHelixTagsForTable(List<String> tags, TenantConfig tenantConfig, TableType tableType) {
     tags.add(TagNameUtils.getBrokerTagForTenant(tenantConfig.getBroker()));
     if (tableType == TableType.OFFLINE) {
@@ -102,10 +147,22 @@ public class PropagationUtils {
   }
 
   /**
-   * Get the helix tags for a given table name.
-   * If the table name does not have a type suffix, it will return both offline and realtime tags.
+   * Resolves Helix tags for a table.
+   *
+   * <p>
+   * If the input table name lacks a type suffix, both offline and realtime table names are expanded
+   * and resolved. Otherwise, the specific table name is used.
+   * </p>
+   *
+   * @param pinotResourceManager Resource manager to fetch table configs.
+   * @param tableName The raw or type-qualified table name.
+   * @return A list of Helix tags associated with the table.
    */
   public static List<String> getHelixTagsForTable(PinotHelixResourceManager pinotResourceManager, String tableName) {
+    if (tableName == null || tableName.trim().isEmpty()) {
+      throw new IllegalArgumentException("Table name cannot be null or empty");
+    }
+
     List<String> combinedTags = new ArrayList<>();
     TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableName);
     List<String> tablesWithType = (tableType == null)
@@ -113,54 +170,97 @@ public class PropagationUtils {
             TableNameBuilder.REALTIME.tableNameWithType(tableName))
         : Collections.singletonList(tableName);
     for (String table : tablesWithType) {
-      TableConfig tableConfig = pinotResourceManager.getTableConfig(table);
-      if (tableConfig != null) {
-        collectHelixTagsForTable(combinedTags, tableConfig.getTenantConfig(), tableConfig.getTableType());
+      try {
+        TableConfig tableConfig = pinotResourceManager.getTableConfig(table);
+        if (tableConfig != null && tableConfig.getTenantConfig() != null && tableConfig.getTableType() != null) {
+          collectHelixTagsForTable(combinedTags, tableConfig.getTenantConfig(), tableConfig.getTableType());
+        }
+      } catch (Exception e) {
+        throw new RuntimeException("Failed to get table config for table: " + table, e);
       }
     }
     return combinedTags;
   }
 
   /**
-   * Get the mapping between helix tag -> instances
+   * Builds a mapping from Helix tag to the set of instances carrying that tag.
+   *
+   * @param pinotResourceManager Resource manager used to fetch instance configs.
+   * @return A mapping of Helix tag → set of instance names.
    */
   public static Map<String, Set<String>> getHelixTagToInstances(PinotHelixResourceManager pinotResourceManager) {
     Map<String, Set<String>> tagToInstances = new HashMap<>();
-    for (InstanceConfig instanceConfig : pinotResourceManager.getAllHelixInstanceConfigs()) {
-      String instanceName = instanceConfig.getInstanceName();
-      for (String helixTag : instanceConfig.getTags()) {
-        tagToInstances.computeIfAbsent(helixTag, tag -> new HashSet<>()).add(instanceName);
+    try {
+      List<InstanceConfig> instanceConfigs = pinotResourceManager.getAllHelixInstanceConfigs();
+      if (instanceConfigs == null) {
+        LOGGER.warn("No instance configs found, returning empty mapping");
+        return tagToInstances;
       }
+
+      for (InstanceConfig instanceConfig : instanceConfigs) {
+        if (instanceConfig == null) {
+          LOGGER.warn("Skipping null instance config");
+          continue;
+        }
+        String instanceName = instanceConfig.getInstanceName();
+        if (instanceName == null || instanceName.trim().isEmpty()) {
+          LOGGER.warn("Skipping instance config with null or empty instance name");
+          continue;
+        }
+
+        List<String> tags = instanceConfig.getTags();
+        if (tags != null) {
+          for (String helixTag : tags) {
+            if (helixTag != null && !helixTag.trim().isEmpty()) {
+              tagToInstances.computeIfAbsent(helixTag, tag -> new HashSet<>()).add(instanceName);
+            }
+          }
+        }
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to retrieve instance configurations", e);
     }
     return tagToInstances;
   }
 
   /**
-   * Returns the set of {@link QueryWorkloadConfig}s that match any of the given Helix tags.
+   * Filters the provided list of {@link QueryWorkloadConfig}s to those that match the given Helix
+   * tags.
    *
-   * This method filters the provided list of QueryWorkloadConfigs based on whether their propagation
-   * targets intersect with the specified `filterTags`. The matching is performed based on the
-   * propagation type defined for each node in the config:
+   * <p>Matching rules:</p>
+   * <ul>
+   *   <li><strong>TENANT propagation</strong>:
+   *     <ol>
+   *       <li>Each cost ID is treated as either a tenant name or Helix tag.</li>
+   *       <li>If it is a Helix tag (broker/server), use directly.</li>
+   *       <li>Otherwise, resolve it to possible broker/server tags.</li>
+   *       <li>If any resolved tag intersects with {@code filterTags}, include the config.</li>
+   *     </ol>
+   *   </li>
+   *   <li><strong>TABLE propagation</strong>:
+   *     <ol>
+   *       <li>Expand table names into type-qualified forms (OFFLINE/REALTIME).</li>
+   *       <li>Resolve those table names into Helix tags per node type.</li>
+   *       <li>If any resolved tag intersects with {@code filterTags}, include the config.</li>
+   *     </ol>
+   *   </li>
+   * </ul>
    *
-   * - For {@code TENANT} propagation:
-   *   1. Each value in the propagation scheme is treated as a tenant name or direct Helix tag.
-   *   2. If the value is a recognized Helix tag (broker/server), it is used directly.
-   *   3. Otherwise, the value is resolved to possible broker and server tags for the tenant.
-   *   4. If any resolved tag matches one of the `filterTags`, the config is included.
-   *
-   * - For {@code TABLE} propagation:
-   *   1. Table names are expanded to include type-suffixed forms (OFFLINE and/or REALTIME).
-   *   2. These table names are mapped to corresponding Helix tags using node type.
-   *   3. If any of the mapped tags intersect with `filterTags`, the config is included.
-   *
-   * @param pinotHelixResourceManager The resource manager used to look up table and instance metadata.
-   * @param filterTags The set of Helix tags used for filtering configs.
-   * @param queryWorkloadConfigs The full list of workload configs to evaluate.
-   * @return A set of workload configs whose propagation targets intersect with the filterTags.
+   * @param pinotHelixResourceManager Resource manager used for table/tenant lookups.
+   * @param filterTags Helix tags used as the filter.
+   * @param queryWorkloadConfigs Candidate workload configs to evaluate.
+   * @return A set of configs whose propagation scope matches the filter tags.
    */
   public static Set<QueryWorkloadConfig> getQueryWorkloadConfigsForTags(
       PinotHelixResourceManager pinotHelixResourceManager, List<String> filterTags,
       List<QueryWorkloadConfig> queryWorkloadConfigs) {
+    if (filterTags == null) {
+      throw new IllegalArgumentException("Filter tags cannot be null");
+    }
+    if (queryWorkloadConfigs == null) {
+      return Collections.emptySet();
+    }
+
     Set<QueryWorkloadConfig> matchedConfigs = new HashSet<>();
     Map<String, Map<NodeConfig.Type, Set<String>>> tableToHelixTags = getTableToHelixTags(pinotHelixResourceManager);
 
@@ -202,6 +302,14 @@ public class PropagationUtils {
     return matchedConfigs;
   }
 
+  /**
+   * Returns all possible Helix tags for a given tenant name.
+   *
+   * <p>This includes broker, offline, and realtime tags.</p>
+   *
+   * @param tenantName Tenant name.
+   * @return A list of Helix tags for the tenant.
+   */
   private static List<String> getAllPossibleHelixTagsFor(String tenantName) {
     List<String> helixTags = new ArrayList<>();
     helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
@@ -210,6 +318,12 @@ public class PropagationUtils {
     return helixTags;
   }
 
+  /**
+   * Extracts all top-level cost IDs from the given propagation scheme.
+   *
+   * @param propagationScheme The propagation scheme containing cost splits.
+   * @return A list of top-level cost IDs (non-null).
+   */
   private static List<String> getTopLevelCostIds(PropagationScheme propagationScheme) {
     List<String> topLevelCostIds = new ArrayList<>();
     for (CostSplit costSplit : propagationScheme.getCostSplits()) {
