@@ -242,6 +242,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.initialDelayInSeconds";
     public static final String REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.rebalanceChecker.initialDelayInSeconds";
+    public static final String TENANT_REBALANCE_CHECKER_FREQUENCY_PERIOD =
+        "controller.tenant.rebalance.checker.frequencyPeriod";
+    public static final String TENANT_REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
+        "controller.tenant.rebalance.checker.initialDelayInSeconds";
 
     // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
     // Default value is false.
@@ -278,6 +282,7 @@ public class ControllerConf extends PinotConfiguration {
     public static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_STATUS_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     public static final int DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
+    public static final int DEFAULT_TENANT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     public static final int DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     public static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
     public static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
@@ -729,6 +734,19 @@ public class ControllerConf extends PinotConfiguration {
 
   public long getRebalanceCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public int getTenantRebalanceCheckerFrequencyInSeconds() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.TENANT_REBALANCE_CHECKER_FREQUENCY_PERIOD))
+        .filter(period -> isValidPeriodWithLogging(
+            ControllerPeriodicTasksConf.TENANT_REBALANCE_CHECKER_FREQUENCY_PERIOD, period))
+        .map(period -> (int) convertPeriodToSeconds(period))
+        .orElse(ControllerPeriodicTasksConf.DEFAULT_TENANT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS);
+  }
+
+  public long getTenantRebalanceCheckerInitialDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TENANT_REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -94,34 +95,20 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     // and put in the queue for the consuming threads to pick up and run the rebalance operation
 
     String tenantRebalanceJobId = createUniqueRebalanceJobIdentifier();
-    TenantRebalanceObserver observer = new ZkBasedTenantRebalanceObserver(tenantRebalanceJobId, config.getTenantName(),
-        tables, _pinotHelixResourceManager);
-    observer.onTrigger(TenantRebalanceObserver.Trigger.START_TRIGGER, null, null);
-    Pair<ConcurrentLinkedQueue<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>> queues =
+    Pair<ConcurrentLinkedDeque<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>> queues =
         createParallelAndSequentialQueues(config, dryRunResults, config.getParallelWhitelist(),
             config.getParallelBlacklist());
-    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
+    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
     Queue<TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
+    DefaultTenantRebalanceContext tenantRebalanceContext =
+        DefaultTenantRebalanceContext.forInitialRebalance(tenantRebalanceJobId, config, parallelQueue,
+            sequentialQueue);
 
+    ZkBasedTenantRebalanceObserver observer =
+        new ZkBasedTenantRebalanceObserver(tenantRebalanceContext.getJobId(), config.getTenantName(),
+            tables, tenantRebalanceContext, _pinotHelixResourceManager);
     // Step 4: Spin up threads to consume the parallel queue and sequential queue.
-
-    // ensure atleast 1 thread is created to run the sequential table rebalance operations
-    int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
-    AtomicInteger activeThreads = new AtomicInteger(parallelism);
-    try {
-      for (int i = 0; i < parallelism; i++) {
-        _executorService.submit(() -> {
-          doConsumeTablesFromQueue(parallelQueue, config, observer);
-          if (activeThreads.decrementAndGet() == 0) {
-            doConsumeTablesFromQueue(sequentialQueue, config, observer);
-            observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
-          }
-        });
-      }
-    } catch (Exception exception) {
-      observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", config.getTenantName(),
-          exception.getMessage()));
-    }
+    rebalanceWithContext(tenantRebalanceContext, observer);
 
     // Step 5: Prepare the rebalance results to be returned to the user. The rebalance jobs are running in the
     // background asynchronously.
@@ -141,20 +128,92 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return new TenantRebalanceResult(tenantRebalanceJobId, rebalanceResults, config.isVerboseResult());
   }
 
-  private void doConsumeTablesFromQueue(Queue<TenantTableRebalanceJobContext> queue, RebalanceConfig config,
-      TenantRebalanceObserver observer) {
+  /**
+   * Spins up threads to rebalance the tenant with the given context and observer.
+   * The rebalance operation is performed in parallel for the tables in the parallel queue, then, sequentially for the
+   * tables in the sequential queue.
+   * The observer should be initiated with the tenantRebalanceContext in order to track the progress properly.
+   *
+   * @param tenantRebalanceContext The context containing the configuration and queues for the rebalance operation.
+   * @param observer The observer to notify about the rebalance progress and results.
+   */
+  public void rebalanceWithContext(DefaultTenantRebalanceContext tenantRebalanceContext,
+      ZkBasedTenantRebalanceObserver observer) {
+    TenantRebalanceConfig config = tenantRebalanceContext.getConfig();
+    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = tenantRebalanceContext.getParallelQueue();
+    Queue<TenantTableRebalanceJobContext> sequentialQueue = tenantRebalanceContext.getSequentialQueue();
+    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> ongoingJobs = tenantRebalanceContext.getOngoingJobsQueue();
+
+    observer.onTrigger(TenantRebalanceObserver.Trigger.START_TRIGGER, null, null);
+
+    // ensure atleast 1 thread is created to run the sequential table rebalance operations
+    int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
+    AtomicInteger activeThreads = new AtomicInteger(parallelism);
+    try {
+      for (int i = 0; i < parallelism; i++) {
+        _executorService.submit(() -> {
+          doConsumeTablesFromQueueAndRebalance(parallelQueue, ongoingJobs, config, observer);
+          if (activeThreads.decrementAndGet() == 0) {
+            doConsumeTablesFromQueueAndRebalance(sequentialQueue, ongoingJobs, config, observer);
+            observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
+          }
+        });
+      }
+    } catch (Exception exception) {
+      observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", config.getTenantName(),
+          exception.getMessage()));
+    }
+  }
+
+  /**
+   * Consumes tables from the given queue from the DefaultTenantRebalanceContext that is being monitored by the
+   * observer and rebalances them using the provided config.
+   * The ongoing jobs are tracked in the ongoingJobs queue, which is also from the monitored
+   * DefaultTenantRebalanceContext.
+   *
+   * @param queue The queue of TenantTableRebalanceJobContext to consume tables from.
+   * @param ongoingJobs The queue to track ongoing rebalance jobs.
+   * @param config The rebalance configuration to use for the rebalancing.
+   * @param observer The observer to notify about the rebalance progress and results, should be initiated with the
+   *                 DefaultTenantRebalanceContext that contains `queue` and `ongoingJobs`.
+   */
+  private void doConsumeTablesFromQueueAndRebalance(Queue<TenantTableRebalanceJobContext> queue,
+      Queue<TenantTableRebalanceJobContext> ongoingJobs, RebalanceConfig config,
+      ZkBasedTenantRebalanceObserver observer) {
     while (true) {
       TenantTableRebalanceJobContext jobContext = queue.poll();
       if (jobContext == null) {
         break;
       }
-      String table = jobContext.getTableName();
+      ongoingJobs.add(jobContext);
+      String tableName = jobContext.getTableName();
+      String rebalanceJobId = jobContext.getJobId();
       RebalanceConfig rebalanceConfig = RebalanceConfig.copy(config);
       rebalanceConfig.setDryRun(false);
       if (jobContext.shouldRebalanceWithDowntime()) {
         rebalanceConfig.setMinAvailableReplicas(0);
       }
-      rebalanceTable(table, rebalanceConfig, jobContext.getJobId(), observer);
+      try {
+        observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
+        // Disallow TABLE rebalance checker to retry the rebalance job here, since we want TENANT rebalance checker
+        // to do so
+        RebalanceResult result =
+            _tableRebalanceManager.rebalanceTable(tableName, rebalanceConfig, rebalanceJobId, false);
+        // TODO: For downtime=true rebalance, track if the EV-IS has converged to move on, otherwise it fundementally
+        //  breaks the degree of parallelism
+        if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
+          ongoingJobs.remove(jobContext);
+          observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
+        } else {
+          ongoingJobs.remove(jobContext);
+          observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
+              result.getDescription());
+        }
+      } catch (Throwable t) {
+        ongoingJobs.remove(jobContext);
+        observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
+            String.format("Caught exception/error while rebalancing table: %s", tableName));
+      }
     }
   }
 
@@ -192,25 +251,6 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     return tables;
   }
 
-  private void rebalanceTable(String tableName, RebalanceConfig config, String rebalanceJobId,
-      TenantRebalanceObserver observer) {
-    try {
-      observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
-      RebalanceResult result = _tableRebalanceManager.rebalanceTable(tableName, config, rebalanceJobId, true);
-      // TODO: For downtime=true rebalance, track if the EV-IS has converged to move on, otherwise it fundementally
-      //  breaks the degree of parallelism
-      if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
-        observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
-      } else {
-        observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
-            result.getDescription());
-      }
-    } catch (Throwable t) {
-      observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
-          String.format("Caught exception/error while rebalancing table: %s", tableName));
-    }
-  }
-
   private static Set<String> getTablesToRunInParallel(Set<String> tables,
       @Nullable Set<String> parallelWhitelist, @Nullable Set<String> parallelBlacklist) {
     Set<String> parallelTables = new HashSet<>(tables);
@@ -224,7 +264,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
   }
 
   @VisibleForTesting
-  Pair<ConcurrentLinkedQueue<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>>
+  Pair<ConcurrentLinkedDeque<TenantTableRebalanceJobContext>, Queue<TenantTableRebalanceJobContext>>
   createParallelAndSequentialQueues(
       TenantRebalanceConfig config, Map<String, RebalanceResult> dryRunResults, @Nullable Set<String> parallelWhitelist,
       @Nullable Set<String> parallelBlacklist) {
@@ -238,14 +278,14 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         sequentialTableDryRunResults.put(table, result);
       }
     });
-    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> parallelQueue =
+    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue =
         createTableQueue(config, parallelTableDryRunResults);
     Queue<TenantTableRebalanceJobContext> sequentialQueue = createTableQueue(config, sequentialTableDryRunResults);
     return Pair.of(parallelQueue, sequentialQueue);
   }
 
   @VisibleForTesting
-  ConcurrentLinkedQueue<TenantTableRebalanceJobContext> createTableQueue(TenantRebalanceConfig config,
+  ConcurrentLinkedDeque<TenantTableRebalanceJobContext> createTableQueue(TenantRebalanceConfig config,
       Map<String, RebalanceResult> dryRunResults) {
     Queue<TenantTableRebalanceJobContext> firstQueue = new LinkedList<>();
     Queue<TenantTableRebalanceJobContext> queue = new LinkedList<>();
@@ -279,7 +319,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         queue.add(jobContext);
       }
     });
-    ConcurrentLinkedQueue<TenantTableRebalanceJobContext> tableQueue = new ConcurrentLinkedQueue<>();
+    ConcurrentLinkedDeque<TenantTableRebalanceJobContext> tableQueue = new ConcurrentLinkedDeque<>();
     tableQueue.addAll(firstQueue);
     tableQueue.addAll(queue);
     tableQueue.addAll(lastQueue);
