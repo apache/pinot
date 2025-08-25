@@ -18,20 +18,31 @@
  */
 package org.apache.pinot.core.operator.transform.function;
 
+import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
+import org.apache.pinot.queries.FluentQueryTest;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.sql.parsers.SqlCompilationException;
 import org.testng.Assert;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -516,5 +527,47 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         new Object[]{String.format("jsonExtractKey(%s, \"$.*\")", JSON_COLUMN)},
         new Object[]{String.format("json_extract_key(%s, \"$.*\")", JSON_COLUMN)}};
     //@formatter:on
+  }
+
+  protected File _baseDir;
+
+  @BeforeClass
+  void createBaseDir() {
+    try {
+      _baseDir = Files.createTempDirectory(getClass().getSimpleName()).toFile();
+    } catch (IOException ex) {
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  @AfterClass
+  void destroyBaseDir()
+      throws IOException {
+    if (_baseDir != null) {
+      FileUtils.deleteDirectory(_baseDir);
+    }
+  }
+
+  @Test
+  public void mvStringWithNulls() {
+    // schema with a single column called "json" of type JSON
+    Schema schema = new Schema.SchemaBuilder()
+        .setSchemaName("testTable")
+        .setEnableColumnBasedNullHandling(true)
+        .addDimensionField("json", DataType.JSON)
+        .build();
+    // trivial table config
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE)
+        .setTableName("testTable")
+        .build();
+    FluentQueryTest.withBaseDir(_baseDir)
+        .withNullHandling(false)
+        .givenTable(schema, tableConfig)
+        .onFirstInstance(new Object[]{"{\"name\": [\"a\", null, \"c\"]}"})
+        .whenQuery("SELECT jsonExtractScalar(json, '$.name', 'STRING_ARRAY') FROM testTable")
+        // TODO: Change the framework to do not duplicate segments when only one segment is used
+        .thenResultIs(
+            new Object[]{new String[]{"a", "", "c"}},
+            new Object[]{new String[]{"a", "", "c"}});
   }
 }
