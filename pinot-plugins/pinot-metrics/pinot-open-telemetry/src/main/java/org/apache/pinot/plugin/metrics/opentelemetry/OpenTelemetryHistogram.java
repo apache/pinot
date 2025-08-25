@@ -16,28 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.compound;
+package org.apache.pinot.plugin.metrics.opentelemetry;
 
-import java.util.List;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import io.opentelemetry.api.metrics.DoubleHistogram;
+import org.apache.pinot.spi.metrics.PinotHistogram;
 
 
-/**
- * CompoundPinotJmxReporter is a composite reporter that aggregates multiple PinotJmxReporters.
- * @deprecated Use {@link org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricReporter} instead.
- */
-@Deprecated
-public class CompoundPinotJmxReporter implements PinotJmxReporter {
-  private final List<PinotJmxReporter> _reporters;
+public class OpenTelemetryHistogram implements PinotHistogram {
+  private final OpenTelemetryMetricName _metricName;
+  private final DoubleHistogram _histogram;
 
-  public CompoundPinotJmxReporter(List<PinotJmxReporter> reporters) {
-    _reporters = reporters;
+  public OpenTelemetryHistogram(OpenTelemetryMetricName metricName) {
+    _metricName = metricName;
+    _histogram = OpenTelemetryMetricsRegistry.OTEL_METER_PROVIDER
+        .histogramBuilder(metricName.getOtelMetricName())
+        .build();
   }
 
   @Override
-  public void start() {
-    for (PinotJmxReporter reporter : _reporters) {
-      reporter.start();
-    }
+  public Object getHistogram() {
+    return _histogram;
+  }
+
+  @Override
+  public Object getMetric() {
+    return _histogram;
   }
 }

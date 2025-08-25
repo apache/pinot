@@ -19,24 +19,22 @@
 package org.apache.pinot.plugin.metrics.compound;
 
 import java.util.List;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 
 
 /**
- * CompoundPinotJmxReporter is a composite reporter that aggregates multiple PinotJmxReporters.
- * @deprecated Use {@link org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricReporter} instead.
+ * CompoundPinotMetricReporter delegates metric reporting to each of the reporters in the list.
  */
-@Deprecated
-public class CompoundPinotJmxReporter implements PinotJmxReporter {
-  private final List<PinotJmxReporter> _reporters;
+public class CompoundPinotMetricReporter implements PinotMetricReporter {
+  private final List<PinotMetricReporter> _reporters;
 
-  public CompoundPinotJmxReporter(List<PinotJmxReporter> reporters) {
+  public CompoundPinotMetricReporter(List<PinotMetricReporter> reporters) {
     _reporters = reporters;
   }
 
   @Override
   public void start() {
-    for (PinotJmxReporter reporter : _reporters) {
+    for (PinotMetricReporter reporter : _reporters) {
       reporter.start();
     }
   }
