@@ -23,11 +23,16 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
+import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.index.loader.SegmentPreProcessor;
+import org.apache.pinot.segment.local.segment.store.TextIndexUtils;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
+import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
 import org.apache.pinot.segment.spi.index.IndexReaderFactory;
@@ -78,7 +83,8 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   @Override
-  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
+      throws Exception {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
@@ -94,6 +100,13 @@ public class TextIndexHandler extends BaseIndexHandler {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateTextIndex(columnMetadata)) {
         LOGGER.info("Need to create new text index for segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
+    // Check if existing indexes need configuration updates based on useCombineFiles
+    for (String column : existingColumns) {
+      if (hasTextIndexConfigurationChanged(column, segmentReader)) {
+        LOGGER.info("Need to update text index configuration for segment: {}, column: {}", segmentName, column);
         return true;
       }
     }
@@ -117,6 +130,16 @@ public class TextIndexHandler extends BaseIndexHandler {
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateTextIndex(columnMetadata)) {
+        createTextIndexForColumn(segmentWriter, columnMetadata);
+      }
+    }
+    // Handle configuration changes for existing indexes
+    for (String column : existingColumns) {
+      if (hasTextIndexConfigurationChanged(column, segmentWriter)) {
+        LOGGER.info("Updating text index configuration for segment: {}, column: {}", segmentName, column);
+        // Remove existing index and recreate with new configuration
+        segmentWriter.removeIndex(column, StandardIndexes.text());
+        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         createTextIndexForColumn(segmentWriter, columnMetadata);
       }
     }
@@ -160,10 +183,28 @@ public class TextIndexHandler extends BaseIndexHandler {
     // Create a temporary forward index if it is disabled and does not exist
     columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
 
-    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}", columnName, segmentName,
-        hasDictionary);
+    // Get text index configuration to check if useCombineFiles is enabled
+    TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
+    boolean useCombineFiles = config.isUseCombineFiles();
+
+    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}, useCombineFiles: {}",
+        columnName, segmentName, hasDictionary, useCombineFiles);
+
+    // Create in-progress marker file for recovery
+    File inProgress = new File(indexDir, columnName + ".text.inprogress");
+    if (!inProgress.exists()) {
+      // Marker file does not exist, which means last run ended normally.
+      // Create a marker file.
+      FileUtils.touch(inProgress);
+    } else {
+      // Marker file exists, which means last run was interrupted.
+      // Clean up any existing text index files
+      cleanupExistingTextIndexFiles(indexDir, columnName);
+    }
+
     File segmentDirectory = SegmentDirectoryPaths.segmentDirectoryFor(indexDir,
         _segmentDirectory.getSegmentMetadata().getVersion());
+
     // The handlers are always invoked by the preprocessor. Before this ImmutableSegmentLoader would have already
     // up-converted the segment from v1/v2 -> v3 (if needed). So based on the segmentVersion, whatever segment
     // segmentDirectory is indicated to us by SegmentDirectoryPaths, we create lucene index there. There is no
@@ -178,7 +219,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         .withContinueOnError(_tableConfig.getIngestionConfig() != null
             && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
-    TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
+
     IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
     try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
         _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
@@ -193,6 +234,15 @@ public class TextIndexHandler extends BaseIndexHandler {
       }
       textIndexCreator.seal();
     }
+
+    // If useCombineFiles is true, convert to combined format
+    if (useCombineFiles && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
+      LOGGER.info("Converting text index to V3 combined format for column: {} in segment: {}", columnName, segmentName);
+      convertTextIndexToV3Format(segmentWriter, columnName, segmentDirectory);
+    }
+
+    // Delete the marker file.
+    FileUtils.deleteQuietly(inProgress);
 
     LOGGER.info("Created text index for column: {} in segment: {}", columnName, segmentName);
   }
@@ -247,5 +297,82 @@ public class TextIndexHandler extends BaseIndexHandler {
         }
       }
     }
+  }
+
+  /**
+   * Checks if text index configuration has changed based on useCombineFiles field config flag.
+   *
+   * The method uses TextIndexUtils.hasTextIndex() to determine the current format and compare with desired format:
+   * - If TextIndexUtils.hasTextIndex() returns true: means text index in directory format
+   * - If TextIndexUtils.hasTextIndex() returns false means no text index in directory format
+   *
+   * @param columnName the column name to check
+   * @param segmentReader the segment reader to access the segment
+   * @return true if the text index configuration has changed and needs reprocessing, false otherwise
+   * @throws Exception if there's an error checking the text index directory structure
+   */
+  private boolean hasTextIndexConfigurationChanged(String columnName, SegmentDirectory.Reader segmentReader)
+      throws Exception {
+    // Get current configuration
+    TextIndexConfig currentConfig = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
+
+    // Check if current config expects combined format
+    boolean expectedFormat = currentConfig.isUseCombineFiles();
+
+    // Check if existing index is in combined format using TextIndexUtils
+    File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();
+    File segmentDirectory =
+        SegmentDirectoryPaths.segmentDirectoryFor(indexDir, _segmentDirectory.getSegmentMetadata().getVersion());
+    boolean currentFormat = !TextIndexUtils.hasTextIndex(segmentDirectory, columnName);
+
+    // If the expected format doesn't match the existing format, we need an update
+    return expectedFormat != currentFormat;
+  }
+
+  /**
+   * Clean up existing text index files for recovery purposes.
+   *
+   * @param indexDir the index directory
+   * @param columnName the column name
+   */
+  private void cleanupExistingTextIndexFiles(File indexDir, String columnName) {
+    // Remove any existing text index files for this column
+    File[] textIndexFiles = indexDir.listFiles((dir, name) -> {
+      // Look for text index files for this column
+      return name.startsWith(columnName) && (name.endsWith(V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION)
+          || name.endsWith(".text.inprogress"));
+    });
+
+    if (textIndexFiles != null) {
+      for (File file : textIndexFiles) {
+        FileUtils.deleteQuietly(file);
+      }
+    }
+  }
+
+  /**
+   * Convert text index to V3 combined format by merging into columns.psf.
+   *
+   * @param segmentWriter the segment writer
+   * @param columnName the column name
+   * @param segmentDirectory the segment directory
+   * @throws Exception if there's an error during conversion
+   */
+  private void convertTextIndexToV3Format(SegmentDirectory.Writer segmentWriter, String columnName,
+      File segmentDirectory)
+      throws Exception {
+    File combinedTextIndexFile =
+        new File(segmentDirectory, columnName + V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+
+    if (!combinedTextIndexFile.exists()) {
+      LOGGER.warn("Combined text index file not found for column: {} in segment directory: {}", columnName,
+          segmentDirectory);
+      return;
+    }
+
+    // Write the combined file to V3 format (similar to rewriteForwardIndexForCompressionChange)
+    LoaderUtils.writeIndexToV3Format(segmentWriter, columnName, combinedTextIndexFile, StandardIndexes.text());
+
+    LOGGER.info("Successfully converted text index to V3 combined format for column: {}", columnName);
   }
 }
