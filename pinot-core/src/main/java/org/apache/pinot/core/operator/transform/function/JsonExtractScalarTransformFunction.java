@@ -361,7 +361,17 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       int numValues = result.size();
       int[] values = new int[numValues];
       for (int j = 0; j < numValues; j++) {
-        values[j] = result.get(j);
+        Integer value = result.get(j);
+        if (value == null) {
+          if (_defaultValue != null) {
+            value = ((Number) _defaultValue).intValue();
+          } else {
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the forth argument of jsonextractscalar.");
+          }
+        }
+        values[j] = value;
       }
       _intValuesMV[i] = values;
     }
@@ -386,7 +396,17 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       int numValues = result.size();
       long[] values = new long[numValues];
       for (int j = 0; j < numValues; j++) {
-        values[j] = result.get(j);
+        Long value = result.get(j);
+        if (value == null) {
+          if (_defaultValue != null) {
+            value = ((Number) _defaultValue).longValue();
+          } else {
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the forth argument of jsonextractscalar.");
+          }
+        }
+        values[j] = value;
       }
       _longValuesMV[i] = values;
     }
@@ -411,7 +431,17 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       int numValues = result.size();
       float[] values = new float[numValues];
       for (int j = 0; j < numValues; j++) {
-        values[j] = result.get(j);
+        Float value = result.get(j);
+        if (value == null) {
+          if (_defaultValue != null) {
+            value = ((Number) _defaultValue).floatValue();
+          } else {
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the forth argument of jsonextractscalar.");
+          }
+        }
+        values[j] = value;
       }
       _floatValuesMV[i] = values;
     }
@@ -436,7 +466,17 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       int numValues = result.size();
       double[] values = new double[numValues];
       for (int j = 0; j < numValues; j++) {
-        values[j] = result.get(j);
+        Double value = result.get(j);
+        if (value == null) {
+          if (_defaultValue != null) {
+            value = ((Number) _defaultValue).doubleValue();
+          } else {
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the forth argument of jsonextractscalar.");
+          }
+        }
+        values[j] = value;
       }
       _doubleValuesMV[i] = values;
     }
@@ -461,7 +501,17 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
       int numValues = result.size();
       String[] values = new String[numValues];
       for (int j = 0; j < numValues; j++) {
-        values[j] = result.get(j);
+        String value = result.get(j);
+        if (value == null) {
+          if (_defaultValue != null) {
+            value = _defaultValue.toString();
+          } else {
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the forth argument of jsonextractscalar.");
+          }
+        }
+        values[j] = value;
       }
       _stringValuesMV[i] = values;
     }
