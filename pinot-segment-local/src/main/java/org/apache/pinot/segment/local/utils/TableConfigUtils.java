@@ -722,8 +722,8 @@ public final class TableConfigUtils {
     Preconditions.checkState(!(isUpsertEnabled && isDedupEnabled),
         "A table can have either Upsert or Dedup enabled, but not both");
     // check table type is realtime
-    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
-        "Upsert/Dedup table is for realtime table only.");
+//    Preconditions.checkState(tableConfig.getTableType() == TableType.REALTIME,
+//        "Upsert/Dedup table is for realtime table only.");
     // primary key exists
     Preconditions.checkState(CollectionUtils.isNotEmpty(schema.getPrimaryKeyColumns()),
         "Upsert/Dedup table must have primary key columns in the schema");

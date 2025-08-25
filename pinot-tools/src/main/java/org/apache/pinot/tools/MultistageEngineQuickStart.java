@@ -32,19 +32,20 @@ import org.apache.pinot.tools.utils.SampleQueries;
 
 public class MultistageEngineQuickStart extends Quickstart {
   protected static final String[] MULTI_STAGE_TABLE_DIRECTORIES = new String[]{
-      "examples/batch/airlineStats",
-      "examples/batch/baseballStats",
-      "examples/batch/billing",
-      "examples/batch/dimBaseballTeams",
-      "examples/batch/githubEvents",
+//      "examples/batch/airlineStats",
+//      "examples/batch/baseballStats",
+//      "examples/batch/billing",
+//      "examples/batch/dimBaseballTeams",
+//      "examples/batch/githubEvents",
       "examples/batch/githubComplexTypeEvents",
-      "examples/batch/ssb/customer",
-      "examples/batch/ssb/dates",
-      "examples/batch/ssb/lineorder",
-      "examples/batch/ssb/part",
-      "examples/batch/ssb/supplier",
-      "examples/batch/starbucksStores",
-      "examples/batch/fineFoodReviews",
+      "examples/batch/githubComplexTypeEvents2",
+//      "examples/batch/ssb/customer",
+//      "examples/batch/ssb/dates",
+//      "examples/batch/ssb/lineorder",
+//      "examples/batch/ssb/part",
+//      "examples/batch/ssb/supplier",
+//      "examples/batch/starbucksStores",
+//      "examples/batch/fineFoodReviews",
   };
 
   protected static final Map<String, String> OPTIONS_TO_USE_MSE = Map.of("queryOptions",

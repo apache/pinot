@@ -52,6 +52,7 @@ public class UpsertUtils {
       return queryableDocIds.getMutableRoaringBitmap();
     }
     ThreadSafeMutableRoaringBitmap validDocIds = segment.getValidDocIds();
+    int numberOfValidDocIds = validDocIds.getMutableRoaringBitmap().getCardinality();
     return validDocIds != null ? validDocIds.getMutableRoaringBitmap()
         : (useEmptyForNull ? new MutableRoaringBitmap() : null);
   }
