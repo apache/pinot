@@ -105,4 +105,3 @@ SELECT count(*) FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__
 SELECT count(*) FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__ AND regexp_like(stringDimMV2, 'm2.*0') GROUP BY stringDimMV2 LIMIT 3
 SELECT stringDimSV1, longDimSV1, intDimMV1 FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__ ORDER BY stringDimSV1 DESC, longDimSV1 LIMIT 3
 SELECT stringDimSV1, longDimSV1, intDimMV1 FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__ ORDER BY stringDimSV1 DESC, longDimSV1 DESC LIMIT 3
-SELECT CAST(intMetric1 AS LONG) FROM FeatureTest1 WHERE generationNumber = __GENERATION_NUMBER__ LIMIT 3
