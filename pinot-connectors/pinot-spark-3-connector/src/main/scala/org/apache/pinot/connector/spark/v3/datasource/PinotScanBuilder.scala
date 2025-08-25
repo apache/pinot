@@ -45,7 +45,7 @@ class PinotScanBuilder(readParameters: PinotDataSourceReadOptions)
       if (readParameters.tableType.isDefined) {
         None
       } else {
-        PinotClusterClient.getTimeBoundaryInfo(readParameters.broker, readParameters.tableName)
+        PinotClusterClient.getTimeBoundaryInfo(readParameters.broker, readParameters.tableName, readParameters.useHttps, readParameters.authHeader, readParameters.authToken, readParameters.proxyEnabled)
       }
 
     val whereCondition = FilterPushDown.compileFiltersToSqlWhereClause(this.acceptedFilters)
