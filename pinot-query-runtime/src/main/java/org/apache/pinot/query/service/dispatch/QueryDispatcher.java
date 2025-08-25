@@ -55,7 +55,6 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.failuredetector.FailureDetector;
 import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.common.proto.Worker;
-import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
@@ -698,18 +697,7 @@ public class QueryDispatcher {
     _executorService.shutdown();
   }
 
-  public PinotBrokerTimeSeriesResponse submitAndGet(RequestContext context, TimeSeriesDispatchablePlan plan,
-      long timeoutMs, Map<String, String> queryOptions) {
-    long requestId = context.getRequestId();
-    try {
-      TimeSeriesBlock result = submitAndGet(requestId, plan, timeoutMs, queryOptions, context);
-      return PinotBrokerTimeSeriesResponse.fromTimeSeriesBlock(result);
-    } catch (Throwable t) {
-      return PinotBrokerTimeSeriesResponse.newErrorResponse(t.getClass().getSimpleName(), t.getMessage());
-    }
-  }
-
-  TimeSeriesBlock submitAndGet(long requestId, TimeSeriesDispatchablePlan plan, long timeoutMs,
+  public TimeSeriesBlock submitAndGet(long requestId, TimeSeriesDispatchablePlan plan, long timeoutMs,
       Map<String, String> queryOptions, RequestContext requestContext)
       throws Exception {
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
