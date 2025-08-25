@@ -677,10 +677,10 @@ public class S3PinotFS extends BasePinotFS {
         ListObjectsV2Response listObjectsV2Response = _s3Client.listObjectsV2(listObjectsV2Request);
         LOGGER.debug("Getting ListObjectsV2Response: {}", listObjectsV2Response);
         List<S3Object> filesReturned = listObjectsV2Response.contents();
-        filesReturned.forEach(objectVisitor);
+        filesReturned.stream().filter(file -> !prefix.equals(file.key())).forEach(objectVisitor);
         if (!recursive && listObjectsV2Response.hasCommonPrefixes() && commonPrefixVisitor != null) {
           List<CommonPrefix> dirsReturned = listObjectsV2Response.commonPrefixes();
-          dirsReturned.forEach(commonPrefixVisitor);
+          dirsReturned.stream().filter(dir -> !prefix.equals(dir.prefix())).forEach(commonPrefixVisitor);
         }
         isDone = !listObjectsV2Response.isTruncated();
         continuationToken = listObjectsV2Response.nextContinuationToken();
