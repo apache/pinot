@@ -115,6 +115,7 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         String segmentName = message.getPartitionName();
         _instanceDataManager.offloadSegment(realtimeTableName, segmentName);
         _recentlyOffloadedConsumingSegments.put(Pair.of(realtimeTableName, segmentName), true);
+        onConsumingToOffline(realtimeTableName, segmentName);
       } catch (Exception e) {
         _logger.error(
             "Caught exception while processing SegmentOnlineOfflineStateModel.onBecomeOfflineFromConsuming() for "
@@ -156,6 +157,17 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         return;
       }
       tableDataManager.onConsumingToDropped(segmentName);
+    }
+
+    private void onConsumingToOffline(String realtimeTableName, String segmentName) {
+      TableDataManager tableDataManager = _instanceDataManager.getTableDataManager(realtimeTableName);
+      if (tableDataManager == null) {
+        _logger.warn(
+            "Failed to find data manager for table: {}, skip invoking consuming to offline callback for segment: {}",
+            realtimeTableName, segmentName);
+        return;
+      }
+      tableDataManager.onConsumingToOffline(segmentName);
     }
 
     @Transition(from = "OFFLINE", to = "ONLINE")
