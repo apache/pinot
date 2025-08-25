@@ -87,6 +87,8 @@ public class AggregationFunctionTypeTest {
         AggregationFunctionType.DISTINCTCOUNTULL);
     Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTrAwUll"),
         AggregationFunctionType.DISTINCTCOUNTRAWULL);
+    Assert.assertEquals(AggregationFunctionType.getAggregationFunctionType("DiStInCtCoUnTsMaRtUlL"),
+        AggregationFunctionType.DISTINCTCOUNTSMARTULL);
   }
 
   @Test(expectedExceptions = IllegalArgumentException.class)

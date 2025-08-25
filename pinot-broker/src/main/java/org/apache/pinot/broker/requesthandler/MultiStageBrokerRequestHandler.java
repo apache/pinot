@@ -51,7 +51,6 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.failuredetector.FailureDetector;
@@ -71,6 +70,7 @@ import org.apache.pinot.common.utils.NamedThreadFactory;
 import org.apache.pinot.common.utils.Timer;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.common.utils.tls.TlsUtils;
+import org.apache.pinot.core.routing.RoutingManager;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.query.ImmutableQueryEnvironment;
 import org.apache.pinot.query.QueryEnvironment;
@@ -120,7 +120,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   ///      </AppenderRef>
   ///    </Logger>
   ///  </Loggers>
-  /// ```
+  ///```
   private static final Marker MSE_STATS_MARKER = MarkerFactory.getMarker("MSE_STATS_MARKER");
 
   private static final int NUM_UNAVAILABLE_SEGMENTS_TO_LOG = 10;
@@ -132,16 +132,17 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   private final ExecutorService _queryCompileExecutor;
   protected final long _extraPassiveTimeoutMs;
 
-  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
+  public MultiStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       MultiStageQueryThrottler queryThrottler, FailureDetector failureDetector,
       ThreadResourceUsageAccountant accountant) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
+    super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        accountant);
     String hostname = config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     int port = Integer.parseInt(config.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT));
     _workerManager = new WorkerManager(_brokerId, hostname, port, _routingManager);
-    TlsConfig tlsConfig = config.getProperty(
-        CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
+    TlsConfig tlsConfig = config.getProperty(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED,
         CommonConstants.Helix.DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED) ? TlsUtils.extractTlsConfig(config,
         CommonConstants.Broker.BROKER_TLS_PREFIX) : null;
 
@@ -166,9 +167,9 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         CommonConstants.MultiStageQueryRunner.DEFAULT_OF_MULTISTAGE_EXPLAIN_INCLUDE_SEGMENT_PLAN);
     _queryThrottler = queryThrottler;
     _queryCompileExecutor = QueryThreadContext.contextAwareExecutorService(
-            Executors.newFixedThreadPool(
-                Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
-                new NamedThreadFactory("multi-stage-query-compile-executor")));
+        Executors.newFixedThreadPool(
+            Math.max(1, Runtime.getRuntime().availableProcessors() / 2),
+            new NamedThreadFactory("multi-stage-query-compile-executor")));
   }
 
   @Override
@@ -442,7 +443,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     return passiveTimeoutMsFromQueryOption != null ? passiveTimeoutMsFromQueryOption : _extraPassiveTimeoutMs;
   }
 
-
   /**
    * Explains the query and returns the broker response.
    *
@@ -463,7 +463,6 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     QueryEnvironment.QueryPlannerResult queryPlanResult = callAsync(requestId, query.getTextQuery(),
         () -> query.explain(requestId, fragmentToPlanNode), timer);
     String plan = queryPlanResult.getExplainPlan();
-    Set<String> tableNames = queryPlanResult.getTableNames();
     Map<String, String> extraFields = queryPlanResult.getExtraFields();
     return constructMultistageExplainPlan(query.getTextQuery(), plan, extraFields);
   }
@@ -476,6 +475,12 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         () -> query.planQuery(requestId), timer);
 
     DispatchableSubPlan dispatchableSubPlan = queryPlanResult.getQueryPlan();
+
+    // Optionally set ignoreMissingSegments query option based on broker config if not already set.
+    if (_config.getProperty(CommonConstants.Broker.CONFIG_OF_IGNORE_MISSING_SEGMENTS,
+        CommonConstants.Broker.DEFAULT_IGNORE_MISSING_SEGMENTS)) {
+      query.getOptions().putIfAbsent(CommonConstants.Broker.Request.QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+    }
 
     Set<QueryServerInstance> servers = new HashSet<>();
     for (DispatchablePlanFragment planFragment : dispatchableSubPlan.getQueryStageMap().values()) {
@@ -530,14 +535,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
     try {
       String workloadName = QueryOptionsUtils.getWorkloadName(query.getOptions());
-      _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), CommonConstants.Accounting.ANCHOR_TASK_ID,
-          ThreadExecutionContext.TaskType.MSE, workloadName);
+      _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.MSE,
+          workloadName);
 
       long executionStartTimeNs = System.nanoTime();
       QueryDispatcher.QueryResult queryResults;
       try {
         queryResults = _queryDispatcher.submitAndReduce(requestContext, dispatchableSubPlan, timer.getRemainingTimeMs(),
-                query.getOptions());
+            query.getOptions());
       } catch (QueryException e) {
         throw e;
       } catch (Throwable t) {
@@ -581,17 +586,19 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       brokerResponse.setNumServersQueried(servers.size() - 1);
       brokerResponse.setNumServersResponded(servers.size() - 1);
 
-      // Attach unavailable segments
+      // Attach unavailable segments (unless configured to ignore missing segments)
       int numUnavailableSegments = 0;
-      for (Map.Entry<String, Set<String>> entry : dispatchableSubPlan.getTableToUnavailableSegmentsMap().entrySet()) {
-        String tableName = entry.getKey();
-        Set<String> unavailableSegments = entry.getValue();
-        int unavailableSegmentsInSubPlan = unavailableSegments.size();
-        numUnavailableSegments += unavailableSegmentsInSubPlan;
-        QueryProcessingException errMsg = new QueryProcessingException(QueryErrorCode.SERVER_SEGMENT_MISSING,
-            "Found " + unavailableSegmentsInSubPlan + " unavailable segments for table " + tableName + ": "
-                + toSizeLimitedString(unavailableSegments, NUM_UNAVAILABLE_SEGMENTS_TO_LOG));
-        brokerResponse.addException(errMsg);
+      if (!QueryOptionsUtils.isIgnoreMissingSegments(query.getOptions())) {
+        for (Map.Entry<String, Set<String>> entry : dispatchableSubPlan.getTableToUnavailableSegmentsMap().entrySet()) {
+          String tableName = entry.getKey();
+          Set<String> unavailableSegments = entry.getValue();
+          int unavailableSegmentsInSubPlan = unavailableSegments.size();
+          numUnavailableSegments += unavailableSegmentsInSubPlan;
+          QueryProcessingException errMsg = new QueryProcessingException(QueryErrorCode.SERVER_SEGMENT_MISSING,
+              "Found " + unavailableSegmentsInSubPlan + " unavailable segments for table " + tableName + ": "
+                  + toSizeLimitedString(unavailableSegments, NUM_UNAVAILABLE_SEGMENTS_TO_LOG));
+          brokerResponse.addException(errMsg);
+        }
       }
       requestContext.setNumUnavailableSegments(numUnavailableSegments);
 

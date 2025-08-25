@@ -23,7 +23,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.BrokerRequest;
-import org.apache.pinot.core.transport.ImplicitHybridTableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 
 
@@ -43,8 +42,8 @@ public class PhysicalTableRouteProvider extends ImplicitHybridTableRouteProvider
       BrokerRequest offlineBrokerRequest, BrokerRequest realtimeBrokerRequest, long requestId) {
     String offlineTableName = tableRouteInfo.getOfflineTableName();
     String realtimeTableName = tableRouteInfo.getRealtimeTableName();
-    Map<ServerInstance, ServerRouteInfo> offlineRoutingTable = null;
-    Map<ServerInstance, ServerRouteInfo> realtimeRoutingTable = null;
+    Map<ServerInstance, SegmentsToQuery> offlineRoutingTable = null;
+    Map<ServerInstance, SegmentsToQuery> realtimeRoutingTable = null;
     List<String> unavailableSegments = new ArrayList<>();
     int numPrunedSegmentsTotal = 0;
 
@@ -59,7 +58,7 @@ public class PhysicalTableRouteProvider extends ImplicitHybridTableRouteProvider
       }
       if (routingTable != null) {
         unavailableSegments.addAll(routingTable.getUnavailableSegments());
-        Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
+        Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           offlineRoutingTable = serverInstanceToSegmentsMap;
@@ -82,7 +81,7 @@ public class PhysicalTableRouteProvider extends ImplicitHybridTableRouteProvider
       }
       if (routingTable != null) {
         unavailableSegments.addAll(routingTable.getUnavailableSegments());
-        Map<ServerInstance, ServerRouteInfo> serverInstanceToSegmentsMap =
+        Map<ServerInstance, SegmentsToQuery> serverInstanceToSegmentsMap =
             routingTable.getServerInstanceToSegmentsMap();
         if (!serverInstanceToSegmentsMap.isEmpty()) {
           realtimeRoutingTable = serverInstanceToSegmentsMap;

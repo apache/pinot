@@ -56,7 +56,7 @@ public class ServerStarterIntegrationTest extends ControllerTest {
       int expectedPort)
       throws Exception {
     serverConf.setProperty(CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
-    serverConf.setProperty(CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl());
+    serverConf.setProperty(CONFIG_OF_ZOOKEEPER_SERVER, getZkUrl());
     HelixServerStarter helixServerStarter = new HelixServerStarter();
     helixServerStarter.init(serverConf);
     helixServerStarter.start();

@@ -19,8 +19,6 @@
 package org.apache.pinot.core.accounting;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -42,6 +40,7 @@ import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.ResourceUsageUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,13 +49,10 @@ import org.slf4j.LoggerFactory;
  * Aggregator that computes resource aggregation for queries. Most of the logic from PerQueryCPUMemAccountantFactory is
  * retained here for backward compatibility.
  *
- * Design and algorithm are outlined in
- * https://docs.google.com/document/d/1Z9DYAfKznHQI9Wn8BjTWZYTcNRVGiPP0B8aEP3w_1jQ
+ * TODO: Integrate recent changes in PerQueryCPUMemAccountantFactory
  */
 public class QueryAggregator implements ResourceAggregator {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryAggregator.class);
-
-  static final MemoryMXBean MEMORY_MX_BEAN = ManagementFactory.getMemoryMXBean();
 
   enum TriggeringLevel {
     Normal, HeapMemoryAlarmingVerbose, CPUTimeBasedKilling, HeapMemoryCritical, HeapMemoryPanic
@@ -81,7 +77,7 @@ public class QueryAggregator implements ResourceAggregator {
   private final String _instanceId;
 
   // max heap usage, Xmx
-  private final long _maxHeapSize = MEMORY_MX_BEAN.getHeapMemoryUsage().getMax();
+  private final long _maxHeapSize = ResourceUsageUtils.getMaxHeapSize();
 
   // don't kill a query if its memory footprint is below some ratio of _maxHeapSize
   private final long _minMemoryFootprintForKill;
@@ -420,7 +416,7 @@ public class QueryAggregator implements ResourceAggregator {
         Thread.sleep(_gcWaitTime);
       } catch (InterruptedException ignored) {
       }
-      _usedBytes = MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
+      _usedBytes = ResourceUsageUtils.getUsedHeapSize();
       if (_usedBytes < _criticalLevelAfterGC) {
         return;
       }
@@ -637,7 +633,7 @@ public class QueryAggregator implements ResourceAggregator {
   }
 
   private void collectTriggerMetrics() {
-    _usedBytes = MEMORY_MX_BEAN.getHeapMemoryUsage().getUsed();
+    _usedBytes = ResourceUsageUtils.getUsedHeapSize();
     LOGGER.debug("Heap used bytes {}", _usedBytes);
   }
 

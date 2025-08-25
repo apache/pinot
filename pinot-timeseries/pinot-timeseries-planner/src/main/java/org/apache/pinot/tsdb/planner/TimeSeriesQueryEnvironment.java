@@ -61,16 +61,8 @@ public class TimeSeriesQueryEnvironment {
         .split(",");
     LOGGER.info("Found {} configured time series languages. List: {}", languages.length, languages);
     for (String language : languages) {
-      String configPrefix = PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey(language);
-      String klassName =
-          config.getProperty(PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey(language));
-      Preconditions.checkNotNull(klassName, "Logical planner class not found for language: " + language);
-      // Create the planner with empty constructor
       try {
-        Class<?> klass = TimeSeriesQueryEnvironment.class.getClassLoader().loadClass(klassName);
-        Constructor<?> constructor = klass.getConstructor();
-        TimeSeriesLogicalPlanner planner = (TimeSeriesLogicalPlanner) constructor.newInstance();
-        planner.init(config.subset(configPrefix));
+        TimeSeriesLogicalPlanner planner = buildLogicalPlanner(language, config);
         _plannerMap.put(language, planner);
       } catch (Exception e) {
         throw new RuntimeException("Failed to instantiate logical planner for language: " + language, e);
@@ -78,6 +70,23 @@ public class TimeSeriesQueryEnvironment {
     }
     // TODO(timeseries): Add support for logical tables in the future.
     TableScanVisitor.INSTANCE.init(_routingManager, new ImplicitHybridTableRouteProvider(), _tableCache);
+  }
+
+  public static TimeSeriesLogicalPlanner buildLogicalPlanner(String language, PinotConfiguration config)
+      throws RuntimeException {
+    String configPrefix = PinotTimeSeriesConfiguration.getLogicalPlannerConfigKey(language);
+    String klassName = config.getProperty(configPrefix);
+    Preconditions.checkNotNull(klassName, "Logical planner class not found for language: " + language);
+    // Create the planner with empty constructor
+    try {
+      Class<?> klass = TimeSeriesQueryEnvironment.class.getClassLoader().loadClass(klassName);
+      Constructor<?> constructor = klass.getConstructor();
+      TimeSeriesLogicalPlanner planner = (TimeSeriesLogicalPlanner) constructor.newInstance();
+      planner.init(config.subset(configPrefix));
+      return planner;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to instantiate logical planner for language: " + language, e);
+    }
   }
 
   public TimeSeriesLogicalPlanResult buildLogicalPlan(RangeTimeSeriesRequest request) {

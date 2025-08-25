@@ -805,6 +805,21 @@
           "\n                PhysicalTableScan(table=[[default, a]])",
           "\n"
         ]
+      },
+      {
+        "description": "Tests collation push down for Lite Mode. Collation from the exchange above should get pushed down to the sort below.",
+        "sql": "SET usePhysicalOptimizer=true; SET useLiteMode=true; EXPLAIN PLAN FOR WITH tmp AS (SELECT col1, ROW_NUMBER() OVER (ORDER BY ts DESC) as row_num FROM a) SELECT COUNT(*) FROM tmp WHERE row_num <= 100",
+        "output": [
+          "Execution Plan",
+          "\nPhysicalAggregate(group=[{}], agg#0=[COUNT()], aggType=[DIRECT])",
+          "\n  PhysicalFilter(condition=[<=($1, 100)])",
+          "\n    PhysicalWindow(window#0=[window(order by [0 DESC] rows between UNBOUNDED PRECEDING and CURRENT ROW aggs [ROW_NUMBER()])])",
+          "\n      PhysicalExchange(exchangeStrategy=[SINGLETON_EXCHANGE], collation=[[0 DESC]])",
+          "\n        PhysicalSort(sort0=[$0], dir0=[DESC], fetch=[100000])",
+          "\n          PhysicalProject(ts=[$7])",
+          "\n            PhysicalTableScan(table=[[default, a]])",
+          "\n"
+        ]
       }
     ]
   },

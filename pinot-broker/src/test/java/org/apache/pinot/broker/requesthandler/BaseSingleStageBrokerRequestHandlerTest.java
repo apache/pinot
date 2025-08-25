@@ -35,7 +35,7 @@ import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.core.routing.RoutingTable;
-import org.apache.pinot.core.routing.ServerRouteInfo;
+import org.apache.pinot.core.routing.SegmentsToQuery;
 import org.apache.pinot.core.routing.TableRouteInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -169,7 +169,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
     when(routingManager.getQueryTimeoutMs(tableName)).thenReturn(10000L);
     RoutingTable rt = mock(RoutingTable.class);
     when(rt.getServerInstanceToSegmentsMap()).thenReturn(Map.of(new ServerInstance(new InstanceConfig("server01_9000")),
-        new ServerRouteInfo(List.of("segment01"), List.of())));
+        new SegmentsToQuery(List.of("segment01"), List.of())));
     when(routingManager.getRoutingTable(any(), Mockito.anyLong())).thenReturn(rt);
     QueryQuotaManager queryQuotaManager = mock(QueryQuotaManager.class);
     when(queryQuotaManager.acquire(anyString())).thenReturn(true);
@@ -182,7 +182,7 @@ public class BaseSingleStageBrokerRequestHandlerTest {
         new PinotConfiguration(Map.of(Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, "true"));
     BrokerQueryEventListenerFactory.init(config);
     BaseSingleStageBrokerRequestHandler requestHandler =
-        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", routingManager,
+        new BaseSingleStageBrokerRequestHandler(config, "testBrokerId", new BrokerRequestIdGenerator(), routingManager,
             new AllowAllAccessControlFactory(), queryQuotaManager, tableCache,
             new Tracing.DefaultThreadResourceUsageAccountant()) {
           @Override

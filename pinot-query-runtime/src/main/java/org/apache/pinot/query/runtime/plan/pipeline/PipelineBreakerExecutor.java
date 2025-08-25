@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -38,6 +37,7 @@ import org.apache.pinot.query.runtime.operator.OpChain;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.PlanNodeToOpChain;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.exception.QueryCancelledException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,9 +107,14 @@ public class PipelineBreakerExecutor {
                 stagePlan.getStageMetadata(), workerMetadata, null, parentContext, sendStats);
         return execute(scheduler, pipelineBreakerContext, opChainExecutionContext);
       } catch (Exception e) {
-        LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
-            stagePlan.getStageMetadata().getStageId(), e);
-        return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), Collections.emptyMap(),
+        if (e instanceof QueryCancelledException) {
+          LOGGER.debug("Pipeline breaker execution cancelled for request: {}, stage: {}", requestId,
+              stagePlan.getStageMetadata().getStageId(), e);
+        } else {
+          LOGGER.error("Caught exception executing pipeline breaker for request: {}, stage: {}", requestId,
+              stagePlan.getStageMetadata().getStageId(), e);
+        }
+        return new PipelineBreakerResult(pipelineBreakerContext.getNodeIdMap(), Map.of(),
             ErrorMseBlock.fromException(e), null);
       }
     } else {

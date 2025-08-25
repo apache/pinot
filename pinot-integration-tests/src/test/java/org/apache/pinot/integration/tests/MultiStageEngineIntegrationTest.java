@@ -55,6 +55,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.FileFormat;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.util.TestUtils;
 import org.assertj.core.api.Assertions;
 import org.joda.time.DateTime;
@@ -261,11 +262,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String[] numericResultFunctions = new String[]{
         "distinctCount", "distinctCountBitmap", "distinctCountHLL", "segmentPartitionedDistinctCount",
-        "distinctCountSmartHLL", "distinctCountThetaSketch", "distinctSum", "distinctAvg"
+        "distinctCountSmartHLL", "distinctCountULL", "distinctCountSmartULL", "distinctCountThetaSketch",
+        "distinctSum", "distinctAvg"
     };
 
     double[] expectedNumericResults = new double[]{
-        364, 364, 355, 364, 364, 364, 5915969, 16252.662087912087
+        364, 364, 355, 364, 364, 364, 364, 364, 5915969, 16252.662087912087
     };
     Assert.assertEquals(numericResultFunctions.length, expectedNumericResults.length);
 
@@ -379,8 +381,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testUnsupportedUdfOnIntermediateStage()
       throws Exception {
-    String sqlQuery = ""
-        + "SET timeoutMs=10000;\n" // In older versions we timeout in this case, but we should fail fast now
+    String sqlQuery = "SET timeoutMs=10000;\n" // In older versions we timeout in this case, but we should fail fast now
         + "WITH fakeTable AS (\n" // this table is used to make sure the call is made on an intermediate stage
         + "  SELECT \n"
         + "    t1.DaysSinceEpoch + t2.DaysSinceEpoch as DaysSinceEpoch"
@@ -1557,7 +1558,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testCaseInsensitiveNames() throws Exception {
+  public void testCaseInsensitiveNames()
+      throws Exception {
     String query = "select ACTualELAPsedTIMe from mYtABLE where actUALelAPSedTIMe > 0 limit 1";
     JsonNode jsonNode = postQuery(query);
     long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -1566,7 +1568,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testCaseInsensitiveNamesAgainstController() throws Exception {
+  public void testCaseInsensitiveNamesAgainstController()
+      throws Exception {
     String query = "select ACTualELAPsedTIMe from mYtABLE where actUALelAPSedTIMe > 0 limit 1";
     JsonNode jsonNode = postQueryToController(query);
     long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -1575,7 +1578,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testQueryCompileBrokerTimeout() throws Exception {
+  public void testQueryCompileBrokerTimeout()
+      throws Exception {
     // The sleep function is called with a literal value so it should be evaluated during the query compile phase
     String query = "SET timeoutMs=100; SELECT sleep(1000) FROM mytable";
 
@@ -1600,7 +1604,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testNumServersQueried() throws Exception {
+  public void testNumServersQueried()
+      throws Exception {
     String query = "select * from mytable limit 10";
     JsonNode jsonNode = postQuery(query);
     JsonNode numServersQueried = jsonNode.get("numServersQueried");
@@ -1610,7 +1615,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testLookupJoin() throws Exception {
+  public void testLookupJoin()
+      throws Exception {
 
     Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
     addSchema(lookupTableSchema);
@@ -1647,7 +1653,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     dropOfflineTable(tableConfig.getTableName());
   }
 
-  public void testSearchLiteralFilter() throws Exception {
+  public void testSearchLiteralFilter()
+      throws Exception {
     String sqlQuery =
         "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) SELECT 1692057600000 AS __ts FROM "
             + "CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts";
@@ -1672,7 +1679,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testPolymorphicScalarArrayFunctions() throws Exception {
+  public void testPolymorphicScalarArrayFunctions()
+      throws Exception {
     String query = "select ARRAY_LENGTH(ARRAY[1,2,3]);";
     JsonNode jsonNode = postQuery(query);
     assertNoError(jsonNode);
@@ -1682,6 +1690,35 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     jsonNode = postQuery(query);
     assertNoError(jsonNode);
     assertEquals(jsonNode.get("resultTable").get("rows").get(0).get(0).asInt(), 2);
+  }
+
+  @Test
+  public void testValidateQueryApiSuccess()
+      throws Exception {
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
+            "{\"sql\": \"SELECT * FROM mytable\"}", null));
+    assertTrue(result.get("compiledSuccessfully").asBoolean());
+    assertTrue(result.get("errorCode").isNull());
+    assertTrue(result.get("errorMessage").isNull());
+  }
+
+  @Test
+  public void testValidateQueryApiError()
+      throws Exception {
+    JsonNode result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
+            "{\"sql\": \"SELECT invalidColumn FROM invalidTable\"}", null));
+    assertFalse(result.get("compiledSuccessfully").asBoolean());
+    assertEquals(result.get("errorCode").asText(), QueryErrorCode.TABLE_DOES_NOT_EXIST.name());
+    assertFalse(result.get("errorMessage").isNull());
+
+    result = JsonUtils.stringToJsonNode(
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery",
+            "{\"sql\": \"SELECT CAST('abc' AS INT)\"}", null));
+    assertFalse(result.get("compiledSuccessfully").asBoolean());
+    assertEquals(result.get("errorCode").asText(), QueryErrorCode.QUERY_PLANNING.name());
+    assertFalse(result.get("errorMessage").isNull());
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)

@@ -31,6 +31,7 @@ import org.apache.pinot.common.proto.Plan;
 import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.query.reduce.ExplainPlanDataTableReducer;
 import org.apache.pinot.query.planner.plannode.AggregateNode;
+import org.apache.pinot.query.planner.plannode.EnrichedJoinNode;
 import org.apache.pinot.query.planner.plannode.ExchangeNode;
 import org.apache.pinot.query.planner.plannode.ExplainedNode;
 import org.apache.pinot.query.planner.plannode.FilterNode;
@@ -194,6 +195,38 @@ class PlanNodeMerger {
         return null;
       }
       if (!node.getNonEquiConditions().equals(otherNode.getNonEquiConditions())) {
+        return null;
+      }
+      List<PlanNode> children = mergeChildren(node, context);
+      if (children == null) {
+        return null;
+      }
+      return node.withInputs(children);
+    }
+
+    @Nullable
+    @Override
+    public PlanNode visitEnrichedJoin(EnrichedJoinNode node, PlanNode context) {
+      if (context.getClass() != EnrichedJoinNode.class) {
+        return null;
+      }
+      EnrichedJoinNode otherNode = (EnrichedJoinNode) context;
+      if (!node.getJoinType().equals(otherNode.getJoinType())) {
+        return null;
+      }
+      if (!node.getLeftKeys().equals(otherNode.getLeftKeys())) {
+        return null;
+      }
+      if (!node.getRightKeys().equals(otherNode.getRightKeys())) {
+        return null;
+      }
+      if (!node.getNonEquiConditions().equals(otherNode.getNonEquiConditions())) {
+        return null;
+      }
+      if (!Objects.equals(node.getFilterProjectRexes(), otherNode.getFilterProjectRexes())) {
+        return null;
+      }
+      if (node.getFetch() != otherNode.getFetch() || node.getOffset() != otherNode.getOffset()) {
         return null;
       }
       List<PlanNode> children = mergeChildren(node, context);

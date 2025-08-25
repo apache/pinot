@@ -37,6 +37,7 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.operator.set.IntersectOperator;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
@@ -92,7 +93,7 @@ public class MultistageResourceUsageAccountingTest implements ITest {
     // init accountant and start watcher task
     PinotConfiguration pinotCfg = new PinotConfiguration(configs);
     Tracing.unregisterThreadAccountant();
-    Tracing.ThreadAccountantOps.initializeThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
+    Tracing.ThreadAccountantOps.createThreadAccountant(pinotCfg, "testGroupBy", InstanceType.SERVER);
     Tracing.ThreadAccountantOps.startThreadAccountant();
 
     // Setup Thread Context
