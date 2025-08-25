@@ -40,6 +40,7 @@ import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.RecordReaderSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
+import org.apache.pinot.segment.local.segment.creator.impl.stats.SegmentColumnarPreIndexStatsContainer;
 import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConverterFactory;
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
@@ -369,6 +370,135 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     LOGGER.info("Finished records indexing by column in IndexCreator!");
 
     handlePostCreation();
+  }
+
+  /**
+   * Builds an index segment from an existing immutable segment.
+   * <p>This method is optimized for immutable-to-immutable segment conversion where data is not re-sorted, not
+   * re-transformed (skipping row transformations) again and stats are collected(skipping row transformations) in
+   * columnar manner see
+   * {@link SegmentColumnarPreIndexStatsContainer}. The segments are also built in a columnar fashion similar to
+   * {@link #buildByColumn(IndexSegment)}.
+   * <p> This also handles new columns that don't exist in the input segment and compatible data type conversions.
+   *
+   * @param indexSegment The source segment to read column data from
+   * @throws Exception if segment creation fails
+   */
+  public void rebuildSegment(IndexSegment indexSegment)
+          throws Exception {
+    // Count the number of documents and gather per-column statistics
+    collectStatsAndIndexCreationInfoFromSegmentData(indexSegment);
+    LOGGER.info("Finished building StatsCollector!");
+    LOGGER.info("Collected stats for {} documents", _totalDocs);
+
+    try {
+      // For immutable-to-immutable segment conversion, we can skip sorted doc IDs processing
+      // since the data layout is expected to be already sorted similar to how segment reload skips re-sorting the data.
+
+      // Create a new SegmentColumnarIndexCreator with data type conversion enabled for segment-to-segment conversion
+      _indexCreator = new SegmentColumnarIndexCreator();
+
+      // Initialize the index creation using the per-column statistics information
+      // TODO: _indexCreationInfoMap holds the reference to all unique values on heap (ColumnIndexCreationInfo ->
+      //       ColumnStatistics) throughout the segment creation. Find a way to release the memory early.
+      _indexCreator.init(_config, _segmentIndexCreationInfo, _indexCreationInfoMap, _dataSchema, _tempIndexDir,
+              null, true);
+
+      // Build the indexes
+      LOGGER.info("Start building Index by column for segment-to-segment conversion");
+
+      TreeSet<String> columnsInSchema = _dataSchema.getPhysicalColumnNames();
+      Set<String> columnsInSegment = indexSegment.getPhysicalColumnNames();
+
+      // Process columns that exist in both schema and segment
+      for (String columnName : columnsInSchema) {
+        if (columnsInSegment.contains(columnName)) {
+          LOGGER.debug("Indexing existing column: {}", columnName);
+          _indexCreator.indexColumn(columnName, null, indexSegment);
+        } else {
+          // Handle new columns that don't exist in the input segment
+          LOGGER.info("Creating new column with default values: {}", columnName);
+          indexNewColumnWithDefaultValues(columnName);
+        }
+      }
+    } catch (Exception e) {
+      _indexCreator.close();
+      throw e;
+    } finally {
+      // The record reader is created by the `init` method and needs to be closed and
+      // cleaned up even by the Column Mode builder.
+      _recordReader.close();
+    }
+
+    LOGGER.info("Finished records indexing by column for segment-to-segment conversion!");
+
+    handlePostCreation();
+  }
+
+
+  /**
+   * Column-wise stats gathering process optimized for immutable segment-to-segment transformation.
+   * This method reads column data directly to collect comprehensive statistics including unique values
+   * required for dictionary creation. Handles new columns that don't exist in the input segment.
+   */
+  void collectStatsAndIndexCreationInfoFromSegmentData(IndexSegment indexSegment) throws Exception {
+    long statsCollectorStartTime = System.nanoTime();
+
+    LOGGER.info("Using optimized column-wise stats collection for segment-to-segment transformation");
+    // Use column-wise stats collection optimized for segment transformation
+    _segmentStats = new SegmentColumnarPreIndexStatsContainer(indexSegment, _dataSchema,
+            new StatsCollectorConfig(_config.getTableConfig(), _dataSchema, _config.getSegmentPartitionConfig()));
+    _totalDocs = indexSegment.getSegmentMetadata().getTotalDocs();
+    Map<String, FieldIndexConfigs> indexConfigsMap = _config.getIndexConfigsByColName();
+
+    for (FieldSpec fieldSpec : _dataSchema.getAllFieldSpecs()) {
+      // Ignore virtual columns
+      if (fieldSpec.isVirtualColumn()) {
+        continue;
+      }
+
+      String column = fieldSpec.getName();
+      DataType storedType = fieldSpec.getDataType().getStoredType();
+      ColumnStatistics columnProfile = _segmentStats.getColumnProfileFor(column);
+      DictionaryIndexConfig dictionaryIndexConfig = indexConfigsMap.get(column).getConfig(StandardIndexes.dictionary());
+      boolean createDictionary = !dictionaryIndexConfig.isDisabled();
+      boolean useVarLengthDictionary = dictionaryIndexConfig.getUseVarLengthDictionary()
+          || DictionaryIndexType.optimizeTypeShouldUseVarLengthDictionary(storedType, columnProfile);
+      Object defaultNullValue = fieldSpec.getDefaultNullValue();
+      if (storedType == DataType.BYTES) {
+        defaultNullValue = new ByteArray((byte[]) defaultNullValue);
+      }
+
+      boolean isAutoGenerated = !indexSegment.getPhysicalColumnNames().contains(column);
+
+      _indexCreationInfoMap.put(column,
+          new ColumnIndexCreationInfo(columnProfile, createDictionary, useVarLengthDictionary, isAutoGenerated,
+              defaultNullValue));
+    }
+    _segmentIndexCreationInfo.setTotalDocs(_totalDocs);
+    _totalStatsCollectorTimeNs = System.nanoTime() - statsCollectorStartTime;
+  }
+
+  /**
+   * Index a new column that doesn't exist in the input segment by creating default values.
+   * This is inspired by the SegmentPreProcessor's default column handling.
+   */
+  private void indexNewColumnWithDefaultValues(String columnName) throws Exception {
+    FieldSpec fieldSpec = _dataSchema.getFieldSpecFor(columnName);
+    if (fieldSpec == null) {
+      throw new IllegalArgumentException("Field spec not found for column: " + columnName);
+    }
+
+    LOGGER.info("Creating default values for new column: {} with data type: {}", columnName,
+            fieldSpec.getDataType());
+
+    if (_indexCreator instanceof SegmentColumnarIndexCreator) {
+      SegmentColumnarIndexCreator columnarCreator = (SegmentColumnarIndexCreator) _indexCreator;
+      columnarCreator.indexNewColumnWithDefaultValues(columnName, _totalDocs);
+    } else {
+      throw new UnsupportedOperationException(
+              "Column-wise building is only supported with SegmentColumnarIndexCreator");
+    }
   }
 
   private void handlePostCreation()
