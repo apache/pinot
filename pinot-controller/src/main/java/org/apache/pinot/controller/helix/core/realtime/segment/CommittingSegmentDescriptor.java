@@ -32,6 +32,7 @@ public class CommittingSegmentDescriptor {
   private String _nextOffset;
   private SegmentMetadataImpl _segmentMetadata;
   private String _stopReason;
+  private int _preCommitRowCount = -1; // -1 indicates not available
 
   public static CommittingSegmentDescriptor fromSegmentCompletionReqParams(
       SegmentCompletionProtocol.Request.Params reqParams) {
@@ -40,6 +41,12 @@ public class CommittingSegmentDescriptor {
             reqParams.getSegmentSizeBytes());
     committingSegmentDescriptor.setSegmentLocation(reqParams.getSegmentLocation());
     committingSegmentDescriptor.setStopReason(reqParams.getReason());
+
+    // Capture pre-commit row count from the request (for commit time compaction awareness)
+    if (reqParams.getNumRows() > 0) {
+      committingSegmentDescriptor.setPreCommitRowCount(reqParams.getNumRows());
+    }
+
     return committingSegmentDescriptor;
   }
 
@@ -104,5 +111,13 @@ public class CommittingSegmentDescriptor {
 
   public void setStopReason(String stopReason) {
     _stopReason = stopReason;
+  }
+
+  public int getPreCommitRowCount() {
+    return _preCommitRowCount;
+  }
+
+  public void setPreCommitRowCount(int preCommitRowCount) {
+    _preCommitRowCount = preCommitRowCount;
   }
 }
