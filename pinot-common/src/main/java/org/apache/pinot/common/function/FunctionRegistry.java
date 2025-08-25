@@ -246,7 +246,7 @@ public class FunctionRegistry {
   }
 
   public static String canonicalize(String name) {
-    return StringUtils.remove(StringUtils.remove(name, '_'), ' ').toLowerCase();
+    return StringUtils.remove(name, '_').toLowerCase();
   }
 
   public static class ArgumentCountBasedScalarFunction implements PinotScalarFunction {

@@ -396,7 +396,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void isNullAndComparisonWithoutNullHandling() {
+  public void mseIsNullAndComparisonWithoutNullHandling() {
     setUseMultiStageQueryEngine(true);
     String query = ""
         + "SELECT 1 \n"
@@ -414,7 +414,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
   }
 
   @Test
-  public void isNullAndComparisonWithNullHandling() {
+  public void mseIsNullAndComparisonWithNullHandling() {
     setUseMultiStageQueryEngine(true);
     String query = ""
         + "SELECT 1 \n"

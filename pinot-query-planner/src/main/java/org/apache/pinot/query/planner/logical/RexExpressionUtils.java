@@ -299,8 +299,24 @@ public class RexExpressionUtils {
       case OTHER:
         // NOTE: SqlStdOperatorTable.CONCAT has OTHER kind and "||" as name
         return operator.getName().equals("||") ? "CONCAT" : operator.getName();
-      case OTHER_FUNCTION:
-        return FunctionRegistry.canonicalize(operator.getName());
+      case OTHER_FUNCTION: {
+        String opName = operator.getName();
+        String canonicalized = FunctionRegistry.canonicalize(opName);
+        // See https://github.com/apache/pinot/pull/16658
+        // If null handling is disabled, functions `is null` and `is not null` are registered as OTHER_FUNCTION with
+        // name "IS NULL" and "IS NOT NULL".
+        // They have to be registered with these names in order to be recognized in the SQL parser, but at the same
+        // time servers won't recognize function names with spaces. This is why we convert them to "is_null" and
+        // "is_not_null" here, just before we send the function from broker to server.
+        switch (canonicalized) {
+          case "is null":
+            return "is_null";
+          case "is not null":
+            return "is_not_null";
+          default:
+            return canonicalized;
+        }
+      }
       default:
         return operator.kind.name();
     }
