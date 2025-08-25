@@ -125,6 +125,25 @@ public final class IngestionConfigUtils {
   }
 
   /**
+   * Getting the StreamConfig from StreamConfigs list based on topicName and partitionId.
+   * @param partitionId the segment partition id on Pinot
+   */
+  public static StreamConfig getStreamConfigFromStreamConfigList(
+      int partitionId, String topicName, List<StreamConfig> streamConfigs) {
+    int rawTopicIndex = getStreamConfigIndexFromPinotPartitionId(partitionId);
+    if (topicName != null && !topicName.isEmpty()) {
+      return streamConfigs.stream().filter(c -> topicName.equals(c.getTopicName()))
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException("No matching StreamConfig found for topic: " + topicName));
+    } else {
+      return streamConfigs.stream()
+          .filter(c -> !c.isEphemeralBackfillTopic()).skip(rawTopicIndex)
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException("Not enough non-ephemeral StreamConfigs"));
+    }
+  }
+
+  /**
    * Fetches the streamConfig from the list of streamConfigs according to the partition id.
    */
   public static Map<String, String> getStreamConfigMap(TableConfig tableConfig, int partitionId) {

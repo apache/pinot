@@ -18,6 +18,9 @@
  */
 package org.apache.pinot.spi.stream;
 
+import javax.annotation.Nullable;
+
+
 /**
  * A PartitionGroup is a group of partitions/shards that the same consumer should consume from.
  * This class contains all information which describes the latest state of a partition group.
@@ -35,6 +38,9 @@ package org.apache.pinot.spi.stream;
  * This information is needed by the stream, when grouping the partitions/shards into new partition groups.
  */
 public class PartitionGroupConsumptionStatus {
+
+  @Nullable
+  private final String _topicName;
   private final int _partitionGroupId;
   private final int _streamPartitionId;
   private int _sequenceNumber;
@@ -42,8 +48,9 @@ public class PartitionGroupConsumptionStatus {
   private StreamPartitionMsgOffset _endOffset;
   private String _status;
 
-  public PartitionGroupConsumptionStatus(int partitionGroupId, int streamPartitionId, int sequenceNumber,
-      StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+  public PartitionGroupConsumptionStatus(String topicName, int partitionGroupId, int streamPartitionId,
+      int sequenceNumber, StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+    _topicName = topicName;
     _partitionGroupId = partitionGroupId;
     _streamPartitionId = streamPartitionId;
     _sequenceNumber = sequenceNumber;
@@ -52,9 +59,21 @@ public class PartitionGroupConsumptionStatus {
     _status = status;
   }
 
-  public PartitionGroupConsumptionStatus(int partitionGroupId, int sequenceNumber, StreamPartitionMsgOffset startOffset,
-      StreamPartitionMsgOffset endOffset, String status) {
-    this(partitionGroupId, partitionGroupId, sequenceNumber, startOffset, endOffset, status);
+  public PartitionGroupConsumptionStatus(int partitionGroupId, int streamPartitionId,
+      int sequenceNumber, StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+    this(null, partitionGroupId, streamPartitionId, sequenceNumber, startOffset, endOffset, status);
+  }
+
+  public PartitionGroupConsumptionStatus(int partitionGroupId, int sequenceNumber,
+      StreamPartitionMsgOffset startOffset, StreamPartitionMsgOffset endOffset, String status) {
+    this(null, partitionGroupId, partitionGroupId, sequenceNumber, startOffset, endOffset, status);
+  }
+
+  public String getTopicName() {
+    if (_topicName == null || _topicName.isEmpty()) {
+      return null;
+    }
+    return _topicName;
   }
 
   public int getPartitionGroupId() {
