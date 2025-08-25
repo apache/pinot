@@ -580,6 +580,18 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  public JsonNode postTimeseriesQuery(String baseUrl, String query, long startTime, long endTime,
+      Map<String, String> headers) {
+    try {
+      Map<String, String> payload = Map.of("language", "m3ql", "query", query, "start",
+          String.valueOf(startTime), "end", String.valueOf(endTime));
+      return JsonUtils.stringToJsonNode(
+          sendPostRequest(baseUrl + "/query/timeseries", JsonUtils.objectToString(payload), headers));
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to post timeseries query: " + query, e);
+    }
+  }
+
   /**
    * Queries the broker's query endpoint (/query/sql)
    */

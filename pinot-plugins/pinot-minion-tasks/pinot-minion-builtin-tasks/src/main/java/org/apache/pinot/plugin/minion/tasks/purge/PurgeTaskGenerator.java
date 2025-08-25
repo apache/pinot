@@ -76,19 +76,8 @@ public class PurgeTaskGenerator extends BaseTaskGenerator {
       long purgeDeltaMs = TimeUtils.convertPeriodToMillis(deltaTimePeriod);
 
       LOGGER.info("Start generating task configs for table: {} for task: {}", tableName, taskType);
-      // Get max number of tasks for this table
-      int tableMaxNumTasks;
-      String tableMaxNumTasksConfig = taskConfigs.get(MinionConstants.TABLE_MAX_NUM_TASKS_KEY);
-      if (tableMaxNumTasksConfig != null) {
-        try {
-          tableMaxNumTasks = Integer.parseInt(tableMaxNumTasksConfig);
-        } catch (Exception e) {
-          tableMaxNumTasks = Integer.MAX_VALUE;
-          LOGGER.warn("MaxNumTasks have been wrongly set for table : {}, and task {}", tableName, taskType);
-        }
-      } else {
-        tableMaxNumTasks = Integer.MAX_VALUE;
-      }
+      // Get max number of subtasks for this table
+      int tableMaxNumTasks = getAndUpdateMaxNumSubTasks(taskConfigs, Integer.MAX_VALUE, tableName);
       List<SegmentZKMetadata> segmentsZKMetadata =
           tableConfig.getTableType() == TableType.OFFLINE
               ? getSegmentsZKMetadataForTable(tableName)

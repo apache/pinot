@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.function.scalar.JsonFunctions;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -97,6 +98,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
   private final CollectionNotUnnestedToJson _collectionNotUnnestedToJson;
   private final Map<String, String> _prefixesToRename;
   private final boolean _continueOnError;
+  private final List<String> _fieldsToUnnestAndKeepOriginalValue;
 
   private ComplexTypeTransformer(TableConfig tableConfig) {
     IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
@@ -113,6 +115,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
     } else {
       _fieldsToUnnest = List.of();
     }
+    _fieldsToUnnestAndKeepOriginalValue = new ArrayList<>(_fieldsToUnnest);
 
     _delimiter = Objects.requireNonNullElse(complexTypeConfig.getDelimiter(), DEFAULT_DELIMITER);
     _collectionNotUnnestedToJson =
@@ -135,6 +138,7 @@ public class ComplexTypeTransformer implements RecordTransformer {
       CollectionNotUnnestedToJson collectionNotUnnestedToJson, Map<String, String> prefixesToRename,
       boolean continueOnError) {
     _fieldsToUnnest = fieldsToUnnest;
+    _fieldsToUnnestAndKeepOriginalValue = new ArrayList<>(_fieldsToUnnest);
     _delimiter = delimiter;
     _collectionNotUnnestedToJson = collectionNotUnnestedToJson;
     _prefixesToRename = prefixesToRename;
@@ -181,6 +185,16 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   @Override
+  public void withInputColumnsForDownstreamTransformers(Set<String> columns) {
+    // The input columns passed in from the downstream transformers have their name in the context of names after
+    // prefix-renaming, while the fields to unnest are before prefix-renaming.
+    _fieldsToUnnestAndKeepOriginalValue.removeIf(field -> {
+      String renamedField = renamePrefix(field);
+      return !columns.contains(renamedField == null ? field : renamedField);
+    });
+  }
+
+  @Override
   public List<String> getInputColumns() {
     return _fieldsToUnnest;
   }
@@ -195,18 +209,21 @@ public class ComplexTypeTransformer implements RecordTransformer {
           flattenMap(record, columns);
           transformedRecords.add(record);
         } else {
-          Map<String, Object> originalValues = record.copy(_fieldsToUnnest).getFieldToValueMap();
+          Map<String, Object> originalValues = _fieldsToUnnestAndKeepOriginalValue.isEmpty() ? null
+              : record.copy(_fieldsToUnnestAndKeepOriginalValue).getFieldToValueMap();
           flattenMap(record, columns);
           List<GenericRow> unnestedRecords = List.of(record);
           for (String field : _fieldsToUnnest) {
             unnestedRecords = unnestCollection(unnestedRecords, field);
           }
-          unnestedRecords.forEach(unnestedRecord -> {
-            Map<String, Object> values = unnestedRecord.getFieldToValueMap();
-            for (Map.Entry<String, Object> entry : originalValues.entrySet()) {
-              values.putIfAbsent(entry.getKey(), entry.getValue());
-            }
-          });
+          if (originalValues != null) {
+            unnestedRecords.forEach(unnestedRecord -> {
+              Map<String, Object> values = unnestedRecord.getFieldToValueMap();
+              for (Map.Entry<String, Object> entry : originalValues.entrySet()) {
+                values.putIfAbsent(entry.getKey(), entry.getValue());
+              }
+            });
+          }
           if (record.isIncomplete()) {
             unnestedRecords.forEach(GenericRow::markIncomplete);
           }
@@ -276,6 +293,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
   }
 
   private GenericRow flattenCollectionItem(GenericRow record, Object obj, String column) {
+    // TODO: During the unnesting, there are columns added to the record which are not needed in downstream
+    //  transformers. We should avoid adding those columns to the record to save memory. All columns needed in
+    //  downstream are passed in through the `withInputColumnsForDownstreamTransformers` method.
     GenericRow copy = record.copy();
     if (obj instanceof Map) {
       Map<String, Object> map = (Map<String, Object>) obj;
@@ -295,6 +315,9 @@ public class ComplexTypeTransformer implements RecordTransformer {
    */
   @VisibleForTesting
   protected void flattenMap(GenericRow record, List<String> columns) {
+    // TODO: During the flattening, there are columns added to the record which are not needed in downstream
+    //  transformers. We should avoid adding those columns to the record to save memory. All columns needed in
+    //  downstream are passed in through the `withInputColumnsForDownstreamTransformers` method.
     for (String column : columns) {
       Object value = record.getValue(column);
       if (value instanceof Map) {
@@ -358,22 +381,31 @@ public class ComplexTypeTransformer implements RecordTransformer {
   void renamePrefixes(GenericRow record) {
     assert !_prefixesToRename.isEmpty();
     List<String> fields = new ArrayList<>(record.getFieldToValueMap().keySet());
+    for (String field : fields) {
+      String newName = renamePrefix(field);
+      if (newName == null) {
+        continue;
+      }
+      Object value = record.removeValue(field);
+      if (newName.isEmpty() || record.getValue(newName) != null) {
+        throw new RuntimeException(
+            String.format("Name conflict after attempting to rename field %s to %s", field, newName));
+      }
+      record.putValue(newName, value);
+    }
+  }
+
+  @Nullable
+  private String renamePrefix(String field) {
     for (Map.Entry<String, String> entry : _prefixesToRename.entrySet()) {
-      for (String field : fields) {
-        String prefix = entry.getKey();
+      String prefix = entry.getKey();
+      if (field.startsWith(prefix)) {
         String replacementPrefix = entry.getValue();
-        if (field.startsWith(prefix)) {
-          Object value = record.removeValue(field);
-          String remainingColumnName = field.substring(prefix.length());
-          String newName = replacementPrefix + remainingColumnName;
-          if (newName.isEmpty() || record.getValue(newName) != null) {
-            throw new RuntimeException(
-                String.format("Name conflict after attempting to rename field %s to %s", field, newName));
-          }
-          record.putValue(newName, value);
-        }
+        String remainingColumnName = field.substring(prefix.length());
+        return replacementPrefix + remainingColumnName;
       }
     }
+    return null;
   }
 
   private boolean containPrimitives(Object[] value) {

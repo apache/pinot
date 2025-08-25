@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.query;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import java.util.Map;
@@ -59,7 +60,7 @@ import org.slf4j.MDC;
 public class QueryThreadContext {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryThreadContext.class);
   private static final ThreadLocal<Instance> THREAD_LOCAL = new ThreadLocal<>();
-  public static volatile boolean _strictMode = false;
+  public static volatile boolean _strictMode;
   private static final FakeInstance FAKE_INSTANCE = new FakeInstance();
 
   static {
@@ -156,6 +157,7 @@ public class QueryThreadContext {
    * @return an {@link AutoCloseable} object that should be used within a try-with-resources block
    * @throws IllegalStateException if the {@link QueryThreadContext} is already initialized.
    */
+  @VisibleForTesting
   public static CloseableContext open() {
     return open("unknown");
   }
@@ -164,12 +166,6 @@ public class QueryThreadContext {
     CloseableContext open = open((Memento) null);
     get()._instanceId = instanceId;
     return open;
-  }
-
-  /// Just kept for backward compatibility.
-  @Deprecated
-  public static CloseableContext openFromRequestMetadata(Map<String, String> requestMetadata) {
-    return openFromRequestMetadata("unknown", requestMetadata);
   }
 
   public static CloseableContext openFromRequestMetadata(String instanceId, Map<String, String> requestMetadata) {
@@ -296,23 +292,6 @@ public class QueryThreadContext {
    */
   public static void setStartTimeMs(long startTimeMs) {
     get().setStartTimeMs(startTimeMs);
-  }
-
-  /**
-   * Use {@link #getActiveDeadlineMs()} instead.
-   */
-  @Deprecated
-  public static long getDeadlineMs() {
-    return get().getActiveDeadlineMs();
-  }
-
-  /**
-   * @deprecated Use {@link #setActiveDeadlineMs(long)} instead.
-   * @throws IllegalStateException if deadline is already set or if the {@link QueryThreadContext} is not initialized
-   */
-  @Deprecated
-  public static void setDeadlineMs(long deadlineMs) {
-    get().setActiveDeadlineMs(deadlineMs);
   }
 
   /**
@@ -516,18 +495,8 @@ public class QueryThreadContext {
       _startTimeMs = startTimeMs;
     }
 
-    @Deprecated
-    public long getDeadlineMs() {
-      return getActiveDeadlineMs();
-    }
-
     public long getActiveDeadlineMs() {
       return _activeDeadlineMs;
-    }
-
-    @Deprecated
-    public void setDeadlineMs(long deadlineMs) {
-      setActiveDeadlineMs(deadlineMs);
     }
 
     public void setActiveDeadlineMs(long activeDeadlineMs) {

@@ -286,6 +286,7 @@ public class QueryEnvironmentTestBase {
         // Verify type coercion in standard functions
         new Object[]{"SELECT DATEADD('DAY', 1, col7) FROM a"},
         new Object[]{"SELECT TIMESTAMPADD(DAY, 10, NOW() - 100) FROM a"},
+        new Object[]{"SELECT ts FROM a WHERE ts <= '2025-08-14 00:00:00.000000'"}
     };
   }
 

@@ -16,36 +16,37 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator;
+package org.apache.pinot.query.runtime.operator.set;
 
 import java.util.List;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * EXCEPT ALL operator.
+ * Intersect operator.
  */
-public class MinusAllOperator extends SetOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MinusAllOperator.class);
-  private static final String EXPLAIN_NAME = "MINUS_ALL";
+public class IntersectOperator extends RightRowSetBasedSetOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IntersectOperator.class);
+  private static final String EXPLAIN_NAME = "INTERSECT";
 
-  public MinusAllOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
+  public IntersectOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, inputOperators, dataSchema);
   }
 
   @Override
-  protected Logger logger() {
-    return LOGGER;
+  public Type getOperatorType() {
+    return Type.INTERSECT;
   }
 
   @Override
-  public Type getOperatorType() {
-    return Type.MINUS;
+  protected Logger logger() {
+    return LOGGER;
   }
 
   @Override
@@ -55,6 +56,6 @@ public class MinusAllOperator extends SetOperator {
 
   @Override
   protected boolean handleRowMatched(Object[] row) {
-    return !_rightRowSet.remove(new Record(row));
+    return _rightRowSet.setCount(new Record(row), 0) != 0;
   }
 }

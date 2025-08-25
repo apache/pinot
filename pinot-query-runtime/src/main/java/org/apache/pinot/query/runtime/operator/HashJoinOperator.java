@@ -51,17 +51,17 @@ public class HashJoinOperator extends BaseJoinOperator {
   private static final String EXPLAIN_NAME = "HASH_JOIN";
 
   // Placeholder for BitSet in _matchedRightRows when all keys are unique in the right table.
-  private static final BitSet BIT_SET_PLACEHOLDER = new BitSet(0);
+  protected static final BitSet BIT_SET_PLACEHOLDER = new BitSet(0);
 
-  private final KeySelector<?> _leftKeySelector;
-  private final KeySelector<?> _rightKeySelector;
+  protected final KeySelector<?> _leftKeySelector;
+  protected final KeySelector<?> _rightKeySelector;
   @Nullable
-  private LookupTable _rightTable;
+  protected LookupTable _rightTable;
   // Track matched right rows for right join and full join to output non-matched right rows.
   // TODO: Revisit whether we should use IntList or RoaringBitmap for smaller memory footprint.
   // TODO: Optimize this
   @Nullable
-  private Map<Object, BitSet> _matchedRightRows;
+  protected Map<Object, BitSet> _matchedRightRows;
   // Store null key rows separately for RIGHT and FULL JOINs
   @Nullable
   private List<Object[]> _nullKeyRightRows;
@@ -77,6 +77,18 @@ public class HashJoinOperator extends BaseJoinOperator {
     _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
     // Initialize _nullKeyRightRows for both RIGHT and FULL JOINs
     _nullKeyRightRows = needUnmatchedRightRows() ? new ArrayList<>() : null;
+  }
+
+  /// Constructor that takes the schema for NonEquiEvaluator as an argument
+  public HashJoinOperator(OpChainExecutionContext context, MultiStageOperator leftInput, DataSchema leftSchema,
+      MultiStageOperator rightInput, JoinNode node, DataSchema nonEquiEvaluationSchema) {
+    super(context, leftInput, leftSchema, rightInput, node, nonEquiEvaluationSchema);
+    List<Integer> leftKeys = node.getLeftKeys();
+    Preconditions.checkState(!leftKeys.isEmpty(), "Hash join operator requires join keys");
+    _leftKeySelector = KeySelectorFactory.getKeySelector(leftKeys);
+    _rightKeySelector = KeySelectorFactory.getKeySelector(node.getRightKeys());
+    _rightTable = createLookupTable(leftKeys, leftSchema);
+    _matchedRightRows = needUnmatchedRightRows() ? new HashMap<>() : null;
   }
 
   private static LookupTable createLookupTable(List<Integer> joinKeys, DataSchema schema) {
