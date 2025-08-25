@@ -28,7 +28,6 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.util.Collections;
-import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.GET;
@@ -40,11 +39,10 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.pinot.common.restlet.resources.ResourceUtils;
-import org.apache.pinot.core.accounting.WorkloadBudgetManager;
 import org.apache.pinot.server.api.AdminApiApplication;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +57,7 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 @SwaggerDefinition(securityDefinition = @SecurityDefinition(apiKeyAuthDefinitions = @ApiKeyAuthDefinition(name =
     HttpHeaders.AUTHORIZATION, in = ApiKeyAuthDefinition.ApiKeyLocation.HEADER, key = SWAGGER_AUTHORIZATION_KEY,
     description = "The format of the key is  ```\"Basic <token>\" or \"Bearer <token>\"```")))
-@Path("workload")
+@Path("/queryWorkloadCost")
 public class QueryWorkloadResource {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryWorkloadResource.class);
 
@@ -72,7 +70,6 @@ public class QueryWorkloadResource {
    * Returns the names of workloads that have budgets configured.
    */
   @GET
-  @Path("list")
   @ApiOperation(value = "List all active workload names on this server instance")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -81,24 +78,15 @@ public class QueryWorkloadResource {
   @Produces(MediaType.APPLICATION_JSON)
   public String listWorkloads() {
     try {
-      // Verify this is a server instance
-      if (!InstanceTypeUtils.isServer(_instanceId)) {
-        throw new WebApplicationException("This endpoint is only available on server instances",
-            Response.Status.BAD_REQUEST);
-      }
-
       WorkloadBudgetManager workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
-      
       if (workloadBudgetManager == null) {
+        LOGGER.warn("WorkloadBudgetManager is not available on instance: {}", _instanceId);
         return ResourceUtils.convertToJsonString(Collections.emptySet());
       }
 
-      // Note: WorkloadBudgetManager doesn't expose workload names directly
-      // This is a limitation - we can only return empty set for now
-      // In a real implementation, we'd need WorkloadBudgetManager to expose active workload names
-      Set<String> workloadNames = Collections.emptySet();
-      
-      return ResourceUtils.convertToJsonString(workloadNames);
+      // TODO: Implement actual workload listing when WorkloadBudgetManager supports it
+      // For now, return empty set as placeholder
+      return ResourceUtils.convertToJsonString(Collections.emptySet());
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
@@ -113,7 +101,7 @@ public class QueryWorkloadResource {
    * Returns InstanceCost with CPU and memory budget information.
    */
   @GET
-  @Path("workload/{workloadName}")
+  @Path("/{workloadName}")
   @ApiOperation(value = "Get instance cost information for a specific workload")
   @ApiResponses(value = {
       @ApiResponse(code = 200, message = "Success"),
@@ -121,33 +109,32 @@ public class QueryWorkloadResource {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   @Produces(MediaType.APPLICATION_JSON)
-  public String getWorkload(@ApiParam(value = "Name of the workload", required = true) 
+  public String getWorkload(@ApiParam(value = "Name of the workload", required = true)
                            @PathParam("workloadName") String workloadName) {
-    try {
-      // Verify this is a server instance
-      if (!InstanceTypeUtils.isServer(_instanceId)) {
-        throw new WebApplicationException("This endpoint is only available on server instances",
-            Response.Status.BAD_REQUEST);
-      }
+    // Input validation
+    if (workloadName == null || workloadName.trim().isEmpty()) {
+      throw new WebApplicationException("Workload name cannot be null or empty",
+          Response.Status.BAD_REQUEST);
+    }
 
+    try {
       WorkloadBudgetManager workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
-      
       if (workloadBudgetManager == null) {
+        LOGGER.warn("WorkloadBudgetManager is not available on instance: {}", _instanceId);
         throw new WebApplicationException("WorkloadBudgetManager is not available",
             Response.Status.INTERNAL_SERVER_ERROR);
       }
 
       // Get remaining budget for the specific workload
       WorkloadBudgetManager.BudgetStats budgetStats = workloadBudgetManager.getRemainingBudgetForWorkload(workloadName);
-      
-      if (budgetStats._cpuRemaining == 0 && budgetStats._memoryRemaining == 0) {
+      if (budgetStats == null) {
+        LOGGER.warn("No budget stats found for workload: {} on instance: {}", workloadName, _instanceId);
         throw new WebApplicationException("Workload not found: " + workloadName,
             Response.Status.NOT_FOUND);
       }
 
       // Create InstanceCost object with the budget information
       InstanceCost instanceCost = new InstanceCost(budgetStats._cpuRemaining, budgetStats._memoryRemaining);
-      
       return ResourceUtils.convertToJsonString(instanceCost);
     } catch (WebApplicationException e) {
       throw e;
@@ -157,5 +144,4 @@ public class QueryWorkloadResource {
           Response.Status.INTERNAL_SERVER_ERROR);
     }
   }
-
 }
