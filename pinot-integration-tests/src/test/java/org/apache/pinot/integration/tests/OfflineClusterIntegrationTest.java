@@ -1893,6 +1893,8 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     }, 60_000L, "Failed to query new added columns without reload");
     // Table size shouldn't change without reload
     assertEquals(getTableSize(getTableName()), _tableSize);
+    // Test REGEXP_LIKE on new added columns
+    testRegexpLikeOnNewAddedColumns();
 
     // Trigger reload and verify column count
     reloadAllSegments(TEST_EXTRA_COLUMNS_QUERY, false, numTotalDocs);
@@ -1942,6 +1944,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertTrue(derivedNullStringColumnIndex.has(StandardIndexes.NULL_VALUE_VECTOR_ID));
 
     testNewAddedColumns();
+    testRegexpLikeOnNewAddedColumns();
 
     // The multi-stage query engine doesn't support expression overrides currently
     if (!useMultiStageQueryEngine()) {
@@ -2207,6 +2210,22 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
     assertEquals(row.get(10).asDouble(), numTotalDocsInDouble);
     assertEquals(row.get(11).asDouble(), 0.0);
     assertEquals(row.get(12).asDouble(), 0.0);
+  }
+
+  private void testRegexpLikeOnNewAddedColumns()
+      throws Exception {
+    int numTotalDocs = (int) getCountStarResult();
+
+    // REGEXP_LIKE on new added dictionary-encoded columns should not scan the table when it matches all or nothing
+    for (String column : List.of("NewAddedSVJSONDimension", "NewAddedDerivedNullString")) {
+      JsonNode response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(" + column + ", 'foo')");
+      assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), 0);
+      assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0);
+
+      response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(" + column + ", '.*')");
+      assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
+      assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0);
+    }
   }
 
   private void testExpressionOverride()

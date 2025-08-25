@@ -61,9 +61,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
 
   public MultiStageReplicaGroupSelector(String tableNameWithType, ZkHelixPropertyStore<ZNRecord> propertyStore,
       BrokerMetrics brokerMetrics, @Nullable AdaptiveServerSelector adaptiveServerSelector, Clock clock,
-      boolean useFixedReplica, long newSegmentExpirationTimeInSeconds) {
-    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, useFixedReplica,
-        newSegmentExpirationTimeInSeconds);
+      InstanceSelectorConfig config) {
+    super(tableNameWithType, propertyStore, brokerMetrics, adaptiveServerSelector, clock, config);
   }
 
   @Override

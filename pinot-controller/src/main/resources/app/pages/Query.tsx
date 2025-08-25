@@ -298,7 +298,7 @@ const QueryPage = () => {
   useEffect(() => {
     handleQueryInterfaceKeyDownRef.current = handleQueryInterfaceKeyDown;
   }, [handleQueryInterfaceKeyDown]);
-  
+
 
   const handleComment = (cm: NativeCodeMirror.Editor) => {
     const selections = cm.listSelections();
@@ -566,7 +566,7 @@ const QueryPage = () => {
                   onChange={handleOutputDataChange}
                   // Ensures the latest function is always called, preventing stale state issues due to closures.
                   // Directly passing handleQueryInterfaceKeyDown may result in outdated state references.
-                  onKeyDown={(editor, event) => handleQueryInterfaceKeyDownRef.current(editor, event)} 
+                  onKeyDown={(editor, event) => handleQueryInterfaceKeyDownRef.current(editor, event)}
                   className={classes.codeMirror}
                   autoCursor={false}
                 />
@@ -646,13 +646,13 @@ const QueryPage = () => {
                                    </Alert>
                   )
                 }
-        
+
                 {/* Sql result errors */}
                 {resultError && resultError.length > 0 && (
                     <>
-                      <Alert 
-                        className={classes.sqlError} 
-                        severity="error" 
+                      <Alert
+                        className={classes.sqlError}
+                        severity="error"
                         action={
 
                           <FormControlLabel
@@ -717,7 +717,7 @@ const QueryPage = () => {
                     </>
                   )
                 }
-        
+
                 <Grid item xs style={{ backgroundColor: 'white' }}>
                   {resultData.columns.length ? (
                     <>
@@ -781,7 +781,7 @@ const QueryPage = () => {
                           showSearchBox={true}
                           inAccordionFormat={true}
                         />
-                      )} 
+                      )}
                       {resultViewType === ResultViewType.JSON && (
                         <SimpleAccordion
                           headerTitle="Query Result (JSON Format)"

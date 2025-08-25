@@ -287,6 +287,7 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       return;
     }
 
+    long evSnapshotTimestamp = System.currentTimeMillis();
     ExternalView externalView = _pinotHelixResourceManager.getTableExternalView(tableNameWithType);
     if (externalView != null) {
       _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.EXTERNALVIEW_ZNODE_SIZE,
@@ -349,9 +350,13 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
       //       the ZK metadata; for pushed segments, we use push time from the ZK metadata. Both of them are the time
       //       when segment is newly created. For committed segments from real-time table, push time doesn't exist, and
       //       creationTimeMs will be Long.MIN_VALUE, which is fine because we want to include them in the check.
+      //       The comparison uses evSnapshotTimestamp instead of System.currentTimeMillis() because for large tables
+      //       with many segments, the status check can take several minutes. A segment updated after
+      //       the EV snapshot was taken but before this individual segment check runs could be incorrectly flagged as
+      //       OFFLINE when using current time.
       long creationTimeMs = segmentZKMetadata.getStatus() == Status.IN_PROGRESS ? segmentZKMetadata.getCreationTime()
           : segmentZKMetadata.getPushTime();
-      if (creationTimeMs > System.currentTimeMillis() - _waitForPushTimeSeconds * 1000L) {
+      if (creationTimeMs > evSnapshotTimestamp - _waitForPushTimeSeconds * 1000L) {
         continue;
       }
 

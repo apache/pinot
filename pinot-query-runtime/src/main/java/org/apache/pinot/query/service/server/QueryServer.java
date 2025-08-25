@@ -33,7 +33,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiFunction;
 import javax.annotation.Nullable;
 import org.apache.commons.io.output.UnsynchronizedByteArrayOutputStream;
 import org.apache.pinot.common.config.TlsConfig;
@@ -42,8 +41,11 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.PinotQueryWorkerGrpc;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.common.utils.NamedThreadFactory;
+import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
 import org.apache.pinot.query.MseWorkerThreadContext;
+import org.apache.pinot.query.access.AuthorizationInterceptor;
+import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.planner.serde.PlanNodeSerializer;
 import org.apache.pinot.query.routing.QueryPlanSerDeUtils;
 import org.apache.pinot.query.routing.StageMetadata;
@@ -79,6 +81,8 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   private final QueryRunner _queryRunner;
   @Nullable
   private final TlsConfig _tlsConfig;
+  @Nullable
+  private final QueryAccessControlFactory _accessControlFactory;
   // query submission service is only used for plan submission for now.
   // TODO: with complex query submission logic we should allow asynchronous query submission return instead of
   //   directly return from submission response observer.
@@ -101,19 +105,35 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
 
   @VisibleForTesting
   public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
-    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration());
+    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration(), null);
+  }
+
+  @VisibleForTesting
+  public QueryServer(int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
+      QueryAccessControlFactory accessControlFactory) {
+    this("unknownServer", port, queryRunner, tlsConfig, new PinotConfiguration(), accessControlFactory);
   }
 
   public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig) {
-    this(instanceId, port, queryRunner, tlsConfig, new PinotConfiguration());
+    this(instanceId, port, queryRunner, tlsConfig, new PinotConfiguration(), null);
   }
 
   public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
       PinotConfiguration config) {
+    this(instanceId, port, queryRunner, tlsConfig, config, null);
+  }
+
+  public QueryServer(String instanceId, int port, QueryRunner queryRunner, @Nullable TlsConfig tlsConfig,
+      PinotConfiguration config, @Nullable QueryAccessControlFactory accessControlFactory) {
     _instanceId = instanceId;
     _port = port;
     _queryRunner = queryRunner;
     _tlsConfig = tlsConfig;
+    if (accessControlFactory == null) {
+      _accessControlFactory = QueryAccessControlFactory.fromConfig(config);
+    } else {
+      _accessControlFactory = accessControlFactory;
+    }
 
     ExecutorService baseExecutorService = ExecutorServiceUtils.create(config,
         CommonConstants.Server.MULTISTAGE_SUBMISSION_EXEC_CONFIG_PREFIX,
@@ -160,9 +180,13 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   }
 
   private <T extends ServerBuilder<T>> Server buildGrpcServer(ServerBuilder<T> builder) {
-    return builder
+    builder
          // By using directExecutor, GRPC doesn't need to manage its own thread pool
-        .directExecutor()
+        .directExecutor();
+    if (_accessControlFactory != null) {
+      builder.intercept(new AuthorizationInterceptor(_accessControlFactory));
+    }
+    return builder
         .addService(this)
         .maxInboundMessageSize(MAX_INBOUND_MESSAGE_SIZE)
         .build();
@@ -284,7 +308,7 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
   /// (normally cancelling other already started workers and sending the error through GRPC)
   private CompletableFuture<Void> submitWorker(WorkerMetadata workerMetadata, StagePlan stagePlan,
       Map<String, String> reqMetadata) {
-    String workloadName = reqMetadata.get(CommonConstants.Broker.Request.QueryOptionKey.WORKLOAD_NAME);
+    String workloadName = QueryOptionsUtils.getWorkloadName(reqMetadata);
     //TODO: Verify if this matches with what OOM protection expects. This method will not block for the query to
     // finish, so it may be breaking some of the OOM protection assumptions.
     Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.MSE,
@@ -357,10 +381,6 @@ public class QueryServer extends PinotQueryWorkerGrpc.PinotQueryWorkerImplBase {
     try (QueryThreadContext.CloseableContext qTlClosable
         = QueryThreadContext.openFromRequestMetadata(_instanceId, reqMetadata);
         QueryThreadContext.CloseableContext mseTlCloseable = MseWorkerThreadContext.open()) {
-      // Explain the stage for each worker
-      BiFunction<StagePlan, WorkerMetadata, StagePlan> explainFun = (stagePlan, workerMetadata) ->
-          _queryRunner.explainQuery(workerMetadata, stagePlan, reqMetadata);
-
       List<Worker.StagePlan> protoStagePlans = request.getStagePlanList();
 
       for (Worker.StagePlan protoStagePlan : protoStagePlans) {

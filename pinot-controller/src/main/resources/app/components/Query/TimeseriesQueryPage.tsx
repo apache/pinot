@@ -47,7 +47,7 @@ import TimeseriesChart from './TimeseriesChart';
 import MetricStatsTable from './MetricStatsTable';
 import { parseTimeseriesResponse, isPrometheusFormat } from '../../utils/TimeseriesUtils';
 import { ChartSeries } from 'Models';
-import { MAX_SERIES_LIMIT } from '../../utils/ChartConstants';
+import { DEFAULT_SERIES_LIMIT } from '../../utils/ChartConstants';
 
 // Define proper types
 interface TimeseriesQueryResponse {
@@ -144,6 +144,20 @@ const useStyles = makeStyles((theme) => ({
     padding: theme.spacing(1),
     minWidth: 0,
   },
+  seriesLimitContainer: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    padding: theme.spacing(1),
+    borderTop: `1px solid ${theme.palette.divider}`,
+    backgroundColor: theme.palette.grey[50],
+  },
+  seriesLimitInput: {
+    width: 50,
+    marginLeft: theme.spacing(2),
+    '& .MuiInputBase-input': { padding: '8px 12px', fontSize: '1rem' },
+  },
+  timeseriesAccordionDetails: { overflow: 'hidden !important' },
 
 }));
 
@@ -157,8 +171,8 @@ const TruncationWarning: React.FC<{ totalSeries: number; truncatedSeries: number
   return (
     <Alert severity="warning" style={{ marginBottom: '16px' }}>
       <Typography variant="body2">
-        Large dataset detected: Showing first {truncatedSeries} of {totalSeries} series for visualization.
-        Switch to JSON view to see the complete dataset.
+        Truncation warning: Showing first {truncatedSeries} of {totalSeries} series for visualization.
+        Switch to JSON view to see the complete dataset or increase the max series limit.
       </Typography>
     </Alert>
   );
@@ -252,15 +266,15 @@ const TimeseriesQueryPage = () => {
   const [languagesLoading, setLanguagesLoading] = useState(true);
 
   const [rawOutput, setRawOutput] = useState<string>('');
-  const [rawData, setRawData] = useState<TimeseriesQueryResponse | null>(null);
   const [chartSeries, setChartSeries] = useState<ChartSeries[]>([]);
-  const [truncatedChartSeries, setTruncatedChartSeries] = useState<ChartSeries[]>([]);
+  const [totalSeriesCount, setTotalSeriesCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [shouldAutoExecute, setShouldAutoExecute] = useState<boolean>(false);
   const [copyMsg, showCopyMsg] = React.useState(false);
   const [viewType, setViewType] = useState<'json' | 'chart'>('chart');
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
+  const [seriesLimitInput, setSeriesLimitInput] = useState<string>(DEFAULT_SERIES_LIMIT.toString());
 
 
   // Fetch supported languages from controller configuration
@@ -351,30 +365,32 @@ const TimeseriesQueryPage = () => {
 
   // Extract data processing logic
   const processQueryResponse = useCallback((parsedData: TimeseriesQueryResponse) => {
-    setRawData(parsedData);
     setRawOutput(JSON.stringify(parsedData, null, 2));
 
     // Check if this is an error response
     if (parsedData.error != null && parsedData.error !== '') {
       setError(parsedData.error);
       setChartSeries([]);
-      setTruncatedChartSeries([]);
+      setTotalSeriesCount(0);
       return;
     }
 
     // Parse timeseries data for chart and stats
     if (isPrometheusFormat(parsedData)) {
       const series = parseTimeseriesResponse(parsedData);
-      setChartSeries(series);
+      setTotalSeriesCount(series.length);
 
-      // Create truncated series for visualization (limit to MAX_SERIES_LIMIT)
-      const truncatedSeries = series.slice(0, MAX_SERIES_LIMIT);
-      setTruncatedChartSeries(truncatedSeries);
+      // Create truncated series for visualization (limit to seriesLimitInput or default to DEFAULT_SERIES_LIMIT)
+      const limit = parseInt(seriesLimitInput, 10);
+      const effectiveLimit = !isNaN(limit) && limit > 0 ? limit : DEFAULT_SERIES_LIMIT;
+
+      const truncatedSeries = series.slice(0, effectiveLimit);
+      setChartSeries(truncatedSeries);
     } else {
       setChartSeries([]);
-      setTruncatedChartSeries([]);
+      setTotalSeriesCount(0);
     }
-  }, []);
+  }, [seriesLimitInput]);
 
   const handleExecuteQuery = useCallback(async () => {
     if (!config.query.trim()) {
@@ -386,6 +402,9 @@ const TimeseriesQueryPage = () => {
     setIsLoading(true);
     setError('');
     setRawOutput('');
+    setSelectedMetric(null);
+    setChartSeries([]);
+    setTotalSeriesCount(0);
 
     try {
       const requestPayload = {
@@ -544,7 +563,7 @@ const TimeseriesQueryPage = () => {
                          <ViewToggle
                viewType={viewType}
                onViewChange={setViewType}
-               isChartDisabled={truncatedChartSeries.length === 0}
+               isChartDisabled={chartSeries.length === 0}
                onCopy={copyToClipboard}
                copyMsg={copyMsg}
                classes={classes}
@@ -560,23 +579,37 @@ const TimeseriesQueryPage = () => {
               <SimpleAccordion
                 headerTitle="Timeseries Chart & Statistics"
                 showSearchBox={false}
+                detailsContainerClass={classes.timeseriesAccordionDetails}
               >
-                {truncatedChartSeries.length > 0 ? (
+                {chartSeries.length > 0 ? (
                   <>
                     <TruncationWarning
-                      totalSeries={chartSeries.length}
-                      truncatedSeries={truncatedChartSeries.length}
+                      totalSeries={totalSeriesCount}
+                      truncatedSeries={chartSeries.length}
                     />
                     <TimeseriesChart
-                      series={truncatedChartSeries}
+                      series={chartSeries}
                       height={500}
                       selectedMetric={selectedMetric}
                     />
                     <MetricStatsTable
-                      series={truncatedChartSeries}
+                      series={chartSeries}
                       selectedMetric={selectedMetric}
                       onMetricSelect={setSelectedMetric}
                     />
+                    <div className={classes.seriesLimitContainer}>
+                      <Typography variant="body2" color="textSecondary">
+                        Max Series Render Limit:
+                      </Typography>
+                      <FormControl className={classes.seriesLimitInput}>
+                        <Input
+                          value={seriesLimitInput}
+                          onChange={(e) => setSeriesLimitInput(e.target.value)}
+                          inputProps={{ min: 1, max: 1000 }}
+                          placeholder={DEFAULT_SERIES_LIMIT.toString()}
+                        />
+                      </FormControl>
+                    </div>
                   </>
                 ) : (
                   <Box p={3} textAlign="center">

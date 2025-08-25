@@ -60,7 +60,6 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
-import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.api.access.AccessType;
 import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -409,8 +408,7 @@ public class PinotTenantRestletResource {
         LOGGER.error("Unable to retrieve table config for table: {}", tableNameWithType);
         continue;
       }
-      Set<String> relevantTags = TableConfigUtils.getRelevantTags(tableConfig);
-      if (relevantTags.contains(TagNameUtils.getServerTagForTenant(tenantName, tableConfig.getTableType()))) {
+      if (TableConfigUtils.isRelevantToTenant(tableConfig, tenantName)) {
         tables.add(tableNameWithType);
         if (withTableProperties) {
           IdealState idealState = _pinotHelixResourceManager.getTableIdealState(tableNameWithType);

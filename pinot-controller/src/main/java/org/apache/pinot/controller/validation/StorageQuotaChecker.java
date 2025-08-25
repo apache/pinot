@@ -20,6 +20,7 @@ package org.apache.pinot.controller.validation;
 
 import com.google.common.base.Preconditions;
 import org.apache.pinot.common.exception.InvalidConfigException;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -81,7 +82,7 @@ public class StorageQuotaChecker {
    * Returns whether the new added segment is within the storage quota.
    */
   public QuotaCheckerResponse isSegmentStorageWithinQuota(TableConfig tableConfig, String segmentName,
-      long segmentSizeInBytes)
+      long tarSegmentSizeInBytes, long untarredSegmentSizeInBytes)
       throws InvalidConfigException {
     if (!_isEnabled) {
       return success("Storage quota check is disabled, skipping the check");
@@ -124,7 +125,7 @@ public class StorageQuotaChecker {
     // The logic inside this if block is applicable for missing segments as well as
     // when we are checking the quota for only existing segments (segmentSizeInBytes == 0)
     // as in both cases quota is checked across existing segments estimated size alone
-    if (segmentSizeInBytes == 0 || tableSubtypeSize._missingSegments > 0) {
+    if (untarredSegmentSizeInBytes == 0 || tableSubtypeSize._missingSegments > 0) {
       emitStorageQuotaUtilizationMetric(tableNameWithType, tableSubtypeSize, allowedStorageBytes);
       if (tableSubtypeSize._estimatedSizeInBytes > allowedStorageBytes) {
         return failure("Table " + tableNameWithType + " already over quota. Estimated size for all replicas is "
@@ -139,6 +140,10 @@ public class StorageQuotaChecker {
     // If the segment exists(refresh), get the existing size
     TableSizeReader.SegmentSizeDetails sizeDetails = tableSubtypeSize._segments.get(segmentName);
     long existingSegmentSizeBytes = sizeDetails != null ? sizeDetails._estimatedSizeInBytes : 0;
+    SegmentZKMetadata existingSegmentZkMetadata =
+        _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName);
+    long existingTarSegmentSize = existingSegmentZkMetadata != null
+        ? _pinotHelixResourceManager.getSegmentZKMetadata(tableNameWithType, segmentName).getSizeInBytes() : 0;
 
     // Since tableNameWithType comes with the table type(OFFLINE), thus we guarantee that
     // tableSubtypeSize.estimatedSizeInBytes is the offline table size.
@@ -150,9 +155,19 @@ public class StorageQuotaChecker {
 
     emitStorageQuotaUtilizationMetric(tableNameWithType, tableSubtypeSize, allowedStorageBytes);
 
+    if (existingSegmentZkMetadata != null && tarSegmentSizeInBytes <= existingTarSegmentSize) {
+      // If the segment already exists and the tarred size of the incoming segment is less than or equal to the
+      // existing segment size, we can skip the quota check.
+      String message = String.format(
+          "Skipping storage quota check for segment %s of table %s since incoming tarred segment size %s is less than "
+              + "or equal to existing segment size %s", segmentName, tableNameWithType,
+          DataSizeUtils.fromBytes(tarSegmentSizeInBytes), DataSizeUtils.fromBytes(existingTarSegmentSize));
+      LOGGER.info(message);
+      return success(message);
+    }
     // Note: incomingSegmentSizeBytes is uncompressed data size for just 1 replica,
     // while estimatedFinalSizeBytes is for all replicas of all segments put together.
-    long totalIncomingSegmentSizeBytes = segmentSizeInBytes * numReplicas;
+    long totalIncomingSegmentSizeBytes = untarredSegmentSizeInBytes * numReplicas;
     long estimatedFinalSizeBytes =
         tableSubtypeSize._estimatedSizeInBytes - existingSegmentSizeBytes + totalIncomingSegmentSizeBytes;
     if (estimatedFinalSizeBytes <= allowedStorageBytes) {
@@ -168,7 +183,7 @@ public class StorageQuotaChecker {
             DataSizeUtils.fromBytes(allowedStorageBytes), quotaConfig.getStorage(), numReplicas,
             DataSizeUtils.fromBytes(estimatedFinalSizeBytes),
             DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes),
-            DataSizeUtils.fromBytes(totalIncomingSegmentSizeBytes), DataSizeUtils.fromBytes(segmentSizeInBytes),
+            DataSizeUtils.fromBytes(totalIncomingSegmentSizeBytes), DataSizeUtils.fromBytes(untarredSegmentSizeInBytes),
             numReplicas);
       } else {
         // refresh use case
@@ -181,7 +196,7 @@ public class StorageQuotaChecker {
                 + "segment size", segmentName, tableNameWithType, DataSizeUtils.fromBytes(allowedStorageBytes),
             quotaConfig.getStorage(), numReplicas, DataSizeUtils.fromBytes(estimatedFinalSizeBytes),
             DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes),
-            DataSizeUtils.fromBytes(totalIncomingSegmentSizeBytes), DataSizeUtils.fromBytes(segmentSizeInBytes),
+            DataSizeUtils.fromBytes(totalIncomingSegmentSizeBytes), DataSizeUtils.fromBytes(untarredSegmentSizeInBytes),
             numReplicas, DataSizeUtils.fromBytes(existingSegmentSizeBytes));
       }
       LOGGER.info(message);
@@ -203,8 +218,8 @@ public class StorageQuotaChecker {
                 + "allowed storage size = configured quota: %s * number replicas: %d", tableNameWithType,
             DataSizeUtils.fromBytes(estimatedFinalSizeBytes), DataSizeUtils.fromBytes(allowedStorageBytes),
             DataSizeUtils.fromBytes(tableSubtypeSize._estimatedSizeInBytes),
-            DataSizeUtils.fromBytes(existingSegmentSizeBytes), DataSizeUtils.fromBytes(segmentSizeInBytes), numReplicas,
-            quotaConfig.getStorage(), numReplicas);
+            DataSizeUtils.fromBytes(existingSegmentSizeBytes), DataSizeUtils.fromBytes(untarredSegmentSizeInBytes),
+            numReplicas, quotaConfig.getStorage(), numReplicas);
       }
       LOGGER.warn(message);
       return failure(message);
@@ -229,7 +244,7 @@ public class StorageQuotaChecker {
    */
   public boolean isTableStorageQuotaExceeded(TableConfig tableConfig) {
     try {
-      return !isSegmentStorageWithinQuota(tableConfig, null, 0)._isSegmentWithinQuota;
+      return !isSegmentStorageWithinQuota(tableConfig, null, 0, 0)._isSegmentWithinQuota;
     } catch (InvalidConfigException e) {
       // skip the check upon exception
       return false;

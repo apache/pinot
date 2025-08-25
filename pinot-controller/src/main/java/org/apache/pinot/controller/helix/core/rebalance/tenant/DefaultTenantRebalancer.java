@@ -32,7 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.exception.TableNotFoundException;
-import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
@@ -186,8 +185,7 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
         LOGGER.error("Unable to retrieve table config for table: {}", table);
         continue;
       }
-      Set<String> relevantTags = TableConfigUtils.getRelevantTags(tableConfig);
-      if (relevantTags.contains(TagNameUtils.getServerTagForTenant(tenantName, tableConfig.getTableType()))) {
+      if (TableConfigUtils.isRelevantToTenant(tableConfig, tenantName)) {
         tables.add(table);
       }
     }

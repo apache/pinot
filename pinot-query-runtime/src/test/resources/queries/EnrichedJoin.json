@@ -1,0 +1,93 @@
+{
+  "enriched_join_test": {
+    "tables": {
+      "t1": {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", 1],
+          ["bar", 2],
+          ["qux", 6],
+          ["qux", 6]
+        ]
+      },
+      "t2": {
+        "schema": [
+          {"name": "col1", "type": "STRING"},
+          {"name": "col2", "type": "INT"}
+        ],
+        "inputs": [
+          ["foo", 3],
+          ["foo", 3],
+          ["bar", 4],
+          ["baz", 5]
+        ]
+      }
+    },
+    "queries": [
+      {
+        "description": "enriched join with one projection",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; SELECT {t1}.col2 + {t2}.col2 AS result FROM {t1} JOIN {t2} ON {t1}.col1 = {t2}.col1 ORDER BY result",
+        "outputs": [
+          [4],
+          [4],
+          [6]
+        ]
+      },
+      {
+        "description": "enriched left join with one projection",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; SELECT {t1}.col2 + CASE WHEN {t2}.col2 IS NULL THEN 0 ELSE {t2}.col2 END AS result FROM {t1} LEFT JOIN {t2} ON {t1}.col1 = {t2}.col1 ORDER BY result",
+        "outputs": [
+          [4],
+          [4],
+          [6],
+          [6],
+          [6]
+        ]
+      },
+      {
+        "description": "enriched right join with one projection",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; SELECT CASE WHEN {t1}.col2 IS NULL THEN 0 ELSE {t1}.col2 END + {t2}.col2 AS result FROM {t1} RIGHT JOIN {t2} ON {t1}.col1 = {t2}.col1 ORDER BY result",
+        "outputs": [
+          [4],
+          [4],
+          [5],
+          [6]
+        ]
+      },
+      {
+        "description": "enriched anti join with limit",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; SELECT {t1}.col2 AS result FROM {t1} WHERE NOT EXISTS (SELECT 1 FROM {t2} WHERE {t1}.col1 = {t2}.col1) LIMIT 1",
+        "outputs": [
+          [6]
+        ]
+      },
+      {
+        "description": "enriched join with one projection and limit",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; SELECT {t1}.col2 + {t2}.col2 AS result FROM {t1} JOIN {t2} ON {t1}.col1 = {t2}.col1 WHERE {t1}.col2=1 LIMIT 1",
+        "outputs": [
+          [4]
+        ]
+      },
+      {
+        "description": "enriched join with two projects",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; SELECT sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 AS result FROM (SELECT {t1}.col2 + {t2}.col2 + {t1}.col2 + {t2}.col2 + {t1}.col2 + {t2}.col2 + {t1}.col2 + {t2}.col2 + {t1}.col2 + {t2}.col2 AS sum5 FROM {t1} JOIN {t2} ON {t1}.col1 = {t2}.col1) ORDER BY sum5",
+        "outputs": [
+          [220],
+          [220],
+          [330]
+        ]
+      },
+      {
+        "description": "enriched join with two projects and a filter",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; SELECT * FROM (SELECT * FROM (SELECT {t1}.col2 + {t2}.col2 + {t1}.col2 + {t2}.col2 + {t1}.col2 + {t2}.col2 + {t1}.col2 + {t2}.col2 + {t1}.col2 + {t2}.col2 AS sum5 FROM {t1} JOIN {t2} ON {t1}.col1 = {t2}.col1)) WHERE sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 + sum5 < 300",
+        "outputs": [
+          [20],
+          [20]
+        ]
+      }
+    ]
+  }
+}

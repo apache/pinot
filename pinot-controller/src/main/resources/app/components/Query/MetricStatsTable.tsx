@@ -115,7 +115,6 @@ const MetricStatsTable: React.FC<MetricStatsTableProps> = ({
   };
 
 
-
   const handleRowClick = (metricName: string) => {
     if (onMetricSelect) {
       // If clicking the same metric, deselect it

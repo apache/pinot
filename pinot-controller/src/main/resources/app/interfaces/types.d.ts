@@ -275,6 +275,10 @@ declare module 'Models' {
     clusterName: string
   };
 
+  export type PackageVersions = {
+    [packageName: string]: string;
+  };
+
   export type ZKGetList = Array<string>;
 
   export type ZKConfig = {
