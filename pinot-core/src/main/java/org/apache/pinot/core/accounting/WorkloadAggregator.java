@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -172,7 +173,7 @@ public class WorkloadAggregator implements ResourceAggregator {
                 anchorThread.getName(), budgetStats._cpuRemaining, budgetStats._memoryRemaining);
             String expMsg = String.format("Query %s on instance %s (type: %s) killed. Workload Cost exceeded.", queryId,
                 _instanceId, _instanceType);
-            threadEntry._errorStatus.set(new RuntimeException(expMsg));
+            threadEntry._errorStatus.set(QueryErrorCode.WORKLOAD_BUDGET_EXCEEDED.asException(expMsg));
             anchorThread.interrupt();
           }
         }

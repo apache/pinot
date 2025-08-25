@@ -52,7 +52,7 @@ public enum QueryErrorCode {
   BROKER_REQUEST_SEND(425, "BrokerRequestSend"),
   SERVER_NOT_RESPONDING(427, "ServerNotResponding"),
   TOO_MANY_REQUESTS(429, "TooManyRequests"),
-  WORKLOAD_BUDGET_EXCEEDED(429, "WorkloadBudgetExceededError"),
+  WORKLOAD_BUDGET_EXCEEDED(430, "WorkloadBudgetExceededError"),
   INTERNAL(450, "InternalError"),
   MERGE_RESPONSE(500, "MergeResponseError"),
   QUERY_CANCELLATION(503, "QueryCancellationError"),
@@ -155,6 +155,7 @@ public enum QueryErrorCode {
       case TOO_MANY_REQUESTS:
       case TABLE_DOES_NOT_EXIST:
       case TABLE_IS_DISABLED:
+      case WORKLOAD_BUDGET_EXCEEDED:
       case UNKNOWN_COLUMN:
         return true;
       default:
