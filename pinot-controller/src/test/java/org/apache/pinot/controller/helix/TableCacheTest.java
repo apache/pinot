@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.ZkTableCache;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
@@ -73,7 +74,7 @@ public class TableCacheTest {
   @Test(dataProvider = "testTableCacheDataProvider")
   public void testTableCache(boolean isCaseInsensitive)
       throws Exception {
-    TableCache tableCache = new TableCache(TEST_INSTANCE.getPropertyStore(), isCaseInsensitive);
+    TableCache tableCache = new ZkTableCache(TEST_INSTANCE.getPropertyStore(), isCaseInsensitive);
 
     assertNull(tableCache.getSchema(RAW_TABLE_NAME));
     assertNull(tableCache.getColumnNameMap(RAW_TABLE_NAME));

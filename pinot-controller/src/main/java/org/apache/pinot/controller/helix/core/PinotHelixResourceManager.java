@@ -92,6 +92,7 @@ import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.config.provider.TableCache;
+import org.apache.pinot.common.config.provider.ZkTableCache;
 import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaAlreadyExistsException;
 import org.apache.pinot.common.exception.SchemaBackwardIncompatibleException;
@@ -325,7 +326,7 @@ public class PinotHelixResourceManager {
         _helixAdmin.getConfig(helixConfigScope, Arrays.asList(Helix.ENABLE_CASE_INSENSITIVE_KEY));
     boolean caseInsensitive = Boolean.parseBoolean(configs.getOrDefault(Helix.ENABLE_CASE_INSENSITIVE_KEY,
         Boolean.toString(Helix.DEFAULT_ENABLE_CASE_INSENSITIVE)));
-    _tableCache = new TableCache(_propertyStore, caseInsensitive);
+    _tableCache = new ZkTableCache(_propertyStore, caseInsensitive);
   }
 
   /**
