@@ -106,7 +106,22 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
           _fstType = FSTType.LUCENE;
         }
       }
+
+      if (textIndexProperties.get("useCombineFiles") != null) {
+        withUseCombineFiles(Boolean.parseBoolean(textIndexProperties.get("useCombineFiles")));
+      }
     }
+    return this;
+  }
+
+  /**
+   * Sets whether to combine text index files into a single file and cleanup the directory structure.
+   *
+   * @param useCombineFiles true if files should be combined and directory cleaned up, false to keep directory structure
+   * @return this builder
+   */
+  public TextIndexConfigBuilder setUseCombineFiles(boolean useCombineFiles) {
+    withUseCombineFiles(useCombineFiles);
     return this;
   }
 }

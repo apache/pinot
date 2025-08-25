@@ -43,6 +43,7 @@ public class TextIndexConfig extends IndexConfig {
   private static final boolean LUCENE_USE_LOG_BYTE_SIZE_MERGE_POLICY = false;
   private static final DocIdTranslatorMode LUCENE_TRANSLATOR_MODE = null;
   private static final boolean LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX = false;
+  private static final boolean LUCENE_INDEX_DEFAULT_USE_COMBINE_FILES = false;
 
   // keep in sync with constructor!
   private static final List<String> PROPERTY_NAMES = List.of(
@@ -50,13 +51,13 @@ public class TextIndexConfig extends IndexConfig {
       "luceneUseCompoundFile", "luceneMaxBufferSizeMB", "luceneAnalyzerClass", "luceneAnalyzerClassArgs",
       "luceneAnalyzerClassArgTypes", "luceneQueryParserClass", "enablePrefixSuffixMatchingInPhraseQueries",
       "reuseMutableIndex", "luceneNRTCachingDirectoryMaxBufferSizeMB", "useLogByteSizeMergePolicy",
-      "docIdTranslatorMode", "caseSensitive"
+      "docIdTranslatorMode", "caseSensitive", "useCombineFiles"
   );
 
   public static final TextIndexConfig DISABLED =
       new TextIndexConfig(true, null, null, false, false, Collections.emptyList(), Collections.emptyList(), false,
-          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false,
-          null, LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX);
+          LUCENE_INDEX_DEFAULT_MAX_BUFFER_SIZE_MB, null, null, null, null, false, false, 0, false, null,
+          LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_USE_COMBINE_FILES);
 
   private final FSTType _fstType;
   @Nullable
@@ -77,6 +78,7 @@ public class TextIndexConfig extends IndexConfig {
   private final boolean _useLogByteSizeMergePolicy;
   private final DocIdTranslatorMode _docIdTranslatorMode;
   private final boolean _caseSensitive;
+  private final boolean _useCombineFiles;
 
   public enum DocIdTranslatorMode {
     // build and keep mapping
@@ -112,7 +114,7 @@ public class TextIndexConfig extends IndexConfig {
         luceneAnalyzerClassArgs, luceneAnalyzerClassArgTypes, luceneQueryParserClass,
         enablePrefixSuffixMatchingInPhraseQueries, reuseMutableIndex,
         luceneNRTCachingDirectoryMaxBufferSizeMB, useLogByteSizeMergePolicy, docIdTranslatorMode,
-        LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX);
+        LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_USE_COMBINE_FILES);
   }
 
   @JsonCreator
@@ -134,7 +136,7 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("luceneNRTCachingDirectoryMaxBufferSizeMB") Integer luceneNRTCachingDirectoryMaxBufferSizeMB,
       @JsonProperty("useLogByteSizeMergePolicy") Boolean useLogByteSizeMergePolicy,
       @JsonProperty("docIdTranslatorMode") DocIdTranslatorMode docIdTranslatorMode,
-      @JsonProperty("caseSensitive") Boolean caseSensitive) {
+      @JsonProperty("caseSensitive") Boolean caseSensitive, @JsonProperty("useCombineFiles") Boolean useCombineFiles) {
     super(disabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
@@ -167,6 +169,7 @@ public class TextIndexConfig extends IndexConfig {
         : useLogByteSizeMergePolicy;
     _docIdTranslatorMode = docIdTranslatorMode == null ? LUCENE_TRANSLATOR_MODE : docIdTranslatorMode;
     _caseSensitive = caseSensitive == null ? LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX : caseSensitive;
+    _useCombineFiles = useCombineFiles == null ? LUCENE_INDEX_DEFAULT_USE_COMBINE_FILES : useCombineFiles;
   }
 
   public FSTType getFstType() {
@@ -273,6 +276,14 @@ public class TextIndexConfig extends IndexConfig {
     return _caseSensitive;
   }
 
+  /**
+   * Whether to combine text index files into a single file and cleanup the directory structure.
+   * @return true if files should be combined and directory cleaned up, false to keep directory structure
+   */
+  public boolean isUseCombineFiles() {
+    return _useCombineFiles;
+  }
+
   public static abstract class AbstractBuilder {
     @Nullable
     protected FSTType _fstType;
@@ -296,6 +307,7 @@ public class TextIndexConfig extends IndexConfig {
     @Nullable
     protected DocIdTranslatorMode _docIdTranslatorMode = LUCENE_TRANSLATOR_MODE;
     protected boolean _caseSensitive = LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX;
+    protected boolean _useCombineFiles = LUCENE_INDEX_DEFAULT_USE_COMBINE_FILES;
 
     public AbstractBuilder(@Nullable FSTType fstType) {
       _fstType = fstType;
@@ -321,6 +333,7 @@ public class TextIndexConfig extends IndexConfig {
       _useLogByteSizeMergePolicy = other._useLogByteSizeMergePolicy;
       _docIdTranslatorMode = other._docIdTranslatorMode;
       _caseSensitive = other._caseSensitive;
+      _useCombineFiles = other._useCombineFiles;
     }
 
     public TextIndexConfig build() {
@@ -329,8 +342,8 @@ public class TextIndexConfig extends IndexConfig {
           CsvParser.serialize(_luceneAnalyzerClassArgs, true, false),
           CsvParser.serialize(_luceneAnalyzerClassArgTypes, true, false),
           _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
-          _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy,
-          _docIdTranslatorMode, _caseSensitive);
+          _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode, _caseSensitive,
+          _useCombineFiles);
     }
 
     public abstract AbstractBuilder withProperties(@Nullable Map<String, String> textIndexProperties);
@@ -425,6 +438,11 @@ public class TextIndexConfig extends IndexConfig {
       _caseSensitive = caseSensitive;
       return this;
     }
+
+    public AbstractBuilder withUseCombineFiles(boolean useCombineFiles) {
+      _useCombineFiles = useCombineFiles;
+      return this;
+    }
   }
 
   @Override
@@ -456,7 +474,7 @@ public class TextIndexConfig extends IndexConfig {
         && Objects.equals(_luceneAnalyzerClassArgs, that._luceneAnalyzerClassArgs)
         && Objects.equals(_luceneAnalyzerClassArgTypes, that._luceneAnalyzerClassArgTypes)
         && Objects.equals(_luceneQueryParserClass, that._luceneQueryParserClass)
-        && _caseSensitive == that._caseSensitive;
+        && _caseSensitive == that._caseSensitive && _useCombineFiles == that._useCombineFiles;
   }
 
   @Override
@@ -465,8 +483,8 @@ public class TextIndexConfig extends IndexConfig {
         _useANDForMultiTermQueries, _stopWordsInclude, _stopWordsExclude, _luceneUseCompoundFile,
         _luceneMaxBufferSizeMB, _luceneAnalyzerClass, _luceneAnalyzerClassArgs, _luceneAnalyzerClassArgTypes,
         _luceneQueryParserClass, _enablePrefixSuffixMatchingInPhraseQueries, _reuseMutableIndex,
-        _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode,
-        _caseSensitive);
+        _luceneNRTCachingDirectoryMaxBufferSizeMB, _useLogByteSizeMergePolicy, _docIdTranslatorMode, _caseSensitive,
+        _useCombineFiles);
   }
 
   public static boolean isProperty(String prop) {
