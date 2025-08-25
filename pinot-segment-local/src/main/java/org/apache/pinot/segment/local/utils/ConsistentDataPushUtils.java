@@ -230,13 +230,14 @@ public class ConsistentDataPushUtils {
   public static Map<URI, List<String>> getSegmentsToReplace(SegmentGenerationJobSpec spec, String rawTableName)
       throws Exception {
     Map<URI, List<String>> uriToOfflineSegments = new HashMap<>();
+    AuthProvider authProvider = AuthProviderUtils.makeAuthProvider(spec.getAuthToken());
     for (PinotClusterSpec pinotClusterSpec : spec.getPinotClusterSpecs()) {
       URI controllerURI;
       List<String> offlineSegments;
       try {
         controllerURI = new URI(pinotClusterSpec.getControllerURI());
         Map<String, List<String>> segments =
-            FILE_UPLOAD_DOWNLOAD_CLIENT.getSegments(controllerURI, rawTableName, TableType.OFFLINE, true);
+          FILE_UPLOAD_DOWNLOAD_CLIENT.getSegments(controllerURI, rawTableName, TableType.OFFLINE, true, authProvider);
         offlineSegments = segments.get(TableType.OFFLINE.toString());
         uriToOfflineSegments.put(controllerURI, offlineSegments);
       } catch (URISyntaxException e) {
