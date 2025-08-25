@@ -648,9 +648,9 @@ public class JsonExtractScalarTransformFunctionTest extends BaseTransformFunctio
         .withNullHandling(false)
         .givenTable(schema, tableConfig)
         .onFirstInstance(new Object[]{"{\"name\": [null]}"})
-        .whenQuery("SELECT jsonExtractScalar(json, '$.name', '" + resultsType + "', " + defaultValSql + ") FROM testTable")
+        .whenQuery("SELECT jsonExtractScalar(json, '$.name', '" + resultsType + "', " + defaultValSql + ") "
+            + "FROM testTable")
         // TODO: Change the framework to do not duplicate segments when only one segment is used
         .thenResultIs(expectedRow, expectedRow); // 2 rows because of segment duplication
-
   }
 }
