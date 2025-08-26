@@ -47,6 +47,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.controller.api.resources.PinotQueryResource.MultiStageQueryValidationRequest;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TenantConfig;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
@@ -1752,22 +1753,27 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         "SELECT AVG(arrayToMV(DivAirportSeqIDs)) FROM mytable WHERE AirlineID IS NOT NULL"
     };
 
-    List<String> configs = new ArrayList<>();
+    // Parse table configs from JSON response
+    List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
-      configs.add(offlineConfig.toString());
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
     }
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
     if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
-      configs.add(realtimeConfig.toString());
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
     }
-    String tableConfigsJson = String.join(",", configs);
+
+    // Parse schema from JSON response
+    Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
+    List<Schema> schemas = Collections.singletonList(schema);
 
     for (String query : successfulQueries) {
-      String requestJson = String.format(
-          "{ \"sql\": \"%s\", \"tableConfigs\": [%s], \"schemas\": [%s], \"ignoreCase\": false }",
-          query, tableConfigsJson, schemaNode.toString());
+      // Create request object using proper POJO
+      MultiStageQueryValidationRequest request = new MultiStageQueryValidationRequest(
+          query, tableConfigs, schemas, null, false);
 
+      String requestJson = JsonUtils.objectToString(request);
       JsonNode result = JsonUtils.stringToJsonNode(
           sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
 
@@ -1785,33 +1791,36 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode schemaNode =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
 
-    List<String> configs = new ArrayList<>();
+    // Parse table configs from JSON response
+    List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
-      configs.add(offlineConfig.toString());
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
     }
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
     if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
-      configs.add(realtimeConfig.toString());
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
     }
-    String tableConfigsJson = String.join(",", configs);
 
-    //  Invalid column in the query
-    String requestJson = String.format(
-        "{\"sql\": \"SELECT nonExistentColumn FROM mytable\", \"tableConfigs\": [%s], \"schemas\": [%s]}",
-        tableConfigsJson, schemaNode.toString());
+    // Parse schema from JSON response
+    Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
+    List<Schema> schemas = Collections.singletonList(schema);
 
+    // Invalid column in the query
+    MultiStageQueryValidationRequest request = new MultiStageQueryValidationRequest(
+        "SELECT nonExistentColumn FROM mytable", tableConfigs, schemas, null, null);
+
+    String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
     assertFalse(result.get("compiledSuccessfully").asBoolean());
     assertEquals(result.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
 
-    //  Cannot apply '>' to arguments of type '<INTEGER> to <ARRAY>
+    // Cannot apply '>' to arguments of type '<INTEGER> to <ARRAY>
     String query = "SELECT DivAirportSeqIDs FROM mytable WHERE DivAirportSeqIDs > 0 LIMIT 10";
-    requestJson = String.format(
-        "{\"sql\": \"%s\", \"tableConfigs\": [%s], \"schemas\": [%s], \"ignoreCase\": false}",
-        query, tableConfigsJson, schemaNode.toString());
+    request = new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, false);
 
+    requestJson = JsonUtils.objectToString(request);
     result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
 
@@ -1827,40 +1836,44 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
     JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
 
-    List<String> configs = new ArrayList<>();
+    // Parse table configs from JSON response
+    List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
-      configs.add(offlineConfig.toString());
+      tableConfigs.add(JsonUtils.jsonNodeToObject(offlineConfig, TableConfig.class));
     }
     JsonNode realtimeConfig = tableConfigsNode.get("REALTIME");
     if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
-      configs.add(realtimeConfig.toString());
+      tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
     }
-    String tableConfigsJson = String.join(",", configs);
 
-    // ---- case-sensitive mode ----
-    String query = String.format(
-        "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s], \"schemas\": [%s], "
-            + "\"ignoreCase\": false}",
-        tableConfigsJson, schemaNode.toString());
+    // Parse schema from JSON response
+    Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
+    List<Schema> schemas = Collections.singletonList(schema);
 
+    // Test case-sensitive mode
+    MultiStageQueryValidationRequest request = new MultiStageQueryValidationRequest(
+        "SELECT divairportseqids FROM mytable", tableConfigs, schemas, null, false);
+
+    String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
-        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", query, null));
-    assertTrue(result.get("compiledSuccessfully").asBoolean(), "Query should compile successfully: " + query);
-    assertTrue(result.get("errorCode").isNull(), "Error code should be null for: " + query);
-    assertTrue(result.get("errorMessage").isNull(), "Error message should be null for: " + query);
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+    assertTrue(result.get("compiledSuccessfully").asBoolean(),
+        "Query should compile successfully in case-sensitive mode");
+    assertTrue(result.get("errorCode").isNull(), "Error code should be null in case-sensitive mode");
+    assertTrue(result.get("errorMessage").isNull(), "Error message should be null in case-sensitive mode");
 
-    // Case-insensitive mode
-    query = String.format(
-        "{\"sql\": \"SELECT divairportseqids FROM mytable\", \"tableConfigs\": [%s], \"schemas\": [%s], "
-            + "\"ignoreCase\": true}",
-        tableConfigsJson, schemaNode.toString());
+    // Test case-insensitive mode
+    request = new MultiStageQueryValidationRequest(
+        "SELECT divairportseqids FROM mytable", tableConfigs, schemas, null, true);
 
+    requestJson = JsonUtils.objectToString(request);
     result = JsonUtils.stringToJsonNode(
-        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", query, null));
-    assertTrue(result.get("compiledSuccessfully").asBoolean(), "Query should compile successfully: " + query);
-    assertTrue(result.get("errorCode").isNull(), "Error code should be null for: " + query);
-    assertTrue(result.get("errorMessage").isNull(), "Error message should be null for: " + query);
+        sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
+    assertTrue(result.get("compiledSuccessfully").asBoolean(),
+        "Query should compile successfully in case-insensitive mode");
+    assertTrue(result.get("errorCode").isNull(), "Error code should be null in case-insensitive mode");
+    assertTrue(result.get("errorMessage").isNull(), "Error message should be null in case-insensitive mode");
   }
 
   private void checkQueryResultForDBTest(String column, String tableName)
