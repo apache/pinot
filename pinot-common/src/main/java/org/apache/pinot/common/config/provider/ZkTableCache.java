@@ -646,44 +646,6 @@ public class ZkTableCache implements TableCache {
     }
   }
 
-  private static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
-    QueryConfig queryConfig) {
-    Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
-    if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
-      for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
-        try {
-          Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
-          Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
-          expressionOverrideMap.put(srcExp, destExp);
-        } catch (Exception e) {
-          LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
-            entry.getKey(), entry.getValue(), physicalOrLogicalTableName);
-        }
-      }
-      int mapSize = expressionOverrideMap.size();
-      if (mapSize == 1) {
-        Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
-        return Collections.singletonMap(entry.getKey(), entry.getValue());
-      } else if (mapSize > 1) {
-        return expressionOverrideMap;
-      }
-    }
-    return null;
-  }
-
-  private static class TableConfigInfo {
-    final TableConfig _tableConfig;
-    final Map<Expression, Expression> _expressionOverrideMap;
-    // All the timestamp with granularity column names
-    final Set<String> _timestampIndexColumns;
-
-    private TableConfigInfo(TableConfig tableConfig) {
-      _tableConfig = tableConfig;
-      _expressionOverrideMap = createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
-      _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
-    }
-  }
-
   private static class SchemaInfo {
     final Schema _schema;
     final Map<String, String> _columnNameMap;
@@ -691,17 +653,6 @@ public class ZkTableCache implements TableCache {
     private SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
       _schema = schema;
       _columnNameMap = columnNameMap;
-    }
-  }
-
-  private static class LogicalTableConfigInfo {
-    final LogicalTableConfig _logicalTableConfig;
-    final Map<Expression, Expression> _expressionOverrideMap;
-
-    private LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
-      _logicalTableConfig = logicalTableConfig;
-      _expressionOverrideMap = createExpressionOverrideMap(logicalTableConfig.getTableName(),
-        logicalTableConfig.getQueryConfig());
     }
   }
 }
