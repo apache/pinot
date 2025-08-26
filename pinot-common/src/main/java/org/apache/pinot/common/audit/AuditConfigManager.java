@@ -153,6 +153,14 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    boolean hasAuditConfigChanges = changedConfigs.stream()
+        .anyMatch(configKey -> configKey.startsWith(CommonConstants.AuditLogConstants.PREFIX));
+
+    if (!hasAuditConfigChanges) {
+      LOG.info("No audit-related configs changed, skipping configuration rebuild");
+      return;
+    }
+
     try {
       _currentConfig = buildFromClusterConfig(clusterConfigs);
       LOG.info("Successfully updated audit configuration");

@@ -20,6 +20,7 @@ package org.apache.pinot.common.audit;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -148,6 +149,60 @@ public class AuditConfigManagerTest {
   }
 
   @Test
+  public void testOnChangeSkipsRebuildWhenNoAuditConfigsChanged() {
+    // Given - AuditConfigManager with initial config
+    AuditConfigManager manager = new AuditConfigManager();
+    Map<String, String> initialProperties = new HashMap<>();
+    initialProperties.put("pinot.audit.enabled", "true");
+    initialProperties.put("pinot.audit.payload.size.max.bytes", "15000");
+    manager.onChange(initialProperties.keySet(), initialProperties);
+
+    // Capture initial config instance - this should NOT change after non-audit config changes
+    AuditConfig configBeforeNonAuditChange = manager.getCurrentConfig();
+    assertThat(configBeforeNonAuditChange.isEnabled()).isTrue();
+    assertThat(configBeforeNonAuditChange.getMaxPayloadSize()).isEqualTo(15000);
+
+    // When - Update with only non-audit configs
+    Map<String, String> nonAuditProperties = new HashMap<>();
+    nonAuditProperties.put("some.other.config", "newValue");
+    nonAuditProperties.put("another.config", "456");
+    // Include the previous audit configs to simulate cluster state
+    nonAuditProperties.putAll(initialProperties);
+
+    manager.onChange(Set.of("some.other.config", "another.config"), nonAuditProperties);
+
+    // Then - Config instance should be the exact same object (no rebuild occurred)
+    AuditConfig configAfterNonAuditChange = manager.getCurrentConfig();
+    assertThat(configAfterNonAuditChange).isSameAs(configBeforeNonAuditChange);
+  }
+
+  @Test
+  public void testOnChangeRebuildsWhenAuditConfigsChanged() {
+    // Given - AuditConfigManager with initial config
+    AuditConfigManager manager = new AuditConfigManager();
+    Map<String, String> initialProperties = new HashMap<>();
+    initialProperties.put("pinot.audit.enabled", "false");
+    initialProperties.put("pinot.audit.payload.size.max.bytes", "10000");
+    manager.onChange(initialProperties.keySet(), initialProperties);
+
+    assertThat(manager.getCurrentConfig().isEnabled()).isFalse();
+    assertThat(manager.getCurrentConfig().getMaxPayloadSize()).isEqualTo(10000);
+
+    // When - Update with audit configs changed
+    Map<String, String> updatedProperties = new HashMap<>();
+    updatedProperties.put("pinot.audit.enabled", "true");
+    updatedProperties.put("pinot.audit.payload.size.max.bytes", "20000");
+    updatedProperties.put("some.other.config", "value");
+
+    manager.onChange(Set.of("pinot.audit.enabled", "pinot.audit.payload.size.max.bytes"), updatedProperties);
+
+    // Then - Config should be rebuilt with new audit config values
+    AuditConfig updatedConfig = manager.getCurrentConfig();
+    assertThat(updatedConfig.isEnabled()).isTrue();
+    assertThat(updatedConfig.getMaxPayloadSize()).isEqualTo(20000);
+  }
+
+  @Test
   public void testZookeeperConfigDeletionRevertsToDefaults() {
     // Given
     AuditConfigManager manager = new AuditConfigManager();
@@ -170,8 +225,9 @@ public class AuditConfigManagerTest {
     assertThat(customConfig.getExcludedEndpoints()).isEqualTo("/test,/debug");
 
     // When - Simulate ZooKeeper config deletion with empty map
+    // The changedConfigs should contain the keys that were deleted, but clusterConfigs should be empty
     Map<String, String> emptyProperties = new HashMap<>();
-    manager.onChange(emptyProperties.keySet(), emptyProperties);
+    manager.onChange(customProperties.keySet(), emptyProperties);
 
     // Then - Verify all configs revert to defaults as defined in AuditConfig class
     AuditConfig defaultConfig = manager.getCurrentConfig();
