@@ -345,7 +345,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   @Override
   public void onConsumingToOffline(String segmentName) {
-    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
+    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName);
   }
 
   @Override
