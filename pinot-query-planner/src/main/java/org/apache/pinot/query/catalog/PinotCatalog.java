@@ -50,9 +50,8 @@ public class PinotCatalog implements Schema {
   private final String _databaseName;
 
   /**
-   * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts
-   * the actual table available for query and processes table/segment metadata updates when cluster
-   * status changes.
+   * PinotCatalog needs have access to the actual {@link TableCache} object because TableCache hosts the actual
+   * table available for query and processes table/segment metadata updates when cluster status changes.
    */
   public PinotCatalog(TableCache tableCache, String databaseName) {
     _tableCache = tableCache;
