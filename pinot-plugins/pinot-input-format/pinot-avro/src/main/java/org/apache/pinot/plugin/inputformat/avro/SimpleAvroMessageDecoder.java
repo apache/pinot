@@ -42,17 +42,16 @@ import org.apache.pinot.spi.stream.StreamMessageDecoder;
 public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private static final String SCHEMA = "schema";
 
-  private org.apache.avro.Schema _avroSchema;
-  private DatumReader<GenericData.Record> _datumReader;
-  private RecordExtractor<GenericData.Record> _avroRecordExtractor;
-  private BinaryDecoder _binaryDecoderToReuse;
-  private GenericData.Record _avroRecordToReuse;
+  protected org.apache.avro.Schema _avroSchema;
+  protected DatumReader<GenericData.Record> _datumReader;
+  protected RecordExtractor<GenericData.Record> _avroRecordExtractor;
+  protected BinaryDecoder _binaryDecoderToReuse;
+  protected GenericData.Record _avroRecordToReuse;
 
   @Override
   public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
       throws Exception {
-    Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
-    _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
+    initAvroSchema(props, topicName);
     _datumReader = new GenericDatumReader<>(_avroSchema);
     String recordExtractorClass = props.get(RECORD_EXTRACTOR_CONFIG_KEY);
     String recordExtractorConfigClass = props.get(RECORD_EXTRACTOR_CONFIG_CONFIG_KEY);
@@ -94,5 +93,10 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       throw new RuntimeException("Caught exception while reading message using schema: " + _avroSchema, e);
     }
     return _avroRecordExtractor.extract(_avroRecordToReuse, destination);
+  }
+
+  protected void initAvroSchema(Map<String, String> props, String topicName) {
+    Preconditions.checkState(props.containsKey(SCHEMA), "Avro schema must be provided");
+    _avroSchema = new org.apache.avro.Schema.Parser().parse(props.get(SCHEMA));
   }
 }
