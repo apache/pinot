@@ -53,8 +53,7 @@ public class TimeSeriesResponseMapperTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void toBrokerResponseNullBlockThrows() {
-    _block = null;
-    TimeSeriesResponseMapper.toBrokerResponse(_block);
+    TimeSeriesResponseMapper.toBrokerResponse((TimeSeriesBlock) null);
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
