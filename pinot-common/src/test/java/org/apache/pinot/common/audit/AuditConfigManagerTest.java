@@ -20,7 +20,7 @@ package org.apache.pinot.common.audit;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.helix.model.ClusterConfig;
+import java.util.Set;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,15 +35,19 @@ public class AuditConfigManagerTest {
   @Test
   public void testOnClusterConfigChangeWithAllConfigs() {
     // Given
-    ClusterConfig clusterConfig = createClusterConfig(
-        Map.of("pinot.audit.enabled", "true", "pinot.audit.capture.request.payload.enabled", "true",
-            "pinot.audit.capture.request.headers", "true", "pinot.audit.payload.size.max.bytes", "20480",
-            "pinot.audit.excluded.endpoints", "/health,/metrics"));
+    Map<String, String> properties = new HashMap<>();
+    properties.put("pinot.audit.enabled", "true");
+    properties.put("pinot.audit.capture.request.payload.enabled", "true");
+    properties.put("pinot.audit.capture.request.headers", "true");
+    properties.put("pinot.audit.payload.size.max.bytes", "20480");
+    properties.put("pinot.audit.excluded.endpoints", "/health,/metrics");
+    properties.put("some.other.config", "value");
+    properties.put("another.config", "123");
 
     AuditConfigManager manager = new AuditConfigManager();
 
     // When
-    manager.onClusterConfigChange(clusterConfig, null);
+    manager.onChange(properties.keySet(), properties);
 
     // Then
     AuditConfig config = manager.getCurrentConfig();
@@ -57,13 +61,16 @@ public class AuditConfigManagerTest {
   @Test
   public void testOnClusterConfigChangeWithPartialConfigs() {
     // Given
-    ClusterConfig clusterConfig =
-        createClusterConfig(Map.of("pinot.audit.enabled", "true", "pinot.audit.payload.size.max.bytes", "5000"));
+    Map<String, String> properties = new HashMap<>();
+    properties.put("pinot.audit.enabled", "true");
+    properties.put("pinot.audit.payload.size.max.bytes", "5000");
+    properties.put("some.other.config", "value");
+    properties.put("another.config", "123");
 
     AuditConfigManager manager = new AuditConfigManager();
 
     // When
-    manager.onClusterConfigChange(clusterConfig, null);
+    manager.onChange(properties.keySet(), properties);
 
     // Then
     AuditConfig config = manager.getCurrentConfig();
@@ -78,11 +85,13 @@ public class AuditConfigManagerTest {
   @Test
   public void testOnClusterConfigChangeWithNoAuditConfigs() {
     // Given
-    ClusterConfig clusterConfig = createClusterConfig(Map.of());
+    Map<String, String> properties = new HashMap<>();
+    properties.put("some.other.config", "value");
+    properties.put("another.config", "123");
     AuditConfigManager manager = new AuditConfigManager();
 
     // When
-    manager.onClusterConfigChange(clusterConfig, null);
+    manager.onChange(properties.keySet(), properties);
 
     // Then
     AuditConfig config = manager.getCurrentConfig();
@@ -99,16 +108,18 @@ public class AuditConfigManagerTest {
     AuditConfigManager manager = new AuditConfigManager();
 
     // Set initial config
-    ClusterConfig initialConfig =
-        createClusterConfig(Map.of("pinot.audit.enabled", "true", "pinot.audit.payload.size.max.bytes", "15000"));
-    manager.onClusterConfigChange(initialConfig, null);
+    Map<String, String> initialProperties = new HashMap<>();
+    initialProperties.put("pinot.audit.enabled", "true");
+    initialProperties.put("pinot.audit.payload.size.max.bytes", "15000");
+    manager.onChange(initialProperties.keySet(), initialProperties);
     assertThat(manager.getCurrentConfig().isEnabled()).isTrue();
     assertThat(manager.getCurrentConfig().getMaxPayloadSize()).isEqualTo(15000);
 
     // When - Update with new config
-    ClusterConfig updatedConfig =
-        createClusterConfig(Map.of("pinot.audit.enabled", "false", "pinot.audit.payload.size.max.bytes", "25000"));
-    manager.onClusterConfigChange(updatedConfig, null);
+    Map<String, String> updatedProperties = new HashMap<>();
+    updatedProperties.put("pinot.audit.enabled", "false");
+    updatedProperties.put("pinot.audit.payload.size.max.bytes", "25000");
+    manager.onChange(updatedProperties.keySet(), updatedProperties);
 
     // Then
     assertThat(manager.getCurrentConfig().isEnabled()).isFalse();
@@ -118,12 +129,15 @@ public class AuditConfigManagerTest {
   @Test
   public void testBuildFromClusterConfigDirectly() {
     // Given
-    ClusterConfig clusterConfig = createClusterConfig(
-        Map.of("pinot.audit.enabled", "true", "pinot.audit.capture.request.payload.enabled", "false",
-            "pinot.audit.capture.request.headers", "true"));
+    Map<String, String> properties = new HashMap<>();
+    properties.put("pinot.audit.enabled", "true");
+    properties.put("pinot.audit.capture.request.payload.enabled", "false");
+    properties.put("pinot.audit.capture.request.headers", "true");
+    properties.put("some.other.config", "value");
+    properties.put("another.config", "123");
 
     // When
-    AuditConfig config = AuditConfigManager.buildFromClusterConfig(clusterConfig);
+    AuditConfig config = AuditConfigManager.buildFromClusterConfig(properties);
 
     // Then
     assertThat(config.isEnabled()).isTrue();
@@ -134,14 +148,93 @@ public class AuditConfigManagerTest {
     assertThat(config.getExcludedEndpoints()).isEmpty();
   }
 
-  // Helper method to create ClusterConfig with given properties
-  private ClusterConfig createClusterConfig(Map<String, String> properties) {
-    ClusterConfig clusterConfig = new ClusterConfig("testCluster");
-    Map<String, String> allProperties = new HashMap<>(properties);
-    // Add some non-audit configs to verify filtering works
-    allProperties.put("some.other.config", "value");
-    allProperties.put("another.config", "123");
-    clusterConfig.getRecord().setSimpleFields(allProperties);
-    return clusterConfig;
+  @Test
+  public void testOnChangeSkipsRebuildWhenNoAuditConfigsChanged() {
+    // Given - AuditConfigManager with initial config
+    AuditConfigManager manager = new AuditConfigManager();
+    Map<String, String> initialProperties = new HashMap<>();
+    initialProperties.put("pinot.audit.enabled", "true");
+    initialProperties.put("pinot.audit.payload.size.max.bytes", "15000");
+    manager.onChange(initialProperties.keySet(), initialProperties);
+
+    // Capture initial config instance - this should NOT change after non-audit config changes
+    AuditConfig configBeforeNonAuditChange = manager.getCurrentConfig();
+    assertThat(configBeforeNonAuditChange.isEnabled()).isTrue();
+    assertThat(configBeforeNonAuditChange.getMaxPayloadSize()).isEqualTo(15000);
+
+    // When - Update with only non-audit configs
+    Map<String, String> nonAuditProperties = new HashMap<>();
+    nonAuditProperties.put("some.other.config", "newValue");
+    nonAuditProperties.put("another.config", "456");
+    // Include the previous audit configs to simulate cluster state
+    nonAuditProperties.putAll(initialProperties);
+
+    manager.onChange(Set.of("some.other.config", "another.config"), nonAuditProperties);
+
+    // Then - Config instance should be the exact same object (no rebuild occurred)
+    AuditConfig configAfterNonAuditChange = manager.getCurrentConfig();
+    assertThat(configAfterNonAuditChange).isSameAs(configBeforeNonAuditChange);
+  }
+
+  @Test
+  public void testOnChangeRebuildsWhenAuditConfigsChanged() {
+    // Given - AuditConfigManager with initial config
+    AuditConfigManager manager = new AuditConfigManager();
+    Map<String, String> initialProperties = new HashMap<>();
+    initialProperties.put("pinot.audit.enabled", "false");
+    initialProperties.put("pinot.audit.payload.size.max.bytes", "10000");
+    manager.onChange(initialProperties.keySet(), initialProperties);
+
+    assertThat(manager.getCurrentConfig().isEnabled()).isFalse();
+    assertThat(manager.getCurrentConfig().getMaxPayloadSize()).isEqualTo(10000);
+
+    // When - Update with audit configs changed
+    Map<String, String> updatedProperties = new HashMap<>();
+    updatedProperties.put("pinot.audit.enabled", "true");
+    updatedProperties.put("pinot.audit.payload.size.max.bytes", "20000");
+    updatedProperties.put("some.other.config", "value");
+
+    manager.onChange(Set.of("pinot.audit.enabled", "pinot.audit.payload.size.max.bytes"), updatedProperties);
+
+    // Then - Config should be rebuilt with new audit config values
+    AuditConfig updatedConfig = manager.getCurrentConfig();
+    assertThat(updatedConfig.isEnabled()).isTrue();
+    assertThat(updatedConfig.getMaxPayloadSize()).isEqualTo(20000);
+  }
+
+  @Test
+  public void testZookeeperConfigDeletionRevertsToDefaults() {
+    // Given
+    AuditConfigManager manager = new AuditConfigManager();
+
+    // Set initial custom configs
+    Map<String, String> customProperties = new HashMap<>();
+    customProperties.put("pinot.audit.enabled", "true");
+    customProperties.put("pinot.audit.capture.request.payload.enabled", "true");
+    customProperties.put("pinot.audit.capture.request.headers", "true");
+    customProperties.put("pinot.audit.payload.size.max.bytes", "50000");
+    customProperties.put("pinot.audit.excluded.endpoints", "/test,/debug");
+    manager.onChange(customProperties.keySet(), customProperties);
+
+    // Verify custom configs are applied
+    AuditConfig customConfig = manager.getCurrentConfig();
+    assertThat(customConfig.isEnabled()).isTrue();
+    assertThat(customConfig.isCaptureRequestPayload()).isTrue();
+    assertThat(customConfig.isCaptureRequestHeaders()).isTrue();
+    assertThat(customConfig.getMaxPayloadSize()).isEqualTo(50000);
+    assertThat(customConfig.getExcludedEndpoints()).isEqualTo("/test,/debug");
+
+    // When - Simulate ZooKeeper config deletion with empty map
+    // The changedConfigs should contain the keys that were deleted, but clusterConfigs should be empty
+    Map<String, String> emptyProperties = new HashMap<>();
+    manager.onChange(customProperties.keySet(), emptyProperties);
+
+    // Then - Verify all configs revert to defaults as defined in AuditConfig class
+    AuditConfig defaultConfig = manager.getCurrentConfig();
+    assertThat(defaultConfig.isEnabled()).isFalse();
+    assertThat(defaultConfig.isCaptureRequestPayload()).isFalse();
+    assertThat(defaultConfig.isCaptureRequestHeaders()).isFalse();
+    assertThat(defaultConfig.getMaxPayloadSize()).isEqualTo(10240);
+    assertThat(defaultConfig.getExcludedEndpoints()).isEmpty();
   }
 }
