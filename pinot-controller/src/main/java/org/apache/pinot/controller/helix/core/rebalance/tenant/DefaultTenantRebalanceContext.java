@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -29,7 +30,16 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * for managing tenant rebalance operations. This context is synchronized to ZK by `ZkBasedTenantRebalanceObserver`
  * to ensure consistency across controller restarts.
  */
-public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
+public class DefaultTenantRebalanceContext {
+  protected static final int INITIAL_ATTEMPT_ID = 1;
+  @JsonProperty("jobId")
+  private final String _jobId;
+  @JsonProperty("originalJobId")
+  private final String _originalJobId;
+  @JsonProperty("config")
+  private final TenantRebalanceConfig _config;
+  @JsonProperty("attemptId")
+  private final int _attemptId;
   // Ongoing jobs queue and parallel queue are accessed concurrently by multiple threads, where each worker thread
   // consumes a tenant-table-rebalance-job from the parallel queue, adds it to the ongoing jobs queue, processes it.
   // On the other hand, only a single thread consumes from the sequential queue.
@@ -39,7 +49,10 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
 
   // Default constructor for JSON deserialization
   public DefaultTenantRebalanceContext() {
-    super();
+    _jobId = null;
+    _originalJobId = null;
+    _config = null;
+    _attemptId = INITIAL_ATTEMPT_ID;
     _parallelQueue = new ConcurrentLinkedDeque<>();
     _sequentialQueue = new LinkedList<>();
     _ongoingJobsQueue = new ConcurrentLinkedQueue<>();
@@ -49,7 +62,10 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
       ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
       ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
-    super(originalJobId, config, attemptId);
+    _jobId = createAttemptJobId(originalJobId, attemptId);
+    _originalJobId = originalJobId;
+    _config = config;
+    _attemptId = attemptId;
     _parallelQueue = new ConcurrentLinkedDeque<>(parallelQueue);
     _sequentialQueue = new LinkedList<>(sequentialQueue);
     _ongoingJobsQueue = new ConcurrentLinkedQueue<>(ongoingJobsQueue);
@@ -82,11 +98,33 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
     return _ongoingJobsQueue;
   }
 
-  @Override
+  public int getAttemptId() {
+    return _attemptId;
+  }
+
+  public String getOriginalJobId() {
+    return _originalJobId;
+  }
+
+  public String getJobId() {
+    return _jobId;
+  }
+
+  public TenantRebalanceConfig getConfig() {
+    return _config;
+  }
+
   public String toString() {
     return "DefaultTenantRebalanceContext{" + "jobId='" + getJobId() + '\'' + ", originalJobId='" + getOriginalJobId()
         + '\'' + ", attemptId=" + getAttemptId() + ", parallelQueueSize="
         + getParallelQueue().size() + ", sequentialQueueSize=" + getSequentialQueue().size() + ", ongoingJobsQueueSize="
         + getOngoingJobsQueue().size() + '}';
+  }
+
+  private static String createAttemptJobId(String originalJobId, int attemptId) {
+    if (attemptId == INITIAL_ATTEMPT_ID) {
+      return originalJobId;
+    }
+    return originalJobId + "_" + attemptId;
   }
 }

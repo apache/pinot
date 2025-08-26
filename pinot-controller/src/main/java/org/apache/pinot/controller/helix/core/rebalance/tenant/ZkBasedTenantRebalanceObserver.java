@@ -41,12 +41,12 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   private final String _tenantName;
   private final List<String> _unprocessedTables;
   private final TenantRebalanceProgressStats _progressStats;
-  private final TenantRebalanceContext _tenantRebalanceContext;
+  private final DefaultTenantRebalanceContext _tenantRebalanceContext;
   // Keep track of number of updates. Useful during debugging.
   private int _numUpdatesToZk;
 
   public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, TenantRebalanceProgressStats progressStats,
-      TenantRebalanceContext tenantRebalanceContext,
+      DefaultTenantRebalanceContext tenantRebalanceContext,
       PinotHelixResourceManager pinotHelixResourceManager) {
     _jobId = jobId;
     _tenantName = tenantName;
@@ -63,7 +63,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   }
 
   public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, Set<String> tables,
-      TenantRebalanceContext tenantRebalanceContext,
+      DefaultTenantRebalanceContext tenantRebalanceContext,
       PinotHelixResourceManager pinotHelixResourceManager) {
     this(jobId, tenantName, new TenantRebalanceProgressStats(tables), tenantRebalanceContext,
         pinotHelixResourceManager);
