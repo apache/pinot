@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -44,7 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DefaultTenantRebalancer implements TenantRebalancer {
+public class DefaultTenantRebalancer {
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultTenantRebalancer.class);
   private final TableRebalanceManager _tableRebalanceManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
@@ -56,8 +58,42 @@ public class DefaultTenantRebalancer implements TenantRebalancer {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _executorService = executorService;
   }
+  public static class TenantTableRebalanceJobContext {
+    private final String _tableName;
+    private final String _jobId;
+    // Whether the rebalance should be done with downtime or minAvailableReplicas=0.
+    private final boolean _withDowntime;
 
-  @Override
+    /**
+     * Create a context to run a table rebalance job with in a tenant rebalance operation.
+     *
+     * @param tableName The name of the table to rebalance.
+     * @param jobId The job ID for the rebalance operation.
+     * @param withDowntime Whether the rebalance should be done with downtime or minAvailableReplicas=0.
+     * @return The result of the rebalance operation.
+     */
+    @JsonCreator
+    public TenantTableRebalanceJobContext(@JsonProperty("tableName") String tableName,
+        @JsonProperty("jobId") String jobId, @JsonProperty("withDowntime") boolean withDowntime) {
+      _tableName = tableName;
+      _jobId = jobId;
+      _withDowntime = withDowntime;
+    }
+
+    public String getJobId() {
+      return _jobId;
+    }
+
+    public String getTableName() {
+      return _tableName;
+    }
+
+    @JsonProperty("withDowntime")
+    public boolean shouldRebalanceWithDowntime() {
+      return _withDowntime;
+    }
+  }
+
   public TenantRebalanceResult rebalance(TenantRebalanceConfig config) {
     Map<String, RebalanceResult> dryRunResults = new HashMap<>();
 

@@ -392,10 +392,10 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(serverInfo.getServersAdded().size(), 3);
     assertEquals(serverInfo.getServersRemoved().size(), 0);
 
-    Queue<TenantRebalancer.TenantTableRebalanceJobContext> tableQueue =
+    Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> tableQueue =
         tenantRebalancer.createTableQueue(config, dryRunResult.getRebalanceTableResults());
     // Dimension Table B should be rebalance first since it is a dim table, and we're doing scale out
-    TenantRebalancer.TenantTableRebalanceJobContext jobContext = tableQueue.poll();
+    DefaultTenantRebalancer.TenantTableRebalanceJobContext jobContext = tableQueue.poll();
     assertNotNull(jobContext);
     assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
     jobContext = tableQueue.poll();
@@ -442,13 +442,13 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
 
     // set table B in parallel blacklist, so that it ends up in sequential queue, and table A in parallel queue
-    Pair<ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext>,
-        Queue<TenantRebalancer.TenantTableRebalanceJobContext>>
+    Pair<ConcurrentLinkedDeque<DefaultTenantRebalancer.TenantTableRebalanceJobContext>,
+        Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext>>
         queues =
         tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(), null,
             Collections.singleton(OFFLINE_TABLE_NAME_B));
-    Queue<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
-    Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
+    Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
+    Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
     jobContext = parallelQueue.poll();
     assertNotNull(jobContext);
     assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_A);

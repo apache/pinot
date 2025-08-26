@@ -109,7 +109,6 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerFacto
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceChecker;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
 import org.apache.pinot.controller.helix.core.statemodel.LeadControllerResourceMasterSlaveStateModelFactory;
@@ -210,7 +209,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected StaleInstancesCleanupTask _staleInstancesCleanupTask;
   protected TaskMetricsEmitter _taskMetricsEmitter;
   protected PoolingHttpClientConnectionManager _connectionManager;
-  protected TenantRebalancer _tenantRebalancer;
+  protected DefaultTenantRebalancer _tenantRebalancer;
   // This executor should be used by all code paths for user initiated rebalances, so that the controller config
   // CONTROLLER_EXECUTOR_REBALANCE_NUM_THREADS is honored.
   protected ExecutorService _rebalancerExecutorService;
@@ -636,7 +635,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_periodicTaskScheduler).to(PeriodicTaskScheduler.class);
         bind(_sqlQueryExecutor).to(SqlQueryExecutor.class);
         bind(_pinotLLCRealtimeSegmentManager).to(PinotLLCRealtimeSegmentManager.class);
-        bind(_tenantRebalancer).to(TenantRebalancer.class);
+        bind(_tenantRebalancer).to(DefaultTenantRebalancer.class);
         bind(_tableSizeReader).to(TableSizeReader.class);
         bind(_storageQuotaChecker).to(StorageQuotaChecker.class);
         bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);

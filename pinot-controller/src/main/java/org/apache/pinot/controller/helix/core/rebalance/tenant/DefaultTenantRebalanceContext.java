@@ -33,9 +33,9 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
   // Ongoing jobs queue and parallel queue are accessed concurrently by multiple threads, where each worker thread
   // consumes a tenant-table-rebalance-job from the parallel queue, adds it to the ongoing jobs queue, processes it.
   // On the other hand, only a single thread consumes from the sequential queue.
-  private final ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> _ongoingJobsQueue;
-  private final ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> _parallelQueue;
-  private final Queue<TenantRebalancer.TenantTableRebalanceJobContext> _sequentialQueue;
+  private final ConcurrentLinkedQueue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> _ongoingJobsQueue;
+  private final ConcurrentLinkedDeque<DefaultTenantRebalancer.TenantTableRebalanceJobContext> _parallelQueue;
+  private final Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> _sequentialQueue;
 
   // Default constructor for JSON deserialization
   public DefaultTenantRebalanceContext() {
@@ -46,9 +46,9 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
   }
 
   public DefaultTenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId,
-      ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
-      Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
-      ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
+      ConcurrentLinkedDeque<DefaultTenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
+      Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
+      ConcurrentLinkedQueue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
     super(originalJobId, config, attemptId);
     _parallelQueue = new ConcurrentLinkedDeque<>(parallelQueue);
     _sequentialQueue = new LinkedList<>(sequentialQueue);
@@ -56,29 +56,29 @@ public class DefaultTenantRebalanceContext extends TenantRebalanceContext {
   }
 
   public static DefaultTenantRebalanceContext forInitialRebalance(String originalJobId, TenantRebalanceConfig config,
-      ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
-      Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue) {
+      ConcurrentLinkedDeque<DefaultTenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
+      Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue) {
     return new DefaultTenantRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID,
         parallelQueue, sequentialQueue, new ConcurrentLinkedQueue<>());
   }
 
   public static DefaultTenantRebalanceContext forRetry(String originalJobId, TenantRebalanceConfig config,
-      int attemptId, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
-      Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
-      ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
+      int attemptId, ConcurrentLinkedDeque<DefaultTenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
+      Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
+      ConcurrentLinkedQueue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
     return new DefaultTenantRebalanceContext(originalJobId, config, attemptId,
         parallelQueue, sequentialQueue, ongoingJobsQueue);
   }
 
-  public ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> getParallelQueue() {
+  public ConcurrentLinkedDeque<DefaultTenantRebalancer.TenantTableRebalanceJobContext> getParallelQueue() {
     return _parallelQueue;
   }
 
-  public Queue<TenantRebalancer.TenantTableRebalanceJobContext> getSequentialQueue() {
+  public Queue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> getSequentialQueue() {
     return _sequentialQueue;
   }
 
-  public ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> getOngoingJobsQueue() {
+  public ConcurrentLinkedQueue<DefaultTenantRebalancer.TenantTableRebalanceJobContext> getOngoingJobsQueue() {
     return _ongoingJobsQueue;
   }
 
