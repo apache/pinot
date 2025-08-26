@@ -146,4 +146,39 @@ public class AuditConfigManagerTest {
     assertThat(config.getMaxPayloadSize()).isEqualTo(10240);
     assertThat(config.getExcludedEndpoints()).isEmpty();
   }
+
+  @Test
+  public void testZookeeperConfigDeletionRevertsToDefaults() {
+    // Given
+    AuditConfigManager manager = new AuditConfigManager();
+
+    // Set initial custom configs
+    Map<String, String> customProperties = new HashMap<>();
+    customProperties.put("pinot.audit.enabled", "true");
+    customProperties.put("pinot.audit.capture.request.payload.enabled", "true");
+    customProperties.put("pinot.audit.capture.request.headers", "true");
+    customProperties.put("pinot.audit.payload.size.max.bytes", "50000");
+    customProperties.put("pinot.audit.excluded.endpoints", "/test,/debug");
+    manager.onChange(customProperties.keySet(), customProperties);
+
+    // Verify custom configs are applied
+    AuditConfig customConfig = manager.getCurrentConfig();
+    assertThat(customConfig.isEnabled()).isTrue();
+    assertThat(customConfig.isCaptureRequestPayload()).isTrue();
+    assertThat(customConfig.isCaptureRequestHeaders()).isTrue();
+    assertThat(customConfig.getMaxPayloadSize()).isEqualTo(50000);
+    assertThat(customConfig.getExcludedEndpoints()).isEqualTo("/test,/debug");
+
+    // When - Simulate ZooKeeper config deletion with empty map
+    Map<String, String> emptyProperties = new HashMap<>();
+    manager.onChange(emptyProperties.keySet(), emptyProperties);
+
+    // Then - Verify all configs revert to defaults as defined in AuditConfig class
+    AuditConfig defaultConfig = manager.getCurrentConfig();
+    assertThat(defaultConfig.isEnabled()).isFalse();
+    assertThat(defaultConfig.isCaptureRequestPayload()).isFalse();
+    assertThat(defaultConfig.isCaptureRequestHeaders()).isFalse();
+    assertThat(defaultConfig.getMaxPayloadSize()).isEqualTo(10240);
+    assertThat(defaultConfig.getExcludedEndpoints()).isEmpty();
+  }
 }
