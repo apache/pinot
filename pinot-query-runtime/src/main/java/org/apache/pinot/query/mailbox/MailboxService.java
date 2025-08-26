@@ -177,6 +177,7 @@ public class MailboxService {
     if (channelIdleTimeoutSeconds > 0) {
       return Duration.ofSeconds(channelIdleTimeoutSeconds);
     }
-    return Duration.ofSeconds(Integer.MAX_VALUE);
+    // Use a reasonable maximum idle timeout (1 year) to avoid overflow.
+    return Duration.ofDays(365);
   }
 }

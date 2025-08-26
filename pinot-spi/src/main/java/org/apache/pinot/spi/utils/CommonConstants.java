@@ -1911,7 +1911,7 @@ public class CommonConstants {
      * query using the channel will need to re-establish the connection. This includes the TLS negotiation and therefore
      * can increase the latency of the query by some milliseconds.
      *
-     * In normal Pinot clusters where that are continuously serving queries, channels should never go idle.
+     * In normal Pinot clusters that are continuously serving queries, channels should never go idle.
      * But it could affect clusters that are not continuously serving queries.
      * This is why by default the channel idle timeout is set to -1, which means that the channel idle timeout is
      * disabled.

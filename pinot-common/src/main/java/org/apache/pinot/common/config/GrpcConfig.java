@@ -31,7 +31,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 ///    - The ability to send query plans from broker to server, and the mailbox service for sending data between
 ///      servers/brokers
 ///    - The broker -> server communication for the SSE when `pinot.broker.request.handler.type` is set to grpc
-///      (see the GrpcBrokerRequestHandler)?
+///      (see the GrpcBrokerRequestHandler)
 ///
 /// This class only affects the **query** service. See ChannelManager, MailboxService and GrpcMailboxServer to learn
 /// more about the Grpc config used for MSE.
