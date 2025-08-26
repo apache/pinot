@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import javax.annotation.Nullable;
 import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 
@@ -125,6 +126,11 @@ public interface StreamMetadataProvider extends Closeable {
     PartitionLagState unknownLagState = new UnknownLagState();
     currentPartitionStateMap.forEach((k, v) -> result.put(k, unknownLagState));
     return result;
+  }
+
+  @Nullable
+  default StreamPartitionMsgOffset getOffsetAtTimestamp(int partitionId, long timestampMillis, long timeoutMillis) {
+    return null;
   }
 
   /**

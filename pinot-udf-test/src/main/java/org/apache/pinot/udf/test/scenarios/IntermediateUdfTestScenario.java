@@ -91,7 +91,7 @@ public class IntermediateUdfTestScenario extends AbstractUdfTestScenario {
             + "@otherCols\n"
             + "  FROM @table_OFFLINE AS t1 \n"
             + "  JOIN @table_OFFLINE AS t2 \n"
-            + "  ON t1.@testCol = t2.@testCol AND t1.@signatureCol = t2.@signatureCol \n"
+            + "  ON t1.@testCol = t2.@testCol AND t1.@signatureCol = t2.@signatureCol and t1.udf = t2.udf \n"
             + ")\n"
             + "SELECT \n"
             + "  @testCol as test, \n"

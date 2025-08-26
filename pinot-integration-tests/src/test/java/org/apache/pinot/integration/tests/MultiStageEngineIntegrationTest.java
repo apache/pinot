@@ -20,6 +20,8 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.jayway.jsonpath.DocumentContext;
+import com.jayway.jsonpath.JsonPath;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
@@ -68,7 +70,10 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.apache.pinot.common.function.scalar.StringFunctions.*;
-import static org.testng.Assert.*;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
+import static org.testng.Assert.assertTrue;
 
 
 public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestSet {
@@ -259,11 +264,12 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
     String[] numericResultFunctions = new String[]{
         "distinctCount", "distinctCountBitmap", "distinctCountHLL", "segmentPartitionedDistinctCount",
-        "distinctCountSmartHLL", "distinctCountThetaSketch", "distinctSum", "distinctAvg"
+        "distinctCountSmartHLL", "distinctCountULL", "distinctCountSmartULL", "distinctCountThetaSketch",
+        "distinctSum", "distinctAvg"
     };
 
     double[] expectedNumericResults = new double[]{
-        364, 364, 355, 364, 364, 364, 5915969, 16252.662087912087
+        364, 364, 355, 364, 364, 364, 364, 364, 5915969, 16252.662087912087
     };
     Assert.assertEquals(numericResultFunctions.length, expectedNumericResults.length);
 
@@ -377,8 +383,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   @Test
   public void testUnsupportedUdfOnIntermediateStage()
       throws Exception {
-    String sqlQuery = ""
-        + "SET timeoutMs=10000;\n" // In older versions we timeout in this case, but we should fail fast now
+    String sqlQuery = "SET timeoutMs=10000;\n" // In older versions we timeout in this case, but we should fail fast now
         + "WITH fakeTable AS (\n" // this table is used to make sure the call is made on an intermediate stage
         + "  SELECT \n"
         + "    t1.DaysSinceEpoch + t2.DaysSinceEpoch as DaysSinceEpoch"
@@ -891,6 +896,19 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         + "GROUP BY ARRAY_TO_MV(RandomAirports)";
     JsonNode jsonNode = postQuery(pinotQuery);
     Assert.assertEquals(jsonNode.get("resultTable").get("rows").size(), 154);
+  }
+
+  @Test
+  public void incorrectMultiValueColumnGroupBy()
+      throws Exception {
+    String pinotQuery = "SELECT count(*) FROM mytable "
+        + "GROUP BY RandomAirports";
+    JsonNode jsonNode = postQuery(pinotQuery);
+    DocumentContext docContext = JsonPath.parse(jsonNode.toString());
+    List<String> messages = docContext.read("$.exceptions[*].message");
+    Assertions.assertThat(messages)
+        .anySatisfy(message ->
+            Assertions.assertThat(message).contains("Use ARRAY_TO_MV() to group by multi-value column"));
   }
 
   @Test
@@ -1555,7 +1573,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testCaseInsensitiveNames() throws Exception {
+  public void testCaseInsensitiveNames()
+      throws Exception {
     String query = "select ACTualELAPsedTIMe from mYtABLE where actUALelAPSedTIMe > 0 limit 1";
     JsonNode jsonNode = postQuery(query);
     long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -1564,7 +1583,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testCaseInsensitiveNamesAgainstController() throws Exception {
+  public void testCaseInsensitiveNamesAgainstController()
+      throws Exception {
     String query = "select ACTualELAPsedTIMe from mYtABLE where actUALelAPSedTIMe > 0 limit 1";
     JsonNode jsonNode = postQueryToController(query);
     long result = jsonNode.get("resultTable").get("rows").get(0).get(0).asLong();
@@ -1573,7 +1593,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testQueryCompileBrokerTimeout() throws Exception {
+  public void testQueryCompileBrokerTimeout()
+      throws Exception {
     // The sleep function is called with a literal value so it should be evaluated during the query compile phase
     String query = "SET timeoutMs=100; SELECT sleep(1000) FROM mytable";
 
@@ -1598,7 +1619,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testNumServersQueried() throws Exception {
+  public void testNumServersQueried()
+      throws Exception {
     String query = "select * from mytable limit 10";
     JsonNode jsonNode = postQuery(query);
     JsonNode numServersQueried = jsonNode.get("numServersQueried");
@@ -1608,7 +1630,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testLookupJoin() throws Exception {
+  public void testLookupJoin()
+      throws Exception {
 
     Schema lookupTableSchema = createSchema(DIM_TABLE_SCHEMA_PATH);
     addSchema(lookupTableSchema);
@@ -1645,7 +1668,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     dropOfflineTable(tableConfig.getTableName());
   }
 
-  public void testSearchLiteralFilter() throws Exception {
+  public void testSearchLiteralFilter()
+      throws Exception {
     String sqlQuery =
         "WITH CTE_B AS (SELECT 1692057600000 AS __ts FROM mytable GROUP BY __ts) SELECT 1692057600000 AS __ts FROM "
             + "CTE_B WHERE __ts >= 1692057600000 AND __ts < 1693267200000 GROUP BY __ts";
@@ -1670,7 +1694,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   }
 
   @Test
-  public void testPolymorphicScalarArrayFunctions() throws Exception {
+  public void testPolymorphicScalarArrayFunctions()
+      throws Exception {
     String query = "select ARRAY_LENGTH(ARRAY[1,2,3]);";
     JsonNode jsonNode = postQuery(query);
     assertNoError(jsonNode);

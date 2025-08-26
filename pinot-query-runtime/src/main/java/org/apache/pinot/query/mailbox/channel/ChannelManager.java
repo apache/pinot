@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.query.mailbox.channel;
 
-import com.google.common.base.Preconditions;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder;
@@ -31,7 +30,6 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.utils.grpc.ServerGrpcQueryClient;
-import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -58,10 +56,11 @@ public class ChannelManager {
    * which is the default value in the gRPC Java implementation.
    */
   private final Duration _idleTimeout;
+  private final int _maxInboundMessageSize;
 
-  public ChannelManager(@Nullable TlsConfig tlsConfig, Duration idleTimeout) {
-    Preconditions.checkArgument(!(idleTimeout.isNegative() && !idleTimeout.isZero()), "Idle timeout must be positive");
+  public ChannelManager(@Nullable TlsConfig tlsConfig, int maxInboundMessageSize, Duration idleTimeout) {
     _tlsConfig = tlsConfig;
+    _maxInboundMessageSize = maxInboundMessageSize;
     _idleTimeout = idleTimeout;
   }
 
@@ -73,7 +72,7 @@ public class ChannelManager {
             NettyChannelBuilder channelBuilder = NettyChannelBuilder
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(
-                    CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
+                    _maxInboundMessageSize)
                 .sslContext(ServerGrpcQueryClient.buildSslContext(_tlsConfig));
             return decorate(channelBuilder).build();
           }
@@ -84,7 +83,7 @@ public class ChannelManager {
             ManagedChannelBuilder<?> channelBuilder = ManagedChannelBuilder
                 .forAddress(k.getLeft(), k.getRight())
                 .maxInboundMessageSize(
-                    CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES)
+                    _maxInboundMessageSize)
                 .usePlaintext();
             return decorate(channelBuilder).build();
           });

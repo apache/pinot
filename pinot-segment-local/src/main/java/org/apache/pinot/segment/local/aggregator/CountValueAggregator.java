@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.aggregator;
 
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 
@@ -36,8 +37,8 @@ public class CountValueAggregator implements ValueAggregator<Object, Long> {
   }
 
   @Override
-  public Long getInitialAggregatedValue(Object rawValue) {
-    return 1L;
+  public Long getInitialAggregatedValue(@Nullable Object rawValue) {
+    return rawValue != null ? 1L : 0L;
   }
 
   @Override
@@ -53,6 +54,11 @@ public class CountValueAggregator implements ValueAggregator<Object, Long> {
   @Override
   public Long cloneAggregatedValue(Long value) {
     return value;
+  }
+
+  @Override
+  public boolean isAggregatedValueFixedSize() {
+    return true;
   }
 
   @Override

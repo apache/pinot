@@ -27,6 +27,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.datatable.StatMap;
+import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.GrpcMailboxServer;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
@@ -66,6 +67,7 @@ public class MailboxService {
   private final PinotConfiguration _config;
   private final ChannelManager _channelManager;
   @Nullable private final TlsConfig _tlsConfig;
+  @Nullable private final QueryAccessControlFactory _accessControlFactory;
   private final int _maxByteStringSize;
   @Nullable
   private final MailboxSenderPinger _mailboxSenderPinger;
@@ -73,15 +75,24 @@ public class MailboxService {
   private GrpcMailboxServer _grpcMailboxServer;
 
   public MailboxService(String hostname, int port, PinotConfiguration config) {
-    this(hostname, port, config, null);
+    this(hostname, port, config, null, null);
   }
 
   public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig) {
+    this(hostname, port, config, tlsConfig, null);
+  }
+
+  public MailboxService(String hostname, int port, PinotConfiguration config, @Nullable TlsConfig tlsConfig, @Nullable
+  QueryAccessControlFactory accessControlFactory) {
     _hostname = hostname;
     _port = port;
     _config = config;
     _tlsConfig = tlsConfig;
-    _channelManager = new ChannelManager(tlsConfig, getIdleTimeout(config));
+    int maxInboundMessageSize = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
+    );
+    _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize, getIdleTimeout(config));
 
     Duration pingerPeriod = getPingerPeriod(config);
     if (!pingerPeriod.isZero() && !pingerPeriod.isNegative()) {
@@ -89,15 +100,13 @@ public class MailboxService {
     } else {
       _mailboxSenderPinger = null;
     }
+    _accessControlFactory = accessControlFactory;
     boolean splitBlocks = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
         CommonConstants.MultiStageQueryRunner.DEFAULT_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT);
     if (splitBlocks) {
       // so far we ensure payload is not bigger than maxBlockSize/2, we can fine tune this later
-      _maxByteStringSize = Math.max(config.getProperty(
-          CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
-          CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
-      ) / 2, 1);
+      _maxByteStringSize = Math.max(maxInboundMessageSize / 2, 1);
     } else {
       _maxByteStringSize = 0;
     }
@@ -112,7 +121,7 @@ public class MailboxService {
     if (_mailboxSenderPinger != null) {
       _mailboxSenderPinger.startAsync();
     }
-    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig);
+    _grpcMailboxServer = new GrpcMailboxServer(this, _config, _tlsConfig, _accessControlFactory);
     _grpcMailboxServer.start();
   }
 

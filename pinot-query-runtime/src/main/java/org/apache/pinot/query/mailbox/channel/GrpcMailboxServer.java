@@ -35,6 +35,8 @@ import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.proto.Mailbox;
 import org.apache.pinot.common.proto.PinotMailboxGrpc;
 import org.apache.pinot.core.transport.grpc.GrpcQueryServer;
+import org.apache.pinot.query.access.AuthorizationInterceptor;
+import org.apache.pinot.query.access.QueryAccessControlFactory;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -55,9 +57,13 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
   private final MailboxService _mailboxService;
   private final Server _server;
 
-  public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config, @Nullable TlsConfig tlsConfig) {
+  public GrpcMailboxServer(MailboxService mailboxService, PinotConfiguration config, @Nullable TlsConfig tlsConfig,
+      @Nullable QueryAccessControlFactory accessControlFactory) {
     _mailboxService = mailboxService;
     int port = mailboxService.getPort();
+    if (accessControlFactory == null) {
+      accessControlFactory = QueryAccessControlFactory.fromConfig(config);
+    }
 
     PooledByteBufAllocator bufAllocator = new PooledByteBufAllocator(true);
     PooledByteBufAllocatorMetric metric = bufAllocator.metric();
@@ -86,8 +92,11 @@ public class GrpcMailboxServer extends PinotMailboxGrpc.PinotMailboxImplBase {
     }
 
     NettyServerBuilder builder = NettyServerBuilder
-        .forPort(port)
-        .intercept(new MailboxServerInterceptor())
+        .forPort(port).intercept(new MailboxServerInterceptor());
+    if (accessControlFactory != null) {
+      builder.intercept(new AuthorizationInterceptor(accessControlFactory));
+    }
+    builder
         .addService(this)
         .withOption(ChannelOption.ALLOCATOR, bufAllocator)
         .withChildOption(ChannelOption.ALLOCATOR, bufAllocator)

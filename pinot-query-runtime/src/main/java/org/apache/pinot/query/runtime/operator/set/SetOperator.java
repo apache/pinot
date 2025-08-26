@@ -16,19 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator;
+package org.apache.pinot.query.runtime.operator.set;
 
-import com.google.common.collect.HashMultiset;
-import com.google.common.collect.Multiset;
-import java.util.ArrayList;
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.common.ExplainPlanRows;
-import org.apache.pinot.core.data.table.Record;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
-import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 
@@ -41,26 +38,23 @@ import org.apache.pinot.segment.spi.IndexSegment;
  * UnionOperator: The right child operator is consumed in a blocking manner.
  */
 public abstract class SetOperator extends MultiStageOperator {
-  protected final Multiset<Record> _rightRowSet;
 
-  private final List<MultiStageOperator> _inputOperators;
-  private final MultiStageOperator _leftChildOperator;
-  private final MultiStageOperator _rightChildOperator;
-  private final DataSchema _dataSchema;
+  protected final MultiStageOperator _leftChildOperator;
+  protected final MultiStageOperator _rightChildOperator;
+  protected final DataSchema _dataSchema;
 
-  private boolean _isRightSetBuilt;
-  protected MseBlock.Eos _eos;
-  protected final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+  private boolean _isRightChildOperatorProcessed;
+  private MseBlock.Eos _eos;
+  private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
 
   public SetOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext);
     _dataSchema = dataSchema;
-    _inputOperators = inputOperators;
-    _leftChildOperator = getChildOperators().get(0);
-    _rightChildOperator = getChildOperators().get(1);
-    _rightRowSet = HashMultiset.create();
-    _isRightSetBuilt = false;
+    Preconditions.checkState(inputOperators.size() == 2, "Set operator should have 2 child operators");
+    _leftChildOperator = inputOperators.get(0);
+    _rightChildOperator = inputOperators.get(1);
+    _isRightChildOperatorProcessed = false;
   }
 
   @Override
@@ -71,7 +65,7 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return _inputOperators;
+    return List.of(_leftChildOperator, _rightChildOperator);
   }
 
   @Override
@@ -96,70 +90,41 @@ public abstract class SetOperator extends MultiStageOperator {
 
   @Override
   protected MseBlock getNextBlock() {
-    if (!_isRightSetBuilt) {
-      // construct a SET with all the right side rows.
-      constructRightBlockSet();
-    }
     if (_eos != null) {
       return _eos;
     }
-    return constructResultBlockSet();
-  }
 
-  protected void constructRightBlockSet() {
-    MseBlock block = _rightChildOperator.nextBlock();
-    while (block.isData()) {
-      MseBlock.Data dataBlock = (MseBlock.Data) block;
-      for (Object[] row : dataBlock.asRowHeap().getRows()) {
-        _rightRowSet.add(new Record(row));
+    if (!_isRightChildOperatorProcessed) {
+      MseBlock mseBlock = processRightOperator();
+
+      if (mseBlock.isData()) {
+        return mseBlock;
+      } else if (mseBlock.isError()) {
+        _eos = (MseBlock.Eos) mseBlock;
+        return _eos;
+      } else if (mseBlock.isSuccess()) {
+        // If it's a regular EOS block, we continue to process the left child operator.
+        _isRightChildOperatorProcessed = true;
       }
-      sampleAndCheckInterruption();
-      block = _rightChildOperator.nextBlock();
     }
-    MseBlock.Eos eosBlock = (MseBlock.Eos) block;
-    if (eosBlock.isError()) {
-      _eos = eosBlock;
+
+    MseBlock mseBlock = processLeftOperator();
+    if (mseBlock.isEos()) {
+      _eos = (MseBlock.Eos) mseBlock;
+      return _eos;
     } else {
-      _isRightSetBuilt = true;
+      return mseBlock;
     }
   }
 
-  protected MseBlock constructResultBlockSet() {
-    // Keep reading the input blocks until we find a match row or all blocks are processed.
-    // TODO: Consider batching the rows to improve performance.
-    while (true) {
-      MseBlock leftBlock = _leftChildOperator.nextBlock();
-      if (leftBlock.isEos()) {
-        MseBlock.Eos eosBlock = (MseBlock.Eos) leftBlock;
-        _eos = eosBlock;
-        return eosBlock;
-      }
-      MseBlock.Data dataBlock = (MseBlock.Data) leftBlock;
-      List<Object[]> rows = new ArrayList<>();
-      for (Object[] row : dataBlock.asRowHeap().getRows()) {
-        if (handleRowMatched(row)) {
-          rows.add(row);
-        }
-      }
-      sampleAndCheckInterruption();
-      if (!rows.isEmpty()) {
-        return new RowHeapDataBlock(rows, _dataSchema);
-      }
-    }
-  }
+  protected abstract MseBlock processLeftOperator();
+
+  protected abstract MseBlock processRightOperator();
 
   @Override
   protected StatMap<?> copyStatMaps() {
     return new StatMap<>(_statMap);
   }
-
-  /**
-   * Returns true if the row is matched.
-   * Also updates the right row set based on the Operator.
-   * @param row
-   * @return true if the row is matched.
-   */
-  protected abstract boolean handleRowMatched(Object[] row);
 
   public enum StatKey implements StatMap.Key {
     //@formatter:off

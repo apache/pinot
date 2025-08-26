@@ -18,32 +18,26 @@
  */
 package org.apache.pinot.broker.requesthandler;
 
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
 
-/**
- * An ID generator to produce a global unique identifier for each query, used in v1/v2 engine for tracking and
- * inter-stage communication(v2 only). It's guaranteed by:
- * <ol>
- *   <li>
- *     Using a mask computed using the hash-code of the broker-id to ensure two brokers don't arrive at the same
- *     requestId. This mask becomes the most significant 9 digits (in base-10).
- *   </li>
- *   <li>
- *     Using a auto-incrementing counter for the least significant 9 digits (in base-10).
- *   </li>
- * </ol>
- */
+
+/// An ID generator to produce a global unique identifier for each query, used in single-stage/multi-stage engine for
+/// tracking and inter-stage communication (multi-stage engine only). It's guaranteed by:
+/// - Using a random number to ensure two brokers (or restarted broker) don't arrive at the same request ID. This random
+///   number becomes the most significant 10 digits of the request ID (in base-10).
+/// - Using an auto-incrementing counter for the least significant 9 digits (in base-10).
 public class BrokerRequestIdGenerator {
   private static final long OFFSET = 1_000_000_000L;
-  private final long _mask;
+  private final long _base;
   private final AtomicLong _incrementingId = new AtomicLong(0);
 
-  public BrokerRequestIdGenerator(String brokerId) {
-    _mask = ((long) (brokerId.hashCode() & Integer.MAX_VALUE)) * OFFSET;
+  public BrokerRequestIdGenerator() {
+    _base = ThreadLocalRandom.current().nextInt(Integer.MAX_VALUE) * OFFSET;
   }
 
   public long get() {
     long normalized = (_incrementingId.getAndIncrement() & Long.MAX_VALUE) % OFFSET;
-    return _mask + normalized;
+    return _base + normalized;
   }
 }

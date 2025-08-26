@@ -144,6 +144,25 @@ public class StreamConfigProperties {
       "realtime.segment.pauseless.download.timeoutSeconds";
 
   /**
+   * Config used to enable offset auto reset during segment commit.
+   */
+  public static final String ENABLE_OFFSET_AUTO_RESET = "realtime.segment.offsetAutoReset.enable";
+
+  /**
+   * During segment commit, the new segment startOffset would skip to the latest offset if thisValue is set as positive
+   * and (latestStreamOffset - latestIngestedOffset > thisValue)
+   */
+  public static final String OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY =
+      "realtime.segment.offsetAutoReset.offsetThreshold";
+
+  /**
+   * During segment commit, the new segment startOffset would skip to the latest offset if thisValue is set as positive
+   * and (latestStreamOffset's timestamp - latestIngestedOffset's timestamp > thisValue)
+   */
+  public static final String OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY =
+      "realtime.segment.offsetAutoReset.timeThresholdSeconds";
+
+  /**
    * Helper method to create a stream specific property
    */
   public static String constructStreamProperty(String streamType, String property) {

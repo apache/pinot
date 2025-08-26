@@ -93,22 +93,25 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       return currentNode;
     }
     if (currentNode.getPRelInputs().isEmpty()) {
-      return processCurrentNode(currentNode, parent);
+      return processCurrentNode(currentNode, parent, true);
     }
     if (currentNode.getPRelInputs().size() == 1) {
       List<PRelNode> newInputs = List.of(executeInternal(currentNode.getPRelInput(0), currentNode));
       currentNode = currentNode.with(newInputs);
-      return processCurrentNode(currentNode, parent);
+      return processCurrentNode(currentNode, parent, true);
     }
     // Process first input.
     List<PRelNode> newInputs = new ArrayList<>();
     newInputs.add(executeInternal(currentNode.getPRelInput(0), currentNode));
     newInputs.addAll(currentNode.getPRelInputs().subList(1, currentNode.getPRelInputs().size()));
     currentNode = currentNode.with(newInputs);
-    // Process current node.
-    currentNode = processCurrentNode(currentNode, parent);
+    // Process current node. For SetOp, we don't meet dist/collation traits immediately. This is because all inputs
+    // of a SetOp need to be processed before we can infer any Dist trait (specifically Hash).
+    boolean meetConstraints = !(currentNode.unwrap() instanceof SetOp);
+    currentNode = processCurrentNode(currentNode, parent, meetConstraints);
     // Process remaining inputs.
     if (currentNode instanceof PhysicalExchange) {
+      Preconditions.checkState(meetConstraints, "PhysicalExchange should not be created constraints were skipped");
       PhysicalExchange exchange = (PhysicalExchange) currentNode;
       currentNode = exchange.getPRelInput(0);
       for (int index = 1; index < currentNode.getPRelInputs().size(); index++) {
@@ -123,16 +126,24 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     }
     currentNode = currentNode.with(newInputs);
     currentNode = inheritDistDescFromInputs(currentNode);
+    if (!meetConstraints) {
+      currentNode = meetCurrentNodeConstraints(currentNode, parent);
+    }
     return currentNode;
   }
 
-  PRelNode processCurrentNode(PRelNode currentNode, @Nullable PRelNode parentNode) {
-    // Step-1: Initialize variables.
-    boolean isLeafStageBoundary = isLeafStageBoundary(currentNode, parentNode);
-    // Step-2: Get current node's distribution. If the current node already has a distribution attached, use that.
-    //         Otherwise, compute it using DistMappingGenerator.
+  PRelNode processCurrentNode(PRelNode currentNode, @Nullable PRelNode parentNode, boolean meetConstraints) {
     PinotDataDistribution currentNodeDistribution = computeCurrentNodeDistribution(currentNode, parentNode);
     currentNode = currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
+    if (meetConstraints) {
+      return meetCurrentNodeConstraints(currentNode, parentNode);
+    }
+    return currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
+  }
+
+  PRelNode meetCurrentNodeConstraints(PRelNode currentNode, @Nullable PRelNode parentNode) {
+    boolean isLeafStageBoundary = isLeafStageBoundary(currentNode, parentNode);
+    PinotDataDistribution currentNodeDistribution = currentNode.getPinotDataDistributionOrThrow();
     // Step-3: Add an optional exchange to meet unmet distribution trait constraint, if it exists. This also takes care
     //         of different workers when the parent already has workers assigned to it (when parent is not a SingleRel).
     PRelNode currentNodeExchange = meetDistributionConstraint(currentNode, currentNodeDistribution, parentNode);
@@ -156,12 +167,27 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     return currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
   }
 
+  /**
+   * For Hash Distributed nodes, for nodes like Join we can inherit multiple distribution traits from inputs.
+   * For SetOp nodes, we may have to drop some Distribution traits that we initially inferred from the left-most
+   * input. This is because SetOp nodes all fold into the same schema, and if any of the inputs is not distributed
+   * by a column, the entire SetOp is not distributed by that column.
+   */
   PRelNode inheritDistDescFromInputs(PRelNode currentNode) {
-    // Inherit distribution trait from inputs (except left-most input, which is already inherited).
     if (currentNode.getPRelInputs().size() <= 1
         || currentNode.getPinotDataDistributionOrThrow().getType() != RelDistribution.Type.HASH_DISTRIBUTED) {
       return currentNode;
     }
+    if (currentNode instanceof Join) {
+      return inheritDistDescFromInputsForJoin(currentNode);
+    } else if (currentNode instanceof SetOp) {
+      return inheritDistDescFromInputsForSetOp(currentNode);
+    }
+    return currentNode;
+  }
+
+  PRelNode inheritDistDescFromInputsForJoin(PRelNode currentNode) {
+    // Inherit distribution trait from inputs (except left-most input, which is already inherited).
     PinotDataDistribution currentDistribution = currentNode.getPinotDataDistributionOrThrow();
     Set<HashDistributionDesc> newDistributionSet =
         new HashSet<>(currentNode.getPinotDataDistributionOrThrow().getHashDistributionDesc());
@@ -181,6 +207,36 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
         currentDistribution.getWorkers(), currentDistribution.getWorkerHash(), newDistributionSet,
         currentDistribution.getCollation());
     return currentNode.with(currentNode.getPRelInputs(), finalDist);
+  }
+
+  PRelNode inheritDistDescFromInputsForSetOp(PRelNode currentNode) {
+    Preconditions.checkState(currentNode instanceof SetOp, "Expected SetOp. Found: %s", currentNode);
+    if (currentNode.getPinotDataDistributionOrThrow().getType() != RelDistribution.Type.HASH_DISTRIBUTED) {
+      return currentNode;
+    }
+    Set<HashDistributionDesc> currentDescs = currentNode.getPinotDataDistributionOrThrow().getHashDistributionDesc();
+    // if any of these descriptors doesn't exist in any of inputs[1:n], then drop them.
+    for (PRelNode input : currentNode.getPRelInputs().subList(1, currentNode.getPRelInputs().size())) {
+      if (input.getPinotDataDistributionOrThrow().getType() != RelDistribution.Type.HASH_DISTRIBUTED) {
+        return currentNode.with(currentNode.getPRelInputs(), new PinotDataDistribution(
+            RelDistribution.Type.RANDOM_DISTRIBUTED, currentNode.getPinotDataDistributionOrThrow().getWorkers(),
+            currentNode.getPinotDataDistributionOrThrow().getWorkerHash(), null, null));
+      }
+      Set<HashDistributionDesc> inputDescs = input.getPinotDataDistributionOrThrow().getHashDistributionDesc();
+      currentDescs.removeIf(desc -> !inputDescs.contains(desc));
+      if (currentDescs.isEmpty()) {
+        break;
+      }
+    }
+    if (currentDescs.isEmpty()) {
+      return currentNode.with(currentNode.getPRelInputs(), new PinotDataDistribution(
+          RelDistribution.Type.RANDOM_DISTRIBUTED, currentNode.getPinotDataDistributionOrThrow().getWorkers(),
+          currentNode.getPinotDataDistributionOrThrow().getWorkerHash(), null, null));
+    }
+    return currentNode.with(currentNode.getPRelInputs(), new PinotDataDistribution(
+        RelDistribution.Type.HASH_DISTRIBUTED, currentNode.getPinotDataDistributionOrThrow().getWorkers(),
+        currentNode.getPinotDataDistributionOrThrow().getWorkerHash(), currentDescs,
+        currentNode.getPinotDataDistributionOrThrow().getCollation()));
   }
 
   @Nullable
