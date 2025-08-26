@@ -23,7 +23,7 @@
       },
       {
         "description": "Query that gets optimized to a Values node",
-        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a WHERE col1 IS NULL LIMIT 1",
+        "sql": "SET usePhysicalOptimizer=true; EXPLAIN PLAN FOR SELECT * FROM a WHERE col1 <> col1 LIMIT 1",
         "output": [
           "Execution Plan",
           "\nPhysicalSort(fetch=[1])",
