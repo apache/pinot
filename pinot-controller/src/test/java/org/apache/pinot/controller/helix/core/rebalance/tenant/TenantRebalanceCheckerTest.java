@@ -302,34 +302,6 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
   }
 
   @Test
-  public void testHandleCorruptedZKMetadata()
-      throws Exception {
-    // Create corrupted ZK metadata (missing required fields)
-    Map<String, String> corruptedJobZKMetadata = new HashMap<>();
-    corruptedJobZKMetadata.put(CommonConstants.ControllerJob.JOB_ID, JOB_ID);
-    corruptedJobZKMetadata.put(CommonConstants.ControllerJob.TENANT_NAME, TENANT_NAME);
-    corruptedJobZKMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
-        String.valueOf(System.currentTimeMillis()));
-    corruptedJobZKMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobTypes.TENANT_REBALANCE.name());
-    // Provide invalid JSON to trigger JsonProcessingException
-    corruptedJobZKMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_CONTEXT, "invalid json");
-    corruptedJobZKMetadata.put(RebalanceJobConstants.JOB_METADATA_KEY_REBALANCE_PROGRESS_STATS, "invalid json");
-
-    Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
-    allJobMetadata.put(JOB_ID, corruptedJobZKMetadata);
-
-    // Setup mocks
-    doReturn(allJobMetadata).when(_mockPinotHelixResourceManager)
-        .getAllJobs(eq(Set.of(ControllerJobTypes.TENANT_REBALANCE)), any());
-
-    // Execute the checker - should not throw exception
-    _tenantRebalanceChecker.runTask(new Properties());
-
-    // Verify that the tenant rebalancer was NOT called
-    verify(_mockTenantRebalancer, never()).rebalanceWithContext(any(), any());
-  }
-
-  @Test
   public void testHandleJsonProcessingException()
       throws Exception {
     // Create ZK metadata with invalid JSON
@@ -442,17 +414,6 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
         new ConcurrentLinkedDeque<>(), new ConcurrentLinkedQueue<>(), new ConcurrentLinkedQueue<>());
   }
 
-  private DefaultTenantRebalanceContext createOldTenantRebalanceContext()
-      throws JsonProcessingException {
-    TenantRebalanceConfig config = new TenantRebalanceConfig();
-    config.setTenantName(TENANT_NAME);
-    config.setHeartbeatTimeoutInMs(300000L);
-
-    return new DefaultTenantRebalanceContext(
-        ORIGINAL_JOB_ID, config, 1,
-        new ConcurrentLinkedDeque<>(), new ConcurrentLinkedQueue<>(), new ConcurrentLinkedQueue<>());
-  }
-
   private TenantRebalanceProgressStats createProgressStats() {
     Set<String> tables = new HashSet<>();
     tables.add(TABLE_NAME_1);
@@ -502,15 +463,6 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     Map<String, String> metadata = createTenantJobZKMetadata(context, progressStats);
     metadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
         String.valueOf(System.currentTimeMillis() - 60000)); // 1 minute ago (within heartbeat timeout)
-    return metadata;
-  }
-
-  private Map<String, String> createJobZKMetadataWithOldTimestamp(DefaultTenantRebalanceContext context,
-      TenantRebalanceProgressStats progressStats)
-      throws JsonProcessingException {
-    Map<String, String> metadata = createTenantJobZKMetadata(context, progressStats);
-    metadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
-        String.valueOf(System.currentTimeMillis() - 400000)); // 6+ minutes ago (beyond heartbeat timeout)
     return metadata;
   }
 
