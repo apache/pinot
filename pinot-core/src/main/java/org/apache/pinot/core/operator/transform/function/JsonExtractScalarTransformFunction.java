@@ -366,7 +366,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           if (_defaultValue != null) {
             value = ((Number) _defaultValue).intValue();
           } else {
-                    + "Consider setting a default value as the fourth argument of jsonextractscalar.");
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the fourth argument of json_extract_scalar.");
           }
         }
         values[j] = value;
@@ -399,7 +401,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           if (_defaultValue != null) {
             value = ((Number) _defaultValue).longValue();
           } else {
-                    + "Consider setting a default value as the fourth argument of jsonextractscalar.");
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the fourth argument of json_extract_scalar.");
           }
         }
         values[j] = value;
@@ -432,7 +436,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           if (_defaultValue != null) {
             value = ((Number) _defaultValue).floatValue();
           } else {
-                    + "Consider setting a default value as the fourth argument of jsonextractscalar.");
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the fourth argument of json_extract_scalar.");
           }
         }
         values[j] = value;
@@ -465,7 +471,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           if (_defaultValue != null) {
             value = ((Number) _defaultValue).doubleValue();
           } else {
-                    + "Consider setting a default value as the fourth argument of jsonextractscalar.");
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the fourth argument of json_extract_scalar.");
           }
         }
         values[j] = value;
@@ -498,7 +506,9 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           if (_defaultValue != null) {
             value = _defaultValue.toString();
           } else {
-                    + "Consider setting a default value as the fourth argument of jsonextractscalar.");
+            throw new IllegalArgumentException(
+                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
+                    + "Consider setting a default value as the fourth argument of json_extract_scalar.");
           }
         }
         values[j] = value;
