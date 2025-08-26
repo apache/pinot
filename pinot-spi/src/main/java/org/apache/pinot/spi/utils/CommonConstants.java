@@ -1102,6 +1102,20 @@ public class CommonConstants {
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
     public static final int DEFAULT_QUERY_EXECUTOR_MAX_EXECUTION_THREADS = -1;  // Use number of CPU cores
 
+    // OOM throttle configuration
+    public static final String CONFIG_OF_OOM_THROTTLE_MODE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".oomThrottle.mode"; // values: queue | reject
+    public static final String DEFAULT_OOM_THROTTLE_MODE = "queue";
+    public static final String CONFIG_OF_OOM_THROTTLE_QUEUE_MAX_SIZE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".oomThrottle.queue.maxSize";
+    public static final int DEFAULT_OOM_THROTTLE_QUEUE_MAX_SIZE = 1000;
+    public static final String CONFIG_OF_OOM_THROTTLE_QUEUE_TIMEOUT_MS =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".oomThrottle.queue.timeoutMs";
+    public static final long DEFAULT_OOM_THROTTLE_QUEUE_TIMEOUT_MS = 30_000L;
+    public static final String CONFIG_OF_OOM_THROTTLE_MONITOR_INTERVAL_MS =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".oomThrottle.monitorIntervalMs";
+    public static final long DEFAULT_OOM_THROTTLE_MONITOR_INTERVAL_MS = 1_000L;
+
     // Group-by query related configs
     public static final String NUM_GROUPS_LIMIT = "num.groups.limit";
     public static final String CONFIG_OF_QUERY_EXECUTOR_NUM_GROUPS_LIMIT =
