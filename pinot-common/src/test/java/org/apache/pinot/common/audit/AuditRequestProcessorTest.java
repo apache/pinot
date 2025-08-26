@@ -68,7 +68,7 @@ public class AuditRequestProcessorTest {
     _defaultConfig = new AuditConfig();
     _defaultConfig.setEnabled(true);
     _defaultConfig.setCaptureRequestPayload(false);
-    _defaultConfig.setCaptureRequestHeaders(false);
+    _defaultConfig.setCaptureRequestHeaders("");
     _defaultConfig.setMaxPayloadSize(10240);
     _defaultConfig.setExcludedEndpoints("");
 
@@ -139,7 +139,7 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testCaptureHeadersWhenEnabled() {
-    _defaultConfig.setCaptureRequestHeaders(true);
+    _defaultConfig.setCaptureRequestHeaders("Content-Type,X-Custom-Header,Authorization,X-Password");
     MultivaluedMap<String, String> headers =
         createHeaders("Content-Type", "application/json", "X-Custom-Header", "custom-value", "Authorization",
             "Bearer token123",  // Should be filtered out
@@ -167,7 +167,7 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testSkipHeadersWhenDisabled() {
-    _defaultConfig.setCaptureRequestHeaders(false);
+    _defaultConfig.setCaptureRequestHeaders("");
     MultivaluedMap<String, String> headers = createHeaders("Content-Type", "application/json");
 
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
@@ -187,7 +187,8 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testFilterSensitiveHeaders() {
-    _defaultConfig.setCaptureRequestHeaders(true);
+    _defaultConfig.setCaptureRequestHeaders(
+        "authorization,x-auth-token,password-header,api-secret,x-api-key,content-type");
     MultivaluedMap<String, String> headers =
         createHeaders("authorization", "Bearer token123", "x-auth-token", "token456", "password-header", "pass123",
             "api-secret", "secret789", "x-api-key", "key123",

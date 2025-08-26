@@ -19,9 +19,12 @@
 package org.apache.pinot.common.audit;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -52,19 +55,40 @@ public class AuditRequestProcessor {
    * If a key has multiple values, the list of values is added instead.
    *
    * @param multimap the input MultivaluedMap containing keys and their associated values
+   * @param allowedKeys optional set of allowed keys for case-insensitive filtering.
+   *                    If null or empty, all keys are included
+   * @return a Map where each key is mapped to either a single value or a list of values
+   */
+  private static Map<String, Object> toMap(MultivaluedMap<String, String> multimap, Set<String> allowedKeys) {
+    Map<String, Object> resultMap = new HashMap<>();
+    boolean filterKeys = allowedKeys != null && !allowedKeys.isEmpty();
+
+    for (Map.Entry<String, List<String>> entry : multimap.entrySet()) {
+      String key = entry.getKey();
+      // Skip if filtering is enabled and key is not in allowed list (case-insensitive)
+      if (filterKeys && !allowedKeys.contains(key.toLowerCase())) {
+        continue;
+      }
+
+      List<String> values = entry.getValue();
+      if (values.size() == 1) {
+        resultMap.put(key, values.get(0));
+      } else {
+        resultMap.put(key, values);
+      }
+    }
+    return resultMap;
+  }
+
+  /**
+   * Converts a MultivaluedMap into a Map of query parameters without filtering.
+   * Backward compatibility method.
+   *
+   * @param multimap the input MultivaluedMap containing keys and their associated values
    * @return a Map where each key is mapped to either a single value or a list of values
    */
   private static Map<String, Object> toMap(MultivaluedMap<String, String> multimap) {
-    Map<String, Object> queryMap = new HashMap<>();
-    for (Map.Entry<String, List<String>> entry : multimap.entrySet()) {
-      List<String> values = entry.getValue();
-      if (values.size() == 1) {
-        queryMap.put(entry.getKey(), values.get(0));
-      } else {
-        queryMap.put(entry.getKey(), values);
-      }
-    }
-    return queryMap;
+    return toMap(multimap, null);
   }
 
   public AuditEvent processRequest(ContainerRequestContext requestContext, String remoteAddr) {
@@ -140,10 +164,15 @@ public class AuditRequestProcessor {
       }
 
       final AuditConfig config = _configManager.getCurrentConfig();
-      if (config.isCaptureRequestHeaders()) {
-        MultivaluedMap<String, String> headers = requestContext.getHeaders();
-        if (!headers.isEmpty()) {
-          payload.setHeaders(toMap(headers));
+
+      Set<String> allowedHeaders = parseAllowedHeaders(config.getCaptureRequestHeaders());
+      if (!allowedHeaders.isEmpty()) {
+        MultivaluedMap<String, String> allHeaders = requestContext.getHeaders();
+        if (!allHeaders.isEmpty()) {
+          Map<String, Object> filteredHeaders = toMap(allHeaders, allowedHeaders);
+          if (!filteredHeaders.isEmpty()) {
+            payload.setHeaders(filteredHeaders);
+          }
         }
       }
 
@@ -174,6 +203,29 @@ public class AuditRequestProcessor {
    * @param maxPayloadSize maximum bytes to read from the request body
    * @return the request body as string (potentially truncated)
    */
+  /**
+   * Parses a comma-separated list of headers into a Set of lowercase header names
+   * for case-insensitive comparison.
+   *
+   * @param headerList comma-separated list of header names
+   * @return Set of lowercase header names, empty if headerList is blank
+   */
+  private static Set<String> parseAllowedHeaders(String headerList) {
+    if (StringUtils.isBlank(headerList)) {
+      return Collections.emptySet();
+    }
+
+    Set<String> headers = new HashSet<>();
+    for (String header : headerList.split(",")) {
+      String trimmed = header.trim();
+      if (!trimmed.isEmpty()) {
+        // Store as lowercase for case-insensitive comparison
+        headers.add(trimmed.toLowerCase());
+      }
+    }
+    return headers;
+  }
+
   private String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
     // TODO spyne to be implemented
     return null;
