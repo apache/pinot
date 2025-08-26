@@ -23,11 +23,24 @@
   <Appenders>
     <Console name="console" target="SYSTEM_OUT">
       <PatternLayout pattern="%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n"/>
+      <Filters>
+        <BurstFilter level="ERROR" rate="5" maxBurst="10"/>
+      </Filters>
+    </Console>
+    <Console name="spammy" target="SYSTEM_OUT">
+      <PatternLayout pattern="%d{HH:mm:ss.SSS} %p [%c{1}] [%t] %m%n"/>
+      <Filters>
+        <BurstFilter level="ERROR" rate="1" maxBurst="2"/>
+      </Filters>
     </Console>
   </Appenders>
+
   <Loggers>
     <Logger name="org.apache.pinot" level="warn" additivity="false">
       <AppenderRef ref="console"/>
+    </Logger>
+    <Logger name="org.apache.pinot.core.accounting" level="warn" additivity="false">
+      <AppenderRef ref="spammy"/>
     </Logger>
     <Root level="error">
       <AppenderRef ref="console"/>

@@ -23,7 +23,18 @@ import java.util.Map;
 import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
-
+/// Configs used for the gRPC **query** service.
+///
+/// Remember that in Pinot we use different gPRC services for different purposes:
+/// - **query**: used by Pinot users for executing queries
+/// - **internal**: used by Pinot for internal communication between servers/broker in MSE. This includes:
+///    - The ability to send query plans from broker to server, and the mailbox service for sending data between
+///      servers/brokers
+///    - The broker -> server communication for the SSE when `pinot.broker.request.handler.type` is set to grpc
+///      (see the GrpcBrokerRequestHandler)
+///
+/// This class only affects the **query** service. See ChannelManager, MailboxService and GrpcMailboxServer to learn
+/// more about the Grpc config used for MSE.
 public class GrpcConfig {
   public static final String GRPC_TLS_PREFIX = "tls";
   public static final String CONFIG_USE_PLAIN_TEXT = "usePlainText";
