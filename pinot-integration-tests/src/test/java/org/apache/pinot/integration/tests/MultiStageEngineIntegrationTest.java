@@ -1769,7 +1769,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<Schema> schemas = Collections.singletonList(schema);
 
     for (String query : successfulQueries) {
-      // Create request object using proper POJO
       MultiStageQueryValidationRequest request = new MultiStageQueryValidationRequest(
           query, tableConfigs, schemas, null, false);
 
@@ -1791,7 +1790,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     JsonNode schemaNode =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
 
-    // Parse table configs from JSON response
     List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
@@ -1802,7 +1800,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
       tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
     }
 
-    // Parse schema from JSON response
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
     List<Schema> schemas = Collections.singletonList(schema);
 
@@ -1836,7 +1833,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable"));
     JsonNode schemaNode = JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/schemas/mytable"));
 
-    // Parse table configs from JSON response
     List<TableConfig> tableConfigs = new ArrayList<>();
     JsonNode offlineConfig = tableConfigsNode.get("OFFLINE");
     if (offlineConfig != null && !offlineConfig.isMissingNode() && !offlineConfig.isEmpty()) {
@@ -1846,8 +1842,6 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     if (realtimeConfig != null && !realtimeConfig.isMissingNode() && !realtimeConfig.isEmpty()) {
       tableConfigs.add(JsonUtils.jsonNodeToObject(realtimeConfig, TableConfig.class));
     }
-
-    // Parse schema from JSON response
     Schema schema = JsonUtils.jsonNodeToObject(schemaNode, Schema.class);
     List<Schema> schemas = Collections.singletonList(schema);
 
