@@ -179,6 +179,26 @@ public class PinotClusterConfigProviderTest {
     assertThat(changedProperties).containsExactlyInAnyOrder("key1");
   }
 
+  @Test
+  public void testGetChangedPropertiesWithNoChanges() {
+    // Given
+    PinotClusterConfigProviderMock handler = new PinotClusterConfigProviderMock();
+    Map<String, String> oldProperties = new HashMap<>();
+    oldProperties.put("key1", "value1");
+    oldProperties.put("key2", "value2");
+    oldProperties.put("key3", "value3");
+    Map<String, String> newProperties = new HashMap<>();
+    newProperties.put("key1", "value1");
+    newProperties.put("key2", "value2");
+    newProperties.put("key3", "value3");
+
+    // When
+    Set<String> changedProperties = handler.getChangedProperties(oldProperties, newProperties);
+
+    // Then
+    assertThat(changedProperties).isEmpty();
+  }
+
   public static class PinotClusterConfigProviderMock implements PinotClusterConfigProvider {
     @Override
     public Map<String, String> getClusterConfigs() {
