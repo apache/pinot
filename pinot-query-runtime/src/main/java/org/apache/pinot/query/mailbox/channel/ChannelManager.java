@@ -93,16 +93,4 @@ public class ChannelManager {
   private ManagedChannelBuilder<?> decorate(ManagedChannelBuilder<?> builder) {
     return builder.idleTimeout(_idleTimeout.getSeconds(), TimeUnit.SECONDS);
   }
-
-  /**
-   * Returns a set with the key of all known channels.
-   *
-   * For each entry, the key is a pair of (hostname, port).
-   *
-   * The returned value is a copy of the internal map's key set, so it is safe to use
-   * without worrying about concurrent modifications.
-   */
-  public Set<Pair<String, Integer>> getKnownChannels() {
-    return new HashSet<>(_channelMap.keySet());
-  }
 }
