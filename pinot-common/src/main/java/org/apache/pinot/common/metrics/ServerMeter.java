@@ -210,6 +210,16 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   // reingestion metrics
   SEGMENT_REINGESTION_FAILURE("segments", false),
 
+  // ThrottleOnCriticalHeapUsageExecutor meters
+  THROTTLE_EXECUTOR_QUEUED_TASKS("count", true,
+      "Number of tasks that have been queued in the throttle executor"),
+  THROTTLE_EXECUTOR_PROCESSED_TASKS("count", true,
+      "Number of tasks processed from the throttle executor queue"),
+  THROTTLE_EXECUTOR_TIMED_OUT_TASKS("count", true,
+      "Number of tasks that timed out in the throttle executor queue"),
+  THROTTLE_EXECUTOR_SHUTDOWN_CANCELED_TASKS("count", true,
+      "Number of tasks canceled during throttle executor shutdown"),
+
   // commit-time compaction metrics
   COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS("segments", false,
       "Number of segments processed with commit-time compaction enabled"),
