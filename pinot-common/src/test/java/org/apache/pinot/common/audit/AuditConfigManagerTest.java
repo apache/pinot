@@ -237,4 +237,29 @@ public class AuditConfigManagerTest {
     assertThat(defaultConfig.getMaxPayloadSize()).isEqualTo(10240);
     assertThat(defaultConfig.getExcludedEndpoints()).isEmpty();
   }
+
+  @Test
+  public void testConfigurationStringFormats() {
+    Map<String, String> properties = new HashMap<>();
+
+    // Test various string formats
+    properties.put("pinot.audit.capture.request.headers", "Header1,Header2,Header3");
+    AuditConfig config1 = AuditConfigManager.buildFromClusterConfig(properties);
+    assertThat(config1.getCaptureRequestHeaders()).isEqualTo("Header1,Header2,Header3");
+
+    // Test empty string
+    properties.put("pinot.audit.capture.request.headers", "");
+    AuditConfig config2 = AuditConfigManager.buildFromClusterConfig(properties);
+    assertThat(config2.getCaptureRequestHeaders()).isEmpty();
+
+    // Test single header
+    properties.put("pinot.audit.capture.request.headers", "Content-Type");
+    AuditConfig config3 = AuditConfigManager.buildFromClusterConfig(properties);
+    assertThat(config3.getCaptureRequestHeaders()).isEqualTo("Content-Type");
+
+    // Test headers with mixed case and special characters
+    properties.put("pinot.audit.capture.request.headers", "Content-Type,X-Request-ID,User-Agent,X-Custom-123");
+    AuditConfig config4 = AuditConfigManager.buildFromClusterConfig(properties);
+    assertThat(config4.getCaptureRequestHeaders()).isEqualTo("Content-Type,X-Request-ID,User-Agent,X-Custom-123");
+  }
 }

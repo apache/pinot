@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -210,7 +211,8 @@ public class AuditRequestProcessor {
    * @param headerList comma-separated list of header names
    * @return Set of lowercase header names, empty if headerList is blank
    */
-  private static Set<String> parseAllowedHeaders(String headerList) {
+  @VisibleForTesting
+  static Set<String> parseAllowedHeaders(String headerList) {
     if (StringUtils.isBlank(headerList)) {
       return Collections.emptySet();
     }
