@@ -49,6 +49,84 @@ This document guides AI coding assistants (Copilot, Cursor, etc.) contributing t
   coverage of common timezones, and sort entries by UTC offset.
 - Imports: Favor importing classes at the top of files instead of using fully qualified class names inline.
 
+## Testing Best Practices
+
+- Write unit tests for new functionality and bug fixes; follow the existing test naming conventions.
+- Use Mockito for mocking dependencies in unit tests.
+- Include integration tests when modifying core components or data flows.
+- Add performance tests for optimization changes; measure impact with realistic data volumes.
+- Use `@Test(expected = Exception.class)` sparingly; prefer `@Test` with try-catch for specific assertions.
+- Keep test methods focused and descriptive; avoid overly complex test setups.
+
+## Test Coverage Guidelines
+
+- Aim for high branch coverage (≥80%) on new code and modified code paths.
+- Focus on testing business logic rather than trivial getters/setters or framework boilerplate.
+- Prioritize coverage of error handling paths, edge cases, and boundary conditions.
+- Use JaCoCo or similar tools for measuring coverage; include coverage reports in CI builds.
+- Don't artificially inflate coverage with trivial tests; quality matters more than quantity.
+- Cover both happy path and failure scenarios, including timeout and resource exhaustion cases.
+- For critical components (e.g., query execution, data ingestion), maintain ≥90% coverage.
+- Document coverage expectations in PR descriptions when coverage goals aren't met.
+- Use mutation testing (e.g., PITest) for critical code to ensure test quality.
+- Exclude generated code, test utilities, and simple data transfer objects from coverage requirements.
+
+## Performance Considerations
+
+- Be mindful of memory usage in data processing pipelines; avoid loading large datasets into memory unnecessarily.
+- Use efficient data structures (e.g., primitive arrays over collections for numerical data).
+- Consider lazy evaluation for expensive operations that might not always be needed.
+- Profile performance-critical code paths and document assumptions about data scale.
+- Use appropriate collection types based on access patterns (e.g., ArrayList for iteration, HashMap for lookups).
+
+## Security Guidelines
+
+- Never log sensitive information like passwords, API keys, or personally identifiable data.
+- Validate all user inputs and external data sources; sanitize inputs to prevent injection attacks.
+- Use parameterized queries for database operations to prevent SQL injection.
+- Implement proper authentication and authorization checks for sensitive operations.
+- Follow the principle of least privilege when granting permissions.
+
+## Error Handling and Logging
+
+- Use appropriate log levels: ERROR for failures, WARN for concerning situations, INFO for important events, DEBUG for detailed troubleshooting.
+- Include relevant context in log messages (e.g., request IDs, user context, operation parameters).
+- Use structured logging with key-value pairs for better searchability and analysis.
+- Create custom exception types for domain-specific errors rather than generic RuntimeException.
+- Include stack traces only in DEBUG level; avoid in production logs to prevent information leakage.
+
+## Concurrency and Threading
+
+- Use thread-safe data structures (e.g., ConcurrentHashMap) in multi-threaded contexts.
+- Prefer immutable objects for shared state to avoid race conditions.
+- Use appropriate synchronization mechanisms; favor higher-level constructs over synchronized blocks.
+- Document thread safety guarantees in class-level Javadoc.
+- Be aware of Pinot's distributed nature; consider consistency models and eventual consistency scenarios.
+
+## Configuration Management
+
+- Externalize configuration values; avoid hardcoding environment-specific settings.
+- Use meaningful default values with clear documentation about their impact.
+- Validate configuration at startup and provide helpful error messages for invalid settings.
+- Document all configuration properties in code comments or separate configuration docs.
+- Use consistent naming conventions for configuration keys (e.g., pinot.server.port).
+
+## Documentation Standards
+
+- Document public APIs with comprehensive Javadoc including parameter descriptions, return values, and exceptions.
+- Include code examples in documentation where helpful for complex APIs.
+- Update documentation when changing behavior; keep README files current.
+- Use consistent terminology across documentation and code comments.
+- Document performance characteristics and limitations for important components.
+
+## Code Review Process
+
+- Address all review comments thoughtfully; if you disagree, explain your reasoning clearly.
+- Keep PRs focused on a single concern; split large changes into smaller, reviewable commits.
+- Include context in PR descriptions: what problem you're solving, how you solved it, and any trade-offs.
+- Test your changes thoroughly before requesting review; include test results when relevant.
+- Be responsive to feedback and iterate quickly on requested changes.
+
 ## Assistant guidance
 
 - When editing, touch only what is necessary; keep changes minimal and localized.
@@ -56,3 +134,8 @@ This document guides AI coding assistants (Copilot, Cursor, etc.) contributing t
 - When creating new files, include the ASF license header and all required imports/dependencies.
 - Avoid adding extremely long hashes or non-textual content; keep repository contents textual and reviewable.
 - If uncertain about where a change belongs, search for similar code in the codebase and follow established patterns.
+- Use absolute file paths in discussions and tool calls for clarity.
+- Prefer early returns and guard clauses to reduce nesting and improve readability.
+- When implementing complex logic, break it into smaller, well-named methods.
+- Consider edge cases and failure scenarios in your implementations.
+- Follow the existing code patterns and architectural decisions in the codebase.
