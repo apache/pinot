@@ -58,6 +58,7 @@ import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.Utils;
 import org.apache.pinot.common.config.provider.StaticTableCache;
+import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.common.response.ProcessingException;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
@@ -171,7 +172,7 @@ public class PinotQueryResource {
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
 
     try {
-      TableCacheProvider tableCache;
+      TableCache tableCache;
       if (request.getTableConfigs() != null && !request.getTableConfigs().isEmpty() && request.getSchemas() != null
           && !request.getSchemas().isEmpty()) {
         List<TableConfig> tableConfigs = new ArrayList<>();

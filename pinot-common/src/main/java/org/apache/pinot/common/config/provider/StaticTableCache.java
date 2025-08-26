@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
  * This is useful for validation scenarios where you want to test query compilation against a specific
  * set of table configs and schemas without needing a live cluster.
  */
-public class StaticTableCache implements TableCacheProvider {
+public class StaticTableCache implements TableCache {
   private static final Logger LOGGER = LoggerFactory.getLogger(StaticTableCache.class);
 
   private final boolean _ignoreCase;

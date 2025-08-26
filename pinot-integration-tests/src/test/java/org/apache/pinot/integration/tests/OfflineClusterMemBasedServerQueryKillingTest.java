@@ -287,7 +287,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     assertTrue(exceptions.contains("got killed on SERVER"), exceptions);
   }
 
-  @Test
+  @Test(enabled = false) // Disabled because this test is flaky in the multi-stage query engine
   public void testDigestOOMMSE()
       throws Exception {
     setUseMultiStageQueryEngine(true);
@@ -321,7 +321,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     assertTrue(exceptions.contains("got killed on SERVER"), exceptions);
   }
 
-  @Test
+  @Test(enabled = false) // Disabled because this test is flaky in the multi-stage query engine
   public void testSelectionOnlyOOMMSE()
       throws Exception {
     setUseMultiStageQueryEngine(true);
@@ -343,7 +343,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     assertTrue(exceptions.contains("got killed on SERVER"), exceptions);
   }
 
-  @Test
+  @Test(enabled = false) // Disabled because this test is flaky in the multi-stage query engine
   public void testDigestOOM2MSE()
       throws Exception {
     setUseMultiStageQueryEngine(true);

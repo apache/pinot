@@ -22,7 +22,6 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.config.provider.TableCache;
-import org.apache.pinot.common.config.provider.TableCacheProvider;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.routing.timeboundary.TimeBoundaryStrategy;
@@ -47,7 +46,7 @@ public class LogicalTableRouteProvider implements TableRouteProvider {
   }
 
   public void fillTableConfigMetadata(LogicalTableRouteInfo logicalTableRouteInfo, String tableName,
-      TableCacheProvider tableCache) {
+      TableCache tableCache) {
     LogicalTableConfig logicalTableConfig = tableCache.getLogicalTableConfig(tableName);
     if (logicalTableConfig == null) {
       return;
