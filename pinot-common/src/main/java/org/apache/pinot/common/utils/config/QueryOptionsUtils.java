@@ -142,6 +142,10 @@ public class QueryOptionsUtils {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UPSERT_VIEW));
   }
 
+  public static boolean isTraceRuleProductions(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.TRACE_RULE_PRODUCTIONS));
+  }
+
   public static long getUpsertViewFreshnessMs(Map<String, String> queryOptions) {
     String freshnessMsString = queryOptions.get(QueryOptionKey.UPSERT_VIEW_FRESHNESS_MS);
     return freshnessMsString != null ? Long.parseLong(freshnessMsString) : -1; //can blow up with NFE
@@ -187,17 +191,28 @@ public class QueryOptionsUtils {
     return skipIndexes;
   }
 
-  @Nullable
   public static Set<String> getSkipPlannerRules(Map<String, String> queryOptions) {
-    // Example config:  skipPlannerRules='FilterIntoJoinRule,FilterAggregateTransposeRule'
+    // Example config:  skipPlannerRules='FilterIntoJoin,FilterAggregateTranspose'
     String skipIndexesStr = queryOptions.get(QueryOptionKey.SKIP_PLANNER_RULES);
     if (skipIndexesStr == null) {
-      return null;
+      return Set.of();
     }
 
     String[] skippedRules = StringUtils.split(skipIndexesStr, ',');
 
     return new HashSet<>(List.of(skippedRules));
+  }
+
+  public static Set<String> getUsePlannerRules(Map<String, String> queryOptions) {
+    // Example config:  usePlannerRules='SortJoinTranspose, AggregateJoinTransposeExtended'
+    String usedIndexesStr = queryOptions.get(QueryOptionKey.USE_PLANNER_RULES);
+    if (usedIndexesStr == null) {
+      return Set.of();
+    }
+
+    String[] usedRules = StringUtils.split(usedIndexesStr, ',');
+
+    return new HashSet<>(List.of(usedRules));
   }
 
   @Nullable
@@ -351,6 +366,7 @@ public class QueryOptionsUtils {
     String numGroupsWarningLimit = queryOptions.get(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT);
     return checkedParseIntPositive(QueryOptionKey.NUM_GROUPS_WARNING_LIMIT, numGroupsWarningLimit);
   }
+
   @Nullable
   public static Integer getMaxInitialResultHolderCapacity(Map<String, String> queryOptions) {
     String maxInitialResultHolderCapacity = queryOptions.get(QueryOptionKey.MAX_INITIAL_RESULT_HOLDER_CAPACITY);
@@ -375,6 +391,20 @@ public class QueryOptionsUtils {
 
   public static boolean shouldDropResults(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(CommonConstants.Broker.Request.QueryOptionKey.DROP_RESULTS));
+  }
+
+  @Nullable
+  public static Integer getSortAggregateLimitThreshold(Map<String, String> queryOptions) {
+    String sortAggregateLimitThreshold = queryOptions.get(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD);
+    return checkedParseIntPositive(QueryOptionKey.SORT_AGGREGATE_LIMIT_THRESHOLD, sortAggregateLimitThreshold);
+  }
+
+  @Nullable
+  public static Integer getSortAggregateSequentialCombineNumSegmentsThreshold(Map<String, String> queryOptions) {
+    String sortAggregateSingleThreadedNumSegmentsThreshold =
+        queryOptions.get(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD);
+    return checkedParseIntPositive(QueryOptionKey.SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD,
+        sortAggregateSingleThreadedNumSegmentsThreshold);
   }
 
   @Nullable
@@ -409,6 +439,10 @@ public class QueryOptionsUtils {
 
   public static boolean isSkipUnavailableServers(Map<String, String> queryOptions) {
     return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.SKIP_UNAVAILABLE_SERVERS));
+  }
+
+  public static boolean isIgnoreMissingSegments(Map<String, String> queryOptions) {
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.IGNORE_MISSING_SEGMENTS));
   }
 
   public static boolean isSecondaryWorkload(Map<String, String> queryOptions) {
@@ -532,5 +566,9 @@ public class QueryOptionsUtils {
       long minValue) {
     return new IllegalArgumentException(
         String.format("%s must be a number between %d and 2^63-1, got: %s", optionName, minValue, optionValue));
+  }
+
+  public static String getWorkloadName(Map<String, String> queryOptions) {
+    return queryOptions.getOrDefault(QueryOptionKey.WORKLOAD_NAME, CommonConstants.Accounting.DEFAULT_WORKLOAD_NAME);
   }
 }

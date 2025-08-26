@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
 import org.apache.pinot.segment.spi.Constants;
@@ -81,6 +82,7 @@ import org.apache.pinot.spi.utils.Enablement;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.mockito.Mockito;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.when;
@@ -814,6 +816,48 @@ public class TableConfigUtilsTest {
     // Legacy behavior: allow size based threshold to be explicitly set to 0
     streamConfigs.put(StreamConfigProperties.SEGMENT_FLUSH_THRESHOLD_ROWS, "0");
     TableConfigUtils.validateStreamConfig(new StreamConfig("test", streamConfigs));
+
+    // Test for multiple stream configs with pauseless consumption enabled - should fail
+    StreamIngestionConfig streamIngestionConfigWithPauseless =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+    streamIngestionConfigWithPauseless.setPauselessConsumptionEnabled(true);
+
+    IngestionConfig ingestionConfigWithPauseless = new IngestionConfig();
+    ingestionConfigWithPauseless.setStreamIngestionConfig(streamIngestionConfigWithPauseless);
+
+    TableConfig tableConfigWithPauseless = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithPauseless)
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfigWithPauseless, schema);
+      fail("Should fail when pauseless consumption is enabled with multiple stream configs");
+    } catch (IllegalStateException e) {
+      // Expected - should fail with specific error message
+      assertTrue(
+          e.getMessage().contains("Multiple stream configs are not supported with pauseless consumption enabled"));
+    }
+
+    // Test for multiple stream configs with pauseless consumption disabled - should pass
+    StreamIngestionConfig streamIngestionConfigWithoutPauseless =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, streamConfigs));
+    streamIngestionConfigWithoutPauseless.setPauselessConsumptionEnabled(false);
+
+    IngestionConfig ingestionConfigWithoutPauseless = new IngestionConfig();
+    ingestionConfigWithoutPauseless.setStreamIngestionConfig(streamIngestionConfigWithoutPauseless);
+
+    TableConfig tableConfigWithoutPauseless = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName("timeColumn")
+        .setIngestionConfig(ingestionConfigWithoutPauseless)
+        .build();
+
+    try {
+      TableConfigUtils.validate(tableConfigWithoutPauseless, schema);
+      // Should pass - multiple stream configs are allowed when pauseless consumption is disabled
+    } catch (IllegalStateException e) {
+      fail("Should not fail when pauseless consumption is disabled with multiple stream configs: " + e.getMessage());
+    }
   }
 
   @Test
@@ -1440,6 +1484,7 @@ public class TableConfigUtilsTest {
         .addSingleValueDimension("myCol", FieldSpec.DataType.STRING)
         .addSingleValueDimension("bytesCol", FieldSpec.DataType.BYTES)
         .addSingleValueDimension("intCol", FieldSpec.DataType.INT)
+        .addSingleValueDimension("bigDecimalCol", FieldSpec.DataType.BIG_DECIMAL)
         .addMultiValueDimension("multiValCol", FieldSpec.DataType.STRING)
         .build();
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
@@ -1707,11 +1752,16 @@ public class TableConfigUtilsTest {
     }
 
     tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
+        .setVarLengthDictionaryColumns(Arrays.asList("myCol", "bytesCol", "bigDecimalCol", "multiValCol"))
+        .build();
+    TableConfigUtils.validate(tableConfig, schema);
+
+    tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName(TABLE_NAME)
         .setVarLengthDictionaryColumns(Arrays.asList("intCol"))
         .build();
     try {
       TableConfigUtils.validate(tableConfig, schema);
-      fail("Should fail for Var length dictionary defined for non string/bytes column");
+      fail("Should fail for Var length dictionary defined for fixed-width column");
     } catch (Exception e) {
       // expected
     }
@@ -3099,11 +3149,13 @@ public class TableConfigUtilsTest {
     public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName) {
     }
 
+    @Nullable
     @Override
     public GenericRow decode(byte[] payload, GenericRow destination) {
       return null;
     }
 
+    @Nullable
     @Override
     public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
       return null;
@@ -3201,5 +3253,81 @@ public class TableConfigUtilsTest {
     tableConfig.setValidationConfig(validationConfig);
 
     assertEquals(TableConfigUtils.getPartitionColumn(tableConfig), PARTITION_COLUMN);
+  }
+
+  @DataProvider(name = "tableTypeTestDataProvider")
+  public Object[][] tableTypeTestDataProvider() {
+    return new Object[][]{
+        {TableType.OFFLINE},
+        {TableType.REALTIME}
+    };
+  }
+
+  @Test(dataProvider = "tableTypeTestDataProvider")
+  public void testIsRelevantToTenant(TableType tableType) {
+    // Test 1: Basic server tenant relevance
+    TableConfig tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TABLE_NAME)
+        .setServerTenant("serverTenant")
+        .setBrokerTenant("brokerTenant")
+        .build();
+
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig,
+        "brokerTenant")); // broker tenant not relevant for server operations
+
+    // Test 2: Tag override configs
+    TagOverrideConfig tagOverrideConfig = new TagOverrideConfig("customConsuming_REALTIME", "customCompleted_OFFLINE");
+    tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TABLE_NAME)
+        .setTagOverrideConfig(tagOverrideConfig)
+        .setServerTenant("serverTenant")
+        .setBrokerTenant("brokerTenant")
+        .build();
+
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "customConsuming"));
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "customCompleted"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
+
+    // Test 3: Instance assignment configs
+    String tagSuffix = tableType == TableType.OFFLINE ? "_OFFLINE" : "_REALTIME";
+    InstanceTagPoolConfig tagPoolConfig = new InstanceTagPoolConfig("tag" + tagSuffix, false, 0, null);
+    InstanceReplicaGroupPartitionConfig replicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(false, 0, 0, 0, 0, 0, false, null);
+    InstanceAssignmentConfig instanceAssignmentConfig =
+        new InstanceAssignmentConfig(tagPoolConfig, null, replicaGroupPartitionConfig, null, false);
+
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
+    instanceAssignmentConfigMap.put(tableType.name(), instanceAssignmentConfig);
+
+    tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TABLE_NAME)
+        .setServerTenant("serverTenant")
+        .setBrokerTenant("brokerTenant")
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap)
+        .build();
+
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "tag"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
+
+    // Test 4: Tier configs
+    TierConfig tierConfig =
+        new TierConfig("tier", TierFactory.TIME_SEGMENT_SELECTOR_TYPE.toLowerCase(), "40d", null,
+            TierFactory.PINOT_SERVER_STORAGE_TYPE, "tierTag" + tagSuffix, null, null);
+    List<TierConfig> tierConfigs = Collections.singletonList(tierConfig);
+
+    tableConfig = new TableConfigBuilder(tableType)
+        .setTableName(TABLE_NAME)
+        .setServerTenant("serverTenant")
+        .setBrokerTenant("brokerTenant")
+        .setTierConfigList(tierConfigs)
+        .build();
+
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "serverTenant"));
+    assertTrue(TableConfigUtils.isRelevantToTenant(tableConfig, "tierTag"));
+    assertFalse(TableConfigUtils.isRelevantToTenant(tableConfig, "otherTenant"));
   }
 }

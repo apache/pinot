@@ -50,7 +50,6 @@ import org.apache.pinot.segment.local.segment.creator.impl.stats.StringColumnPre
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexCreatorFactory;
 import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexPlugin;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentColumnReader;
@@ -63,6 +62,8 @@ import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 import org.apache.pinot.segment.spi.index.DictionaryIndexConfig;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.ForwardIndexConfig;
+import org.apache.pinot.segment.spi.index.IndexReaderConstraintException;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
@@ -1200,6 +1201,8 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
         .withTotalDocs(numDocs)
         .withDictionary(hasDictionary)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
 
     ForwardIndexConfig forwardIndexConfig = null;
@@ -1221,8 +1224,13 @@ public abstract class BaseDefaultColumnHandler implements DefaultColumnHandler {
     final PinotSegmentColumnReader _columnReader;
 
     ValueReader(ColumnMetadata columnMetadata)
-        throws IOException {
-      _forwardIndexReader = ForwardIndexType.read(_segmentWriter, columnMetadata);
+        throws IOException, IndexReaderConstraintException {
+
+      IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+      FieldIndexConfigs fieldIndexConfigs = new FieldIndexConfigs.Builder()
+          .add(StandardIndexes.forward(), ForwardIndexConfig.getDefault())
+          .build();
+      _forwardIndexReader = readerFactory.createIndexReader(_segmentWriter, fieldIndexConfigs, columnMetadata);
       if (columnMetadata.hasDictionary()) {
         _dictionary = DictionaryIndexType.read(_segmentWriter, columnMetadata);
       } else {

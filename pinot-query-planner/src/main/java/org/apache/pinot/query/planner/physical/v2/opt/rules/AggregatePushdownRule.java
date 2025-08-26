@@ -136,7 +136,7 @@ public class AggregatePushdownRule extends PRelOptRule {
         : PinotDistMapping.apply(o1.getRelCollation(), mapFromInputToPartialAgg);
     PhysicalExchange n1 = new PhysicalExchange(o1.getNodeId(), n2,
         o1.getPinotDataDistributionOrThrow().apply(mapFromInputToPartialAgg), newDistKeys, o1.getExchangeStrategy(),
-        newCollation, PinotExecStrategyTrait.getDefaultExecStrategy());
+        newCollation, PinotExecStrategyTrait.getDefaultExecStrategy(), o1.getHashFunction());
     return convertAggFromIntermediateInput(aggPRelNode, n1, AggType.FINAL, leafReturnFinalResult,
         PinotDistMapping.apply(RelCollations.of(o0.getCollations()), mapFromInputToPartialAgg).getFieldCollations(),
         aggPRelNode.getLimit(), idGenerator);

@@ -106,7 +106,8 @@ public class LiteModeWorkerAssignmentRule implements PRelNodeTransformer {
           RelDistribution.Type.SINGLETON, liteModeWorkers, liteModeWorkers.hashCode(), null, null);
     }
     return new PhysicalExchange(nodeId(), leafStageRoot, pdd, Collections.emptyList(),
-        ExchangeStrategy.SINGLETON_EXCHANGE, collation, PinotExecStrategyTrait.getDefaultExecStrategy());
+        ExchangeStrategy.SINGLETON_EXCHANGE, collation, PinotExecStrategyTrait.getDefaultExecStrategy(),
+        _context.getDefaultHashFunction());
   }
 
   /**

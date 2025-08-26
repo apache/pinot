@@ -21,9 +21,13 @@ package org.apache.pinot.query.runtime.operator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.operator.blocks.InstanceResponseBlock;
@@ -36,10 +40,12 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
+import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -50,6 +56,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertNotSame;
+import static org.testng.Assert.assertSame;
+import static org.testng.Assert.assertTrue;
 
 
 // TODO: add tests for Agg / GroupBy / Distinct result blocks
@@ -121,9 +131,9 @@ public class LeafOperatorTest {
 
     // Then:
     List<Object[]> rows = ((MseBlock.Data) resultBlock).asRowHeap().getRows();
-    Assert.assertEquals(rows.get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(rows.get(1), new Object[]{"", 2});
-    Assert.assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 2 blocks");
+    assertEquals(rows.get(0), new Object[]{"foo", 1});
+    assertEquals(rows.get(1), new Object[]{"", 2});
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -153,9 +163,9 @@ public class LeafOperatorTest {
 
     // Then:
     List<Object[]> rows = ((MseBlock.Data) resultBlock).asRowHeap().getRows();
-    Assert.assertEquals(rows.get(0), new Object[]{1, 1660000000000L, 1});
-    Assert.assertEquals(rows.get(1), new Object[]{0, 1600000000000L, 0});
-    Assert.assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 2 blocks");
+    assertEquals(rows.get(0), new Object[]{1, 1660000000000L, 1});
+    assertEquals(rows.get(1), new Object[]{0, 1600000000000L, 0});
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -184,11 +194,11 @@ public class LeafOperatorTest {
     // Then:
     List<Object[]> rows1 = ((MseBlock.Data) resultBlock1).asRowHeap().getRows();
     List<Object[]> rows2 = ((MseBlock.Data) resultBlock2).asRowHeap().getRows();
-    Assert.assertEquals(rows1.get(0), new Object[]{"foo", 1});
-    Assert.assertEquals(rows1.get(1), new Object[]{"", 2});
-    Assert.assertEquals(rows2.get(0), new Object[]{"bar", 3});
-    Assert.assertEquals(rows2.get(1), new Object[]{"foo", 4});
-    Assert.assertTrue(resultBlock3.isEos(), "Expected EOS after reading 2 blocks");
+    assertEquals(rows1.get(0), new Object[]{"foo", 1});
+    assertEquals(rows1.get(1), new Object[]{"", 2});
+    assertEquals(rows2.get(0), new Object[]{"bar", 3});
+    assertEquals(rows2.get(1), new Object[]{"foo", 4});
+    assertTrue(resultBlock3.isEos(), "Expected EOS after reading 2 blocks");
 
     operator.close();
   }
@@ -210,11 +220,11 @@ public class LeafOperatorTest {
     _operatorRef.set(operator);
 
     // Then: the 5th block should be EOS
-    Assert.assertTrue(operator.nextBlock().isData());
-    Assert.assertTrue(operator.nextBlock().isData());
-    Assert.assertTrue(operator.nextBlock().isData());
-    Assert.assertTrue(operator.nextBlock().isData());
-    Assert.assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 5 blocks");
+    assertTrue(operator.nextBlock().isData());
+    assertTrue(operator.nextBlock().isData());
+    assertTrue(operator.nextBlock().isData());
+    assertTrue(operator.nextBlock().isData());
+    assertTrue(operator.nextBlock().isEos(), "Expected EOS after reading 5 blocks");
 
     operator.close();
   }
@@ -240,7 +250,7 @@ public class LeafOperatorTest {
 
     // Then: error block can be returned as first or second block depending on the sequence of the execution
     if (!resultBlock.isError()) {
-      Assert.assertTrue(operator.nextBlock().isError());
+      assertTrue(operator.nextBlock().isError());
     }
 
     operator.close();
@@ -267,7 +277,7 @@ public class LeafOperatorTest {
     MseBlock resultBlock = operator.nextBlock();
 
     // Then:
-    Assert.assertTrue(resultBlock.isEos());
+    assertTrue(resultBlock.isEos());
 
     operator.close();
   }
@@ -339,5 +349,60 @@ public class LeafOperatorTest {
 
     // Then:
     verify(operator).cancelSseTasks();
+  }
+
+  @Test
+  public void executionThreadShouldNotBlockOnLastResultsBlockWhenCancelled()
+      throws Exception {
+    // Given: operator with queue size 1
+    DataSchema schema = new DataSchema(new String[]{"strCol", "intCol"},
+        new DataSchema.ColumnDataType[]{DataSchema.ColumnDataType.STRING, DataSchema.ColumnDataType.INT});
+    QueryContext queryContext = QueryContextConverterUtils.getQueryContext("SELECT strCol, intCol FROM tbl");
+
+    Map<String, String> opChainMetadata = new HashMap<>();
+    opChainMetadata.put("maxStreamingPendingBlocks", "1");
+    opChainMetadata.put("timeoutMs", "100000");
+    OpChainExecutionContext context = OperatorTestUtil.getContext(opChainMetadata);
+    CountDownLatch resultsBlockAdded = new CountDownLatch(1);
+
+    LeafOperator operator =
+        new LeafOperator(context, mockQueryRequests(1), schema, mock(QueryExecutor.class), _executorService) {
+          @Override
+          void execute(ThreadExecutionContext parentContext) {
+            try {
+              // Fill queue and block on second add
+              SelectionResultsBlock dataBlock =
+                  new SelectionResultsBlock(schema, Arrays.asList(new Object[]{"foo", 1}, new Object[]{"", 2}),
+                      queryContext);
+              // First data block is consumed by the first call of getNextBlock()
+              addResultsBlock(dataBlock);
+              // Second data block will remain in the blocking queue and block the third data block
+              addResultsBlock(dataBlock);
+              resultsBlockAdded.countDown();
+              addResultsBlock(dataBlock);
+            } catch (Exception e) {
+              assertTrue(e instanceof InterruptedException);
+            }
+          }
+        };
+
+    // Main thread read the next block to start the execution
+    assertTrue(operator.getNextBlock() instanceof MseBlock.Data);
+
+    // Wait for blocking queue to fill up
+    resultsBlockAdded.await();
+
+    // Early terminate the operator, which will also interrupt the child
+    operator.earlyTerminate();
+
+    // Child should still block on adding LAST_RESULTS_BLOCK
+    Thread.sleep(100);
+    assertNotSame(operator._blockingQueue.peek(), LeafOperator.LAST_RESULTS_BLOCK);
+
+    // Main thread read the next block, which should return SUCCESS_MSE_BLOCK and also unblock the child
+    assertSame(operator.getNextBlock(), SuccessMseBlock.INSTANCE);
+    assertSame(operator._blockingQueue.poll(10, TimeUnit.SECONDS), LeafOperator.LAST_RESULTS_BLOCK);
+
+    operator.close();
   }
 }

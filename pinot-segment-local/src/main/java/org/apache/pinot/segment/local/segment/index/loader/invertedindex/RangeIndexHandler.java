@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.LoaderUtils;
@@ -34,6 +33,7 @@ import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.RangeIndexConfig;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.CombinedInvertedIndexCreator;
@@ -162,7 +162,9 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private void handleDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {
@@ -185,7 +187,9 @@ public class RangeIndexHandler extends BaseIndexHandler {
   private void handleNonDictionaryBasedColumn(SegmentDirectory.Writer segmentWriter, ColumnMetadata columnMetadata)
       throws Exception {
     int numDocs = columnMetadata.getTotalDocs();
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         CombinedInvertedIndexCreator rangeIndexCreator = newRangeIndexCreator(columnMetadata)) {
       if (columnMetadata.isSingleValue()) {
@@ -261,6 +265,8 @@ public class RangeIndexHandler extends BaseIndexHandler {
         .withIndexDir(indexDir)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     RangeIndexConfig config = _fieldIndexConfigs.get(columnMetadata.getColumnName())
         .getConfig(StandardIndexes.range());

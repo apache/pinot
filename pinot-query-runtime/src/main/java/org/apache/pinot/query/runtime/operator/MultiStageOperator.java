@@ -37,6 +37,7 @@ import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.plan.ExplainInfo;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.operator.set.SetOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
@@ -97,7 +98,7 @@ public abstract class MultiStageOperator
       earlyTerminate();
       throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on " + getExplainName());
     }
-    Tracing.ThreadAccountantOps.sampleMSE();
+    Tracing.ThreadAccountantOps.sample();
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
       earlyTerminate();
       throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "
@@ -124,6 +125,7 @@ public abstract class MultiStageOperator
       try {
         nextBlock = getNextBlock();
       } catch (Exception e) {
+        logger().warn("Operator {}: Exception while processing next block", _operatorId, e);
         nextBlock = ErrorMseBlock.fromException(e);
       }
       int numRows = nextBlock instanceof MseBlock.Data ? ((MseBlock.Data) nextBlock).getNumRows() : 0;

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.integration.tests;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
 import java.io.FileInputStream;
@@ -37,10 +38,14 @@ import java.util.Properties;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
+import org.apache.helix.task.TaskPartitionState;
+import org.apache.helix.task.TaskState;
 import org.apache.pinot.client.ConnectionFactory;
 import org.apache.pinot.client.JsonAsyncHttpPinotClientTransportFactory;
 import org.apache.pinot.client.PinotClientTransportFactory;
 import org.apache.pinot.client.ResultSetGroup;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsMetadataInfo;
+import org.apache.pinot.common.restlet.resources.ValidDocIdsType;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.plugin.inputformat.csv.CSVMessageDecoder;
@@ -207,6 +212,17 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   }
 
   @Nullable
+  protected RoutingConfig getRoutingConfig() {
+    // Default routing config is handled by broker
+    return null;
+  }
+
+  @Nullable
+  protected UpsertConfig getUpsertConfig() {
+    return null;
+  }
+
+  @Nullable
   protected List<String> getBloomFilterColumns() {
     return new ArrayList<>(DEFAULT_BLOOM_FILTER_COLUMNS);
   }
@@ -261,6 +277,11 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
 
   @Nullable
   protected SegmentPartitionConfig getSegmentPartitionConfig() {
+    return null;
+  }
+
+  @Nullable
+  protected ReplicaGroupStrategyConfig getReplicaGroupStrategyConfig() {
     return null;
   }
 
@@ -384,6 +405,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setInvertedIndexColumns(getInvertedIndexColumns())
         .setNoDictionaryColumns(getNoDictionaryColumns())
         .setRangeIndexColumns(getRangeIndexColumns())
+        .setRoutingConfig(getRoutingConfig())
+        .setUpsertConfig(getUpsertConfig())
         .setBloomFilterColumns(getBloomFilterColumns())
         .setFieldConfigList(getFieldConfigs())
         .setNumReplicas(getNumReplicas())
@@ -395,7 +418,9 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         .setIngestionConfig(getIngestionConfig())
         .setQueryConfig(getQueryConfig())
         .setStreamConfigs(getStreamConfigs())
-        .setNullHandlingEnabled(getNullHandlingEnabled());
+        .setNullHandlingEnabled(getNullHandlingEnabled())
+        .setSegmentPartitionConfig(getSegmentPartitionConfig())
+        .setReplicaGroupStrategyConfig(getReplicaGroupStrategyConfig());
   }
 
   /**
@@ -637,11 +662,25 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return false;
   }
 
-  protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
+  protected void createAndUploadSegmentFromClasspath(TableConfig tableConfig, Schema schema, String dataFilePath,
       FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
     URL dataPathUrl = getClass().getClassLoader().getResource(dataFilePath);
     assert dataPathUrl != null;
     File file = new File(dataPathUrl.getFile());
+
+    createAndUploadSegmentFromFile(tableConfig, schema, file, fileFormat, expectedNoOfDocs, timeoutMs);
+  }
+
+  /// @deprecated use createAndUploadSegmentFromClasspath instead, given what this class does is to look for
+  /// dataFilePath on the classpath
+  @Deprecated
+  protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, String dataFilePath,
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
+    createAndUploadSegmentFromClasspath(tableConfig, schema, dataFilePath, fileFormat, expectedNoOfDocs, timeoutMs);
+  }
+
+  protected void createAndUploadSegmentFromFile(TableConfig tableConfig, Schema schema, File file,
+      FileFormat fileFormat, long expectedNoOfDocs, long timeoutMs) throws Exception {
 
     TestUtils.ensureDirectoriesExistAndEmpty(_segmentDir, _tarDir);
     ClusterIntegrationTestUtils.buildSegmentFromFile(file, tableConfig, schema, "%", _segmentDir, _tarDir, fileFormat);
@@ -722,6 +761,30 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       return resultSetGroup.getResultSet(0).getLong(0);
     }
     return 0;
+  }
+
+  protected void waitForMinionTaskCompletion(String taskId, long timeout) {
+    TestUtils.waitForCondition(aVoid ->
+            _controllerStarter.getHelixTaskResourceManager().getTaskState(taskId) == TaskState.COMPLETED,
+        timeout, "Failed to complete the task " + taskId);
+
+    // Validate that there were > 0 subtasks so that we know the task was actually run
+    Assert.assertFalse(_controllerStarter.getHelixTaskResourceManager().getSubtaskStates(taskId).isEmpty());
+
+    // Validate that all subtasks are completed successfully. A task can be marked completed even if some subtasks
+    // failed, so we need to check the subtask states.
+    Map<String, TaskPartitionState> subTaskStates = _controllerStarter.getHelixTaskResourceManager()
+        .getSubtaskStates(taskId);
+    Assert.assertTrue(subTaskStates.values().stream().allMatch(x -> x == TaskPartitionState.COMPLETED),
+        "Not all subtasks are completed for task " + taskId + " : " + subTaskStates);
+  }
+
+  protected List<String> getSegments(String tableNameWithType) {
+    return _controllerStarter.getHelixResourceManager().getSegmentsFor(tableNameWithType, false);
+  }
+
+  protected int getSegmentCount(String tableNameWithType) {
+    return getSegments(tableNameWithType).size();
   }
 
   /**
@@ -808,5 +871,15 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return JsonUtils.stringToJsonNode(
             sendGetRequest(_controllerRequestURLBuilder.forTableAggregateMetadata(getTableName(), List.of(column))))
         .get("columnIndexSizeMap").get(column);
+  }
+
+  protected List<ValidDocIdsMetadataInfo> getValidDocIdsMetadata(String tableNameWithType,
+      ValidDocIdsType validDocIdsType)
+      throws Exception {
+
+    StringBuilder urlBuilder = new StringBuilder(
+        _controllerRequestURLBuilder.forValidDocIdsMetadata(tableNameWithType, validDocIdsType.toString()));
+    String responseString = sendGetRequest(urlBuilder.toString());
+    return JsonUtils.stringToObject(responseString, new TypeReference<>() { });
   }
 }

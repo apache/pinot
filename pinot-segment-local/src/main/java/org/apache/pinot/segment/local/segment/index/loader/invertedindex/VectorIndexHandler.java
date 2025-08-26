@@ -24,13 +24,13 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.segment.local.segment.index.forward.ForwardIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.BaseIndexHandler;
 import org.apache.pinot.segment.spi.ColumnMetadata;
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.creator.IndexCreationContext;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
 import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.IndexReaderFactory;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexConfig;
 import org.apache.pinot.segment.spi.index.creator.VectorIndexCreator;
@@ -168,6 +168,8 @@ public class VectorIndexHandler extends BaseIndexHandler {
         .withIndexDir(segmentDirectory)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     VectorIndexConfig config = colIndexConf.getConfig(StandardIndexes.vector());
 
@@ -202,9 +204,13 @@ public class VectorIndexHandler extends BaseIndexHandler {
         .withIndexDir(segmentDirectory)
         .withColumnMetadata(columnMetadata)
         .withTableNameWithType(_tableConfig.getTableName())
+        .withContinueOnError(_tableConfig.getIngestionConfig() != null
+            && _tableConfig.getIngestionConfig().isContinueOnError())
         .build();
     VectorIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.vector());
-    try (ForwardIndexReader forwardIndexReader = ForwardIndexType.read(segmentWriter, columnMetadata);
+    IndexReaderFactory<ForwardIndexReader> readerFactory = StandardIndexes.forward().getReaderFactory();
+    try (ForwardIndexReader forwardIndexReader = readerFactory.createIndexReader(segmentWriter,
+        _fieldIndexConfigs.get(columnMetadata.getColumnName()), columnMetadata);
         ForwardIndexReaderContext readerContext = forwardIndexReader.createContext();
         VectorIndexCreator vectorIndexCreator = StandardIndexes.vector().createIndexCreator(context, config)) {
       int numDocs = columnMetadata.getTotalDocs();

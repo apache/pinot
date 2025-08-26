@@ -57,7 +57,6 @@ import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
 import org.apache.pinot.broker.querylog.QueryLogger;
 import org.apache.pinot.broker.queryquota.QueryQuotaManager;
-import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.http.MultiHttpRequest;
 import org.apache.pinot.common.http.MultiHttpRequestResponse;
@@ -90,15 +89,18 @@ import org.apache.pinot.core.query.reduce.BaseGapfillProcessor;
 import org.apache.pinot.core.query.reduce.GapfillProcessorFactory;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
-import org.apache.pinot.core.routing.TimeBoundaryInfo;
+import org.apache.pinot.core.routing.ImplicitHybridTableRouteProvider;
+import org.apache.pinot.core.routing.LogicalTableRouteProvider;
+import org.apache.pinot.core.routing.RoutingManager;
+import org.apache.pinot.core.routing.TableRouteInfo;
+import org.apache.pinot.core.routing.TableRouteProvider;
+import org.apache.pinot.core.routing.timeboundary.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
-import org.apache.pinot.core.transport.TableRouteInfo;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.parser.utils.ParserUtils;
-import org.apache.pinot.query.routing.table.ImplicitHybridTableRouteProvider;
-import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
-import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
+import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.TableRowColAccessResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
@@ -168,9 +170,11 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   protected LogicalTableRouteProvider _logicalTableRouteProvider;
 
   public BaseSingleStageBrokerRequestHandler(PinotConfiguration config, String brokerId,
-      BrokerRoutingManager routingManager, AccessControlFactory accessControlFactory,
-      QueryQuotaManager queryQuotaManager, TableCache tableCache) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache);
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
+      AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
+      ThreadResourceUsageAccountant accountant) {
+    super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        accountant);
     _disableGroovy = _config.getProperty(Broker.DISABLE_GROOVY, Broker.DEFAULT_DISABLE_GROOVY);
     _useApproximateFunction = _config.getProperty(Broker.USE_APPROXIMATE_FUNCTION, false);
     _defaultHllLog2m = _config.getProperty(CommonConstants.Helix.DEFAULT_HYPERLOGLOG_LOG2M_KEY,
@@ -319,16 +323,19 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       JsonNode request, @Nullable RequesterIdentity requesterIdentity, RequestContext requestContext,
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl)
       throws Exception {
+    QueryThreadContext.setQueryEngine("sse");
     _queryLogger.log(requestId, query);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
-    Tracing.ThreadAccountantOps.setupRunner(String.valueOf(requestId));
+    String workloadName = QueryOptionsUtils.getWorkloadName(sqlNodeAndOptions.getOptions());
+    _resourceUsageAccountant.setupRunner(QueryThreadContext.getCid(), ThreadExecutionContext.TaskType.SSE,
+        workloadName);
 
     try {
       return doHandleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext,
           httpHeaders, accessControl);
     } finally {
-      Tracing.ThreadAccountantOps.clear();
+      _resourceUsageAccountant.clear();
     }
   }
 
@@ -396,6 +403,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     // full request compile time = compilationTimeNs + parserTimeNs
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.REQUEST_COMPILATION,
         (compilationEndTimeNs - compilationStartTimeNs) + sqlNodeAndOptions.getParseTimeNs());
+    // Accounts for resource usage of the compilation phase, since compilation for some queries can be expensive.
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
 
     // Second-stage table-level access control
     // TODO: Modify AccessControl interface to directly take PinotQuery
@@ -435,6 +444,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
       _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.AUTHORIZATION,
           System.nanoTime() - compilationEndTimeNs);
+      // Accounts for resource usage of the authorization phase.
+      Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
 
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
@@ -683,6 +694,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     long routingEndTimeNs = System.nanoTime();
     _brokerMetrics.addPhaseTiming(rawTableName, BrokerQueryPhase.QUERY_ROUTING,
         routingEndTimeNs - routingStartTimeNs);
+    // Account the resource used for routing phase, since for single stage queries with multiple segments, routing
+    // can be expensive.
+    Tracing.ThreadAccountantOps.sampleAndCheckInterruption(_resourceUsageAccountant);
 
     // Set timeout in the requests
     long timeSpentMs = TimeUnit.NANOSECONDS.toMillis(routingEndTimeNs - compilationStartTimeNs);
@@ -733,6 +747,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverBrokerRequest.getPinotQuery().getQueryOptions()
               .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
         }
+        // Optionally set ignoreMissingSegments based on broker config
+        setIgnoreMissingSegmentsIfConfigured(queryOptions);
       }
     }
     if (realtimeBrokerRequest != null) {
@@ -746,6 +762,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           serverBrokerRequest.getPinotQuery().getQueryOptions()
               .put(QueryOptionKey.SERVER_RETURN_FINAL_RESULT, "true");
         }
+        // Optionally set ignoreMissingSegments based on broker config
+        setIgnoreMissingSegmentsIfConfigured(queryOptions);
       }
     }
 
@@ -1031,7 +1049,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
   @Override
   protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {
     super.onQueryStart(requestId, clientRequestId, query, extras);
-    QueryThreadContext.setQueryEngine("sse");
     if (isQueryCancellationEnabled() && extras.length > 0 && extras[0] instanceof QueryServers) {
       _serversById.put(requestId, (QueryServers) extras[0]);
     }
@@ -1934,10 +1951,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       // Use query-level timeout if exists
       queryTimeoutMs = queryLevelTimeoutMs;
     } else {
-      Long tableLevelTimeoutMs = _routingManager.getQueryTimeoutMs(tableNameWithType);
-      if (tableLevelTimeoutMs != null) {
+      TableConfig tableConfig = _tableCache.getTableConfig(tableNameWithType);
+      if (tableConfig != null
+          && tableConfig.getQueryConfig() != null
+          && tableConfig.getQueryConfig().getTimeoutMs() != null) {
         // Use table-level timeout if exists
-        queryTimeoutMs = tableLevelTimeoutMs;
+        queryTimeoutMs = tableConfig.getQueryConfig().getTimeoutMs();
       } else if (logicalTableQueryTimeout != null) {
         queryTimeoutMs = logicalTableQueryTimeout;
       } else {
@@ -2067,6 +2086,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private String getGlobalQueryId(long requestId) {
     return _brokerId + "_" + requestId;
+  }
+
+  private void setIgnoreMissingSegmentsIfConfigured(Map<String, String> queryOptions) {
+    if (_config.getProperty(CommonConstants.Broker.CONFIG_OF_IGNORE_MISSING_SEGMENTS,
+        CommonConstants.Broker.DEFAULT_IGNORE_MISSING_SEGMENTS)) {
+      queryOptions.putIfAbsent(QueryOptionKey.IGNORE_MISSING_SEGMENTS, "true");
+    }
   }
 
   /**

@@ -140,9 +140,11 @@ public abstract class QueryScheduler {
    */
   @Nullable
   protected byte[] processQueryAndSerialize(ServerQueryRequest queryRequest, ExecutorService executorService) {
+    Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
+    String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
 
     //Start instrumentation context. This must not be moved further below interspersed into the code.
-    Tracing.ThreadAccountantOps.setupRunner(queryRequest.getQueryId());
+    Tracing.ThreadAccountantOps.setupRunner(QueryThreadContext.getCid(), workloadName);
 
     try {
       _latestQueryTime.accumulate(System.currentTimeMillis());
@@ -161,6 +163,7 @@ public abstract class QueryScheduler {
       long requestId = queryRequest.getRequestId();
       Map<String, String> responseMetadata = instanceResponse.getResponseMetadata();
       responseMetadata.put(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+      responseMetadata.put(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
       byte[] responseBytes = serializeResponse(queryRequest, instanceResponse);
 
       // Log the statistics
@@ -169,7 +172,6 @@ public abstract class QueryScheduler {
       }
 
       // TODO: Perform this check sooner during the serialization of DataTable.
-      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
       Long maxResponseSizeBytes = QueryOptionsUtils.getMaxServerResponseSizeBytes(queryOptions);
       if (maxResponseSizeBytes != null && responseBytes != null && responseBytes.length > maxResponseSizeBytes) {
         String errMsg = "Serialized query response size " + responseBytes.length + " exceeds threshold "
@@ -182,6 +184,7 @@ public abstract class QueryScheduler {
         instanceResponse = new InstanceResponseBlock();
         instanceResponse.addException(QueryErrorCode.QUERY_CANCELLATION, errMsg);
         instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(requestId));
+        responseMetadata.put(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
         responseBytes = serializeResponse(queryRequest, instanceResponse);
       }
 
@@ -233,8 +236,11 @@ public abstract class QueryScheduler {
           "Cancelled while building data table" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg);
       LOGGER.error(userMsg);
       QueryErrorMessage errMsg = QueryErrorMessage.safeMsg(QueryErrorCode.QUERY_CANCELLATION, userMsg);
+      Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
+      String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
       instanceResponse = new InstanceResponseBlock(new ExceptionResultsBlock(errMsg));
       instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
+      instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
       return serializeResponse(queryRequest, instanceResponse);
     } catch (Exception e) {
       _serverMetrics.addMeteredGlobalValue(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS, 1);
@@ -255,8 +261,11 @@ public abstract class QueryScheduler {
    */
   protected ListenableFuture<byte[]> immediateErrorResponse(ServerQueryRequest queryRequest,
       QueryErrorCode errorCode) {
+    Map<String, String> queryOptions = queryRequest.getQueryContext().getQueryOptions();
+    String workloadName = QueryOptionsUtils.getWorkloadName(queryOptions);
     InstanceResponseBlock instanceResponse = new InstanceResponseBlock();
     instanceResponse.addMetadata(MetadataKey.REQUEST_ID.getName(), Long.toString(queryRequest.getRequestId()));
+    instanceResponse.addMetadata(MetadataKey.WORKLOAD_NAME.getName(), workloadName);
     instanceResponse.addException(errorCode, errorCode.getDefaultMessage());
     return Futures.immediateFuture(serializeResponse(queryRequest, instanceResponse));
   }

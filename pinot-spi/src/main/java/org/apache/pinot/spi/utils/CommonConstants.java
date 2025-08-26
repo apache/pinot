@@ -72,6 +72,21 @@ public class CommonConstants {
   public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
   public static final String QUERY_WORKLOAD = "queryWorkload";
 
+  // Audit logging configuration constants
+  public static class AuditLogConstants {
+    public static final String PREFIX = "pinot.audit";
+    public static final String CONFIG_OF_AUDIT_LOG_ENABLED = PREFIX + ".enabled";
+    public static final String CONFIG_OF_AUDIT_LOG_CAPTURE_REQUEST_PAYLOAD = PREFIX + ".capture.request.payload";
+    public static final String CONFIG_OF_AUDIT_LOG_EXCLUDED_ENDPOINTS = PREFIX + ".excluded.endpoints";
+    public static final String CONFIG_OF_AUDIT_LOG_CAPTURE_REQUEST_HEADERS = PREFIX + ".capture.request.headers";
+    public static final String CONFIG_OF_AUDIT_LOG_MAX_PAYLOAD_SIZE = PREFIX + ".max.payload.size";
+    public static final String CONFIG_OF_AUDIT_LOG_LOGGER_NAME = PREFIX + ".logger.name";
+  }
+
+  public static class Lucene {
+    public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
+    public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;
+  }
   public static final String JFR = "pinot.jfr";
 
   public static final String RLS_FILTERS = "rlsFilters";
@@ -237,6 +252,8 @@ public class CommonConstants {
     public static final String DEFAULT_FLAPPING_TIME_WINDOW_MS = "1";
     public static final String PINOT_SERVICE_ROLE = "pinot.service.role";
     public static final String CONFIG_OF_CLUSTER_NAME = "pinot.cluster.name";
+    public static final String CONFIG_OF_ZOOKEEPER_SERVER = "pinot.zk.server";
+    @Deprecated(since = "1.5.0", forRemoval = true)
     public static final String CONFIG_OF_ZOOKEEPR_SERVER = "pinot.zk.server";
 
     public static final String CONFIG_OF_PINOT_CONTROLLER_STARTABLE_CLASS = "pinot.controller.startable.class";
@@ -249,6 +266,8 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_TLS_ENABLED = "pinot.multistage.engine.tls.enabled";
     public static final boolean DEFAULT_MULTI_STAGE_ENGINE_TLS_ENABLED = false;
+    public static final String CONFIG_OF_MULTI_STAGE_CHANNEL_ACCESS_CONTROL_FACTORY_CLASS =
+        "pinot.multistage.engine.channel.auth.factory.class";
 
     // This is a "beta" config and can be changed or even removed in future releases.
     public static final String CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS =
@@ -405,6 +424,9 @@ public class CommonConstants {
 
     public static final String CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS = "pinot.broker.mse.max.server.query.threads";
     public static final int DEFAULT_MSE_MAX_SERVER_QUERY_THREADS = -1;
+    public static final String CONFIG_OF_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY =
+        "pinot.broker.mse.max.server.query.threads.exceed.strategy";
+    public static final String DEFAULT_MSE_MAX_SERVER_QUERY_THREADS_EXCEED_STRATEGY = "WAIT";
 
     // Configure the request handler type used by broker to handler inbound query request.
     // NOTE: the request handler type refers to the communication between Broker and Server.
@@ -449,6 +471,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER =
         "pinot.broker.enable.partition.metadata.manager";
     public static final boolean DEFAULT_ENABLE_PARTITION_METADATA_MANAGER = true;
+
+      // When enabled, the broker will set a query option to ignore SERVER_SEGMENT_MISSING errors from servers.
+      // This is useful to tolerate short windows where routing has not yet reflected recently deleted segments.
+      public static final String CONFIG_OF_IGNORE_MISSING_SEGMENTS =
+          "pinot.broker.query.ignore.missing.segments";
+      public static final boolean DEFAULT_IGNORE_MISSING_SEGMENTS = false;
     // Whether to infer partition hint by default or not.
     // This value can always be overridden by INFER_PARTITION_HINT query option
     public static final String CONFIG_OF_INFER_PARTITION_HINT = "pinot.broker.multistage.infer.partition.hint";
@@ -530,6 +558,15 @@ public class CommonConstants {
         "pinot.broker.multistage.lite.mode.leaf.stage.limit";
     public static final int DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT = 100_000;
 
+    // Config for default hash function used in KeySelector for data shuffling
+    public static final String CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION = "pinot.broker.multistage.default.hash.function";
+    public static final String DEFAULT_BROKER_DEFAULT_HASH_FUNCTION = "absHashCode";
+
+    // Config for default single pool segments metric
+    public static final String CONFIG_OF_BROKER_ENABLE_SINGLE_POOL_SEGMENTS_METRIC =
+        "pinot.broker.enable.single.pool.segments.metric";
+    public static final boolean DEFAULT_ENABLE_SINGLE_POOL_SEGMENTS_METRIC = false;
+
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
     // would set the pool to -1 in the routing table for that server.
     public static final int FALLBACK_POOL_ID = -1;
@@ -543,6 +580,8 @@ public class CommonConstants {
       public static final String SQL_V2 = "sqlV2";
       public static final String TRACE = "trace";
       public static final String QUERY_OPTIONS = "queryOptions";
+      public static final String LANGUAGE = "language";
+      public static final String QUERY = "query";
 
       public static class QueryOptionKey {
         public static final String TIMEOUT_MS = "timeoutMs";
@@ -574,6 +613,16 @@ public class CommonConstants {
         public static final String MIN_SERVER_GROUP_TRIM_SIZE = "minServerGroupTrimSize";
         public static final String MIN_BROKER_GROUP_TRIM_SIZE = "minBrokerGroupTrimSize";
         public static final String MSE_MIN_GROUP_TRIM_SIZE = "mseMinGroupTrimSize";
+
+        // When safeTrim (ORDER BY groupKeys without HAVING clause), do sort aggregate when LIMIT is below this value
+        public static final String SORT_AGGREGATE_LIMIT_THRESHOLD = "sortAggregateLimitThreshold";
+
+        /**
+         * When safeTrim (ORDER BY groupKeys without HAVING clause),
+         * do single-threaded sort aggregate when num of segments is below this value
+         */
+        public static final String SORT_AGGREGATE_SINGLE_THREADED_NUM_SEGMENTS_THRESHOLD =
+            "sortAggregateSingleThreadedNumSegmentsThreshold";
 
         /**
          * This will help in getting accurate and correct result for queries
@@ -625,8 +674,14 @@ public class CommonConstants {
         public static final String AND_SCAN_REORDERING = "AndScanReordering";
         public static final String SKIP_INDEXES = "skipIndexes";
 
+        // Query option key used to trace rule productions
+        public static final String TRACE_RULE_PRODUCTIONS = "traceRuleProductions";
+
         // Query option key used to skip a given set of rules
         public static final String SKIP_PLANNER_RULES = "skipPlannerRules";
+
+        // Query option key used to enable a given set of defaultly disabled rules
+        public static final String USE_PLANNER_RULES = "usePlannerRules";
 
         public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
 
@@ -670,6 +725,10 @@ public class CommonConstants {
 
         // If query submission causes an exception, still continue to submit the query to other servers
         public static final String SKIP_UNAVAILABLE_SERVERS = "skipUnavailableServers";
+
+        // Ignore server-side segment missing errors and proceed without marking the query as failed.
+        // When set to true, SERVER_SEGMENT_MISSING exceptions are filtered out on the broker.
+        public static final String IGNORE_MISSING_SEGMENTS = "ignoreMissingSegments";
 
         // Indicates that a query belongs to a secondary workload when using the BinaryWorkloadScheduler. The
         // BinaryWorkloadScheduler divides queries into two workloads, primary and secondary. Primary workloads are
@@ -735,6 +794,10 @@ public class CommonConstants {
         /// For MSE queries, when this option is set to true, only use servers for leaf stages as the workers for the
         /// intermediate stages. This is useful to control the fanout of the query and reduce data shuffling.
         public static final String USE_LEAF_SERVER_FOR_INTERMEDIATE_STAGE = "useLeafServerForIntermediateStage";
+
+        // Option denoting the workloadName to which the query belongs. This is used to enforce resource budgets for
+        // each workload if "Query Workload Isolation" feature enabled.
+        public static final String WORKLOAD_NAME = "workloadName";
       }
 
       public static class QueryOptionValue {
@@ -763,7 +826,7 @@ public class CommonConstants {
       public static final String EVALUATE_LITERAL_FILTER = "EvaluateFilterLiteral";
       public static final String JOIN_PUSH_EXPRESSIONS = "JoinPushExpressions";
       public static final String PROJECT_TO_SEMI_JOIN = "ProjectToSemiJoin";
-      public static final String SEMIN_JOIN_DISTINCT_PROJECT = "SeminJoinDistinctProject";
+      public static final String SEMI_JOIN_DISTINCT_PROJECT = "SemiJoinDistinctProject";
       public static final String UNION_TO_DISTINCT = "UnionToDistinct";
       public static final String AGGREGATE_REMOVE = "AggregateRemove";
       public static final String AGGREGATE_JOIN_TRANSPOSE = "AggregateJoinTranspose";
@@ -775,6 +838,8 @@ public class CommonConstants {
       public static final String AGGREGATE_PROJECT_MERGE = "AggregateProjectMerge";
       public static final String FILTER_MERGE = "FilterMerge";
       public static final String SORT_REMOVE = "SortRemove";
+      public static final String SORT_JOIN_TRANSPOSE = "SortJoinTranspose";
+      public static final String SORT_JOIN_COPY = "SortJoinCopy";
       public static final String AGGREGATE_JOIN_TRANSPOSE_EXTENDED = "AggregateJoinTransposeExtended";
       public static final String PRUNE_EMPTY_AGGREGATE = "PruneEmptyAggregate";
       public static final String PRUNE_EMPTY_FILTER = "PruneEmptyFilter";
@@ -785,7 +850,24 @@ public class CommonConstants {
       public static final String PRUNE_EMPTY_CORRELATE_RIGHT = "PruneEmptyCorrelateRight";
       public static final String PRUNE_EMPTY_JOIN_LEFT = "PruneEmptyJoinLeft";
       public static final String PRUNE_EMPTY_JOIN_RIGHT = "PruneEmptyJoinRight";
+      public static final String JOIN_TO_ENRICHED_JOIN = "JoinToEnrichedJoin";
     }
+
+    /**
+     * Set of planner rules that will be disabled by default
+     * and could be enabled by setting
+     * {@link CommonConstants.Broker.Request.QueryOptionKey#USE_PLANNER_RULES}.
+     *
+     * If a rule is enabled and disabled at the same time,
+     * it will be disabled
+     */
+    public static final Set<String> DEFAULT_DISABLED_RULES = Set.of(
+        PlannerRuleNames.AGGREGATE_JOIN_TRANSPOSE_EXTENDED,
+        PlannerRuleNames.SORT_JOIN_TRANSPOSE,
+        PlannerRuleNames.SORT_JOIN_COPY,
+        PlannerRuleNames.AGGREGATE_UNION_AGGREGATE,
+        PlannerRuleNames.JOIN_TO_ENRICHED_JOIN
+    );
 
     public static class FailureDetector {
       public enum Type {
@@ -1036,6 +1118,9 @@ public class CommonConstants {
     public static final String CONFIG_OF_MSE_MAX_EXECUTION_THREADS =
         MSE_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS;
     public static final int DEFAULT_MSE_MAX_EXECUTION_THREADS = -1;
+    public static final String CONFIG_OF_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY =
+        MSE_CONFIG_PREFIX + "." + MAX_EXECUTION_THREADS + ".exceed.strategy";
+    public static final String DEFAULT_MSE_MAX_EXECUTION_THREADS_EXCEED_STRATEGY = "ERROR";
 
     // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
     // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When
@@ -1063,6 +1148,12 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD =
         QUERY_EXECUTOR_CONFIG_PREFIX + "." + GROUPBY_TRIM_THRESHOLD;
     public static final int DEFAULT_QUERY_EXECUTOR_GROUPBY_TRIM_THRESHOLD = 1_000_000;
+    // Do sort-aggregation when LIMIT is below this threshold
+    public static final int DEFAULT_SORT_AGGREGATE_LIMIT_THRESHOLD = 10_000;
+    // Use sequential instead of pair-wise combine for sort-aggr when numSegments is below this threshold
+    // Sequential combine utilizes N + 1 threads, N for processing and 1 for merge. Pair-wise only uses N.
+    public static final int DEFAULT_SORT_AGGREGATE_SEQUENTIAL_COMBINE_NUM_SEGMENTS_THRESHOLD =
+        Runtime.getRuntime().availableProcessors();
     public static final String CONFIG_OF_MSE_MIN_GROUP_TRIM_SIZE = MSE_CONFIG_PREFIX + ".min.group.trim.size";
     // Match the value of GroupByUtils.DEFAULT_MIN_NUM_GROUPS
     public static final int DEFAULT_MSE_MIN_GROUP_TRIM_SIZE = 5000;
@@ -1098,6 +1189,11 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = MULTISTAGE_EXECUTOR_CONFIG_PREFIX;
     @Deprecated
     public static final String DEFAULT_QUERY_EXECUTOR_OPCHAIN_EXECUTOR = DEFAULT_MULTISTAGE_EXECUTOR_TYPE;
+
+    // Enable SSE & MSE task throttling on critical heap usage.
+    public static final String CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE =
+        QUERY_EXECUTOR_CONFIG_PREFIX + ".enableThrottlingOnHeapUsage";
+    public static final boolean DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE = false;
 
     /**
      * The ExecutorServiceProvider to be used for timeseries threads.
@@ -1496,8 +1592,70 @@ public class CommonConstants {
     public static final String CONFIG_OF_QUERY_KILLED_METRIC_ENABLED = "accounting.query.killed.metric.enabled";
     public static final boolean DEFAULT_QUERY_KILLED_METRIC_ENABLED = false;
 
-    public static final String CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = "accounting.enable.thread.sampling.mse.debug";
-    public static final Boolean DEFAULT_ENABLE_THREAD_SAMPLING_MSE = true;
+    public static final String CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE = "accounting.cancel.callback.cache.max.size";
+    public static final int DEFAULT_CANCEL_CALLBACK_CACHE_MAX_SIZE = 500;
+
+    public static final String CONFIG_OF_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS =
+        "accounting.cancel.callback.cache.expiry.seconds";
+    public static final int DEFAULT_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS = 1200;
+
+    public static final String CONFIG_OF_THREAD_SELF_TERMINATE =
+        "accounting.thread.self.terminate";
+    public static final boolean DEFAULT_THREAD_SELF_TERMINATE = false;
+
+    /**
+     * QUERY WORKLOAD ISOLATION Configs
+     *
+     * This is a set of configs to enable query workload isolation. Queries are classified into workload based on the
+     * QueryOption - WORKLOAD_NAME. The CPU and Memory cost for a workload are set globally in ZK. The CPU and memory
+     * costs are for a certain time duration, called "enforcementWindow". The workload cost is split into smaller cost
+     * for each instance involved in executing queries of the workload.
+     *
+     *
+     * At each instance (broker,server), there are two parts to workload isolation:
+     * 1. Workload Cost Collection
+     * 2. Workload Cost Enforcement
+     *
+     *
+     * Workload Cost collection happens at various stages of query execution. On server, the resource costs associated
+     * with pruning, planning and execution are collected. On broker, the resource costs associated with compilation &
+     * reduce are collected. WorkloadBudgetManager maintains the budget and usage for each workload in the instance.
+     * Workload Enforcement enforces the budget for a workload if the resource usages are exceeded. The queries in the
+     * workload are killed until the enforcementWindow is refreshed.
+     *
+     * More details in https://tinyurl.com/2p9vuzbd
+     *
+     * Pre-req configs for enabling Query Workload Isolation:
+     *  - CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME  = ResourceUsageAccountantFactory
+     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING = true
+     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING = true
+     *  - CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE = true
+     *  - Instance Config: enableThreadCpuTimeMeasurement = true
+     *  - Instance Config: enableThreadAllocatedBytesMeasurement = true
+     */
+
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_COLLECTION =
+        "accounting.workload.enable.cost.collection";
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_COLLECTION = false;
+
+    public static final String CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT =
+        "accounting.workload.enable.cost.enforcement";
+    public static final boolean DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT = false;
+
+    public static final String CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS =
+        "accounting.workload.enforcement.window.ms";
+    public static final long DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS = 60_000L;
+
+    public static final String CONFIG_OF_WORKLOAD_SLEEP_TIME_MS =
+        "accounting.workload.sleep.time.ms";
+    public static final int DEFAULT_WORKLOAD_SLEEP_TIME_MS = 1;
+
+    public static final String DEFAULT_WORKLOAD_NAME = "default";
+    public static final String CONFIG_OF_SECONDARY_WORKLOAD_NAME = "accounting.secondary.workload.name";
+    public static final String DEFAULT_SECONDARY_WORKLOAD_NAME = "defaultSecondary";
+    public static final String CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE =
+        "accounting.secondary.workload.cpu.percentage";
+    public static final double DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE = 0.0;
   }
 
   public static class ExecutorService {
@@ -1648,6 +1806,29 @@ public class CommonConstants {
         public static final String ENABLE_TRACE = "enableTrace";
         public static final String ENABLE_STREAMING = "enableStreaming";
         public static final String PAYLOAD_TYPE = "payloadType";
+
+        public static class TimeSeries {
+          public static final String LANGUAGE = "language";
+          public static final String START_TIME_SECONDS = "startTimeSeconds";
+          public static final String WINDOW_SECONDS = "windowSeconds";
+          public static final String NUM_ELEMENTS = "numElements";
+          public static final String DEADLINE_MS = "deadlineMs";
+
+          public static final String SEGMENT_MAP_ENTRY_PREFIX = "$segmentMapEntry#";
+
+          public static boolean isKeySegmentList(String key) {
+            return key.startsWith(SEGMENT_MAP_ENTRY_PREFIX);
+          }
+
+          public static String encodeSegmentListKey(String planId) {
+            return SEGMENT_MAP_ENTRY_PREFIX + planId;
+          }
+
+          /// Returns the plan-id corresponding to the encoded key.
+          public static String decodeSegmentListKey(String key) {
+            return key.substring(SEGMENT_MAP_ENTRY_PREFIX.length());
+          }
+        }
       }
 
       public static class PayloadType {
@@ -1659,6 +1840,12 @@ public class CommonConstants {
     public static class Response {
       public static class MetadataKeys {
         public static final String RESPONSE_TYPE = "responseType";
+
+        public static class TimeSeries {
+          public static final String PLAN_ID = "planId";
+          public static final String ERROR_TYPE = "errorType";
+          public static final String ERROR_MESSAGE = "error";
+        }
       }
 
       public static class ResponseType {
@@ -1715,6 +1902,22 @@ public class CommonConstants {
      */
     public static final String KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = "pinot.query.runner.max.msg.size.bytes";
     public static final int DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES = 16 * 1024 * 1024;
+
+
+    /**
+     * Configuration for channel idle timeout in seconds.
+     *
+     * gRPC channels go idle after a period of inactivity. When a channel is idle, its resources are released. The next
+     * query using the channel will need to re-establish the connection. This includes the TLS negotiation and therefore
+     * can increase the latency of the query by some milliseconds.
+     *
+     * In normal Pinot clusters that are continuously serving queries, channels should never go idle.
+     * But it could affect clusters that are not continuously serving queries.
+     * This is why by default the channel idle timeout is set to -1, which means that the channel idle timeout is
+     * disabled.
+     */
+    public static final String KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS = "pinot.query.runner.channel.idle.timeout.seconds";
+    public static final long DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS = -1;
 
     /**
      * Enable splitting of data block payload during mailbox transfer.
@@ -1802,7 +2005,17 @@ public class CommonConstants {
     /// Max time to keep the op stats in the cache.
     public static final String KEY_OF_OP_STATS_CACHE_EXPIRE_MS = "pinot.server.query.op.stats.cache.ms";
     public static final int DEFAULT_OF_OP_STATS_CACHE_EXPIRE_MS = 60 * 1000;
+
+    /// Max number of cancelled queries to keep in the cache.
+    public static final String KEY_OF_CANCELLED_QUERY_CACHE_SIZE = "pinot.server.query.cancelled.cache.size";
+    public static final int DEFAULT_OF_CANCELLED_QUERY_CACHE_SIZE = 1000;
+
+    /// Max time to keep the cancelled queries in the cache.
+    public static final String KEY_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS = "pinot.server.query.cancelled.cache.ms";
+    public static final int DEFAULT_OF_CANCELLED_QUERY_CACHE_EXPIRE_MS = 60 * 1000;
+
     /// Timeout of the cancel request, in milliseconds.
+    /// TODO: This is used by the broker. Consider renaming it.
     public static final String KEY_OF_CANCEL_TIMEOUT_MS = "pinot.server.query.cancel.timeout.ms";
     public static final long DEFAULT_OF_CANCEL_TIMEOUT_MS = 1000;
   }

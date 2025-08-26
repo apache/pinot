@@ -26,6 +26,7 @@ import app_state from './app_state';
 import { useAuthProvider } from './components/auth/AuthProvider';
 import { AppLoadingIndicator } from './components/AppLoadingIndicator';
 import { AuthWorkflow } from 'Models';
+import { TimezoneProvider } from './contexts/TimezoneContext';
 
 export const App = () => {
   const [clusterName, setClusterName] = useState('');
@@ -91,10 +92,12 @@ export const App = () => {
 
   const getRouterData = () => {
     if (app_state.queryConsoleOnlyView) {
-      return RouterData.filter((routeObj) => { return routeObj.path === '/query' });
+      return RouterData.filter((routeObj) => {
+        return routeObj.path === '/query' || routeObj.path === '/query/timeseries';
+      });
     }
     if (app_state.hideQueryConsoleTab) {
-      return RouterData.filter((routeObj) => routeObj.path !== '/query');
+      return RouterData.filter((routeObj) => routeObj.path !== '/query' && routeObj.path !== '/query/timeseries');
     }
     return RouterData;
   };
@@ -135,31 +138,33 @@ export const App = () => {
   }
 
   return (
-    <Switch>
-      {getRouterData().map(({ path, Component }, key) => (
-        <Route
-          exact
-          path={path}
-          key={key}
-          render={(props) => {
-            if (path === '/login') {
-              return loginRender(Component, props);
-            } else if (isAuthenticated) {
-              // default render
-              return componentRender(Component, props, role);
-            } else {
-              return <Redirect to="/login" />;
-            }
-          }}
-        />
-      ))}
-      <Route path="*">
-        <Redirect
-          to={PinotMethodUtils.getURLWithoutAccessToken(
-            app_state.queryConsoleOnlyView ? '/query' : '/'
-          )}
-        />
-      </Route>
-    </Switch>
+    <TimezoneProvider>
+      <Switch>
+        {getRouterData().map(({ path, Component }, key) => (
+          <Route
+            exact
+            path={path}
+            key={key}
+            render={(props) => {
+              if (path === '/login') {
+                return loginRender(Component, props);
+              } else if (isAuthenticated) {
+                // default render
+                return componentRender(Component, props, role);
+              } else {
+                return <Redirect to="/login" />;
+              }
+            }}
+          />
+        ))}
+        <Route path="*">
+          <Redirect
+            to={PinotMethodUtils.getURLWithoutAccessToken(
+              app_state.queryConsoleOnlyView ? '/query' : '/'
+            )}
+          />
+        </Route>
+      </Switch>
+    </TimezoneProvider>
   );
 };

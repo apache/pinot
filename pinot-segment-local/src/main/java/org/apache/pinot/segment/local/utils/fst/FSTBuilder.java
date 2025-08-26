@@ -31,14 +31,18 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- *  Builds FST using lucene org.apache.lucene.util.fst.Builder library. FSTBuilder requires all the key/values
- *  be added in sorted order.
+ * Builds case-sensitive FST using lucene org.apache.lucene.util.fst.Builder library. FSTBuilder requires all the
+ * key/values be added in sorted order.
  */
 public class FSTBuilder {
   public static final Logger LOGGER = LoggerFactory.getLogger(FSTBuilder.class);
-  private final FSTCompiler<Long> _fstCompiler =
-      (new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE4, PositiveIntOutputs.getSingleton())).build();
+
+  private final FSTCompiler<Long> _fstCompiler;
   private final IntsRefBuilder _scratch = new IntsRefBuilder();
+
+  public FSTBuilder() {
+    _fstCompiler = (new FSTCompiler.Builder<>(FST.INPUT_TYPE.BYTE4, PositiveIntOutputs.getSingleton())).build();
+  }
 
   public static FST<Long> buildFST(SortedMap<String, Integer> input)
       throws IOException {

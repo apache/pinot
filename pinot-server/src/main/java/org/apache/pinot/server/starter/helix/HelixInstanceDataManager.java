@@ -283,6 +283,7 @@ public class HelixInstanceDataManager implements InstanceDataManager {
       return;
     }
     LOGGER.info("Shutting down table data manager for table: {}", tableNameWithType);
+    tableDataManager.setDeleted(true);
     tableDataManager.shutDown();
     LOGGER.info("Finished shutting down table data manager for table: {}", tableNameWithType);
   }

@@ -52,6 +52,18 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.MAX);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("MiNsTrInG");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof MinStringAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MINSTRING);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
+    function = getFunction("MaXsTrInG");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof MaxStringAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.MAXSTRING);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("SuM");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
     assertTrue(aggregationFunction instanceof SumAggregationFunction);

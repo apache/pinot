@@ -20,32 +20,22 @@ package org.apache.pinot.query.runtime.queries;
 
 import java.util.HashMap;
 import java.util.Map;
-import org.apache.pinot.common.metrics.ServerMetrics;
-import org.apache.pinot.common.response.broker.ResultTable;
-import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.query.QueryEnvironmentTestBase;
 import org.apache.pinot.query.QueryServerEnclosure;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.routing.QueryServerInstance;
 import org.apache.pinot.query.testutils.MockInstanceDataManagerFactory;
 import org.apache.pinot.query.testutils.QueryTestUtils;
-import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
-import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
-import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.Test;
 
 
-public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
+public abstract class QueryRunnerAccountingTest extends QueryRunnerTestBase {
+
+  protected ThreadResourceUsageAccountant _accountant;
 
   @BeforeClass
   public void setUp()
@@ -66,10 +56,12 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     _mailboxService = new MailboxService(_reducerHostname, _reducerPort, new PinotConfiguration(reducerConfig));
     _mailboxService.start();
 
-    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1);
+    _accountant = getThreadResourceUsageAccountant();
+
+    QueryServerEnclosure server1 = new QueryServerEnclosure(factory1, Map.of(), _accountant);
     server1.start();
     // Start server1 to ensure the next server will have a different port.
-    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2);
+    QueryServerEnclosure server2 = new QueryServerEnclosure(factory2, Map.of(), _accountant);
     server2.start();
     // this doesn't test the QueryServer functionality so the server port can be the same as the mailbox port.
     // this is only use for test identifier purpose.
@@ -91,95 +83,5 @@ public class QueryRunnerAccountingTest extends QueryRunnerTestBase {
     _mailboxService.shutdown();
   }
 
-  @Test
-  void testWithDefaultThreadAccountant() {
-    Tracing.DefaultThreadResourceUsageAccountant accountant = new Tracing.DefaultThreadResourceUsageAccountant();
-    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
-      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
-
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
-
-      ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-      Assert.assertTrue(threadAccountant.getThreadResources().isEmpty());
-      Assert.assertTrue(threadAccountant.getQueryResources().isEmpty());
-    }
-  }
-
-  @Test
-  void testWithPerQueryAccountantFactory() {
-    HashMap<String, Object> configs = getAccountingConfig();
-
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
-        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
-            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
-
-    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
-      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
-
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
-
-      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
-      Assert.assertEquals(resources.size(), 1);
-      Assert.assertTrue(resources.entrySet().iterator().next().getValue().getAllocatedBytes() > 0);
-    }
-  }
-
-  @Test
-  void testDisableSamplingForMSE() {
-    HashMap<String, Object> configs = getAccountingConfig();
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_SAMPLING_MSE, false);
-
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-    PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant accountant =
-        new PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant(new PinotConfiguration(configs),
-            "testWithPerQueryAccountantFactory", InstanceType.SERVER);
-
-    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
-      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
-      ResultTable resultTable = queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-      Assert.assertEquals(resultTable.getRows().size(), 2);
-
-      Map<String, ? extends QueryResourceTracker> resources = accountant.getQueryResources();
-      Assert.assertEquals(resources.size(), 1);
-      Assert.assertEquals(resources.entrySet().iterator().next().getValue().getAllocatedBytes(), 0);
-    }
-  }
-
-  public static class InterruptingAccountant
-      extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
-
-    public InterruptingAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
-      super(config, instanceId, instanceType);
-    }
-
-    @Override
-    public boolean isAnchorThreadInterrupted() {
-      return true;
-    }
-  }
-
-  @Test(expectedExceptions = EarlyTerminationException.class)
-  void testInterrupt() {
-    HashMap<String, Object> configs = getAccountingConfig();
-
-    ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
-    InterruptingAccountant accountant =
-        new InterruptingAccountant(new PinotConfiguration(configs), "testWithPerQueryAccountantFactory",
-            InstanceType.SERVER);
-
-    try (MockedStatic<Tracing> tracing = Mockito.mockStatic(Tracing.class, Mockito.CALLS_REAL_METHODS)) {
-      tracing.when(Tracing::getThreadAccountant).thenReturn(accountant);
-      queryRunner("SELECT * FROM a LIMIT 2", false).getResultTable();
-    }
-  }
-
-  private static HashMap<String, Object> getAccountingConfig() {
-    HashMap<String, Object> configs = new HashMap<>();
-    ServerMetrics.register(Mockito.mock(ServerMetrics.class));
-    configs.put(CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    return configs;
-  }
+  protected abstract ThreadResourceUsageAccountant getThreadResourceUsageAccountant();
 }

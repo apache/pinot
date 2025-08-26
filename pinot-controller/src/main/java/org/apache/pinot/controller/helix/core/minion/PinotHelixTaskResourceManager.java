@@ -524,8 +524,11 @@ public class PinotHelixTaskResourceManager {
    * @return List of child task configs
    */
   public synchronized List<PinotTaskConfig> getSubtaskConfigs(String taskName) {
-    Collection<TaskConfig> helixTaskConfigs =
-        _taskDriver.getJobConfig(getHelixJobName(taskName)).getTaskConfigMap().values();
+    JobConfig jobConfig = _taskDriver.getJobConfig(getHelixJobName(taskName));
+    if (jobConfig == null) {
+      return List.of();
+    }
+    Collection<TaskConfig> helixTaskConfigs = jobConfig.getTaskConfigMap().values();
     List<PinotTaskConfig> taskConfigs = new ArrayList<>(helixTaskConfigs.size());
     for (TaskConfig helixTaskConfig : helixTaskConfigs) {
       taskConfigs.add(PinotTaskConfig.fromHelixTaskConfig(helixTaskConfig));
@@ -774,6 +777,121 @@ public class PinotHelixTaskResourceManager {
   }
 
   /**
+   * Fetch count of sub-tasks for each of the tasks for the given taskType, filtered by state.
+   *
+   * @param taskType      Pinot taskType / Helix JobQueue
+   * @param state         State(s) to filter by. Can be single state or comma-separated multiple states
+   *                      (waiting, running, error, completed, dropped, timedOut, aborted, unknown, total)
+   * @return Map of Pinot Task Name to TaskCount containing only tasks that have > 0 count for any of the
+   *         specified states
+   */
+  public synchronized Map<String, TaskCount> getTaskCounts(String taskType, String state) {
+    return getTaskCounts(taskType, state, null);
+  }
+
+  /**
+   * Fetch count of sub-tasks for each of the tasks for the given taskType, filtered by state and/or table.
+   *
+   * @param taskType           Pinot taskType / Helix JobQueue
+   * @param state              State(s) to filter by. Can be single state or comma-separated multiple states
+   *                           (NOT_STARTED, IN_PROGRESS, STOPPED, STOPPING, FAILED, COMPLETED, ABORTED, TIMED_OUT,
+   *                           TIMING_OUT, FAILING). Can be null to skip state filtering.
+   * @param tableNameWithType  Table name with type to filter by. Only tasks that have subtasks for this table
+   *                           will be returned. Can be null to skip table filtering.
+   * @return Map of Pinot Task Name to TaskCount containing only tasks that match the specified filters
+   */
+  public synchronized Map<String, TaskCount> getTaskCounts(String taskType, @Nullable String state,
+      @Nullable String tableNameWithType) {
+    Set<String> tasks = getTasks(taskType);
+    if (tasks == null) {
+      return Collections.emptyMap();
+    }
+
+    // Parse and validate comma-separated states if provided
+    Set<TaskState> requestedStates = null;
+    if (StringUtils.isNotEmpty(state)) {
+      String[] stateArray = state.trim().split(",");
+      requestedStates = new HashSet<>();
+      for (String s : stateArray) {
+        String normalizedState = s.trim().toUpperCase();
+        // Validate each state upfront
+        TaskState taskState = validateAndParseTaskState(normalizedState);
+        requestedStates.add(taskState);
+      }
+    }
+
+    // Get all task states if we need to filter by state
+    Map<String, TaskState> taskStates = null;
+    if (requestedStates != null) {
+      taskStates = getTaskStates(taskType);
+    }
+
+    Map<String, TaskCount> taskCounts = new TreeMap<>();
+    for (String taskName : tasks) {
+      // Apply state filtering first (less expensive)
+      if (requestedStates != null) {
+        TaskState currentTaskState = taskStates.get(taskName);
+        if (currentTaskState == null || !requestedStates.contains(currentTaskState)) {
+          continue;
+        }
+      }
+
+      // Apply table filtering next (also less expensive than getting task count)
+      if (StringUtils.isNotEmpty(tableNameWithType) && !hasTasksForTable(taskName, tableNameWithType)) {
+        continue;
+      }
+
+      // Only collect TaskCount after passing all filters (expensive operation)
+      TaskCount taskCount = getTaskCount(taskName);
+      taskCounts.put(taskName, taskCount);
+    }
+    return taskCounts;
+  }
+
+  /**
+   * Validates and parses a task state string into TaskState enum.
+   *
+   * @param state State string to validate (should be uppercase)
+   * @throws IllegalArgumentException if the state is invalid
+   * @return TaskState enum value
+   */
+  private TaskState validateAndParseTaskState(String state) {
+    try {
+      return TaskState.valueOf(state);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException("Invalid state: " + state + ". Valid states are: "
+          + Arrays.toString(TaskState.values()));
+    }
+  }
+
+  /**
+   * Helper method to check if a task has any subtasks for the specified table.
+   *
+   * @param taskName          Task name to check
+   * @param tableNameWithType Table name with type to check for
+   * @return true if the task has subtasks for the specified table
+   */
+  private boolean hasTasksForTable(String taskName, String tableNameWithType) {
+    try {
+      // Get all subtask configs for this task
+      List<PinotTaskConfig> subtaskConfigs = getSubtaskConfigs(taskName);
+
+      // Check if any subtask is for the specified table
+      for (PinotTaskConfig taskConfig : subtaskConfigs) {
+        String taskTableName = taskConfig.getTableName();
+        if (taskTableName != null && taskTableName.equals(tableNameWithType)) {
+          return true;
+        }
+      }
+      return false;
+    } catch (Exception e) {
+      // If we can't get the subtask configs, assume no match
+      LOGGER.warn("Failed to get subtask configs for task: {}", taskName, e);
+      return false;
+    }
+  }
+
+  /**
    * Given a taskType, helper method to debug all the HelixJobs for the taskType.
    * For each of the HelixJobs, collects status of the (sub)tasks in the taskbatch.
    *
@@ -878,7 +996,7 @@ public class PinotHelixTaskResourceManager {
       }
       String triggeredBy = jobConfig.getTaskConfigMap().values().stream().findFirst()
           .map(TaskConfig::getConfigMap)
-          .map(taskConfigs -> taskConfigs.get(PinotTaskManager.TRIGGERED_BY))
+          .map(taskConfigs -> taskConfigs.get(MinionConstants.TRIGGERED_BY))
           .orElse("");
       taskDebugInfo.setTriggeredBy(triggeredBy);
       Set<Integer> partitionSet = jobContext.getPartitionSet();

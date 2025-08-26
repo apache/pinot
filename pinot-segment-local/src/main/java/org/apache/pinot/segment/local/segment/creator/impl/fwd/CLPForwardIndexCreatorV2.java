@@ -291,7 +291,7 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
     _dictVarDictFile = new File(_intermediateFilesDir, _column + ".var.dict");
     _dictVarDict = new VarLengthValueWriter(_dictVarDictFile, dictVarDictSize);
     _dictVarDictSize = dictVarDictSize;
-    _dictVarIdFwdIndexFile = new File(_dictVarIdFwdIndexFile, _column + ".dictVars");
+    _dictVarIdFwdIndexFile = new File(_intermediateFilesDir, _column + ".dictVars");
     _dictVarIdFwdIndex =
         new VarByteChunkForwardIndexWriterV5(_dictVarIdFwdIndexFile, chunkCompressionType, _targetChunkSize);
 
@@ -397,8 +397,6 @@ public class CLPForwardIndexCreatorV2 implements ForwardIndexCreator {
 
       // Write intermediate files to memory mapped buffer
       long totalSize = 0;
-      _fileBuffer.putInt(MAGIC_BYTES.length);
-      totalSize += Integer.BYTES;
       _fileBuffer.put(MAGIC_BYTES);
       totalSize += MAGIC_BYTES.length;
 

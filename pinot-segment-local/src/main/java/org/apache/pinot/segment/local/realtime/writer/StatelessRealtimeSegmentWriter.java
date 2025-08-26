@@ -24,7 +24,6 @@ import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
@@ -64,6 +63,7 @@ import org.apache.pinot.spi.stream.StreamDataDecoderImpl;
 import org.apache.pinot.spi.stream.StreamDataDecoderResult;
 import org.apache.pinot.spi.stream.StreamMessage;
 import org.apache.pinot.spi.stream.StreamMessageDecoder;
+import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffsetFactory;
@@ -256,7 +256,6 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
         _consumer.start(_startOffset);
         _logger.info("Created new consumer thread {} for {}", _consumerThread, this);
         _currentOffset = _startOffset;
-        TransformPipeline.Result reusedResult = new TransformPipeline.Result();
         while (_currentOffset.compareTo(_endOffset) < 0) {
           // Fetch messages
           MessageBatch messageBatch = _consumer.fetchMessages(_currentOffset, _fetchTimeoutMs);
@@ -265,8 +264,8 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
 
           for (int i = 0; i < messageCount; i++) {
             StreamMessage streamMessage = messageBatch.getStreamMessage(i);
-            if (streamMessage.getMetadata() != null && streamMessage.getMetadata().getOffset() != null
-                && streamMessage.getMetadata().getOffset().compareTo(_endOffset) >= 0) {
+            StreamMessageMetadata metadata = streamMessage.getMetadata();
+            if (metadata.getOffset().compareTo(_endOffset) >= 0) {
               _logger.info("Reached end offset: {} for partition group: {}", _endOffset, _partitionGroupId);
               break;
             }
@@ -276,13 +275,10 @@ public class StatelessRealtimeSegmentWriter implements Closeable {
             if (decodedResult.getException() == null) {
               // Index message
               GenericRow row = decodedResult.getResult();
-
-              _transformPipeline.processRow(row, reusedResult);
-
-              List<GenericRow> transformedRows = reusedResult.getTransformedRows();
-
-              for (GenericRow transformedRow : transformedRows) {
-                _realtimeSegment.index(transformedRow, streamMessage.getMetadata());
+              assert row != null;
+              TransformPipeline.Result result = _transformPipeline.processRow(row);
+              for (GenericRow transformedRow : result.getTransformedRows()) {
+                _realtimeSegment.index(transformedRow, metadata);
               }
             } else {
               _logger.warn("Failed to decode message at offset {}: {}", _currentOffset, decodedResult.getException());

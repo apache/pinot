@@ -37,13 +37,14 @@ import org.apache.calcite.rel.RelDistributions;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.core.Aggregate;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.Values;
 import org.apache.pinot.calcite.rel.hint.PinotHintOptions;
 import org.apache.pinot.calcite.rel.hint.PinotHintStrategyTable;
 import org.apache.pinot.calcite.rel.traits.PinotExecStrategyTrait;
 import org.apache.pinot.query.context.PhysicalPlannerContext;
-import org.apache.pinot.query.planner.partitioning.KeySelector;
+import org.apache.pinot.query.planner.physical.v2.DistHashFunction;
 import org.apache.pinot.query.planner.physical.v2.ExchangeStrategy;
 import org.apache.pinot.query.planner.physical.v2.HashDistributionDesc;
 import org.apache.pinot.query.planner.physical.v2.PRelNode;
@@ -77,7 +78,6 @@ import org.slf4j.LoggerFactory;
 public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkerExchangeAssignmentRule.class);
   private final PhysicalPlannerContext _physicalPlannerContext;
-  private static final String DEFAULT_HASH_FUNCTION = KeySelector.DEFAULT_HASH_ALGORITHM;
 
   public WorkerExchangeAssignmentRule(PhysicalPlannerContext context) {
     _physicalPlannerContext = context;
@@ -93,22 +93,25 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       return currentNode;
     }
     if (currentNode.getPRelInputs().isEmpty()) {
-      return processCurrentNode(currentNode, parent);
+      return processCurrentNode(currentNode, parent, true);
     }
     if (currentNode.getPRelInputs().size() == 1) {
       List<PRelNode> newInputs = List.of(executeInternal(currentNode.getPRelInput(0), currentNode));
       currentNode = currentNode.with(newInputs);
-      return processCurrentNode(currentNode, parent);
+      return processCurrentNode(currentNode, parent, true);
     }
     // Process first input.
     List<PRelNode> newInputs = new ArrayList<>();
     newInputs.add(executeInternal(currentNode.getPRelInput(0), currentNode));
     newInputs.addAll(currentNode.getPRelInputs().subList(1, currentNode.getPRelInputs().size()));
     currentNode = currentNode.with(newInputs);
-    // Process current node.
-    currentNode = processCurrentNode(currentNode, parent);
+    // Process current node. For SetOp, we don't meet dist/collation traits immediately. This is because all inputs
+    // of a SetOp need to be processed before we can infer any Dist trait (specifically Hash).
+    boolean meetConstraints = !(currentNode.unwrap() instanceof SetOp);
+    currentNode = processCurrentNode(currentNode, parent, meetConstraints);
     // Process remaining inputs.
     if (currentNode instanceof PhysicalExchange) {
+      Preconditions.checkState(meetConstraints, "PhysicalExchange should not be created constraints were skipped");
       PhysicalExchange exchange = (PhysicalExchange) currentNode;
       currentNode = exchange.getPRelInput(0);
       for (int index = 1; index < currentNode.getPRelInputs().size(); index++) {
@@ -123,16 +126,24 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     }
     currentNode = currentNode.with(newInputs);
     currentNode = inheritDistDescFromInputs(currentNode);
+    if (!meetConstraints) {
+      currentNode = meetCurrentNodeConstraints(currentNode, parent);
+    }
     return currentNode;
   }
 
-  PRelNode processCurrentNode(PRelNode currentNode, @Nullable PRelNode parentNode) {
-    // Step-1: Initialize variables.
-    boolean isLeafStageBoundary = isLeafStageBoundary(currentNode, parentNode);
-    // Step-2: Get current node's distribution. If the current node already has a distribution attached, use that.
-    //         Otherwise, compute it using DistMappingGenerator.
+  PRelNode processCurrentNode(PRelNode currentNode, @Nullable PRelNode parentNode, boolean meetConstraints) {
     PinotDataDistribution currentNodeDistribution = computeCurrentNodeDistribution(currentNode, parentNode);
     currentNode = currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
+    if (meetConstraints) {
+      return meetCurrentNodeConstraints(currentNode, parentNode);
+    }
+    return currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
+  }
+
+  PRelNode meetCurrentNodeConstraints(PRelNode currentNode, @Nullable PRelNode parentNode) {
+    boolean isLeafStageBoundary = isLeafStageBoundary(currentNode, parentNode);
+    PinotDataDistribution currentNodeDistribution = currentNode.getPinotDataDistributionOrThrow();
     // Step-3: Add an optional exchange to meet unmet distribution trait constraint, if it exists. This also takes care
     //         of different workers when the parent already has workers assigned to it (when parent is not a SingleRel).
     PRelNode currentNodeExchange = meetDistributionConstraint(currentNode, currentNodeDistribution, parentNode);
@@ -150,18 +161,33 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       // Update current node with its distribution, and since this is a leaf stage boundary, add an identity exchange.
       return new PhysicalExchange(nodeId(), currentNode,
           currentNode.getPinotDataDistribution(), Collections.emptyList(), ExchangeStrategy.IDENTITY_EXCHANGE,
-          null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          null, PinotExecStrategyTrait.getDefaultExecStrategy(), _physicalPlannerContext.getDefaultHashFunction());
     }
     // When no exchange, simply update current node with the distribution.
     return currentNode.with(currentNode.getPRelInputs(), currentNodeDistribution);
   }
 
+  /**
+   * For Hash Distributed nodes, for nodes like Join we can inherit multiple distribution traits from inputs.
+   * For SetOp nodes, we may have to drop some Distribution traits that we initially inferred from the left-most
+   * input. This is because SetOp nodes all fold into the same schema, and if any of the inputs is not distributed
+   * by a column, the entire SetOp is not distributed by that column.
+   */
   PRelNode inheritDistDescFromInputs(PRelNode currentNode) {
-    // Inherit distribution trait from inputs (except left-most input, which is already inherited).
     if (currentNode.getPRelInputs().size() <= 1
         || currentNode.getPinotDataDistributionOrThrow().getType() != RelDistribution.Type.HASH_DISTRIBUTED) {
       return currentNode;
     }
+    if (currentNode instanceof Join) {
+      return inheritDistDescFromInputsForJoin(currentNode);
+    } else if (currentNode instanceof SetOp) {
+      return inheritDistDescFromInputsForSetOp(currentNode);
+    }
+    return currentNode;
+  }
+
+  PRelNode inheritDistDescFromInputsForJoin(PRelNode currentNode) {
+    // Inherit distribution trait from inputs (except left-most input, which is already inherited).
     PinotDataDistribution currentDistribution = currentNode.getPinotDataDistributionOrThrow();
     Set<HashDistributionDesc> newDistributionSet =
         new HashSet<>(currentNode.getPinotDataDistributionOrThrow().getHashDistributionDesc());
@@ -181,6 +207,36 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
         currentDistribution.getWorkers(), currentDistribution.getWorkerHash(), newDistributionSet,
         currentDistribution.getCollation());
     return currentNode.with(currentNode.getPRelInputs(), finalDist);
+  }
+
+  PRelNode inheritDistDescFromInputsForSetOp(PRelNode currentNode) {
+    Preconditions.checkState(currentNode instanceof SetOp, "Expected SetOp. Found: %s", currentNode);
+    if (currentNode.getPinotDataDistributionOrThrow().getType() != RelDistribution.Type.HASH_DISTRIBUTED) {
+      return currentNode;
+    }
+    Set<HashDistributionDesc> currentDescs = currentNode.getPinotDataDistributionOrThrow().getHashDistributionDesc();
+    // if any of these descriptors doesn't exist in any of inputs[1:n], then drop them.
+    for (PRelNode input : currentNode.getPRelInputs().subList(1, currentNode.getPRelInputs().size())) {
+      if (input.getPinotDataDistributionOrThrow().getType() != RelDistribution.Type.HASH_DISTRIBUTED) {
+        return currentNode.with(currentNode.getPRelInputs(), new PinotDataDistribution(
+            RelDistribution.Type.RANDOM_DISTRIBUTED, currentNode.getPinotDataDistributionOrThrow().getWorkers(),
+            currentNode.getPinotDataDistributionOrThrow().getWorkerHash(), null, null));
+      }
+      Set<HashDistributionDesc> inputDescs = input.getPinotDataDistributionOrThrow().getHashDistributionDesc();
+      currentDescs.removeIf(desc -> !inputDescs.contains(desc));
+      if (currentDescs.isEmpty()) {
+        break;
+      }
+    }
+    if (currentDescs.isEmpty()) {
+      return currentNode.with(currentNode.getPRelInputs(), new PinotDataDistribution(
+          RelDistribution.Type.RANDOM_DISTRIBUTED, currentNode.getPinotDataDistributionOrThrow().getWorkers(),
+          currentNode.getPinotDataDistributionOrThrow().getWorkerHash(), null, null));
+    }
+    return currentNode.with(currentNode.getPRelInputs(), new PinotDataDistribution(
+        RelDistribution.Type.HASH_DISTRIBUTED, currentNode.getPinotDataDistributionOrThrow().getWorkers(),
+        currentNode.getPinotDataDistributionOrThrow().getWorkerHash(), currentDescs,
+        currentNode.getPinotDataDistributionOrThrow().getCollation()));
   }
 
   @Nullable
@@ -234,7 +290,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
         PinotDataDistribution newDataDistribution = derivedDistribution.withCollation(relCollation);
         currentNodeExchange = new PhysicalExchange(nodeId(), currentNode,
             newDataDistribution, Collections.emptyList(), ExchangeStrategy.IDENTITY_EXCHANGE, relCollation,
-            PinotExecStrategyTrait.getDefaultExecStrategy());
+            PinotExecStrategyTrait.getDefaultExecStrategy(), _physicalPlannerContext.getDefaultHashFunction());
       }
     } else {
       if (!relCollation.getKeys().isEmpty()) {
@@ -244,7 +300,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
         currentNodeExchange = new PhysicalExchange(_physicalPlannerContext.getNodeIdGenerator().get(),
             oldExchange.getPRelInput(0), newDataDistribution.withCollation(relCollation),
             oldExchange.getDistributionKeys(), oldExchange.getExchangeStrategy(), relCollation,
-            PinotExecStrategyTrait.getDefaultExecStrategy());
+            PinotExecStrategyTrait.getDefaultExecStrategy(), oldExchange.getHashFunction());
       }
     }
     return currentNodeExchange;
@@ -264,23 +320,25 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
           RelDistribution.Type.BROADCAST_DISTRIBUTED, currentNodeDistribution.getWorkers(),
           currentNodeDistribution.getWorkerHash(), null, null);
       return new PhysicalExchange(nodeId(), currentNode, pinotDataDistribution, List.of(),
-          ExchangeStrategy.BROADCAST_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          ExchangeStrategy.BROADCAST_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
+          _physicalPlannerContext.getDefaultHashFunction());
     }
     if (distributionConstraint.getType() == RelDistribution.Type.SINGLETON) {
       List<String> newWorkers = currentNodeDistribution.getWorkers().subList(0, 1);
       PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
           newWorkers, newWorkers.hashCode(), null, null);
       return new PhysicalExchange(nodeId(), currentNode, pinotDataDistribution, List.of(),
-          ExchangeStrategy.SINGLETON_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          ExchangeStrategy.SINGLETON_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
+          _physicalPlannerContext.getDefaultHashFunction());
     }
     if (distributionConstraint.getType() == RelDistribution.Type.HASH_DISTRIBUTED) {
-      HashDistributionDesc desc = new HashDistributionDesc(
-          distributionConstraint.getKeys(), DEFAULT_HASH_FUNCTION, currentNodeDistribution.getWorkers().size());
-      PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(
-          RelDistribution.Type.HASH_DISTRIBUTED, currentNodeDistribution.getWorkers(),
-          currentNodeDistribution.getWorkerHash(), ImmutableSet.of(desc), null);
+      HashDistributionDesc desc = new HashDistributionDesc(distributionConstraint.getKeys(),
+          _physicalPlannerContext.getDefaultHashFunction(), currentNodeDistribution.getWorkers().size());
+      PinotDataDistribution pinotDataDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
+          currentNodeDistribution.getWorkers(), currentNodeDistribution.getWorkerHash(), ImmutableSet.of(desc), null);
       return new PhysicalExchange(nodeId(), currentNode, pinotDataDistribution, distributionConstraint.getKeys(),
-          ExchangeStrategy.PARTITIONING_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          ExchangeStrategy.PARTITIONING_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
+          _physicalPlannerContext.getDefaultHashFunction());
     }
     throw new IllegalStateException("Distribution constraint not met: " + distributionConstraint.getType());
   }
@@ -305,7 +363,7 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       PinotDataDistribution newDistribution = new PinotDataDistribution(RelDistribution.Type.RANDOM_DISTRIBUTED,
           parentDistribution.getWorkers(), parentDistribution.getWorkerHash(), null, null);
       return new PhysicalExchange(nodeId(), currentNode, newDistribution, List.of(), ExchangeStrategy.RANDOM_EXCHANGE,
-          null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          null, PinotExecStrategyTrait.getDefaultExecStrategy(), _physicalPlannerContext.getDefaultHashFunction());
     } else if (relDistribution.getType() == RelDistribution.Type.BROADCAST_DISTRIBUTED) {
       if (assumedDistribution.getType() == RelDistribution.Type.BROADCAST_DISTRIBUTED) {
         if (parentHasSameWorkers) {
@@ -317,7 +375,8 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       PinotDataDistribution newDistribution = new PinotDataDistribution(RelDistribution.Type.BROADCAST_DISTRIBUTED,
           parentDistribution.getWorkers(), parentDistribution.getWorkerHash(), null, null);
       return new PhysicalExchange(nodeId(), currentNode, newDistribution, List.of(),
-          ExchangeStrategy.BROADCAST_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          ExchangeStrategy.BROADCAST_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
+          _physicalPlannerContext.getDefaultHashFunction());
     } else if (relDistribution.getType() == RelDistribution.Type.SINGLETON) {
       if (parentHasSameWorkers) {
         return null;
@@ -327,14 +386,23 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
       PinotDataDistribution newDistribution = new PinotDataDistribution(RelDistribution.Type.SINGLETON,
           parentDistribution.getWorkers(), parentDistribution.getWorkerHash(), null, null);
       return new PhysicalExchange(nodeId(), currentNode, newDistribution, List.of(),
-          ExchangeStrategy.SINGLETON_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+          ExchangeStrategy.SINGLETON_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
+          _physicalPlannerContext.getDefaultHashFunction());
     }
     Preconditions.checkState(relDistribution.getType() == RelDistribution.Type.HASH_DISTRIBUTED,
         "Unexpected distribution constraint: %s", relDistribution.getType());
-    Preconditions.checkState(parent instanceof Join, "Expected parent to be join. Found: %s", parent);
-    Join parentJoin = (Join) parent;
-    // TODO(mse-physical): add support for sub-partitioning and coalescing exchange.
-    HashDistributionDesc hashDistToMatch = getLeftInputHashDistributionDesc(parentJoin).orElseThrow();
+    Preconditions.checkState(parent instanceof Join || parent instanceof SetOp,
+        "Expected parent to be Join/SetOp. Found: %s", parent);
+    HashDistributionDesc hashDistToMatch;
+    if (parent instanceof Join) {
+      Join join = (Join) parent.unwrap();
+      hashDistToMatch = getLeftInputHashDistributionDesc(join)
+          .orElseThrow(() -> new IllegalStateException("Join left input does not have hash distribution desc"));
+    } else {
+      SetOp setOp = (SetOp) parent.unwrap();
+      hashDistToMatch = getLeftInputHashDistributionDesc(setOp)
+          .orElseThrow(() -> new IllegalStateException("SetOp left input does not have hash distribution desc"));
+    }
     if (assumedDistribution.satisfies(relDistribution)) {
       if (parentDistribution.getWorkers().size() == assumedDistribution.getWorkers().size()) {
         List<Integer> distKeys = relDistribution.getKeys();
@@ -355,7 +423,8 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
                 parentDistribution.getWorkers(), parentDistribution.getWorkerHash(),
                 assumedDistribution.getHashDistributionDesc(), assumedDistribution.getCollation());
             return new PhysicalExchange(nodeId(), currentNode, newDistribution, List.of(),
-                ExchangeStrategy.IDENTITY_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+                ExchangeStrategy.IDENTITY_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
+                _physicalPlannerContext.getDefaultHashFunction());
           }
         }
       }
@@ -363,14 +432,15 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     }
     // Re-partition.
     int numberOfPartitions = hashDistToMatch.getNumPartitions();
-    String hashFunction = hashDistToMatch.getHashFunction();
+    DistHashFunction hashFunction = hashDistToMatch.getHashFunction();
     HashDistributionDesc newDesc = new HashDistributionDesc(relDistribution.getKeys(), hashFunction,
         numberOfPartitions);
     PinotDataDistribution newDistribution = new PinotDataDistribution(RelDistribution.Type.HASH_DISTRIBUTED,
         parentDistribution.getWorkers(), parentDistribution.getWorkerHash(), ImmutableSet.of(newDesc),
         null);
     return new PhysicalExchange(nodeId(), currentNode, newDistribution, relDistribution.getKeys(),
-        ExchangeStrategy.PARTITIONING_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy());
+        ExchangeStrategy.PARTITIONING_EXCHANGE, null, PinotExecStrategyTrait.getDefaultExecStrategy(),
+        hashFunction);
   }
 
   private boolean complicatedButColocated(int partitionOne, int partitionTwo, int numStreams) {
@@ -387,8 +457,15 @@ public class WorkerExchangeAssignmentRule implements PRelNodeTransformer {
     List<Integer> leftKeys = join.analyzeCondition().leftKeys;
     PRelNode asPRelNode = (PRelNode) join;
     return asPRelNode.getPRelInput(0).getPinotDataDistributionOrThrow().getHashDistributionDesc().stream()
-        .filter(desc -> desc.getKeys().equals(leftKeys))
+        .filter(desc -> new HashSet<>(desc.getKeys()).equals(new HashSet<>(leftKeys)))
         .findFirst();
+  }
+
+  private Optional<HashDistributionDesc> getLeftInputHashDistributionDesc(SetOp setOp) {
+    PRelNode asPRelNode = (PRelNode) setOp;
+    int numExpectedKeys = setOp.getRowType().getFieldCount();
+    return asPRelNode.getPinotDataDistributionOrThrow().getHashDistributionDesc().stream()
+        .filter(desc -> desc.getKeys().size() == numExpectedKeys).findFirst();
   }
 
   /**

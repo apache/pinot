@@ -178,7 +178,7 @@ public class FilePerIndexDirectoryTest implements PinotBuffersAfterMethodCheckRu
       throws IOException {
     // See https://github.com/apache/pinot/issues/11529
     try (FilePerIndexDirectory fpi = new FilePerIndexDirectory(TEMP_DIR, _segmentMetadata, ReadMode.mmap);
-        NativeTextIndexCreator fooCreator = new NativeTextIndexCreator("foo", TEMP_DIR)) {
+        NativeTextIndexCreator fooCreator = new NativeTextIndexCreator("foo", "myTable_OFFLINE", false, TEMP_DIR)) {
 
       fooCreator.add("{\"clean\":\"this\"}");
       fooCreator.seal();

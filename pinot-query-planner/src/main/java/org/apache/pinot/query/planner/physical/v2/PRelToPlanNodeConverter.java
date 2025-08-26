@@ -117,7 +117,8 @@ public class PRelToPlanNodeConverter {
     return new ExchangeNode(DEFAULT_STAGE_ID, toDataSchema(node.getRowType()),
         new ArrayList<>(), node.getRelExchangeType(), RelDistribution.Type.ANY, node.getDistributionKeys(),
         false, node.getRelCollation().getFieldCollations(), false,
-        !node.getRelCollation().getKeys().isEmpty(), Set.of() /* table names */, node.getExchangeStrategy());
+        !node.getRelCollation().getKeys().isEmpty(), Set.of() /* table names */, node.getExchangeStrategy(),
+        node.getHashFunction().name());
   }
 
   public static SetOpNode convertSetOp(SetOp node) {

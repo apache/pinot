@@ -38,20 +38,21 @@ public interface ThreadResourceUsageAccountant {
   boolean isAnchorThreadInterrupted();
 
   /**
-   * This method has been deprecated and replaced by {@link setupRunner(String, int, ThreadExecutionContext.TaskType)}
-   * and {@link setupWorker(int, ThreadExecutionContext.TaskType, ThreadExecutionContext)}.
+   * This function is expected to be called by threads in query engine. The query id of the task will be available in
+   * the thread execution context stored in a thread local. Therefore it does not accept any parameters.
+   * @return true if the query is terminated, false otherwise
    */
-  @Deprecated
-  void createExecutionContext(String queryId, int taskId, ThreadExecutionContext.TaskType taskType,
-      @Nullable ThreadExecutionContext parentContext);
+  default boolean isQueryTerminated() {
+    return false;
+  }
 
   /**
    * Set up the thread execution context for an anchor a.k.a runner thread.
    * @param queryId query id string
-   * @param taskId a unique task id
    * @param taskType the type of the task - SSE or MSE
+   * @param workloadName the name of the workload, can be null
    */
-  void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType);
+  void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType, String workloadName);
 
   /**
    * Set up the thread execution context for a worker thread.
@@ -69,35 +70,43 @@ public interface ThreadResourceUsageAccountant {
   ThreadExecutionContext getThreadExecutionContext();
 
   /**
-   * set resource usage provider
-   */
-  @Deprecated
-  void setThreadResourceUsageProvider(ThreadResourceUsageProvider threadResourceUsageProvider);
-
-  /**
    * call to sample usage
    */
   void sampleUsage();
 
+  default boolean throttleQuerySubmission() {
+    return false;
+  }
+
   /**
-   * Sample Usage for Multi-stage engine queries
+   * Register a callback to be invoked when a query is cancelled.
+   * This is useful for cleaning up resources or notifying other components.
+   *
+   * @param mseCancelCallback the callback to register
    */
-  void sampleUsageMSE();
+  default void registerMseCancelCallback(String queryId, MseCancelCallback mseCancelCallback) {
+    // Default implementation does nothing. Subclasses can override to register a cancel callback.
+  }
 
   /**
    * special interface to aggregate usage to the stats store only once, it is used for response
    * ser/de threads where the thread execution context cannot be setup before hands as
-   * queryId/taskId is unknown and the execution process is hard to instrument
+   * queryId/taskId/workloadName is unknown and the execution process is hard to instrument
    */
-  void updateQueryUsageConcurrently(String queryId, long cpuTimeNs, long allocatedBytes);
-
-  @Deprecated
-  void updateQueryUsageConcurrently(String queryId);
+  void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long allocatedBytes,
+      TrackingScope trackingScope);
 
   /**
    * start the periodical task
    */
   void startWatcherTask();
+
+  /**
+   * Stop the periodic watcher task.
+   */
+  default void stopWatcherTask() {
+    // Default implementation does nothing. Subclasses can override to stop the watcher task.
+  }
 
   @Nullable
   default PinotClusterConfigChangeListener getClusterConfigChangeListener() {
