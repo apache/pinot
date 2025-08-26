@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.config.table;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.pinot.spi.config.BaseJsonConfig;
 
 
@@ -26,15 +28,19 @@ public class PauseState extends BaseJsonConfig {
   private ReasonCode _reasonCode;
   private String _comment;
   private String _timestamp;
+  // List of inactive topic indices. Index is the index of the topic in the streamConfigMaps.
+  private List<Integer> _indexOfInActiveTopics;
 
   public PauseState() {
   }
 
-  public PauseState(boolean paused, ReasonCode reasonCode, String comment, String timestamp) {
+  public PauseState(boolean paused, ReasonCode reasonCode, String comment, String timestamp,
+      List<Integer> indexOfInActiveTopics) {
     _paused = paused;
     _reasonCode = reasonCode;
     _comment = comment;
     _timestamp = timestamp;
+    setIndexOfInActiveTopics(indexOfInActiveTopics);
   }
 
   public boolean isPaused() {
@@ -53,6 +59,10 @@ public class PauseState extends BaseJsonConfig {
     return _timestamp;
   }
 
+  public List<Integer> getIndexOfInActiveTopics() {
+    return _indexOfInActiveTopics;
+  }
+
   public void setPaused(boolean paused) {
     _paused = paused;
   }
@@ -67,6 +77,10 @@ public class PauseState extends BaseJsonConfig {
 
   public void setTimeInMillis(String timestamp) {
     _timestamp = timestamp;
+  }
+
+  public void setIndexOfInActiveTopics(List<Integer> indexOfInActiveTopics) {
+    _indexOfInActiveTopics = indexOfInActiveTopics == null ? new ArrayList<>() : indexOfInActiveTopics;
   }
 
   public enum ReasonCode {

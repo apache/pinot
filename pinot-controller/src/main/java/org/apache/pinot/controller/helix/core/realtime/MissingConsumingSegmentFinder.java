@@ -22,6 +22,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,7 @@ import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.PinotTableIdealStateBuilder;
+import org.apache.pinot.spi.config.table.PauseState;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
@@ -67,7 +69,7 @@ public class MissingConsumingSegmentFinder {
   private ControllerMetrics _controllerMetrics;
 
   public MissingConsumingSegmentFinder(String realtimeTableName, ZkHelixPropertyStore<ZNRecord> propertyStore,
-      ControllerMetrics controllerMetrics, List<StreamConfig> streamConfigs) {
+      ControllerMetrics controllerMetrics, List<StreamConfig> streamConfigs, IdealState idealState) {
     _realtimeTableName = realtimeTableName;
     _controllerMetrics = controllerMetrics;
     _segmentMetadataFetcher = new SegmentMetadataFetcher(propertyStore, controllerMetrics);
@@ -81,7 +83,9 @@ public class MissingConsumingSegmentFinder {
       return streamConfig;
     });
     try {
-      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), false)
+      PauseState pauseState = PinotLLCRealtimeSegmentManager.extractTablePauseState(idealState);
+      PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs, Collections.emptyList(),
+              pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInActiveTopics(), false)
           .forEach(metadata -> {
             _partitionGroupIdToLargestStreamOffsetMap.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
           });

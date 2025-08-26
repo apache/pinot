@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -377,7 +378,7 @@ public class PinotLLCRealtimeSegmentManager {
     streamConfigs.forEach(_flushThresholdUpdateManager::clearFlushThresholdUpdater);
     InstancePartitions instancePartitions = getConsumingInstancePartitions(tableConfig);
     List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList());
+        getNewPartitionGroupMetadataList(streamConfigs, Collections.emptyList(), idealState);
     int numPartitionGroups = newPartitionGroupMetadataList.size();
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
@@ -781,7 +782,7 @@ public class PinotLLCRealtimeSegmentManager {
     int numReplicas = getNumReplicas(tableConfig, instancePartitions);
 
     String newConsumingSegmentName = null;
-    if (!isTablePaused(idealState)) {
+    if (!isTablePaused(idealState) && !isTopicPaused(idealState, committingSegmentName)) {
       LLCSegmentName committingLLCSegment = new LLCSegmentName(committingSegmentName);
       int committingSegmentPartitionGroupId = committingLLCSegment.getPartitionGroupId();
 
@@ -932,8 +933,7 @@ public class PinotLLCRealtimeSegmentManager {
 
     // Handle offset auto reset
     String nextOffset = committingSegmentDescriptor.getNextOffset();
-    String startOffset = computeStartOffset(
-        nextOffset, streamConfig, newLLCSegmentName.getPartitionGroupId());
+    String startOffset = computeStartOffset(nextOffset, streamConfig, newLLCSegmentName.getPartitionGroupId());
 
     LOGGER.info(
         "Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
@@ -972,8 +972,9 @@ public class PinotLLCRealtimeSegmentManager {
     int offsetThreshold = streamConfig.getOffsetAutoResetOffsetThreshold();
     if (timeThreshold <= 0 && offsetThreshold <= 0) {
       LOGGER.warn("Invalid offset auto reset configuration for table: {}, topic: {}. "
-              + "timeThreshold: {}, offsetThreshold: {}",
-          streamConfig.getTableNameWithType(), streamConfig.getTopicName(), timeThreshold, offsetThreshold);
+              + "timeThreshold: {}, offsetThreshold: {}", streamConfig.getTableNameWithType(),
+          streamConfig.getTopicName(),
+          timeThreshold, offsetThreshold);
       return nextOffset;
     }
     String clientId = getTableTopicUniqueClientId(streamConfig);
@@ -990,8 +991,8 @@ public class PinotLLCRealtimeSegmentManager {
       // (CurrentTime - SLA)'s offset > nextOffset.
       // TODO: it is relying on System.currentTimeMillis() which might be affected by time drift. If we are able to
       // get nextOffset's time, we should instead check (nextOffset's time + SLA)'s offset < latestOffset
-      latestOffset = metadataProvider.fetchStreamPartitionOffset(
-          OffsetCriteria.LARGEST_OFFSET_CRITERIA, STREAM_FETCH_TIMEOUT_MS);
+      latestOffset =
+          metadataProvider.fetchStreamPartitionOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, STREAM_FETCH_TIMEOUT_MS);
       LOGGER.info("Latest offset of topic {} and partition {} is {}", streamConfig.getTopicName(), partitionId,
           latestOffset);
       if (timeThreshold > 0) {
@@ -1140,7 +1141,7 @@ public class PinotLLCRealtimeSegmentManager {
       List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList =
           getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
       List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
+          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
       partitionIds.addAll(newPartitionGroupMetadataList.stream()
           .map(PartitionGroupMetadata::getPartitionGroupId)
           .collect(Collectors.toSet()));
@@ -1155,9 +1156,9 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList) {
-    return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
-        currentPartitionGroupConsumptionStatusList, false);
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
+    return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState,
+        false);
   }
 
   /**
@@ -1167,10 +1168,12 @@ public class PinotLLCRealtimeSegmentManager {
    */
   @VisibleForTesting
   List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList,
+      List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
       boolean forceGetOffsetFromStream) {
+    PauseState pauseState = extractTablePauseState(idealState);
     return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
-        currentPartitionGroupConsumptionStatusList, forceGetOffsetFromStream);
+        currentPartitionGroupConsumptionStatusList,
+        pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInActiveTopics(), forceGetOffsetFromStream);
   }
 
   /**
@@ -1343,7 +1346,7 @@ public class PinotLLCRealtimeSegmentManager {
               .forEach(streamConfig -> streamConfig.setOffsetCriteria(
                   offsetsHaveToChange ? offsetCriteria : OffsetCriteria.SMALLEST_OFFSET_CRITERIA));
           List<PartitionGroupMetadata> newPartitionGroupMetadataList =
-              getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
+              getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
           streamConfigs.stream().forEach(streamConfig -> streamConfig.setOffsetCriteria(originalOffsetCriteria));
           return ensureAllPartitionsConsuming(tableConfig, streamConfigs, idealState, newPartitionGroupMetadataList,
               offsetCriteria);
@@ -1383,7 +1386,8 @@ public class PinotLLCRealtimeSegmentManager {
             "Exceeded max segment completion time for segment " + committingSegmentName);
       }
       updateInstanceStatesForNewConsumingSegment(idealState.getRecord().getMapFields(), committingSegmentName,
-          isTablePaused(idealState) ? null : newSegmentName, segmentAssignment, instancePartitionsMap);
+          isTablePaused(idealState) || isTopicPaused(idealState, committingSegmentName) ? null : newSegmentName,
+          segmentAssignment, instancePartitionsMap);
       return idealState;
     }, DEFAULT_RETRY_POLICY);
   }
@@ -1399,7 +1403,24 @@ public class PinotLLCRealtimeSegmentManager {
     return Boolean.parseBoolean(idealState.getRecord().getSimpleField(IS_TABLE_PAUSED));
   }
 
-  private static PauseState extractTablePauseState(IdealState idealState) {
+  public static boolean isTopicPaused(IdealState idealState, int topicIndex) {
+    PauseState pauseState = extractTablePauseState(idealState);
+    if (pauseState != null) {
+      return pauseState.getIndexOfInActiveTopics().contains(topicIndex);
+    }
+    return false;
+  }
+
+  public static boolean isTopicPaused(IdealState idealState, String segmentName) {
+    LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+    if (llcSegmentName != null) {
+      return isTopicPaused(idealState,
+          IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(llcSegmentName.getPartitionGroupId()));
+    }
+    return false;
+  }
+
+  public static PauseState extractTablePauseState(IdealState idealState) {
     String pauseStateStr = idealState.getRecord().getSimpleField(PinotLLCRealtimeSegmentManager.PAUSE_STATE);
     try {
       if (pauseStateStr != null) {
@@ -1800,8 +1821,8 @@ public class PinotLLCRealtimeSegmentManager {
       // Temporarily, we are passing a boolean flag to indicate if we want to use the current status
       // The kafka implementation of computePartitionGroupMetadata() will ignore the current status
       // while the kinesis implementation will use it.
-      List<PartitionGroupMetadata> partitionGroupMetadataList =
-          getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, true);
+      List<PartitionGroupMetadata> partitionGroupMetadataList = getNewPartitionGroupMetadataList(
+          streamConfigs, currentPartitionGroupConsumptionStatusList, idealState, true);
       streamConfig.setOffsetCriteria(originalOffsetCriteria);
       for (PartitionGroupMetadata metadata : partitionGroupMetadataList) {
         partitionGroupIdToSmallestOffset.put(metadata.getPartitionGroupId(), metadata.getStartOffset());
@@ -2406,8 +2427,9 @@ public class PinotLLCRealtimeSegmentManager {
   public IdealState updatePauseStateInIdealState(String tableNameWithType, boolean pause,
       PauseState.ReasonCode reasonCode, @Nullable String comment) {
     PauseState pauseState =
-        new PauseState(pause, reasonCode, comment, new Timestamp(System.currentTimeMillis()).toString());
+        new PauseState(pause, reasonCode, comment, new Timestamp(System.currentTimeMillis()).toString(), null);
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+      pauseState.setIndexOfInActiveTopics(extractTablePauseState(idealState).getIndexOfInActiveTopics());
       ZNRecord znRecord = idealState.getRecord();
       znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
       // maintain for backward compatibility
@@ -2416,6 +2438,48 @@ public class PinotLLCRealtimeSegmentManager {
     }, RetryPolicies.noDelayRetryPolicy(3));
     LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. "
         + "Also set 'isTablePaused' to {} for backward compatibility.", pauseState, tableNameWithType, pause);
+    return updatedIdealState;
+  }
+
+  public IdealState pauseTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
+    IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+      PauseState pauseState = extractTablePauseState(idealState);
+      if (pauseState == null) {
+        pauseState = new PauseState(false, PauseState.ReasonCode.ADMINISTRATIVE, null,
+            new Timestamp(System.currentTimeMillis()).toString(), indexOfPausedTopics);
+      } else {
+        // Union the existing paused topics with the newly paused topics
+        pauseState.setIndexOfInActiveTopics(
+            Stream.concat(pauseState.getIndexOfInActiveTopics().stream(), indexOfPausedTopics.stream())
+                .distinct()
+                .collect(Collectors.toList()));
+      }
+      ZNRecord znRecord = idealState.getRecord();
+      znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
+      LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. " + "to pause topics with indices {}.",
+          pauseState, tableNameWithType, indexOfPausedTopics);
+      return new IdealState(znRecord);
+    }, RetryPolicies.noDelayRetryPolicy(3));
+    Set<String> consumingSegments = findConsumingSegmentsOfTopics(updatedIdealState, indexOfPausedTopics);
+    sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
+    return updatedIdealState;
+  }
+
+  public IdealState resumeTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
+    IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
+      PauseState pauseState = extractTablePauseState(idealState);
+      if (pauseState == null) {
+        return idealState;
+      }
+      pauseState.getIndexOfInActiveTopics().removeAll(indexOfPausedTopics);
+      ZNRecord znRecord = idealState.getRecord();
+      znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
+      LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. " + "to resume topics with indices {}.",
+          pauseState, tableNameWithType, indexOfPausedTopics);
+      return new IdealState(znRecord);
+    }, RetryPolicies.noDelayRetryPolicy(3));
+    _helixResourceManager.invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER,
+        new HashMap<>());
     return updatedIdealState;
   }
 
@@ -2446,6 +2510,24 @@ public class PinotLLCRealtimeSegmentManager {
     return consumingSegments;
   }
 
+  private Set<String> findConsumingSegmentsOfTopics(IdealState idealState, List<Integer> topicIndices) {
+    Set<String> consumingSegments = new TreeSet<>();
+    idealState.getRecord().getMapFields().forEach((segmentName, instanceToStateMap) -> {
+      LLCSegmentName llcSegmentName = LLCSegmentName.of(segmentName);
+      if (llcSegmentName != null && topicIndices.contains(
+          IngestionConfigUtils.getStreamConfigIndexFromPinotPartitionId(llcSegmentName.getPartitionGroupId()))) {
+        return;
+      }
+      for (String state : instanceToStateMap.values()) {
+        if (state.equals(SegmentStateModel.CONSUMING)) {
+          consumingSegments.add(segmentName);
+          break;
+        }
+      }
+    });
+    return consumingSegments;
+  }
+
   /**
    * Return pause status:
    *   - Information from the 'pauseState' in the table ideal state
@@ -2456,6 +2538,7 @@ public class PinotLLCRealtimeSegmentManager {
     Set<String> consumingSegments = findConsumingSegments(idealState);
     PauseState pauseState = extractTablePauseState(idealState);
     if (pauseState != null) {
+      // TODO: add paused topics information
       return new PauseStatusDetails(pauseState.isPaused(), consumingSegments, pauseState.getReasonCode(),
           pauseState.getComment(), pauseState.getTimeInMillis());
     }
