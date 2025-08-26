@@ -502,9 +502,7 @@ public class JsonExtractScalarTransformFunction extends BaseTransformFunction {
           if (_defaultValue != null) {
             value = _defaultValue.toString();
           } else {
-            throw new IllegalArgumentException(
-                "At least one of the resolved JSON arrays include nulls, which is not supported in Pinot. "
-                    + "Consider setting a default value as the forth argument of jsonextractscalar.");
+                    + "Consider setting a default value as the fourth argument of jsonextractscalar.");
           }
         }
         values[j] = value;
