@@ -51,6 +51,7 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
@@ -59,6 +60,7 @@ import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,7 +111,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   @Override
   public TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders) throws TimeSeriesException {
     TimeSeriesBlock timeSeriesBlock = null;
     long queryStartTime = System.currentTimeMillis();
     try {
@@ -121,7 +123,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       try {
         timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
-        throw new RuntimeException("Error building RangeTimeSeriesRequest", e);
+        throw new TimeSeriesException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
       }
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       // If there are no buckets in the logical plan, return an empty response.
@@ -138,7 +140,11 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     } catch (Exception e) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
       LOGGER.warn("time-series query failed with error: {}", e.getMessage());
-      throw new RuntimeException("Time-series query failed", e);
+      if (e instanceof TimeSeriesException) {
+        throw (TimeSeriesException) e;
+      } else {
+        throw new TimeSeriesException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
+      }
     } finally {
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
           TimeUnit.MILLISECONDS);

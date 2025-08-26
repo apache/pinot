@@ -92,6 +92,7 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -301,6 +302,8 @@ public class PinotClientRequest {
             requestContext, makeHttpIdentity(requestCtx), httpHeaders);
         asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(timeSeriesBlock));
       }
+    } catch (TimeSeriesException e) {
+      asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(e));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST timeseries request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
@@ -331,6 +334,9 @@ public class PinotClientRequest {
         }
         asyncResponse.resume(response);
       }
+    } catch (TimeSeriesException e) {
+      asyncResponse.resume(Response.serverError().entity(PinotBrokerTimeSeriesResponse.fromTimeSeriesException(e))
+        .build());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
@@ -569,7 +575,7 @@ public class PinotClientRequest {
 
   private TimeSeriesBlock executeTimeSeriesQuery(String language, String queryString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders) throws TimeSeriesException {
     return _requestHandler.handleTimeSeriesRequest(language, queryString, queryParams, requestContext,
         requesterIdentity, httpHeaders);
   }

@@ -32,6 +32,7 @@ import java.util.Objects;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 
 
 /**
@@ -106,6 +107,10 @@ public class PinotBrokerTimeSeriesResponse {
       throw new UnsupportedOperationException("Non-bucketed series block not supported yet");
     }
     return convertBucketedSeriesBlock(seriesBlock);
+  }
+
+  public static PinotBrokerTimeSeriesResponse fromTimeSeriesException(TimeSeriesException e) {
+    return newErrorResponse(e.getErrorCode().getDefaultMessage(), e.getMessage());
   }
 
   private static PinotBrokerTimeSeriesResponse convertBucketedSeriesBlock(TimeSeriesBlock seriesBlock) {

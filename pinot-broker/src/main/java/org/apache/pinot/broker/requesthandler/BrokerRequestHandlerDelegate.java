@@ -38,6 +38,7 @@ import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 
 
 /**
@@ -126,12 +127,12 @@ public class BrokerRequestHandlerDelegate implements BrokerRequestHandler {
   @Override
   public TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders) throws TimeSeriesException {
     if (_timeSeriesRequestHandler != null) {
       return _timeSeriesRequestHandler.handleTimeSeriesRequest(lang, rawQueryParamString, queryParams, requestContext,
           requesterIdentity, httpHeaders);
     }
-    throw new UnsupportedOperationException("Time series query engine not enabled.");
+    throw new TimeSeriesException(QueryErrorCode.INTERNAL, "Time series query engine not enabled.");
   }
 
   @Override

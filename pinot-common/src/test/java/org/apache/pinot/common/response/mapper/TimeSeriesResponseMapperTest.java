@@ -24,11 +24,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeTest;
@@ -50,13 +53,23 @@ public class TimeSeriesResponseMapperTest {
 
   @Test(expectedExceptions = IllegalArgumentException.class)
   public void toBrokerResponseNullBlockThrows() {
-    TimeSeriesResponseMapper.toBrokerResponse(null);
+    _block = null;
+    TimeSeriesResponseMapper.toBrokerResponse(_block);
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
   public void toBrokerResponseNonBucketedThrows() {
     when(_block.getTimeBuckets()).thenReturn(null);
     TimeSeriesResponseMapper.toBrokerResponse(_block);
+  }
+
+  @Test
+  public void toBrokerResponseWithTimeSeriesException() {
+    BrokerResponseNativeV2 resp = (BrokerResponseNativeV2) TimeSeriesResponseMapper.toBrokerResponse(
+      new TimeSeriesException(QueryErrorCode.INTERNAL, "time series exception"));
+    List<QueryProcessingException> exceptions = resp.getExceptions();
+    assertEquals(exceptions.size(), 1);
+    assertEquals(exceptions.get(0).getErrorCode(), QueryErrorCode.INTERNAL.getId());
   }
 
   @Test

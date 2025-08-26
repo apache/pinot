@@ -37,6 +37,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 
 
 @ThreadSafe
@@ -66,7 +67,7 @@ public interface BrokerRequestHandler {
    */
   default TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
       Map<String, String> queryParams, RequestContext requestContext, @Nullable RequesterIdentity requesterIdentity,
-      HttpHeaders httpHeaders) {
+      HttpHeaders httpHeaders) throws TimeSeriesException {
     throw new UnsupportedOperationException("Handler does not support Time Series requests");
   }
 

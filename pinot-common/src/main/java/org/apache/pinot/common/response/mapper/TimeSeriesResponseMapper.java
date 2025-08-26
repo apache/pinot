@@ -22,10 +22,12 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 
 
 public class TimeSeriesResponseMapper {
@@ -55,6 +57,12 @@ public class TimeSeriesResponseMapper {
 
     ResultTable resultTable = new ResultTable(dataSchema, rows);
     brokerResponse.setResultTable(resultTable);
+    return brokerResponse;
+  }
+
+  public static BrokerResponse toBrokerResponse(TimeSeriesException e) {
+    BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
+    brokerResponse.addException(new QueryProcessingException(e.getErrorCode(), e.getMessage()));
     return brokerResponse;
   }
 
