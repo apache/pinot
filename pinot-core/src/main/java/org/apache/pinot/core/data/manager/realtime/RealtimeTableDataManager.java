@@ -337,10 +337,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   /**
    * Method to handle CONSUMING -> OFFLINE segment state transitions:
-   * We must stop tracking partitions for ingestion-delay if consuming segment is marked as offline as there won't be
-   * any consumer present on the server for the partition segment is consuming from.
+   * We stop tracking partitions whose segments are going OFFLINE. The reason is that offline segments are not queried.
+   * So ingestion delay for the offline replicas are not relevant. If there are more replicas with offline state,
+   * replica up metric will determine the severity of the issue.
    *
-   * @param segmentName name of segment which is transitioning state.
+   * @param segmentName name of segment for which the state change is being handled
    */
   @Override
   public void onConsumingToOffline(String segmentName) {
