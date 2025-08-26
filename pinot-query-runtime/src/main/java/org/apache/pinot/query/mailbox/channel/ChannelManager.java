@@ -49,11 +49,7 @@ public class ChannelManager {
    *
    * In general we want to prevent the channel from going idle, so that we don't have to re-establish the connection
    * (including TLS negotiation) before sending any message, which increases the latency of the first query sent after a
-   * period of inactivity.
-   *
-   * This is why by default we set the idle timeout to twice the pinger period if a pinger is configured, so that the
-   * pinger can keep the channel alive. In case the pinger is not configured, we set the idle timeout to 30 minutes,
-   * which is the default value in the gRPC Java implementation.
+   * period of inactivity. In order to achieve that, we set the idle timeout to a very large value by default.
    */
   private final Duration _idleTimeout;
   private final int _maxInboundMessageSize;
