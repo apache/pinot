@@ -71,6 +71,8 @@ public class PredownloadZKClient implements AutoCloseable {
   }
 
   public void start() {
+    // Note: ZooKeeper SSL configuration is handled via system properties
+    // set by PredownloadScheduler.configureSSL() before this method is called
     RealmAwareZkClient.RealmAwareZkClientConfig config = new RealmAwareZkClient.RealmAwareZkClientConfig();
     config.setConnectInitTimeout(ZK_CONNECTION_TIMEOUT_MS);
     config.setZkSerializer(new ZNRecordSerializer());
