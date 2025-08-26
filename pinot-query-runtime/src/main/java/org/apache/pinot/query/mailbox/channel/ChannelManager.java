@@ -41,6 +41,9 @@ import org.apache.pinot.spi.utils.CommonConstants;
  * query/job/stages.
  */
 public class ChannelManager {
+  /**
+   * Map from (hostname, port) to the ManagedChannel with all known channels
+   */
   private final ConcurrentHashMap<Pair<String, Integer>, ManagedChannel> _channelMap = new ConcurrentHashMap<>();
   private final TlsConfig _tlsConfig;
   /**
@@ -57,7 +60,7 @@ public class ChannelManager {
   private final Duration _idleTimeout;
 
   public ChannelManager(@Nullable TlsConfig tlsConfig, Duration idleTimeout) {
-    Preconditions.checkArgument(idleTimeout.isNegative() || idleTimeout.isZero(), "Idle timeout must be positive");
+    Preconditions.checkArgument(!(idleTimeout.isNegative() && !idleTimeout.isZero()), "Idle timeout must be positive");
     _tlsConfig = tlsConfig;
     _idleTimeout = idleTimeout;
   }
@@ -94,6 +97,8 @@ public class ChannelManager {
 
   /**
    * Returns a set with the key of all known channels.
+   *
+   * For each entry, the key is a pair of (hostname, port).
    *
    * The returned value is a copy of the internal map's key set, so it is safe to use
    * without worrying about concurrent modifications.
