@@ -89,13 +89,13 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
           LOGGER.info("Skip checking tenant rebalance job: {} as it has no job context or progress stats", jobId);
           continue;
         }
-        DefaultTenantRebalanceContext tenantRebalanceContext =
-            JsonUtils.stringToObject(tenantRebalanceContextStr, DefaultTenantRebalanceContext.class);
+        TenantRebalanceContext tenantRebalanceContext =
+            JsonUtils.stringToObject(tenantRebalanceContextStr, TenantRebalanceContext.class);
         TenantRebalanceProgressStats progressStats =
             JsonUtils.stringToObject(tenantRebalanceProgressStatsStr, TenantRebalanceProgressStats.class);
         long statsUpdatedAt = Long.parseLong(jobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
 
-        DefaultTenantRebalanceContext retryTenantRebalanceContext =
+        TenantRebalanceContext retryTenantRebalanceContext =
             prepareRetryIfTenantRebalanceJobStuck(jobZKMetadata, tenantRebalanceContext, statsUpdatedAt);
         if (retryTenantRebalanceContext != null) {
           TenantRebalancer.TenantTableRebalanceJobContext ctx;
@@ -121,7 +121,7 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     }
   }
 
-  private void retryTenantRebalanceJob(DefaultTenantRebalanceContext tenantRebalanceContextForRetry,
+  private void retryTenantRebalanceJob(TenantRebalanceContext tenantRebalanceContextForRetry,
       TenantRebalanceProgressStats progressStats) {
     ZkBasedTenantRebalanceObserver observer =
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContextForRetry.getJobId(),
@@ -152,8 +152,8 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
    * @return The TenantRebalanceContext for retry if the tenant rebalance job is stuck and should be retried, null if
    * the job is not stuck, or it's stuck but other controller has prepared the retry first.
    */
-  private DefaultTenantRebalanceContext prepareRetryIfTenantRebalanceJobStuck(
-      Map<String, String> jobZKMetadata, DefaultTenantRebalanceContext tenantRebalanceContext, long statsUpdatedAt) {
+  private TenantRebalanceContext prepareRetryIfTenantRebalanceJobStuck(
+      Map<String, String> jobZKMetadata, TenantRebalanceContext tenantRebalanceContext, long statsUpdatedAt) {
     boolean isStuck = false;
     String stuckTableRebalanceJobId = null;
     long heartbeatTimeoutMs = tenantRebalanceContext.getConfig().getHeartbeatTimeoutInMs();
@@ -179,8 +179,8 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
     if (isStuck) {
       // If any of the table rebalance jobs is stuck, we consider the tenant rebalance job as stuck.
       // We need to make sure only one controller instance retries the tenant rebalance job.
-      DefaultTenantRebalanceContext retryTenantRebalanceContext =
-          DefaultTenantRebalanceContext.forRetry(tenantRebalanceContext.getOriginalJobId(),
+      TenantRebalanceContext retryTenantRebalanceContext =
+          TenantRebalanceContext.forRetry(tenantRebalanceContext.getOriginalJobId(),
               tenantRebalanceContext.getConfig(), tenantRebalanceContext.getAttemptId() + 1,
               tenantRebalanceContext.getParallelQueue(), tenantRebalanceContext.getSequentialQueue(),
               tenantRebalanceContext.getOngoingJobsQueue());
@@ -276,7 +276,7 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
    * @param progressStats The progress stats of the tenant rebalance job.
    */
   private void markTenantRebalanceJobAsAborted(String jobId, Map<String, String> jobMetadata,
-      DefaultTenantRebalanceContext tenantRebalanceContext,
+      TenantRebalanceContext tenantRebalanceContext,
       TenantRebalanceProgressStats progressStats) {
     TenantRebalanceProgressStats abortedProgressStats = new TenantRebalanceProgressStats(progressStats);
     for (Map.Entry<String, String> entry : abortedProgressStats.getTableStatusMap().entrySet()) {

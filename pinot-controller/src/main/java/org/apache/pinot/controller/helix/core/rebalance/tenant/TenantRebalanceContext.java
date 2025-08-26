@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  * for managing tenant rebalance operations. This context is synchronized to ZK by `ZkBasedTenantRebalanceObserver`
  * to ensure consistency across controller restarts.
  */
-public class DefaultTenantRebalanceContext {
+public class TenantRebalanceContext {
   protected static final int INITIAL_ATTEMPT_ID = 1;
   @JsonProperty("jobId")
   private final String _jobId;
@@ -48,7 +48,7 @@ public class DefaultTenantRebalanceContext {
   private final Queue<TenantRebalancer.TenantTableRebalanceJobContext> _sequentialQueue;
 
   // Default constructor for JSON deserialization
-  public DefaultTenantRebalanceContext() {
+  public TenantRebalanceContext() {
     _jobId = null;
     _originalJobId = null;
     _config = null;
@@ -58,7 +58,7 @@ public class DefaultTenantRebalanceContext {
     _ongoingJobsQueue = new ConcurrentLinkedQueue<>();
   }
 
-  public DefaultTenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId,
+  public TenantRebalanceContext(String originalJobId, TenantRebalanceConfig config, int attemptId,
       ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
       ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
@@ -71,18 +71,18 @@ public class DefaultTenantRebalanceContext {
     _ongoingJobsQueue = new ConcurrentLinkedQueue<>(ongoingJobsQueue);
   }
 
-  public static DefaultTenantRebalanceContext forInitialRebalance(String originalJobId, TenantRebalanceConfig config,
+  public static TenantRebalanceContext forInitialRebalance(String originalJobId, TenantRebalanceConfig config,
       ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue) {
-    return new DefaultTenantRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID,
+    return new TenantRebalanceContext(originalJobId, config, INITIAL_ATTEMPT_ID,
         parallelQueue, sequentialQueue, new ConcurrentLinkedQueue<>());
   }
 
-  public static DefaultTenantRebalanceContext forRetry(String originalJobId, TenantRebalanceConfig config,
+  public static TenantRebalanceContext forRetry(String originalJobId, TenantRebalanceConfig config,
       int attemptId, ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext> parallelQueue,
       Queue<TenantRebalancer.TenantTableRebalanceJobContext> sequentialQueue,
       ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext> ongoingJobsQueue) {
-    return new DefaultTenantRebalanceContext(originalJobId, config, attemptId,
+    return new TenantRebalanceContext(originalJobId, config, attemptId,
         parallelQueue, sequentialQueue, ongoingJobsQueue);
   }
 

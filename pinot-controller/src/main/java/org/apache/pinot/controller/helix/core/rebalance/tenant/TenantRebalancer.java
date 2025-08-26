@@ -136,8 +136,8 @@ public class TenantRebalancer {
             config.getParallelBlacklist());
     ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = queues.getLeft();
     Queue<TenantTableRebalanceJobContext> sequentialQueue = queues.getRight();
-    DefaultTenantRebalanceContext tenantRebalanceContext =
-        DefaultTenantRebalanceContext.forInitialRebalance(tenantRebalanceJobId, config, parallelQueue,
+    TenantRebalanceContext tenantRebalanceContext =
+        TenantRebalanceContext.forInitialRebalance(tenantRebalanceJobId, config, parallelQueue,
             sequentialQueue);
 
     ZkBasedTenantRebalanceObserver observer =
@@ -173,7 +173,7 @@ public class TenantRebalancer {
    * @param tenantRebalanceContext The context containing the configuration and queues for the rebalance operation.
    * @param observer The observer to notify about the rebalance progress and results.
    */
-  public void rebalanceWithContext(DefaultTenantRebalanceContext tenantRebalanceContext,
+  public void rebalanceWithContext(TenantRebalanceContext tenantRebalanceContext,
       ZkBasedTenantRebalanceObserver observer) {
     TenantRebalanceConfig config = tenantRebalanceContext.getConfig();
     ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = tenantRebalanceContext.getParallelQueue();

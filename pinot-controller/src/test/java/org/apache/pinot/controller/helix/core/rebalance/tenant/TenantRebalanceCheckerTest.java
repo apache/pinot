@@ -113,7 +113,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
   public void testResumeStuckTenantRebalanceJob()
       throws Exception {
     // Create a stuck tenant rebalance context
-    DefaultTenantRebalanceContext stuckContext = createStuckTenantRebalanceContext();
+    TenantRebalanceContext stuckContext = createStuckTenantRebalanceContext();
     TenantRebalanceProgressStats progressStats = createProgressStats();
 
     // Mock ZK metadata for the stuck job
@@ -131,8 +131,8 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
         .getControllerJobZKMetadata(eq(STUCK_TABLE_JOB_ID), eq(ControllerJobTypes.TABLE_REBALANCE));
 
     // Mock the tenant rebalancer to capture the resumed context
-    ArgumentCaptor<DefaultTenantRebalanceContext> contextCaptor =
-        ArgumentCaptor.forClass(DefaultTenantRebalanceContext.class);
+    ArgumentCaptor<TenantRebalanceContext> contextCaptor =
+        ArgumentCaptor.forClass(TenantRebalanceContext.class);
     ArgumentCaptor<ZkBasedTenantRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTenantRebalanceObserver.class);
 
@@ -144,9 +144,9 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
         contextCaptor.capture(), observerCaptor.capture());
 
     // Verify the resumed context
-    DefaultTenantRebalanceContext resumedContext = contextCaptor.getValue();
+    TenantRebalanceContext resumedContext = contextCaptor.getValue();
     assertNotNull(resumedContext);
-    assertEquals(resumedContext.getAttemptId(), DefaultTenantRebalanceContext.INITIAL_ATTEMPT_ID + 1);
+    assertEquals(resumedContext.getAttemptId(), TenantRebalanceContext.INITIAL_ATTEMPT_ID + 1);
     assertEquals(resumedContext.getOriginalJobId(), ORIGINAL_JOB_ID);
     assertEquals(resumedContext.getAttemptId(), 2); // Should be incremented from 1
     assertEquals(resumedContext.getConfig().getTenantName(), TENANT_NAME);
@@ -170,7 +170,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
   public void testResumeStuckTenantRebalanceJobWithMultipleStuckTables()
       throws Exception {
     // Create a context with multiple stuck table jobs
-    DefaultTenantRebalanceContext stuckContext = createStuckTenantRebalanceContextWithMultipleTables();
+    TenantRebalanceContext stuckContext = createStuckTenantRebalanceContextWithMultipleTables();
     TenantRebalanceProgressStats progressStats = createProgressStatsWithMultipleTables();
 
     // Mock ZK metadata
@@ -194,14 +194,14 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     _tenantRebalanceChecker.runTask(new Properties());
 
     // Verify that the tenant rebalancer was called
-    ArgumentCaptor<DefaultTenantRebalanceContext> contextCaptor =
-        ArgumentCaptor.forClass(DefaultTenantRebalanceContext.class);
+    ArgumentCaptor<TenantRebalanceContext> contextCaptor =
+        ArgumentCaptor.forClass(TenantRebalanceContext.class);
     verify(_mockTenantRebalancer, times(1)).rebalanceWithContext(
         contextCaptor.capture(), any(ZkBasedTenantRebalanceObserver.class));
 
     // Verify that both stuck table jobs were moved back to parallel queue
-    DefaultTenantRebalanceContext resumedContext = contextCaptor.getValue();
-    assertEquals(resumedContext.getAttemptId(), DefaultTenantRebalanceContext.INITIAL_ATTEMPT_ID + 1);
+    TenantRebalanceContext resumedContext = contextCaptor.getValue();
+    assertEquals(resumedContext.getAttemptId(), TenantRebalanceContext.INITIAL_ATTEMPT_ID + 1);
     assertEquals(resumedContext.getParallelQueue().size(), 2);
     assertTrue(resumedContext.getOngoingJobsQueue().isEmpty());
   }
@@ -210,7 +210,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
   public void testDoNotResumeNonStuckTenantRebalanceJob()
       throws Exception {
     // Create a non-stuck tenant rebalance context (no ongoing jobs)
-    DefaultTenantRebalanceContext nonStuckContextWithoutOngoing = createNonStuckTenantRebalanceContextWithoutOngoing();
+    TenantRebalanceContext nonStuckContextWithoutOngoing = createNonStuckTenantRebalanceContextWithoutOngoing();
     TenantRebalanceProgressStats progressStats = createProgressStats();
 
     // Mock ZK metadata
@@ -234,7 +234,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
   public void testDoNotResumeNonStuckTenantRebalanceJobWithOngoing()
       throws Exception {
     // Create a non-stuck tenant rebalance context (no ongoing jobs)
-    DefaultTenantRebalanceContext nonStuckContextWithOngoing = createNonStuckTenantRebalanceContextWithOngoing();
+    TenantRebalanceContext nonStuckContextWithOngoing = createNonStuckTenantRebalanceContextWithOngoing();
     TenantRebalanceProgressStats progressStats = createProgressStats();
 
     // Mock ZK metadata
@@ -268,7 +268,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
       throws Exception {
 
     // Create a stuck tenant rebalance context
-    DefaultTenantRebalanceContext stuckContext = createStuckTenantRebalanceContext();
+    TenantRebalanceContext stuckContext = createStuckTenantRebalanceContext();
     TenantRebalanceProgressStats progressStats = createProgressStats();
 
     // Mock ZK metadata for the stuck job
@@ -288,8 +288,8 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
         .addControllerJobToZK(anyString(), anyMap(), eq(ControllerJobTypes.TENANT_REBALANCE), any());
 
     // Mock the tenant rebalancer to capture the resumed context
-    ArgumentCaptor<DefaultTenantRebalanceContext> contextCaptor =
-        ArgumentCaptor.forClass(DefaultTenantRebalanceContext.class);
+    ArgumentCaptor<TenantRebalanceContext> contextCaptor =
+        ArgumentCaptor.forClass(TenantRebalanceContext.class);
     ArgumentCaptor<ZkBasedTenantRebalanceObserver> observerCaptor =
         ArgumentCaptor.forClass(ZkBasedTenantRebalanceObserver.class);
 
@@ -330,7 +330,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
 
   // Helper methods to create test data
 
-  private DefaultTenantRebalanceContext createStuckTenantRebalanceContext() {
+  private TenantRebalanceContext createStuckTenantRebalanceContext() {
     TenantRebalanceConfig config = new TenantRebalanceConfig();
     config.setTenantName(TENANT_NAME);
     config.setHeartbeatTimeoutInMs(300000L); // 5 minutes
@@ -345,12 +345,12 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
         new TenantRebalancer.TenantTableRebalanceJobContext(TABLE_NAME_1, STUCK_TABLE_JOB_ID, false);
     ongoingJobsQueue.add(stuckJobContext);
 
-    return new DefaultTenantRebalanceContext(
+    return new TenantRebalanceContext(
         ORIGINAL_JOB_ID, config, 1, parallelQueue,
         new ConcurrentLinkedQueue<>(), ongoingJobsQueue);
   }
 
-  private DefaultTenantRebalanceContext createStuckTenantRebalanceContextWithMultipleTables()
+  private TenantRebalanceContext createStuckTenantRebalanceContextWithMultipleTables()
       throws JsonProcessingException {
     TenantRebalanceConfig config = new TenantRebalanceConfig();
     config.setTenantName(TENANT_NAME);
@@ -366,12 +366,12 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     ongoingJobsQueue.add(
         new TenantRebalancer.TenantTableRebalanceJobContext(TABLE_NAME_2, STUCK_TABLE_JOB_ID_2, false));
 
-    return new DefaultTenantRebalanceContext(
+    return new TenantRebalanceContext(
         ORIGINAL_JOB_ID, config, 1, parallelQueue,
         new ConcurrentLinkedQueue<>(), ongoingJobsQueue);
   }
 
-  private DefaultTenantRebalanceContext createNonStuckTenantRebalanceContextWithoutOngoing()
+  private TenantRebalanceContext createNonStuckTenantRebalanceContextWithoutOngoing()
       throws JsonProcessingException {
     TenantRebalanceConfig config = new TenantRebalanceConfig();
     config.setTenantName(TENANT_NAME);
@@ -382,12 +382,12 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     // Add some jobs to parallel queue but none to ongoing queue
     parallelQueue.add(new TenantRebalancer.TenantTableRebalanceJobContext(TABLE_NAME_1, NON_STUCK_TABLE_JOB_ID, false));
 
-    return new DefaultTenantRebalanceContext(
+    return new TenantRebalanceContext(
         ORIGINAL_JOB_ID, config, 1, parallelQueue,
         new ConcurrentLinkedQueue<>(), new ConcurrentLinkedQueue<>());
   }
 
-  private DefaultTenantRebalanceContext createNonStuckTenantRebalanceContextWithOngoing()
+  private TenantRebalanceContext createNonStuckTenantRebalanceContextWithOngoing()
       throws JsonProcessingException {
     TenantRebalanceConfig config = new TenantRebalanceConfig();
     config.setTenantName(TENANT_NAME);
@@ -398,18 +398,18 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     // Add some jobs to parallel queue but none to ongoing queue
     ongoing.add(new TenantRebalancer.TenantTableRebalanceJobContext(TABLE_NAME_1, NON_STUCK_TABLE_JOB_ID, false));
 
-    return new DefaultTenantRebalanceContext(
+    return new TenantRebalanceContext(
         ORIGINAL_JOB_ID, config, 1, new ConcurrentLinkedDeque<>(),
         new ConcurrentLinkedQueue<>(), ongoing);
   }
 
-  private DefaultTenantRebalanceContext createRecentTenantRebalanceContext()
+  private TenantRebalanceContext createRecentTenantRebalanceContext()
       throws JsonProcessingException {
     TenantRebalanceConfig config = new TenantRebalanceConfig();
     config.setTenantName(TENANT_NAME);
     config.setHeartbeatTimeoutInMs(300000L);
 
-    return new DefaultTenantRebalanceContext(
+    return new TenantRebalanceContext(
         ORIGINAL_JOB_ID, config, 1,
         new ConcurrentLinkedDeque<>(), new ConcurrentLinkedQueue<>(), new ConcurrentLinkedQueue<>());
   }
@@ -440,7 +440,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     return stats;
   }
 
-  private Map<String, String> createTenantJobZKMetadata(DefaultTenantRebalanceContext context,
+  private Map<String, String> createTenantJobZKMetadata(TenantRebalanceContext context,
       TenantRebalanceProgressStats progressStats)
       throws JsonProcessingException {
     Map<String, String> metadata = new HashMap<>();
@@ -457,7 +457,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     return metadata;
   }
 
-  private Map<String, String> createTenantJobZKMetadataWithRecentTimestamp(DefaultTenantRebalanceContext context,
+  private Map<String, String> createTenantJobZKMetadataWithRecentTimestamp(TenantRebalanceContext context,
       TenantRebalanceProgressStats progressStats)
       throws JsonProcessingException {
     Map<String, String> metadata = createTenantJobZKMetadata(context, progressStats);
