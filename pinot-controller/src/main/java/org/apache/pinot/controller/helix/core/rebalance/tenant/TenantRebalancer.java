@@ -46,13 +46,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class DefaultTenantRebalancer {
-  private static final Logger LOGGER = LoggerFactory.getLogger(DefaultTenantRebalancer.class);
+public class TenantRebalancer {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TenantRebalancer.class);
   private final TableRebalanceManager _tableRebalanceManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
   private final ExecutorService _executorService;
 
-  public DefaultTenantRebalancer(TableRebalanceManager tableRebalanceManager,
+  public TenantRebalancer(TableRebalanceManager tableRebalanceManager,
       PinotHelixResourceManager pinotHelixResourceManager, ExecutorService executorService) {
     _tableRebalanceManager = tableRebalanceManager;
     _pinotHelixResourceManager = pinotHelixResourceManager;

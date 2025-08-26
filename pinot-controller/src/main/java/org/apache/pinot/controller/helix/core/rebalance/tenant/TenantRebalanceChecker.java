@@ -55,11 +55,11 @@ import org.slf4j.LoggerFactory;
 public class TenantRebalanceChecker extends BasePeriodicTask {
   private final static String TASK_NAME = TenantRebalanceChecker.class.getSimpleName();
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantRebalanceChecker.class);
-  private final DefaultTenantRebalancer _tenantRebalancer;
+  private final TenantRebalancer _tenantRebalancer;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
 
   public TenantRebalanceChecker(ControllerConf config,
-      PinotHelixResourceManager pinotHelixResourceManager, DefaultTenantRebalancer tenantRebalancer) {
+      PinotHelixResourceManager pinotHelixResourceManager, TenantRebalancer tenantRebalancer) {
     super(TASK_NAME, config.getTenantRebalanceCheckerFrequencyInSeconds(),
         config.getTenantRebalanceCheckerInitialDelayInSeconds());
     _pinotHelixResourceManager = pinotHelixResourceManager;
@@ -98,12 +98,12 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
         DefaultTenantRebalanceContext retryTenantRebalanceContext =
             prepareRetryIfTenantRebalanceJobStuck(jobZKMetadata, tenantRebalanceContext, statsUpdatedAt);
         if (retryTenantRebalanceContext != null) {
-          DefaultTenantRebalancer.TenantTableRebalanceJobContext ctx;
+          TenantRebalancer.TenantTableRebalanceJobContext ctx;
           while ((ctx = retryTenantRebalanceContext.getOngoingJobsQueue().poll()) != null) {
             abortTableRebalanceJob(ctx.getTableName());
             // the existing table rebalance job is aborted, we need to run the rebalance job with a new job ID.
-            DefaultTenantRebalancer.TenantTableRebalanceJobContext newCtx =
-                new DefaultTenantRebalancer.TenantTableRebalanceJobContext(
+            TenantRebalancer.TenantTableRebalanceJobContext newCtx =
+                new TenantRebalancer.TenantTableRebalanceJobContext(
                     ctx.getTableName(), UUID.randomUUID().toString(), ctx.shouldRebalanceWithDowntime());
             retryTenantRebalanceContext.getParallelQueue().addFirst(newCtx);
           }
@@ -127,7 +127,7 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContextForRetry.getJobId(),
             tenantRebalanceContextForRetry.getConfig().getTenantName(),
             progressStats, tenantRebalanceContextForRetry, _pinotHelixResourceManager);
-    ((DefaultTenantRebalancer) _tenantRebalancer).rebalanceWithContext(tenantRebalanceContextForRetry, observer);
+    ((TenantRebalancer) _tenantRebalancer).rebalanceWithContext(tenantRebalanceContextForRetry, observer);
   }
 
   /**
@@ -167,7 +167,7 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
       }
     } else {
       // Check if there's any stuck ongoing table rebalance jobs
-      for (DefaultTenantRebalancer.TenantTableRebalanceJobContext ctx : new ArrayList<>(
+      for (TenantRebalancer.TenantTableRebalanceJobContext ctx : new ArrayList<>(
           tenantRebalanceContext.getOngoingJobsQueue())) {
         if (isOngoingTableRebalanceJobStuck(ctx.getJobId(), statsUpdatedAt, heartbeatTimeoutMs)) {
           isStuck = true;
