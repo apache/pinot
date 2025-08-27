@@ -2441,7 +2441,7 @@ public class PinotLLCRealtimeSegmentManager {
     return updatedIdealState;
   }
 
-  public IdealState pauseTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
+  public PauseState pauseTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       PauseState pauseState = extractTablePauseState(idealState);
       if (pauseState == null) {
@@ -2462,10 +2462,10 @@ public class PinotLLCRealtimeSegmentManager {
     }, RetryPolicies.noDelayRetryPolicy(3));
     Set<String> consumingSegments = findConsumingSegmentsOfTopics(updatedIdealState, indexOfPausedTopics);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
-    return updatedIdealState;
+    return extractTablePauseState(updatedIdealState);
   }
 
-  public IdealState resumeTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
+  public PauseState resumeTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       PauseState pauseState = extractTablePauseState(idealState);
       if (pauseState == null) {
@@ -2480,7 +2480,7 @@ public class PinotLLCRealtimeSegmentManager {
     }, RetryPolicies.noDelayRetryPolicy(3));
     _helixResourceManager.invokeControllerPeriodicTask(tableNameWithType, Constants.REALTIME_SEGMENT_VALIDATION_MANAGER,
         new HashMap<>());
-    return updatedIdealState;
+    return extractTablePauseState(updatedIdealState);
   }
 
   private void sendForceCommitMessageToServers(String tableNameWithType, Set<String> consumingSegments) {
