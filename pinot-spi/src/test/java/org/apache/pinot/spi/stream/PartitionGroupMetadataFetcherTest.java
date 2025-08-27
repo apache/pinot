@@ -38,7 +38,8 @@ import static org.mockito.Mockito.when;
 public class PartitionGroupMetadataFetcherTest {
 
   @Test
-  public void testFetchSingleStreamSuccess() throws Exception {
+  public void testFetchSingleStreamSuccess()
+      throws Exception {
     // Setup
     StreamConfig streamConfig = createMockStreamConfig("test-topic", "test-table", false);
     List<StreamConfig> streamConfigs = Collections.singletonList(streamConfig);
@@ -62,7 +63,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(),false);
+          streamConfigs, statusList, Collections.emptyList(), false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -108,7 +109,8 @@ public class PartitionGroupMetadataFetcherTest {
   }
 
   @Test
-  public void testFetchMultipleStreams() throws Exception {
+  public void testFetchMultipleStreams()
+      throws Exception {
     // Setup
     StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
     StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
@@ -134,7 +136,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Collections.emptyList(),false);
+          streamConfigs, statusList, Collections.emptyList(), false);
 
       // Execute
       Boolean result = fetcher.call();
@@ -156,7 +158,8 @@ public class PartitionGroupMetadataFetcherTest {
   }
 
   @Test
-  public void testFetchMultipleStreamsWithPause() throws Exception {
+  public void testFetchMultipleStreamsWithPause()
+      throws Exception {
     // Setup
     StreamConfig streamConfig1 = createMockStreamConfig("topic1", "test-table", false);
     StreamConfig streamConfig2 = createMockStreamConfig("topic2", "test-table", false);
@@ -183,7 +186,7 @@ public class PartitionGroupMetadataFetcherTest {
       mockedProvider.when(() -> StreamConsumerFactoryProvider.create(any(StreamConfig.class))).thenReturn(factory);
 
       PartitionGroupMetadataFetcher fetcher = new PartitionGroupMetadataFetcher(
-          streamConfigs, statusList, Arrays.asList(1),false);
+          streamConfigs, statusList, Arrays.asList(1), false);
 
       // Execute
       Boolean result = fetcher.call();
