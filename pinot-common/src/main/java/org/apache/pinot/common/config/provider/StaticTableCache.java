@@ -172,9 +172,6 @@ public class StaticTableCache implements TableCache {
     return logicalTableConfigInfo != null ? logicalTableConfigInfo._expressionOverrideMap : null;
   }
 
-  /**
-   * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
-   */
   @Nullable
   @Override
   public Set<String> getTimestampIndexColumns(String tableNameWithType) {
@@ -196,7 +193,6 @@ public class StaticTableCache implements TableCache {
 
   @Override
   public boolean registerTableConfigChangeListener(TableConfigChangeListener tableConfigChangeListener) {
-    // Static implementation doesn't support change listeners
     return false;
   }
 
