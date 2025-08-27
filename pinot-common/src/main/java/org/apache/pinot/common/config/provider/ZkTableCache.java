@@ -43,11 +43,8 @@ import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -434,21 +431,7 @@ public class ZkTableCache implements TableCache {
     _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
   }
 
-  /**
-   * Adds the built-in virtual columns to the schema.
-   * NOTE: The virtual column provider class is not added.
-   */
-  private static void addBuiltInVirtualColumns(Schema schema) {
-    if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true));
-    }
-    if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true));
-    }
-    if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true));
-    }
-  }
+
 
   private void removeSchema(String path) {
     _propertyStore.unsubscribeDataChanges(path, _zkSchemaChangeListener);
@@ -648,16 +631,6 @@ public class ZkTableCache implements TableCache {
       String logicalTableName = path.substring(path.lastIndexOf('/') + 1);
       removeLogicalTableConfig(ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
       notifyLogicalTableConfigChangeListeners();
-    }
-  }
-
-  private static class SchemaInfo {
-    final Schema _schema;
-    final Map<String, String> _columnNameMap;
-
-    private SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
-      _schema = schema;
-      _columnNameMap = columnNameMap;
     }
   }
 }

@@ -24,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.Expression;
@@ -32,10 +31,8 @@ import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,9 +51,9 @@ public class StaticTableCache implements TableCache {
   private final Map<String, LogicalTableConfig> _logicalTableConfigMap = new HashMap<>();
   private final Map<String, String> _tableNameMap = new HashMap<>();
   private final Map<String, TableConfigInfo> _tableConfigInfoMap = new ConcurrentHashMap<>();
+  private final Map<String, SchemaInfo> _schemaInfoMap = new ConcurrentHashMap<>();
   private final Map<String, LogicalTableConfigInfo> _logicalTableConfigInfoMap = new ConcurrentHashMap<>();
   private final Map<String, String> _logicalTableNameMap = new HashMap<>();
-  private final Map<String, Map<String, String>> _columnNameMaps = new HashMap<>();
 
   public StaticTableCache(List<TableConfig> tableConfigs, List<Schema> schemas,
       List<LogicalTableConfig> logicalTableConfigs, boolean ignoreCase) {
@@ -78,19 +75,20 @@ public class StaticTableCache implements TableCache {
     }
 
     for (Schema schema : schemas) {
+      addBuiltInVirtualColumns(schema);
       String schemaName = schema.getSchemaName();
       _schemaMap.put(schemaName, schema);
-      Map<String, String> columnNameMap = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
-      for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-        String columnName = fieldSpec.getName();
-        if (_ignoreCase) {
+      Map<String, String> columnNameMap = new HashMap<>();
+      if (_ignoreCase) {
+        for (String columnName : schema.getColumnNames()) {
           columnNameMap.put(columnName.toLowerCase(), columnName);
-        } else {
+        }
+      } else {
+        for (String columnName : schema.getColumnNames()) {
           columnNameMap.put(columnName, columnName);
         }
       }
-      addBuiltInVirtualColumns(columnNameMap);
-      _columnNameMaps.put(schemaName, Collections.unmodifiableMap(columnNameMap));
+      _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
     }
 
     if (logicalTableConfigs != null) {
@@ -107,7 +105,7 @@ public class StaticTableCache implements TableCache {
     }
 
     LOGGER.info(
-        "Initialized QueryValidator with {} table configs, {} schemas, {} logical table configs (ignoreCase: {})",
+        "Initialized StaticTableCache with {} table configs, {} schemas, {} logical table configs (ignoreCase: {})",
         _tableConfigMap.size(), _schemaMap.size(), _logicalTableNameMap.size(), ignoreCase);
   }
 
@@ -156,8 +154,8 @@ public class StaticTableCache implements TableCache {
 
   @Override
   public Map<String, String> getColumnNameMap(String rawTableName) {
-    Map<String, String> columnNameMap = _columnNameMaps.get(rawTableName);
-    return columnNameMap != null ? columnNameMap : Collections.emptyMap();
+    SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
+    return schemaInfo != null ? schemaInfo._columnNameMap : Collections.emptyMap();
   }
 
   @Nullable
@@ -198,7 +196,8 @@ public class StaticTableCache implements TableCache {
   @Nullable
   @Override
   public Schema getSchema(String rawTableName) {
-    return _schemaMap.get(rawTableName);
+    SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
+    return schemaInfo != null ? schemaInfo._schema : null;
   }
 
   @Override
@@ -220,16 +219,5 @@ public class StaticTableCache implements TableCache {
   @Override
   public boolean isLogicalTable(String logicalTableName) {
     return _logicalTableConfigMap.containsKey(logicalTableName);
-  }
-
-  private void addBuiltInVirtualColumns(Map<String, String> columnNameMap) {
-    Set<String> builtInColumns = BuiltInVirtualColumn.BUILT_IN_VIRTUAL_COLUMNS;
-    for (String columnName : builtInColumns) {
-      if (_ignoreCase) {
-        columnNameMap.put(columnName.toLowerCase(), columnName);
-      } else {
-        columnNameMap.put(columnName, columnName);
-      }
-    }
   }
 }

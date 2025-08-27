@@ -32,8 +32,11 @@ import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
 import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
@@ -138,6 +141,22 @@ public interface TableCache extends PinotConfigProvider {
   boolean registerLogicalTableConfigChangeListener(
       LogicalTableConfigChangeListener logicalTableConfigChangeListener);
 
+  /**
+   * Adds the built-in virtual columns to the schema.
+   * NOTE: The virtual column provider class is not added.
+   */
+  default void addBuiltInVirtualColumns(Schema schema) {
+    if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true));
+    }
+    if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true));
+    }
+    if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true));
+    }
+  }
+
   static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
       QueryConfig queryConfig) {
     Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
@@ -186,6 +205,16 @@ public interface TableCache extends PinotConfigProvider {
       _logicalTableConfig = logicalTableConfig;
       _expressionOverrideMap = createExpressionOverrideMap(logicalTableConfig.getTableName(),
           logicalTableConfig.getQueryConfig());
+    }
+  }
+
+  class SchemaInfo {
+    final Schema _schema;
+    final Map<String, String> _columnNameMap;
+
+    SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
+      _schema = schema;
+      _columnNameMap = columnNameMap;
     }
   }
 }
