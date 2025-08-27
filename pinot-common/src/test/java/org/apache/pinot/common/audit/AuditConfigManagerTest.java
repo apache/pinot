@@ -38,7 +38,7 @@ public class AuditConfigManagerTest {
     Map<String, String> properties = new HashMap<>();
     properties.put("pinot.audit.enabled", "true");
     properties.put("pinot.audit.capture.request.payload.enabled", "true");
-    properties.put("pinot.audit.capture.request.headers", "true");
+    properties.put("pinot.audit.capture.request.headers", "Content-Type,X-Request-Id,Authorization");
     properties.put("pinot.audit.payload.size.max.bytes", "20480");
     properties.put("pinot.audit.excluded.endpoints", "/health,/metrics");
     properties.put("some.other.config", "value");
@@ -53,7 +53,7 @@ public class AuditConfigManagerTest {
     AuditConfig config = manager.getCurrentConfig();
     assertThat(config.isEnabled()).isTrue();
     assertThat(config.isCaptureRequestPayload()).isTrue();
-    assertThat(config.isCaptureRequestHeaders()).isTrue();
+    assertThat(config.getCaptureRequestHeaders()).isEqualTo("Content-Type,X-Request-Id,Authorization");
     assertThat(config.getMaxPayloadSize()).isEqualTo(20480);
     assertThat(config.getExcludedEndpoints()).isEqualTo("/health,/metrics");
   }
@@ -78,7 +78,7 @@ public class AuditConfigManagerTest {
     assertThat(config.getMaxPayloadSize()).isEqualTo(5000);
     // Verify defaults for unspecified configs
     assertThat(config.isCaptureRequestPayload()).isFalse();
-    assertThat(config.isCaptureRequestHeaders()).isFalse();
+    assertThat(config.getCaptureRequestHeaders()).isEmpty();
     assertThat(config.getExcludedEndpoints()).isEmpty();
   }
 
@@ -97,7 +97,7 @@ public class AuditConfigManagerTest {
     AuditConfig config = manager.getCurrentConfig();
     assertThat(config.isEnabled()).isFalse();
     assertThat(config.isCaptureRequestPayload()).isFalse();
-    assertThat(config.isCaptureRequestHeaders()).isFalse();
+    assertThat(config.getCaptureRequestHeaders()).isEmpty();
     assertThat(config.getMaxPayloadSize()).isEqualTo(10240);
     assertThat(config.getExcludedEndpoints()).isEmpty();
   }
@@ -132,7 +132,7 @@ public class AuditConfigManagerTest {
     Map<String, String> properties = new HashMap<>();
     properties.put("pinot.audit.enabled", "true");
     properties.put("pinot.audit.capture.request.payload.enabled", "false");
-    properties.put("pinot.audit.capture.request.headers", "true");
+    properties.put("pinot.audit.capture.request.headers", "X-User-Id,X-Session-Token");
     properties.put("some.other.config", "value");
     properties.put("another.config", "123");
 
@@ -142,7 +142,7 @@ public class AuditConfigManagerTest {
     // Then
     assertThat(config.isEnabled()).isTrue();
     assertThat(config.isCaptureRequestPayload()).isFalse();
-    assertThat(config.isCaptureRequestHeaders()).isTrue();
+    assertThat(config.getCaptureRequestHeaders()).isEqualTo("X-User-Id,X-Session-Token");
     // Verify defaults for unspecified fields
     assertThat(config.getMaxPayloadSize()).isEqualTo(10240);
     assertThat(config.getExcludedEndpoints()).isEmpty();
@@ -211,7 +211,7 @@ public class AuditConfigManagerTest {
     Map<String, String> customProperties = new HashMap<>();
     customProperties.put("pinot.audit.enabled", "true");
     customProperties.put("pinot.audit.capture.request.payload.enabled", "true");
-    customProperties.put("pinot.audit.capture.request.headers", "true");
+    customProperties.put("pinot.audit.capture.request.headers", "X-Trace-Id,X-Correlation-Id");
     customProperties.put("pinot.audit.payload.size.max.bytes", "50000");
     customProperties.put("pinot.audit.excluded.endpoints", "/test,/debug");
     manager.onChange(customProperties.keySet(), customProperties);
@@ -220,7 +220,7 @@ public class AuditConfigManagerTest {
     AuditConfig customConfig = manager.getCurrentConfig();
     assertThat(customConfig.isEnabled()).isTrue();
     assertThat(customConfig.isCaptureRequestPayload()).isTrue();
-    assertThat(customConfig.isCaptureRequestHeaders()).isTrue();
+    assertThat(customConfig.getCaptureRequestHeaders()).isEqualTo("X-Trace-Id,X-Correlation-Id");
     assertThat(customConfig.getMaxPayloadSize()).isEqualTo(50000);
     assertThat(customConfig.getExcludedEndpoints()).isEqualTo("/test,/debug");
 
@@ -233,8 +233,33 @@ public class AuditConfigManagerTest {
     AuditConfig defaultConfig = manager.getCurrentConfig();
     assertThat(defaultConfig.isEnabled()).isFalse();
     assertThat(defaultConfig.isCaptureRequestPayload()).isFalse();
-    assertThat(defaultConfig.isCaptureRequestHeaders()).isFalse();
+    assertThat(defaultConfig.getCaptureRequestHeaders()).isEmpty();
     assertThat(defaultConfig.getMaxPayloadSize()).isEqualTo(10240);
     assertThat(defaultConfig.getExcludedEndpoints()).isEmpty();
+  }
+
+  @Test
+  public void testConfigurationStringFormats() {
+    Map<String, String> properties = new HashMap<>();
+
+    // Test various string formats
+    properties.put("pinot.audit.capture.request.headers", "Header1,Header2,Header3");
+    AuditConfig config1 = AuditConfigManager.buildFromClusterConfig(properties);
+    assertThat(config1.getCaptureRequestHeaders()).isEqualTo("Header1,Header2,Header3");
+
+    // Test empty string
+    properties.put("pinot.audit.capture.request.headers", "");
+    AuditConfig config2 = AuditConfigManager.buildFromClusterConfig(properties);
+    assertThat(config2.getCaptureRequestHeaders()).isEmpty();
+
+    // Test single header
+    properties.put("pinot.audit.capture.request.headers", "Content-Type");
+    AuditConfig config3 = AuditConfigManager.buildFromClusterConfig(properties);
+    assertThat(config3.getCaptureRequestHeaders()).isEqualTo("Content-Type");
+
+    // Test headers with mixed case and special characters
+    properties.put("pinot.audit.capture.request.headers", "Content-Type,X-Request-ID,User-Agent,X-Custom-123");
+    AuditConfig config4 = AuditConfigManager.buildFromClusterConfig(properties);
+    assertThat(config4.getCaptureRequestHeaders()).isEqualTo("Content-Type,X-Request-ID,User-Agent,X-Custom-123");
   }
 }
