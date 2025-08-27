@@ -153,7 +153,8 @@ public class TableMetadataReader {
         cs.doMultiGetRequest(urls, tableNameWithType, perSegmentJson, timeoutMs);
     // all requests will fail if new server endpoint is not available
     if (resp._failedResponseCount > 0) {
-      throw new RuntimeException("All requests to server instances failed.");
+      throw new RuntimeException(String.format("Got %d failed responses from total %d server instances. "
+          + "Falling back to legacy segment metadata api", resp._failedResponseCount, urls.size()));
     }
 
     ObjectMapper mapper = new ObjectMapper();

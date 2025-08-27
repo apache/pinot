@@ -926,12 +926,13 @@ public class PinotSegmentRestletResource {
   public String getServerMetadata(
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
-      @Encoded @ApiParam(value = "Segments to include", allowMultiple = true) @QueryParam("segments")
-      @Nullable List<String> segments,
+      @Encoded @ApiParam(value = "Segments to include (all if not specified)", allowMultiple = true)
+      @QueryParam("segments") @Nullable List<String> segments,
       @Encoded @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns")
       @Nullable List<String> columns, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
-    LOGGER.info("Received a request to fetch metadata for all segments for table {}", tableName);
+    String segmentCount = (segments == null) ? "all" : String.valueOf(segments.size());
+    LOGGER.info("Received a request to fetch metadata for {} segments for table {}", segmentCount, tableName);
     TableType tableType = Constants.validateTableType(tableTypeStr);
 
     String tableNameWithType =
