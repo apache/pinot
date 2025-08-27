@@ -77,6 +77,9 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
    */
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
+    if (payload == null) {
+      return null;
+    }
     return decode(payload, 0, payload.length, destination);
   }
 
@@ -87,6 +90,11 @@ public class SimpleAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
    */
   @Override
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
+    // Check for null or empty payload
+    if (payload == null || payload.length == 0 || length == 0) {
+      return null;
+    }
+
     _binaryDecoderToReuse = DecoderFactory.get().binaryDecoder(payload, offset, length, _binaryDecoderToReuse);
     try {
       _avroRecordToReuse = _datumReader.read(_avroRecordToReuse, _binaryDecoderToReuse);
