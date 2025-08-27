@@ -37,7 +37,6 @@ import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.jvnet.hk2.annotations.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,7 +59,7 @@ public class StaticTableCache implements TableCache {
   private final Map<String, Map<String, String>> _columnNameMaps = new HashMap<>();
 
   public StaticTableCache(List<TableConfig> tableConfigs, List<Schema> schemas,
-      @Optional List<LogicalTableConfig> logicalTableConfigs, boolean ignoreCase) {
+      List<LogicalTableConfig> logicalTableConfigs, boolean ignoreCase) {
     _ignoreCase = ignoreCase;
 
     for (TableConfig tableConfig : tableConfigs) {
@@ -127,8 +126,8 @@ public class StaticTableCache implements TableCache {
     }
   }
 
-  @Override
   @Nullable
+  @Override
   public String getActualLogicalTableName(String logicalTableName) {
     return _ignoreCase ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
         : _logicalTableNameMap.get(logicalTableName);

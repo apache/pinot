@@ -53,6 +53,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hc.core5.net.URIBuilder;
 import org.apache.helix.model.InstanceConfig;
@@ -172,42 +173,14 @@ public class PinotQueryResource {
 
     try {
       TableCache tableCache;
-      if (request.getTableConfigs() != null && !request.getTableConfigs().isEmpty() && request.getSchemas() != null
-          && !request.getSchemas().isEmpty()) {
-        List<TableConfig> tableConfigs = new ArrayList<>();
-        if (request.getTableConfigs() != null) {
-          for (TableConfig tableConfig : request.getTableConfigs()) {
-            if (tableConfig != null) {
-              tableConfigs.add(tableConfig);
-            }
-          }
-        }
-        List<Schema> schemas = new ArrayList<>();
-        if (request.getSchemas() != null) {
-          for (Schema schema : request.getSchemas()) {
-            if (schema != null) {
-              schemas.add(schema);
-            }
-          }
-        }
-        List<LogicalTableConfig> logicalTableConfigs = new ArrayList<>();
-        if (request.getLogicalTableConfigs() != null) {
-          for (LogicalTableConfig logicalTableConfig : request.getLogicalTableConfigs()) {
-            if (logicalTableConfig != null) {
-              logicalTableConfigs.add(logicalTableConfig);
-            }
-          }
-        }
-        boolean ignoreCase = true;
-        if (request.getIgnoreCase() != null) {
-          ignoreCase = request.getIgnoreCase();
-        }
-        tableCache = new StaticTableCache(tableConfigs, schemas, logicalTableConfigs, ignoreCase);
+      if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && !CollectionUtils.isNotEmpty(request.getSchemas())) {
+        tableCache =
+            new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
+                request.getIgnoreCase());
       } else {
-        // Use TableCache from environment
+        // Use TableCache from environment if static fields are not specified
         tableCache = _pinotHelixResourceManager.getTableCache();
       }
-
       try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
           sqlQuery)) {
         return new MultiStageQueryValidationResponse(true, null, null);
@@ -254,19 +227,19 @@ public class PinotQueryResource {
     private final List<TableConfig> _tableConfigs;
     private final List<Schema> _schemas;
     private final List<LogicalTableConfig> _logicalTableConfigs;
-    private final Boolean _ignoreCase;
+    private final boolean _ignoreCase;
 
     @JsonCreator
     public MultiStageQueryValidationRequest(@JsonProperty("sql") String sql,
         @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
         @JsonProperty("schemas") @Nullable List<Schema> schemas,
         @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
-        @JsonProperty("ignoreCase") @Nullable Boolean ignoreCase) {
+        @JsonProperty("ignoreCase") boolean ignoreCase) {
       _sql = sql;
       _tableConfigs = tableConfigs != null ? tableConfigs : new ArrayList<>();
-      _schemas = schemas != null ? schemas : new ArrayList<>();
-      _logicalTableConfigs = logicalTableConfigs != null ? logicalTableConfigs : new ArrayList<>();
-      _ignoreCase = ignoreCase != null ? ignoreCase : true;
+      _schemas = schemas;
+      _logicalTableConfigs = logicalTableConfigs;
+      _ignoreCase = ignoreCase;
     }
 
     public String getSql() {
@@ -283,11 +256,12 @@ public class PinotQueryResource {
       return _schemas;
     }
 
+    @Nullable
     public List<LogicalTableConfig> getLogicalTableConfigs() {
       return _logicalTableConfigs;
     }
 
-    public Boolean getIgnoreCase() {
+    public boolean getIgnoreCase() {
       return _ignoreCase;
     }
   }

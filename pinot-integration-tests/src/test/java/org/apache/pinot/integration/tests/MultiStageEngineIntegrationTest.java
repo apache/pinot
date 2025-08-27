@@ -1805,7 +1805,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
 
     // Invalid column in the query
     MultiStageQueryValidationRequest request = new MultiStageQueryValidationRequest(
-        "SELECT nonExistentColumn FROM mytable", tableConfigs, schemas, null, null);
+        "SELECT nonExistentColumn FROM mytable", tableConfigs, schemas, null, true);
 
     String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(

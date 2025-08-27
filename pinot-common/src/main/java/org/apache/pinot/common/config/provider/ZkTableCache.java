@@ -148,6 +148,7 @@ public class ZkTableCache implements TableCache {
   /**
    * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
    */
+  @Override
   public boolean isIgnoreCase() {
     return _ignoreCase;
   }
@@ -157,6 +158,7 @@ public class ZkTableCache implements TableCache {
    * does not exist.
    */
   @Nullable
+  @Override
   public String getActualTableName(String tableName) {
     if (_ignoreCase) {
       return _tableNameMap.get(tableName.toLowerCase());
@@ -171,6 +173,7 @@ public class ZkTableCache implements TableCache {
    * @return Actual logical table name
    */
   @Nullable
+  @Override
   public String getActualLogicalTableName(String logicalTableName) {
     return _ignoreCase
       ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
@@ -181,6 +184,7 @@ public class ZkTableCache implements TableCache {
    * Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
    * case.
    */
+  @Override
   public Map<String, String> getTableNameMap() {
     return _tableNameMap;
   }
@@ -190,6 +194,7 @@ public class ZkTableCache implements TableCache {
    * are in lower case.
    * @return Map from logical table name to actual logical table name
    */
+  @Override
   public Map<String, String> getLogicalTableNameMap() {
     return _logicalTableNameMap;
   }
@@ -198,6 +203,7 @@ public class ZkTableCache implements TableCache {
    * Get all dimension table names.
    * @return List of dimension table names
    */
+  @Override
   public List<String> getAllDimensionTables() {
     List<String> dimensionTables = new ArrayList<>();
     for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
@@ -213,6 +219,7 @@ public class ZkTableCache implements TableCache {
    * not exist. For case-insensitive case, the keys of the map are in lower case.
    */
   @Nullable
+  @Override
   public Map<String, String> getColumnNameMap(String rawTableName) {
     SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
@@ -223,6 +230,7 @@ public class ZkTableCache implements TableCache {
    * configured.
    */
   @Nullable
+  @Override
   public Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName) {
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(physicalOrLogicalTableName);
     if (tableConfigInfo != null) {
@@ -236,6 +244,7 @@ public class ZkTableCache implements TableCache {
    * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
    */
   @Nullable
+  @Override
   public Set<String> getTimestampIndexColumns(String tableNameWithType) {
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
     return tableConfigInfo != null ? tableConfigInfo._timestampIndexColumns : null;
@@ -473,6 +482,7 @@ public class ZkTableCache implements TableCache {
     return tableConfigs;
   }
 
+  @Override
   public List<LogicalTableConfig> getLogicalTableConfigs() {
     return _logicalTableConfigInfoMap.values().stream().map(o -> o._logicalTableConfig).collect(Collectors.toList());
   }
@@ -494,6 +504,7 @@ public class ZkTableCache implements TableCache {
     return schemas;
   }
 
+  @Override
   public boolean isLogicalTable(String logicalTableName) {
     logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     return _logicalTableConfigInfoMap.containsKey(logicalTableName);
