@@ -1173,7 +1173,7 @@ public class PinotLLCRealtimeSegmentManager {
     PauseState pauseState = extractTablePauseState(idealState);
     return PinotTableIdealStateBuilder.getPartitionGroupMetadataList(streamConfigs,
         currentPartitionGroupConsumptionStatusList,
-        pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInActiveTopics(), forceGetOffsetFromStream);
+        pauseState == null ? new ArrayList<>() : pauseState.getIndexOfInactiveTopics(), forceGetOffsetFromStream);
   }
 
   /**
@@ -1406,7 +1406,7 @@ public class PinotLLCRealtimeSegmentManager {
   public static boolean isTopicPaused(IdealState idealState, int topicIndex) {
     PauseState pauseState = extractTablePauseState(idealState);
     if (pauseState != null) {
-      return pauseState.getIndexOfInActiveTopics().contains(topicIndex);
+      return pauseState.getIndexOfInactiveTopics().contains(topicIndex);
     }
     return false;
   }
@@ -2431,7 +2431,7 @@ public class PinotLLCRealtimeSegmentManager {
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
       PauseState previousPauseState = extractTablePauseState(idealState);
       if (previousPauseState != null) {
-        pauseState.setIndexOfInActiveTopics(previousPauseState.getIndexOfInActiveTopics());
+        pauseState.setIndexOfInactiveTopics(previousPauseState.getIndexOfInactiveTopics());
       }
       ZNRecord znRecord = idealState.getRecord();
       znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
@@ -2452,8 +2452,8 @@ public class PinotLLCRealtimeSegmentManager {
             new Timestamp(System.currentTimeMillis()).toString(), indexOfPausedTopics);
       } else {
         // Union the existing paused topics with the newly paused topics
-        pauseState.setIndexOfInActiveTopics(
-            Stream.concat(pauseState.getIndexOfInActiveTopics().stream(), indexOfPausedTopics.stream())
+        pauseState.setIndexOfInactiveTopics(
+            Stream.concat(pauseState.getIndexOfInactiveTopics().stream(), indexOfPausedTopics.stream())
                 .distinct()
                 .collect(Collectors.toList()));
       }
@@ -2474,7 +2474,7 @@ public class PinotLLCRealtimeSegmentManager {
       if (pauseState == null) {
         return idealState;
       }
-      pauseState.getIndexOfInActiveTopics().removeAll(indexOfPausedTopics);
+      pauseState.getIndexOfInactiveTopics().removeAll(indexOfPausedTopics);
       ZNRecord znRecord = idealState.getRecord();
       znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
       LOGGER.info("Set 'pauseState' to {} in the Ideal State for table {}. " + "to resume topics with indices {}.",
