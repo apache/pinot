@@ -2429,7 +2429,10 @@ public class PinotLLCRealtimeSegmentManager {
     PauseState pauseState =
         new PauseState(pause, reasonCode, comment, new Timestamp(System.currentTimeMillis()).toString(), null);
     IdealState updatedIdealState = HelixHelper.updateIdealState(_helixManager, tableNameWithType, idealState -> {
-      pauseState.setIndexOfInActiveTopics(extractTablePauseState(idealState).getIndexOfInActiveTopics());
+      PauseState previousPauseState = extractTablePauseState(idealState);
+      if (previousPauseState != null) {
+        pauseState.setIndexOfInActiveTopics(previousPauseState.getIndexOfInActiveTopics());
+      }
       ZNRecord znRecord = idealState.getRecord();
       znRecord.setSimpleField(PAUSE_STATE, pauseState.toJsonString());
       // maintain for backward compatibility
