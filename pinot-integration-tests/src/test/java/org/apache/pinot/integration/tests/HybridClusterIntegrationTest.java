@@ -124,23 +124,55 @@ public class HybridClusterIntegrationTest extends BaseHybridClusterIntegrationTe
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
     }
+    // get list of segment names to pass in query params for following tests
+    List<String> segmentNames = getSegmentNames(getTableName(), TableType.OFFLINE.toString());
+    List<String> segments = new ArrayList<>();
+    for (String segment : segmentNames) {
+      String encodedSegmentName = URLEncoder.encode(segment, StandardCharsets.UTF_8.toString());
+      segments.add(encodedSegmentName);
+    }
+    // with null column params
     {
-      List<String> segmentNames = getSegmentNames(getTableName(), TableType.OFFLINE.toString());
-      List<String> segments = new ArrayList<>();
-      for (String segment : segmentNames) {
-        String encodedSegmentName = URLEncoder.encode(segment, StandardCharsets.UTF_8.toString());
-        segments.add(encodedSegmentName);
-      }
       String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(),
           null, segments));
       JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
-      Assert.assertEquals(tableSegmentsMetadata.size(), 8);
+      Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
       JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
       String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
       jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
       JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
       Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
           segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+      Assert.assertEquals(tableSegmentsMetadata.get(segmentNames.get(0)).get("columns").size(), 0);
+    }
+    // with * column param
+    {
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(),
+          List.of("*"), segments));
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+      Assert.assertEquals(tableSegmentsMetadata.get(segmentNames.get(0)).get("columns").size(), 79);
+    }
+    // with specified column params
+    {
+      List<String> columns = List.of("Carrier", "FlightNum", "TailNum");
+      String jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentsMetadataFromServer(getTableName(),
+          columns, segments));
+      JsonNode tableSegmentsMetadata = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(tableSegmentsMetadata.size(), segments.size());
+      JsonNode segmentMetadataFromAllEndpoint = tableSegmentsMetadata.elements().next();
+      String segmentName = segmentMetadataFromAllEndpoint.get("segmentName").asText();
+      jsonOutputStr = sendGetRequest(_controllerRequestURLBuilder.forSegmentMetadata(getTableName(), segmentName));
+      JsonNode segmentMetadataFromDirectEndpoint = JsonUtils.stringToJsonNode(jsonOutputStr);
+      Assert.assertEquals(segmentMetadataFromAllEndpoint.get("totalDocs"),
+          segmentMetadataFromDirectEndpoint.get("segment.total.docs"));
+      Assert.assertEquals(tableSegmentsMetadata.get(segmentNames.get(0)).get("columns").size(), columns.size());
     }
   }
 

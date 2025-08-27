@@ -44,6 +44,8 @@ import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -54,6 +56,7 @@ import org.apache.pinot.spi.utils.builder.TableNameBuilder;
  * the column indexes available.
  */
 public class TableMetadataReader {
+  private static final Logger log = LoggerFactory.getLogger(TableMetadataReader.class);
   private final Executor _executor;
   private final HttpClientConnectionManager _connectionManager;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
@@ -134,7 +137,7 @@ public class TableMetadataReader {
    * This calls the server to get the metadata for all segments instead of making a call per segment.
    */
   public JsonNode getSegmentsMetadata(String tableNameWithType, @Nullable List<String> columns,
-      @Nullable Set<String> segments, int timeoutMs)
+      @Nullable List<String> segments, int timeoutMs)
       throws InvalidConfigException, IOException {
     return getSegmentsMetadataInternal(tableNameWithType, columns, segments, timeoutMs);
   }
@@ -169,7 +172,7 @@ public class TableMetadataReader {
   }
 
   private List<String> buildTableLevelUrls(Map<String, List<String>> serverToSegs, BiMap<String, String> endpoints,
-      String tableNameWithType, List<String> columns, Set<String> segmentsFilter, ServerSegmentMetadataReader reader) {
+      String tableNameWithType, List<String> columns, List<String> segmentsFilter, ServerSegmentMetadataReader reader) {
     List<String> urls = new ArrayList<>(serverToSegs.size());
     for (String server : serverToSegs.keySet()) {
       urls.add(reader.generateTableMetadataServerURL(
@@ -179,7 +182,7 @@ public class TableMetadataReader {
   }
 
   private List<String> buildSegmentLevelUrls(Map<String, List<String>> serverToSegs, BiMap<String, String> endpoints,
-      String tableNameWithType, List<String> columns, Set<String> segmentsFilter, ServerSegmentMetadataReader reader) {
+      String tableNameWithType, List<String> columns, List<String> segmentsFilter, ServerSegmentMetadataReader reader) {
     List<String> urls = new ArrayList<>();
     for (Map.Entry<String, List<String>> e : serverToSegs.entrySet()) {
       for (String segment : e.getValue()) {
@@ -194,7 +197,7 @@ public class TableMetadataReader {
   }
 
   private JsonNode getSegmentsMetadataInternal(String tableNameWithType, @Nullable List<String> columns,
-      @Nullable Set<String> segments, int timeoutMs)
+      @Nullable List<String> segments, int timeoutMs)
       throws InvalidConfigException, IOException {
     Map<String, List<String>> serverToSegs =
         _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
@@ -209,8 +212,9 @@ public class TableMetadataReader {
           tableNameWithType, columns, segments, reader);
       return fetchAndAggregateMetadata(tableUrls, endpoints, /*perSegmentJson=*/false,
           tableNameWithType, timeoutMs);
-    } catch (RuntimeException ignore) {
-      // fall through to legacy
+    } catch (RuntimeException e) {
+      log.warn("Failed to fetch table metadata for table {} using new server endpoint, falling back to legacy "
+              + "per-segment endpoint", tableNameWithType, e);
     }
 
     // legacy per segment endpoint
