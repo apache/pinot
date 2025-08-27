@@ -28,7 +28,6 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -91,7 +90,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
             maxRowsLimitReached = true;
             break;
           }
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+          sampleAndCheckInterruptionPeriodically(rows.size());
           rows.add(joinRowView.toArray());
           hasMatchForLeftRow = true;
           if (_matchedRightRows != null) {
@@ -106,7 +105,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
         if (isMaxRowsLimitReached(rows.size())) {
           break;
         }
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+        sampleAndCheckInterruptionPeriodically(rows.size());
         rows.add(joinRow(leftRow, null));
       }
     }
@@ -124,7 +123,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
     List<Object[]> rows = new ArrayList<>(numRightRows - numMatchedRightRows);
     int unmatchedIndex = 0;
     while ((unmatchedIndex = _matchedRightRows.nextClearBit(unmatchedIndex)) < numRightRows) {
-      Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+      sampleAndCheckInterruptionPeriodically(rows.size());
       rows.add(joinRow(null, _rightTable.get(unmatchedIndex++)));
     }
     return rows;

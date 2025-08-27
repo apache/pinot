@@ -18,10 +18,9 @@
  */
 package org.apache.pinot.query.runtime.plan.pipeline;
 
+import com.google.common.collect.Maps;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -43,18 +42,24 @@ public class PipelineBreakerOperator extends MultiStageOperator {
   private static final String EXPLAIN_NAME = "PIPELINE_BREAKER";
 
   private final Map<Integer, MultiStageOperator> _workerMap;
-
-  private Map<Integer, List<MseBlock>> _resultMap;
-  private ErrorMseBlock _errorBlock;
+  private final List<MultiStageOperator> _childOperators;
+  private final Map<Integer, List<MseBlock>> _resultMap;
   private final StatMap<StatKey> _statMap = new StatMap<>(StatKey.class);
+
+  private ErrorMseBlock _errorBlock;
 
   public PipelineBreakerOperator(OpChainExecutionContext context, Map<Integer, MultiStageOperator> workerMap) {
     super(context);
     _workerMap = workerMap;
-    _resultMap = new HashMap<>();
+    _childOperators = new ArrayList<>(workerMap.values());
+    _resultMap = Maps.newHashMapWithExpectedSize(workerMap.size());
     for (int workerKey : workerMap.keySet()) {
       _resultMap.put(workerKey, new ArrayList<>());
     }
+  }
+
+  public Map<Integer, List<MseBlock>> getResultMap() {
+    return _resultMap;
   }
 
   @Override
@@ -65,7 +70,7 @@ public class PipelineBreakerOperator extends MultiStageOperator {
 
   @Override
   public List<MultiStageOperator> getChildOperators() {
-    return Collections.emptyList();
+    return _childOperators;
   }
 
   @Override
@@ -76,10 +81,6 @@ public class PipelineBreakerOperator extends MultiStageOperator {
   @Override
   protected Logger logger() {
     return LOGGER;
-  }
-
-  public Map<Integer, List<MseBlock>> getResultMap() {
-    return _resultMap;
   }
 
   @Nullable
@@ -100,8 +101,7 @@ public class PipelineBreakerOperator extends MultiStageOperator {
     // NOTE: Put an empty list for each worker in case there is no data block returned from that worker
     if (_workerMap.size() == 1) {
       Map.Entry<Integer, MultiStageOperator> entry = _workerMap.entrySet().iterator().next();
-      List<MseBlock> dataBlocks = new ArrayList<>();
-      _resultMap = Collections.singletonMap(entry.getKey(), dataBlocks);
+      List<MseBlock> dataBlocks = _resultMap.get(entry.getKey());
       Operator<MseBlock> operator = entry.getValue();
       MseBlock block = operator.nextBlock();
       while (block.isData()) {
@@ -113,10 +113,6 @@ public class PipelineBreakerOperator extends MultiStageOperator {
         return block;
       }
     } else {
-      _resultMap = new HashMap<>();
-      for (int workerKey : _workerMap.keySet()) {
-        _resultMap.put(workerKey, new ArrayList<>());
-      }
       // Keep polling from every operator in round-robin fashion
       Queue<Map.Entry<Integer, MultiStageOperator>> entries = new ArrayDeque<>(_workerMap.entrySet());
       while (!entries.isEmpty()) {
@@ -152,13 +148,6 @@ public class PipelineBreakerOperator extends MultiStageOperator {
   @Override
   protected StatMap<?> copyStatMaps() {
     return new StatMap<>(_statMap);
-  }
-
-  @Override
-  public void close() {
-    for (MultiStageOperator operator : _workerMap.values()) {
-      operator.close();
-    }
   }
 
   public enum StatKey implements StatMap.Key {
