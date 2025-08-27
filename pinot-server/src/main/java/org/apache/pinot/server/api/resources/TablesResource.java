@@ -425,19 +425,16 @@ public class TablesResource {
   public String getSegmentsMetadata(
       @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
       @PathParam("tableName") String tableName,
-      @ApiParam(value = "Segments name", allowMultiple = true) @QueryParam("segments")
-      @DefaultValue("") List<String> segments,
-      @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") @DefaultValue("")
-      List<String> columns, @Context HttpHeaders headers) {
+      @Nullable @ApiParam(value = "Segments name", allowMultiple = true) @QueryParam("segments") List<String> segments,
+      @Nullable @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
     TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
     // decode columns and segments
     List<String> decodedSegments = new ArrayList<>();
     if (CollectionUtils.isNotEmpty(segments)) {
       for (String segment : segments) {
-        if (!segment.isEmpty()) {
-          decodedSegments.add(URIUtils.decode(segment));
-        }
+        decodedSegments.add(URIUtils.decode(segment));
       }
     }
     List<SegmentDataManager> segmentDataManagers;
@@ -446,22 +443,27 @@ public class TablesResource {
     } else {
       segmentDataManagers = tableDataManager.acquireAllSegments();
     }
-    for (int i = 0; i < columns.size(); i++) {
-      columns.set(i, URIUtils.decode(columns.get(i)));
+    List<String> decodedColumns = new ArrayList<>();
+    if (CollectionUtils.isNotEmpty(columns)) {
+      for (String column: columns) {
+        decodedColumns.add(URIUtils.decode(column));
+      }
     }
     // get metadata for every segment in the list
     Map<String, JsonNode> response = new HashMap<>();
-    for (SegmentDataManager segmentDataManager: segmentDataManagers) {
-      String segmentName = segmentDataManager.getSegmentName();
-      try {
-        String segmentMetadata = SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, columns);
+    try {
+      for (SegmentDataManager segmentDataManager: segmentDataManagers) {
+        String segmentName = segmentDataManager.getSegmentName();
+        String segmentMetadata = SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, decodedColumns);
         JsonNode segmentMetadataJson = JsonUtils.stringToJsonNode(segmentMetadata);
         response.put(segmentName, segmentMetadataJson);
-      } catch (Exception e) {
-        LOGGER.error("Failed to convert table {} segment {} to json", tableName, segmentName);
-        throw new WebApplicationException("Failed to convert segment metadata to json",
-            Response.Status.INTERNAL_SERVER_ERROR);
-      } finally {
+      }
+    } catch (Exception e) {
+      LOGGER.error("Failed to convert table {} segments to json", tableName);
+      throw new WebApplicationException("Failed to convert segment metadata to json",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
         tableDataManager.releaseSegment(segmentDataManager);
       }
     }

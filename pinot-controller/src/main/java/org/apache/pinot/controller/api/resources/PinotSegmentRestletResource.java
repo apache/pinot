@@ -927,7 +927,7 @@ public class PinotSegmentRestletResource {
       @ApiParam(value = "Name of the table", required = true) @PathParam("tableName") String tableName,
       @ApiParam(value = "OFFLINE|REALTIME") @QueryParam("type") String tableTypeStr,
       @Encoded @ApiParam(value = "Segments to include", allowMultiple = true) @QueryParam("segments")
-      @Nullable Set<String> segments,
+      @Nullable List<String> segments,
       @Encoded @ApiParam(value = "Columns name", allowMultiple = true) @QueryParam("columns")
       @Nullable List<String> columns, @Context HttpHeaders headers) {
     tableName = DatabaseUtils.translateTableName(tableName, headers);
@@ -1162,7 +1162,7 @@ public class PinotSegmentRestletResource {
    * @return Map<String, String>  metadata of the table segments -> map of segment name to its metadata
    */
   private JsonNode getSegmentsMetadataFromServer(String tableNameWithType, @Nullable List<String> columns,
-      @Nullable Set<String> segments)
+      @Nullable List<String> segments)
       throws InvalidConfigException, IOException {
     TableMetadataReader tableMetadataReader =
         new TableMetadataReader(_executor, _connectionManager, _pinotHelixResourceManager);
