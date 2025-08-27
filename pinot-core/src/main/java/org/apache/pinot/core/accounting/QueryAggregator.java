@@ -19,7 +19,6 @@
 package org.apache.pinot.core.accounting;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,9 +40,13 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.pinot.spi.accounting.MseCancelCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Aggregator that computes resource aggregation for queries. Most of the logic from PerQueryCPUMemAccountantFactory is
@@ -53,6 +56,7 @@ import org.slf4j.LoggerFactory;
  */
 public class QueryAggregator implements ResourceAggregator {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryAggregator.class);
+  private static final boolean IS_DEBUG_MODE_ENABLED = LOGGER.isDebugEnabled();
 
   enum TriggeringLevel {
     Normal, HeapMemoryAlarmingVerbose, CPUTimeBasedKilling, HeapMemoryCritical, HeapMemoryPanic
@@ -67,72 +71,23 @@ public class QueryAggregator implements ResourceAggregator {
   private final HashMap<String, Long> _finishedTaskCPUStatsAggregator = new HashMap<>();
   private final HashMap<String, Long> _finishedTaskMemStatsAggregator = new HashMap<>();
 
+  Cache<String, MseCancelCallback> _queryCancelCallbacks;
+
   private final boolean _isThreadCPUSamplingEnabled;
   private final boolean _isThreadMemorySamplingEnabled;
 
   private final Set<String> _inactiveQuery;
+  private Set<String> _cancelSentQueries;
   private final PinotConfiguration _config;
 
   private final InstanceType _instanceType;
   private final String _instanceId;
 
-  // max heap usage, Xmx
-  private final long _maxHeapSize = ResourceUsageUtils.getMaxHeapSize();
-
-  // don't kill a query if its memory footprint is below some ratio of _maxHeapSize
-  private final long _minMemoryFootprintForKill;
-
-  // kill all queries if heap usage exceeds this
-  private final long _panicLevel;
-
-  // kill the most expensive query if heap usage exceeds this
-  private final long _criticalLevel;
-
-  // if after gc the heap usage is still above this, kill the most expensive query
-  // use this to prevent heap size oscillation and repeatedly triggering gc
-  private final long _criticalLevelAfterGC;
-
-  // trigger gc if consecutively kill more than some number of queries
-  // set this to 0 to always trigger gc before killing a query to give gc a second chance
-  // as would minimize the chance of false positive killing in some usecases
-  // should consider use -XX:+ExplicitGCInvokesConcurrent to avoid STW for some gc algorithms
-  private final int _gcBackoffCount;
-
-  // start to sample more frequently if heap usage exceeds this
-  private final long _alarmingLevel;
-
-  // normal sleep time
-  private final int _normalSleepTime;
-
-  // wait for gc to complete, according to system.gc() javadoc, when control returns from the method call,
-  // the Java Virtual Machine has made a best effort to reclaim space from all discarded objects.
-  // Therefore, we default this to 0.
-  // Tested with Shenandoah GC and G1GC, with -XX:+ExplicitGCInvokesConcurrent
-  private final int _gcWaitTime;
-
-  // alarming sleep time denominator, should be > 1 to sample more frequent at alarming level
-  private final int _alarmingSleepTimeDenominator;
-
-  // alarming sleep time
-  private final int _alarmingSleepTime;
-
-  // the framework would not commit to kill any query if this is disabled
-  private final boolean _oomKillQueryEnabled;
-
-  // if we want to publish the heap usage
-  private final boolean _publishHeapUsageMetric;
-
-  // if we want kill query based on CPU time
-  private final boolean _isCPUTimeBasedKillingEnabled;
-
-  // CPU time based killing threshold
-  private final long _cpuTimeBasedKillingThresholdNS;
-
-  private final boolean _isQueryKilledMetricEnabled;
+  // Centralized configuration using QueryMonitorConfig
+  private final AtomicReference<QueryMonitorConfig> _queryMonitorConfig = new AtomicReference<>();
 
   private long _usedBytes;
   private int _sleepTime;
-  private int _numQueriesKilledConsecutively = 0;
   protected Map<String, AggregatedStats> _aggregatedUsagePerActiveQuery;
   private TriggeringLevel _triggeringLevel;
 
@@ -152,42 +107,8 @@ public class QueryAggregator implements ResourceAggregator {
     _instanceType = instanceType;
     _instanceId = instanceId;
 
-    _minMemoryFootprintForKill = (long) (_maxHeapSize * _config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_MIN_MEMORY_FOOTPRINT_TO_KILL_RATIO,
-        CommonConstants.Accounting.DEFAULT_MEMORY_FOOTPRINT_TO_KILL_RATIO));
-    _panicLevel =
-        (long) (_maxHeapSize * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_PANIC_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DFAULT_PANIC_LEVEL_HEAP_USAGE_RATIO));
-    _criticalLevel =
-        (long) (_maxHeapSize * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DEFAULT_CRITICAL_LEVEL_HEAP_USAGE_RATIO));
-    _criticalLevelAfterGC = _criticalLevel - (long) (_maxHeapSize * _config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC,
-        CommonConstants.Accounting.DEFAULT_CONFIG_OF_CRITICAL_LEVEL_HEAP_USAGE_RATIO_DELTA_AFTER_GC));
-    _gcBackoffCount = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_GC_BACKOFF_COUNT,
-        CommonConstants.Accounting.DEFAULT_GC_BACKOFF_COUNT);
-    _alarmingLevel =
-        (long) (_maxHeapSize * _config.getProperty(CommonConstants.Accounting.CONFIG_OF_ALARMING_LEVEL_HEAP_USAGE_RATIO,
-            CommonConstants.Accounting.DEFAULT_ALARMING_LEVEL_HEAP_USAGE_RATIO));
-    _normalSleepTime = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_MS,
-        CommonConstants.Accounting.DEFAULT_SLEEP_TIME_MS);
-    _gcWaitTime = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_GC_WAIT_TIME_MS,
-        CommonConstants.Accounting.DEFAULT_CONFIG_OF_GC_WAIT_TIME_MS);
-    _alarmingSleepTimeDenominator = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_SLEEP_TIME_DENOMINATOR,
-        CommonConstants.Accounting.DEFAULT_SLEEP_TIME_DENOMINATOR);
-    _alarmingSleepTime = _normalSleepTime / _alarmingSleepTimeDenominator;
-    _oomKillQueryEnabled = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY,
-        CommonConstants.Accounting.DEFAULT_ENABLE_OOM_PROTECTION_KILLING_QUERY);
-    _publishHeapUsageMetric = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_PUBLISHING_JVM_USAGE,
-        CommonConstants.Accounting.DEFAULT_PUBLISHING_JVM_USAGE);
-    _isCPUTimeBasedKillingEnabled =
-        _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_ENABLED,
-            CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_ENABLED) && _isThreadCPUSamplingEnabled;
-    _cpuTimeBasedKillingThresholdNS =
-        _config.getProperty(CommonConstants.Accounting.CONFIG_OF_CPU_TIME_BASED_KILLING_THRESHOLD_MS,
-            CommonConstants.Accounting.DEFAULT_CPU_TIME_BASED_KILLING_THRESHOLD_MS) * 1000_000L;
-    _isQueryKilledMetricEnabled = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_QUERY_KILLED_METRIC_ENABLED,
-        CommonConstants.Accounting.DEFAULT_QUERY_KILLED_METRIC_ENABLED);
+    // Initialize QueryMonitorConfig with all centralized configuration
+    _queryMonitorConfig.set(new QueryMonitorConfig(_config, ResourceUsageUtils.getMaxHeapSize()));
 
     switch (_instanceType) {
       case SERVER:
@@ -215,22 +136,16 @@ public class QueryAggregator implements ResourceAggregator {
     }
 
     _inactiveQuery = new HashSet<>();
+    _cancelSentQueries = ConcurrentHashMap.newKeySet();
+    _queryCancelCallbacks = CacheBuilder.newBuilder()
+        .maximumSize(_config.getProperty(CommonConstants.Accounting.CONFIG_OF_CANCEL_CALLBACK_CACHE_MAX_SIZE,
+            CommonConstants.Accounting.DEFAULT_CANCEL_CALLBACK_CACHE_MAX_SIZE))
+        .expireAfterWrite(_config.getProperty(CommonConstants.Accounting.CONFIG_OF_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS,
+            CommonConstants.Accounting.DEFAULT_CANCEL_CALLBACK_CACHE_EXPIRY_SECONDS), TimeUnit.SECONDS)
+        .build();
 
     LOGGER.info("Starting accountant task for QueryAggregator.");
-    LOGGER.info("Xmx is {}", _maxHeapSize);
-    LOGGER.info("_instanceType is {}", _instanceType);
-    LOGGER.info("_alarmingLevel of on heap memory is {}", _alarmingLevel);
-    LOGGER.info("_criticalLevel of on heap memory is {}", _criticalLevel);
-    LOGGER.info("_criticalLevelAfterGC of on heap memory is {}", _criticalLevelAfterGC);
-    LOGGER.info("_panicLevel of on heap memory is {}", _panicLevel);
-    LOGGER.info("_gcBackoffCount is {}", _gcBackoffCount);
-    LOGGER.info("_gcWaitTime is {}", _gcWaitTime);
-    LOGGER.info("_normalSleepTime is {}", _normalSleepTime);
-    LOGGER.info("_alarmingSleepTime is {}", _alarmingSleepTime);
-    LOGGER.info("_oomKillQueryEnabled: {}", _oomKillQueryEnabled);
-    LOGGER.info("_minMemoryFootprintForKill: {}", _minMemoryFootprintForKill);
-    LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}", _isCPUTimeBasedKillingEnabled,
-        _cpuTimeBasedKillingThresholdNS);
+    logQueryMonitorConfig();
   }
 
   protected static class AggregatedStats implements QueryResourceTracker {
@@ -298,11 +213,50 @@ public class QueryAggregator implements ResourceAggregator {
     return _sleepTime;
   }
 
+  /**
+   * Get the current QueryMonitorConfig
+   */
+  public QueryMonitorConfig getQueryMonitorConfig() {
+    return _queryMonitorConfig.get();
+  }
+
+  /**
+   * Log the current QueryMonitorConfig settings
+   */
+  private void logQueryMonitorConfig() {
+    QueryMonitorConfig config = getQueryMonitorConfig();
+    LOGGER.info("Updated Configuration for Query Monitor");
+    LOGGER.info("Xmx is {}", config.getMaxHeapSize());
+    LOGGER.info("_instanceType is {}", _instanceType);
+    LOGGER.info("_alarmingLevel of on heap memory is {}", config.getAlarmingLevel());
+    LOGGER.info("_criticalLevel of on heap memory is {}", config.getCriticalLevel());
+    LOGGER.info("_panicLevel of on heap memory is {}", config.getPanicLevel());
+    LOGGER.info("_normalSleepTime is {}", config.getNormalSleepTime());
+    LOGGER.info("_alarmingSleepTime is {}", config.getAlarmingSleepTime());
+    LOGGER.info("_oomKillQueryEnabled: {}", config.isOomKillQueryEnabled());
+    LOGGER.info("_minMemoryFootprintForKill: {}", config.getMinMemoryFootprintForKill());
+    LOGGER.info("_isCPUTimeBasedKillingEnabled: {}, _cpuTimeBasedKillingThresholdNS: {}",
+        config.isCpuTimeBasedKillingEnabled(), config.getCpuTimeBasedKillingThresholdNS());
+  }
+
+  /**
+   * Register MSE cancel callback for graceful query termination
+   */
+  public void registerMseCancelCallback(String queryId, MseCancelCallback callback) {
+    _queryCancelCallbacks.put(queryId, callback);
+  }
+
+  @Nullable
+  public MseCancelCallback getQueryCancelCallback(String queryId) {
+    return _queryCancelCallbacks.getIfPresent(queryId);
+  }
+
   // Implement getQueryResources
 
   public void preAggregate(List<CPUMemThreadLevelAccountingObjects.ThreadEntry> anchorThreadEntries) {
     LOGGER.debug("Running pre-aggregate for QueryAggregator.");
-    _sleepTime = _normalSleepTime;
+    QueryMonitorConfig config = getQueryMonitorConfig();
+    _sleepTime = config.getNormalSleepTime();
     _triggeringLevel = TriggeringLevel.Normal;
     collectTriggerMetrics();
     evalTriggers();
@@ -383,22 +337,19 @@ public class QueryAggregator implements ResourceAggregator {
       queryIdResult.getValue()
           .merge(accumulatedCPUValue + concurrentCPUValue, accumulatedMemValue + concurrentMemValue, false, null);
     }
-
+    QueryMonitorConfig config = getQueryMonitorConfig();
     switch (_triggeringLevel) {
       case HeapMemoryCritical:
-        LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes, _criticalLevel);
+        LOGGER.warn("Heap used bytes {} exceeds critical level {}", _usedBytes, config.getCriticalLevel());
         killMostExpensiveQuery();
         break;
       case CPUTimeBasedKilling:
         killCPUTimeExceedQueries();
         break;
       case HeapMemoryAlarmingVerbose:
-        LOGGER.warn("Heap used bytes {} exceeds alarming level", _usedBytes);
-        LOGGER.warn("Query usage aggregation results {}", _aggregatedUsagePerActiveQuery.toString());
-        _numQueriesKilledConsecutively = 0;
+        LOGGER.debug("Query usage aggregation results: {}", _aggregatedUsagePerActiveQuery);
         break;
       default:
-        _numQueriesKilledConsecutively = 0;
         break;
     }
   }
@@ -409,48 +360,41 @@ public class QueryAggregator implements ResourceAggregator {
    * use XX:+ExplicitGCInvokesConcurrent to avoid a full gc when system.gc is triggered
    */
   private void killMostExpensiveQuery() {
-    if (!_aggregatedUsagePerActiveQuery.isEmpty() && _numQueriesKilledConsecutively >= _gcBackoffCount) {
-      _numQueriesKilledConsecutively = 0;
-      System.gc();
-      try {
-        Thread.sleep(_gcWaitTime);
-      } catch (InterruptedException ignored) {
-      }
-      _usedBytes = ResourceUsageUtils.getUsedHeapSize();
-      if (_usedBytes < _criticalLevelAfterGC) {
-        return;
-      }
-      LOGGER.error("After GC, heap used bytes {} still exceeds _criticalLevelAfterGC level {}", _usedBytes,
-          _criticalLevelAfterGC);
-    }
-    if (!(_isThreadMemorySamplingEnabled || _isThreadCPUSamplingEnabled)) {
-      LOGGER.warn("But unable to kill query because neither memory nor cpu tracking is enabled");
+    if (!_isThreadMemorySamplingEnabled) {
       return;
     }
-    // Critical heap memory usage while no queries running
-    if (_aggregatedUsagePerActiveQuery.isEmpty()) {
+    if (!_aggregatedUsagePerActiveQuery.isEmpty()) {
+      AggregatedStats maxUsageTuple = _aggregatedUsagePerActiveQuery.values()
+          .stream()
+          .filter(stats -> !_cancelSentQueries.contains(stats.getQueryId()))
+          .max(Comparator.comparing(AggregatedStats::getAllocatedBytes))
+          .orElse(null);
+      if (maxUsageTuple != null) {
+        String queryId = maxUsageTuple.getQueryId();
+        long allocatedBytes = maxUsageTuple.getAllocatedBytes();
+        QueryMonitorConfig config = getQueryMonitorConfig();
+        if (allocatedBytes > config.getMinMemoryFootprintForKill()) {
+          if (config.isOomKillQueryEnabled()) {
+            maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
+                String.format("Query: %s got killed on %s: %s because it allocated: %d bytes of memory", queryId,
+                    _instanceType, _instanceId, allocatedBytes)));
+            boolean hasCallBack = _queryCancelCallbacks.getIfPresent(maxUsageTuple.getQueryId()) != null;
+            terminateQuery(maxUsageTuple);
+            logTerminatedQuery(maxUsageTuple, _usedBytes, hasCallBack);
+          } else {
+            LOGGER.warn("Query: {} got picked because it allocated: {} bytes of memory, "
+                + "not killing it because OOM kill is not enabled", queryId, allocatedBytes);
+          }
+        } else {
+          LOGGER.debug(
+              "Query: {} has most allocated bytes: {}, but below the minimum memory footprint for kill: {}, "
+                  + "skipping query kill", queryId, allocatedBytes, config.getMinMemoryFootprintForKill());
+        }
+      }
+      logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
+    } else {
       LOGGER.debug("No active queries to kill");
-      return;
     }
-    AggregatedStats maxUsageTuple;
-    if (_isThreadMemorySamplingEnabled) {
-      maxUsageTuple = Collections.max(_aggregatedUsagePerActiveQuery.values(),
-          Comparator.comparing(AggregatedStats::getAllocatedBytes));
-      boolean shouldKill = _oomKillQueryEnabled && maxUsageTuple._allocatedBytes > _minMemoryFootprintForKill;
-      if (shouldKill) {
-        maxUsageTuple._exceptionAtomicReference.set(new RuntimeException(
-            String.format(" Query %s got killed because using %d bytes of memory on %s: %s, exceeding the quota",
-                maxUsageTuple._queryId, maxUsageTuple.getAllocatedBytes(), _instanceType, _instanceId)));
-        interruptRunnerThread(maxUsageTuple.getAnchorThread());
-        logTerminatedQuery(maxUsageTuple, _usedBytes);
-      } else if (!_oomKillQueryEnabled) {
-        LOGGER.warn("Query {} got picked because using {} bytes of memory, actual kill committed false "
-            + "because oomKillQueryEnabled is false", maxUsageTuple._queryId, maxUsageTuple._allocatedBytes);
-      } else {
-        LOGGER.warn("But all queries are below quota, no query killed");
-      }
-    }
-    logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
   }
 
   protected void logQueryResourceUsage(Map<String, ? extends QueryResourceTracker> aggregatedUsagePerActiveQuery) {
@@ -458,79 +402,139 @@ public class QueryAggregator implements ResourceAggregator {
   }
 
   protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {
-    LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}",
+    logTerminatedQuery(queryResourceTracker, totalHeapMemoryUsage, false);
+  }
+
+  protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage, boolean hasCallback) {
+    LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}. Used Callback: {}",
         queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
-        queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage);
+        queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage, hasCallback);
   }
 
   private void killCPUTimeExceedQueries() {
-    for (Map.Entry<String, AggregatedStats> entry : _aggregatedUsagePerActiveQuery.entrySet()) {
-      AggregatedStats value = entry.getValue();
-      if (value._cpuNS > _cpuTimeBasedKillingThresholdNS) {
-        LOGGER.error("Query {} got picked because using {} ns of cpu time," + " greater than threshold {}",
-            value._queryId, value.getCpuTimeNs(), _cpuTimeBasedKillingThresholdNS);
-        value._exceptionAtomicReference.set(new RuntimeException(String.format(
-            "Query %s got killed on %s: %s because using %d " + "CPU time exceeding limit of %d ns CPU time",
-            value._queryId, _instanceType, _instanceId, value.getCpuTimeNs(), _cpuTimeBasedKillingThresholdNS)));
-        interruptRunnerThread(value.getAnchorThread());
-        logTerminatedQuery(value, _usedBytes);
-      }
+    if (!_isThreadCPUSamplingEnabled) {
+      return;
     }
-    logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
+    if (!_aggregatedUsagePerActiveQuery.isEmpty()) {
+      QueryMonitorConfig config = getQueryMonitorConfig();
+      for (Map.Entry<String, AggregatedStats> entry : _aggregatedUsagePerActiveQuery.entrySet()) {
+        AggregatedStats stats = entry.getValue();
+        String queryId = stats.getQueryId();
+        if (_cancelSentQueries.contains(queryId)) {
+          continue;
+        }
+        long cpuTimeNs = stats.getCpuTimeNs();
+        if (cpuTimeNs > config.getCpuTimeBasedKillingThresholdNS()) {
+
+          LOGGER.debug("Query {} got picked because using {} ns of cpu time, greater than threshold {}",
+              queryId, cpuTimeNs, config.getCpuTimeBasedKillingThresholdNS());
+
+          stats._exceptionAtomicReference.set(new RuntimeException(String.format(
+              "Query: %s got killed on %s: %s because it used: %d ns of CPU time (exceeding threshold: %d)",
+              queryId, _instanceType, _instanceId, cpuTimeNs, config.getCpuTimeBasedKillingThresholdNS())));
+          boolean hasCallBack = _queryCancelCallbacks.getIfPresent(queryId) != null;
+          terminateQuery(stats);
+          logTerminatedQuery(stats, _usedBytes, hasCallBack);
+        }
+      }
+      logQueryResourceUsage(_aggregatedUsagePerActiveQuery);
+    } else {
+      LOGGER.debug("No active queries to kill");
+    }
   }
 
-  private void interruptRunnerThread(Thread thread) {
-    thread.interrupt();
-    if (_isQueryKilledMetricEnabled) {
+  /**
+   * Enhanced query termination with MSE callback support
+   */
+  private void terminateQuery(AggregatedStats queryResourceTracker) {
+    cancelQuery(queryResourceTracker.getQueryId(), queryResourceTracker.getAnchorThread());
+    if (getQueryMonitorConfig().isQueryKilledMetricEnabled()) {
       _metrics.addMeteredGlobalValue(_queryKilledMeter, 1);
     }
-    _numQueriesKilledConsecutively += 1;
+  }
+
+  public void cancelQuery(String queryId, Thread anchorThread) {
+    MseCancelCallback callback = _queryCancelCallbacks.getIfPresent(queryId);
+    if (callback != null) {
+      callback.cancelQuery(Long.parseLong(queryId));
+      _queryCancelCallbacks.invalidate(queryId);
+    } else {
+      anchorThread.interrupt();
+    }
+    _cancelSentQueries.add(queryId);
   }
 
   void killAllQueries(List<CPUMemThreadLevelAccountingObjects.ThreadEntry> anchorThreadEntries) {
-    if (_oomKillQueryEnabled) {
-      LOGGER.error("Heap used bytes {}, greater than _panicLevel {}, Killing all queries and triggering gc!",
-          _usedBytes, _panicLevel);
+    QueryMonitorConfig config = getQueryMonitorConfig();
 
+    if (config.isOomKillQueryEnabled()) {
       int killedCount = 0;
-
-      for (CPUMemThreadLevelAccountingObjects.ThreadEntry anchorThreadEntry : anchorThreadEntries) {
-        CPUMemThreadLevelAccountingObjects.TaskEntry taskEntry = anchorThreadEntry.getCurrentThreadTaskStatus();
-        anchorThreadEntry._errorStatus.set(
-            new RuntimeException(String.format("Query killed due to %s out of memory!", _instanceType)));
-        taskEntry.getAnchorThread().interrupt();
-        killedCount += 1;
+      for (CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry : anchorThreadEntries) {
+        CPUMemThreadLevelAccountingObjects.TaskEntry taskEntry = threadEntry.getCurrentThreadTaskStatus();
+        if (taskEntry != null && !_cancelSentQueries.contains(taskEntry.getQueryId())) {
+          cancelQuery(taskEntry.getQueryId(), taskEntry.getAnchorThread());
+          killedCount += 1;
+        }
       }
-      if (_isQueryKilledMetricEnabled) {
+      if (config.isQueryKilledMetricEnabled()) {
         _metrics.addMeteredGlobalValue(_queryKilledMeter, killedCount);
       }
-      try {
-        Thread.sleep(_normalSleepTime);
-      } catch (InterruptedException ignored) {
-      }
-      // In this extreme case we directly trigger system.gc
-      System.gc();
-      _numQueriesKilledConsecutively = 0;
     }
   }
 
   private void evalTriggers() {
-    // CPU based triggers
-    if (_isCPUTimeBasedKillingEnabled) {
-      _triggeringLevel = TriggeringLevel.CPUTimeBasedKilling;
-    }
+    TriggeringLevel previousTriggeringLevel = _triggeringLevel;
 
-    // Memory based triggers
-    if (_usedBytes >= _panicLevel) {
+    // Compute the new triggering level based on current conditions
+    QueryMonitorConfig config = getQueryMonitorConfig();
+    _triggeringLevel
+        = config.isCpuTimeBasedKillingEnabled() ? TriggeringLevel.CPUTimeBasedKilling : TriggeringLevel.Normal;
+
+    // Memory based triggers (higher priority)
+    if (_usedBytes >= config.getPanicLevel()) {
       _triggeringLevel = TriggeringLevel.HeapMemoryPanic;
       _metrics.addMeteredGlobalValue(_heapMemoryPanicExceededMeter, 1);
-    } else if (_usedBytes > _criticalLevel) {
+    } else if (_usedBytes > config.getCriticalLevel()) {
       _triggeringLevel = TriggeringLevel.HeapMemoryCritical;
       _metrics.addMeteredGlobalValue(_heapMemoryCriticalExceededMeter, 1);
-    } else if (_usedBytes > _alarmingLevel) {
-      _sleepTime = _alarmingSleepTime;
-      _triggeringLevel = (LOGGER.isDebugEnabled() && _triggeringLevel == TriggeringLevel.Normal)
-          ? TriggeringLevel.HeapMemoryAlarmingVerbose : _triggeringLevel;
+    } else if (_usedBytes > config.getAlarmingLevel()) {
+      _sleepTime = config.getAlarmingSleepTime();
+      // For debugging - only set verbose mode if debug is enabled and we were in normal mode
+      if (IS_DEBUG_MODE_ENABLED && _triggeringLevel == TriggeringLevel.Normal) {
+        _triggeringLevel = TriggeringLevel.HeapMemoryAlarmingVerbose;
+      }
+    }
+
+    // Log triggering level changes for better observability
+    if (previousTriggeringLevel != _triggeringLevel) {
+      switch (_triggeringLevel) {
+        case HeapMemoryPanic:
+          LOGGER.error("Heap used bytes: {} exceeds panic level: {}, killing all queries", _usedBytes,
+              config.getPanicLevel());
+          break;
+        case HeapMemoryCritical:
+          LOGGER.warn("Heap used bytes: {} exceeds critical level: {}, killing most expensive query", _usedBytes,
+              config.getCriticalLevel());
+          if (!_isThreadMemorySamplingEnabled) {
+            LOGGER.error("Unable to terminate queries as memory tracking is not enabled");
+          }
+          break;
+        case CPUTimeBasedKilling:
+          LOGGER.info("Entering CPU time based killing mode, threshold (ns): {}",
+              config.getCpuTimeBasedKillingThresholdNS());
+          if (!_isThreadCPUSamplingEnabled) {
+            LOGGER.error("Unable to terminate queries as CPU time tracking is not enabled");
+          }
+          break;
+        case HeapMemoryAlarmingVerbose:
+          LOGGER.debug("Heap used bytes: {} exceeds alarming level: {}", _usedBytes, config.getAlarmingLevel());
+          break;
+        case Normal:
+          LOGGER.info("Heap used bytes: {} drops to safe zone, entering normal mode", _usedBytes);
+          break;
+        default:
+          throw new IllegalStateException("Unsupported triggering level: " + _triggeringLevel);
+      }
     }
   }
 
@@ -547,6 +551,8 @@ public class QueryAggregator implements ResourceAggregator {
   }
 
   private void cleanInactive() {
+    Set<String> cancellingQueries = new HashSet<>();
+
     for (String inactiveQueryId : _inactiveQuery) {
       if (_isThreadCPUSamplingEnabled) {
         _finishedTaskCPUStatsAggregator.remove(inactiveQueryId);
@@ -556,7 +562,20 @@ public class QueryAggregator implements ResourceAggregator {
         _finishedTaskMemStatsAggregator.remove(inactiveQueryId);
         _concurrentTaskMemStatsAggregator.remove(inactiveQueryId);
       }
+      // Clean up cancel callbacks for inactive queries
+      _queryCancelCallbacks.invalidate(inactiveQueryId);
     }
+
+    // Retain queries that are currently being cancelled
+    for (String queryId : _cancelSentQueries) {
+      if (_finishedTaskCPUStatsAggregator.containsKey(queryId) ||
+          _finishedTaskMemStatsAggregator.containsKey(queryId) ||
+          _concurrentTaskCPUStatsAggregator.containsKey(queryId) ||
+          _concurrentTaskMemStatsAggregator.containsKey(queryId)) {
+        cancellingQueries.add(queryId);
+      }
+    }
+
     _inactiveQuery.clear();
     if (_isThreadCPUSamplingEnabled) {
       _inactiveQuery.addAll(_finishedTaskCPUStatsAggregator.keySet());
@@ -566,12 +585,15 @@ public class QueryAggregator implements ResourceAggregator {
       _inactiveQuery.addAll(_finishedTaskMemStatsAggregator.keySet());
       _inactiveQuery.addAll(_concurrentTaskMemStatsAggregator.keySet());
     }
+
+    _cancelSentQueries = cancellingQueries;
   }
 
   public void cleanUpPostAggregation() {
     LOGGER.debug(_aggregatedUsagePerActiveQuery == null ? "_aggregatedUsagePerActiveQuery : null"
         : _aggregatedUsagePerActiveQuery.toString());
-    if (_publishHeapUsageMetric) {
+    QueryMonitorConfig config = getQueryMonitorConfig();
+    if (config.isPublishHeapUsageMetric()) {
       _metrics.setValueOfGlobalGauge(_memoryUsageGauge, _usedBytes);
     }
     cleanInactive();
@@ -587,18 +609,9 @@ public class QueryAggregator implements ResourceAggregator {
   public Map<String, ? extends QueryResourceTracker> getQueryResources(
       Map<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> threadEntriesMap) {
     HashMap<String, AggregatedStats> ret = new HashMap<>();
-
     // for each {pqr, pqw}
-    for (Map.Entry<Thread, CPUMemThreadLevelAccountingObjects.ThreadEntry> entry : threadEntriesMap.entrySet()) {
-      // sample current usage
-      CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry = entry.getValue();
-      long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
-      long currentMemSample =
-          _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
-      // sample current running task status
+    for (CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry : threadEntriesMap.values()) {
       CPUMemThreadLevelAccountingObjects.TaskEntry currentTaskStatus = threadEntry.getCurrentThreadTaskStatus();
-      Thread thread = entry.getKey();
-      LOGGER.trace("tid: {}, task: {}", thread.getId(), currentTaskStatus);
 
       // if current thread is not idle
       if (currentTaskStatus != null) {
@@ -607,10 +620,14 @@ public class QueryAggregator implements ResourceAggregator {
         if (queryId != null) {
           Thread anchorThread = currentTaskStatus.getAnchorThread();
           boolean isAnchorThread = currentTaskStatus.isAnchorThread();
+          long currentCPUSample = _isThreadCPUSamplingEnabled ? threadEntry._currentThreadCPUTimeSampleMS : 0;
+          long currentMemSample =
+              _isThreadMemorySamplingEnabled ? threadEntry._currentThreadMemoryAllocationSampleBytes : 0;
           ret.compute(queryId,
               (k, v) -> v == null ? new AggregatedStats(currentCPUSample, currentMemSample, anchorThread,
                   isAnchorThread, threadEntry._errorStatus, queryId)
-                  : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
+                  : v.merge(currentCPUSample, currentMemSample, isAnchorThread,
+                  threadEntry._errorStatus));
         }
       }
     }
@@ -632,6 +649,10 @@ public class QueryAggregator implements ResourceAggregator {
     return ret;
   }
 
+  public long getHeapUsageBytes() {
+    return _usedBytes;
+  }
+
   private void collectTriggerMetrics() {
     _usedBytes = ResourceUsageUtils.getUsedHeapSize();
     LOGGER.debug("Heap used bytes {}", _usedBytes);
@@ -639,5 +660,21 @@ public class QueryAggregator implements ResourceAggregator {
 
   private boolean isTriggered() {
     return _triggeringLevel.ordinal() > TriggeringLevel.Normal.ordinal();
+  }
+
+  public boolean isQueryTerminated(String queryId) {
+    QueryMonitorConfig config = getQueryMonitorConfig();
+    if (config.isThreadSelfTerminate() && getHeapUsageBytes() > config.getPanicLevel()) {
+      logSelfTerminatedQuery(queryId, Thread.currentThread());
+      return true;
+    }
+    return false;
+  }
+
+  protected void logSelfTerminatedQuery(String queryId, Thread queryThread) {
+    if (_cancelSentQueries.add(queryId)) {
+      LOGGER.warn("Query: {} self-terminated. Total Heap Usage: {}. Query Thread: {}", queryId, _usedBytes,
+          queryThread.getName());
+    }
   }
 }

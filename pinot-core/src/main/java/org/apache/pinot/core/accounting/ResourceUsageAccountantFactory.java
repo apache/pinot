@@ -27,6 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
+
+import org.apache.pinot.spi.accounting.MseCancelCallback;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
@@ -141,6 +143,12 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
     }
 
     @Override
+    public boolean isQueryTerminated() {
+      QueryAggregator queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
+      return queryAggregator.isQueryTerminated(_threadLocalEntry.get().getQueryId());
+    }
+
+    @Override
     public void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType, String workloadName) {
       _threadLocalEntry.get()._errorStatus.set(null);
       if (queryId != null) {
@@ -252,6 +260,27 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
         }
       }
       return anchorThreadEntries;
+    }
+
+    @Override
+    public boolean throttleQuerySubmission() {
+      QueryAggregator _queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
+      return _queryAggregator.getHeapUsageBytes() > _queryAggregator.getQueryMonitorConfig().getAlarmingLevel();
+    }
+
+    /**
+     * Register MSE cancel callback for graceful query termination
+     */
+    @Override
+    public void registerMseCancelCallback(String queryId, MseCancelCallback callback) {
+      QueryAggregator queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
+      queryAggregator.registerMseCancelCallback(queryId, callback);
+    }
+
+    @Nullable
+    public MseCancelCallback getQueryCancelCallback(String queryId) {
+      QueryAggregator queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
+      return queryAggregator.getQueryCancelCallback(queryId);
     }
 
     class WatcherTask implements Runnable {
