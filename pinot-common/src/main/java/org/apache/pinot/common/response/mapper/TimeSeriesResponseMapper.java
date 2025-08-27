@@ -25,9 +25,9 @@ import org.apache.pinot.common.response.broker.BrokerResponseNativeV2;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 
 
 public class TimeSeriesResponseMapper {
@@ -60,7 +60,7 @@ public class TimeSeriesResponseMapper {
     return brokerResponse;
   }
 
-  public static BrokerResponse toBrokerResponse(TimeSeriesException e) {
+  public static BrokerResponse toBrokerResponse(QueryException e) {
     BrokerResponseNativeV2 brokerResponse = new BrokerResponseNativeV2();
     brokerResponse.addException(new QueryProcessingException(e.getErrorCode(), e.getMessage()));
     return brokerResponse;

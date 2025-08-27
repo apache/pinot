@@ -82,6 +82,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
@@ -92,7 +93,6 @@ import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -302,7 +302,7 @@ public class PinotClientRequest {
             requestContext, makeHttpIdentity(requestCtx), httpHeaders);
         asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(timeSeriesBlock));
       }
-    } catch (TimeSeriesException e) {
+    } catch (QueryException e) {
       asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(e));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing POST timeseries request", e);
@@ -334,8 +334,8 @@ public class PinotClientRequest {
         }
         asyncResponse.resume(response);
       }
-    } catch (TimeSeriesException e) {
-      asyncResponse.resume(Response.serverError().entity(PinotBrokerTimeSeriesResponse.fromTimeSeriesException(e))
+    } catch (QueryException e) {
+      asyncResponse.resume(Response.serverError().entity(PinotBrokerTimeSeriesResponse.fromException(e))
         .build());
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
@@ -575,7 +575,7 @@ public class PinotClientRequest {
 
   private TimeSeriesBlock executeTimeSeriesQuery(String language, String queryString,
       Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
-      HttpHeaders httpHeaders) throws TimeSeriesException {
+      HttpHeaders httpHeaders) throws QueryException {
     return _requestHandler.handleTimeSeriesRequest(language, queryString, queryParams, requestContext,
         requesterIdentity, httpHeaders);
   }

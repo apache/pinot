@@ -30,9 +30,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.spi.annotations.InterfaceStability;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 
 
 /**
@@ -109,7 +109,7 @@ public class PinotBrokerTimeSeriesResponse {
     return convertBucketedSeriesBlock(seriesBlock);
   }
 
-  public static PinotBrokerTimeSeriesResponse fromTimeSeriesException(TimeSeriesException e) {
+  public static PinotBrokerTimeSeriesResponse fromException(QueryException e) {
     return newErrorResponse(e.getErrorCode().getDefaultMessage(), e.getMessage());
   }
 

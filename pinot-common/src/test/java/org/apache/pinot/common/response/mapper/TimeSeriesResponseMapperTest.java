@@ -28,10 +28,10 @@ import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.response.broker.ResultTable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.tsdb.spi.TimeBuckets;
 import org.apache.pinot.tsdb.spi.series.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
-import org.apache.pinot.tsdb.spi.series.TimeSeriesException;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeTest;
@@ -63,9 +63,9 @@ public class TimeSeriesResponseMapperTest {
   }
 
   @Test
-  public void toBrokerResponseWithTimeSeriesException() {
+  public void toBrokerResponseWithException() {
     BrokerResponseNativeV2 resp = (BrokerResponseNativeV2) TimeSeriesResponseMapper.toBrokerResponse(
-      new TimeSeriesException(QueryErrorCode.INTERNAL, "time series exception"));
+      new QueryException(QueryErrorCode.INTERNAL, "time series exception"));
     List<QueryProcessingException> exceptions = resp.getExceptions();
     assertEquals(exceptions.size(), 1);
     assertEquals(exceptions.get(0).getErrorCode(), QueryErrorCode.INTERNAL.getId());
