@@ -60,7 +60,7 @@ public class PinotQueryResourceStaticValidationTest {
     List<TableConfig> tableConfigs = Arrays.asList(tableConfig);
     List<Schema> schemas = Arrays.asList(schema);
 
-    StaticTableCache provider = new StaticTableCache(tableConfigs, schemas, null, true);
+    StaticTableCache provider = new StaticTableCache(tableConfigs, schemas, null, false);
 
     Assert.assertFalse(provider.isIgnoreCase());
     Assert.assertEquals(provider.getActualTableName("testTable_OFFLINE"), "testTable_OFFLINE");
