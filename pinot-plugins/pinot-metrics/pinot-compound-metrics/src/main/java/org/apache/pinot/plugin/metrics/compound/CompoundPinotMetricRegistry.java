@@ -51,7 +51,7 @@ public class CompoundPinotMetricRegistry implements PinotMetricsRegistry {
     CompoundPinotMetricName castedName = (CompoundPinotMetricName) name;
     _allMetrics.remove(name);
     for (int i = 0; i < _registries.size(); i++) {
-      _registries.get(i).removeMetric(castedName.getMetricName().get(i));
+      _registries.get(i).removeMetric(castedName.getSubMetricName(i));
     }
   }
 
@@ -59,7 +59,7 @@ public class CompoundPinotMetricRegistry implements PinotMetricsRegistry {
     CompoundPinotMetricName castedName = (CompoundPinotMetricName) name;
     ArrayList<T> result = new ArrayList<>(_registries.size());
     for (int i = 0; i < _registries.size(); i++) {
-      PinotMetricName metricName = castedName.getMetricName().get(i);
+      PinotMetricName metricName = castedName.getSubMetricName(i);
       T mappedElement = mapFun.apply(_registries.get(i), metricName);
       result.add(mappedElement);
     }
@@ -70,25 +70,25 @@ public class CompoundPinotMetricRegistry implements PinotMetricsRegistry {
   public <T> PinotGauge<T> newGauge(PinotMetricName name, PinotGauge<T> gauge) {
     if (gauge == null) {
       return (PinotGauge<T>) _allMetrics.computeIfAbsent(name,
-          key -> new CompoundPinotGauge<>(map(key, (reg, subName) -> reg.newGauge(subName, null))));
-    } else {
-      CompoundPinotGauge<T> compoundGauge = (CompoundPinotGauge<T>) PinotMetricUtils
-              .makePinotGauge(name.getMetricName().toString(), avoid -> gauge.value());
-
-      Function<PinotMetricName, CompoundPinotGauge<?>> creator = key -> {
-        CompoundPinotMetricName compoundName = (CompoundPinotMetricName) key;
-        ArrayList<PinotGauge<T>> gauges = new ArrayList<>(_registries.size());
-        for (int i = 0; i < _registries.size(); i++) {
-          PinotGauge<?> subGauge = compoundGauge.getMeter(i);
-          PinotMetricName subName = compoundName.getMetricName().get(i);
-          PinotGauge<T> created = (PinotGauge<T>) _registries.get(i).newGauge(subName, subGauge);
-          gauges.add(created);
-        }
-        return new CompoundPinotGauge<>(gauges);
-      };
-
-      return (PinotGauge<T>) _allMetrics.computeIfAbsent(name, creator);
+          key -> new CompoundPinotGauge<>(map(key, (reg, subName) -> reg.newGauge(subName, gauge))));
     }
+
+    CompoundPinotGauge<T> compoundGauge = (CompoundPinotGauge<T>) PinotMetricUtils
+        .makePinotGauge(name.getMetricName().toString(), avoid -> gauge.value());
+
+    Function<PinotMetricName, CompoundPinotGauge<?>> creator = key -> {
+      CompoundPinotMetricName compoundName = (CompoundPinotMetricName) key;
+      ArrayList<PinotGauge<T>> gauges = new ArrayList<>(_registries.size());
+      for (int i = 0; i < _registries.size(); i++) {
+        PinotGauge<?> subGauge = compoundGauge.getMeter(i);
+        PinotMetricName subName = compoundName.getSubMetricName(i);
+        PinotGauge<T> created = (PinotGauge<T>) _registries.get(i).newGauge(subName, subGauge);
+        gauges.add(created);
+      }
+      return new CompoundPinotGauge<>(gauges);
+    };
+
+    return (PinotGauge<T>) _allMetrics.computeIfAbsent(name, creator);
   }
 
   @Override
@@ -122,7 +122,9 @@ public class CompoundPinotMetricRegistry implements PinotMetricsRegistry {
 
   @Override
   public void addListener(PinotMetricsRegistryListener listener) {
-    throw new UnsupportedOperationException("Not implemented yet");
+    for (int i = 0; i < _registries.size(); i++) {
+      _registries.get(i).addListener(listener);
+    }
   }
 
   @Override
