@@ -45,7 +45,7 @@ public class AuditEvent {
   @JsonProperty("origin_ip_address")
   private String _originIpAddress;
 
-  @JsonProperty("user")
+  @JsonProperty("userid")
   private UserIdentity _user;
 
   @JsonProperty("request")

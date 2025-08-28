@@ -43,7 +43,7 @@ public class AuditIdentityResolver {
     AuditConfig config = _configManager.getCurrentConfig();
 
     // Priority 1: Check custom identity header
-    String identityHeader = config.getIdentityHeader();
+    String identityHeader = config.getUseridHeader();
     if (StringUtils.isNotBlank(identityHeader)) {
       String principal = requestContext.getHeaderString(identityHeader);
       if (StringUtils.isNotBlank(principal)) {
@@ -55,7 +55,7 @@ public class AuditIdentityResolver {
     String authHeader = requestContext.getHeaderString(HttpHeaders.AUTHORIZATION);
     if (StringUtils.isNotBlank(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
       String token = authHeader.substring(BEARER_PREFIX.length()).trim();
-      String principal = extractJwtPrincipal(token, config.getJwtClaimName());
+      String principal = extractJwtPrincipal(token, config.getUseridJwtClaimName());
       if (principal != null) {
         return new AuditEvent.UserIdentity().setPrincipal(principal);
       }

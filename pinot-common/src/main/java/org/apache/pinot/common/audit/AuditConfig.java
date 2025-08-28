@@ -44,11 +44,11 @@ public final class AuditConfig {
   @JsonProperty("excluded.endpoints")
   private String _excludedEndpoints = "";
 
-  @JsonProperty("identity.header")
-  private String _identityHeader = "";
+  @JsonProperty("userid.header")
+  private String _useridHeader = "";
 
-  @JsonProperty("identity.jwt.claim")
-  private String _jwtClaimName = "";
+  @JsonProperty("userid.jwt.claim")
+  private String _useridJwtClaimName = "";
 
   public boolean isEnabled() {
     return _enabled;
@@ -90,27 +90,27 @@ public final class AuditConfig {
     _excludedEndpoints = excludedEndpoints;
   }
 
-  public String getIdentityHeader() {
-    return _identityHeader;
+  public String getUseridHeader() {
+    return _useridHeader;
   }
 
-  public void setIdentityHeader(String identityHeader) {
-    _identityHeader = identityHeader;
+  public void setUseridHeader(String useridHeader) {
+    _useridHeader = useridHeader;
   }
 
-  public String getJwtClaimName() {
-    return _jwtClaimName;
+  public String getUseridJwtClaimName() {
+    return _useridJwtClaimName;
   }
 
-  public void setJwtClaimName(String jwtClaimName) {
-    _jwtClaimName = jwtClaimName;
+  public void setUseridJwtClaimName(String useridJwtClaimName) {
+    _useridJwtClaimName = useridJwtClaimName;
   }
 
   @Override
   public String toString() {
     return "AuditConfig{" + "enabled=" + _enabled + ", captureRequestPayload=" + _captureRequestPayload
         + ", captureRequestHeaders='" + _captureRequestHeaders + "', maxPayloadSize=" + _maxPayloadSize
-        + ", excludedEndpoints='" + _excludedEndpoints + "', identityHeader='" + _identityHeader
-        + "', jwtClaimName='" + _jwtClaimName + "'}";
+        + ", excludedEndpoints='" + _excludedEndpoints + "', identityHeader='" + _useridHeader
+        + "', jwtClaimName='" + _useridJwtClaimName + "'}";
   }
 }
