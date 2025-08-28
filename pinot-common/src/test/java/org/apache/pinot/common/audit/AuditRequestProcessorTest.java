@@ -21,6 +21,7 @@ package org.apache.pinot.common.audit;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -68,7 +69,7 @@ public class AuditRequestProcessorTest {
     _defaultConfig = new AuditConfig();
     _defaultConfig.setEnabled(true);
     _defaultConfig.setCaptureRequestPayload(false);
-    _defaultConfig.setCaptureRequestHeaders(false);
+    _defaultConfig.setCaptureRequestHeaders("");
     _defaultConfig.setMaxPayloadSize(10240);
     _defaultConfig.setExcludedEndpoints("");
 
@@ -139,7 +140,7 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testCaptureHeadersWhenEnabled() {
-    _defaultConfig.setCaptureRequestHeaders(true);
+    _defaultConfig.setCaptureRequestHeaders("Content-Type,X-Custom-Header,Authorization,X-Password");
     MultivaluedMap<String, String> headers =
         createHeaders("Content-Type", "application/json", "X-Custom-Header", "custom-value", "Authorization",
             "Bearer token123",  // Should be filtered out
@@ -167,7 +168,7 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testSkipHeadersWhenDisabled() {
-    _defaultConfig.setCaptureRequestHeaders(false);
+    _defaultConfig.setCaptureRequestHeaders("");
     MultivaluedMap<String, String> headers = createHeaders("Content-Type", "application/json");
 
     when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
@@ -187,7 +188,8 @@ public class AuditRequestProcessorTest {
 
   @Test
   public void testFilterSensitiveHeaders() {
-    _defaultConfig.setCaptureRequestHeaders(true);
+    _defaultConfig.setCaptureRequestHeaders(
+        "authorization,x-auth-token,password-header,api-secret,x-api-key,content-type");
     MultivaluedMap<String, String> headers =
         createHeaders("authorization", "Bearer token123", "x-auth-token", "token456", "password-header", "pass123",
             "api-secret", "secret789", "x-api-key", "key123",
@@ -239,5 +241,126 @@ public class AuditRequestProcessorTest {
 
     // The main processRequest catches all exceptions and returns null, so test for that
     assertThat(result).isNull();
+  }
+
+  @Test
+  public void testParseAllowedHeadersEdgeCases() {
+    // Empty/null/whitespace
+    assertThat(AuditRequestProcessor.parseAllowedHeaders("")).isEmpty();
+    assertThat(AuditRequestProcessor.parseAllowedHeaders("   ")).isEmpty();
+    assertThat(AuditRequestProcessor.parseAllowedHeaders(null)).isEmpty();
+
+    // Single header
+    Set<String> singleHeader = AuditRequestProcessor.parseAllowedHeaders("Content-Type");
+    assertThat(singleHeader).containsExactly("content-type");
+
+    // Malformed comma separation
+    Set<String> malformed1 = AuditRequestProcessor.parseAllowedHeaders("Header1,,Header2");
+    assertThat(malformed1).containsExactlyInAnyOrder("header1", "header2");
+
+    Set<String> malformed2 = AuditRequestProcessor.parseAllowedHeaders(",Header1,Header2,");
+    assertThat(malformed2).containsExactlyInAnyOrder("header1", "header2");
+
+    // Whitespace handling
+    Set<String> withWhitespace = AuditRequestProcessor.parseAllowedHeaders(" Content-Type , X-Custom ");
+    assertThat(withWhitespace).containsExactly("content-type", "x-custom");
+  }
+
+  @Test
+  public void testHeaderFilteringCaseInsensitive() {
+    _defaultConfig.setCaptureRequestHeaders("content-type,authorization,x-custom-header");
+
+    MultivaluedMap<String, String> headers = createHeaders(
+        "Content-Type", "application/json",      // Different case
+        "AUTHORIZATION", "Bearer token",         // All caps
+        "x-custom-header", "value",              // All lower
+        "X-Ignored-Header", "ignored"            // Not in config
+    );
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(_uriInfo.getPath()).thenReturn("/test");
+    when(_requestContext.getMethod()).thenReturn("GET");
+    when(_requestContext.getHeaders()).thenReturn(headers);
+
+    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
+
+    assertThat(result).isNotNull();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
+    assertThat(payload).isNotNull();
+    Map<String, Object> capturedHeaders = payload.getHeaders();
+
+    // Should capture first 3, ignore the 4th
+    assertThat(capturedHeaders).hasSize(3);
+    assertThat(capturedHeaders).containsKeys("Content-Type", "AUTHORIZATION", "x-custom-header");
+    assertThat(capturedHeaders).doesNotContainKey("X-Ignored-Header");
+  }
+
+  @Test
+  public void testHeaderValueHandling() {
+    _defaultConfig.setCaptureRequestHeaders("single-value,multi-value,empty-value");
+
+    MultivaluedMap<String, String> headers = new MultivaluedHashMap<>();
+    headers.add("single-value", "value1");
+    headers.addAll("multi-value", Arrays.asList("val1", "val2", "val3"));
+    headers.add("empty-value", "");
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(_uriInfo.getPath()).thenReturn("/test");
+    when(_requestContext.getMethod()).thenReturn("GET");
+    when(_requestContext.getHeaders()).thenReturn(headers);
+
+    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
+
+    assertThat(result).isNotNull();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
+    assertThat(payload).isNotNull();
+    Map<String, Object> capturedHeaders = payload.getHeaders();
+
+    // Single value stored as String
+    assertThat(capturedHeaders.get("single-value")).isEqualTo("value1");
+
+    // Multiple values stored as List
+    @SuppressWarnings("unchecked")
+    List<String> multiValues = (List<String>) capturedHeaders.get("multi-value");
+    assertThat(multiValues).containsExactly("val1", "val2", "val3");
+
+    // Empty value still captured
+    assertThat(capturedHeaders.get("empty-value")).isEqualTo("");
+  }
+
+  @Test
+  public void testCompleteHeaderCaptureFlow() {
+    // Configure specific headers
+    _defaultConfig.setCaptureRequestHeaders("Content-Type,X-Request-ID,User-Agent");
+
+    // Create request with mixed case headers + extras
+    MultivaluedMap<String, String> headers = createHeaders(
+        "content-type", "application/json",
+        "X-REQUEST-ID", "req-123",
+        "user-agent", "test-client",
+        "Cookie", "session=abc",           // Should be ignored
+        "Accept", "application/json"       // Should be ignored
+    );
+
+    when(_requestContext.getUriInfo()).thenReturn(_uriInfo);
+    when(_uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(_uriInfo.getPath()).thenReturn("/test");
+    when(_requestContext.getMethod()).thenReturn("GET");
+    when(_requestContext.getHeaders()).thenReturn(headers);
+
+    AuditEvent result = _processor.processRequest(_requestContext, "10.0.0.1");
+
+    assertThat(result).isNotNull();
+    AuditEvent.AuditRequestPayload payload = result.getRequest();
+    assertThat(payload).isNotNull();
+    Map<String, Object> capturedHeaders = payload.getHeaders();
+
+    assertThat(capturedHeaders).hasSize(3);
+    assertThat(capturedHeaders).containsOnlyKeys("content-type", "X-REQUEST-ID", "user-agent");
+    assertThat(capturedHeaders).containsEntry("content-type", "application/json");
+    assertThat(capturedHeaders).containsEntry("X-REQUEST-ID", "req-123");
+    assertThat(capturedHeaders).containsEntry("user-agent", "test-client");
   }
 }
