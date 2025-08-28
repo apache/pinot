@@ -40,5 +40,15 @@
       <artifactId>pinot-yammer</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-open-telemetry</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pinot</groupId>
+      <artifactId>pinot-compound-metrics</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 </project>

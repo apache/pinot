@@ -78,6 +78,12 @@ public class OpenTelemetryUtil {
       ControllerTimer.CRON_SCHEDULER_JOB_EXECUTION_TIME_MS.getTimerName()
   };
 
+  // pinot.controller.<rawTableName>.<metricName>
+  public static final String[] CONTROLLER_DEEP_STORE_METRIC = new String[]{
+      ControllerTimer.DEEP_STORE_SEGMENT_READ_TIME_MS.getTimerName(),
+      ControllerTimer.DEEP_STORE_SEGMENT_WRITE_TIME_MS.getTimerName()
+  };
+
   // pinot.controller.<metricName>.<rawTableName>.<topicName>
   public static final String[] CONTROLLER_TOPIC_METRIC = new String[]{
       ControllerGauge.NUM_ROWS_THRESHOLD_WITH_TOPIC.getGaugeName(),
@@ -86,6 +92,10 @@ public class OpenTelemetryUtil {
 
   // pinot.controller.<resourceName>.<metricName>
   public static final String[] CONTROLLER_IDEAL_STATE_METRIC = new String[]{
+      ControllerMeter.IDEAL_STATE_UPDATE_FAILURE.getMeterName(),
+      ControllerMeter.IDEAL_STATE_UPDATE_RETRY.getMeterName(),
+      ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS.getMeterName(),
+
       ControllerTimer.IDEAL_STATE_UPDATE_TIME_MS.getTimerName()
   };
 
@@ -180,6 +190,15 @@ public class OpenTelemetryUtil {
       otelMetricName = extractOtelMetricName(pinotMetricName, maybeControllerIdealStateIndex);
       String resourceName = part[2];
       dimensions.put(OTEL_ATTRIBUTE_RESOURCE_NAME, resourceName);
+      return Pair.of(otelMetricName, dimensions);
+    }
+
+    // pinot.controller.<metricName>.<rawTableName>
+    int maybeControllerDeepStoreIndex = StringUtils.indexOfAny(pinotMetricName, CONTROLLER_DEEP_STORE_METRIC);
+    if (maybeControllerDeepStoreIndex >= 0) {
+      otelMetricName = extractOtelMetricName(pinotMetricName, maybeControllerDeepStoreIndex);
+      String rawTableName = part[3];
+      dimensions.put(OTEL_ATTRIBUTE_RAW_TABLE_NAME, rawTableName);
       return Pair.of(otelMetricName, dimensions);
     }
 
