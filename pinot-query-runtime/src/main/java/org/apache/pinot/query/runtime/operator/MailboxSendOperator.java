@@ -235,9 +235,9 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  protected void sampleAndCheckInterruption() {
+  protected long getDeadlineMs() {
     // mailbox send operator uses passive deadline instead of the active one
-    sampleAndCheckInterruption(_context.getPassiveDeadlineMs());
+    return _context.getPassiveDeadlineMs();
   }
 
   private void sendEos(MseBlock.Eos eosBlockWithoutStats)

@@ -48,17 +48,15 @@ import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 
 
-public abstract class MultiStageOperator
-    implements Operator<MseBlock>, AutoCloseable {
-
+public abstract class MultiStageOperator implements Operator<MseBlock>, AutoCloseable {
   protected final OpChainExecutionContext _context;
   protected final String _operatorId;
+
   protected boolean _isEarlyTerminated;
 
   public MultiStageOperator(OpChainExecutionContext context) {
     _context = context;
     _operatorId = Joiner.on("_").join(getClass().getSimpleName(), _context.getStageId(), _context.getServer());
-    _isEarlyTerminated = false;
   }
 
   /**
@@ -74,35 +72,34 @@ public abstract class MultiStageOperator
 
   public abstract void registerExecution(long time, int numRows);
 
-  /// This method should be called periodically by the operator to check whether the execution should be interrupted.
-  ///
-  /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
-  /// due to resource constraints.
-  ///
-  /// Normally, callers should call [#sampleAndCheckInterruption(long deadlineMs)] passing the correct deadline, but
-  /// given most operators use either the active or the passive deadline, this method is provided as a convenience
-  /// method. By default, it uses the active deadline, which is the one that should be used for most operators, but
-  /// if the operator does not actively process data (ie both mailbox operators), it should override this method to
-  /// use the passive deadline instead.
-  /// See for example [MailboxSendOperator][org.apache.pinot.query.runtime.operator.MailboxSendOperator]).
-  protected void sampleAndCheckInterruption() {
-    sampleAndCheckInterruption(_context.getActiveDeadlineMs());
+  /// By default, it uses the active deadline, which is the one that should be used for most operators, but if the
+  /// operator does not actively process data (ie both mailbox operators), it should override this method to use the
+  /// passive deadline instead.
+  protected long getDeadlineMs() {
+    return _context.getActiveDeadlineMs();
   }
 
   /// This method should be called periodically by the operator to check whether the execution should be interrupted.
   ///
   /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
   /// due to resource constraints.
-  protected void sampleAndCheckInterruption(long deadlineMs) {
-    if (System.currentTimeMillis() >= deadlineMs) {
-      earlyTerminate();
-      throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on " + getExplainName());
+  protected void checkInterruption() {
+    if (System.currentTimeMillis() >= getDeadlineMs()) {
+      throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on: " + getExplainName());
     }
-    Tracing.ThreadAccountantOps.sample();
     if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      earlyTerminate();
-      throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Resource limit exceeded for operator: "
-          + getExplainName());
+      throw new EarlyTerminationException("Interrupted on: " + getExplainName());
+    }
+  }
+
+  protected void sampleAndCheckInterruption() {
+    checkInterruption();
+    Tracing.ThreadAccountantOps.sample();
+  }
+
+  protected void sampleAndCheckInterruptionPeriodically(int numRecordsProcessed) {
+    if ((numRecordsProcessed & Tracing.ThreadAccountantOps.MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0) {
+      sampleAndCheckInterruption();
     }
   }
 
@@ -113,9 +110,6 @@ public abstract class MultiStageOperator
    */
   @Override
   public MseBlock nextBlock() {
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException("Interrupted while processing next block");
-    }
     if (logger().isDebugEnabled()) {
       logger().debug("Operator {}: Reading next block", _operatorId);
     }
@@ -123,6 +117,7 @@ public abstract class MultiStageOperator
       MseBlock nextBlock;
       Stopwatch executeStopwatch = Stopwatch.createStarted();
       try {
+        checkInterruption();
         nextBlock = getNextBlock();
       } catch (Exception e) {
         logger().warn("Operator {}: Exception while processing next block", _operatorId, e);

@@ -335,6 +335,19 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
     _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
+  /**
+   * Method to handle CONSUMING -> OFFLINE segment state transitions:
+   * We stop tracking partitions whose segments are going OFFLINE. The reason is that offline segments are not queried.
+   * So ingestion delay for the offline replicas are not relevant. If there are more replicas with offline state,
+   * replica up metric will determine the severity of the issue.
+   *
+   * @param segmentName name of segment for which the state change is being handled
+   */
+  @Override
+  public void onConsumingToOffline(String segmentName) {
+    _ingestionDelayTracker.stopTrackingPartitionIngestionDelay(segmentName);
+  }
+
   @Override
   public List<SegmentContext> getSegmentContexts(List<IndexSegment> selectedSegments,
       Map<String, String> queryOptions) {
