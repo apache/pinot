@@ -33,6 +33,7 @@ import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 
@@ -56,15 +57,7 @@ public class AuditRequestProcessorTest {
   @BeforeMethod
   public void setUp() {
     MockitoAnnotations.openMocks(this);
-    _processor = new AuditRequestProcessor();
-    // Use reflection to inject the mock config manager since it's private
-    try {
-      java.lang.reflect.Field field = AuditRequestProcessor.class.getDeclaredField("_configManager");
-      field.setAccessible(true);
-      field.set(_processor, _configManager);
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to inject mock config manager", e);
-    }
+    _processor = new AuditRequestProcessor(_configManager, mock(AuditIdentityResolver.class));
 
     _defaultConfig = new AuditConfig();
     _defaultConfig.setEnabled(true);

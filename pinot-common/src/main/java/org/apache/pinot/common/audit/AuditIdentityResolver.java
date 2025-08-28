@@ -36,8 +36,12 @@ public class AuditIdentityResolver {
   private static final Logger LOG = LoggerFactory.getLogger(AuditIdentityResolver.class);
   private static final String BEARER_PREFIX = "Bearer ";
 
+  private final AuditConfigManager _configManager;
+
   @Inject
-  private AuditConfigManager _configManager;
+  public AuditIdentityResolver(AuditConfigManager configManager) {
+    _configManager = configManager;
+  }
 
   public AuditEvent.UserIdentity resolveIdentity(ContainerRequestContext requestContext) {
     AuditConfig config = _configManager.getCurrentConfig();

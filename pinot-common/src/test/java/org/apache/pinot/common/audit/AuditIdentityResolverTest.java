@@ -24,7 +24,6 @@ import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import java.lang.reflect.Field;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -54,11 +53,7 @@ public class AuditIdentityResolverTest {
   public void setUp()
       throws Exception {
     MockitoAnnotations.openMocks(this);
-    _auditIdentityResolver = new AuditIdentityResolver();
-
-    Field field = AuditIdentityResolver.class.getDeclaredField("_configManager");
-    field.setAccessible(true);
-    field.set(_auditIdentityResolver, _auditConfigManager);
+    _auditIdentityResolver = new AuditIdentityResolver(_auditConfigManager);
 
     _auditConfig = new AuditConfig();
     when(_auditConfigManager.getCurrentConfig()).thenReturn(_auditConfig);

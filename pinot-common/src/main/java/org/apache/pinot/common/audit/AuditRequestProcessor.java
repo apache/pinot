@@ -47,11 +47,14 @@ public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
 
-  @Inject
-  private AuditConfigManager _configManager;
+  private final AuditConfigManager _configManager;
+  private final AuditIdentityResolver _identityResolver;
 
   @Inject
-  private AuditIdentityResolver _identityResolver;
+  public AuditRequestProcessor(AuditConfigManager configManager, AuditIdentityResolver identityResolver) {
+    _configManager = configManager;
+    _identityResolver = identityResolver;
+  }
 
   /**
    * Converts a MultivaluedMap into a Map of query parameters.
