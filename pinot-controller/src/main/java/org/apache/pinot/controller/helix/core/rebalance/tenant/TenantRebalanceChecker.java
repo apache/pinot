@@ -127,7 +127,7 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContextForRetry.getJobId(),
             tenantRebalanceContextForRetry.getConfig().getTenantName(),
             progressStats, tenantRebalanceContextForRetry, _pinotHelixResourceManager);
-    ((TenantRebalancer) _tenantRebalancer).rebalanceWithContext(tenantRebalanceContextForRetry, observer);
+    _tenantRebalancer.rebalanceWithContext(tenantRebalanceContextForRetry, observer);
   }
 
   /**
