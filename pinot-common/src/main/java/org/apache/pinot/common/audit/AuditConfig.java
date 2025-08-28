@@ -36,7 +36,7 @@ public final class AuditConfig {
   private boolean _captureRequestPayload = false;
 
   @JsonProperty("capture.request.headers")
-  private boolean _captureRequestHeaders = false;
+  private String _captureRequestHeaders = "";
 
   @JsonProperty("payload.size.max.bytes")
   private int _maxPayloadSize = 10_240;
@@ -60,11 +60,11 @@ public final class AuditConfig {
     _captureRequestPayload = captureRequestPayload;
   }
 
-  public boolean isCaptureRequestHeaders() {
+  public String getCaptureRequestHeaders() {
     return _captureRequestHeaders;
   }
 
-  public void setCaptureRequestHeaders(boolean captureRequestHeaders) {
+  public void setCaptureRequestHeaders(String captureRequestHeaders) {
     _captureRequestHeaders = captureRequestHeaders;
   }
 
@@ -87,7 +87,7 @@ public final class AuditConfig {
   @Override
   public String toString() {
     return "AuditConfig{" + "enabled=" + _enabled + ", captureRequestPayload=" + _captureRequestPayload
-        + ", captureRequestHeaders=" + _captureRequestHeaders + ", maxPayloadSize=" + _maxPayloadSize
+        + ", captureRequestHeaders='" + _captureRequestHeaders + "', maxPayloadSize=" + _maxPayloadSize
         + ", excludedEndpoints='" + _excludedEndpoints + "'}";
   }
 }
