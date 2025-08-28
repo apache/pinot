@@ -32,6 +32,7 @@ import org.apache.calcite.sql.SqlIdentifier;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlOperator;
 import org.apache.calcite.sql.SqlOperatorTable;
+import org.apache.calcite.sql.SqlPostfixOperator;
 import org.apache.calcite.sql.SqlSyntax;
 import org.apache.calcite.sql.fun.SqlLeadLagAggFunction;
 import org.apache.calcite.sql.fun.SqlMonotonicBinaryOperator;
@@ -67,10 +68,13 @@ import org.apache.pinot.segment.spi.AggregationFunctionType;
  */
 @SuppressWarnings("unused") // unused fields are accessed by reflection
 public class PinotOperatorTable implements SqlOperatorTable {
-  private static final Supplier<PinotOperatorTable> INSTANCE = Suppliers.memoize(PinotOperatorTable::new);
+  private static final Supplier<PinotOperatorTable> WITH_NULL_HANDLING =
+      Suppliers.memoize(() -> new PinotOperatorTable(true));
+  private static final Supplier<PinotOperatorTable> WITHOUT_NULL_HANDLING =
+      Suppliers.memoize(() -> new PinotOperatorTable(false));
 
-  public static PinotOperatorTable instance() {
-    return INSTANCE.get();
+  public static PinotOperatorTable instance(boolean nullHandlingEnabled) {
+    return nullHandlingEnabled ? WITH_NULL_HANDLING.get() : WITHOUT_NULL_HANDLING.get();
   }
 
   // The standard Calcite + and - operators don't support operations on TIMESTAMP types. However, Pinot supports these
@@ -96,6 +100,26 @@ public class PinotOperatorTable implements SqlOperatorTable {
           ReturnTypes.NULLABLE_SUM,
           InferTypes.FIRST_KNOWN,
           OperandTypes.MINUS_OPERATOR.or(OperandTypes.family(SqlTypeFamily.TIMESTAMP, SqlTypeFamily.TIMESTAMP)));
+
+  // See the usage of this attribute to see why it is needed
+  public static final SqlPostfixOperator PINOT_IS_NOT_NULL =
+      new SqlPostfixOperator(
+          "IS NOT NULL",
+          SqlKind.OTHER_FUNCTION,
+          28,
+          ReturnTypes.BOOLEAN_NOT_NULL,
+          InferTypes.VARCHAR_1024,
+          OperandTypes.ANY);
+
+  // See the usage of this attribute to see why it is needed
+  public static final SqlPostfixOperator PINOT_IS_NULL =
+      new SqlPostfixOperator(
+          "IS NULL",
+          SqlKind.OTHER_FUNCTION,
+          28,
+          ReturnTypes.BOOLEAN_NOT_NULL,
+          InferTypes.VARCHAR_1024,
+          OperandTypes.ANY);
 
   /**
    * This list includes the supported standard {@link SqlOperator}s defined in {@link SqlStdOperatorTable}.
@@ -302,7 +326,7 @@ public class PinotOperatorTable implements SqlOperatorTable {
   private final Map<String, SqlOperator> _operatorMap;
   private final List<SqlOperator> _operatorList;
 
-  private PinotOperatorTable() {
+  private PinotOperatorTable(boolean nullHandlingEnabled) {
     Map<String, SqlOperator> operatorMap = new HashMap<>();
 
     // Register standard operators
@@ -314,6 +338,14 @@ public class PinotOperatorTable implements SqlOperatorTable {
       for (String name : pair.getRight()) {
         register(name, operator, operatorMap);
       }
+    }
+    // When null handling is disabled, we need to use a fake IS NULL and IS NOT NULL operators to skip some
+    // standard Calcite simplifications which are correct in SQL, but incorrect for Pinot. For example, in SQL
+    // `col IS NOT NULL AND col <> 0` is simplified to `col <> 0` because `col IS NOT NULL` is always true if
+    // `col <> 0` is true. However, in Pinot, `IS NOT NULL` has a special meaning when using basic null handling
+    if (!nullHandlingEnabled) {
+      operatorMap.put(FunctionRegistry.canonicalize(PINOT_IS_NULL.getName()), PINOT_IS_NULL);
+      operatorMap.put(FunctionRegistry.canonicalize(PINOT_IS_NOT_NULL.getName()), PINOT_IS_NOT_NULL);
     }
 
     // Register Pinot operators

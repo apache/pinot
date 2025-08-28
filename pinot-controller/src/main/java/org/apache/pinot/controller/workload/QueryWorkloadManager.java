@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.workload;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import org.apache.pinot.controller.workload.scheme.PropagationSchemeProvider;
 import org.apache.pinot.controller.workload.scheme.PropagationUtils;
 import org.apache.pinot.controller.workload.splitter.CostSplitter;
 import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
+import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
@@ -107,6 +109,8 @@ public class QueryWorkloadManager {
       try {
         PropagationScheme propagationScheme = _propagationSchemeProvider.getPropagationScheme(
             nodeConfig.getPropagationScheme().getPropagationType());
+        // For cost splits with empty cpu or memory cost, distribute the remaining cost evenly among them
+        checkAndDistributeEmptyCostSplitsEvenly(nodeConfig);
         Map<String, InstanceCost> instanceCostMap = propagationScheme.resolveInstanceCostMap(nodeConfig, _costSplitter);
 
         if (instanceCostMap.isEmpty()) {
@@ -122,9 +126,10 @@ public class QueryWorkloadManager {
         LOGGER.info("Successfully propagated workload update for: {} to {} instances", queryWorkloadName,
             instanceCostMap.size());
       } catch (Exception e) {
-        LOGGER.error("Failed to propagate workload update for: {} with nodeConfig: {}", queryWorkloadName,
-            nodeConfig, e);
-        throw new RuntimeException("Failed to propagate workload update for: " + queryWorkloadName, e);
+        String errorMsg = String.format("Failed to propagate workload update for: %s with nodeConfig: %s",
+            queryWorkloadName, nodeConfig);
+        LOGGER.error(errorMsg, e);
+        throw new RuntimeException(errorMsg, e);
       }
     }
   }
@@ -151,7 +156,6 @@ public class QueryWorkloadManager {
         LOGGER.warn("Skipping null NodeConfig for workload delete: {}", queryWorkloadName);
         continue;
       }
-
       try {
         Set<String> instances = resolveInstances(nodeConfig);
         if (instances.isEmpty()) {
@@ -241,7 +245,6 @@ public class QueryWorkloadManager {
           // Continue with other workloads instead of failing completely
         }
       }
-
       LOGGER.info("Successfully propagated {} out of {} workloads for table: {}",
           successCount, queryWorkloadConfigsForTags.size(), tableName);
     } catch (Exception e) {
@@ -348,11 +351,12 @@ public class QueryWorkloadManager {
           }
         }
       }
-      LOGGER.debug("Computed {} workload costs for instance: {}", workloadToInstanceCostMap.size(), instanceName);
+      LOGGER.info("Computed {} workload costs for instance: {}", workloadToInstanceCostMap.size(), instanceName);
       return workloadToInstanceCostMap;
     } catch (Exception e) {
-      LOGGER.error("Failed to compute workload costs for instance: {}", instanceName, e);
-      throw new RuntimeException("Failed to compute workload costs for instance: " + instanceName, e);
+      String errorMsg = String.format("Failed to compute workload costs for instance: %s", instanceName);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
     }
   }
 
@@ -360,5 +364,44 @@ public class QueryWorkloadManager {
     PropagationScheme propagationScheme =
         _propagationSchemeProvider.getPropagationScheme(nodeConfig.getPropagationScheme().getPropagationType());
     return propagationScheme.resolveInstances(nodeConfig);
+  }
+
+  private void checkAndDistributeEmptyCostSplitsEvenly(NodeConfig nodeConfig) {
+    // Check for empty cost splits
+    List<CostSplit> costSplits = nodeConfig.getPropagationScheme().getCostSplits();
+    List<CostSplit> emptySplits = new ArrayList<>();
+    List<CostSplit> nonEmptySplits = new ArrayList<>();
+    for (CostSplit costSplit : costSplits) {
+      if (costSplit.getCpuCostNs() == null || costSplit.getMemoryCostBytes() == null) {
+        emptySplits.add(costSplit);
+      } else {
+        nonEmptySplits.add(costSplit);
+      }
+    }
+    if (emptySplits.isEmpty()) {
+      return;
+    }
+    // Get remaining cpu and memory cost after removing share of non-empty splits
+    long totalCpuCostNs = nodeConfig.getEnforcementProfile().getCpuCostNs();
+    long totalMemoryCostBytes = nodeConfig.getEnforcementProfile().getMemoryCostBytes();
+    for (CostSplit costSplit : nonEmptySplits) {
+      totalCpuCostNs -= costSplit.getCpuCostNs();
+      totalMemoryCostBytes -= costSplit.getMemoryCostBytes();
+    }
+    // Distribute remaining cost equally among empty splits
+    int numEmptySplits = emptySplits.size();
+    long shareCpuCostNs = totalCpuCostNs / numEmptySplits;
+    long shareMemoryCostBytes = totalMemoryCostBytes / numEmptySplits;
+    for (CostSplit costSplit : emptySplits) {
+      costSplit.setCpuCostNs(shareCpuCostNs);
+      costSplit.setMemoryCostBytes(shareMemoryCostBytes);
+    }
+    // Add empty and non-empty splits back together
+    costSplits.clear();
+    List<CostSplit> mergedCostSplits = new ArrayList<>();
+    mergedCostSplits.addAll(nonEmptySplits);
+    mergedCostSplits.addAll(emptySplits);
+    // Set merged cost splits back to nodeConfig
+    nodeConfig.getPropagationScheme().setCostSplits(mergedCostSplits);
   }
 }

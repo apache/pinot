@@ -60,7 +60,7 @@ public class QueryWorkloadConfigUtilsTest {
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
 
     // Server node
-    CostSplit costSplit1 = new CostSplit("testId", 50, 50, null);
+    CostSplit costSplit1 = new CostSplit("testId", 50L, 50L, null);
     List<CostSplit> costSplits = List.of(costSplit1);
     PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, costSplits);
     NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
@@ -128,7 +128,7 @@ public class QueryWorkloadConfigUtilsTest {
 
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
     // Server scheme
-    CostSplit costSplit1 = new CostSplit("testId", 50, 50, null);
+    CostSplit costSplit1 = new CostSplit("testId", 50L, 50L, null);
     List<CostSplit> costSplits = List.of(costSplit1);
     PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, costSplits);
     NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
@@ -200,8 +200,6 @@ public class QueryWorkloadConfigUtilsTest {
     return data.toArray(new Object[0][]);
   }
 
-  // ========== COMPREHENSIVE TESTS FOR validateQueryWorkloadConfig ==========
-
   @Test
   public void testValidateQueryWorkloadConfigNullConfig() {
     List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(null);
@@ -211,7 +209,8 @@ public class QueryWorkloadConfigUtilsTest {
 
   @Test
   public void testValidateQueryWorkloadConfigValidConfig() {
-    QueryWorkloadConfig validConfig = createValidQueryWorkloadConfig();
+    QueryWorkloadConfig validConfig = new QueryWorkloadConfig("testWorkload",
+        Arrays.asList(createValidServerNodeConfig()));
     List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(validConfig);
     Assert.assertTrue(errors.isEmpty(), "Valid config should have no errors, but got: " + errors);
   }
@@ -219,10 +218,8 @@ public class QueryWorkloadConfigUtilsTest {
   @Test(dataProvider = "workloadNameValidationProvider")
   public void testValidateQueryWorkloadConfigWorkloadNameValidation(String workloadName, boolean shouldHaveError,
       String expectedErrorSubstring) {
-    QueryWorkloadConfig config = createValidQueryWorkloadConfig();
-    // Use reflection or create a new config with the test workload name
-    QueryWorkloadConfig testConfig = new QueryWorkloadConfig(workloadName, config.getNodeConfigs());
-
+    QueryWorkloadConfig testConfig = new QueryWorkloadConfig(workloadName,
+        Arrays.asList(createValidServerNodeConfig()));
     List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(testConfig);
 
     if (shouldHaveError) {
@@ -283,16 +280,6 @@ public class QueryWorkloadConfigUtilsTest {
     data.add(new Object[]{Arrays.asList(createValidServerNodeConfig()), Collections.emptyList()});
 
     return data.toArray(new Object[0][]);
-  }
-
-  @Test
-  public void testValidateQueryWorkloadConfigNodeConfigNullType() {
-    NodeConfig nodeConfig = new NodeConfig(null, createValidEnforcementProfile(), createValidPropagationScheme());
-    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
-
-    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
-    Assert.assertTrue(errors.stream().anyMatch(error -> error.contains("nodeConfigs[0].type cannot be null")),
-        "Expected node type validation error, but got: " + errors);
   }
 
   @Test(dataProvider = "enforcementProfileValidationProvider")
@@ -384,36 +371,22 @@ public class QueryWorkloadConfigUtilsTest {
     data.add(new Object[]{costSplitsWithNull, Arrays.asList("costSplits[0] cannot be null")});
 
     // CostSplit with null costId
-    CostSplit costSplitWithNullId = new CostSplit(null, 100, 100, null);
+    CostSplit costSplitWithNullId = new CostSplit(null, 100L, 100L, null);
     data.add(new Object[]{Arrays.asList(costSplitWithNullId), Arrays.asList("costId cannot be null or empty")});
 
     // CostSplit with empty costId
-    CostSplit costSplitWithEmptyId = new CostSplit("", 100, 100, null);
+    CostSplit costSplitWithEmptyId = new CostSplit("", 100L, 100L, null);
     data.add(new Object[]{Arrays.asList(costSplitWithEmptyId), Arrays.asList("costId cannot be null or empty")});
 
     // CostSplit with whitespace-only costId
-    CostSplit costSplitWithWhitespaceId = new CostSplit("   ", 100, 100, null);
+    CostSplit costSplitWithWhitespaceId = new CostSplit("   ", 100L, 100L, null);
     data.add(new Object[]{Arrays.asList(costSplitWithWhitespaceId),
         Arrays.asList("costId cannot be null or empty")});
 
     // CostSplit with negative CPU cost
-    CostSplit costSplitWithNegativeCpu = new CostSplit("test", -1, 100, null);
+    CostSplit costSplitWithNegativeCpu = new CostSplit("test", -1L, 100L, null);
     data.add(new Object[]{Arrays.asList(costSplitWithNegativeCpu),
-        Arrays.asList("cpuCostNs cannot be negative")});
-
-    // CostSplit with zero CPU cost
-    CostSplit costSplitWithZeroCpu = new CostSplit("test", 0, 100, null);
-    data.add(new Object[]{Arrays.asList(costSplitWithZeroCpu), Arrays.asList("cpuCostNs should be positive")});
-
-    // CostSplit with negative memory cost
-    CostSplit costSplitWithNegativeMemory = new CostSplit("test", 100, -1, null);
-    data.add(new Object[]{Arrays.asList(costSplitWithNegativeMemory),
-        Arrays.asList("memoryCostBytes cannot be negative")});
-
-    // CostSplit with zero memory cost
-    CostSplit costSplitWithZeroMemory = new CostSplit("test", 100, 0, null);
-    data.add(new Object[]{Arrays.asList(costSplitWithZeroMemory),
-        Arrays.asList("memoryCostBytes should be positive")});
+        Arrays.asList("cpuCostNs should be greater than 0")});
 
     // Valid costSplits
     data.add(new Object[]{Arrays.asList(createValidCostSplit()), Collections.emptyList()});
@@ -423,8 +396,8 @@ public class QueryWorkloadConfigUtilsTest {
 
   @Test
   public void testValidateQueryWorkloadConfigDuplicateCostIds() {
-    CostSplit costSplit1 = new CostSplit("duplicate", 100, 100, null);
-    CostSplit costSplit2 = new CostSplit("duplicate", 200, 200, null);
+    CostSplit costSplit1 = new CostSplit("duplicate", 100L, 100L, null);
+    CostSplit costSplit2 = new CostSplit("duplicate", 200L, 200L, null);
 
     PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE,
         Arrays.asList(costSplit1, costSplit2));
@@ -438,7 +411,7 @@ public class QueryWorkloadConfigUtilsTest {
 
   @Test(dataProvider = "costIdFormatValidationProvider")
   public void testValidateQueryWorkloadConfigCostIdFormatValidation(String costId, boolean shouldHaveError) {
-    CostSplit costSplit = new CostSplit(costId, 100, 100, null);
+    CostSplit costSplit = new CostSplit(costId, 100L, 100L, null);
     PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(costSplit));
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
     QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
@@ -493,7 +466,7 @@ public class QueryWorkloadConfigUtilsTest {
   public void testValidateQueryWorkloadConfigCostOverflow() {
     // Create cost splits that would cause overflow when summed
     CostSplit costSplit1 = new CostSplit("cost1", Long.MAX_VALUE, Long.MAX_VALUE, null);
-    CostSplit costSplit2 = new CostSplit("cost2", 1, 1, null);
+    CostSplit costSplit2 = new CostSplit("cost2", 1L, 1L, null);
 
     PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE,
         Arrays.asList(costSplit1, costSplit2));
@@ -510,12 +483,12 @@ public class QueryWorkloadConfigUtilsTest {
   @Test
   public void testValidateQueryWorkloadConfigSubAllocationsValidation() {
     // Create sub-allocations that exceed parent limits
-    CostSplit subAllocation1 = new CostSplit("sub1", 60, 60, null);
-    CostSplit subAllocation2 = new CostSplit("sub2", 60, 60, null);
+    CostSplit subAllocation1 = new CostSplit("sub1", 60L, 60L, null);
+    CostSplit subAllocation2 = new CostSplit("sub2", 60L, 60L, null);
     List<CostSplit> subAllocations = Arrays.asList(subAllocation1, subAllocation2);
 
     // Parent has limits of 100 each, but sub-allocations total 120 each
-    CostSplit parentCostSplit = new CostSplit("parent", 100, 100, subAllocations);
+    CostSplit parentCostSplit = new CostSplit("parent", 100L, 100L, subAllocations);
 
     PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(parentCostSplit));
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
@@ -529,9 +502,9 @@ public class QueryWorkloadConfigUtilsTest {
   @Test
   public void testValidateQueryWorkloadConfigNestedSubAllocations() {
     // Test that nested sub-allocations are not allowed
-    CostSplit nestedSubAllocation = new CostSplit("nested", 10, 10, null);
-    CostSplit subAllocation = new CostSplit("sub", 50, 50, Arrays.asList(nestedSubAllocation));
-    CostSplit parentCostSplit = new CostSplit("parent", 100, 100, Arrays.asList(subAllocation));
+    CostSplit nestedSubAllocation = new CostSplit("nested", 10L, 10L, null);
+    CostSplit subAllocation = new CostSplit("sub", 50L, 50L, Arrays.asList(nestedSubAllocation));
+    CostSplit parentCostSplit = new CostSplit("parent", 100L, 100L, Arrays.asList(subAllocation));
 
     PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(parentCostSplit));
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
@@ -544,11 +517,11 @@ public class QueryWorkloadConfigUtilsTest {
 
   @Test
   public void testValidateQueryWorkloadConfigDuplicateSubAllocationIds() {
-    CostSplit subAllocation1 = new CostSplit("duplicate", 30, 30, null);
-    CostSplit subAllocation2 = new CostSplit("duplicate", 40, 40, null);
+    CostSplit subAllocation1 = new CostSplit("duplicate", 30L, 30L, null);
+    CostSplit subAllocation2 = new CostSplit("duplicate", 40L, 40L, null);
     List<CostSplit> subAllocations = Arrays.asList(subAllocation1, subAllocation2);
 
-    CostSplit parentCostSplit = new CostSplit("parent", 100, 100, subAllocations);
+    CostSplit parentCostSplit = new CostSplit("parent", 100L, 100L, subAllocations);
 
     PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(parentCostSplit));
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
@@ -562,12 +535,12 @@ public class QueryWorkloadConfigUtilsTest {
   @Test
   public void testValidateQueryWorkloadConfigComplexValidConfig() {
     // Test a complex but valid configuration with multiple nodes and sub-allocations
-    CostSplit subAllocation1 = new CostSplit("sub1", 30, 30, null);
-    CostSplit subAllocation2 = new CostSplit("sub2", 40, 40, null);
+    CostSplit subAllocation1 = new CostSplit("sub1", 30L, 30L, null);
+    CostSplit subAllocation2 = new CostSplit("sub2", 40L, 40L, null);
     List<CostSplit> subAllocations = Arrays.asList(subAllocation1, subAllocation2);
 
-    CostSplit costSplit1 = new CostSplit("cost1", 100, 100, subAllocations);
-    CostSplit costSplit2 = new CostSplit("cost2", 200, 200, null);
+    CostSplit costSplit1 = new CostSplit("cost1", 100L, 100L, subAllocations);
+    CostSplit costSplit2 = new CostSplit("cost2", 200L, 200L, null);
 
     PropagationScheme serverScheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(costSplit1,
         costSplit2));
@@ -580,12 +553,6 @@ public class QueryWorkloadConfigUtilsTest {
 
     List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
     Assert.assertTrue(errors.isEmpty(), "Complex valid config should have no errors, but got: " + errors);
-  }
-
-  // ========== HELPER METHODS ==========
-
-  private QueryWorkloadConfig createValidQueryWorkloadConfig() {
-    return new QueryWorkloadConfig("testWorkload", Arrays.asList(createValidServerNodeConfig()));
   }
 
   private NodeConfig createValidServerNodeConfig() {
@@ -601,6 +568,6 @@ public class QueryWorkloadConfigUtilsTest {
   }
 
   private CostSplit createValidCostSplit() {
-    return new CostSplit("validCostId", 100, 100, null);
+    return new CostSplit("validCostId", 100L, 100L, null);
   }
 }

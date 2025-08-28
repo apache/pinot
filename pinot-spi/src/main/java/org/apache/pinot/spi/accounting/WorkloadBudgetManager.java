@@ -33,7 +33,7 @@ public class WorkloadBudgetManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
 
   private long _enforcementWindowMs;
-  private final ConcurrentHashMap<String, Budget> _workloadBudgets = new ConcurrentHashMap<>();
+  private ConcurrentHashMap<String, Budget> _workloadBudgets;
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
   private volatile boolean _isEnabled;
 
@@ -45,6 +45,7 @@ public class WorkloadBudgetManager {
       LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
       return;
     }
+    _workloadBudgets = new ConcurrentHashMap<>();
     _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
     initSecondaryWorkloadBudget(config);
@@ -114,8 +115,20 @@ public class WorkloadBudgetManager {
   }
 
   public void deleteWorkload(String workload) {
+    if (!_isEnabled) {
+      LOGGER.info("WorkloadBudgetManager is disabled. Not deleting workload: {}", workload);
+      return;
+    }
     _workloadBudgets.remove(workload);
-    LOGGER.info("Deleted workload: {}", workload);
+    LOGGER.info("Removed workload: {}", workload);
+  }
+
+  /**
+   * Collects workload stats for CPU and memory usage.
+   * Could be overridden for custom implementations
+   */
+  protected void collectWorkloadStats(String workload, BudgetStats stats) {
+    // Default implementation does nothing.
   }
 
   /**
@@ -124,13 +137,13 @@ public class WorkloadBudgetManager {
    */
   public BudgetStats tryCharge(String workload, long cpuUsedNs, long memoryUsedBytes) {
     if (!_isEnabled) {
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE);
+      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
-    Budget budget = _workloadBudgets.get(workload);
+      Budget budget = _workloadBudgets.get(workload);
     if (budget == null) {
       LOGGER.warn("No budget found for workload: {}", workload);
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE);
+      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
     return budget.tryCharge(cpuUsedNs, memoryUsedBytes);
   }
@@ -140,11 +153,11 @@ public class WorkloadBudgetManager {
    */
   public BudgetStats getRemainingBudgetForWorkload(String workload) {
     if (!_isEnabled) {
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE);
+      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
     Budget budget = _workloadBudgets.get(workload);
-    return budget != null ? budget.getStats() : new BudgetStats(0, 0);
+    return budget != null ? budget.getStats() : new BudgetStats(0, 0, 0, 0);
   }
 
   /**
@@ -152,22 +165,32 @@ public class WorkloadBudgetManager {
    */
   public BudgetStats getRemainingBudgetAcrossAllWorkloads() {
     if (!_isEnabled) {
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE);
+      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
-
+    long totalCpuBudget =
+        _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._initialCpuBudget).sum();
+    long totalMemoryBudget =
+        _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._initialMemoryBudget).sum();
     long totalCpuRemaining =
         _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._cpuRemaining).sum();
     long totalMemRemaining =
         _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._memoryRemaining).sum();
-    return new BudgetStats(totalCpuRemaining, totalMemRemaining);
+    return new BudgetStats(totalCpuBudget, totalMemoryBudget, totalCpuRemaining, totalMemRemaining);
+  }
+
+  public BudgetStats getBudgetStats(String workload) {
+    if (!_isEnabled) {
+      return null;
+    }
+    Budget budget = _workloadBudgets.get(workload);
+    return budget != null ? budget.getStats() : null;
   }
 
   /**
    * Periodically resets budgets at the end of each enforcement window (Thread-Safe).
    */
   private void startBudgetResetTask() {
-    // TODO(Vivek): Reduce logging verbosity. Maybe make it debug logs.
-    LOGGER.info("Starting budget reset task with enforcement window: {}ms", _enforcementWindowMs);
+    LOGGER.debug("Starting budget reset task with enforcement window: {}ms", _enforcementWindowMs);
     _resetScheduler.scheduleAtFixedRate(() -> {
       LOGGER.debug("Resetting all workload budgets.");
       // Also print the budget used in the last enforcement window.
@@ -175,6 +198,7 @@ public class WorkloadBudgetManager {
         BudgetStats stats = budget.getStats();
         LOGGER.debug("Workload: {} -> CPU: {}ns, Memory: {} bytes", workload, stats._cpuRemaining,
             stats._memoryRemaining);
+        collectWorkloadStats(workload, stats);
         // Reset the budget.
         budget.reset();
       });
@@ -211,15 +235,21 @@ public class WorkloadBudgetManager {
     BudgetStats stats = budget.getStats();
     return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
   }
-
   /**
-   * Represents remaining budget stats.
+   * Internal class representing budget statistics.
+   * It contains initial CPU and memory budgets that are configured during workload registration,
+   * as well as the remaining CPU and memory budgets during runtime in an enforcement window.
    */
   public static class BudgetStats {
+    public final long _initialCpuBudget;
+    public final long _initialMemoryBudget;
+
     public final long _cpuRemaining;
     public final long _memoryRemaining;
 
-    public BudgetStats(long cpuRemaining, long memoryRemaining) {
+    public BudgetStats(long cpuBudgetNs, long memoryBudgetBytes, long cpuRemaining, long memoryRemaining) {
+      _initialCpuBudget = cpuBudgetNs;
+      _initialMemoryBudget = memoryBudgetBytes;
       _cpuRemaining = cpuRemaining;
       _memoryRemaining = memoryRemaining;
     }
@@ -252,7 +282,7 @@ public class WorkloadBudgetManager {
       _memoryRemaining.addAndGet(-memoryUsedBytes);
       _cpuRemaining.addAndGet(-cpuUsedNs);
 
-      return new BudgetStats(_cpuRemaining.get(), _memoryRemaining.get());
+      return new BudgetStats(_initialCpuBudget, _initialMemoryBudget, _cpuRemaining.get(), _memoryRemaining.get());
     }
 
     /**
@@ -267,7 +297,7 @@ public class WorkloadBudgetManager {
      * Gets the current remaining budget.
      */
     public BudgetStats getStats() {
-      return new BudgetStats(_cpuRemaining.get(), _memoryRemaining.get());
+      return new BudgetStats(_initialCpuBudget, _initialMemoryBudget, _cpuRemaining.get(), _memoryRemaining.get());
     }
   }
 }

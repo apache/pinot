@@ -60,8 +60,8 @@ public class PropagationSchemeTest {
   @Test
   public void testTablePropagationScheme() {
     EnforcementProfile profile = new EnforcementProfile(100, 100);
-    CostSplit split1 = new CostSplit("table1", 50, 50, null);
-    CostSplit split2 = new CostSplit("table2", 50, 50, null);
+    CostSplit split1 = new CostSplit("table1", 50L, 50L, null);
+    CostSplit split2 = new CostSplit("table2", 50L, 50L, null);
     PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(split1, split2));
 
     // Mock the behavior of getAllTableConfigs to return the list of table configurations
@@ -101,8 +101,8 @@ public class PropagationSchemeTest {
 
     // Case 3 : Test for cost split for table1 and table2 with sub-allocations for servers in table2
     // Add SubAllocation for table2 (realtime)
-    CostSplit subSplit1 = new CostSplit("serverTag2_REALTIME", 25, 25, null); // Consuming
-    CostSplit subSplit2 = new CostSplit("serverTag2CompletedOffline", 25, 25, null); // Completed
+    CostSplit subSplit1 = new CostSplit("serverTag2_REALTIME", 25L, 25L, null); // Consuming
+    CostSplit subSplit2 = new CostSplit("serverTag2CompletedOffline", 25L, 25L, null); // Completed
     split2.setSubAllocations(List.of(subSplit1, subSplit2));
     // Add instance for completed tenant
     instanceConfigs.add(createInstanceConfig("instance5", List.of("serverTag2CompletedOffline")));
@@ -128,8 +128,8 @@ public class PropagationSchemeTest {
   @Test
   public void testTenantPropagationScheme() {
     EnforcementProfile profile = new EnforcementProfile(100, 100);
-    CostSplit split1 = new CostSplit("tenant1", 50, 50, null);
-    CostSplit split2 = new CostSplit("tenant2", 50, 50, null);
+    CostSplit split1 = new CostSplit("tenant1", 50L, 50L, null);
+    CostSplit split2 = new CostSplit("tenant2", 50L, 50L, null);
     PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT, List.of(split1, split2));
     // Mock the behavior of getAllHelixInstanceConfigs to return the list of instance configurations
     List<InstanceConfig> instanceConfigs = new ArrayList<>();
@@ -169,8 +169,8 @@ public class PropagationSchemeTest {
 
     // Case 4 : Test for exception when sub-allocations are present in tenant propagation scheme,
     // since it's not supported
-    CostSplit subSplit1 = new CostSplit("table1", 25, 25, null);
-    CostSplit subSplit2 = new CostSplit("table2", 25, 25, null);
+    CostSplit subSplit1 = new CostSplit("table1", 25L, 25L, null);
+    CostSplit subSplit2 = new CostSplit("table2", 25L, 25L, null);
     split1.setSubAllocations(List.of(subSplit1, subSplit2));
     try {
       _tenantPropagationScheme.resolveInstanceCostMap(nodeConfigServer, _costSplitter);

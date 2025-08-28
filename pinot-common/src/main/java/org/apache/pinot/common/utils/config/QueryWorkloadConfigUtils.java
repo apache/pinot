@@ -285,40 +285,51 @@ public class QueryWorkloadConfigUtils {
           errors.add(costSplitPrefix + ".costId '" + costId + "' contains invalid characters");
         }
       }
+      // Validate that either both costs are null or both are non-null when sub-allocations exist
+      boolean hasCpuCost = costSplit.getCpuCostNs() != null;
+      boolean hasMemoryCost = costSplit.getMemoryCostBytes() != null;
+      boolean hasSubAllocations = costSplit.getSubAllocations() != null;
 
+      if ((hasCpuCost != hasMemoryCost)) {
+        errors.add(costSplitPrefix + ".cpuCostNs and memoryCostBytes must either both be null or both be non-null");
+        if (hasSubAllocations) {
+          errors.add(costSplitPrefix + ".subAllocations must be null when costs are null");
+        }
+        continue;
+      }
       // Validate CPU cost
-      long cpuCostNs = costSplit.getCpuCostNs();
-      if (cpuCostNs < 0) {
-        errors.add(costSplitPrefix + ".cpuCostNs cannot be negative, got: " + cpuCostNs);
-      } else if (cpuCostNs == 0) {
-        errors.add(costSplitPrefix + ".cpuCostNs should be positive, got: " + cpuCostNs);
-      } else {
-        // Check for potential overflow when summing
-        if (totalCpuCost > Long.MAX_VALUE - cpuCostNs) {
-          errors.add(prefix + " total CPU cost would overflow");
+      Long cpuCostNs = costSplit.getCpuCostNs();
+      if (cpuCostNs != null) {
+        if (cpuCostNs <= 0) {
+          errors.add(costSplitPrefix + ".cpuCostNs should be greater than 0, got: " + cpuCostNs);
         } else {
-          totalCpuCost += cpuCostNs;
+          // Check for potential overflow when summing
+          if (totalCpuCost > Long.MAX_VALUE - cpuCostNs) {
+            errors.add(prefix + " total CPU cost would overflow");
+          } else {
+            totalCpuCost += cpuCostNs;
+          }
         }
       }
 
       // Validate memory cost
-      long memoryCostBytes = costSplit.getMemoryCostBytes();
-      if (memoryCostBytes < 0) {
-        errors.add(costSplitPrefix + ".memoryCostBytes cannot be negative, got: " + memoryCostBytes);
-      } else if (memoryCostBytes == 0) {
-        errors.add(costSplitPrefix + ".memoryCostBytes should be positive, got: " + memoryCostBytes);
-      } else {
-        // Check for potential overflow when summing
-        if (totalMemoryCost > Long.MAX_VALUE - memoryCostBytes) {
-          errors.add(prefix + " total memory cost would overflow");
+      Long memoryCostBytes = costSplit.getMemoryCostBytes();
+      if (memoryCostBytes != null) {
+        if (memoryCostBytes <= 0) {
+          errors.add(costSplitPrefix + ".memoryCostBytes should be greater than 0, got: " + memoryCostBytes);
         } else {
-          totalMemoryCost += memoryCostBytes;
+          // Check for potential overflow when summing
+          if (totalMemoryCost > Long.MAX_VALUE - memoryCostBytes) {
+            errors.add(prefix + " total memory cost would overflow");
+          } else {
+            totalMemoryCost += memoryCostBytes;
+          }
         }
       }
 
       // Validate sub-allocations (recursive validation)
       List<CostSplit> subAllocations = costSplit.getSubAllocations();
-      if (subAllocations != null && !subAllocations.isEmpty()) {
+      if (subAllocations != null && !subAllocations.isEmpty() && cpuCostNs != null && memoryCostBytes != null) {
         validateCostSplitSubAllocations(subAllocations, costSplitPrefix + ".subAllocations",
                                       cpuCostNs, memoryCostBytes, errors);
       }

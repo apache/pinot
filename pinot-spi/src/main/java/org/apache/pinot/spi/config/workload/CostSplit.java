@@ -29,11 +29,11 @@ public class CostSplit extends BaseJsonConfig {
   @JsonPropertyDescription("Describes the unique identifier for cost allocation could be a table,tenant etc.")
   private String _costId;
 
-  @JsonPropertyDescription("Max CPU cost allowed for the cost id")
-  private long _cpuCostNs;
+  @JsonPropertyDescription("Max CPU cost allowed for the cost id, if not specified, inherited from parent")
+  private Long _cpuCostNs;
 
-  @JsonPropertyDescription("Max memory cost allowed for the cost id")
-  private long _memoryCostBytes;
+  @JsonPropertyDescription("Max memory cost allowed for the cost id, if not specified, inherited from parent")
+  private Long _memoryCostBytes;
 
   /**
    * Optional nested allocations. Omitted or empty when not used.
@@ -45,8 +45,8 @@ public class CostSplit extends BaseJsonConfig {
 
   @JsonCreator
   public CostSplit(@JsonProperty("costId") String costId,
-                   @JsonProperty("cpuCostNs") long cpuCostNs,
-                   @JsonProperty("memoryCostBytes") long memoryCostBytes,
+                   @Nullable @JsonProperty("cpuCostNs") Long cpuCostNs,
+                   @Nullable @JsonProperty("memoryCostBytes") Long memoryCostBytes,
                    @Nullable @JsonProperty("subAllocations") List<CostSplit> subAllocations) {
     _costId = costId;
     _cpuCostNs = cpuCostNs;
@@ -58,11 +58,13 @@ public class CostSplit extends BaseJsonConfig {
     return _costId;
   }
 
-  public long getCpuCostNs() {
+  @Nullable
+  public Long getCpuCostNs() {
     return _cpuCostNs;
   }
 
-  public long getMemoryCostBytes() {
+  @Nullable
+  public Long getMemoryCostBytes() {
     return _memoryCostBytes;
   }
 

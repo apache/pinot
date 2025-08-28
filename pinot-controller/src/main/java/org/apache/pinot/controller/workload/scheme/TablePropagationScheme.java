@@ -101,7 +101,8 @@ public class TablePropagationScheme implements PropagationScheme {
     NodeConfig.Type nodeType = nodeConfig.getNodeType();
     for (CostSplit costSplit : nodeConfig.getPropagationScheme().getCostSplits()) {
       // Gives a mapping of helix tag to instances for this cost split
-      // e.g. "myTable_OFFLINE" -> {"Server_1", "Server_2"} we get it this way to check for sub-allocations later
+      // e.g. "myTable_REALTIME" -> {"Server_1", "Server_2"}, "myTableCompleted_OFFLINE" -> {"Server_3", "Server_4"}
+      // we get it this way to check for sub-allocations later that are based on helix tags
       Map<String, Set<String>> instancesByTag = resolveInstancesByHelixTag(costSplit, nodeType,
           tableWithTypeToHelixTags, helixTagToInstances);
       if (instancesByTag.isEmpty()) {
