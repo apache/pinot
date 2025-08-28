@@ -20,6 +20,7 @@ package org.apache.pinot.common.audit;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.StringJoiner;
 
 
 /**
@@ -108,9 +109,13 @@ public final class AuditConfig {
 
   @Override
   public String toString() {
-    return "AuditConfig{" + "enabled=" + _enabled + ", captureRequestPayload=" + _captureRequestPayload
-        + ", captureRequestHeaders='" + _captureRequestHeaders + "', maxPayloadSize=" + _maxPayloadSize
-        + ", excludedEndpoints='" + _excludedEndpoints + "', identityHeader='" + _useridHeader
-        + "', jwtClaimName='" + _useridJwtClaimName + "'}";
+    return new StringJoiner(", ", AuditConfig.class.getSimpleName() + "[", "]").add("_enabled=" + _enabled)
+        .add("_captureRequestPayload=" + _captureRequestPayload)
+        .add("_captureRequestHeaders='" + _captureRequestHeaders + "'")
+        .add("_maxPayloadSize=" + _maxPayloadSize)
+        .add("_excludedEndpoints='" + _excludedEndpoints + "'")
+        .add("_useridHeader='" + _useridHeader + "'")
+        .add("_useridJwtClaimName='" + _useridJwtClaimName + "'")
+        .toString();
   }
 }

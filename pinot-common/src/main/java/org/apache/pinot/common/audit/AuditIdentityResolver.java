@@ -30,6 +30,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
+/**
+ * Resolves user identity for audit logging purposes from HTTP request contexts.
+ * <p>
+ * This resolver supports multiple identity resolution strategies in order of priority:
+ * <ol>
+ *   <li>Custom identity header - as configured in the audit configuration</li>
+ *   <li>JWT token in Authorization header - extracting principal from JWT claims</li>
+ * </ol>
+ * <p>
+ * The resolver is designed to be used in a JAX-RS environment where HTTP request
+ * context is available through {@link ContainerRequestContext}.
+ *
+ * @since 1.0
+ */
 @Singleton
 public class AuditIdentityResolver {
 
@@ -43,6 +57,22 @@ public class AuditIdentityResolver {
     _configManager = configManager;
   }
 
+  /**
+   * Resolves user identity from the given HTTP request context.
+   * <p>
+   * The resolution follows a priority order:
+   * <ol>
+   *   <li>Check for a custom identity header as specified in the audit configuration</li>
+   *   <li>Extract principal from JWT token in the Authorization header</li>
+   * </ol>
+   * <p>
+   * If no identity can be resolved from any of the above methods, this method returns {@code null}
+   * rather than creating an anonymous identity.
+   *
+   * @param requestContext the HTTP request context containing headers and other request information
+   * @return a {@link AuditEvent.UserIdentity} containing the resolved principal, or {@code null} if no identity
+   * could be resolved
+   */
   public AuditEvent.UserIdentity resolveIdentity(ContainerRequestContext requestContext) {
     AuditConfig config = _configManager.getCurrentConfig();
 
@@ -60,7 +90,7 @@ public class AuditIdentityResolver {
     if (StringUtils.isNotBlank(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
       String token = authHeader.substring(BEARER_PREFIX.length()).trim();
       String principal = extractJwtPrincipal(token, config.getUseridJwtClaimName());
-      if (principal != null) {
+      if (StringUtils.isNotBlank(principal)) {
         return new AuditEvent.UserIdentity().setPrincipal(principal);
       }
     }
