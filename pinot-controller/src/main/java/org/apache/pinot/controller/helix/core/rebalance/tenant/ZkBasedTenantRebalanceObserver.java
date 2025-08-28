@@ -44,10 +44,12 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   private final TenantRebalanceContext _tenantRebalanceContext;
   // Keep track of number of updates. Useful during debugging.
   private int _numUpdatesToZk;
+  private boolean _isDone;
 
   public ZkBasedTenantRebalanceObserver(String jobId, String tenantName, TenantRebalanceProgressStats progressStats,
       TenantRebalanceContext tenantRebalanceContext,
       PinotHelixResourceManager pinotHelixResourceManager) {
+    _isDone = false;
     _jobId = jobId;
     _tenantName = tenantName;
     _unprocessedTables = progressStats.getTableStatusMap()
@@ -99,6 +101,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     _progressStats.setCompletionStatusMsg(msg);
     _progressStats.setTimeToFinishInSeconds((System.currentTimeMillis() - _progressStats.getStartTimeMs()) / 1000);
     syncStatsAndContextInZk();
+    _isDone = true;
   }
 
   @Override
@@ -106,6 +109,7 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     _progressStats.setCompletionStatusMsg(errorMsg);
     _progressStats.setTimeToFinishInSeconds(System.currentTimeMillis() - _progressStats.getStartTimeMs());
     syncStatsAndContextInZk();
+    _isDone = true;
   }
 
   private void syncStatsAndContextInZk() {
@@ -129,5 +133,9 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     _pinotHelixResourceManager.addControllerJobToZK(_jobId, jobMetadata, ControllerJobTypes.TENANT_REBALANCE);
     _numUpdatesToZk++;
     LOGGER.debug("Number of updates to Zk: {} for rebalanceJob: {}  ", _numUpdatesToZk, _jobId);
+  }
+
+  public boolean isDone() {
+    return _isDone;
   }
 }

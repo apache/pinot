@@ -57,6 +57,8 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantRebalanceChecker.class);
   private final TenantRebalancer _tenantRebalancer;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
+  // To avoid multiple retries of the same tenant rebalance job, we only allow one ongoing retry job at a time.
+  private ZkBasedTenantRebalanceObserver _ongoingJobObserver = null;
 
   public TenantRebalanceChecker(ControllerConf config,
       PinotHelixResourceManager pinotHelixResourceManager, TenantRebalancer tenantRebalancer) {
@@ -68,7 +70,9 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
 
   @Override
   protected void runTask(Properties periodicTaskProperties) {
-    checkAndRetryTenantRebalance();
+    if (_ongoingJobObserver == null || _ongoingJobObserver.isDone()) {
+      checkAndRetryTenantRebalance();
+    }
   }
 
   private void checkAndRetryTenantRebalance() {
@@ -111,6 +115,8 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
           // aborted, so that this original job will not be picked up again in the future.
           markTenantRebalanceJobAsAborted(jobId, jobZKMetadata, tenantRebalanceContext, progressStats);
           retryTenantRebalanceJob(retryTenantRebalanceContext, progressStats);
+          // We only retry one stuck tenant rebalance job at a time to avoid multiple retries of the same job
+          return;
         } else {
           LOGGER.info("Tenant rebalance job: {} is not stuck", jobId);
         }
@@ -127,6 +133,7 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContextForRetry.getJobId(),
             tenantRebalanceContextForRetry.getConfig().getTenantName(),
             progressStats, tenantRebalanceContextForRetry, _pinotHelixResourceManager);
+    _ongoingJobObserver = observer;
     _tenantRebalancer.rebalanceWithContext(tenantRebalanceContextForRetry, observer);
   }
 
