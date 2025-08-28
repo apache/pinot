@@ -116,7 +116,7 @@ public class AuditRequestProcessor {
           .setServiceId(extractServiceId(requestContext))
           .setMethod(requestContext.getMethod())
           .setOriginIpAddress(extractClientIpAddress(requestContext, remoteAddr))
-          .setUser(resolveUserIdentity(requestContext))
+          .setUser(_identityResolver.resolveIdentity(requestContext))
           .setRequest(captureRequestPayload(requestContext));
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main request
@@ -132,10 +132,6 @@ public class AuditRequestProcessor {
   private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
     // TODO spyne to be implemented
     return null;
-  }
-
-  private AuditEvent.UserIdentity resolveUserIdentity(ContainerRequestContext requestContext) {
-    return _identityResolver.resolveIdentity(requestContext);
   }
 
   /**

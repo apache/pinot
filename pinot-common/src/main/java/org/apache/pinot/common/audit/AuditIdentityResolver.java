@@ -21,6 +21,7 @@ package org.apache.pinot.common.audit;
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.JWTParser;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
@@ -34,34 +35,53 @@ public class AuditIdentityResolver {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditIdentityResolver.class);
   private static final String BEARER_PREFIX = "Bearer ";
-  private static final String ANONYMOUS_PRINCIPAL = "anonymous";
+
+  @Inject
+  private AuditConfigManager _configManager;
 
   public AuditEvent.UserIdentity resolveIdentity(ContainerRequestContext requestContext) {
-    AuditEvent.UserIdentity userIdentity = new AuditEvent.UserIdentity();
+    AuditConfig config = _configManager.getCurrentConfig();
 
+    // Priority 1: Check custom identity header
+    String identityHeader = config.getIdentityHeader();
+    if (StringUtils.isNotBlank(identityHeader)) {
+      String principal = requestContext.getHeaderString(identityHeader);
+      if (StringUtils.isNotBlank(principal)) {
+        return new AuditEvent.UserIdentity().setPrincipal(principal);
+      }
+    }
+
+    // Priority 2: Check JWT in Authorization header
     String authHeader = requestContext.getHeaderString(HttpHeaders.AUTHORIZATION);
-    if (StringUtils.isBlank(authHeader)) {
-      userIdentity.setPrincipal(ANONYMOUS_PRINCIPAL);
-      return userIdentity;
+    if (StringUtils.isNotBlank(authHeader) && authHeader.startsWith(BEARER_PREFIX)) {
+      String token = authHeader.substring(BEARER_PREFIX.length()).trim();
+      String principal = extractJwtPrincipal(token, config.getJwtClaimName());
+      if (principal != null) {
+        return new AuditEvent.UserIdentity().setPrincipal(principal);
+      }
     }
 
-    if (authHeader.startsWith(BEARER_PREFIX)) {
-      String principal = extractJwtPrincipal(authHeader.substring(BEARER_PREFIX.length()).trim());
-      userIdentity.setPrincipal(principal != null ? principal : ANONYMOUS_PRINCIPAL);
-      return userIdentity;
-    }
-
-    userIdentity.setPrincipal(ANONYMOUS_PRINCIPAL);
-    return userIdentity;
+    // Return null instead of anonymous
+    return null;
   }
 
-  private String extractJwtPrincipal(String token) {
+  private String extractJwtPrincipal(String token, String claimName) {
     try {
       JWT jwt = JWTParser.parse(token);
       JWTClaimsSet claims = jwt.getJWTClaimsSet();
+
+      // Try configured claim first
+      if (StringUtils.isNotBlank(claimName)) {
+        Object claimValue = claims.getClaim(claimName);
+        if (claimValue != null) {
+          return claimValue.toString();
+        }
+      }
+
+      // Fallback to subject
       return claims.getSubject();
     } catch (Exception e) {
-      LOG.debug("Failed to parse JWT token", e);
+      LOG.error("Failed to parse JWT token", e);
       return null;
     }
   }

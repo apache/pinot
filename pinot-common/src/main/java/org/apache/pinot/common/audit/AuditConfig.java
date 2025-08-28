@@ -44,6 +44,12 @@ public final class AuditConfig {
   @JsonProperty("excluded.endpoints")
   private String _excludedEndpoints = "";
 
+  @JsonProperty("identity.header")
+  private String _identityHeader = "";
+
+  @JsonProperty("identity.jwt.claim")
+  private String _jwtClaimName = "";
+
   public boolean isEnabled() {
     return _enabled;
   }
@@ -84,10 +90,27 @@ public final class AuditConfig {
     _excludedEndpoints = excludedEndpoints;
   }
 
+  public String getIdentityHeader() {
+    return _identityHeader;
+  }
+
+  public void setIdentityHeader(String identityHeader) {
+    _identityHeader = identityHeader;
+  }
+
+  public String getJwtClaimName() {
+    return _jwtClaimName;
+  }
+
+  public void setJwtClaimName(String jwtClaimName) {
+    _jwtClaimName = jwtClaimName;
+  }
+
   @Override
   public String toString() {
     return "AuditConfig{" + "enabled=" + _enabled + ", captureRequestPayload=" + _captureRequestPayload
         + ", captureRequestHeaders='" + _captureRequestHeaders + "', maxPayloadSize=" + _maxPayloadSize
-        + ", excludedEndpoints='" + _excludedEndpoints + "'}";
+        + ", excludedEndpoints='" + _excludedEndpoints + "', identityHeader='" + _identityHeader
+        + "', jwtClaimName='" + _jwtClaimName + "'}";
   }
 }
