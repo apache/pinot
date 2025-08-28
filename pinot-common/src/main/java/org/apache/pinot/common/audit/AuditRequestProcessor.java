@@ -50,6 +50,9 @@ public class AuditRequestProcessor {
   @Inject
   private AuditConfigManager _configManager;
 
+  @Inject
+  private AuditIdentityResolver _identityResolver;
+
   /**
    * Converts a MultivaluedMap into a Map of query parameters.
    * If a key in the MultivaluedMap has a single value, that value is added directly to the resulting map.
@@ -113,7 +116,7 @@ public class AuditRequestProcessor {
           .setServiceId(extractServiceId(requestContext))
           .setMethod(requestContext.getMethod())
           .setOriginIpAddress(extractClientIpAddress(requestContext, remoteAddr))
-          .setUserId(extractUserId(requestContext))
+          .setUser(resolveUserIdentity(requestContext))
           .setRequest(captureRequestPayload(requestContext));
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main request
@@ -131,16 +134,8 @@ public class AuditRequestProcessor {
     return null;
   }
 
-  /**
-   * Extracts user ID from request headers.
-   * Looks for common authentication headers.
-   *
-   * @param requestContext the container request context
-   * @return the user ID or "anonymous" if not found
-   */
-  private String extractUserId(ContainerRequestContext requestContext) {
-    // TODO spyne to be implemented
-    return null;
+  private AuditEvent.UserIdentity resolveUserIdentity(ContainerRequestContext requestContext) {
+    return _identityResolver.resolveIdentity(requestContext);
   }
 
   /**

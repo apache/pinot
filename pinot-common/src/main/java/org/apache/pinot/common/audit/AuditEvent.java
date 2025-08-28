@@ -45,8 +45,8 @@ public class AuditEvent {
   @JsonProperty("origin_ip_address")
   private String _originIpAddress;
 
-  @JsonProperty("user_id")
-  private String _userId;
+  @JsonProperty("user")
+  private UserIdentity _user;
 
   @JsonProperty("request")
   private AuditRequestPayload _request;
@@ -96,12 +96,12 @@ public class AuditEvent {
     return this;
   }
 
-  public String getUserId() {
-    return _userId;
+  public UserIdentity getUser() {
+    return _user;
   }
 
-  public AuditEvent setUserId(String userId) {
-    _userId = userId;
+  public AuditEvent setUser(UserIdentity user) {
+    _user = user;
     return this;
   }
 
@@ -166,6 +166,22 @@ public class AuditEvent {
 
     public AuditRequestPayload setError(String error) {
       _error = error;
+      return this;
+    }
+  }
+
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  public static class UserIdentity {
+
+    @JsonProperty("principal")
+    private String _principal;
+
+    public String getPrincipal() {
+      return _principal;
+    }
+
+    public UserIdentity setPrincipal(String principal) {
+      _principal = principal;
       return this;
     }
   }
