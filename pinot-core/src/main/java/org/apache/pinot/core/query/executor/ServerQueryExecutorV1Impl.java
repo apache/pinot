@@ -278,7 +278,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
       List<String> missingSegments = executionInfo.getMissingSegments();
 
       int numMissingSegments = missingSegments.size();
-      if (numMissingSegments > 0) {
+      if ((numMissingSegments > 0) && (!QueryOptionsUtils.isIgnoreMissingSegments(queryContext.getQueryOptions()))) {
         instanceResponse.addException(QueryErrorCode.SERVER_SEGMENT_MISSING,
             numMissingSegments + " segments " + missingSegments + " missing on server: "
                 + _instanceDataManager.getInstanceId());

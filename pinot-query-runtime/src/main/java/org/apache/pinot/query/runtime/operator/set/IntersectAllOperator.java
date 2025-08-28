@@ -16,27 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.query.runtime.operator;
+package org.apache.pinot.query.runtime.operator.set;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.core.data.table.Record;
+import org.apache.pinot.query.runtime.operator.MultiStageOperator;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
 /**
- * Minus/Except operator.
+ * INTERSECT ALL operator.
  */
-public class MinusOperator extends SetOperator {
-  private static final Logger LOGGER = LoggerFactory.getLogger(MinusOperator.class);
-  private static final String EXPLAIN_NAME = "MINUS";
+public class IntersectAllOperator extends RightRowSetBasedSetOperator {
+  private static final Logger LOGGER = LoggerFactory.getLogger(IntersectAllOperator.class);
+  private static final String EXPLAIN_NAME = "INTERSECT_ALL";
 
-  public MinusOperator(OpChainExecutionContext opChainExecutionContext, List<MultiStageOperator> inputOperators,
+  public IntersectAllOperator(OpChainExecutionContext opChainExecutionContext,
+      List<MultiStageOperator> inputOperators,
       DataSchema dataSchema) {
     super(opChainExecutionContext, inputOperators, dataSchema);
+  }
+
+  @Override
+  public Type getOperatorType() {
+    return Type.INTERSECT;
   }
 
   @Override
@@ -45,24 +51,12 @@ public class MinusOperator extends SetOperator {
   }
 
   @Override
-  public Type getOperatorType() {
-    return Type.MINUS;
-  }
-
-  @Nullable
-  @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
   }
 
   @Override
   protected boolean handleRowMatched(Object[] row) {
-    Record record = new Record(row);
-    if (_rightRowSet.contains(record)) {
-      return false;
-    } else {
-      _rightRowSet.add(record);
-      return true;
-    }
+    return _rightRowSet.remove(new Record(row));
   }
 }

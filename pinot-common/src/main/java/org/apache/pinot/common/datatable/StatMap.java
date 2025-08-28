@@ -58,6 +58,7 @@ public class StatMap<K extends Enum<K> & StatMap.Key> {
   public StatMap(Class<K> keyClass) {
     _keyClass = keyClass;
     // TODO: Study whether this is fine or we should impose a single thread policy in StatMaps
+    // TODO: We might need to synchronize the methods because some methods access the map multiple times
     _map = Collections.synchronizedMap(new EnumMap<>(keyClass));
   }
 

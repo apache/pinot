@@ -47,8 +47,8 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
   public DistinctCountULLAggregationFunction(List<ExpressionContext> arguments) {
     super(arguments.get(0));
     int numExpressions = arguments.size();
-    // This function expects 1 or 2 or 3 arguments.
-    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountHLLPlus expects 1 or 2 arguments, got: %s",
+    // This function expects 1 or 2 arguments.
+    Preconditions.checkArgument(numExpressions <= 2, "DistinctCountULL expects 1 or 2 arguments, got: %s",
         numExpressions);
     if (arguments.size() == 2) {
       _p = arguments.get(1).getLiteral().getIntValue();
@@ -128,19 +128,19 @@ public class DistinctCountULLAggregationFunction extends BaseSingleInputAggregat
       case FLOAT:
         float[] floatValues = blockValSet.getFloatValuesSV();
         for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
+          UltraLogLogUtils.hashObject(floatValues[i]).ifPresent(ull::add);
         }
         break;
       case DOUBLE:
         double[] doubleValues = blockValSet.getDoubleValuesSV();
         for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
+          UltraLogLogUtils.hashObject(doubleValues[i]).ifPresent(ull::add);
         }
         break;
       case STRING:
         String[] stringValues = blockValSet.getStringValuesSV();
         for (int i = 0; i < length; i++) {
-            UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
+          UltraLogLogUtils.hashObject(stringValues[i]).ifPresent(ull::add);
         }
         break;
       default:

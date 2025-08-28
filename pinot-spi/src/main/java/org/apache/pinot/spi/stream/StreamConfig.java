@@ -75,6 +75,10 @@ public class StreamConfig {
 
   private final double _topicConsumptionRateLimit;
 
+  private final boolean _enableOffsetAutoReset;
+  private final int _offsetAutoResetOffsetThreshold;
+  private final long _offsetAutoResetTimeSecThreshold;
+
   private final Map<String, String> _streamConfigMap = new HashMap<>();
 
   // Allow overriding it to use different offset criteria
@@ -199,6 +203,10 @@ public class StreamConfig {
     String rate = streamConfigMap.get(StreamConfigProperties.TOPIC_CONSUMPTION_RATE_LIMIT);
     _topicConsumptionRateLimit = rate != null ? Double.parseDouble(rate) : CONSUMPTION_RATE_LIMIT_NOT_SPECIFIED;
 
+    _enableOffsetAutoReset = Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.ENABLE_OFFSET_AUTO_RESET));
+    _offsetAutoResetOffsetThreshold = parseOffsetAutoResetOffsetThreshold(streamConfigMap);
+    _offsetAutoResetTimeSecThreshold = parseOffsetAutoResetTimeSecThreshold(streamConfigMap);
+
     _streamConfigMap.putAll(streamConfigMap);
   }
 
@@ -310,6 +318,34 @@ public class StreamConfig {
     }
   }
 
+  public static int parseOffsetAutoResetOffsetThreshold(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.OFFSET_AUTO_RESET_OFFSET_THRESHOLD_KEY;
+    String offsetAutoResetOffsetThresholdStr = streamConfigMap.get(key);
+    if (offsetAutoResetOffsetThresholdStr != null) {
+      try {
+        return Integer.parseInt(offsetAutoResetOffsetThresholdStr);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid config " + key + ": " + offsetAutoResetOffsetThresholdStr);
+      }
+    } else {
+      return -1; // Default value indicating disabled
+    }
+  }
+
+  public static long parseOffsetAutoResetTimeSecThreshold(Map<String, String> streamConfigMap) {
+    String key = StreamConfigProperties.OFFSET_AUTO_RESET_TIMESEC_THRESHOLD_KEY;
+    String offsetAutoResetTimeSecThresholdStr = streamConfigMap.get(key);
+    if (offsetAutoResetTimeSecThresholdStr != null) {
+      try {
+        return Long.parseLong(offsetAutoResetTimeSecThresholdStr);
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Invalid config " + key + ": " + offsetAutoResetTimeSecThresholdStr);
+      }
+    } else {
+      return -1; // Default value indicating disabled
+    }
+  }
+
   public String getType() {
     return _type;
   }
@@ -383,6 +419,18 @@ public class StreamConfig {
         : Optional.of(_topicConsumptionRateLimit);
   }
 
+  public boolean isEnableOffsetAutoReset() {
+    return _enableOffsetAutoReset;
+  }
+
+  public int getOffsetAutoResetOffsetThreshold() {
+    return _offsetAutoResetOffsetThreshold;
+  }
+
+  public long getOffsetAutoResetTimeSecThreshold() {
+    return _offsetAutoResetTimeSecThreshold;
+  }
+
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
@@ -402,7 +450,11 @@ public class StreamConfig {
         + _flushThresholdTimeMillis + ", _flushThresholdSegmentSizeBytes=" + _flushThresholdSegmentSizeBytes
         + ", _flushThresholdVarianceFraction=" + _flushThresholdVarianceFraction
         + ", _flushAutotuneInitialRows=" + _flushAutotuneInitialRows + ", _groupId='" + _groupId + '\''
-        + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit + ", _streamConfigMap=" + _streamConfigMap
+        + ", _topicConsumptionRateLimit=" + _topicConsumptionRateLimit
+        + ", _enableOffsetAutoReset=" + _enableOffsetAutoReset
+        + ", _offsetAutoResetOffsetThreshold" + _offsetAutoResetOffsetThreshold
+        + ", _offSetAutoResetTimeSecThreshold" + _offsetAutoResetTimeSecThreshold
+        + ", _streamConfigMap=" + _streamConfigMap
         + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore + '}';
   }
 
@@ -427,7 +479,10 @@ public class StreamConfig {
         && Objects.equals(_consumerFactoryClassName, that._consumerFactoryClassName) && Objects.equals(_decoderClass,
         that._decoderClass) && Objects.equals(_decoderProperties, that._decoderProperties) && Objects.equals(_groupId,
         that._groupId) && Objects.equals(_streamConfigMap, that._streamConfigMap) && Objects.equals(_offsetCriteria,
-        that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction);
+        that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction)
+        && _enableOffsetAutoReset == that._enableOffsetAutoReset
+        && _offsetAutoResetOffsetThreshold == that._offsetAutoResetOffsetThreshold
+        && _offsetAutoResetTimeSecThreshold == that._offsetAutoResetTimeSecThreshold;
   }
 
   @Override
@@ -436,6 +491,7 @@ public class StreamConfig {
         _decoderProperties, _connectionTimeoutMillis, _fetchTimeoutMillis, _idleTimeoutMillis, _flushThresholdRows,
         _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
         _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
-        _serverUploadToDeepStore, _flushThresholdVarianceFraction);
+        _serverUploadToDeepStore, _flushThresholdVarianceFraction, _offsetAutoResetOffsetThreshold,
+        _enableOffsetAutoReset, _offsetAutoResetTimeSecThreshold);
   }
 }

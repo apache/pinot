@@ -56,6 +56,7 @@ import org.apache.calcite.tools.Frameworks;
 import org.apache.calcite.tools.RelBuilder;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.calcite.rel.rules.PinotEnrichedJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotImplicitTableHintRule;
 import org.apache.pinot.calcite.rel.rules.PinotJoinToDynamicBroadcastRule;
 import org.apache.pinot.calcite.rel.rules.PinotQueryRuleSets;
@@ -146,8 +147,12 @@ public class QueryEnvironment {
     String database = config.getDatabase();
     _catalog = new PinotCatalog(config.getTableCache(), database);
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
-    _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
-        .defaultSchema(rootSchema.plus()).sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG).build();
+    _config = Frameworks.newConfigBuilder()
+        .traitDefs()
+        .operatorTable(PinotOperatorTable.instance(config.isNullHandlingEnabled()))
+        .defaultSchema(rootSchema.plus())
+        .sqlToRelConverterConfig(PinotRuleUtils.PINOT_SQL_TO_REL_CONFIG)
+        .build();
     _catalogReader = new PinotCatalogReader(
         rootSchema, List.of(database), _typeFactory, CONNECTION_CONFIG, config.isCaseSensitive());
     // default optProgram with no skip rule options and no use rule options
@@ -155,11 +160,17 @@ public class QueryEnvironment {
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
+    this(database, tableCache, workerManager, true);
+  }
+
+  public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager,
+      boolean nullHandlingEnabled) {
     this(configBuilder()
         .requestId(-1L)
         .database(database)
         .tableCache(tableCache)
         .workerManager(workerManager)
+        .isNullHandlingEnabled(nullHandlingEnabled)
         .build());
   }
 
@@ -170,9 +181,9 @@ public class QueryEnvironment {
     WorkerManager workerManager = getWorkerManager(sqlNodeAndOptions);
     Map<String, String> options = sqlNodeAndOptions.getOptions();
     HepProgram optProgram = _optProgram;
+    Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
     if (MapUtils.isNotEmpty(options)) {
       Set<String> skipRuleSet = QueryOptionsUtils.getSkipPlannerRules(options);
-      Set<String> useRuleSet = QueryOptionsUtils.getUsePlannerRules(options);
       if (!skipRuleSet.isEmpty() || !useRuleSet.isEmpty()) {
         // dynamically create optProgram according to rule options
         optProgram = getOptProgram(skipRuleSet, useRuleSet);
@@ -180,7 +191,7 @@ public class QueryEnvironment {
     }
     boolean usePhysicalOptimizer = QueryOptionsUtils.isUsePhysicalOptimizer(sqlNodeAndOptions.getOptions(),
         _envConfig.defaultUsePhysicalOptimizer());
-    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer);
+    HepProgram traitProgram = getTraitProgram(workerManager, _envConfig, usePhysicalOptimizer, useRuleSet);
     SqlExplainFormat format = SqlExplainFormat.DOT;
     if (sqlNodeAndOptions.getSqlNode().getKind().equals(SqlKind.EXPLAIN)) {
       SqlExplain explain = (SqlExplain) sqlNodeAndOptions.getSqlNode();
@@ -533,6 +544,7 @@ public class QueryEnvironment {
     // Prune duplicate/unnecessary nodes using a single HepInstruction.
     // TODO: We can consider using HepMatchOrder.TOP_DOWN if we find cases where it would help.
     hepProgramBuilder.addRuleCollection(pruneRules);
+
     return hepProgramBuilder.build();
   }
 
@@ -577,7 +589,7 @@ public class QueryEnvironment {
   }
 
   private static HepProgram getTraitProgram(@Nullable WorkerManager workerManager, Config config,
-      boolean usePhysicalOptimizer) {
+      boolean usePhysicalOptimizer, Set<String> useRuleSet) {
     HepProgramBuilder hepProgramBuilder = new HepProgramBuilder();
 
     // Set the match order as BOTTOM_UP.
@@ -590,6 +602,10 @@ public class QueryEnvironment {
         if (isEligibleQueryPostRule(relOptRule, config)) {
           hepProgramBuilder.addRuleInstance(relOptRule);
         }
+      }
+      if (!isRuleSkipped(CommonConstants.Broker.PlannerRuleNames.JOIN_TO_ENRICHED_JOIN, Set.of(), useRuleSet)) {
+        // push filter and project above join to enrichedJoin, does not work with physical optimizer
+        hepProgramBuilder.addRuleCollection(PinotEnrichedJoinRule.PINOT_ENRICHED_JOIN_RULES);
       }
     } else {
       for (RelOptRule relOptRule : PinotQueryRuleSets.PINOT_POST_RULES_V2) {
@@ -640,6 +656,11 @@ public class QueryEnvironment {
      */
     @Nullable
     TableCache getTableCache();
+
+    @Value.Default
+    default boolean isNullHandlingEnabled() {
+      return false;
+    }
 
     /**
      * Whether the schema should be considered case-insensitive.

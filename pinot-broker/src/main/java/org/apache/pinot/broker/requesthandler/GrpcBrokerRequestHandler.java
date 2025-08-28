@@ -63,10 +63,12 @@ public class GrpcBrokerRequestHandler extends BaseSingleStageBrokerRequestHandle
   private final FailureDetector _failureDetector;
 
   // TODO: Support TLS
-  public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId, RoutingManager routingManager,
+  public GrpcBrokerRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, RoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       FailureDetector failureDetector, ThreadResourceUsageAccountant accountant) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
+    super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        accountant);
     _streamingReduceService = new StreamingReduceService(config);
     _streamingQueryClient = new PinotServerStreamingQueryClient(GrpcConfig.buildGrpcQueryConfig(config));
     _failureDetector = failureDetector;

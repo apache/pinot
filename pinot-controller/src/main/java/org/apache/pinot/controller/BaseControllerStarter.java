@@ -59,6 +59,9 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.audit.AuditConfigManager;
+import org.apache.pinot.common.audit.AuditRequestProcessor;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
@@ -218,6 +221,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
+  protected AuditConfigManager _auditConfigManager;
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -540,6 +545,21 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
+    // Initialize cluster config change handler
+    LOGGER.info("Initializing cluster config change handler");
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    try {
+      // Register cluster config change handler with Helix
+      _helixParticipantManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to register cluster config change handler", e);
+    }
+
+    // Initialize audit config manager and register with cluster config change handler
+    LOGGER.info("Initializing audit config manager");
+    _auditConfigManager = new AuditConfigManager();
+    _clusterConfigChangeHandler.registerClusterConfigChangeListener(_auditConfigManager);
+
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
     _segmentCompletionManager =
@@ -627,6 +647,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
+        bind(AuditRequestProcessor.class).to(AuditRequestProcessor.class);
+        bind(_auditConfigManager).to(AuditConfigManager.class);
+
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);

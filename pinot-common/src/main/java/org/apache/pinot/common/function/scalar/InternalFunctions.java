@@ -63,7 +63,7 @@ public class InternalFunctions {
     return QueryThreadContext.getStartTimeMs();
   }
 
-  /// Returns the [deadline][QueryThreadContext#getDeadlineMs] of the query.
+  /// Returns the [deadline][QueryThreadContext#getActiveDeadlineMs()] of the query.
   ///
   /// The input value is not directly used. Instead it is here to control whether the function is called during query
   /// optimization or execution. In order to do the latter, a non-constant value (like a column) should be passed as
@@ -72,7 +72,7 @@ public class InternalFunctions {
   /// This is mostly useful for test and internal usage
   @ScalarFunction
   public static long endTime(String input) {
-    return QueryThreadContext.getDeadlineMs();
+    return QueryThreadContext.getActiveDeadlineMs();
   }
 
   ///  Returns the [broker id][QueryThreadContext#getBrokerId] of the query.

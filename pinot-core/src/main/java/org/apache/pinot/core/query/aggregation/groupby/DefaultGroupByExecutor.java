@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.core.query.aggregation.groupby;
 
-import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -228,8 +228,8 @@ public class DefaultGroupByExecutor implements GroupByExecutor {
   }
 
   @Override
-  public Collection<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer) {
-    return tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, trimSize);
+  public List<IntermediateRecord> trimGroupByResult(int trimSize, TableResizer tableResizer, boolean sortedOutput) {
+    return tableResizer.trimInSegmentResults(_groupKeyGenerator, _groupByResultHolders, trimSize, sortedOutput);
   }
 
   @Override
