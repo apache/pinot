@@ -685,4 +685,37 @@ public class SizeBasedSegmentFlushThresholdComputerTest {
     // 120,000 / 2 = 60,000
     assertEquals(threshold, 60_000);
   }
+
+  @Test
+  public void testCalculateSizeForCalculationWithPreCommitRows() {
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
+
+    // Test with valid pre-commit and post-commit data
+    // Expected: (200_000 * 100_000) / 50_000 = 400_000
+    long result = computer.calculateSizeForCalculation(true, 100_000, 50_000, 200_000);
+    assertEquals(result, 400_000L);
+
+    // Test with pre-commit rows but zero post-commit rows (cannot estimate)
+    // Expected: fallback to post-commit size
+    result = computer.calculateSizeForCalculation(true, 100_000, 0, 200_000);
+    assertEquals(result, 200_000L);
+
+    // Test with high compression (90% reduction)
+    // Expected: (50_000 * 1_000_000) / 100_000 = 500_000
+    result = computer.calculateSizeForCalculation(true, 1_000_000, 100_000, 50_000);
+    assertEquals(result, 500_000L);
+
+  }
+
+  @Test
+  public void testCalculateSizeForCalculationWithoutPreCommitRows() {
+    SizeBasedSegmentFlushThresholdComputer computer = new SizeBasedSegmentFlushThresholdComputer();
+
+    // Test without using pre-commit rows
+    long result = computer.calculateSizeForCalculation(false, 100_000, 50_000, 200_000);
+
+    // Expected: post-commit size directly
+    assertEquals(result, 200_000L);
+  }
+
 }
