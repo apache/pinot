@@ -130,7 +130,7 @@ public class WorkloadBudgetManager {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
-    Budget budget = _workloadBudgets.get(workload);
+      Budget budget = _workloadBudgets.get(workload);
     if (budget == null) {
       LOGGER.warn("No budget found for workload: {}", workload);
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
@@ -219,7 +219,9 @@ public class WorkloadBudgetManager {
     return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
   }
   /**
-   * Represents budget stats.
+   * Internal class representing budget statistics.
+   * It contains initial CPU and memory budgets that are configured during workload registration,
+   * as well as the remaining CPU and memory budgets during runtime in an enforcement window.
    */
   public static class BudgetStats {
     public final long _initialCpuBudget;
