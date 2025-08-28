@@ -77,6 +77,11 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.config.table.ingestion.TransformConfig;
+import org.apache.pinot.spi.config.workload.CostSplit;
+import org.apache.pinot.spi.config.workload.EnforcementProfile;
+import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationScheme;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -4296,5 +4301,105 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       }
     }
     Assert.assertTrue(columnPresent, "Column " + newAddedColumn + " not present in result set");
+  }
+
+  /**
+   * Test QueryWorkloadCost endpoints on all servers for a specific workload
+   */
+  private void testQueryWorkloadCostOnServers(String workloadName) throws Exception {
+    // Get server instances that actually serve this specific table
+    String tableName = getTableName();
+    List<String> serverInstances = getServerInstancesForTable(tableName);
+
+    // Test calling the endpoints on each server that serves this table
+    for (String serverInstance : serverInstances) {
+      testServerQueryWorkloadEndpoints(serverInstance, workloadName);
+    }
+  }
+
+  /**
+   * Get the definitive list of server instances that serve a specific table
+   */
+  private List<String> getServerInstancesForTable(String tableName) throws Exception {
+    // Use the controller API to get server instances for the specific table
+    String url = _controllerRequestURLBuilder.forTableGetServerInstances(tableName);
+    String response = sendGetRequest(url);
+
+    // Parse the JSON response to extract server instance names
+    JsonNode responseJson = JsonUtils.stringToJsonNode(response);
+    JsonNode serverInstancesNode = responseJson.get("server");
+
+    List<String> serverInstances = new ArrayList<>();
+    if (serverInstancesNode != null && serverInstancesNode.isArray()) {
+      for (JsonNode instanceNode : serverInstancesNode) {
+        for (JsonNode instance : instanceNode.get("instances")) {
+          serverInstances.add(instance.asText());
+        }
+      }
+    }
+
+    return serverInstances;
+  }
+
+  /**
+   * Test QueryWorkloadResource endpoints on a specific server instance for a specific workload
+   */
+  private void testServerQueryWorkloadEndpoints(String serverInstance, String workloadName) throws Exception {
+    // Extract host from server instance name (format: Server_hostname_port)
+    String[] parts = serverInstance.split("_");
+    String host = parts[1];
+
+    // Use the proper admin API port (not the netty port from instance name)
+    String serverBaseApiUrl = "http://" + host + ":" + getServerAdminApiPort();
+
+    try {
+      // Test the list workloads endpoint (GET /queryWorkloadCost)
+      String listWorkloadsUrl = serverBaseApiUrl + "/queryWorkloadCost";
+      String listResponse = sendGetRequest(listWorkloadsUrl);
+
+      // Verify response is valid JSON
+      JsonNode listResponseJson = JsonUtils.stringToJsonNode(listResponse);
+      assertNotNull(listResponseJson);
+
+      // Test the get specific workload endpoint (GET /queryWorkloadCost/{workloadName})
+      String getWorkloadUrl = serverBaseApiUrl + "/queryWorkloadCost/" + workloadName;
+      String workloadResponse = sendGetRequest(getWorkloadUrl);
+
+      // Verify response is valid JSON and contains InstanceCost structure
+      JsonNode workloadResponseJson = JsonUtils.stringToJsonNode(workloadResponse);
+      assertNotNull(workloadResponseJson);
+
+      // Verify InstanceCost structure (should have cpuCostNs and memoryCostBytes)
+      assertTrue(workloadResponseJson.has("cpuCostNs"), "Response should contain cpuCostNs field");
+      assertTrue(workloadResponseJson.has("memoryCostBytes"), "Response should contain memoryCostBytes field");
+    } catch (Exception e) {
+      throw e;
+    }
+  }
+
+  @Test
+  public void testQueryWorkloadConfig() throws Exception {
+
+    EnforcementProfile enforcementProfile = new EnforcementProfile(1000, 1000);
+    CostSplit costSplit = new CostSplit(DEFAULT_TABLE_NAME + "_OFFLINE", 1000, 1000, null);
+    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(costSplit));
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
+    QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
+    try {
+      getControllerRequestClient().updateQueryWorkloadConfig(queryWorkloadConfig);
+      TestUtils.waitForCondition(aVoid -> {
+        try {
+          QueryWorkloadConfig retrievedConfig = getControllerRequestClient().getQueryWorkloadConfig("testWorkload");
+          return retrievedConfig != null && retrievedConfig.equals(queryWorkloadConfig);
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }, 60_000L, "Failed to retrieve the created query workload config");
+
+      // Get the instance cost from the server instance
+      testQueryWorkloadCostOnServers("testWorkload");
+    } finally {
+      getControllerRequestClient().deleteQueryWorkloadConfig("testWorkload");
+    }
   }
 }
