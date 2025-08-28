@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import org.apache.pinot.common.proto.Worker;
 import org.apache.pinot.query.runtime.timeseries.serde.TimeSeriesBlockSerde;
-import org.apache.pinot.tsdb.planner.TimeSeriesPlanConstants.WorkerResponseMetadataKeys;
+import org.apache.pinot.spi.utils.CommonConstants.Query.Response.MetadataKeys.TimeSeries;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,13 +50,13 @@ public class TimeSeriesDispatchObserver implements StreamObserver<Worker.TimeSer
 
   @Override
   public void onNext(Worker.TimeSeriesResponse timeSeriesResponse) {
-    if (timeSeriesResponse.containsMetadata(WorkerResponseMetadataKeys.ERROR_TYPE)) {
-      String errorType = timeSeriesResponse.getMetadataOrDefault(WorkerResponseMetadataKeys.ERROR_TYPE, "");
-      String errorMessage = timeSeriesResponse.getMetadataOrDefault(WorkerResponseMetadataKeys.ERROR_MESSAGE, "");
+    if (timeSeriesResponse.containsMetadata(TimeSeries.ERROR_TYPE)) {
+      String errorType = timeSeriesResponse.getMetadataOrDefault(TimeSeries.ERROR_TYPE, "");
+      String errorMessage = timeSeriesResponse.getMetadataOrDefault(TimeSeries.ERROR_MESSAGE, "");
       onError(new Throwable(String.format("Error in server (type: %s): %s", errorType, errorMessage)));
       return;
     }
-    String planId = timeSeriesResponse.getMetadataMap().get(WorkerResponseMetadataKeys.PLAN_ID);
+    String planId = timeSeriesResponse.getMetadataMap().get(TimeSeries.PLAN_ID);
     TimeSeriesBlock block = null;
     Throwable error = null;
     try {
@@ -66,8 +66,9 @@ public class TimeSeriesDispatchObserver implements StreamObserver<Worker.TimeSer
     }
     BlockingQueue<Object> receiverForPlanId = _exchangeReceiversByPlanId.get(planId);
     if (receiverForPlanId == null) {
-      String message = String.format("Receiver is not initialized for planId: %s. Receivers exist only for planIds: %s",
-          planId, _exchangeReceiversByPlanId.keySet());
+      String message =
+          String.format("Receiver is not initialized for planId: %s. Receivers exist only for planIds: %s", planId,
+              _exchangeReceiversByPlanId.keySet());
       LOGGER.warn(message);
       onError(new IllegalStateException(message));
     } else {

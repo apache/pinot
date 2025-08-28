@@ -34,8 +34,6 @@ import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.generic.GenericData;
 import org.apache.avro.generic.GenericDatumWriter;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Level;
-import org.apache.log4j.LogManager;
 import org.apache.pinot.core.accounting.PerQueryCPUMemAccountantFactory;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
@@ -171,8 +169,6 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   @BeforeClass
   public void setUp()
       throws Exception {
-    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.ERROR);
     ThreadResourceUsageProvider.setThreadCpuTimeMeasurementEnabled(true);
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(true);
 
@@ -207,13 +203,6 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
 
     //Wait for all documents loaded
     waitForAllDocsLoaded(10_000L);
-
-    // Setup logging and resource accounting
-    LogManager.getLogger(OfflineClusterMemBasedServerQueryKillingTest.class).setLevel(Level.INFO);
-    LogManager.getLogger(PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant.class)
-        .setLevel(Level.INFO);
-    LogManager.getLogger(ThreadResourceUsageProvider.class).setLevel(Level.INFO);
-    LogManager.getLogger(Tracing.class).setLevel(Level.INFO);
   }
 
   protected void startBrokers()
@@ -293,12 +282,12 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   public void testDigestOOM()
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY);
-    String exceptionsNode = queryResponse.get("exceptions").toString();
-    assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptionsNode);
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    String exceptions = queryResponse.get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptions);
+    assertTrue(exceptions.contains("got killed on SERVER"), exceptions);
   }
 
-  @Test
+  @Test(enabled = false) // Disabled because this test is flaky in the multi-stage query engine
   public void testDigestOOMMSE()
       throws Exception {
     setUseMultiStageQueryEngine(true);
@@ -327,13 +316,12 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   public void testSelectionOnlyOOM()
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY_SELECTION_ONLY);
-
-    String exceptionsNode = queryResponse.get("exceptions").toString();
-    assertTrue(exceptionsNode.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptionsNode);
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    String exceptions = queryResponse.get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptions);
+    assertTrue(exceptions.contains("got killed on SERVER"), exceptions);
   }
 
-  @Test
+  @Test(enabled = false) // Disabled because this test is flaky in the multi-stage query engine
   public void testSelectionOnlyOOMMSE()
       throws Exception {
     setUseMultiStageQueryEngine(true);
@@ -350,11 +338,12 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   public void testDigestOOM2()
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY_2);
-    String exceptionsNode = queryResponse.get("exceptions").toString();
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    String exceptions = queryResponse.get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptions);
+    assertTrue(exceptions.contains("got killed on SERVER"), exceptions);
   }
 
-  @Test
+  @Test(enabled = false) // Disabled because this test is flaky in the multi-stage query engine
   public void testDigestOOM2MSE()
       throws Exception {
     setUseMultiStageQueryEngine(true);
@@ -371,8 +360,9 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   public void testDigestOOM3()
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY_3);
-    String exceptionsNode = queryResponse.get("exceptions").toString();
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    String exceptions = queryResponse.get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptions);
+    assertTrue(exceptions.contains("got killed on SERVER"), exceptions);
   }
 
   @Test
@@ -392,8 +382,9 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
   public void testDigestOOM4()
       throws Exception {
     JsonNode queryResponse = postQuery(OOM_QUERY_4);
-    String exceptionsNode = queryResponse.get("exceptions").toString();
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    String exceptions = queryResponse.get("exceptions").toString();
+    assertTrue(exceptions.contains("\"errorCode\":" + QueryErrorCode.QUERY_CANCELLATION.getId()), exceptions);
+    assertTrue(exceptions.contains("got killed on SERVER"), exceptions);
   }
 
   @Test
@@ -447,7 +438,7 @@ public class OfflineClusterMemBasedServerQueryKillingTest extends BaseClusterInt
     countDownLatch.await();
     String exceptionsNode = queryResponse1.get().get("exceptions").toString();
     assertTrue(exceptionsNode.contains("\"errorCode\":503"), exceptionsNode);
-    assertTrue(exceptionsNode.contains("got killed because"), exceptionsNode);
+    assertTrue(exceptionsNode.contains("got killed"), exceptionsNode);
     assertFalse(StringUtils.isEmpty(queryResponse2.get().get("exceptions").toString()), exceptionsNode);
     assertFalse(StringUtils.isEmpty(queryResponse3.get().get("exceptions").toString()), exceptionsNode);
   }

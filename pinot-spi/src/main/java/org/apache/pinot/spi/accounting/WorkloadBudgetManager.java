@@ -33,7 +33,7 @@ public class WorkloadBudgetManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
 
   private long _enforcementWindowMs;
-  private final ConcurrentHashMap<String, Budget> _workloadBudgets = new ConcurrentHashMap<>();
+  private ConcurrentHashMap<String, Budget> _workloadBudgets;
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
   private volatile boolean _isEnabled;
 
@@ -45,6 +45,7 @@ public class WorkloadBudgetManager {
       LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
       return;
     }
+    _workloadBudgets = new ConcurrentHashMap<>();
     _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
     initSecondaryWorkloadBudget(config);
