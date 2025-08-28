@@ -53,6 +53,7 @@ import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.operator.utils.SortUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.roaringbitmap.RoaringBitmap;
 import org.slf4j.Logger;
@@ -235,8 +236,8 @@ public class AggregateOperator extends MultiStageOperator {
 
         if (_groupByExecutor.isNumGroupsLimitReached()) {
           if (_errorOnNumGroupsLimit) {
-            _input.earlyTerminate();
-            throw new RuntimeException("NUM_GROUPS_LIMIT has been reached at " + _operatorId);
+            throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException(
+                "NUM_GROUPS_LIMIT has been reached at: " + _operatorId);
           } else {
             _statMap.merge(StatKey.NUM_GROUPS_LIMIT_REACHED, true);
             _input.earlyTerminate();
