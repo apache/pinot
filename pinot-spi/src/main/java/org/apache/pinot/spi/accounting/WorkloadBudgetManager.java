@@ -114,6 +114,10 @@ public class WorkloadBudgetManager {
   }
 
   public void deleteWorkload(String workload) {
+    if (!_isEnabled) {
+      LOGGER.info("WorkloadBudgetManager is disabled. Not deleting workload: {}", workload);
+      return;
+    }
     _workloadBudgets.remove(workload);
     LOGGER.info("Removed workload: {}", workload);
   }
@@ -166,14 +170,13 @@ public class WorkloadBudgetManager {
    * Periodically resets budgets at the end of each enforcement window (Thread-Safe).
    */
   private void startBudgetResetTask() {
-    // TODO(Vivek): Reduce logging verbosity. Maybe make it debug logs.
-    LOGGER.info("Starting budget reset task with enforcement window: {}ms", _enforcementWindowMs);
+    LOGGER.debug("Starting budget reset task with enforcement window: {}ms", _enforcementWindowMs);
     _resetScheduler.scheduleAtFixedRate(() -> {
       LOGGER.debug("Resetting all workload budgets.");
       // Also print the budget used in the last enforcement window.
       _workloadBudgets.forEach((workload, budget) -> {
         BudgetStats stats = budget.getStats();
-        LOGGER.info("Workload: {} -> CPU: {}ns, Memory: {} bytes", workload, stats._cpuRemaining,
+        LOGGER.debug("Workload: {} -> CPU: {}ns, Memory: {} bytes", workload, stats._cpuRemaining,
             stats._memoryRemaining);
         // Reset the budget.
         budget.reset();
