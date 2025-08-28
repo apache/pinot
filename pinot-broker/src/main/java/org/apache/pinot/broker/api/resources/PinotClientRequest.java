@@ -335,14 +335,11 @@ public class PinotClientRequest {
         asyncResponse.resume(response);
       }
     } catch (QueryException e) {
-      asyncResponse.resume(Response.serverError().entity(PinotBrokerTimeSeriesResponse.fromException(e))
-        .build());
+      asyncResponse.resume(PinotBrokerTimeSeriesResponse.fromException(e));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      asyncResponse.resume(Response.serverError().entity(
-              new PinotBrokerTimeSeriesResponse("error", null, e.getClass().getSimpleName(), e.getMessage()))
-          .build());
+      asyncResponse.resume(PinotBrokerTimeSeriesResponse.fromException(e));
     }
   }
 

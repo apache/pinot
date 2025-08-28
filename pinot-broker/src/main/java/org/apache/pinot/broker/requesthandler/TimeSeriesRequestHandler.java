@@ -139,7 +139,6 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       return timeSeriesBlock;
     } catch (Exception e) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
-      LOGGER.warn("time-series query failed with error: {}", e.getMessage());
       if (e instanceof QueryException) {
         throw (QueryException) e;
       } else {

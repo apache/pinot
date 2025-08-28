@@ -109,8 +109,12 @@ public class PinotBrokerTimeSeriesResponse {
     return convertBucketedSeriesBlock(seriesBlock);
   }
 
-  public static PinotBrokerTimeSeriesResponse fromException(QueryException e) {
-    return newErrorResponse(e.getErrorCode().getDefaultMessage(), e.getMessage());
+  public static PinotBrokerTimeSeriesResponse fromException(Exception e) {
+    if (e instanceof QueryException) {
+      QueryException qe = (QueryException) e;
+      return newErrorResponse(qe.getErrorCode().getDefaultMessage(), e.getMessage());
+    }
+    return newErrorResponse(e.getClass().getSimpleName(), e.getMessage());
   }
 
   private static PinotBrokerTimeSeriesResponse convertBucketedSeriesBlock(TimeSeriesBlock seriesBlock) {
