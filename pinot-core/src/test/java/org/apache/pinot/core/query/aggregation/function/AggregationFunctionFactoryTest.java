@@ -70,6 +70,12 @@ public class AggregationFunctionFactoryTest {
     assertEquals(aggregationFunction.getType(), AggregationFunctionType.SUM);
     assertEquals(aggregationFunction.getResultColumnName(), function.toString());
 
+    function = getFunction("InTsUm");
+    aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
+    assertTrue(aggregationFunction instanceof IntSumAggregationFunction);
+    assertEquals(aggregationFunction.getType(), AggregationFunctionType.INTSUM);
+    assertEquals(aggregationFunction.getResultColumnName(), function.toString());
+
     function = getFunction("SuMPreCIsiON");
     aggregationFunction = AggregationFunctionFactory.getAggregationFunction(function, false);
     assertTrue(aggregationFunction instanceof SumPrecisionAggregationFunction);
