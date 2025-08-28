@@ -177,9 +177,11 @@ public class PinotQueryResource {
         tableCache =
             new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
                 request.getIgnoreCase());
+        LOGGER.info("Checking MSE validation using static table cache for query: {}", request.getSql());
       } else {
         // Use TableCache from environment if static fields are not specified
         tableCache = _pinotHelixResourceManager.getTableCache();
+        LOGGER.info("Checking MSE validation using Zk table cache for query: {}", request.getSql());
       }
       try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
           sqlQuery)) {
