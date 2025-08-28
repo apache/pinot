@@ -704,7 +704,6 @@ public class SizeBasedSegmentFlushThresholdComputerTest {
     // Expected: (50_000 * 1_000_000) / 100_000 = 500_000
     result = computer.calculateSizeForCalculation(true, 1_000_000, 100_000, 50_000);
     assertEquals(result, 500_000L);
-
   }
 
   @Test
@@ -717,5 +716,4 @@ public class SizeBasedSegmentFlushThresholdComputerTest {
     // Expected: post-commit size directly
     assertEquals(result, 200_000L);
   }
-
 }

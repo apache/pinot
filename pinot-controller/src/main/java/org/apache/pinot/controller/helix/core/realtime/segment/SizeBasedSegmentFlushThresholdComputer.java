@@ -86,7 +86,8 @@ class SizeBasedSegmentFlushThresholdComputer {
 
     // Estimate pre-commit size when using pre-commit rows. If post-commit rows are 0 (cannot infer),
     // fall back to using post-commit size for estimation.
-    long sizeForCalculation = calculateSizeForCalculation(usingPreCommitRows, preCommitRows, postCommitRows, postCommitSizeBytes);
+    long sizeForCalculation =
+        calculateSizeForCalculation(usingPreCommitRows, preCommitRows, postCommitRows, postCommitSizeBytes);
 
     // Skip updating the ratio if the segment is empty, size is not available, or the segment is force-committed.
     if (rowsForCalculation <= 0 || sizeForCalculation <= 0
@@ -234,7 +235,8 @@ class SizeBasedSegmentFlushThresholdComputer {
    * @return the estimated size to use for ratio calculations
    */
   @VisibleForTesting
-  long calculateSizeForCalculation(boolean usingPreCommitRows, long preCommitRows, long postCommitRows, long postCommitSizeBytes) {
+  long calculateSizeForCalculation(
+      boolean usingPreCommitRows, long preCommitRows, long postCommitRows, long postCommitSizeBytes) {
     if (usingPreCommitRows) {
       if (postCommitRows > 0) {
         double estimatedPreCommitSize = ((double) postCommitSizeBytes) * ((double) preCommitRows)
