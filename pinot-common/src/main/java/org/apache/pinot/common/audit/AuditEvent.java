@@ -46,7 +46,7 @@ public class AuditEvent {
   private String _originIpAddress;
 
   @JsonProperty("userid")
-  private UserIdentity _user;
+  private UserIdentity _userid;
 
   @JsonProperty("request")
   private AuditRequestPayload _request;
@@ -96,12 +96,12 @@ public class AuditEvent {
     return this;
   }
 
-  public UserIdentity getUser() {
-    return _user;
+  public UserIdentity getUserid() {
+    return _userid;
   }
 
-  public AuditEvent setUser(UserIdentity user) {
-    _user = user;
+  public AuditEvent setUserid(UserIdentity userid) {
+    _userid = userid;
     return this;
   }
 

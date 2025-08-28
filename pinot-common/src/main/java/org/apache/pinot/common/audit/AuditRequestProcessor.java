@@ -119,7 +119,7 @@ public class AuditRequestProcessor {
           .setServiceId(extractServiceId(requestContext))
           .setMethod(requestContext.getMethod())
           .setOriginIpAddress(extractClientIpAddress(requestContext, remoteAddr))
-          .setUser(_identityResolver.resolveIdentity(requestContext))
+          .setUserid(_identityResolver.resolveIdentity(requestContext))
           .setRequest(captureRequestPayload(requestContext));
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main request
