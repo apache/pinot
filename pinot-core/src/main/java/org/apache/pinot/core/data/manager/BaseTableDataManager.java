@@ -1210,12 +1210,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
     Then:
     We need to fall back to downloading the segment from deep storage to load it.
     */
-    if (segmentMetadata == null || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata))) {
-      if (segmentMetadata == null) {
-        _logger.info("Segment: {} does not exist", segmentName);
-        closeSegmentDirectoryQuietly(segmentDirectory);
-        return false;
-      }
+    if (segmentMetadata == null) {
+      _logger.info("Segment: {} does not exist", segmentName);
+      closeSegmentDirectoryQuietly(segmentDirectory);
+      return false;
+    }
+    if (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata)) {
       _logger.warn("Segment: {} has CRC changed from: {} to: {}", segmentName, segmentMetadata.getCrc(),
           zkMetadata.getCrc());
       if (_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
