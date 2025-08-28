@@ -118,7 +118,8 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
     Algorithm algorithm = Algorithm.valueOf(algorithmName.toUpperCase(Locale.US));
     _factories = algorithm.streamInstances(metricsConfiguration)
         .filter(factory -> allIgnored.stream().noneMatch(ignored -> ignored.isAssignableFrom(factory.getClass())))
-        .filter(factory -> CompoundPinotMetricsFactory.class.isAssignableFrom(factory.getClass()))
+        // remove the compound factory itself from the list to avoid infinite recursion
+        .filter(factory -> !CompoundPinotMetricsFactory.class.isAssignableFrom(factory.getClass()))
         .collect(Collectors.toList());
 
     if (_factories.isEmpty()) {
