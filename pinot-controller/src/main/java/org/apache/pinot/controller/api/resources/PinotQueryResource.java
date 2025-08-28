@@ -177,11 +177,12 @@ public class PinotQueryResource {
         tableCache =
             new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
                 request.getIgnoreCase());
-        LOGGER.info("Checking MSE validation using static table cache for query: {}", request.getSql());
+        LOGGER.info("Validating multi-stage query compilation using static table cache for query: {}",
+            request.getSql());
       } else {
         // Use TableCache from environment if static fields are not specified
         tableCache = _pinotHelixResourceManager.getTableCache();
-        LOGGER.info("Checking MSE validation using Zk table cache for query: {}", request.getSql());
+        LOGGER.info("Validating multi-stage query compilation using Zk table cache for query: {}", request.getSql());
       }
       try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
           sqlQuery)) {
@@ -193,7 +194,7 @@ public class PinotQueryResource {
     } catch (Exception e) {
       LOGGER.error("Caught exception while validating multi-stage query: {}", e.getMessage());
       return new MultiStageQueryValidationResponse(false, "Unexpected error: " + e.getMessage(),
-          QueryErrorCode.QUERY_VALIDATION);
+          QueryErrorCode.UNKNOWN);
     }
   }
 
@@ -238,7 +239,7 @@ public class PinotQueryResource {
         @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
         @JsonProperty("ignoreCase") boolean ignoreCase) {
       _sql = sql;
-      _tableConfigs = tableConfigs != null ? tableConfigs : new ArrayList<>();
+      _tableConfigs = tableConfigs;
       _schemas = schemas;
       _logicalTableConfigs = logicalTableConfigs;
       _ignoreCase = ignoreCase;

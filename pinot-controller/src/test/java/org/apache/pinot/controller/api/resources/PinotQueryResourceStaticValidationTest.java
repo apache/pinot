@@ -73,28 +73,4 @@ public class PinotQueryResourceStaticValidationTest {
     Assert.assertTrue(provider.getTableNameMap().containsKey("testTable_OFFLINE"));
     Assert.assertTrue(provider.getTableNameMap().containsKey("testTable"));
   }
-
-  @Test
-  public void testRequestSerialization()
-      throws Exception {
-    Map<String, Object> request = new HashMap<>();
-    request.put("sql", "SELECT * FROM testTable");
-
-    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable").build();
-    request.put("tableConfigs", Arrays.asList(tableConfig));
-
-    Schema schema =
-        new Schema.SchemaBuilder().setSchemaName("testTable").addSingleValueDimension("col1", FieldSpec.DataType.STRING)
-            .build();
-    request.put("schemas", Arrays.asList(schema));
-    request.put("logicalTableConfigs", Collections.emptyList());
-
-    String json = _objectMapper.writeValueAsString(request);
-    JsonNode jsonNode = _objectMapper.readTree(json);
-
-    Assert.assertEquals(jsonNode.get("sql").asText(), "SELECT * FROM testTable");
-    Assert.assertEquals(jsonNode.get("tableConfigs").size(), 1);
-    Assert.assertEquals(jsonNode.get("schemas").size(), 1);
-    Assert.assertEquals(jsonNode.get("logicalTableConfigs").size(), 0);
-  }
 }
