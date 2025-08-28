@@ -33,7 +33,7 @@ public class WorkloadBudgetManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
 
   private long _enforcementWindowMs;
-  private final ConcurrentHashMap<String, Budget> _workloadBudgets = new ConcurrentHashMap<>();
+  private ConcurrentHashMap<String, Budget> _workloadBudgets;
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
   private volatile boolean _isEnabled;
 
@@ -45,6 +45,7 @@ public class WorkloadBudgetManager {
       LOGGER.info("WorkloadBudgetManager is disabled. Creating a no-op instance.");
       return;
     }
+    _workloadBudgets = new ConcurrentHashMap<>();
     _enforcementWindowMs = config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENFORCEMENT_WINDOW_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_ENFORCEMENT_WINDOW_MS);
     initSecondaryWorkloadBudget(config);
@@ -113,6 +114,15 @@ public class WorkloadBudgetManager {
         memoryBudgetBytes);
   }
 
+  public void deleteWorkload(String workload) {
+    if (!_isEnabled) {
+      LOGGER.info("WorkloadBudgetManager is disabled. Not deleting workload: {}", workload);
+      return;
+    }
+    _workloadBudgets.remove(workload);
+    LOGGER.info("Removed workload: {}", workload);
+  }
+
   /**
    * Collects workload stats for CPU and memory usage.
    * Could be overridden for custom implementations
@@ -172,8 +182,7 @@ public class WorkloadBudgetManager {
    * Periodically resets budgets at the end of each enforcement window (Thread-Safe).
    */
   private void startBudgetResetTask() {
-    // TODO(Vivek): Reduce logging verbosity. Maybe make it debug logs.
-    LOGGER.info("Starting budget reset task with enforcement window: {}ms", _enforcementWindowMs);
+    LOGGER.debug("Starting budget reset task with enforcement window: {}ms", _enforcementWindowMs);
     _resetScheduler.scheduleAtFixedRate(() -> {
       LOGGER.debug("Resetting all workload budgets.");
       // Also print the budget used in the last enforcement window.
