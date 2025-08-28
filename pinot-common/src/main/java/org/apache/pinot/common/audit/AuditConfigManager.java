@@ -25,9 +25,7 @@ import java.util.Set;
 import javax.inject.Singleton;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.helix.NotificationContext;
-import org.apache.helix.api.listeners.ClusterConfigChangeListener;
-import org.apache.helix.model.ClusterConfig;
+import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
@@ -40,7 +38,7 @@ import org.slf4j.LoggerFactory;
  * Self-registers with the provided cluster config provider.
  */
 @Singleton
-public final class AuditConfigManager implements ClusterConfigChangeListener {
+public final class AuditConfigManager implements PinotClusterConfigChangeListener {
   private static final Logger LOG = LoggerFactory.getLogger(AuditConfigManager.class);
 
   private AuditConfig _currentConfig = new AuditConfig();
@@ -106,8 +104,8 @@ public final class AuditConfigManager implements ClusterConfigChangeListener {
   }
 
   @VisibleForTesting
-  static AuditConfig buildFromClusterConfig(ClusterConfig clusterConfig) {
-    return mapPrefixedConfigToObject(clusterConfig.getRecord().getSimpleFields(),
+  static AuditConfig buildFromClusterConfig(Map<String, String> clusterConfigs) {
+    return mapPrefixedConfigToObject(clusterConfigs,
         CommonConstants.AuditLogConstants.PREFIX, AuditConfig.class);
   }
 
@@ -154,9 +152,17 @@ public final class AuditConfigManager implements ClusterConfigChangeListener {
   }
 
   @Override
-  public void onClusterConfigChange(ClusterConfig clusterConfig, NotificationContext context) {
+  public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
+    boolean hasAuditConfigChanges = changedConfigs.stream()
+        .anyMatch(configKey -> configKey.startsWith(CommonConstants.AuditLogConstants.PREFIX));
+
+    if (!hasAuditConfigChanges) {
+      LOG.info("No audit-related configs changed, skipping configuration rebuild");
+      return;
+    }
+
     try {
-      _currentConfig = buildFromClusterConfig(clusterConfig);
+      _currentConfig = buildFromClusterConfig(clusterConfigs);
       LOG.info("Successfully updated audit configuration");
     } catch (Exception e) {
       LOG.error("Failed to update audit configuration from cluster configs", e);
