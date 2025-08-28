@@ -190,8 +190,7 @@ public interface TableCache extends PinotConfigProvider {
 
     public TableConfigInfo(TableConfig tableConfig) {
       _tableConfig = tableConfig;
-      _expressionOverrideMap =
-          createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
+      _expressionOverrideMap = createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
       _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
     }
   }
@@ -202,8 +201,8 @@ public interface TableCache extends PinotConfigProvider {
 
     LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
       _logicalTableConfig = logicalTableConfig;
-      _expressionOverrideMap = createExpressionOverrideMap(logicalTableConfig.getTableName(),
-          logicalTableConfig.getQueryConfig());
+      _expressionOverrideMap =
+          createExpressionOverrideMap(logicalTableConfig.getTableName(), logicalTableConfig.getQueryConfig());
     }
   }
 
