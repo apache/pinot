@@ -58,6 +58,7 @@ public class TenantRebalancer {
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _executorService = executorService;
   }
+
   public static class TenantTableRebalanceJobContext {
     private final String _tableName;
     private final String _jobId;
@@ -175,6 +176,7 @@ public class TenantRebalancer {
    */
   public void rebalanceWithContext(TenantRebalanceContext tenantRebalanceContext,
       ZkBasedTenantRebalanceObserver observer) {
+    LOGGER.info("Starting tenant rebalance with context: {}", tenantRebalanceContext);
     TenantRebalanceConfig config = tenantRebalanceContext.getConfig();
     ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = tenantRebalanceContext.getParallelQueue();
     Queue<TenantTableRebalanceJobContext> sequentialQueue = tenantRebalanceContext.getSequentialQueue();
@@ -184,20 +186,27 @@ public class TenantRebalancer {
 
     // ensure atleast 1 thread is created to run the sequential table rebalance operations
     int parallelism = Math.max(config.getDegreeOfParallelism(), 1);
+    LOGGER.info("Spinning up {} threads for tenant rebalance job: {}", parallelism, tenantRebalanceContext.getJobId());
     AtomicInteger activeThreads = new AtomicInteger(parallelism);
     try {
       for (int i = 0; i < parallelism; i++) {
         _executorService.submit(() -> {
           doConsumeTablesFromQueueAndRebalance(parallelQueue, ongoingJobs, config, observer);
+          // If this is the last thread to finish, start consuming the sequential queue
           if (activeThreads.decrementAndGet() == 0) {
+            LOGGER.info("All parallel threads completed, starting sequential rebalance for job: {}",
+                tenantRebalanceContext.getJobId());
             doConsumeTablesFromQueueAndRebalance(sequentialQueue, ongoingJobs, config, observer);
             observer.onSuccess(String.format("Successfully rebalanced tenant %s.", config.getTenantName()));
+            LOGGER.info("Completed tenant rebalance job: {}", tenantRebalanceContext.getJobId());
           }
         });
       }
     } catch (Exception exception) {
       observer.onError(String.format("Failed to rebalance the tenant %s. Cause: %s", config.getTenantName(),
           exception.getMessage()));
+      LOGGER.error("Caught exception in tenant rebalance job: {}, Cause: {}", tenantRebalanceContext.getJobId(),
+          exception.getMessage(), exception);
     }
   }
 
@@ -230,6 +239,8 @@ public class TenantRebalancer {
         rebalanceConfig.setMinAvailableReplicas(0);
       }
       try {
+        LOGGER.info("Starting rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {}",
+            tableName, rebalanceJobId, observer.getJobId());
         observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_STARTED_TRIGGER, tableName, rebalanceJobId);
         // Disallow TABLE rebalance checker to retry the rebalance job here, since we want TENANT rebalance checker
         // to do so
@@ -238,9 +249,14 @@ public class TenantRebalancer {
         // TODO: For downtime=true rebalance, track if the EV-IS has converged to move on, otherwise it fundementally
         //  breaks the degree of parallelism
         if (result.getStatus().equals(RebalanceResult.Status.DONE)) {
+          LOGGER.info("Completed rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {}",
+              tableName, rebalanceJobId, observer.getJobId());
           ongoingJobs.remove(jobContext);
           observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_COMPLETED_TRIGGER, tableName, null);
         } else {
+          LOGGER.warn("Rebalance for table: {} with table rebalance job ID: {} in tenant rebalance job: {} is not done."
+                  + "Status: {}, Description: {}", tableName, rebalanceJobId, observer.getJobId(), result.getStatus(),
+              result.getDescription());
           ongoingJobs.remove(jobContext);
           observer.onTrigger(TenantRebalanceObserver.Trigger.REBALANCE_ERRORED_TRIGGER, tableName,
               result.getDescription());

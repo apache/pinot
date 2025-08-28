@@ -115,7 +115,7 @@ public class TenantRebalanceContext {
   }
 
   public String toString() {
-    return "DefaultTenantRebalanceContext{" + "jobId='" + getJobId() + '\'' + ", originalJobId='" + getOriginalJobId()
+    return "TenantRebalanceContext{" + "jobId='" + getJobId() + '\'' + ", originalJobId='" + getOriginalJobId()
         + '\'' + ", attemptId=" + getAttemptId() + ", parallelQueueSize="
         + getParallelQueue().size() + ", sequentialQueueSize=" + getSequentialQueue().size() + ", ongoingJobsQueueSize="
         + getOngoingJobsQueue().size() + '}';

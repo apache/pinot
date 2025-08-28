@@ -138,4 +138,12 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
   public boolean isDone() {
     return _isDone;
   }
+
+  public String getJobId() {
+    return _jobId;
+  }
+
+  public String getTenantName() {
+    return _tenantName;
+  }
 }
