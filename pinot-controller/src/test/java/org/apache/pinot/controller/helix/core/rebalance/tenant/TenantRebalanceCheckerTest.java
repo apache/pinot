@@ -58,6 +58,7 @@ import static org.testng.Assert.*;
 public class TenantRebalanceCheckerTest extends ControllerTest {
   private static final String TENANT_NAME = "TestTenant";
   private static final String JOB_ID = "test-tenant-rebalance-job-123";
+  private static final String JOB_ID_2 = "test-tenant-rebalance-job-456";
   private static final String ORIGINAL_JOB_ID = "original-tenant-rebalance-job-123";
   private static final String TABLE_NAME_1 = "testTable1_OFFLINE";
   private static final String TABLE_NAME_2 = "testTable2_OFFLINE";
@@ -322,6 +323,57 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     verify(_mockTenantRebalancer, never()).rebalanceWithContext(any(), any());
   }
 
+  @Test
+  public void testDoNotRunMultipleTenantRebalanceRetry()
+      throws Exception {
+
+    // Create a stuck tenant rebalance context
+    TenantRebalanceContext stuckContext = createStuckTenantRebalanceContext();
+    TenantRebalanceProgressStats progressStats = createProgressStats();
+
+    // Mock ZK metadata for the stuck job
+    Map<String, Map<String, String>> allJobMetadata = new HashMap<>();
+    allJobMetadata.put(JOB_ID, createTenantJobZKMetadata(stuckContext, progressStats, JOB_ID));
+    allJobMetadata.put(JOB_ID_2, createTenantJobZKMetadata(stuckContext, progressStats, JOB_ID_2));
+
+    // Mock stuck table rebalance job metadata
+    Map<String, String> stuckTableJobMetadata = createStuckTableJobMetadata();
+
+    // Setup mocks
+    doReturn(allJobMetadata).when(_mockPinotHelixResourceManager)
+        .getAllJobs(eq(Set.of(ControllerJobTypes.TENANT_REBALANCE)), any());
+    doReturn(stuckTableJobMetadata).when(_mockPinotHelixResourceManager)
+        .getControllerJobZKMetadata(eq(STUCK_TABLE_JOB_ID), eq(ControllerJobTypes.TABLE_REBALANCE));
+
+    // Mock the tenant rebalancer to capture the resumed context
+    ArgumentCaptor<TenantRebalanceContext> contextCaptor =
+        ArgumentCaptor.forClass(TenantRebalanceContext.class);
+    ArgumentCaptor<ZkBasedTenantRebalanceObserver> observerCaptor =
+        ArgumentCaptor.forClass(ZkBasedTenantRebalanceObserver.class);
+
+    // Execute the checker
+    _tenantRebalanceChecker.runTask(new Properties());
+
+    // Verify that the tenant rebalancer was called to resume the job
+    verify(_mockTenantRebalancer, times(1)).rebalanceWithContext(
+        contextCaptor.capture(), observerCaptor.capture());
+    // The mockTenantRebalance never let the job done
+    assertFalse(observerCaptor.getValue().isDone());
+
+    _tenantRebalanceChecker.runTask(new Properties());
+    // Since the previous job is not done, the rebalanceWithContext should not be called again as we have set the limit
+    // to one tenant rebalance retry at a time
+    verify(_mockTenantRebalancer, times(1)).rebalanceWithContext(
+        contextCaptor.capture(), observerCaptor.capture());
+
+    // Mark the job as done and run the checker again - should pick up another job now
+    observerCaptor.getValue().setDone(true);
+    _tenantRebalanceChecker.runTask(new Properties());
+
+    verify(_mockTenantRebalancer, times(2)).rebalanceWithContext(
+        contextCaptor.capture(), observerCaptor.capture());
+  }
+
   // Helper methods to create test data
 
   private TenantRebalanceContext createStuckTenantRebalanceContext() {
@@ -437,8 +489,14 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
   private Map<String, String> createTenantJobZKMetadata(TenantRebalanceContext context,
       TenantRebalanceProgressStats progressStats)
       throws JsonProcessingException {
+    return createTenantJobZKMetadata(context, progressStats, JOB_ID);
+  }
+
+  private Map<String, String> createTenantJobZKMetadata(TenantRebalanceContext context,
+      TenantRebalanceProgressStats progressStats, String jobId)
+      throws JsonProcessingException {
     Map<String, String> metadata = new HashMap<>();
-    metadata.put(CommonConstants.ControllerJob.JOB_ID, JOB_ID);
+    metadata.put(CommonConstants.ControllerJob.JOB_ID, jobId);
     metadata.put(CommonConstants.ControllerJob.TENANT_NAME, TENANT_NAME);
     metadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS,
         String.valueOf(System.currentTimeMillis() - 400000)); // 6+ minutes ago (beyond heartbeat timeout)

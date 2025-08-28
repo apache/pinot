@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,5 +146,10 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
 
   public String getTenantName() {
     return _tenantName;
+  }
+
+  @VisibleForTesting
+  void setDone(boolean isDone) {
+    _isDone = isDone;
   }
 }
