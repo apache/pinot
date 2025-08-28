@@ -163,11 +163,11 @@ public class PinotQueryResource {
   public MultiStageQueryValidationResponse validateMultiStageQuery(MultiStageQueryValidationRequest request,
       @Context HttpHeaders httpHeaders) {
 
-    if (request.getSql() == null || request.getSql().trim().isEmpty()) {
+    String sqlQuery = request.getSql().trim();
+    if (request.getSql() == null || sqlQuery.isEmpty()) {
       return new MultiStageQueryValidationResponse(false, "Request is missing the query string field 'sql'", null);
     }
 
-    String sqlQuery = request.getSql();
     Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
     String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
 
@@ -176,7 +176,7 @@ public class PinotQueryResource {
       if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && CollectionUtils.isNotEmpty(request.getSchemas())) {
         tableCache =
             new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
-                request.getIgnoreCase());
+                request.isIgnoreCase());
         LOGGER.info("Validating multi-stage query compilation using static table cache for query: {}",
             request.getSql());
       } else {
@@ -264,7 +264,7 @@ public class PinotQueryResource {
       return _logicalTableConfigs;
     }
 
-    public boolean getIgnoreCase() {
+    public boolean isIgnoreCase() {
       return _ignoreCase;
     }
   }

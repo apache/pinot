@@ -414,7 +414,7 @@ public class ZkTableCache implements TableCache {
   }
 
   private void putSchema(ZNRecord znRecord)
-    throws IOException {
+      throws IOException {
     Schema schema = SchemaSerDeUtils.fromZNRecord(znRecord);
     addBuiltInVirtualColumns(schema);
     String schemaName = schema.getSchemaName();
@@ -430,8 +430,6 @@ public class ZkTableCache implements TableCache {
     }
     _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
   }
-
-
 
   private void removeSchema(String path) {
     _propertyStore.unsubscribeDataChanges(path, _zkSchemaChangeListener);

@@ -50,6 +50,7 @@ import org.slf4j.LoggerFactory;
  */
 public interface TableCache extends PinotConfigProvider {
   Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
+
   /**
    * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
    */
@@ -138,8 +139,7 @@ public interface TableCache extends PinotConfigProvider {
   boolean isLogicalTable(String logicalTableName);
 
   @Override
-  boolean registerLogicalTableConfigChangeListener(
-      LogicalTableConfigChangeListener logicalTableConfigChangeListener);
+  boolean registerLogicalTableConfigChangeListener(LogicalTableConfigChangeListener logicalTableConfigChangeListener);
 
   /**
    * Adds the built-in virtual columns to the schema.
@@ -195,7 +195,6 @@ public interface TableCache extends PinotConfigProvider {
       _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
     }
   }
-
 
   class LogicalTableConfigInfo {
     final LogicalTableConfig _logicalTableConfig;
