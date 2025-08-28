@@ -173,7 +173,7 @@ public class PinotQueryResource {
 
     try {
       TableCache tableCache;
-      if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && !CollectionUtils.isNotEmpty(request.getSchemas())) {
+      if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && CollectionUtils.isNotEmpty(request.getSchemas())) {
         tableCache =
             new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
                 request.getIgnoreCase());
