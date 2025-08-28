@@ -28,8 +28,6 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
-import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -71,10 +69,6 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
   private PinotHelixResourceManager _mockPinotHelixResourceManager;
   @Mock
   private TenantRebalancer _mockTenantRebalancer;
-  @Mock
-  private ControllerMetrics _mockControllerMetrics;
-  @Mock
-  private PoolingHttpClientConnectionManager _mockConnectionManager;
   @Mock
   private ControllerConf _mockControllerConf;
 
