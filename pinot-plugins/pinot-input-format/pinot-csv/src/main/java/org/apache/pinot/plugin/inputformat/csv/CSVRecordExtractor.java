@@ -69,39 +69,22 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
       return value;
     }
 
-    // Performance optimization: Use fast string.contains() instead of slow regex
-    if (value.contains(String.valueOf(_multiValueDelimiter))) {
-      // Performance optimization: Use manual split instead of regex for maximum speed
-      String delimiter = String.valueOf(_multiValueDelimiter);
-      int delimiterLength = delimiter.length();
-      int lastIndex = 0;
-      int count = 0;
+    String[] stringValues = StringUtils.split(value, _multiValueDelimiter);
+    int numValues = stringValues.length;
 
-      // Count delimiters to pre-allocate array
-      for (int i = 0; i < value.length() - delimiterLength + 1; i++) {
-        if (value.regionMatches(i, delimiter, 0, delimiterLength)) {
-          count++;
-        }
+    // NOTE about CSV behavior for multi value column - cannot distinguish between multi value column with just 1
+    // entry vs single value
+    // MV column with single value will be treated as single value until DataTypeTransformer.
+    // Transform functions on such columns will have to handle the special case.
+    if (numValues > 1) {
+      Object[] array = new Object[numValues];
+      int index = 0;
+      for (String stringVal : stringValues) {
+        array[index++] = stringVal;
       }
-
-      if (count > 0) {
-        // Create array with exact size needed
-        Object[] array = new Object[count + 1];
-        int arrayIndex = 0;
-
-        // Manual split for maximum performance
-        for (int i = 0; i < value.length() - delimiterLength + 1; i++) {
-          if (value.regionMatches(i, delimiter, 0, delimiterLength)) {
-            array[arrayIndex++] = value.substring(lastIndex, i);
-            lastIndex = i + delimiterLength;
-          }
-        }
-        // Add the last part
-        array[arrayIndex] = value.substring(lastIndex);
-
-        return array;
-      }
+      return array;
+    } else {
+      return value;
     }
-    return value;
   }
 }
