@@ -425,6 +425,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
       return;
     }
+    if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
+      _logger.info("Skipping replacing segment: {} even though its CRC has changed from: {} to: {} because "
+          + "instance.check.crc.on.segment.load is set to false", segmentName, localMetadata.getCrc(),
+          zkMetadata.getCrc());
+      return;
+    }
     _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,
         localMetadata.getCrc(), zkMetadata.getCrc());
     downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
@@ -806,7 +812,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       - Continue loading the segment from the index directory.
       */
       boolean shouldDownload =
-          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata));
+          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
+              && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
@@ -1205,19 +1212,24 @@ public abstract class BaseTableDataManager implements TableDataManager {
        - The "DONE" status confirms the COMMIT_END_METADATA call succeeded,
          and the segment is available either in deep storage or with a peer
          before discarding the local copy.
+       The only exception is if the server does not check CRC on segment load.
 
     Then:
     We need to fall back to downloading the segment from deep storage to load it.
     */
-    if (segmentMetadata == null || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata))) {
-      if (segmentMetadata == null) {
-        _logger.info("Segment: {} does not exist", segmentName);
-      } else if (!hasSameCRC(zkMetadata, segmentMetadata)) {
-        _logger.info("Segment: {} has CRC changed from: {} to: {}", segmentName, segmentMetadata.getCrc(),
-            zkMetadata.getCrc());
-      }
+    if (segmentMetadata == null) {
+      _logger.info("Segment: {} does not exist", segmentName);
       closeSegmentDirectoryQuietly(segmentDirectory);
       return false;
+    }
+    if (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, segmentMetadata)) {
+      _logger.warn("Segment: {} has CRC changed from: {} to: {}", segmentName, segmentMetadata.getCrc(),
+          zkMetadata.getCrc());
+      if (_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
+        closeSegmentDirectoryQuietly(segmentDirectory);
+        return false;
+      }
+      _logger.info("Skipping CRC check for segment: {} as configured. Proceed to load segment.", segmentName);
     }
 
     try {
