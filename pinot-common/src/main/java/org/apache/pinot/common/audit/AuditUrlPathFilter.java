@@ -22,6 +22,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import javax.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -50,6 +51,23 @@ public class AuditUrlPathFilter {
   private static final String PREFIX_GLOB = "glob:";
   private static final String PREFIX_REGEX = "regex:";
 
+  private static boolean testPattern(Path path, String pattern) {
+    try {
+      String globPattern = pattern;
+      if (!globPattern.startsWith(PREFIX_GLOB) && !globPattern.startsWith(PREFIX_REGEX)) {
+        globPattern = PREFIX_GLOB + globPattern;
+      }
+
+      PathMatcher matcher = FileSystems.getDefault().getPathMatcher(globPattern);
+      if (matcher.matches(path)) {
+        return true;
+      }
+    } catch (Exception e) {
+      LOG.error("Invalid pattern '{}', skipping", pattern, e);
+    }
+    return false;
+  }
+
   /**
    * Checks if the given URL path should be excluded based on the provided patterns.
    *
@@ -66,23 +84,11 @@ public class AuditUrlPathFilter {
       Path path = Paths.get(urlPath);
       String[] patterns = excludePatterns.split(",");
 
-      for (String pattern : patterns) {
-        String trimmedPattern = pattern.trim();
-        if (StringUtils.isNotBlank(trimmedPattern)) {
-          try {
-            String globPattern = trimmedPattern;
-            if (!globPattern.startsWith(PREFIX_GLOB) && !globPattern.startsWith(PREFIX_REGEX)) {
-              globPattern = PREFIX_GLOB + globPattern;
-            }
-
-            PathMatcher matcher = FileSystems.getDefault().getPathMatcher(globPattern);
-            if (matcher.matches(path)) {
-              return true;
-            }
-          } catch (Exception e) {
-            LOG.error("Invalid pattern '{}', skipping", trimmedPattern, e);
-          }
-        }
+      if (Arrays.stream(patterns)
+          .map(String::trim)
+          .filter(StringUtils::isNotBlank)
+          .anyMatch(p -> testPattern(path, p))) {
+        return true;
       }
     } catch (Exception e) {
       LOG.warn("Error checking URL path '{}' against exclude patterns", urlPath, e);
