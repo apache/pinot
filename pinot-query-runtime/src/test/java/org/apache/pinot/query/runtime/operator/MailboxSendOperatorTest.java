@@ -98,7 +98,6 @@ public class MailboxSendOperatorTest {
 
     // Then:
     assertTrue(block.isError(), "expected error block to propagate");
-    ErrorMseBlock errorMseBlock = (ErrorMseBlock) block;
     ArgumentCaptor<MseBlock.Eos> captor = ArgumentCaptor.forClass(MseBlock.Eos.class);
     verify(_exchange).send(captor.capture(), anyList());
     assertTrue(captor.getValue().isError(), "expected to send error block to exchange");
