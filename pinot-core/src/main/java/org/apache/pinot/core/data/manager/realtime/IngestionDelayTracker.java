@@ -19,6 +19,7 @@
 package org.apache.pinot.core.data.manager.realtime;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.time.Clock;
@@ -38,10 +39,16 @@ import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.stream.LongMsgOffset;
+import org.apache.pinot.spi.stream.OffsetCriteria;
+import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
+import org.apache.pinot.spi.stream.StreamConsumerFactoryProvider;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -88,17 +95,34 @@ import org.slf4j.LoggerFactory;
 public class IngestionDelayTracker {
 
   private static class IngestionInfo {
-    final long _ingestionTimeMs;
-    final long _firstStreamIngestionTimeMs;
-    final StreamPartitionMsgOffset _currentOffset;
-    final StreamPartitionMsgOffset _latestOffset;
+    final StreamMetadataProvider _streamMetadataProvider;
+    volatile long _ingestionTimeMs;
+    volatile long _firstStreamIngestionTimeMs;
+    volatile StreamPartitionMsgOffset _currentOffset;
+    volatile StreamPartitionMsgOffset _latestOffset;
+    volatile Long _offsetLag;
 
-    IngestionInfo(long ingestionTimeMs, long firstStreamIngestionTimeMs,
-        @Nullable StreamPartitionMsgOffset currentOffset, @Nullable StreamPartitionMsgOffset latestOffset) {
+    IngestionInfo(long ingestionTimeMs, long firstStreamIngestionTimeMs, StreamPartitionMsgOffset currentOffset,
+        Long offsetLag, StreamMetadataProvider streamMetadataProvider) {
       _ingestionTimeMs = ingestionTimeMs;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
+      _streamMetadataProvider = streamMetadataProvider;
       _currentOffset = currentOffset;
+      _offsetLag = offsetLag;
+    }
+
+    void updateOffsetLag(Long offsetLag, StreamPartitionMsgOffset latestOffset) {
+      _offsetLag = offsetLag;
       _latestOffset = latestOffset;
+    }
+
+    void updateCurrentOffset(StreamPartitionMsgOffset currentOffset) {
+      _currentOffset = currentOffset;
+    }
+
+    void updateIngestionTime(long ingestionTimeMs, long firstStreamIngestionTimeMs) {
+      _ingestionTimeMs = ingestionTimeMs;
+      _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
     }
   }
 
@@ -113,6 +137,14 @@ public class IngestionDelayTracker {
 
   // Cache expire time for ignored segment if there is no update from the segment.
   private static final int IGNORED_SEGMENT_CACHE_TIME_MINUTES = 10;
+  public static final String OFFSET_LAG_TRACKING_ENABLE_CONFIG_KEY = "offset.lag.tracking.enable";
+  public static final String OFFSET_LAG_TRACKING_UPDATE_INTERVAL_CONFIG_KEY = "offset.lag.tracking.update.interval";
+
+  // Since offset lag metric fetches metadata from upstream, we want to make sure we don't do it too frequently.
+  public static final boolean DEFAULT_ENABLE_OFFSET_LAG_METRIC = false;
+  public static final long DEFAULT_OFFSET_LAG_UPDATE_INTERVAL_MS = 60000; // 1 minute
+  public static final long MIN_OFFSET_LAG_UPDATE_INTERVAL = 1000L;
+  public static final int MAX_OFFSET_FETCH_WAIT_TIME_MS = 5000;
 
   // Per partition info for all partitions active for the current table.
   private final Map<Integer, IngestionInfo> _ingestionInfoMap = new ConcurrentHashMap<>();
@@ -140,6 +172,12 @@ public class IngestionDelayTracker {
 
   private Clock _clock;
 
+  // Configuration parameters
+  private final boolean _enableOffsetLagMetric;
+  private final long _offsetLagUpdateIntervalMs;
+
+  private final StreamConsumerFactory _streamConsumerFactory;
+
   @VisibleForTesting
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, int scheduledExecutorThreadTickIntervalMs,
@@ -151,10 +189,32 @@ public class IngestionDelayTracker {
     _realTimeTableDataManager = realtimeTableDataManager;
     _clock = Clock.systemUTC();
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
+
+    Map<String, String> streamConfigMap = IngestionConfigUtils.getFirstStreamConfigMap(
+        _realTimeTableDataManager.getCachedTableConfigAndSchema().getKey());
+    _streamConsumerFactory =
+        StreamConsumerFactoryProvider.create(new StreamConfig(_tableNameWithType, streamConfigMap));
+    if (realtimeTableDataManager.getInstanceDataManagerConfig() != null
+        && realtimeTableDataManager.getInstanceDataManagerConfig().getConfig() != null) {
+      PinotConfiguration pinotConfiguration = realtimeTableDataManager.getInstanceDataManagerConfig().getConfig();
+      _enableOffsetLagMetric =
+          pinotConfiguration.getProperty(OFFSET_LAG_TRACKING_ENABLE_CONFIG_KEY, DEFAULT_ENABLE_OFFSET_LAG_METRIC);
+      _offsetLagUpdateIntervalMs = pinotConfiguration.getProperty(OFFSET_LAG_TRACKING_UPDATE_INTERVAL_CONFIG_KEY,
+          DEFAULT_OFFSET_LAG_UPDATE_INTERVAL_MS);
+
+      Preconditions.checkArgument(_offsetLagUpdateIntervalMs >= MIN_OFFSET_LAG_UPDATE_INTERVAL,
+          String.format("Value of Offset lag update interval config: %s must be greater than %d",
+              OFFSET_LAG_TRACKING_UPDATE_INTERVAL_CONFIG_KEY, MIN_OFFSET_LAG_UPDATE_INTERVAL));
+    } else {
+      _enableOffsetLagMetric = DEFAULT_ENABLE_OFFSET_LAG_METRIC;
+      _offsetLagUpdateIntervalMs = DEFAULT_OFFSET_LAG_UPDATE_INTERVAL_MS;
+    }
+
     // Handle negative timer values
     if (scheduledExecutorThreadTickIntervalMs <= 0) {
-      throw new RuntimeException("Illegal timer timeout argument, expected > 0, got="
-          + scheduledExecutorThreadTickIntervalMs + " for table=" + _tableNameWithType);
+      throw new RuntimeException(
+          "Illegal timer timeout argument, expected > 0, got=" + scheduledExecutorThreadTickIntervalMs + " for table="
+              + _tableNameWithType);
     }
 
     // ThreadFactory to set the thread's name
@@ -172,6 +232,15 @@ public class IngestionDelayTracker {
 
     _scheduledExecutor.scheduleWithFixedDelay(this::timeoutInactivePartitions,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, scheduledExecutorThreadTickIntervalMs, TimeUnit.MILLISECONDS);
+
+    if (_enableOffsetLagMetric) {
+      // the updateIngestionMetrics is called in the consumer thread, so if consumer thread is not running
+      // the lag metrics will not be updated
+      // Hence, using a seperate periodic task to update offset lag so that we can get the offset lag for a partition
+      // even when the consumer thread in RealtimeSegmentDataManager is not running
+      _scheduledExecutor.scheduleWithFixedDelay(this::updateOffsetLagForAllPartitions,
+          INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, _offsetLagUpdateIntervalMs, TimeUnit.MILLISECONDS);
+    }
   }
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
@@ -255,20 +324,17 @@ public class IngestionDelayTracker {
    * @param partitionId partition id of the consuming segment (directly passed in to avoid parsing the segment name)
    * @param ingestionTimeMs ingestion time of the last consumed message (from {@link StreamMessageMetadata})
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
-   *                                   {@link StreamMessageMetadata})
-   * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
-   * @param latestOffset offset of the latest message in the partition (from {@link StreamMetadataProvider})
+   * @param currentOffset offset of the last consumed message
    */
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
-      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
-      @Nullable StreamPartitionMsgOffset latestOffset) {
+      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
       // or once the table data manager has been shutdown.
       return;
     }
 
-    if (ingestionTimeMs < 0 && firstStreamIngestionTimeMs < 0 && (currentOffset == null || latestOffset == null)) {
+    if (ingestionTimeMs < 0 && firstStreamIngestionTimeMs < 0 && (currentOffset == null)) {
       // Do not publish metrics if stream does not return valid ingestion time or offset.
       return;
     }
@@ -289,9 +355,20 @@ public class IngestionDelayTracker {
               ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
               () -> getPartitionEndToEndIngestionDelayMs(partitionId));
         }
-        if (currentOffset != null && latestOffset != null) {
+        if (currentOffset != null) {
           _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
               () -> getPartitionIngestionOffsetLag(partitionId));
+        }
+
+        StreamMetadataProvider streamMetadataProvider = createPartitionMetadataProvider("IngestionOffsetLagCalculation",
+            segmentName + "_consumer_ingestionDelayTracker", partitionId);
+
+        long offsetLag = 0L;
+        StreamPartitionMsgOffset latestOffset = null;
+        if (streamMetadataProvider != null && _enableOffsetLagMetric) {
+          latestOffset = fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, MAX_OFFSET_FETCH_WAIT_TIME_MS,
+              streamMetadataProvider);
+          offsetLag = calculateOffsetLag(partitionId, currentOffset, latestOffset);
         }
 
         if (currentOffset != null) {
@@ -303,8 +380,14 @@ public class IngestionDelayTracker {
           _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
               ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getPartitionIngestionUpstreamOffset(partitionId));
         }
+        return new IngestionInfo(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset, offsetLag,
+            streamMetadataProvider);
+      } else {
+        v.updateCurrentOffset(currentOffset);
+        v.updateIngestionTime(ingestionTimeMs, firstStreamIngestionTimeMs);
       }
-      return new IngestionInfo(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset, latestOffset);
+
+      return v;
     });
 
     // If we are consuming we do not need to track this partition for removal.
@@ -432,16 +515,74 @@ public class IngestionDelayTracker {
     if (ingestionInfo == null) {
       return 0;
     }
-    StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
-    StreamPartitionMsgOffset latestOffset = ingestionInfo._latestOffset;
+    return ingestionInfo._offsetLag;
+  }
+
+  private StreamPartitionMsgOffset fetchStreamOffset(OffsetCriteria offsetCriteria, long maxWaitTimeMs,
+      StreamMetadataProvider streamMetadataProvider) {
+    try {
+      return streamMetadataProvider.fetchStreamPartitionOffset(offsetCriteria, maxWaitTimeMs);
+    } catch (Exception e) {
+      LOGGER.debug("Caught exception while fetching stream offset", e);
+    }
+    return null;
+  }
+
+  /**
+   * Creates a new stream metadata provider
+   */
+  private StreamMetadataProvider createPartitionMetadataProvider(String reason, String clientId, int partitionGroupId) {
+    LOGGER.info("Creating new partition metadata provider, reason: {}", reason);
+    return _streamConsumerFactory.createPartitionMetadataProvider(clientId, partitionGroupId);
+  }
+
+  private void updateOffsetLagForAllPartitions() {
+    List<Map.Entry<Integer, IngestionInfo>> entries = new ArrayList<>(_ingestionInfoMap.entrySet());
+    for (Map.Entry<Integer, IngestionInfo> entry : entries) {
+      int partitionId = entry.getKey();
+      IngestionInfo ingestionInfo = entry.getValue();
+      StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
+      StreamMetadataProvider streamMetadataProvider = ingestionInfo._streamMetadataProvider;
+      // fetch latest offset
+      StreamPartitionMsgOffset latestOffset =
+          fetchStreamOffset(OffsetCriteria.LARGEST_OFFSET_CRITERIA, MAX_OFFSET_FETCH_WAIT_TIME_MS,
+              streamMetadataProvider);
+      long offsetLag = calculateOffsetLag(partitionId, currentOffset, latestOffset);
+      ingestionInfo.updateOffsetLag(offsetLag, latestOffset);
+    }
+  }
+
+  /** For testing: manually update offset lag and latest offset for a given partition. */
+  @VisibleForTesting
+  public void updateOffsetLagForPartition(int partitionId, StreamPartitionMsgOffset latestOffset) {
+    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
+    if (ingestionInfo != null) {
+      StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
+      long offsetLag = calculateOffsetLag(partitionId, currentOffset, latestOffset);
+      ingestionInfo.updateOffsetLag(offsetLag, latestOffset);
+    }
+  }
+
+  public long calculateOffsetLag(int partitionId, StreamPartitionMsgOffset currentOffset,
+      StreamPartitionMsgOffset latestOffset) {
     if (currentOffset == null || latestOffset == null) {
       return 0;
     }
+
     // TODO: Support other types of offsets
     if (!(currentOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset)) {
       return 0;
     }
-    return ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
+
+    long offsetLag = ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) currentOffset).getOffset();
+
+    if (offsetLag < 0) {
+      LOGGER.debug(
+          "Offset lag for partition {} is negative: currentOffset={}, latestOffset={}. This is most likely due to "
+              + "latestOffset not being updated", partitionId, currentOffset, latestOffset);
+      return 0L;
+    }
+    return offsetLag;
   }
 
   // Get the consuming offset for a given partition
