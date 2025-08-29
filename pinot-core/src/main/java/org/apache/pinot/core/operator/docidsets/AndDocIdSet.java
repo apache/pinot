@@ -54,8 +54,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  *     Otherwise, construct and return an AndDocIdIterator with all BlockDocIdIterators.
  *   </li>
  * </ul>
+ *
+ * All children of the AndDocIdSet must follow the same order (ascending or descending) and the AndDocIdSet will follow
+ * the same order as its children.
  */
-public final class AndDocIdSet implements BlockDocIdSet {
+public final class AndDocIdSet extends BlockDocIdSet.Base {
   // Keep the scan based BlockDocIdSets to be accessed when collecting query execution stats
   private final AtomicReference<List<BlockDocIdSet>> _scanBasedDocIdSets = new AtomicReference<>();
   private final boolean _cardinalityBasedRankingForScan;
@@ -63,6 +66,7 @@ public final class AndDocIdSet implements BlockDocIdSet {
   private volatile long _numEntriesScannedInFilter;
 
   public AndDocIdSet(List<BlockDocIdSet> docIdSets, @Nullable Map<String, String> queryOptions) {
+    super(getCommonAscending(docIdSets));
     _docIdSets = docIdSets;
     _cardinalityBasedRankingForScan =
         queryOptions != null && QueryOptionsUtils.isAndScanReorderingEnabled(queryOptions);
@@ -167,7 +171,8 @@ public final class AndDocIdSet implements BlockDocIdSet {
       for (ScanBasedDocIdIterator scanBasedDocIdIterator : scanBasedDocIdIterators) {
         docIds = scanBasedDocIdIterator.applyAnd(docIds);
       }
-      RangelessBitmapDocIdIterator rangelessBitmapDocIdIterator = new RangelessBitmapDocIdIterator(docIds);
+      RangelessBitmapDocIdIterator rangelessBitmapDocIdIterator =
+          RangelessBitmapDocIdIterator.create(docIds, _ascending);
       if (numRemainingDocIdIterators == 0) {
         return rangelessBitmapDocIdIterator;
       } else {
@@ -176,12 +181,12 @@ public final class AndDocIdSet implements BlockDocIdSet {
         for (int i = 0; i < numRemainingDocIdIterators; i++) {
           docIdIterators[i + 1] = remainingDocIdIterators.get(i);
         }
-        return new AndDocIdIterator(docIdIterators);
+        return AndDocIdIterator.create(docIdIterators, _ascending);
       }
     } else {
       // Otherwise, construct and return an AndDocIdIterator with all BlockDocIdIterators.
 
-      return new AndDocIdIterator(allDocIdIterators);
+      return AndDocIdIterator.create(allDocIdIterators, _ascending);
     }
   }
 

@@ -43,11 +43,14 @@ public class NotDocIdIteratorTest {
     bitmap3.add(docIds3);
     MutableRoaringBitmap bitmap4 = new MutableRoaringBitmap();
     bitmap4.add(docIds4);
-    OrDocIdIterator orDocIdIterator = new OrDocIdIterator(new BlockDocIdIterator[]{
-        new RangelessBitmapDocIdIterator(bitmap1), new RangelessBitmapDocIdIterator(
-        bitmap2), new RangelessBitmapDocIdIterator(bitmap3)
-    });
-    NotDocIdIterator notDocIdIterator = new NotDocIdIterator(new RangelessBitmapDocIdIterator(bitmap1), 25);
+    OrDocIdIterator orDocIdIterator = OrDocIdIterator.create(
+        new BlockDocIdIterator[]{
+            RangelessBitmapDocIdIterator.create(bitmap1, true),
+            RangelessBitmapDocIdIterator.create(bitmap2, true),
+            RangelessBitmapDocIdIterator.create(bitmap3, true)
+    }, true);
+    NotDocIdIterator notDocIdIterator = NotDocIdIterator.create(
+        RangelessBitmapDocIdIterator.create(bitmap1, true), 25, true);
 
     assertEquals(notDocIdIterator.advance(1), 2);
     assertEquals(notDocIdIterator.next(), 3);
@@ -59,7 +62,7 @@ public class NotDocIdIteratorTest {
     assertEquals(notDocIdIterator.advance(21), 21);
     assertEquals(notDocIdIterator.advance(26), Constants.EOF);
 
-    notDocIdIterator = new NotDocIdIterator(new RangelessBitmapDocIdIterator(bitmap1), 25);
+    notDocIdIterator = NotDocIdIterator.create(RangelessBitmapDocIdIterator.create(bitmap1, true), 25, true);
     assertEquals(notDocIdIterator.next(), 0);
     assertEquals(notDocIdIterator.next(), 2);
     assertEquals(notDocIdIterator.next(), 3);
@@ -79,7 +82,7 @@ public class NotDocIdIteratorTest {
     assertEquals(notDocIdIterator.next(), 24);
     assertEquals(notDocIdIterator.next(), Constants.EOF);
 
-    notDocIdIterator = new NotDocIdIterator(orDocIdIterator, 25);
+    notDocIdIterator = NotDocIdIterator.create(orDocIdIterator, 25, true);
     assertEquals(notDocIdIterator.next(), 3);
     assertEquals(notDocIdIterator.next(), 7);
     assertEquals(notDocIdIterator.next(), 9);
@@ -92,10 +95,10 @@ public class NotDocIdIteratorTest {
     assertEquals(notDocIdIterator.next(), 24);
     assertEquals(notDocIdIterator.next(), Constants.EOF);
 
-    notDocIdIterator = new NotDocIdIterator(new RangelessBitmapDocIdIterator(bitmap4), 6);
+    notDocIdIterator = NotDocIdIterator.create(RangelessBitmapDocIdIterator.create(bitmap4, true), 6, true);
     assertEquals(notDocIdIterator.next(), Constants.EOF);
 
-    notDocIdIterator = new NotDocIdIterator(new RangelessBitmapDocIdIterator(bitmap4), 9);
+    notDocIdIterator = NotDocIdIterator.create(RangelessBitmapDocIdIterator.create(bitmap4, true), 9, true);
     assertEquals(notDocIdIterator.next(), 6);
     assertEquals(notDocIdIterator.next(), 7);
     assertEquals(notDocIdIterator.next(), 8);

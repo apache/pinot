@@ -60,7 +60,12 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
 
   public H3InclusionIndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate,
       int numDocs) {
-    super(numDocs, false);
+    this(segment, queryContext, predicate, numDocs, true);
+  }
+
+  public H3InclusionIndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate,
+      int numDocs, boolean ascending) {
+    super(numDocs, false, ascending);
     _segment = segment;
     _queryContext = queryContext;
     _predicate = predicate;
@@ -78,6 +83,17 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     }
     // must be some h3 index
     assert _h3IndexReader != null : "the column must have H3 index setup.";
+  }
+
+  private H3InclusionIndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate,
+      int numDocs, H3IndexReader h3IndexReader, Geometry geometry, boolean isPositiveCheck, boolean ascending) {
+    super(numDocs, false, ascending);
+    _segment = segment;
+    _queryContext = queryContext;
+    _predicate = predicate;
+    _h3IndexReader = h3IndexReader;
+    _geometry = geometry;
+    _isPositiveCheck = isPositiveCheck;
   }
 
   @Override
@@ -127,7 +143,7 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     ScanBasedDocIdIterator docIdIterator = (ScanBasedDocIdIterator) expressionFilterOperator.getTrues().iterator();
     MutableRoaringBitmap result = docIdIterator.applyAnd(partialMatchDocIds);
     result.or(fullMatchDocIds);
-    return new BitmapDocIdSet(result, _numDocs) {
+    return new BitmapDocIdSet(result, _numDocs, _ascending) {
       @Override
       public long getNumEntriesScannedInFilter() {
         return docIdIterator.getNumEntriesScanned();
@@ -158,5 +174,11 @@ public class H3InclusionIndexFilterOperator extends BaseFilterOperator {
     super.explainAttributes(attributeBuilder);
     attributeBuilder.putString("operator", _predicate.getType().name());
     attributeBuilder.putString("predicate", _predicate.toString());
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new H3InclusionIndexFilterOperator(_segment, _queryContext, _predicate, _numDocs, _h3IndexReader, _geometry,
+        _isPositiveCheck, !_ascending);
   }
 }

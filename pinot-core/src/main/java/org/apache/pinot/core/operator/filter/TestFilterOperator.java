@@ -35,15 +35,28 @@ public class TestFilterOperator extends BaseFilterOperator {
   private final int[] _nullDocIds;
 
   public TestFilterOperator(int[] trueDocIds, int[] nullDocIds, int numDocs) {
-    super(numDocs, true);
+    this(trueDocIds, nullDocIds, numDocs, true);
+  }
+
+  public TestFilterOperator(int[] trueDocIds, int[] nullDocIds, int numDocs, boolean ascending) {
+    super(numDocs, true, ascending);
     _trueDocIds = trueDocIds;
     _nullDocIds = nullDocIds;
   }
 
   public TestFilterOperator(int[] docIds, int numDocs) {
-    super(numDocs, false);
+    this(docIds, numDocs, true);
+  }
+
+  public TestFilterOperator(int[] docIds, int numDocs, boolean ascending) {
+    super(numDocs, false, ascending);
     _trueDocIds = docIds;
     _nullDocIds = new int[0];
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new TestFilterOperator(_trueDocIds, _nullDocIds, _numDocs, !_ascending);
   }
 
   @Override
@@ -59,12 +72,12 @@ public class TestFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     if (_trueDocIds.length == _numDocs) {
-      return new MatchAllDocIdSet(_numDocs);
+      return MatchAllDocIdSet.create(_numDocs, _ascending);
     }
     if (_trueDocIds.length == 0) {
       return EmptyDocIdSet.getInstance();
     }
-    return new TestBlockDocIdSet(_trueDocIds);
+    return TestBlockDocIdSet.create(_trueDocIds, _ascending);
   }
 
   @Override
@@ -72,47 +85,91 @@ public class TestFilterOperator extends BaseFilterOperator {
     if (_nullDocIds.length == 0) {
       return EmptyDocIdSet.getInstance();
     }
-    return new TestBlockDocIdSet(_nullDocIds);
+    return TestBlockDocIdSet.create(_nullDocIds, _ascending);
   }
 
-  private static class TestBlockDocIdSet implements BlockDocIdSet {
-    private final int[] _docIds;
+  private abstract static class TestBlockDocIdSet extends BlockDocIdSet.Base {
+    protected final int[] _docIds;
 
-    public TestBlockDocIdSet(int[] docIds) {
+    private TestBlockDocIdSet(int[] docIds, boolean ascending) {
+      super(ascending);
       _docIds = docIds;
     }
 
-    @Override
-    public BlockDocIdIterator iterator() {
-      return new BlockDocIdIterator() {
-        private final int _numDocIds = _docIds.length;
-        private int _nextIndex = 0;
-
-        @Override
-        public int next() {
-          if (_nextIndex < _numDocIds) {
-            return _docIds[_nextIndex++];
-          } else {
-            return Constants.EOF;
-          }
-        }
-
-        @Override
-        public int advance(int targetDocId) {
-          while (_nextIndex < _numDocIds) {
-            int docId = _docIds[_nextIndex++];
-            if (docId >= targetDocId) {
-              return docId;
-            }
-          }
-          return Constants.EOF;
-        }
-      };
+    public static TestBlockDocIdSet create(int[] docIds, boolean ascending) {
+      return ascending ? new Asc(docIds) : new Desc(docIds);
     }
 
     @Override
     public long getNumEntriesScannedInFilter() {
       return 0L;
+    }
+
+    public static class Asc extends TestBlockDocIdSet {
+      private Asc(int[] docIds) {
+        super(docIds, true);
+      }
+
+      @Override
+      public BlockDocIdIterator iterator() {
+        return new BlockDocIdIterator() {
+          private final int _numDocIds = _docIds.length;
+          private int _nextIndex = 0;
+
+          @Override
+          public int next() {
+            if (_nextIndex < _numDocIds) {
+              return _docIds[_nextIndex++];
+            } else {
+              return Constants.EOF;
+            }
+          }
+
+          @Override
+          public int advance(int targetDocId) {
+            while (_nextIndex < _numDocIds) {
+              int docId = _docIds[_nextIndex++];
+              if (docId >= targetDocId) {
+                return docId;
+              }
+            }
+            return Constants.EOF;
+          }
+        };
+      }
+    }
+
+    public static class Desc extends TestBlockDocIdSet {
+      public Desc(int[] docIds) {
+        super(docIds, false);
+      }
+
+      @Override
+      public BlockDocIdIterator iterator() {
+        return new BlockDocIdIterator() {
+          private int _nextIndex = _docIds.length;
+
+          @Override
+          public int next() {
+            if (_nextIndex > 0) {
+              return _docIds[--_nextIndex];
+            } else {
+              return Constants.EOF;
+            }
+          }
+
+          @Override
+          public int advance(int targetDocId) {
+            while (_nextIndex > 0) {
+              int docId = _docIds[--_nextIndex];
+              if (docId <= targetDocId) {
+                return docId;
+              }
+            }
+            return Constants.EOF;
+          }
+        };
+      }
     }
   }
 }

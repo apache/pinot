@@ -18,14 +18,16 @@
  */
 package org.apache.pinot.core.common;
 
+import java.util.Iterator;
+import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.dociditerators.AndDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.ScanBasedDocIdIterator;
-import org.apache.pinot.core.operator.docidsets.BitmapDocIdSet;
 import org.apache.pinot.core.operator.docidsets.RangelessBitmapDocIdSet;
+import org.apache.pinot.core.operator.docidsets.RoaringBitmapDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.roaringbitmap.RoaringBitmapWriter;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -33,6 +35,11 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 /**
  * The {@code BlockDocIdSet} contains the matching document ids returned by the {@link FilterBlock}.
+ *
+ * BlockDocIdSet has been designed to iterate over the matching document ids one by one.
+ * Do not confuse this class with {@link DocIdSetBlock}, which is designed to consume the ids in bulk
+ * ({@link DocIdSetBlock#getDocIds()} returns a array). BlocDocIdSet is the class used <em>deeper</em> in the execution
+ * than DocIdSetBlock, which is the latest block before materialization.
  */
 public interface BlockDocIdSet {
 
@@ -64,18 +71,66 @@ public interface BlockDocIdSet {
       while ((docId = docIdIterator.next()) != Constants.EOF) {
         bitmapWriter.add(docId);
       }
-      return new RangelessBitmapDocIdSet(bitmapWriter.get());
+      return new RangelessBitmapDocIdSet(bitmapWriter.get(), isAscending());
     }
 
     // NOTE: AND and OR DocIdSet might return BitmapBasedDocIdIterator after processing the iterators. Create a new
     //       DocIdSet to prevent processing the iterators again
     if (docIdIterator instanceof RangelessBitmapDocIdIterator) {
-      return new RangelessBitmapDocIdSet((RangelessBitmapDocIdIterator) docIdIterator);
+      return new RangelessBitmapDocIdSet((RangelessBitmapDocIdIterator) docIdIterator, isAscending());
     }
     if (docIdIterator instanceof BitmapDocIdIterator) {
-      return new BitmapDocIdSet((BitmapDocIdIterator) docIdIterator);
+      return new RoaringBitmapDocIdSet((BitmapDocIdIterator) docIdIterator);
     }
 
     return this;
+  }
+
+  /// Returns true if and only if the order of the document ids in the iterator is ascending.
+  ///
+  /// Remember that this is not the inverse of [#isDescending()] because an empty filter is considered to be both
+  boolean isAscending();
+
+  /// Returns true if and only if the order of the document ids in the iterator is descending.
+  ///
+  /// Remember that this is not the inverse of [#isAscending()] because an empty filter is considered to be both
+  boolean isDescending();
+
+  abstract class Base implements BlockDocIdSet {
+    protected final boolean _ascending;
+
+    protected Base(boolean ascending) {
+      _ascending = ascending;
+    }
+
+    /// Returns the order between rows in a block.
+    ///
+    /// Most are ascending. Remember that a empty filter is considered to be both ascending
+    /// and descending.
+    public boolean isAscending() {
+      return _ascending;
+    }
+
+    public boolean isDescending() {
+      return !_ascending;
+    }
+
+    protected static boolean getCommonAscending(Iterable<BlockDocIdSet> subBlocks) {
+      Iterator<BlockDocIdSet> iterator = subBlocks.iterator();
+      boolean ascendingSoFar = true;
+      boolean descendingSoFar = true;
+      while (iterator.hasNext() && (ascendingSoFar || descendingSoFar)) {
+        BlockDocIdSet block = iterator.next();
+        ascendingSoFar &= block.isAscending();
+        descendingSoFar &= block.isDescending();
+      }
+      if (ascendingSoFar) {
+        return true;
+      }
+      if (descendingSoFar) {
+        return false;
+      }
+      throw new IllegalStateException("All sub-block operators must have the same order");
+    }
   }
 }

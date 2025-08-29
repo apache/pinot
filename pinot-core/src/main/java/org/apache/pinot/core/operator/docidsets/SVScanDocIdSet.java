@@ -24,11 +24,17 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
-public final class SVScanDocIdSet implements BlockDocIdSet {
+public final class SVScanDocIdSet extends BlockDocIdSet.Base {
   private final SVScanDocIdIterator _docIdIterator;
 
-  public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
-    _docIdIterator = new SVScanDocIdIterator(predicateEvaluator, dataSource, numDocs, batchSize);
+  public SVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize,
+      boolean ascending) {
+    super(ascending);
+    if (ascending) {
+      _docIdIterator = new SVScanDocIdIterator.Asc(predicateEvaluator, dataSource, numDocs, batchSize);
+    } else {
+      _docIdIterator = new SVScanDocIdIterator.Desc(predicateEvaluator, dataSource, numDocs, batchSize);
+    }
   }
 
   @Override

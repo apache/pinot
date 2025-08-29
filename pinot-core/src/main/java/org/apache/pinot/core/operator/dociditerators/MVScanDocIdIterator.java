@@ -35,19 +35,19 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * matching document ids.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
+public abstract class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
   private final ForwardIndexReader _reader;
   private final ForwardIndexReaderContext _readerContext;
-  private final int _numDocs;
-  private final int _maxNumValuesPerMVEntry;
-  private final ValueMatcher _valueMatcher;
-  private final int _cardinality;
+  protected final int _numDocs;
+  protected final int _maxNumValuesPerMVEntry;
+  protected final ValueMatcher _valueMatcher;
+  protected final int _cardinality;
 
-  private int _nextDocId = 0;
-  private long _numEntriesScanned = 0L;
+  protected int _nextDocId = 0;
+  protected long _numEntriesScanned = 0L;
 
-  public MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+  private MVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
     _predicateEvaluator = predicateEvaluator;
     _reader = dataSource.getForwardIndex();
     _readerContext = _reader.createContext();
@@ -55,21 +55,6 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     _maxNumValuesPerMVEntry = dataSource.getDataSourceMetadata().getMaxNumValuesPerMVEntry();
     _valueMatcher = getValueMatcher();
     _cardinality = dataSource.getDataSourceMetadata().getCardinality();
-  }
-
-  @Override
-  public int next() {
-    while (_nextDocId < _numDocs) {
-      int nextDocId = _nextDocId++;
-      // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
-      //       SVScanDocIdIterator
-      boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId);
-      if (doesValueMatch) {
-        return nextDocId;
-      }
-    }
-    close();
-    return Constants.EOF;
   }
 
   @Override
@@ -160,7 +145,7 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
-  private interface ValueMatcher {
+  protected interface ValueMatcher {
 
     /**
      * Returns {@code true} if the value for the given document id matches the predicate, {@code false} Otherwise.
@@ -256,6 +241,47 @@ public final class MVScanDocIdIterator implements ScanBasedDocIdIterator {
   public void close() {
     if (_readerContext != null) {
       _readerContext.close();
+    }
+  }
+
+  public static class Asc extends MVScanDocIdIterator {
+    public Asc(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+      super(predicateEvaluator, dataSource, numDocs);
+    }
+
+    @Override
+    public int next() {
+      while (_nextDocId < _numDocs) {
+        int nextDocId = _nextDocId++;
+        // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
+        //       SVScanDocIdIterator
+        boolean doesValueMatch = _valueMatcher.doesValueMatch(nextDocId);
+        if (doesValueMatch) {
+          return nextDocId;
+        }
+      }
+      close();
+      return Constants.EOF;
+    }
+  }
+
+  public static class Desc extends MVScanDocIdIterator {
+    public Desc(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+      super(predicateEvaluator, dataSource, numDocs);
+    }
+
+    @Override
+    public int next() {
+      while (_nextDocId >= 0) {
+        int nextDocId = _nextDocId--;
+        // TODO: The performance can be improved by batching the docID lookups similar to how it's done in
+        //       SVScanDocIdIterator
+        if (_valueMatcher.doesValueMatch(nextDocId)) {
+          return nextDocId;
+        }
+      }
+      close();
+      return Constants.EOF;
     }
   }
 }

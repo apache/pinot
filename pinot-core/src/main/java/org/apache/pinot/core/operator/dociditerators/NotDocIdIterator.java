@@ -26,44 +26,92 @@ import org.apache.pinot.segment.spi.Constants;
  * The iterator performs a linear pass through the underlying child iterator and returns
  * the complement of the result set.
  */
-public class NotDocIdIterator implements BlockDocIdIterator {
-  private final BlockDocIdIterator _childDocIdIterator;
-  private final int _numDocs;
-  private int _nextDocId;
-  private int _nextNonMatchingDocId;
+public abstract class NotDocIdIterator implements BlockDocIdIterator {
+  protected final BlockDocIdIterator _childDocIdIterator;
+  protected final int _numDocs;
 
-  public NotDocIdIterator(BlockDocIdIterator childDocIdIterator, int numDocs) {
+  private NotDocIdIterator(BlockDocIdIterator childDocIdIterator, int numDocs) {
     _childDocIdIterator = childDocIdIterator;
-    _nextDocId = 0;
-
-    int currentDocIdFromChildIterator = childDocIdIterator.next();
-    _nextNonMatchingDocId = currentDocIdFromChildIterator == Constants.EOF ? numDocs : currentDocIdFromChildIterator;
     _numDocs = numDocs;
   }
 
-  @Override
-  public int next() {
-    if (_nextDocId >= _numDocs) {
-      return Constants.EOF;
-    }
-    while (_nextDocId == _nextNonMatchingDocId) {
-      _nextDocId++;
-      int nextNonMatchingDocId = _childDocIdIterator.next();
-      _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? _numDocs : nextNonMatchingDocId;
-    }
-    if (_nextDocId >= _numDocs) {
-      return Constants.EOF;
-    }
-    return _nextDocId++;
+  public static NotDocIdIterator create(BlockDocIdIterator childDocIdIterator, int numDocs, boolean ascending) {
+    return ascending ? new Asc(childDocIdIterator, numDocs) : new Desc(childDocIdIterator, numDocs);
   }
 
-  @Override
-  public int advance(int targetDocId) {
-    _nextDocId = targetDocId;
-    if (targetDocId > _nextNonMatchingDocId) {
-      int nextNonMatchingDocId = _childDocIdIterator.advance(targetDocId);
-      _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? _numDocs : nextNonMatchingDocId;
+  private static final class Asc extends NotDocIdIterator {
+    private int _nextDocId;
+    private int _nextNonMatchingDocId;
+
+    public Asc(BlockDocIdIterator childDocIdIterator, int numDocs) {
+      super(childDocIdIterator, numDocs);
+      int currentDocIdFromChildIterator = childDocIdIterator.next();
+
+      _nextNonMatchingDocId = currentDocIdFromChildIterator == Constants.EOF ? numDocs : currentDocIdFromChildIterator;
     }
-    return next();
+
+    @Override
+    public int next() {
+      if (_nextDocId >= _numDocs) {
+        return Constants.EOF;
+      }
+      while (_nextDocId == _nextNonMatchingDocId) {
+        _nextDocId++;
+        int nextNonMatchingDocId = _childDocIdIterator.next();
+        _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? _numDocs : nextNonMatchingDocId;
+      }
+      if (_nextDocId >= _numDocs) {
+        return Constants.EOF;
+      }
+      return _nextDocId++;
+    }
+
+    @Override
+    public int advance(int targetDocId) {
+      _nextDocId = targetDocId;
+      if (targetDocId > _nextNonMatchingDocId) {
+        int nextNonMatchingDocId = _childDocIdIterator.advance(targetDocId);
+        _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? _numDocs : nextNonMatchingDocId;
+      }
+      return next();
+    }
+  }
+
+  private static final class Desc extends NotDocIdIterator {
+    private int _nextDocId;
+    private int _nextNonMatchingDocId;
+    public Desc(BlockDocIdIterator childDocIdIterator, int numDocs) {
+      super(childDocIdIterator, numDocs);
+
+      int currentDocIdFromChildIterator = childDocIdIterator.next();
+      _nextNonMatchingDocId = currentDocIdFromChildIterator == Constants.EOF ? numDocs : currentDocIdFromChildIterator;
+      _nextDocId = numDocs - 1;
+    }
+
+    @Override
+    public int next() {
+      if (_nextDocId < 0) {
+        return Constants.EOF;
+      }
+      while (_nextDocId == _nextNonMatchingDocId) {
+        _nextDocId--;
+        int nextNonMatchingDocId = _childDocIdIterator.next();
+        _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? 0 : nextNonMatchingDocId;
+      }
+      if (_nextDocId < 0) {
+        return Constants.EOF;
+      }
+      return _nextDocId--;
+    }
+
+    @Override
+    public int advance(int targetDocId) {
+      _nextDocId = targetDocId;
+      if (targetDocId < _nextNonMatchingDocId) {
+        int nextNonMatchingDocId = _childDocIdIterator.advance(targetDocId);
+        _nextNonMatchingDocId = nextNonMatchingDocId == Constants.EOF ? 0 : nextNonMatchingDocId;
+      }
+      return next();
+    }
   }
 }

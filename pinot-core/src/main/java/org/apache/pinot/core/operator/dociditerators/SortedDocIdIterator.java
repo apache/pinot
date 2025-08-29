@@ -28,57 +28,114 @@ import org.apache.pinot.spi.utils.Pairs.IntPair;
  * The {@code SortedDocIdIterator} is the iterator for SortedDocIdSet to iterate over a list of matching document id
  * ranges from a sorted column.
  */
-public final class SortedDocIdIterator implements BlockDocIdIterator {
-  private final List<IntPair> _docIdRanges;
-  private final int _numRanges;
+public abstract class SortedDocIdIterator implements BlockDocIdIterator {
+  protected final List<IntPair> _docIdRanges;
+  protected final int _numRanges;
 
-  private int _currentRangeId = 0;
-  private int _nextDocId;
+  protected int _currentRangeId;
+  protected int _nextDocId;
 
-  public SortedDocIdIterator(List<IntPair> docIdRanges) {
+  private SortedDocIdIterator(List<IntPair> docIdRanges) {
     _docIdRanges = docIdRanges;
     _numRanges = _docIdRanges.size();
     _nextDocId = docIdRanges.get(0).getLeft();
+  }
+
+  public static SortedDocIdIterator create(List<IntPair> docIdRanges, boolean ascending) {
+    return ascending ? new Asc(docIdRanges) : new Desc(docIdRanges);
   }
 
   public List<IntPair> getDocIdRanges() {
     return _docIdRanges;
   }
 
-  @Override
-  public int next() {
-    IntPair currentRange = _docIdRanges.get(_currentRangeId);
-    if (_nextDocId <= currentRange.getRight()) {
-      // Next document id is within the current range
-      return _nextDocId++;
+  private static class Asc extends SortedDocIdIterator {
+    private Asc(List<IntPair> docIdRanges) {
+      super(docIdRanges);
+      _currentRangeId = 0;
+      _nextDocId = 0;
     }
-    if (_currentRangeId < _numRanges - 1) {
-      // Move to the next range
-      _currentRangeId++;
-      _nextDocId = _docIdRanges.get(_currentRangeId).getLeft();
-      return _nextDocId++;
-    } else {
+
+    @Override
+    public int next() {
+      IntPair currentRange = _docIdRanges.get(_currentRangeId);
+      if (_nextDocId <= currentRange.getRight()) {
+        // Next document id is within the current range
+        return _nextDocId++;
+      }
+      if (_currentRangeId < _numRanges - 1) {
+        // Move to the next range
+        _currentRangeId++;
+        _nextDocId = _docIdRanges.get(_currentRangeId).getLeft();
+        return _nextDocId++;
+      } else {
+        return Constants.EOF;
+      }
+    }
+
+    @Override
+    public int advance(int targetDocId) {
+      IntPair currentRange = _docIdRanges.get(_currentRangeId);
+      if (targetDocId <= currentRange.getRight()) {
+        // Target document id is within the current range
+        _nextDocId = Math.max(targetDocId, currentRange.getLeft());
+        return _nextDocId++;
+      }
+      while (_currentRangeId < _numRanges - 1) {
+        // Move to the range that contains the target document id
+        _currentRangeId++;
+        currentRange = _docIdRanges.get(_currentRangeId);
+        if (targetDocId <= currentRange.getRight()) {
+          _nextDocId = Math.max(targetDocId, currentRange.getLeft());
+          return _nextDocId++;
+        }
+      }
       return Constants.EOF;
     }
   }
 
-  @Override
-  public int advance(int targetDocId) {
-    IntPair currentRange = _docIdRanges.get(_currentRangeId);
-    if (targetDocId <= currentRange.getRight()) {
-      // Target document id is within the current range
-      _nextDocId = Math.max(targetDocId, currentRange.getLeft());
-      return _nextDocId++;
+  private static class Desc extends SortedDocIdIterator {
+    private Desc(List<IntPair> docIdRanges) {
+      super(docIdRanges);
+      _currentRangeId = _numRanges - 1;
+      _nextDocId = docIdRanges.get(_currentRangeId).getRight();
     }
-    while (_currentRangeId < _numRanges - 1) {
-      // Move to the range that contains the target document id
-      _currentRangeId++;
-      currentRange = _docIdRanges.get(_currentRangeId);
-      if (targetDocId <= currentRange.getRight()) {
-        _nextDocId = Math.max(targetDocId, currentRange.getLeft());
-        return _nextDocId++;
+
+    @Override
+    public int next() {
+      IntPair currentRange = _docIdRanges.get(_currentRangeId);
+      if (_nextDocId >= currentRange.getLeft()) {
+        // Next document id is within the current range
+        return _nextDocId--;
+      }
+      if (_currentRangeId > 0) {
+        // Move to the next range
+        _currentRangeId--;
+        _nextDocId = _docIdRanges.get(_currentRangeId).getRight();
+        return _nextDocId--;
+      } else {
+        return Constants.EOF;
       }
     }
-    return Constants.EOF;
+
+    @Override
+    public int advance(int targetDocId) {
+      IntPair currentRange = _docIdRanges.get(_currentRangeId);
+      if (targetDocId >= currentRange.getLeft()) {
+        // Target document id is within the current range
+        _nextDocId = Math.min(targetDocId, currentRange.getRight());
+        return _nextDocId--;
+      }
+      while (_currentRangeId > 0) {
+        // Move to the range that contains the target document id
+        _currentRangeId--;
+        currentRange = _docIdRanges.get(_currentRangeId);
+        if (targetDocId >= currentRange.getLeft()) {
+          _nextDocId = Math.min(targetDocId, currentRange.getRight());
+          return _nextDocId--;
+        }
+      }
+      return Constants.EOF;
+    }
   }
 }

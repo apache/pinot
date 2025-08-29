@@ -46,8 +46,8 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
   private final boolean _exclusive;
 
   InvertedIndexFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator, DataSource dataSource,
-      int numDocs) {
-    super(queryContext, dataSource, numDocs);
+      int numDocs, boolean ascending) {
+    super(queryContext, dataSource, numDocs, ascending);
     _predicateEvaluator = predicateEvaluator;
     @SuppressWarnings("unchecked")
     InvertedIndexReader<ImmutableRoaringBitmap> invertedIndexReader =
@@ -69,12 +69,13 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
         if (docIds instanceof MutableRoaringBitmap) {
           MutableRoaringBitmap mutableRoaringBitmap = (MutableRoaringBitmap) docIds;
           mutableRoaringBitmap.flip(0L, _numDocs);
-          return new BitmapDocIdSet(mutableRoaringBitmap, _numDocs);
+          return new BitmapDocIdSet(mutableRoaringBitmap, _numDocs, _ascending);
         } else {
-          return new BitmapDocIdSet(ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs), _numDocs);
+          MutableRoaringBitmap flipped = ImmutableRoaringBitmap.flip(docIds, 0L, _numDocs);
+          return new BitmapDocIdSet(flipped, _numDocs, _ascending);
         }
       } else {
-        return new BitmapDocIdSet(docIds, _numDocs);
+        return new BitmapDocIdSet(docIds, _numDocs, _ascending);
       }
     } else {
       ImmutableRoaringBitmap[] bitmaps = new ImmutableRoaringBitmap[numDictIds];
@@ -91,7 +92,7 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
         recording.setNumDocsMatchingAfterFilter(docIds.getCardinality());
         recording.setFilter(FilterType.INDEX, String.valueOf(_predicateEvaluator.getPredicateType()));
       }
-      return new BitmapDocIdSet(docIds, _numDocs);
+      return new BitmapDocIdSet(docIds, _numDocs, _ascending);
     }
   }
 
@@ -170,5 +171,10 @@ public class InvertedIndexFilterOperator extends BaseColumnFilterOperator {
     attributeBuilder.putString("indexLookUp", "inverted_index");
     attributeBuilder.putString("operator", _predicateEvaluator.getPredicate().getType().name());
     attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new InvertedIndexFilterOperator(_queryContext, _predicateEvaluator, _dataSource, _numDocs, !_ascending);
   }
 }

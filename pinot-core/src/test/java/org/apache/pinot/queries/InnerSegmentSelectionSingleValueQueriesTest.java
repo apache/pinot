@@ -28,8 +28,8 @@ import org.apache.pinot.core.operator.BaseOperator;
 import org.apache.pinot.core.operator.ExecutionStatistics;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
-import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByAscOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
+import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOperator;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.testng.annotations.Test;
 
@@ -268,7 +268,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     // Test query order by single sorted column in ascending order
     String orderBy = " ORDER BY column5";
     BaseOperator<SelectionResultsBlock> selectionOrderByOperator = getOperator(SELECTION_QUERY + orderBy);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
     SelectionResultsBlock resultsBlock = selectionOrderByOperator.nextBlock();
     ExecutionStatistics executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -310,7 +310,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     // Test query order by all sorted columns in ascending order
     String query = "SELECT column5, daysSinceEpoch FROM testTable ORDER BY column5, daysSinceEpoch";
     selectionOrderByOperator = getOperator(query);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 10L);
@@ -352,7 +352,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     // Test query order by one sorted column in ascending order, the other sorted column in descending order
     query = "SELECT daysSinceEpoch FROM testTable ORDER BY column5, daysSinceEpoch DESC";
     selectionOrderByOperator = getOperator(query);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
@@ -373,7 +373,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     // Test query order by one sorted column in ascending order, and some unsorted columns
     query = "SELECT column1 FROM testTable ORDER BY column5, column6, column1";
     selectionOrderByOperator = getOperator(query);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByAscOperator);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);

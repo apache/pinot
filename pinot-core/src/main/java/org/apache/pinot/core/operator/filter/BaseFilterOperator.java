@@ -19,8 +19,10 @@
 package org.apache.pinot.core.operator.filter;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.blocks.FilterBlock;
 import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
@@ -30,14 +32,20 @@ import org.apache.pinot.core.operator.docidsets.OrDocIdSet;
 
 /**
  * The {@link BaseFilterOperator} class is the base class for all filter operators.
+ *
+ * Unlike other operators, the {#nextBlock()} method of these operators is expected to be called only once.
+ * This single call returns the {@link FilterBlock} containing the {@link BlockDocIdSet} with all the matching
+ * documents for the given filter and the segment.
  */
 public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   protected final int _numDocs;
   protected final boolean _nullHandlingEnabled;
+  protected final boolean _ascending;
 
-  public BaseFilterOperator(int numDocs, boolean nullHandlingEnabled) {
+  public BaseFilterOperator(int numDocs, boolean nullHandlingEnabled, boolean ascending) {
     _numDocs = numDocs;
     _nullHandlingEnabled = nullHandlingEnabled;
+    _ascending = ascending;
   }
 
   /**
@@ -115,8 +123,67 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
       }
     }
     if (trues instanceof EmptyDocIdSet) {
-      return new MatchAllDocIdSet(_numDocs);
+      return MatchAllDocIdSet.create(_numDocs, _ascending);
     }
     return new NotDocIdSet(trues, _numDocs);
+  }
+
+  /// Returns the order between rows in a block.
+  ///
+  /// Most BaseFilterOperators are ascending. Remember that a empty filter is considered to be both ascending
+  /// and descending.
+  public boolean isAscending() {
+    return _ascending || isResultEmpty();
+  }
+
+  /// Returns the order between rows in a block.
+  ///
+  /// Most BaseFilterOperators are ascending. Remember that a empty filter is considered to be both ascending
+  /// and descending.
+  public boolean isDescending() {
+    return !_ascending || isResultEmpty();
+  }
+
+  /// Returns a reversed version of this filter operator.
+  protected abstract BaseFilterOperator reverse()
+      throws UnsupportedOperationException;
+
+  /// Returns a [BaseFilterOperator] that is ascending or descending based on the input parameter.
+  ///
+  /// Remember that an empty filter is considered to be both ascending and descending.
+  public BaseFilterOperator withOrder(boolean ascending)
+      throws UnsupportedOperationException {
+    if (isResultEmpty()) {
+      return this;
+    }
+    if (ascending == _ascending) {
+      return this;
+    }
+    return reverse();
+  }
+
+  protected static boolean getCommonAscending(Iterable<BaseFilterOperator> filterOperators) {
+    Iterator<BaseFilterOperator> iterator = filterOperators.iterator();
+    boolean ascendingSoFar = true;
+    boolean descendingSoFar = true;
+    while (iterator.hasNext() && (ascendingSoFar || descendingSoFar)) {
+      BaseFilterOperator filterOperator = iterator.next();
+      ascendingSoFar &= filterOperator.isAscending();
+      descendingSoFar &= filterOperator.isDescending();
+    }
+    if (ascendingSoFar) {
+      return true;
+    }
+    if (descendingSoFar) {
+      return false;
+    }
+    throw new IllegalStateException("All filter operators must have the same order");
+  }
+
+  @Override
+  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
+    super.explainAttributes(attributeBuilder);
+    attributeBuilder.putLong("numDocs", _numDocs);
+    attributeBuilder.putString("order", isAscending() ? "ASC" : "DESC");
   }
 }

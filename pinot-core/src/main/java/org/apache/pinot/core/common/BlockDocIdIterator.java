@@ -22,8 +22,13 @@ import org.apache.pinot.segment.spi.Constants;
 
 
 /**
- * The interface <code>BlockDocIdIterator</code> represents the iterator for <code>BlockDocIdSet</code>. The document
- * ids returned from the iterator should be in ascending order.
+ * The interface <code>BlockDocIdIterator</code> represents the iterator for {@link BlockDocIdSet}.
+ *
+ * Each call to {@link #next()} or {@link #advance(int)} returns the next matching document id
+ * in the iterator, or {@link Constants#EOF} if there is no more matching document.
+ *
+ * The order of the returned document ids depends on the order of the iterator, which can be
+ * either ascending or descending.
  */
 public interface BlockDocIdIterator extends AutoCloseable {
 
@@ -34,11 +39,15 @@ public interface BlockDocIdIterator extends AutoCloseable {
   int next();
 
   /**
-   * Returns the first matching document whose id is greater than or equal to the given target document id, or
-   * {@link Constants#EOF} if there is no such document.
-   * <p>NOTE: The target document id should be GREATER THAN the document id previous returned because the iterator
-   *          should not return the same value twice.
+   * Returns the first matching document whose id is equal or greater (for ascending iterators) or smaller
+   * (for descending iterators) than the given target document id, or {@link Constants#EOF} if there is no such
+   * document.
+   * <p>NOTE: The target document id should be GREATER/SMALLER THAN the document id previous returned because the
+   *          iterator should not return the same value twice.
    * <p>NOTE: There should be no more calls to this method after it returns {@link Constants#EOF}.
+   * <p>The actual constraint depends on the order of the iterator: For ascending iterator, the target document id
+   * should be greater than the previous returned document id; For descending iterator, the target document id
+   * should be smaller than the previous returned document id.
    */
   int advance(int targetDocId);
 

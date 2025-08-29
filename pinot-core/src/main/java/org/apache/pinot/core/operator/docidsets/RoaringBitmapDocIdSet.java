@@ -19,30 +19,33 @@
 package org.apache.pinot.core.operator.docidsets;
 
 import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.operator.dociditerators.MVScanDocIdIterator;
-import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
-import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
 
 
-public final class MVScanDocIdSet extends BlockDocIdSet.Base {
-  private final MVScanDocIdIterator _docIdIterator;
+public class RoaringBitmapDocIdSet implements BlockDocIdSet {
+  private final BitmapDocIdIterator _iterator;
 
-  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, boolean ascending) {
-    super(ascending);
-    if (ascending) {
-      _docIdIterator = new MVScanDocIdIterator.Asc(predicateEvaluator, dataSource, numDocs);
-    } else {
-      _docIdIterator = new MVScanDocIdIterator.Desc(predicateEvaluator, dataSource, numDocs);
-    }
+  public RoaringBitmapDocIdSet(BitmapDocIdIterator iterator) {
+    _iterator = iterator;
   }
 
   @Override
-  public MVScanDocIdIterator iterator() {
-    return _docIdIterator;
+  public BitmapDocIdIterator iterator() {
+    return _iterator;
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    return _docIdIterator.getNumEntriesScanned();
+    return 0L;
+  }
+
+  @Override
+  public boolean isAscending() {
+    return _iterator.isAscending();
+  }
+
+  @Override
+  public boolean isDescending() {
+    return !_iterator.isAscending();
   }
 }

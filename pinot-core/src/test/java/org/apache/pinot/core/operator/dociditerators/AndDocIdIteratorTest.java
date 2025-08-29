@@ -41,10 +41,12 @@ public class AndDocIdIteratorTest {
     bitmap2.add(docIds2);
     MutableRoaringBitmap bitmap3 = new MutableRoaringBitmap();
     bitmap3.add(docIds3);
-    AndDocIdIterator andDocIdIterator = new AndDocIdIterator(new BlockDocIdIterator[]{
-        new RangelessBitmapDocIdIterator(bitmap1), new RangelessBitmapDocIdIterator(bitmap2),
-        new RangelessBitmapDocIdIterator(bitmap3)
-    });
+    AndDocIdIterator andDocIdIterator = AndDocIdIterator.create(
+        new BlockDocIdIterator[]{
+            RangelessBitmapDocIdIterator.create(bitmap1, true),
+            RangelessBitmapDocIdIterator.create(bitmap2, true),
+            RangelessBitmapDocIdIterator.create(bitmap3, true)
+    }, true);
 
     assertEquals(andDocIdIterator.next(), 2);
     assertEquals(andDocIdIterator.next(), 7);

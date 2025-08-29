@@ -43,8 +43,8 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
   private final SortedIndexReader<?> _sortedIndexReader;
 
   SortedIndexBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
-      DataSource dataSource, int numDocs) {
-    super(queryContext, dataSource, numDocs);
+      DataSource dataSource, int numDocs, boolean ascending) {
+    super(queryContext, dataSource, numDocs, ascending);
     _predicateEvaluator = predicateEvaluator;
     _sortedIndexReader = (SortedIndexReader<?>) dataSource.getInvertedIndex();
   }
@@ -65,7 +65,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
       int startDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getStartDictId()).getLeft();
       // NOTE: End dictionary id is exclusive in OfflineDictionaryBasedRangePredicateEvaluator.
       int endDocId = _sortedIndexReader.getDocIds(rangePredicateEvaluator.getEndDictId() - 1).getRight();
-      return new SortedDocIdSet(Collections.singletonList(new IntPair(startDocId, endDocId)));
+      return new SortedDocIdSet(Collections.singletonList(new IntPair(startDocId, endDocId)), _ascending);
     } else {
       boolean exclusive = _predicateEvaluator.isExclusive();
       int[] dictIds =
@@ -86,9 +86,9 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
           if (lastDocId < _numDocs - 1) {
             docIdRanges.add(new IntPair(lastDocId + 1, _numDocs - 1));
           }
-          return new SortedDocIdSet(docIdRanges);
+          return new SortedDocIdSet(docIdRanges, _ascending);
         } else {
-          return new SortedDocIdSet(Collections.singletonList(docIdRange));
+          return new SortedDocIdSet(Collections.singletonList(docIdRange), _ascending);
         }
       } else {
         // Merge adjacent docIdRanges (dictIds are already sorted)
@@ -126,7 +126,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
           docIdRanges = invertedDocIdRanges;
         }
 
-        return new SortedDocIdSet(docIdRanges);
+        return new SortedDocIdSet(docIdRanges, _ascending);
       }
     }
   }
@@ -228,6 +228,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:sorted_index");
     stringBuilder.append(",operator:").append(_predicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
+    stringBuilder.append(",order:").append(_ascending ? "ASC" : "DESC");
     return stringBuilder.append(')').toString();
   }
 
@@ -242,5 +243,10 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
     attributeBuilder.putString("indexLookUp", "sorted_index");
     attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
     attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new SortedIndexBasedFilterOperator(_queryContext, _predicateEvaluator, _dataSource, _numDocs, !_ascending);
   }
 }

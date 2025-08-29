@@ -33,7 +33,11 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   private final boolean _exclusive;
 
   public BitmapBasedFilterOperator(ImmutableRoaringBitmap docIds, boolean exclusive, int numDocs) {
-    super(numDocs, false);
+    this(docIds, exclusive, numDocs, true);
+  }
+
+  public BitmapBasedFilterOperator(ImmutableRoaringBitmap docIds, boolean exclusive, int numDocs, boolean ascending) {
+    super(numDocs, false, ascending);
     _docIds = docIds;
     _exclusive = exclusive;
   }
@@ -41,9 +45,9 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     if (_exclusive) {
-      return new BitmapDocIdSet(ImmutableRoaringBitmap.flip(_docIds, 0L, _numDocs), _numDocs);
+      return new BitmapDocIdSet(ImmutableRoaringBitmap.flip(_docIds, 0L, _numDocs), _numDocs, _ascending);
     } else {
-      return new BitmapDocIdSet(_docIds, _numDocs);
+      return new BitmapDocIdSet(_docIds, _numDocs, _ascending);
     }
   }
 
@@ -78,5 +82,10 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new BitmapBasedFilterOperator(_docIds, _ascending, _numDocs, !_ascending);
   }
 }
