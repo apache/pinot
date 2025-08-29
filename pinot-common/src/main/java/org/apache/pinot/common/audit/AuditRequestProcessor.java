@@ -192,15 +192,7 @@ public class AuditRequestProcessor {
     }
   }
 
-  /**
-   * Reads the request body from the entity input stream.
-   * Restores the input stream for downstream processing.
-   * Limits the amount of data read based on configuration.
-   *
-   * @param requestContext the request context
-   * @param maxPayloadSize maximum bytes to read from the request body
-   * @return the request body as string (potentially truncated)
-   */
+
   /**
    * Parses a comma-separated list of headers into a Set of lowercase header names
    * for case-insensitive comparison.
@@ -225,6 +217,15 @@ public class AuditRequestProcessor {
     return headers;
   }
 
+  /**
+   * Reads the request body from the entity input stream.
+   * Restores the input stream for downstream processing.
+   * Limits the amount of data read based on configuration.
+   *
+   * @param requestContext the request context
+   * @param maxPayloadSize maximum bytes to read from the request body
+   * @return the request body as string (potentially truncated)
+   */
   private String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
     // TODO spyne to be implemented
     return null;

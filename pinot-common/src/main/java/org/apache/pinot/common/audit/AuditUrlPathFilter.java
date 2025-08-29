@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.common.audit;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
@@ -39,11 +38,11 @@ import org.slf4j.LoggerFactory;
  * - Grouping: {api,v1,v2}
  *
  * Examples:
- * - /health - exact match
- * - /api/* - matches /api/users but not /api/v1/users
- * - /api/** - matches /api/users and /api/v1/users
- * - /api/v[12]/users - matches /api/v1/users and /api/v2/users
- * - /api/{users,groups}/list - matches /api/users/list and /api/groups/list
+ * - health - exact match
+ * - api/* - matches api/users but not api/v1/users
+ * - api/** - matches api/users and api/v1/users
+ * - api/v[12]/users - matches api/v1/users and api/v2/users
+ * - api/{users,groups}/list - matches api/users/list and api/groups/list
  */
 @Singleton
 public class AuditUrlPathFilter {
@@ -54,7 +53,7 @@ public class AuditUrlPathFilter {
   /**
    * Checks if the given URL path should be excluded based on the provided patterns.
    *
-   * @param urlPath The URL path to check (e.g., "/api/v1/users")
+   * @param urlPath The URL path to check (e.g., "api/v1/users")
    * @param excludePatterns Comma-separated list of glob patterns
    * @return true if the path matches any exclude pattern, false otherwise
    */
@@ -64,7 +63,7 @@ public class AuditUrlPathFilter {
     }
 
     try {
-      Path path = normalizePath(urlPath);
+      Path path = Paths.get(urlPath);
       String[] patterns = excludePatterns.split(",");
 
       for (String pattern : patterns) {
@@ -90,30 +89,5 @@ public class AuditUrlPathFilter {
     }
 
     return false;
-  }
-
-  /**
-   * Normalizes a URL path for consistent matching.
-   * Ensures the path starts with / and uses forward slashes consistently.
-   */
-  @VisibleForTesting
-  static Path normalizePath(String urlPath) {
-    String normalized = urlPath;
-
-    if (!normalized.startsWith("/")) {
-      normalized = "/" + normalized;
-    }
-
-    normalized = normalized.replace('\\', '/');
-
-    while (normalized.contains("//")) {
-      normalized = normalized.replace("//", "/");
-    }
-
-    if (normalized.length() > 1 && normalized.endsWith("/")) {
-      normalized = normalized.substring(0, normalized.length() - 1);
-    }
-
-    return Paths.get(normalized);
   }
 }
