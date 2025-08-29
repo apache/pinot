@@ -23,9 +23,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import javax.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -52,70 +49,38 @@ import org.slf4j.LoggerFactory;
 public class UrlPathFilter {
   private static final Logger LOG = LoggerFactory.getLogger(UrlPathFilter.class);
 
-  private List<PathMatcher> _excludeMatchers = Collections.emptyList();
-  private String _patternString = "";
-
   /**
-   * Updates the exclude patterns used for filtering.
-   *
-   * @param excludePatterns Comma-separated list of glob patterns
-   */
-  public void updateExcludePatterns(String excludePatterns) {
-    if (StringUtils.isBlank(excludePatterns)) {
-      _excludeMatchers = Collections.emptyList();
-      _patternString = "";
-      LOG.info("Cleared URL exclude patterns");
-      return;
-    }
-
-    if (excludePatterns.equals(_patternString)) {
-      return;
-    }
-
-    List<PathMatcher> matchers = new ArrayList<>();
-    String[] patterns = excludePatterns.split(",");
-
-    for (String pattern : patterns) {
-      String trimmedPattern = pattern.trim();
-      if (StringUtils.isNotBlank(trimmedPattern)) {
-        try {
-          String globPattern = trimmedPattern;
-          if (!globPattern.startsWith("glob:") && !globPattern.startsWith("regex:")) {
-            globPattern = "glob:" + globPattern;
-          }
-
-          PathMatcher matcher = FileSystems.getDefault().getPathMatcher(globPattern);
-          matchers.add(matcher);
-          LOG.debug("Added URL exclude pattern: {}", trimmedPattern);
-        } catch (Exception e) {
-          LOG.error("Invalid pattern '{}', skipping", trimmedPattern, e);
-        }
-      }
-    }
-
-    _excludeMatchers = Collections.unmodifiableList(matchers);
-    _patternString = excludePatterns;
-    LOG.info("Updated URL exclude patterns with {} patterns", matchers.size());
-  }
-
-  /**
-   * Checks if the given URL path should be excluded based on configured patterns.
+   * Checks if the given URL path should be excluded based on the provided patterns.
    *
    * @param urlPath The URL path to check (e.g., "/api/v1/users")
+   * @param excludePatterns Comma-separated list of glob patterns
    * @return true if the path matches any exclude pattern, false otherwise
    */
-  public boolean isExcluded(String urlPath) {
-    if (StringUtils.isBlank(urlPath) || _excludeMatchers.isEmpty()) {
+  public boolean isExcluded(String urlPath, String excludePatterns) {
+    if (StringUtils.isBlank(urlPath) || StringUtils.isBlank(excludePatterns)) {
       return false;
     }
 
     try {
       Path path = normalizePath(urlPath);
+      String[] patterns = excludePatterns.split(",");
 
-      for (PathMatcher matcher : _excludeMatchers) {
-        if (matcher.matches(path)) {
-          LOG.trace("URL path '{}' matched exclude pattern", urlPath);
-          return true;
+      for (String pattern : patterns) {
+        String trimmedPattern = pattern.trim();
+        if (StringUtils.isNotBlank(trimmedPattern)) {
+          try {
+            String globPattern = trimmedPattern;
+            if (!globPattern.startsWith("glob:") && !globPattern.startsWith("regex:")) {
+              globPattern = "glob:" + globPattern;
+            }
+
+            PathMatcher matcher = FileSystems.getDefault().getPathMatcher(globPattern);
+            if (matcher.matches(path)) {
+              return true;
+            }
+          } catch (Exception e) {
+            LOG.error("Invalid pattern '{}', skipping", trimmedPattern, e);
+          }
         }
       }
     } catch (Exception e) {
@@ -148,19 +113,5 @@ public class UrlPathFilter {
     }
 
     return Paths.get(normalized);
-  }
-
-  /**
-   * Gets the current pattern string for debugging/logging purposes.
-   */
-  public String getPatternString() {
-    return _patternString;
-  }
-
-  /**
-   * Gets the number of active exclude patterns.
-   */
-  public int getPatternCount() {
-    return _excludeMatchers.size();
   }
 }
