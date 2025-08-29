@@ -46,8 +46,10 @@ import org.slf4j.LoggerFactory;
  * - /api/{users,groups}/list - matches /api/users/list and /api/groups/list
  */
 @Singleton
-public class UrlPathFilter {
-  private static final Logger LOG = LoggerFactory.getLogger(UrlPathFilter.class);
+public class AuditUrlPathFilter {
+  private static final Logger LOG = LoggerFactory.getLogger(AuditUrlPathFilter.class);
+  private static final String PREFIX_GLOB = "glob:";
+  private static final String PREFIX_REGEX = "regex:";
 
   /**
    * Checks if the given URL path should be excluded based on the provided patterns.
@@ -70,8 +72,8 @@ public class UrlPathFilter {
         if (StringUtils.isNotBlank(trimmedPattern)) {
           try {
             String globPattern = trimmedPattern;
-            if (!globPattern.startsWith("glob:") && !globPattern.startsWith("regex:")) {
-              globPattern = "glob:" + globPattern;
+            if (!globPattern.startsWith(PREFIX_GLOB) && !globPattern.startsWith(PREFIX_REGEX)) {
+              globPattern = PREFIX_GLOB + globPattern;
             }
 
             PathMatcher matcher = FileSystems.getDefault().getPathMatcher(globPattern);
