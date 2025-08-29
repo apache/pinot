@@ -146,7 +146,7 @@
     <helix.version>1.3.2</helix.version>
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.20.0</jackson.version>
-    <zookeeper.version>3.9.3</zookeeper.version>
+    <zookeeper.version>3.9.4</zookeeper.version>
     <async-http-client.version>3.0.2</async-http-client.version>
     <jersey.version>2.47</jersey.version>
     <hk2.version>2.6.1</hk2.version>
