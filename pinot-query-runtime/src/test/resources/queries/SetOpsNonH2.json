@@ -66,8 +66,7 @@
           [2],
           [3],
           [4]
-        ],
-        "ignoreV2Optimizer":  true
+        ]
       },
       {
         "description": "INTERSECT ALL with UNION",
@@ -77,8 +76,7 @@
           [2],
           [3],
           [4]
-        ],
-        "ignoreV2Optimizer":  true
+        ]
       },
       {
         "description": "INTERSECT ALL with UNION ALL",
@@ -117,8 +115,7 @@
           [4],
           [1],
           [2]
-        ],
-        "ignoreV2Optimizer":  true
+        ]
       },
       {
         "description": "EXCEPT ALL with UNION",

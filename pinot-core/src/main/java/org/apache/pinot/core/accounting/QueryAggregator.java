@@ -49,8 +49,7 @@ import org.slf4j.LoggerFactory;
  * Aggregator that computes resource aggregation for queries. Most of the logic from PerQueryCPUMemAccountantFactory is
  * retained here for backward compatibility.
  *
- * Design and algorithm are outlined in
- * https://docs.google.com/document/d/1Z9DYAfKznHQI9Wn8BjTWZYTcNRVGiPP0B8aEP3w_1jQ
+ * TODO: Integrate recent changes in PerQueryCPUMemAccountantFactory
  */
 public class QueryAggregator implements ResourceAggregator {
   private static final Logger LOGGER = LoggerFactory.getLogger(QueryAggregator.class);
@@ -455,7 +454,7 @@ public class QueryAggregator implements ResourceAggregator {
   }
 
   protected void logQueryResourceUsage(Map<String, ? extends QueryResourceTracker> aggregatedUsagePerActiveQuery) {
-    LOGGER.warn("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
+    LOGGER.debug("Query aggregation results {} for the previous kill.", aggregatedUsagePerActiveQuery);
   }
 
   protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage) {

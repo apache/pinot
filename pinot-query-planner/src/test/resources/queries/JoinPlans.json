@@ -861,6 +861,103 @@
           "\n        PinotLogicalTableScan(table=[[default, b]])",
           "\n"
         ]
+      },
+      {
+        "description": "Enriched join with one projection",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; EXPLAIN PLAN FOR SELECT a.col1 + b.col1 FROM a JOIN b ON a.col1 = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalEnrichedJoin(condition=[=($0, $2)], joinType=[inner], filterProjectRex=[[Project: [+($1, $3)]]])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Enriched right join with one projection",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; EXPLAIN PLAN FOR SELECT a.col1 + b.col1 FROM a RIGHT JOIN b ON a.col1 = b.col1",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalEnrichedJoin(condition=[=($0, $2)], joinType=[right], filterProjectRex=[[Project: [+($1, $3)]]])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000)])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Enriched anti join with one limit",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; EXPLAIN PLAN FOR SELECT a.col1 FROM a WHERE NOT EXISTS (SELECT 1 FROM b WHERE a.col1 = b.col1) LIMIT 10",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[10])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    PinotLogicalEnrichedJoin(condition=[=($0, $1)], joinType=[left], filterProjectRex=[[Filter: IS NULL($2), Project: [$0]]], limit=[10])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[FINAL])",
+          "\n          PinotLogicalExchange(distribution=[hash[0]])",
+          "\n            PinotLogicalAggregate(group=[{0}], agg#0=[MIN($1)], aggType=[LEAF])",
+          "\n              LogicalProject(col1=[$0], $f0=[true])",
+          "\n                PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Enriched join with one projection and limit",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; EXPLAIN PLAN FOR SELECT a.col1 + b.col1 FROM a JOIN b ON a.col1 = b.col1 LIMIT 100",
+        "output": [
+          "Execution Plan",
+          "\nLogicalSort(offset=[0], fetch=[100])",
+          "\n  PinotLogicalSortExchange(distribution=[hash], collation=[[]], isSortOnSender=[false], isSortOnReceiver=[false])",
+          "\n    PinotLogicalEnrichedJoin(condition=[=($0, $2)], joinType=[inner], filterProjectRex=[[Project: [+($1, $3)]]], limit=[100])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n          PinotLogicalTableScan(table=[[default, a]])",
+          "\n      PinotLogicalExchange(distribution=[hash[0]])",
+          "\n        LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n          PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Enriched join with two projections",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; EXPLAIN PLAN FOR SELECT sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 FROM (SELECT a.col1 + b.col1 + a.col1 + b.col1 + a.col1 + b.col1 + a.col1 + b.col1 + a.col1 + b.col1 AS sum2 FROM a JOIN b ON a.col1 = b.col1) t;\n",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalEnrichedJoin(condition=[=($0, $2)], joinType=[inner], filterProjectRex=[[Project: [+(+(+(+(+(+(+(+(+($1, $3), $1), $3), $1), $3), $1), $3), $1), $3)], Project: [+(+(+(+(+(+(+(+(+(+(+(+($0, $0), $0), $0), $0), $0), $0), $0), $0), $0), $0), $0), $0)]]])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
+      },
+      {
+        "description": "Enriched join with two projections and one filter",
+        "sql": "SET usePlannerRules='JoinToEnrichedJoin'; EXPLAIN PLAN FOR SELECT * FROM (SELECT sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 + sum2 AS sum3 FROM (SELECT a.col1 + b.col1 + a.col1 + b.col1 + a.col1 + b.col1 + a.col1 + b.col1 + a.col1 + b.col1 AS sum2 FROM a JOIN b ON a.col1 = b.col1)) WHERE sum3 = 1;\n",
+        "output": [
+          "Execution Plan",
+          "\nPinotLogicalEnrichedJoin(condition=[=($0, $2)], joinType=[inner], filterProjectRex=[[Project: [+(+(+(+(+(+(+(+(+($1, $3), $1), $3), $1), $3), $1), $3), $1), $3)], Filter: =(+(+(+(+(+(+(+(+(+(+(+(+($0, $0), $0), $0), $0), $0), $0), $0), $0), $0), $0), $0), $0), 1.0), Project: [+(+(+(+(+(+(+(+(+(+(+(+($0, $0), $0), $0), $0), $0), $0), $0), $0), $0), $0), $0), $0)]]])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n      PinotLogicalTableScan(table=[[default, a]])",
+          "\n  PinotLogicalExchange(distribution=[hash[0]])",
+          "\n    LogicalProject(col1=[$0], EXPR$0=[CAST($0):DECIMAL(2000, 1000) NOT NULL])",
+          "\n      PinotLogicalTableScan(table=[[default, b]])",
+          "\n"
+        ]
       }
     ]
   },
