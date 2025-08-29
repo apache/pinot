@@ -135,7 +135,7 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
 
       tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
       timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
-          timeSeriesRequest.getTimeout().toMillis(), new HashMap<>(), requestContext);
+          timeSeriesRequest.getTimeout().toMillis(), requestContext);
       return timeSeriesBlock;
     } catch (Exception e) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);

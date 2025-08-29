@@ -90,16 +90,6 @@ public class ServerPlanRequestUtils {
         }, false, rowFilters);
   }
 
-  public static OpChain compileLeafStage(
-      OpChainExecutionContext executionContext,
-      StagePlan stagePlan,
-      QueryExecutor leafQueryExecutor,
-      ExecutorService executorService) {
-    return compileLeafStage(executionContext, stagePlan, leafQueryExecutor, executorService,
-        (planNode, multiStageOperator) -> {
-        }, false, null);
-  }
-
   /**
    * main entry point for compiling leaf-stage {@link StagePlan}.
    *

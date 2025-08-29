@@ -698,7 +698,7 @@ public class QueryDispatcher {
   }
 
   public TimeSeriesBlock submitAndGet(long requestId, TimeSeriesDispatchablePlan plan, long timeoutMs,
-      Map<String, String> queryOptions, RequestContext requestContext)
+      RequestContext requestContext)
       throws Exception {
     long deadlineMs = System.currentTimeMillis() + timeoutMs;
     BaseTimeSeriesPlanNode brokerFragment = plan.getBrokerFragment();
