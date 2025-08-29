@@ -35,10 +35,14 @@ import org.glassfish.grizzly.http.server.Request;
 @Singleton
 public class AuditLogFilter implements ContainerRequestFilter {
 
+  private final Provider<Request> _requestProvider;
+  private final AuditRequestProcessor _auditRequestProcessor;
+
   @Inject
-  Provider<Request> _requestProvider;
-  @Inject
-  private AuditRequestProcessor _auditRequestProcessor;
+  public AuditLogFilter(Provider<Request> requestProvider, AuditRequestProcessor auditRequestProcessor) {
+    _requestProvider = requestProvider;
+    _auditRequestProcessor = auditRequestProcessor;
+  }
 
   @Override
   public void filter(ContainerRequestContext requestContext)
