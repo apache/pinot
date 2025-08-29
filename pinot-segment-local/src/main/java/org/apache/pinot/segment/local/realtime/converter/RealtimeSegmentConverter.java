@@ -122,6 +122,10 @@ public class RealtimeSegmentConverter {
     if (useCompactedReader) {
       // Take a snapshot of validDocIds at the beginning of conversion to ensure consistency
       ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = getValidDocIdSnapshot();
+      if (validDocIdsSnapshot == null) {
+        throw new IllegalStateException("Cannot use CompactedPinotSegmentRecordReader without valid document IDs. "
+            + "Segment may be corrupted.");
+      }
       // Use CompactedPinotSegmentRecordReader to remove obsolete/invalidated records
       try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
           validDocIdsSnapshot, _realtimeSegmentImpl.getDeleteRecordColumn())) {
@@ -146,16 +150,11 @@ public class RealtimeSegmentConverter {
     }
   }
 
-  private ThreadSafeMutableRoaringBitmap getValidDocIdSnapshot() {
+  private @Nullable ThreadSafeMutableRoaringBitmap getValidDocIdSnapshot() {
     ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = null;
     if (_realtimeSegmentImpl.getValidDocIds() != null) {
       validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap(
           _realtimeSegmentImpl.getValidDocIds().getMutableRoaringBitmap());
-    }
-
-    if (validDocIdsSnapshot == null) {
-      throw new IllegalStateException("Cannot use CompactedPinotSegmentRecordReader without valid document IDs. "
-          + "Segment may be corrupted.");
     }
     return validDocIdsSnapshot;
   }
