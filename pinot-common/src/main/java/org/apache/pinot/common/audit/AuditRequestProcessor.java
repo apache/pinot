@@ -49,11 +49,14 @@ public class AuditRequestProcessor {
 
   private final AuditConfigManager _configManager;
   private final AuditIdentityResolver _identityResolver;
+  private final UrlPathFilter _urlPathFilter;
 
   @Inject
-  public AuditRequestProcessor(AuditConfigManager configManager, AuditIdentityResolver identityResolver) {
+  public AuditRequestProcessor(AuditConfigManager configManager, AuditIdentityResolver identityResolver,
+      UrlPathFilter urlPathFilter) {
     _configManager = configManager;
     _identityResolver = identityResolver;
+    _urlPathFilter = urlPathFilter;
   }
 
   /**
@@ -108,8 +111,11 @@ public class AuditRequestProcessor {
       UriInfo uriInfo = requestContext.getUriInfo();
       String endpoint = uriInfo.getPath();
 
+      // Update URL filter patterns if configuration changed
+      _urlPathFilter.updateExcludePatterns(_configManager.getCurrentConfig().getUrlFilterExcludePatterns());
+
       // Check endpoint exclusions
-      if (_configManager.isEndpointExcluded(endpoint)) {
+      if (_urlPathFilter.isExcluded(endpoint)) {
         return null;
       }
 
