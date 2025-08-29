@@ -33,21 +33,29 @@ import org.apache.helix.ClusterMessagingService;
 import org.apache.helix.Criteria;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfig;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
 import org.apache.pinot.controller.util.TableTierReader;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.mockito.ArgumentCaptor;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.any;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -110,6 +118,53 @@ public class SegmentRelocatorTest {
         fail("Unexpected server: " + server);
       }
     }
+  }
+
+  @Test
+  public void testRebalanceRemovedTier()
+      throws Exception {
+    String tableName = "table_testRebalanceRemovedTier_OFFLINE";
+    String tableNameWithoutTier = "table_testRebalanceRemovedTier_no_tier_OFFLINE";
+    TableRebalanceManager rebalanceManager = mock(TableRebalanceManager.class);
+    PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
+
+    // table config that contains no tier config
+    TableConfig tableConfig =
+        new TableConfigBuilder(TableType.OFFLINE).setTableName(TableNameBuilder.extractRawTableName(tableName)).build();
+
+    // there are at least one segment in the list has the property of TIER
+    SegmentZKMetadata segmentWithTier = mock(SegmentZKMetadata.class);
+    SegmentZKMetadata segmentWithoutTier = mock(SegmentZKMetadata.class);
+    when(segmentWithTier.getTier()).thenReturn("hotTier");
+    when(segmentWithoutTier.getTier()).thenReturn(null);
+    List<SegmentZKMetadata> segmentZKMetadataList = List.of(segmentWithTier, segmentWithoutTier);
+    List<SegmentZKMetadata> segmentZKMetadataListWithoutTier = List.of(segmentWithoutTier);
+
+    when(pinotHelixResourceManager.getTableConfig(anyString())).thenReturn(tableConfig);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(tableName)).thenReturn(segmentZKMetadataList);
+    when(pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithoutTier)).thenReturn(
+        segmentZKMetadataListWithoutTier);
+
+    SegmentRelocator relocator =
+        new SegmentRelocator(rebalanceManager, pinotHelixResourceManager,
+            mock(LeadControllerManager.class), new ControllerConf(), mock(ControllerMetrics.class),
+            mock(ExecutorService.class),
+            mock(HttpClientConnectionManager.class));
+
+    relocator.rebalanceTable(tableName);
+    relocator.rebalanceTable(tableNameWithoutTier);
+
+    ArgumentCaptor<String> tableNameCapture = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<RebalanceConfig> rebalanceConfigCapture = ArgumentCaptor.forClass(RebalanceConfig.class);
+
+    verify(rebalanceManager, times(1)).rebalanceTable(
+        tableNameCapture.capture(),
+        rebalanceConfigCapture.capture(),
+        any(String.class),
+        any(Boolean.class));
+
+    assertEquals(tableNameCapture.getValue(), tableName);
+    assertTrue(rebalanceConfigCapture.getValue().isUpdateTargetTier());
   }
 
   @Test
