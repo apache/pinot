@@ -20,10 +20,10 @@ package org.apache.pinot.plugin.stream.kinesis;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.apache.pinot.spi.stream.BytesStreamMessage;
 import org.apache.pinot.spi.stream.PartitionGroupConsumer;
 import org.apache.pinot.spi.stream.StreamMessageMetadata;
@@ -78,7 +78,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     } catch (ProvisionedThroughputExceededException pte) {
       LOGGER.error("Rate limit exceeded while fetching messages from Kinesis stream: {} with threshold: {}",
           pte.getMessage(), _config.getRpsLimit());
-      return new KinesisMessageBatch(List.of(), (KinesisPartitionGroupOffset) startMsgOffset, false);
+      return new KinesisMessageBatch(List.of(), (KinesisPartitionGroupOffset) startMsgOffset, false, 0);
     }
   }
 
@@ -100,7 +100,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
       shardIterator = _kinesisClient.getShardIterator(getShardIteratorRequest).shardIterator();
     }
     if (shardIterator == null) {
-      return new KinesisMessageBatch(List.of(), startOffset, true);
+      return new KinesisMessageBatch(List.of(), startOffset, true, 0);
     }
 
     // Read records
@@ -112,8 +112,14 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     List<Record> records = getRecordsResponse.records();
     List<BytesStreamMessage> messages;
     KinesisPartitionGroupOffset offsetOfNextBatch;
+    long batchSizeInBytes = 0;
     if (!records.isEmpty()) {
-      messages = records.stream().map(record -> extractStreamMessage(record, shardId)).collect(Collectors.toList());
+      messages = new ArrayList<>();
+      for (Record record: records) {
+        BytesStreamMessage bytesStreamMessage = extractStreamMessage(record, shardId);
+        batchSizeInBytes += bytesStreamMessage.getLength();
+        messages.add(bytesStreamMessage);
+      }
       offsetOfNextBatch = (KinesisPartitionGroupOffset) messages.get(messages.size() - 1).getMetadata().getNextOffset();
     } else {
       // TODO: Revisit whether Kinesis can return empty batch when there are available records. The consumer cna handle
@@ -124,7 +130,7 @@ public class KinesisConsumer extends KinesisConnectionHandler implements Partiti
     assert offsetOfNextBatch != null;
     _nextStartSequenceNumber = offsetOfNextBatch.getSequenceNumber();
     _nextShardIterator = getRecordsResponse.nextShardIterator();
-    return new KinesisMessageBatch(messages, offsetOfNextBatch, _nextShardIterator == null);
+    return new KinesisMessageBatch(messages, offsetOfNextBatch, _nextShardIterator == null, batchSizeInBytes);
   }
 
   /**

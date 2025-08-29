@@ -27,7 +27,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.stream.MessageBatch;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.mockito.Mockito;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -41,14 +43,17 @@ public class ServerRateLimitConfigChangeListenerTest {
   private static final double DELTA = 0.0001;
   private static final ServerMetrics MOCK_SERVER_METRICS = mock(ServerMetrics.class);
 
-  static {
-    when(SERVER_CONFIG.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
-        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
-  }
-
   @Test
   public void testRateLimitUpdate()
       throws InterruptedException {
+    String rateLimiterConfigKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT;
+    if (Math.random() < 0.5) {
+      rateLimiterConfigKey = CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES;
+    }
+
+    when(SERVER_CONFIG.getProperty(rateLimiterConfigKey,
+        CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
+
     AtomicReference<Throwable> errorRef = new AtomicReference<>();
     simulateThrottling(errorRef);
     // Initial state
@@ -59,10 +64,9 @@ public class ServerRateLimitConfigChangeListenerTest {
 
     // Simulate config change
     Map<String, String> newConfig = new HashMap<>();
-    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "300.0");
+    newConfig.put(rateLimiterConfigKey, "300.0");
     ServerRateLimitConfigChangeListener listener = new ServerRateLimitConfigChangeListener(MOCK_SERVER_METRICS);
-    Set<String> changedConfigSet =
-        new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    Set<String> changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
     simulateThrottling(errorRef);
     listener.onChange(changedConfigSet, newConfig);
     simulateThrottling(errorRef);
@@ -75,8 +79,8 @@ public class ServerRateLimitConfigChangeListenerTest {
 
     // Test removal of serverRateLimit
     newConfig = new HashMap<>();
-    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "0");
-    changedConfigSet = new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    newConfig.put(rateLimiterConfigKey, "0");
+    changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
     simulateThrottling(errorRef);
     listener.onChange(changedConfigSet, newConfig);
     simulateThrottling(errorRef);
@@ -90,8 +94,8 @@ public class ServerRateLimitConfigChangeListenerTest {
 
     // Test update of serverRateLimit after it was removed
     newConfig = new HashMap<>();
-    newConfig.put(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, "10000");
-    changedConfigSet = new HashSet<>(List.of(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+    newConfig.put(rateLimiterConfigKey, "10000");
+    changedConfigSet = new HashSet<>(List.of(rateLimiterConfigKey));
     simulateThrottling(errorRef);
     listener.onChange(changedConfigSet, newConfig);
     simulateThrottling(errorRef);
@@ -111,10 +115,12 @@ public class ServerRateLimitConfigChangeListenerTest {
 
   private void simulateThrottling(AtomicReference<Throwable> errorRef) {
     // A helper method to test side effects of throttling during serverRateLimit config change.
+    MessageBatch messageBatch = Mockito.mock(MessageBatch.class);
+    when(messageBatch.getMessageCount()).thenReturn(100);
     for (int i = 0; i < 10; i++) {
       CompletableFuture.runAsync(() -> {
         try {
-          RealtimeConsumptionRateManager.getInstance().getServerRateLimiter().throttle(100);
+          RealtimeConsumptionRateManager.getInstance().getServerRateLimiter().throttle(messageBatch);
         } catch (Throwable throwable) {
           errorRef.set(throwable);
         }

@@ -81,7 +81,8 @@ public abstract class KafkaPartitionLevelConnectionHandler {
     return consumerProp;
   }
 
-  private Consumer<String, Bytes> createConsumer(Properties consumerProp) {
+  @VisibleForTesting
+  protected Consumer<String, Bytes> createConsumer(Properties consumerProp) {
     return retry(() -> new KafkaConsumer<>(consumerProp), 5);
   }
 
