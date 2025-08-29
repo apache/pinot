@@ -425,6 +425,12 @@ public abstract class BaseTableDataManager implements TableDataManager {
       _logger.info("Segment: {} has CRC: {} same as before, not replacing it", segmentName, localMetadata.getCrc());
       return;
     }
+    if (!_instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad()) {
+      _logger.info("Skipping replacing segment: {} even though its CRC has changed from: {} to: {} because "
+          + "instance.check.crc.on.segment.load is set to false", segmentName, localMetadata.getCrc(),
+          zkMetadata.getCrc());
+      return;
+    }
     _logger.info("Replacing segment: {} because its CRC has changed from: {} to: {}", segmentName,
         localMetadata.getCrc(), zkMetadata.getCrc());
     downloadAndLoadSegment(zkMetadata, indexLoadingConfig);
@@ -806,7 +812,8 @@ public abstract class BaseTableDataManager implements TableDataManager {
       - Continue loading the segment from the index directory.
       */
       boolean shouldDownload =
-          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata));
+          forceDownload || (isSegmentStatusCompleted(zkMetadata) && !hasSameCRC(zkMetadata, localMetadata)
+              && _instanceDataManagerConfig.shouldCheckCRCOnSegmentLoad());
       if (shouldDownload) {
         // Create backup directory to handle failure of segment reloading.
         createBackup(indexDir);
