@@ -265,13 +265,6 @@ public class ControllerConf extends PinotConfiguration {
     // Untracked segments are those that exist in deep store but have no corresponding entry in the ZK property store.
     public static final String ENABLE_UNTRACKED_SEGMENT_DELETION =
         "controller.retentionManager.untrackedSegmentDeletionEnabled";
-
-    public static final String ORPHAN_SEGMENT_RETENTION_TIME_UNIT =
-        "controller.retentionManager.untrackedSegmentDeletionEnabled";
-    public static final String ORPHAN_SEGMENT_RETENTION_TIME_VALUE =
-        "controller.retentionManager.untrackedSegmentDeletionEnabled";
-
-
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
