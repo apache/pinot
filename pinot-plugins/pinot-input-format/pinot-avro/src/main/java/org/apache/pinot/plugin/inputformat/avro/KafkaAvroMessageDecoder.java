@@ -131,6 +131,9 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   @Nullable
   @Override
   public GenericRow decode(byte[] payload, GenericRow destination) {
+    if (payload == null) {
+      return null;
+    }
     return decode(payload, 0, payload.length, destination);
   }
 
@@ -139,6 +142,11 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   public GenericRow decode(byte[] payload, int offset, int length, GenericRow destination) {
     // TODO: Revisit if these checks are needed
     if (payload == null || payload.length == 0 || length == 0) {
+      return null;
+    }
+
+    // Check if payload has enough bytes for header
+    if (payload.length < HEADER_LENGTH) {
       return null;
     }
 

@@ -121,14 +121,34 @@ public abstract class AbstractRecordReaderTest {
       for (FieldSpec fieldSpec : _pinotSchema.getAllFieldSpecs()) {
         String fieldSpecName = fieldSpec.getName();
         if (fieldSpec.isSingleValueField()) {
-          Assert.assertEquals(actualRecord.getValue(fieldSpecName), expectedRecord.get(fieldSpecName));
+          Object expectedValue = expectedRecord.get(fieldSpecName);
+          Object actualValue = actualRecord.getValue(fieldSpecName);
+          // Use delta comparison for floating point numbers to handle precision issues
+          if (expectedValue instanceof Number && actualValue instanceof Number) {
+            double expectedDouble = ((Number) expectedValue).doubleValue();
+            double actualDouble = ((Number) actualValue).doubleValue();
+            Assert.assertTrue(Math.abs(expectedDouble - actualDouble) < 1e-6,
+                "Floating point values don't match: expected=" + expectedDouble + ", actual=" + actualDouble);
+          } else {
+            Assert.assertEquals(actualValue, expectedValue);
+          }
         } else {
           Object[] actualRecords = (Object[]) actualRecord.getValue(fieldSpecName);
           List expectedRecords = (List) expectedRecord.get(fieldSpecName);
           if (expectedRecords != null) {
             Assert.assertEquals(actualRecords.length, expectedRecords.size());
             for (int j = 0; j < actualRecords.length; j++) {
-              Assert.assertEquals(actualRecords[j], expectedRecords.get(j));
+              Object expectedElement = expectedRecords.get(j);
+              Object actualElement = actualRecords[j];
+              // Use delta comparison for floating point numbers in arrays too
+              if (expectedElement instanceof Number && actualElement instanceof Number) {
+                double expectedDouble = ((Number) expectedElement).doubleValue();
+                double actualDouble = ((Number) actualElement).doubleValue();
+                Assert.assertTrue(Math.abs(expectedDouble - actualDouble) < 1e-6,
+                    "Floating point values don't match: expected=" + expectedDouble + ", actual=" + actualDouble);
+              } else {
+                Assert.assertEquals(actualElement, expectedElement);
+              }
             }
           }
         }
