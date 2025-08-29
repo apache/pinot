@@ -57,7 +57,7 @@ public class TenantRebalanceChecker extends BasePeriodicTask {
   private static final Logger LOGGER = LoggerFactory.getLogger(TenantRebalanceChecker.class);
   private final TenantRebalancer _tenantRebalancer;
   private final PinotHelixResourceManager _pinotHelixResourceManager;
-  // To avoid multiple retries of the same tenant rebalance job, we only allow one ongoing retry job at a time.
+  // To avoid multiple retries of tenant rebalance job on one controller, we only allow one ongoing retry job at a time.
   private ZkBasedTenantRebalanceObserver _ongoingJobObserver = null;
 
   public TenantRebalanceChecker(ControllerConf config,
