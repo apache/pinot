@@ -34,6 +34,8 @@ import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationD
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.ColumnMetadata;
+import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
@@ -44,6 +46,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.utils.Obfuscator;
+import org.apache.pinot.spi.utils.ReadMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +82,9 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
 
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Schema schema = getSchema(tableNameWithType);
+
+    // Check if columnar reload is enabled
+    boolean useColumnarReload = isColumnarReloadEnabled(tableConfig, configs);
 
     IndexLoadingConfig indexLoadingConfig = new IndexLoadingConfig(tableConfig, schema);
     SegmentMetadataImpl segmentMetadata = new SegmentMetadataImpl(indexDir);
@@ -142,18 +148,15 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
           .build();
     }
 
-    // Refresh the segment. Segment reload is achieved by generating a new segment from scratch using the updated schema
-    // and table configs.
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      recordReader.init(indexDir, null, null);
-      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata, segmentName,
-          getSchema(tableNameWithType));
-      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-      driver.init(config, recordReader);
-      driver.build();
-      _eventObserver.notifyProgress(pinotTaskConfig,
-          "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound() + ", dropped rows:"
-              + driver.getSkippedRowsFound() + ", sanitized rows:" + driver.getSanitizedRowsFound());
+    // Refresh the segment using either traditional row-major or optimized column-wise approach
+    if (useColumnarReload) {
+      LOGGER.info("Using optimized column-wise segment rebuilding for segment: {}", segmentName);
+      refreshSegmentColumnWise(indexDir, workingDir, tableConfig, segmentMetadata, segmentName, schema,
+          pinotTaskConfig);
+    } else {
+      LOGGER.info("Using traditional row-major segment rebuilding for segment: {}", segmentName);
+      refreshSegmentRowWise(indexDir, workingDir, tableConfig, segmentMetadata, segmentName, schema,
+          pinotTaskConfig);
     }
 
     File refreshedSegmentFile = new File(workingDir, segmentName);
@@ -169,6 +172,80 @@ public class RefreshSegmentTaskExecutor extends BaseSingleSegmentConversionExecu
     }
 
     return result;
+  }
+
+  /**
+   * Check if columnar reload is enabled for the refresh task.
+   * This is configured as a task-specific config only.
+   */
+  private boolean isColumnarReloadEnabled(TableConfig tableConfig, Map<String, String> taskConfigs) {
+    // Check task-specific config only
+    String taskConfigValue = taskConfigs.get(
+        MinionConstants.RefreshSegmentTask.COLUMNAR_RELOAD_AND_SKIP_TRANSFORMATION);
+    if (taskConfigValue != null) {
+      return Boolean.parseBoolean(taskConfigValue);
+    }
+
+    // Default to false (traditional row-major approach)
+    return false;
+  }
+
+  /**
+   * Refresh segment using traditional row-major approach
+   */
+  private void refreshSegmentRowWise(File indexDir, File workingDir, TableConfig tableConfig,
+      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema, PinotTaskConfig pinotTaskConfig)
+      throws Exception {
+    // Segment reload is achieved by generating a new segment from scratch using the updated schema
+    // and table configs.
+    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+      recordReader.init(indexDir, null, null);
+      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata,
+          segmentName, schema);
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+      driver.init(config, recordReader);
+      driver.build();
+      _eventObserver.notifyProgress(pinotTaskConfig,
+          "Segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound()
+              + ", dropped rows:" + driver.getSkippedRowsFound() + ", sanitized rows:"
+              + driver.getSanitizedRowsFound());
+    }
+  }
+
+  /**
+   * Refresh segment using optimized column-wise approach for immutable-to-immutable conversion. See
+   * {@link SegmentIndexCreationDriverImpl#rebuildSegment(IndexSegment)}
+   */
+  private void refreshSegmentColumnWise(File indexDir, File workingDir, TableConfig tableConfig,
+      SegmentMetadataImpl segmentMetadata, String segmentName, Schema schema, PinotTaskConfig pinotTaskConfig)
+      throws Exception {
+    // Load the source segment for column-wise processing
+    ImmutableSegment sourceSegment = ImmutableSegmentLoader.load(indexDir, ReadMode.mmap);
+
+    try {
+      SegmentGeneratorConfig config = getSegmentGeneratorConfig(workingDir, tableConfig, segmentMetadata,
+          segmentName, schema);
+      SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
+
+      // Initialize with a PinotSegmentRecordReader for compatibility, but we'll use rebuildSegment
+      try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+        recordReader.init(sourceSegment);
+        driver.init(config, recordReader);
+
+        // Use the optimized column-wise rebuilding method
+        driver.rebuildSegment(sourceSegment);
+
+        _eventObserver.notifyProgress(pinotTaskConfig,
+            "Column-wise segment processing stats - incomplete rows:" + driver.getIncompleteRowsFound()
+                + ", dropped rows:" + driver.getSkippedRowsFound() + ", sanitized rows:"
+                + driver.getSanitizedRowsFound());
+      }
+    } catch (Exception e) {
+      LOGGER.error("Failed to rebuild segment: {} using column-wise approach due to: {}", segmentName, e.getMessage());
+      throw e;
+    } finally {
+      sourceSegment.destroy();
+    }
   }
 
   private static SegmentGeneratorConfig getSegmentGeneratorConfig(File workingDir, TableConfig tableConfig,
