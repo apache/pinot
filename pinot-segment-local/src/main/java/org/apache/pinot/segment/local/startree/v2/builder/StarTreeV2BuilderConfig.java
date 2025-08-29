@@ -134,12 +134,16 @@ public class StarTreeV2BuilderConfig {
     List<String> numericMetrics = new ArrayList<>();
 
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isSingleValueField() || fieldSpec.isVirtualColumn()) {
+      if (fieldSpec.isVirtualColumn()) {
         continue;
       }
       String column = fieldSpec.getName();
       switch (fieldSpec.getFieldType()) {
         case DIMENSION:
+          // Dimensions must be single-valued
+          if (!fieldSpec.isSingleValueField()) {
+            continue;
+          }
           ColumnMetadata columnMetadata = segmentMetadata.getColumnMetadataFor(column);
           if (columnMetadata.hasDictionary()
               && columnMetadata.getCardinality() <= DIMENSION_CARDINALITY_THRESHOLD_FOR_DEFAULT_CONFIG) {
@@ -148,12 +152,17 @@ public class StarTreeV2BuilderConfig {
           break;
         case DATE_TIME:
         case TIME:
+          // Time columns must be single-valued
+          if (!fieldSpec.isSingleValueField()) {
+            continue;
+          }
           columnMetadata = segmentMetadata.getColumnMetadataFor(column);
           if (columnMetadata.hasDictionary()) {
             timeColumnMetadataList.add(columnMetadata);
           }
           break;
         case METRIC:
+          // Metrics can be single-valued or multi-valued
           if (fieldSpec.getDataType().isNumeric()) {
             numericMetrics.add(column);
           }
@@ -198,12 +207,16 @@ public class StarTreeV2BuilderConfig {
     Map<String, JsonNode> columnMetadataMap = convertJsonNodeToMap(columnsMetadata);
 
     for (FieldSpec fieldSpec : schema.getAllFieldSpecs()) {
-      if (!fieldSpec.isSingleValueField() || fieldSpec.isVirtualColumn()) {
+      if (fieldSpec.isVirtualColumn()) {
         continue;
       }
       String column = fieldSpec.getName();
       switch (fieldSpec.getFieldType()) {
         case DIMENSION:
+          // Dimensions must be single-valued
+          if (!fieldSpec.isSingleValueField()) {
+            continue;
+          }
           JsonNode columnMetadata = columnMetadataMap.get(column);
           if (columnMetadata.get("hasDictionary").asBoolean()
               && columnMetadata.get("cardinality").asInt() <= DIMENSION_CARDINALITY_THRESHOLD_FOR_DEFAULT_CONFIG) {
@@ -212,12 +225,17 @@ public class StarTreeV2BuilderConfig {
           break;
         case DATE_TIME:
         case TIME:
+          // Time columns must be single-valued
+          if (!fieldSpec.isSingleValueField()) {
+            continue;
+          }
           columnMetadata = columnMetadataMap.get(column);
           if (columnMetadata.get("hasDictionary").asBoolean()) {
             timeColumnMetadataList.add(columnMetadata);
           }
           break;
         case METRIC:
+          // Metrics can be single-valued or multi-valued
           if (fieldSpec.getDataType().isNumeric()) {
             numericMetrics.add(column);
           }

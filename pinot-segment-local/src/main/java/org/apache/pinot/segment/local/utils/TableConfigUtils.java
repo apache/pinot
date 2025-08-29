@@ -1313,13 +1313,18 @@ public final class TableConfigUtils {
         }
       }
 
-      // Validate all referenced columns exist in the schema and are single-valued
+      // Validate all referenced columns exist in the schema
+      // Note: Dimensions must be single-valued, but metrics can be multi-valued for certain aggregation functions
+      Set<String> dimensionColumns = new HashSet<>(dimensionsSplitOrder);
       for (String column : referencedColumns) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null,
             "Failed to find column: %s specified in star-tree index config in schema", column);
-        Preconditions.checkState(fieldSpec.isSingleValueField(),
-            "Star-tree index can only be created on single-value columns, but found multi-value column: %s", column);
+        // Dimension columns must be single-valued
+        if (dimensionColumns.contains(column)) {
+          Preconditions.checkState(fieldSpec.isSingleValueField(),
+              "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);
+        }
         Preconditions.checkState(fieldSpec.getDataType() != DataType.MAP,
             "Star-tree index cannot be created on MAP column: %s", column);
       }
