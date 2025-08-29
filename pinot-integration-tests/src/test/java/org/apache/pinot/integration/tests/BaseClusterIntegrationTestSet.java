@@ -38,7 +38,9 @@ import org.apache.pinot.client.ResultSet;
 import org.apache.pinot.client.ResultSetGroup;
 import org.apache.pinot.common.exception.HttpErrorStatusException;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.controller.api.resources.ServerRebalanceJobStatusResponse;
 import org.apache.pinot.controller.api.resources.TableViews;
@@ -445,11 +447,57 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
 
     // Check that the virtual columns work as expected (throws no exceptions)
-    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable");
-    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId < 5 limit 50");
-    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId = 5 limit 50");
-    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId > 19998 limit 50");
-    getPinotConnection().execute("select max($docId) from mytable group by $segmentName");
+    getPinotConnection().execute("select $docId, $segmentName, $hostName, $partitionId from mytable");
+    getPinotConnection().execute(
+        "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId < 5 limit 50");
+    getPinotConnection().execute(
+        "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId = 5 limit 50");
+    getPinotConnection().execute(
+        "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId > 19998 limit 50");
+    testPartitionIdVirtualColumn();
+  }
+
+  /**
+   * Test that the $partitionId virtual column returns valid partition IDs.
+   * Realtime segments (LLCSegmentName or UploadedRealtimeSegmentName) should return partition IDs extracted from
+   * segment names,
+   * while offline segments should return hash-based partition IDs (0-9999).
+   */
+  public void testPartitionIdVirtualColumn() {
+    // Test the specific query that validates partition ID behavior per segment type
+    ResultSetGroup resultSetGroup = getPinotConnection().execute(
+        "select $partitionId, $segmentName, max($docId) from mytable group by $segmentName, $partitionId");
+    ResultSet resultSet = resultSetGroup.getResultSet(0);
+
+    // Verify we get results
+    assertTrue(resultSet.getRowCount() > 0, "Should have at least one segment result");
+
+    // Verify partition ID behavior based on segment type
+    for (int i = 0; i < resultSet.getRowCount(); i++) {
+      int partitionId = Integer.parseInt(resultSet.getString(i, 0));
+      String segmentName = resultSet.getString(i, 1);
+      int maxDocId = Integer.parseInt(resultSet.getString(i, 2));
+
+      // Segment name should be non-empty
+      assertFalse(segmentName.isEmpty(), "Segment name should not be empty");
+
+      // Max doc ID should be non-negative
+      assertTrue(maxDocId >= 0, "Max doc ID should be non-negative");
+
+      // Check if this is a realtime segment (LLC or Uploaded Realtime)
+      boolean isRealtimeSegment = LLCSegmentName.isLLCSegment(segmentName)
+          || UploadedRealtimeSegmentName.isUploadedRealtimeSegmentName(segmentName);
+      if (isRealtimeSegment) {
+        // For realtime segments, verify the partition ID matches what we can extract from the segment name
+        Integer expectedPartitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
+        assertNotNull(expectedPartitionId);
+        assertEquals(partitionId, expectedPartitionId.intValue(),
+            "Partition ID should match the one extracted from realtime segment name '" + segmentName + "'");
+      } else {
+        assertEquals(partitionId, -1,
+            "Offline segment '" + segmentName + "' should partition ID: -1, got: " + partitionId);
+      }
+    }
   }
 
   /**
