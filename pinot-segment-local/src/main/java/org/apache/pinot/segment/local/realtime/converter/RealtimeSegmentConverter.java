@@ -34,6 +34,7 @@ import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
@@ -119,18 +120,20 @@ public class RealtimeSegmentConverter {
     int preCommitRowCount = _realtimeSegmentImpl.getNumDocsIndexed();
 
     if (useCompactedReader) {
+      // Take a snapshot of validDocIds at the beginning of conversion to ensure consistency
+      ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = getValidDocIdSnapshot();
       // Use CompactedPinotSegmentRecordReader to remove obsolete/invalidated records
       try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
-          _realtimeSegmentImpl.getValidDocIds(), _realtimeSegmentImpl.getDeleteRecordColumn())) {
+          validDocIdsSnapshot, _realtimeSegmentImpl.getDeleteRecordColumn())) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, validDocIdsSnapshot);
         publishCompactionMetrics(serverMetrics, preCommitRowCount, driver, compactionStartTime);
       }
     } else {
       // Use regular PinotSegmentRecordReader (existing behavior)
       try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, null);
       }
     }
 
@@ -141,6 +144,20 @@ public class RealtimeSegmentConverter {
         serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, numPartitions);
       }
     }
+  }
+
+  private ThreadSafeMutableRoaringBitmap getValidDocIdSnapshot() {
+    ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = null;
+    if (_realtimeSegmentImpl.getValidDocIds() != null) {
+      validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap(
+          _realtimeSegmentImpl.getValidDocIds().getMutableRoaringBitmap());
+    }
+
+    if (validDocIdsSnapshot == null) {
+      throw new IllegalStateException("Cannot use CompactedPinotSegmentRecordReader without valid document IDs. "
+          + "Segment may be corrupted.");
+    }
+    return validDocIdsSnapshot;
   }
 
   /**
@@ -184,12 +201,14 @@ public class RealtimeSegmentConverter {
    * Common method to build segment with the provided record reader
    */
   private void buildSegmentWithReader(SegmentIndexCreationDriverImpl driver, SegmentGeneratorConfig genConfig,
-      RecordReader recordReader, int[] sortedDocIds, boolean useCompactedReader)
+      RecordReader recordReader, int[] sortedDocIds, boolean useCompactedReader,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot)
       throws Exception {
     RealtimeSegmentSegmentCreationDataSource dataSource;
     if (useCompactedReader) {
-      // For compacted readers, use the constructor that takes sortedDocIds
-      dataSource = new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds);
+      // For compacted readers, use the constructor that takes sortedDocIds and pass the validDocIds snapshot
+      dataSource = new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds,
+          validDocIdsSnapshot);
     } else {
       // For regular readers, use the original constructor
       dataSource =

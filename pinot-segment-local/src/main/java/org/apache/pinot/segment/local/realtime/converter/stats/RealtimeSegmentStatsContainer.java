@@ -44,44 +44,54 @@ public class RealtimeSegmentStatsContainer implements SegmentPreIndexStatsContai
   private final Map<String, ColumnStatistics> _columnStatisticsMap = new HashMap<>();
   private final int _totalDocCount;
 
+  @Deprecated
   public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
       StatsCollectorConfig statsCollectorConfig) {
-    this(mutableSegment, sortedDocIds, statsCollectorConfig, null);
+    this(mutableSegment, sortedDocIds, statsCollectorConfig, null, null);
+  }
+
+  @Deprecated
+  public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
+      StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader) {
+    this(mutableSegment, sortedDocIds, statsCollectorConfig, recordReader, null);
   }
 
   public RealtimeSegmentStatsContainer(MutableSegment mutableSegment, @Nullable int[] sortedDocIds,
-      StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader) {
+      StatsCollectorConfig statsCollectorConfig, @Nullable RecordReader recordReader,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot) {
     _mutableSegment = mutableSegment;
 
     // Determine if we're using compacted reader
     boolean isUsingCompactedReader = recordReader instanceof CompactedPinotSegmentRecordReader;
 
+    // Validate that compacted readers always have a validDocIds snapshot
+    if (isUsingCompactedReader && validDocIdsSnapshot == null) {
+      throw new IllegalArgumentException(
+          "CompactedPinotSegmentRecordReader requires a non-null validDocIdsSnapshot to ensure consistency");
+    }
+
     // Determine the correct total document count based on whether compaction is being used
-    if (isUsingCompactedReader && mutableSegment.getValidDocIds() != null) {
-      _totalDocCount = mutableSegment.getValidDocIds().getMutableRoaringBitmap().getCardinality();
+    if (isUsingCompactedReader) {
+      _totalDocCount = validDocIdsSnapshot.getMutableRoaringBitmap().getCardinality();
     } else {
       _totalDocCount = mutableSegment.getNumDocsIndexed();
     }
 
     // Create all column statistics
-    // Determine compaction mode once for all columns
-    boolean useCompactedStatistics = isUsingCompactedReader && mutableSegment.getValidDocIds() != null;
-    ThreadSafeMutableRoaringBitmap validDocIds = useCompactedStatistics ? mutableSegment.getValidDocIds() : null;
-
     for (String columnName : mutableSegment.getPhysicalColumnNames()) {
       DataSource dataSource = mutableSegment.getDataSource(columnName);
 
       // Handle map columns
       if (dataSource instanceof MutableMapDataSource) {
         _columnStatisticsMap.put(columnName,
-            createMapColumnStatistics(dataSource, useCompactedStatistics, validDocIds, statsCollectorConfig));
+            createMapColumnStatistics(dataSource, isUsingCompactedReader, validDocIdsSnapshot, statsCollectorConfig));
         continue;
       }
 
       // Handle dictionary columns
       if (dataSource.getDictionary() != null) {
         _columnStatisticsMap.put(columnName,
-            createDictionaryColumnStatistics(dataSource, sortedDocIds, useCompactedStatistics, validDocIds));
+            createDictionaryColumnStatistics(dataSource, sortedDocIds, isUsingCompactedReader, validDocIdsSnapshot));
         continue;
       }
 
