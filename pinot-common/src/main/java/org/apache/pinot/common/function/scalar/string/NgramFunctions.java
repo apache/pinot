@@ -32,7 +32,7 @@ public class NgramFunctions {
    * @param length the max length of the ngram for the string.
    * @return generate an array of unique ngram of the string that length are exactly matching the specified length.
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"uniqueNgrams", "generateUniqueNgrams"})
   public String[] uniqueNgrams(String input, int length) {
     if (length == 0 || length > input.length()) {
       return new String[0];
@@ -51,18 +51,74 @@ public class NgramFunctions {
    * @param maxGram the max length of the ngram for the string.
    * @return generate an array of ngram of the string that length are within the specified range [minGram, maxGram].
    */
-  @ScalarFunction
+  @ScalarFunction(names = {"uniqueNgrams", "generateUniqueNgrams"})
   public String[] uniqueNgrams(String input, int minGram, int maxGram) {
     _ngramSet.clear();
-    ObjectSet<String> ngramSet = new ObjectLinkedOpenHashSet<>();
     for (int n = minGram; n <= maxGram && n <= input.length(); n++) {
       if (n == 0) {
         continue;
       }
-      for (int i = 0; i < input.length() - n + 1; i++) {
-        ngramSet.add(input.substring(i, i + n));
+      for (int i = 0; i <= input.length() - n; i++) {
+        _ngramSet.add(input.substring(i, i + n));
       }
     }
-    return ngramSet.toArray(new String[0]);
+    return _ngramSet.toArray(new String[0]);
+  }
+
+  /**
+   * Generate unique ngrams (exact length) across all input strings in a multi-value (MV) column.
+   *
+   * @param inputs array of input strings
+   * @param length exact ngram length to generate
+   * @return unique ngrams of the specified length across all inputs
+   */
+  @ScalarFunction(names = {"uniqueNgramsMV", "generateUniqueNgramsMV"})
+  public String[] generateUniqueNgramsMV(String[] inputs, int length) {
+    if (length <= 0 || inputs == null || inputs.length == 0) {
+      return new String[0];
+    }
+
+    _ngramSet.clear();
+    for (String input : inputs) {
+      if (input == null || length > input.length()) {
+        continue;
+      }
+      for (int i = 0; i <= input.length() - length; i++) {
+        _ngramSet.add(input.substring(i, i + length));
+      }
+    }
+    return _ngramSet.toArray(new String[0]);
+  }
+
+  /**
+   * Generate unique ngrams (within [minGram, maxGram]) across all input strings in a MV column.
+   *
+   * @param inputs array of input strings
+   * @param minGram minimum ngram length
+   * @param maxGram maximum ngram length
+   * @return unique ngrams whose lengths are within the given range across all inputs
+   */
+  @ScalarFunction(names = {"uniqueNgramsMV", "generateUniqueNgramsMV"})
+  public String[] generateUniqueNgramsMV(String[] inputs, int minGram, int maxGram) {
+    if (inputs == null || inputs.length == 0) {
+      return new String[0];
+    }
+
+    _ngramSet.clear();
+    for (String input : inputs) {
+      if (input == null || minGram > input.length()) {
+        continue;
+      }
+      int inputLength = input.length();
+      for (int n = minGram; n <= maxGram && n <= inputLength; n++) {
+        if (n == 0) {
+          continue;
+        }
+        for (int i = 0; i <= inputLength - n; i++) {
+          _ngramSet.add(input.substring(i, i + n));
+        }
+      }
+    }
+    return _ngramSet.toArray(new String[0]);
   }
 }
