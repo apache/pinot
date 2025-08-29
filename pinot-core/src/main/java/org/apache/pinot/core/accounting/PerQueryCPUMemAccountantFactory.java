@@ -268,7 +268,12 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
 
     @Override
     public boolean throttleQuerySubmission() {
-      return getWatcherTask().getHeapUsageBytes() > getWatcherTask().getQueryMonitorConfig().getAlarmingLevel();
+      WatcherTask watcherTask = getWatcherTask();
+      boolean shouldThrottle = watcherTask.getHeapUsageBytes() > watcherTask.getQueryMonitorConfig().getAlarmingLevel();
+      if (shouldThrottle) {
+        watcherTask._metrics.addMeteredGlobalValue(watcherTask._queriesThrottledMeter, 1);
+      }
+      return shouldThrottle;
     }
 
     @Override
@@ -643,6 +648,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
       // metrics class
       private final AbstractMetrics _metrics;
       private final AbstractMetrics.Meter _queryKilledMeter;
+      private final AbstractMetrics.Meter _queriesThrottledMeter;
       private final AbstractMetrics.Meter _heapMemoryCriticalExceededMeter;
       private final AbstractMetrics.Meter _heapMemoryPanicExceededMeter;
       private final AbstractMetrics.Gauge _memoryUsageGauge;
@@ -655,6 +661,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           case SERVER:
             _metrics = ServerMetrics.get();
             _queryKilledMeter = ServerMeter.QUERIES_KILLED;
+            _queriesThrottledMeter = ServerMeter.QUERIES_THROTTLED;
             _memoryUsageGauge = ServerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceededMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             _heapMemoryPanicExceededMeter = ServerMeter.HEAP_PANIC_LEVEL_EXCEEDED;
@@ -662,6 +669,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
           case BROKER:
             _metrics = BrokerMetrics.get();
             _queryKilledMeter = BrokerMeter.QUERIES_KILLED;
+            _queriesThrottledMeter = BrokerMeter.QUERIES_THROTTLED;
             _memoryUsageGauge = BrokerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceededMeter = BrokerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             _heapMemoryPanicExceededMeter = BrokerMeter.HEAP_PANIC_LEVEL_EXCEEDED;
@@ -670,6 +678,7 @@ public class PerQueryCPUMemAccountantFactory implements ThreadAccountantFactory 
             LOGGER.error("instanceType: {} not supported, using server metrics", _instanceType);
             _metrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
             _queryKilledMeter = ServerMeter.QUERIES_KILLED;
+            _queriesThrottledMeter = ServerMeter.QUERIES_THROTTLED;
             _memoryUsageGauge = ServerGauge.JVM_HEAP_USED_BYTES;
             _heapMemoryCriticalExceededMeter = ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED;
             _heapMemoryPanicExceededMeter = ServerMeter.HEAP_PANIC_LEVEL_EXCEEDED;
