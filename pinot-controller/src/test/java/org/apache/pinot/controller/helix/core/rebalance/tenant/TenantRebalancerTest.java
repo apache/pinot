@@ -28,7 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -92,8 +92,8 @@ public class TenantRebalancerTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    DefaultTenantRebalancer tenantRebalancer =
-        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
+    TenantRebalancer tenantRebalancer =
+        new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
 
     // tag all servers and brokers to test tenant
     addTenantTagToInstances(TENANT_NAME);
@@ -161,8 +161,8 @@ public class TenantRebalancerTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    DefaultTenantRebalancer tenantRebalancer =
-        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
+    TenantRebalancer tenantRebalancer =
+        new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
 
     // tag all servers and brokers to test tenant
     addTenantTagToInstances(TENANT_NAME);
@@ -289,8 +289,8 @@ public class TenantRebalancerTest extends ControllerTest {
     addDummySchema(tableNameD);
     addDummySchema(tableNameE);
 
-    DefaultTenantRebalancer tenantRebalancer =
-        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
+    TenantRebalancer tenantRebalancer =
+        new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
 
     // table A set tenantConfig.tenants.server to tenantName
     // SHOULD be selected as tenant's table
@@ -359,8 +359,8 @@ public class TenantRebalancerTest extends ControllerTest {
       addFakeServerInstanceToAutoJoinHelixCluster(SERVER_INSTANCE_ID_PREFIX + i, true);
     }
 
-    DefaultTenantRebalancer tenantRebalancer =
-        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
+    TenantRebalancer tenantRebalancer =
+        new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _executorService);
 
     // tag all servers and brokers to test tenant
     addTenantTagToInstances(TENANT_NAME);
@@ -442,7 +442,7 @@ public class TenantRebalancerTest extends ControllerTest {
     assertEquals(jobContext.getTableName(), OFFLINE_TABLE_NAME_B);
 
     // set table B in parallel blacklist, so that it ends up in sequential queue, and table A in parallel queue
-    Pair<ConcurrentLinkedQueue<TenantRebalancer.TenantTableRebalanceJobContext>,
+    Pair<ConcurrentLinkedDeque<TenantRebalancer.TenantTableRebalanceJobContext>,
         Queue<TenantRebalancer.TenantTableRebalanceJobContext>>
         queues =
         tenantRebalancer.createParallelAndSequentialQueues(config, dryRunResult.getRebalanceTableResults(), null,
