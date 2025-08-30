@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
-import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.segment.local.segment.index.column.DefaultNullValueVirtualColumnProvider;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
@@ -61,13 +60,8 @@ public class VirtualColumnProviderFactory {
     }
 
     if (!schema.hasColumn(BuiltInVirtualColumn.PARTITIONID)) {
-      // Try to extract partition ID from segment name, fall back to -1 as default for offline segments
-      Integer partitionId = SegmentUtils.getPartitionIdFromSegmentName(segmentName);
-      if (partitionId == null) {
-        partitionId = -1;
-      }
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.INT, true,
-          PartitionIdVirtualColumnProvider.class, partitionId));
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.STRING, false,
+          PartitionIdVirtualColumnProvider.class));
     }
   }
 }

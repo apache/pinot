@@ -2366,13 +2366,12 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       throws Exception {
     setUseMultiStageQueryEngine(useMultiStageQueryEngine);
 
-    String query = "SELECT $docId, $hostName, $segmentName, $partitionId FROM mytable LIMIT 10";
+    String query = "SELECT $docId, $hostName, $segmentName FROM mytable LIMIT 10";
     JsonNode response = postQuery(query);
     JsonNode resultTable = response.get("resultTable");
     JsonNode dataSchema = resultTable.get("dataSchema");
-    assertEquals(dataSchema.get("columnNames").toString(),
-        "[\"$docId\",\"$hostName\",\"$segmentName\",\"$partitionId\"]");
-    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"STRING\",\"STRING\",\"INT\"]");
+    assertEquals(dataSchema.get("columnNames").toString(), "[\"$docId\",\"$hostName\",\"$segmentName\"]");
+    assertEquals(dataSchema.get("columnDataTypes").toString(), "[\"INT\",\"STRING\",\"STRING\"]");
     JsonNode rows = resultTable.get("rows");
     assertEquals(rows.size(), 10);
     String expectedHostName = NetUtils.getHostnameOrAddress();
@@ -2383,8 +2382,6 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(row.get(1).asText(), expectedHostName);
       String segmentName = row.get(2).asText();
       assertTrue(segmentName.startsWith(expectedSegmentNamePrefix));
-      // Check partition ID is an integer (exact value may vary based on segment name)
-      assertTrue(row.get(3).isInt());
     }
 
     // Collect all segment names
@@ -4157,7 +4154,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         SELECT_STAR_QUERY + " ORDER BY " + newColumn + " LIMIT 10000",
         "SELECT " + newColumn + " FROM " + DEFAULT_TABLE_NAME
     );
-    for (String query : queries) {
+    for (String query: queries) {
       try {
         // Build new schema with the extra column
         Schema newSchema = new Schema();
