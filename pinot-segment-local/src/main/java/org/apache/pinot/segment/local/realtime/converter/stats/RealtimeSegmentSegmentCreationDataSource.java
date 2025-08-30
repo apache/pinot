@@ -19,11 +19,13 @@
 package org.apache.pinot.segment.local.realtime.converter.stats;
 
 import java.io.File;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.spi.MutableSegment;
 import org.apache.pinot.segment.spi.creator.SegmentCreationDataSource;
 import org.apache.pinot.segment.spi.creator.SegmentPreIndexStatsContainer;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.readers.RecordReader;
 
 
@@ -32,17 +34,30 @@ import org.apache.pinot.spi.data.readers.RecordReader;
  */
 public class RealtimeSegmentSegmentCreationDataSource implements SegmentCreationDataSource {
   private final MutableSegment _mutableSegment;
-  private final PinotSegmentRecordReader _recordReader;
+  private final RecordReader _recordReader;
+  private final int[] _sortedDocIds;
+  private final ThreadSafeMutableRoaringBitmap _validDocIdsSnapshot;
 
   public RealtimeSegmentSegmentCreationDataSource(MutableSegment mutableSegment,
       PinotSegmentRecordReader recordReader) {
     _mutableSegment = mutableSegment;
     _recordReader = recordReader;
+    _sortedDocIds = recordReader.getSortedDocIds();
+    _validDocIdsSnapshot = null;
+  }
+
+  public RealtimeSegmentSegmentCreationDataSource(MutableSegment mutableSegment, RecordReader recordReader,
+      @Nullable int[] sortedDocIds, @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot) {
+    _mutableSegment = mutableSegment;
+    _recordReader = recordReader;
+    _sortedDocIds = sortedDocIds;
+    _validDocIdsSnapshot = validDocIdsSnapshot;
   }
 
   @Override
   public SegmentPreIndexStatsContainer gatherStats(StatsCollectorConfig statsCollectorConfig) {
-    return new RealtimeSegmentStatsContainer(_mutableSegment, _recordReader.getSortedDocIds(), statsCollectorConfig);
+    return new RealtimeSegmentStatsContainer(_mutableSegment, _sortedDocIds, statsCollectorConfig, _recordReader,
+        _validDocIdsSnapshot);
   }
 
   @Override
