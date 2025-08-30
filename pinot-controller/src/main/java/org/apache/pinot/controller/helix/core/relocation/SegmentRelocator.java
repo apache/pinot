@@ -36,6 +36,7 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -182,26 +183,39 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     return _waitingQueue;
   }
 
-  private void rebalanceTable(String tableNameWithType) {
+  @VisibleForTesting
+  void rebalanceTable(String tableNameWithType) {
     TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
+    RebalanceConfig rebalanceConfig = new RebalanceConfig();
+
     boolean relocate = false;
-    if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
-      relocate = true;
-      LOGGER.info("Relocating segments to tiers for table: {}", tableNameWithType);
-    }
     if (tableConfig.getTableType() == TableType.REALTIME
         && InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig)) {
       relocate = true;
       LOGGER.info("Relocating COMPLETED segments for table: {}", tableNameWithType);
+    }
+    if (TierConfigUtils.shouldRelocateToTiers(tableConfig)) {
+      relocate = true;
+      rebalanceConfig.setUpdateTargetTier(true);
+      LOGGER.info("Relocating segments to tiers for table: {}", tableNameWithType);
+    } else {
+      List<SegmentZKMetadata> segmentsZKMetadata = _pinotHelixResourceManager.getSegmentsZKMetadata(tableNameWithType);
+      for (SegmentZKMetadata segmentZKMetadata : segmentsZKMetadata) {
+        if (segmentZKMetadata.getTier() != null) {
+          relocate = true;
+          rebalanceConfig.setUpdateTargetTier(true);
+          LOGGER.info("Relocating segments from tiers to local for table: {}", tableNameWithType);
+          break;
+        }
+      }
     }
     if (!relocate) {
       LOGGER.debug("No need to relocate segments of table: {}", tableNameWithType);
       return;
     }
 
-    RebalanceConfig rebalanceConfig = new RebalanceConfig();
     rebalanceConfig.setReassignInstances(_reassignInstances);
     rebalanceConfig.setBootstrap(_bootstrap);
     rebalanceConfig.setDowntime(_downtime);
@@ -209,7 +223,6 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
     rebalanceConfig.setBestEfforts(_bestEfforts);
     rebalanceConfig.setExternalViewCheckIntervalInMs(_externalViewCheckIntervalInMs);
     rebalanceConfig.setExternalViewStabilizationTimeoutInMs(_externalViewStabilizationTimeoutInMs);
-    rebalanceConfig.setUpdateTargetTier(TierConfigUtils.shouldRelocateToTiers(tableConfig));
     rebalanceConfig.setIncludeConsuming(_includeConsuming);
     rebalanceConfig.setMinimizeDataMovement(_minimizeDataMovement);
     rebalanceConfig.setBatchSizePerServer(_batchSizePerServer);
