@@ -72,17 +72,6 @@ public class CommonConstants {
   public static final String CONFIG_OF_PINOT_TAR_COMPRESSION_CODEC_NAME = "pinot.tar.compression.codec.name";
   public static final String QUERY_WORKLOAD = "queryWorkload";
 
-  // Audit logging configuration constants
-  public static class AuditLogConstants {
-    public static final String PREFIX = "pinot.audit";
-    public static final String CONFIG_OF_AUDIT_LOG_ENABLED = PREFIX + ".enabled";
-    public static final String CONFIG_OF_AUDIT_LOG_CAPTURE_REQUEST_PAYLOAD = PREFIX + ".capture.request.payload";
-    public static final String CONFIG_OF_AUDIT_LOG_FILTER_EXCLUDE_PATTERNS = PREFIX + ".filter.exclude.patterns";
-    public static final String CONFIG_OF_AUDIT_LOG_CAPTURE_REQUEST_HEADERS = PREFIX + ".capture.request.headers";
-    public static final String CONFIG_OF_AUDIT_LOG_MAX_PAYLOAD_SIZE = PREFIX + ".max.payload.size";
-    public static final String CONFIG_OF_AUDIT_LOG_LOGGER_NAME = PREFIX + ".logger.name";
-  }
-
   public static class Lucene {
     public static final String CONFIG_OF_LUCENE_MAX_CLAUSE_COUNT = "pinot.lucene.max.clause.count";
     public static final int DEFAULT_LUCENE_MAX_CLAUSE_COUNT = 1024;

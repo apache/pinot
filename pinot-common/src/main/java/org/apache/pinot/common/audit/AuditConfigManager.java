@@ -25,7 +25,6 @@ import javax.inject.Singleton;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,12 +37,13 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public final class AuditConfigManager implements PinotClusterConfigChangeListener {
   private static final Logger LOG = LoggerFactory.getLogger(AuditConfigManager.class);
+  private static final String AUDIT_CONFIG_PREFIX = "pinot.audit";
 
   private AuditConfig _currentConfig = new AuditConfig();
 
   @VisibleForTesting
   static AuditConfig buildFromClusterConfig(Map<String, String> clusterConfigs) {
-    return mapPrefixedConfigToObject(clusterConfigs, CommonConstants.AuditLogConstants.PREFIX, AuditConfig.class);
+    return mapPrefixedConfigToObject(clusterConfigs, AUDIT_CONFIG_PREFIX, AuditConfig.class);
   }
 
   /**
@@ -69,7 +69,7 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
     boolean hasAuditConfigChanges =
-        changedConfigs.stream().anyMatch(configKey -> configKey.startsWith(CommonConstants.AuditLogConstants.PREFIX));
+        changedConfigs.stream().anyMatch(configKey -> configKey.startsWith(AUDIT_CONFIG_PREFIX));
 
     if (!hasAuditConfigChanges) {
       LOG.info("No audit-related configs changed, skipping configuration rebuild");
