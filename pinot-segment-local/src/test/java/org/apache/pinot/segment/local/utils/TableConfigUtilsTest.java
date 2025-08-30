@@ -854,9 +854,32 @@ public class TableConfigUtilsTest {
 
     try {
       TableConfigUtils.validate(tableConfigWithoutPauseless, schema);
-      // Should pass - multiple stream configs are allowed when pauseless consumption is disabled
+      fail("Should fail when duplicate topic names are present in multiple stream configs");
     } catch (IllegalStateException e) {
-      fail("Should not fail when pauseless consumption is disabled with multiple stream configs: " + e.getMessage());
+      // Expected - should fail with specific error message
+      assertTrue(
+          e.getMessage().contains("Duplicate topic names found in streamConfigs:"));
+    }
+
+    // Test for multiple stream configs with pauseless consumption disabled and unique topic names - should pass
+    Map<String, String> anotherStreamConfig = new HashMap<>(streamConfigs);
+    anotherStreamConfig.put("stream.kafka.topic.name", "myTopic2");
+    StreamIngestionConfig streamIngestionConfigWithoutPauselessUniqueTopics =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, anotherStreamConfig));
+    streamIngestionConfigWithoutPauselessUniqueTopics.setPauselessConsumptionEnabled(false);
+
+    IngestionConfig ingestionConfigWithoutPauselessUniqueTopics = new IngestionConfig();
+    ingestionConfigWithoutPauselessUniqueTopics.setStreamIngestionConfig(
+        streamIngestionConfigWithoutPauselessUniqueTopics);
+    TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+            .setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+            .build();
+    try {
+      TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
+    } catch (IllegalStateException e) {
+      fail("Should not fail when pauseless consumption is disabled with multiple stream configs with unique topics");
     }
   }
 

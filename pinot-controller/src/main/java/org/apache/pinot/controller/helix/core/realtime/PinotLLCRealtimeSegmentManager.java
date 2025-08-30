@@ -934,6 +934,16 @@ public class PinotLLCRealtimeSegmentManager {
     // Handle offset auto reset
     String nextOffset = committingSegmentDescriptor.getNextOffset();
     String startOffset = computeStartOffset(nextOffset, streamConfig, newLLCSegmentName.getPartitionGroupId());
+    if (!startOffset.equals(nextOffset)) {
+      Map<String, String> taskProperties = new HashMap<>();
+      taskProperties.put(Constants.RESET_OFFSET_FROM, nextOffset);
+      taskProperties.put(Constants.RESET_OFFSET_TO, startOffset);
+      taskProperties.put(Constants.RESET_OFFSET_TOPIC_NAME, streamConfig.getTopicName());
+      taskProperties.put(Constants.RESET_OFFSET_TOPIC_PARTITION,
+          Integer.toString(newLLCSegmentName.getPartitionGroupId()));
+      _helixResourceManager.invokeControllerPeriodicTask(streamConfig.getTableNameWithType(),
+          Constants.REALTIME_OFFSET_AUTO_RESET_MANAGER, taskProperties);
+    }
 
     LOGGER.info(
         "Creating segment ZK metadata for new CONSUMING segment: {} with start offset: {} and creation time: {}",
@@ -965,7 +975,7 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   private String computeStartOffset(String nextOffset, StreamConfig streamConfig, int partitionId) {
-    if (!streamConfig.isEnableOffsetAutoReset()) {
+    if (!streamConfig.isEnableOffsetAutoReset() || streamConfig.isBackfillTopic()) {
       return nextOffset;
     }
     long timeThreshold = streamConfig.getOffsetAutoResetTimeSecThreshold();
@@ -2472,6 +2482,12 @@ public class PinotLLCRealtimeSegmentManager {
     Set<String> consumingSegments = findConsumingSegmentsOfTopics(updatedIdealState, indexOfPausedTopics);
     sendForceCommitMessageToServers(tableNameWithType, consumingSegments);
     return extractTablePauseState(updatedIdealState);
+  }
+
+  public boolean isTopicConsumptionPaused(String tableNameWithType, int topicIndex) {
+    IdealState idealState = getIdealState(tableNameWithType);
+    PauseState pauseState = extractTablePauseState(idealState);
+    return pauseState != null && pauseState.getIndexOfInactiveTopics().contains(topicIndex);
   }
 
   public PauseState resumeTopicsConsumption(String tableNameWithType, List<Integer> indexOfPausedTopics) {
