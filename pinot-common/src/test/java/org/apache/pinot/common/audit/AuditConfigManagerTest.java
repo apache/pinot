@@ -40,7 +40,7 @@ public class AuditConfigManagerTest {
     properties.put("pinot.audit.capture.request.payload.enabled", "true");
     properties.put("pinot.audit.capture.request.headers", "Content-Type,X-Request-Id,Authorization");
     properties.put("pinot.audit.payload.size.max.bytes", "20480");
-    properties.put("pinot.audit.excluded.endpoints", "/health,/metrics");
+    properties.put("pinot.audit.url.filter.exclude.patterns", "/health,/metrics");
     properties.put("some.other.config", "value");
     properties.put("another.config", "123");
 
@@ -55,7 +55,7 @@ public class AuditConfigManagerTest {
     assertThat(config.isCaptureRequestPayload()).isTrue();
     assertThat(config.getCaptureRequestHeaders()).isEqualTo("Content-Type,X-Request-Id,Authorization");
     assertThat(config.getMaxPayloadSize()).isEqualTo(20480);
-    assertThat(config.getExcludedEndpoints()).isEqualTo("/health,/metrics");
+    assertThat(config.getUrlFilterExcludePatterns()).isEqualTo("/health,/metrics");
   }
 
   @Test
@@ -79,7 +79,7 @@ public class AuditConfigManagerTest {
     // Verify defaults for unspecified configs
     assertThat(config.isCaptureRequestPayload()).isFalse();
     assertThat(config.getCaptureRequestHeaders()).isEmpty();
-    assertThat(config.getExcludedEndpoints()).isEmpty();
+    assertThat(config.getUrlFilterExcludePatterns()).isEmpty();
   }
 
   @Test
@@ -99,7 +99,7 @@ public class AuditConfigManagerTest {
     assertThat(config.isCaptureRequestPayload()).isFalse();
     assertThat(config.getCaptureRequestHeaders()).isEmpty();
     assertThat(config.getMaxPayloadSize()).isEqualTo(10240);
-    assertThat(config.getExcludedEndpoints()).isEmpty();
+    assertThat(config.getUrlFilterExcludePatterns()).isEmpty();
   }
 
   @Test
@@ -145,7 +145,7 @@ public class AuditConfigManagerTest {
     assertThat(config.getCaptureRequestHeaders()).isEqualTo("X-User-Id,X-Session-Token");
     // Verify defaults for unspecified fields
     assertThat(config.getMaxPayloadSize()).isEqualTo(10240);
-    assertThat(config.getExcludedEndpoints()).isEmpty();
+    assertThat(config.getUrlFilterExcludePatterns()).isEmpty();
   }
 
   @Test
@@ -213,7 +213,7 @@ public class AuditConfigManagerTest {
     customProperties.put("pinot.audit.capture.request.payload.enabled", "true");
     customProperties.put("pinot.audit.capture.request.headers", "X-Trace-Id,X-Correlation-Id");
     customProperties.put("pinot.audit.payload.size.max.bytes", "50000");
-    customProperties.put("pinot.audit.excluded.endpoints", "/test,/debug");
+    customProperties.put("pinot.audit.url.filter.exclude.patterns", "/test,/debug");
     manager.onChange(customProperties.keySet(), customProperties);
 
     // Verify custom configs are applied
@@ -222,7 +222,7 @@ public class AuditConfigManagerTest {
     assertThat(customConfig.isCaptureRequestPayload()).isTrue();
     assertThat(customConfig.getCaptureRequestHeaders()).isEqualTo("X-Trace-Id,X-Correlation-Id");
     assertThat(customConfig.getMaxPayloadSize()).isEqualTo(50000);
-    assertThat(customConfig.getExcludedEndpoints()).isEqualTo("/test,/debug");
+    assertThat(customConfig.getUrlFilterExcludePatterns()).isEqualTo("/test,/debug");
 
     // When - Simulate ZooKeeper config deletion with empty map
     // The changedConfigs should contain the keys that were deleted, but clusterConfigs should be empty
@@ -235,7 +235,7 @@ public class AuditConfigManagerTest {
     assertThat(defaultConfig.isCaptureRequestPayload()).isFalse();
     assertThat(defaultConfig.getCaptureRequestHeaders()).isEmpty();
     assertThat(defaultConfig.getMaxPayloadSize()).isEqualTo(10240);
-    assertThat(defaultConfig.getExcludedEndpoints()).isEmpty();
+    assertThat(defaultConfig.getUrlFilterExcludePatterns()).isEmpty();
   }
 
   @Test
