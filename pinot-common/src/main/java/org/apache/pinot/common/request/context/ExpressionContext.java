@@ -117,16 +117,17 @@ public class ExpressionContext {
 
   @Override
   public int hashCode() {
-    int hash = 31 * 31 * _type.hashCode();
+    int hash = 31 + _type.ordinal(); // simpler seed
+
     switch (_type) {
       case LITERAL:
-        return hash + _literal.hashCode();
+        return 31 * hash + _literal.hashCode();
       case IDENTIFIER:
-        return hash + _identifier.hashCode();
+        return 31 * hash + _identifier.hashCode();
       case FUNCTION:
-        return hash + _function.hashCode();
+        return 31 * hash + _function.hashCode();
       default:
-        throw new IllegalStateException();
+        throw new IllegalStateException("Unknown type: " + _type);
     }
   }
 
