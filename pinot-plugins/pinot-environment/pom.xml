@@ -37,7 +37,6 @@
   </properties>
 
   <modules>
-    <module>pinot-azure</module>
   </modules>
 
   <dependencies>

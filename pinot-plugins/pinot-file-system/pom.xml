@@ -39,7 +39,6 @@
   <modules>
     <module>pinot-adls</module>
     <module>pinot-hdfs</module>
-    <module>pinot-gcs</module>
     <module>pinot-s3</module>
   </modules>
 
