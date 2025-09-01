@@ -270,6 +270,10 @@
       <groupId>com.google.auto.service</groupId>
       <artifactId>auto-service-annotations</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+    </dependency>
 
     <!-- Test -->
     <dependency>

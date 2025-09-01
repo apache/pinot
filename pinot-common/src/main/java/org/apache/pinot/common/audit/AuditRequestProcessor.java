@@ -47,8 +47,14 @@ public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
 
+  private final AuditConfigManager _configManager;
+  private final AuditIdentityResolver _identityResolver;
+
   @Inject
-  private AuditConfigManager _configManager;
+  public AuditRequestProcessor(AuditConfigManager configManager, AuditIdentityResolver identityResolver) {
+    _configManager = configManager;
+    _identityResolver = identityResolver;
+  }
 
   /**
    * Converts a MultivaluedMap into a Map of query parameters.
@@ -113,7 +119,7 @@ public class AuditRequestProcessor {
           .setServiceId(extractServiceId(requestContext))
           .setMethod(requestContext.getMethod())
           .setOriginIpAddress(extractClientIpAddress(requestContext, remoteAddr))
-          .setUserId(extractUserId(requestContext))
+          .setUserid(_identityResolver.resolveIdentity(requestContext))
           .setRequest(captureRequestPayload(requestContext));
     } catch (Exception e) {
       // Graceful degradation: Never let audit logging failures affect the main request
@@ -127,18 +133,6 @@ public class AuditRequestProcessor {
   }
 
   private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
-    // TODO spyne to be implemented
-    return null;
-  }
-
-  /**
-   * Extracts user ID from request headers.
-   * Looks for common authentication headers.
-   *
-   * @param requestContext the container request context
-   * @return the user ID or "anonymous" if not found
-   */
-  private String extractUserId(ContainerRequestContext requestContext) {
     // TODO spyne to be implemented
     return null;
   }

@@ -49,7 +49,6 @@ import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.MailboxSendOperator;
 import org.apache.pinot.segment.spi.memory.DataBuffer;
-import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,8 +72,7 @@ public class GrpcSendingMailbox implements SendingMailbox {
 
   private StreamObserver<MailboxContent> _contentObserver;
 
-  public GrpcSendingMailbox(
-      PinotConfiguration config, String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
+  public GrpcSendingMailbox(String id, ChannelManager channelManager, String hostname, int port, long deadlineMs,
       StatMap<MailboxSendOperator.StatKey> statMap, int maxByteStringSize) {
     _id = id;
     _channelManager = channelManager;
