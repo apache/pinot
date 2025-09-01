@@ -152,6 +152,7 @@ public class RealtimeConsumptionRateManager {
       ServerRateLimiter existingLimiter = (ServerRateLimiter) _serverRateLimiter;
       existingLimiter.updateRateLimit(serverRateLimitConfig._serverRateLimit,
           serverRateLimitConfig._throttlingStrategy);
+      return;
     }
 
     _serverRateLimiter = new ServerRateLimiter(serverRateLimitConfig._serverRateLimit, serverMetrics,
