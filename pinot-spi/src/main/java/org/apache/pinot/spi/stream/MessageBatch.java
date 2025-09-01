@@ -96,5 +96,8 @@ public interface MessageBatch<T> {
     return false;
   }
 
+  /**
+   * Returns the size of the serialized message batch in bytes
+   */
   long getSizeInBytes();
 }
