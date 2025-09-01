@@ -287,7 +287,7 @@
     <prometheus.jmx-exporter-javaagent.version>0.19.0</prometheus.jmx-exporter-javaagent.version>
     <fastutil.version>8.5.16</fastutil.version>
     <disruptor.version>4.0.0</disruptor.version>
-    <snakeyaml.version>2.4</snakeyaml.version>
+    <snakeyaml.version>2.5</snakeyaml.version>
     <hadoop-shaded-protobuf_3_25.version>1.4.0</hadoop-shaded-protobuf_3_25.version>
     <clearspring-stream-lib.version>2.9.8</clearspring-stream-lib.version>
     <datasketches-java.version>6.2.0</datasketches-java.version>
