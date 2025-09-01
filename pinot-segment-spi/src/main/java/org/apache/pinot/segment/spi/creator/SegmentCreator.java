@@ -28,6 +28,7 @@ import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
 
@@ -69,6 +70,8 @@ public interface SegmentCreator extends Closeable, Serializable {
    */
   void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
       throws IOException;
+
+  void indexColumn(String columnName, ColumnReader columnReader) throws IOException;
 
   /**
    * Sets the name of the segment.
