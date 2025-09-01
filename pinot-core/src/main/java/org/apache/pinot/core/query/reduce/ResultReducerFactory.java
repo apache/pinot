@@ -20,7 +20,6 @@ package org.apache.pinot.core.query.reduce;
 
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 
 
 /**
@@ -33,7 +32,7 @@ public final class ResultReducerFactory {
   /**
    * Constructs the right result reducer based on the given query context.
    */
-  public static DataTableReducer getResultReducer(QueryContext queryContext, ThreadResourceUsageAccountant accountant) {
+  public static DataTableReducer getResultReducer(QueryContext queryContext) {
     if (queryContext.isExplain()) {
       return new ExplainPlanDataTableReducer(queryContext);
     }
@@ -44,7 +43,7 @@ public final class ResultReducerFactory {
       if (queryContext.getGroupByExpressions() == null) {
         return new AggregationDataTableReducer(queryContext);
       } else {
-        return new GroupByDataTableReducer(queryContext, accountant);
+        return new GroupByDataTableReducer(queryContext);
       }
     }
     assert QueryContextUtils.isDistinctQuery(queryContext);

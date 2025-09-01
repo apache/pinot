@@ -246,7 +246,7 @@ public interface TableRouteInfo {
     InstanceRequest instanceRequest = new InstanceRequest();
     instanceRequest.setBrokerId(brokerId);
     instanceRequest.setRequestId(requestId);
-    instanceRequest.setCid(QueryThreadContext.getCid());
+    instanceRequest.setCid(QueryThreadContext.get().getExecutionContext().getCid());
     instanceRequest.setQuery(brokerRequest);
     Map<String, String> queryOptions = brokerRequest.getPinotQuery().getQueryOptions();
     if (queryOptions != null) {

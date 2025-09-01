@@ -61,10 +61,8 @@ import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.utils.TypeUtils;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -401,10 +399,9 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   private Future<?> startExecution() {
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     return _executorService.submit(() -> {
       try {
-        execute(parentContext);
+        execute();
       } catch (Exception e) {
         setErrorBlock(
             ErrorMseBlock.fromError(QueryErrorCode.INTERNAL, "Caught exception while executing leaf stage: " + e));
@@ -423,20 +420,9 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   @VisibleForTesting
-  void execute(@Nullable ThreadExecutionContext parentContext) {
+  void execute() {
     if (_requests.size() == 1) {
-      ServerQueryRequest request = _requests.get(0);
-      if (parentContext != null) {
-        // NOTE: Treat this as SSE runner (anchor) thread.
-        Tracing.ThreadAccountantOps.setupRunner(parentContext.getQueryId(), parentContext.getWorkloadName());
-        try {
-          executeOneRequest(request, null);
-        } finally {
-          Tracing.ThreadAccountantOps.clear();
-        }
-      } else {
-        executeOneRequest(request, null);
-      }
+      executeOneRequest(_requests.get(0), null);
     } else {
       // Hit 2 physical tables, one REALTIME and one OFFLINE
       assert _requests.size() == 2;
@@ -448,23 +434,11 @@ public class LeafOperator extends MultiStageOperator {
       for (int i = 0; i < 2; i++) {
         ServerQueryRequest request = _requests.get(i);
         futures[i] = _executorService.submit(() -> {
-          if (parentContext != null) {
-            // NOTE: Treat this as SSE runner (anchor) thread.
-            Tracing.ThreadAccountantOps.setupRunner(parentContext.getQueryId(), parentContext.getWorkloadName());
-            try {
-              // Drain the latch when receiving exception block and not wait for the other thread to finish
-              executeOneRequest(request, latch::countDown);
-            } finally {
-              Tracing.ThreadAccountantOps.clear();
-              latch.countDown();
-            }
-          } else {
-            try {
-              // Drain the latch when receiving exception block and not wait for the other thread to finish
-              executeOneRequest(request, latch::countDown);
-            } finally {
-              latch.countDown();
-            }
+          try {
+            // Drain the latch when receiving exception block and not wait for the other thread to finish
+            executeOneRequest(request, latch::countDown);
+          } finally {
+            latch.countDown();
           }
         });
       }

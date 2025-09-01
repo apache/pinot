@@ -32,6 +32,16 @@ import org.slf4j.LoggerFactory;
 public class WorkloadBudgetManager {
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadBudgetManager.class);
 
+  private static WorkloadBudgetManager _instance;
+
+  public static void set(WorkloadBudgetManager instance) {
+    _instance = instance;
+  }
+
+  public static WorkloadBudgetManager get() {
+    return _instance;
+  }
+
   private long _enforcementWindowMs;
   private ConcurrentHashMap<String, Budget> _workloadBudgets;
   private final ScheduledExecutorService _resetScheduler = Executors.newSingleThreadScheduledExecutor();
@@ -58,17 +68,16 @@ public class WorkloadBudgetManager {
    * This is fixed budget allocated during host startup and used across all secondary queries.
    */
   private void initSecondaryWorkloadBudget(PinotConfiguration config) {
-    double secondaryCpuPercentage = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE,
-        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
+    double secondaryCpuPercentage =
+        config.getProperty(CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_CPU_PERCENTAGE,
+            CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_CPU_PERCENTAGE);
 
     // Don't create a secondary workload if cpu percentage is non-zero.
     if (secondaryCpuPercentage <= 0.0) {
       return;
     }
 
-    String secondaryWorkloadName = config.getProperty(
-        CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
+    String secondaryWorkloadName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
         CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
 
     // The Secondary CPU budget is based on the CPU percentage allocated for secondary workload.
@@ -98,7 +107,6 @@ public class WorkloadBudgetManager {
     }
     LOGGER.info("WorkloadBudgetManager has been shut down.");
   }
-
 
   /**
    * Adds or updates budget for a workload (Thread-Safe).
@@ -140,7 +148,7 @@ public class WorkloadBudgetManager {
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
     }
 
-      Budget budget = _workloadBudgets.get(workload);
+    Budget budget = _workloadBudgets.get(workload);
     if (budget == null) {
       LOGGER.warn("No budget found for workload: {}", workload);
       return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
@@ -227,6 +235,7 @@ public class WorkloadBudgetManager {
     BudgetStats stats = budget.getStats();
     return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
   }
+
   /**
    * Internal class representing budget statistics.
    * It contains initial CPU and memory budgets that are configured during workload registration,

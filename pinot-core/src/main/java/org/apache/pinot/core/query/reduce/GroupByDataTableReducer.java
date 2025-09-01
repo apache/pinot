@@ -59,11 +59,10 @@ import org.apache.pinot.core.query.utils.rewriter.RewriterResult;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GroupByUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
+import org.apache.pinot.spi.exception.QueryException;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.roaringbitmap.RoaringBitmap;
 
 
@@ -80,9 +79,8 @@ public class GroupByDataTableReducer implements DataTableReducer {
   private final int _numAggregationFunctions;
   private final int _numGroupByExpressions;
   private final int _numColumns;
-  private final ThreadResourceUsageAccountant _resourceUsageAccountant;
 
-  public GroupByDataTableReducer(QueryContext queryContext, ThreadResourceUsageAccountant accountant) {
+  public GroupByDataTableReducer(QueryContext queryContext) {
     _queryContext = queryContext;
     _aggregationFunctions = queryContext.getAggregationFunctions();
     assert _aggregationFunctions != null;
@@ -91,7 +89,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
     assert groupByExpressions != null;
     _numGroupByExpressions = groupByExpressions.size();
     _numColumns = _numAggregationFunctions + _numGroupByExpressions;
-    _resourceUsageAccountant = accountant;
   }
 
   /**
@@ -180,6 +177,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
           new HavingFilterHandler(havingFilter, postAggregationHandler, _queryContext.isNullHandlingEnabled());
       int processedRows = 0;
       while (rows.size() < limit && sortedIterator.hasNext()) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(processedRows++, () -> "GroupByDataTableReducer");
         Object[] row = sortedIterator.next().getValues();
         for (int i = 0; i < numColumns; i++) {
           Object value = row[i];
@@ -190,13 +188,12 @@ public class GroupByDataTableReducer implements DataTableReducer {
         if (havingFilterHandler.isMatch(row)) {
           rows.add(row);
         }
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(processedRows);
-        processedRows++;
       }
     } else {
       int numRows = Math.min(numRecords, limit);
       rows = new ArrayList<>(numRows);
       for (int i = 0; i < numRows; i++) {
+        QueryThreadContext.checkTerminationAndSampleUsagePeriodically(i, () -> "GroupByDataTableReducer");
         Object[] row = sortedIterator.next().getValues();
         for (int j = 0; j < numColumns; j++) {
           Object value = row[j];
@@ -205,7 +202,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
           }
         }
         rows.add(row);
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
       }
     }
 
@@ -264,11 +260,9 @@ public class GroupByDataTableReducer implements DataTableReducer {
     for (int i = 0; i < numReduceThreadsToUse; i++) {
       List<DataTable> reduceGroup = reduceGroups.get(i);
       int taskId = i;
-      ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
       futures[i] = reducerContext.getExecutorService().submit(new TraceRunnable() {
         @Override
         public void runJob() {
-          _resourceUsageAccountant.setupWorker(taskId, ThreadExecutionContext.TaskType.SSE, parentContext);
           try {
             for (DataTable dataTable : reduceGroup) {
               boolean nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
@@ -285,7 +279,7 @@ public class GroupByDataTableReducer implements DataTableReducer {
                 // Terminate when thread is interrupted.
                 // This is expected when the query already fails in the main thread.
                 // The first check will always be performed when rowId = 0
-                Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rowId);
+                QueryThreadContext.checkTerminationAndSampleUsagePeriodically(rowId, () -> "GroupByDataTableReducer");
                 Object[] values = new Object[_numColumns];
                 for (int colId = 0; colId < _numColumns; colId++) {
                   // NOTE: We need to handle data types for group key, intermediate and final aggregate result.
@@ -354,7 +348,6 @@ public class GroupByDataTableReducer implements DataTableReducer {
             exception.compareAndSet(null, t);
           } finally {
             countDownLatch.countDown();
-            Tracing.ThreadAccountantOps.clear();
           }
         }
       });
@@ -370,10 +363,10 @@ public class GroupByDataTableReducer implements DataTableReducer {
         Utils.rethrowException(t);
       }
     } catch (InterruptedException e) {
-      Exception killedErrorMsg = Tracing.getThreadAccountant().getErrorStatus();
+      QueryException terminateException = QueryThreadContext.get().getExecutionContext().getTerminateException();
       throw new EarlyTerminationException(
-          "Interrupted in broker reduce phase" + (killedErrorMsg == null ? StringUtils.EMPTY : " " + killedErrorMsg),
-          e);
+          "Interrupted in broker reduce phase" + (terminateException != null ? ": " + terminateException
+              : StringUtils.EMPTY), e);
     } finally {
       for (Future future : futures) {
         if (!future.isDone()) {

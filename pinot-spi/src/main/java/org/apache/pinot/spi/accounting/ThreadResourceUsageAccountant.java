@@ -22,112 +22,48 @@ import java.util.Collection;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public interface ThreadResourceUsageAccountant {
 
-  /**
-   * clear thread accounting info when a task finishes execution on a thread
-   */
-  void clear();
+  /// Registers a [QueryThreadContext] of a running query to the current thread.
+  void setupTask(QueryThreadContext threadContext);
 
-  /**
-   * check if the corresponding anchor thread of current thread is interrupted
-   * so that when we preempt a task we only call interrupt on the anchor thread
-   */
-  boolean isAnchorThreadInterrupted();
-
-  /**
-   * This function is expected to be called by threads in query engine. The query id of the task will be available in
-   * the thread execution context stored in a thread local. Therefore it does not accept any parameters.
-   * @return true if the query is terminated, false otherwise
-   */
-  default boolean isQueryTerminated() {
-    return false;
-  }
-
-  /**
-   * Set up the thread execution context for an anchor a.k.a runner thread.
-   * @param queryId query id string
-   * @param taskType the type of the task - SSE or MSE
-   * @param workloadName the name of the workload, can be null
-   */
-  void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType, String workloadName);
-
-  /**
-   * Set up the thread execution context for a worker thread.
-   * @param taskId a unique task id
-   * @param taskType the type of the task - SSE or MSE
-   * @param parentContext the parent execution context
-   */
-  void setupWorker(int taskId, ThreadExecutionContext.TaskType taskType,
-      @Nullable ThreadExecutionContext parentContext);
-
-  /**
-   * get the executon context of current thread
-   */
-  @Nullable
-  ThreadExecutionContext getThreadExecutionContext();
-
-  /**
-   * call to sample usage
-   */
+  /// Samples the resource usage of the current thread.
   void sampleUsage();
 
+  /// Clears the previous registered [QueryThreadContext] from the current thread.
+  void clear();
+
+  /// Updates the resource usage from an untracked source. This is used for request ser/de threads where thread
+  /// execution context cannot be set up beforehand.
+  void updateUntrackedResourceUsage(String identifier, long cpuTimeNs, long allocatedBytes,
+      TrackingScope trackingScope);
+
+  /// Returns `true` when the query submission should be throttled, `false` otherwise.
   default boolean throttleQuerySubmission() {
     return false;
   }
 
-  /**
-   * Register a callback to be invoked when a query is cancelled.
-   * This is useful for cleaning up resources or notifying other components.
-   *
-   * @param mseCancelCallback the callback to register
-   */
-  default void registerMseCancelCallback(String queryId, MseCancelCallback mseCancelCallback) {
-    // Default implementation does nothing. Subclasses can override to register a cancel callback.
+  /// Starts the watcher periodic task.
+  default void startWatcherTask() {
   }
 
-  /**
-   * special interface to aggregate usage to the stats store only once, it is used for response
-   * ser/de threads where the thread execution context cannot be setup before hands as
-   * queryId/taskId/workloadName is unknown and the execution process is hard to instrument
-   */
-  void updateQueryUsageConcurrently(String identifier, long cpuTimeNs, long allocatedBytes,
-      TrackingScope trackingScope);
-
-  /**
-   * start the periodical task
-   */
-  void startWatcherTask();
-
-  /**
-   * Stop the periodic watcher task.
-   */
+  /// Stops the watcher periodic task.
   default void stopWatcherTask() {
-    // Default implementation does nothing. Subclasses can override to stop the watcher task.
   }
 
+  /// Returns the [PinotClusterConfigChangeListener] if the accountant wants to listen to cluster config changes, `null`
+  /// otherwise.
   @Nullable
   default PinotClusterConfigChangeListener getClusterConfigChangeListener() {
     return null;
   }
 
-  /**
-   * get error status if the query is preempted
-   * @return empty string if N/A
-   */
-  Exception getErrorStatus();
-
-  /**
-   * Get all the ThreadResourceTrackers for all threads executing query tasks
-   * @return A collection of ThreadResourceTracker objects
-   */
+  /// Returns the [ThreadResourceTracker]s for all threads executing queries.
   Collection<? extends ThreadResourceTracker> getThreadResources();
 
-  /**
-   * Get all the QueryResourceTrackers for all the queries executing in a broker or server.
-   * @return A Map of String, QueryResourceTracker for all the queries.
-   */
+  /// Returns the [QueryResourceTracker]s for all queries executing in the broker or server.
   Map<String, ? extends QueryResourceTracker> getQueryResources();
 }

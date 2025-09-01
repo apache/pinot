@@ -68,6 +68,7 @@ import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -84,7 +85,8 @@ import static org.mockito.Mockito.when;
 public class ExplainPlanQueriesTest extends BaseQueriesTest {
   private static final File TEMP_DIR = new File(FileUtils.getTempDirectory(), "ExplainPlanQueriesTest");
   private static final String QUERY_EXECUTOR_CONFIG_PATH = "conf/query-executor.properties";
-  private static final ExecutorService QUERY_RUNNERS = Executors.newFixedThreadPool(20);
+  private static final ExecutorService QUERY_RUNNERS =
+      QueryThreadContext.contextAwareExecutorService(Executors.newFixedThreadPool(2));
 
   private static final String RAW_TABLE_NAME = "testTable";
   private static final String OFFLINE_TABLE_NAME = TableNameBuilder.OFFLINE.tableNameWithType(RAW_TABLE_NAME);
@@ -369,10 +371,10 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     brokerRequest.getPinotQuery().getDataSource().setTableName(OFFLINE_TABLE_NAME);
     InstanceRequest instanceRequest1 = new InstanceRequest(0L, brokerRequest);
     instanceRequest1.setSearchSegments(indexSegmentsForServer1);
-    InstanceResponseBlock instanceResponse1 = queryExecutor.execute(getQueryRequest(instanceRequest1), QUERY_RUNNERS);
+    byte[] serializedResponse1 = execute(instanceRequest1, queryExecutor);
     InstanceRequest instanceRequest2 = new InstanceRequest(0L, brokerRequest);
     instanceRequest2.setSearchSegments(indexSegmentsForServer2);
-    InstanceResponseBlock instanceResponse2 = queryExecutor.execute(getQueryRequest(instanceRequest2), QUERY_RUNNERS);
+    byte[] serializedResponse2 = execute(instanceRequest2, queryExecutor);
 
     // Broker side
     // Use 2 Threads for 2 data-tables
@@ -381,10 +383,8 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     Map<ServerRoutingInstance, DataTable> dataTableMap = new HashMap<>();
     try {
       // For multi-threaded BrokerReduceService, we cannot reuse the same data-table
-      byte[] serializedResponse1 = instanceResponse1.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.OFFLINE),
           DataTableFactory.getDataTable(serializedResponse1));
-      byte[] serializedResponse2 = instanceResponse2.toDataTable().toBytes();
       dataTableMap.put(new ServerRoutingInstance("localhost", 1234, TableType.REALTIME),
           DataTableFactory.getDataTable(serializedResponse2));
     } catch (Exception e) {
@@ -393,15 +393,24 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
 
     // Target raw table on the broker side
     brokerRequest.getPinotQuery().getDataSource().setTableName(RAW_TABLE_NAME);
-    BrokerResponseNative brokerResponse =
-        _brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap,
-            Broker.DEFAULT_BROKER_TIMEOUT_MS, BROKER_METRICS);
+    BrokerResponseNative brokerResponse;
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      brokerResponse = _brokerReduceService.reduceOnDataTable(brokerRequest, brokerRequest, dataTableMap,
+          Broker.DEFAULT_BROKER_TIMEOUT_MS, BROKER_METRICS);
+    }
 
     QueriesTestUtils.testExplainSegmentsResult(brokerResponse, expected);
   }
 
-  private ServerQueryRequest getQueryRequest(InstanceRequest instanceRequest) {
-    return new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+  private byte[] execute(InstanceRequest instanceRequest, QueryExecutor queryExecutor) {
+    ServerQueryRequest queryRequest =
+        new ServerQueryRequest(instanceRequest, ServerMetrics.get(), System.currentTimeMillis());
+    try (QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
+      InstanceResponseBlock instanceResponse = queryExecutor.execute(queryRequest, QUERY_RUNNERS);
+      return instanceResponse.toDataTable().toBytes();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Test

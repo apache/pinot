@@ -38,23 +38,17 @@ import org.apache.pinot.server.access.AccessControl;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 import org.apache.pinot.util.TestUtils;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeClass;
-import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertFalse;
-import static org.testng.Assert.assertNotNull;
-import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.*;
 
 
 public class QueryRoutingTest {
@@ -74,7 +68,6 @@ public class QueryRoutingTest {
   private ServerRoutingStatsManager _serverRoutingStatsManager;
   int _requestCount;
   private QueryServer _queryServer;
-  private QueryThreadContext.CloseableContext _closeableContext;
 
   @BeforeClass
   public void setUp() {
@@ -85,19 +78,6 @@ public class QueryRoutingTest {
     _serverRoutingStatsManager.init();
     _queryRouter = new QueryRouter("testBroker", mock(BrokerMetrics.class), _serverRoutingStatsManager);
     _requestCount = 0;
-  }
-
-  @BeforeMethod
-  public void setupQueryThreadContext() {
-    _closeableContext = QueryThreadContext.open();
-  }
-
-  @AfterMethod
-  void closeQueryThreadContext() {
-    if (_closeableContext != null) {
-      _closeableContext.close();
-      _closeableContext = null;
-    }
   }
 
   @AfterMethod
