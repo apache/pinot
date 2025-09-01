@@ -2366,16 +2366,15 @@ public class PinotLLCRealtimeSegmentManager {
     if (segmentsToCommitStr != null) {
       Set<String> requestedSegmentsToCommit =
           Arrays.stream(segmentsToCommitStr.split(",")).map(String::trim).collect(Collectors.toSet());
-      // Intersect with consuming segments; warn if any requested segments are not currently consuming
-      Set<String> validSegmentsToCommit = requestedSegmentsToCommit.stream()
-          .filter(allConsumingSegments::contains)
-          .collect(Collectors.toSet());
-      Set<String> invalidSegments = new HashSet<>(requestedSegmentsToCommit);
-      invalidSegments.removeAll(allConsumingSegments);
+      Map<Boolean, Set<String>> partitionedByIsConsuming = requestedSegmentsToCommit.stream()
+          .collect(Collectors.partitioningBy(allConsumingSegments::contains, Collectors.toSet()));
+      Set<String> validSegmentsToCommit = partitionedByIsConsuming.get(true);
+      Set<String> invalidSegments = partitionedByIsConsuming.get(false);
       if (!invalidSegments.isEmpty()) {
         LOGGER.warn("Cannot commit segments that are not in CONSUMING state. All consuming segments: {}, "
-            + "provided segments to commit: {}. Ignoring first 10 non-consuming segments: {}", allConsumingSegments,
-            segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
+            + "provided segments to commit: {}. Ignoring all non-consuming segments, sampling 10: {}",
+            allConsumingSegments,
+                segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
       }
       return validSegmentsToCommit;
     }
