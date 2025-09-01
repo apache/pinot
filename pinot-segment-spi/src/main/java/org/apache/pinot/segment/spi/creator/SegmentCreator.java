@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.configuration2.ex.ConfigurationException;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.readers.GenericRow;
 
@@ -67,7 +68,22 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @param sortedDocIds - If not null, then this provides the sorted order of documents.
    * @param segment - Used to get the values of the column.
    */
-  void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+  @Deprecated
+  default void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
+      throws IOException {
+    indexColumn(columnName, sortedDocIds, segment, null);
+  }
+
+  /**
+   * Adds a column to the index.
+   *
+   * @param columnName - The name of the column being added to.
+   * @param sortedDocIds - If not null, then this provides the sorted order of documents.
+   * @param segment - Used to get the values of the column.
+   * @param validDocIds - If not null, then will only iterate over valid doc ids and skip invalid doc ids.
+   */
+  void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIds)
       throws IOException;
 
   /**

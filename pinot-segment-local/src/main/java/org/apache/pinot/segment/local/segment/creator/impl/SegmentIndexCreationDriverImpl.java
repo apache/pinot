@@ -67,6 +67,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -250,7 +251,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       int[] immutableToMutableIdMap = null;
       if (_recordReader instanceof PinotSegmentRecordReader) {
         immutableToMutableIdMap =
-            getImmutableToMutableIdMap(((PinotSegmentRecordReader) _recordReader).getSortedDocIds());
+            getImmutableToMutableIdMap(_recordReader.getSortedDocIds());
       }
 
       // Initialize the index creation using the per-column statistics information
@@ -327,7 +328,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     handlePostCreation();
   }
 
-  public void buildByColumn(IndexSegment indexSegment)
+  public void buildByColumn(IndexSegment indexSegment, ThreadSafeMutableRoaringBitmap validDocIds)
       throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
@@ -338,7 +339,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     try {
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
-      int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+      int[] sortedDocIds = _recordReader.getSortedDocIds();
       int[] immutableToMutableIdMap = getImmutableToMutableIdMap(sortedDocIds);
 
       // Initialize the index creation using the per-column statistics information
@@ -353,7 +354,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
 
       for (String col : columns) {
-        _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
+        _indexCreator.indexColumn(col, sortedDocIds, indexSegment, validDocIds);
       }
     } catch (Exception e) {
       _indexCreator.close();

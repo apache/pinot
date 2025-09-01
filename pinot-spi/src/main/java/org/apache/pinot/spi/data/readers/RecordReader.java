@@ -76,4 +76,15 @@ public interface RecordReader extends Closeable, Serializable {
    */
   void rewind()
       throws IOException;
+
+  /**
+   * Get the sorted document IDs if available.
+   * This method is used to retrieve the sorted order of document IDs for segment creation.
+   *
+   * @return array of sorted document IDs, or null if not available or not applicable
+   */
+  @Nullable
+  default int[] getSortedDocIds() {
+    return null;
+  }
 }

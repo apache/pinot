@@ -774,10 +774,6 @@ public final class TableConfigUtils {
                 deleteRecordColumn));
       }
 
-      // Validate commit-time compaction compatibility with column major segment builder
-      // todo: Remove this after commit time compaction is supported with column major build
-      validateCommitTimeCompactionConfig(tableConfig);
-
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       if (outOfOrderRecordColumn != null) {
         Preconditions.checkState(!Boolean.TRUE.equals(upsertConfig.isDropOutOfOrderRecord()),
@@ -1541,34 +1537,6 @@ public final class TableConfigUtils {
       return false;
     }
     return tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
-  }
-
-  /**
-   * Validates that commit-time compaction is compatible with column major segment builder settings.
-   *
-   * @param tableConfig The table configuration to validate
-   * @throws IllegalStateException if commit-time compaction is enabled with column major segment builder
-   */
-  public static void validateCommitTimeCompactionConfig(TableConfig tableConfig) {
-    boolean commitTimeCompactionEnabled = isCommitTimeCompactionEnabled(tableConfig);
-
-    if (commitTimeCompactionEnabled) {
-      boolean isColumnMajorEnabled = false;
-      if (tableConfig.getIngestionConfig() != null
-          && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-        isColumnMajorEnabled =
-            tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
-      } else {
-        isColumnMajorEnabled = tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
-      }
-
-      String tableNameForError = tableConfig.getTableName();
-
-      Preconditions.checkState(!isColumnMajorEnabled,
-          "Commit-time compaction is not supported when column major segment builder is enabled. "
-              + "Please disable column major segment builder (set columnMajorSegmentBuilderEnabled=false) "
-              + "to use commit-time compaction for table: " + tableNameForError);
-    }
   }
 
   /**
