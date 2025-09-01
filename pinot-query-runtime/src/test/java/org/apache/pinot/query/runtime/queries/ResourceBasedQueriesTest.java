@@ -580,11 +580,4 @@ public class ResourceBasedQueriesTest extends QueryRunnerTestBase {
     }
     return testCaseMap;
   }
-
-  private static Object extractExtraProps(Map<String, Object> extraProps, String propKey) {
-    if (extraProps == null) {
-      return null;
-    }
-    return extraProps.getOrDefault(propKey, null);
-  }
 }

@@ -88,6 +88,7 @@ import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.cursors.ResponseStoreService;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -356,9 +357,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _brokerConf.getProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             CommonConstants.Broker.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
+    // initialize the thread accountant for query killing
+    PinotConfiguration threadAccountantConfigs = _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
+    // This allows for custom implementations of WorkloadBudgetManager.
+    WorkloadBudgetManager workloadBudgetManager = createWorkloadBudgetManager(threadAccountantConfigs);
     _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
-        _brokerConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.BROKER);
+        threadAccountantConfigs, _instanceId,
+        org.apache.pinot.spi.config.instance.InstanceType.BROKER, workloadBudgetManager);
     Preconditions.checkNotNull(_resourceUsageAccountant);
 
     // Create Broker request handler.
@@ -534,6 +539,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
    * @param brokerAdminApplication is the application
    */
   protected void registerExtraComponents(BrokerAdminApiApplication brokerAdminApplication) {
+  }
+
+  /**
+   * Can be overridden to create a custom WorkloadBudgetManager.
+   */
+  protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration brokerConf) {
+    return new WorkloadBudgetManager(brokerConf);
   }
 
   private QueryDispatcher createQueryDispatcher(PinotConfiguration brokerConf) {

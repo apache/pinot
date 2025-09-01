@@ -337,6 +337,14 @@ public interface TableDataManager {
   }
 
   /**
+   * Interface to handle segment state transitions from CONSUMING to OFFLINE
+   *
+   * @param segmentNameStr name of segment for which the state change is being handled
+   */
+  default void onConsumingToOffline(String segmentNameStr) {
+  }
+
+  /**
    * Return list of segment names that are stale along with reason.
    *
    * @return List of {@link StaleSegment} with segment names and reason why it is stale

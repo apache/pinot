@@ -36,7 +36,6 @@ import static org.testng.Assert.assertTrue;
 
 
 public class EnrichedHashJoinOperatorTest {
-  private AutoCloseable _mocks;
   private MultiStageOperator _leftInput;
   private MultiStageOperator _rightInput;
   private static final DataSchema DEFAULT_CHILD_SCHEMA = new DataSchema(new String[]{"int_col", "string_col"},

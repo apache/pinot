@@ -105,6 +105,7 @@ import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.crypt.PinotCrypterFactory;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -673,9 +674,12 @@ public abstract class BaseServerStarter implements ServiceStartable {
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
     // Initialize the thread accountant for query killing
+    PinotConfiguration threadAccountantConfigs = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
+    // This allows for custom implementations of WorkloadBudgetManager.
+    WorkloadBudgetManager workloadBudgetManager = createWorkloadBudgetManager(threadAccountantConfigs);
     _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
         _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER);
+        org.apache.pinot.spi.config.instance.InstanceType.SERVER, workloadBudgetManager);
     Preconditions.checkNotNull(_resourceUsageAccountant);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
@@ -746,12 +750,6 @@ public abstract class BaseServerStarter implements ServiceStartable {
         new SegmentMessageHandlerFactory(instanceDataManager, serverMetrics);
     _helixManager.getMessagingService()
         .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(), messageHandlerFactory);
-    // Query workload message handler factory
-    QueryWorkloadMessageHandlerFactory queryWorkloadMessageHandlerFactory =
-        new QueryWorkloadMessageHandlerFactory(serverMetrics);
-    _helixManager.getMessagingService()
-        .registerMessageHandlerFactory(Message.MessageType.USER_DEFINE_MSG.toString(),
-            queryWorkloadMessageHandlerFactory);
 
     serverMetrics.addCallbackGauge(Helix.INSTANCE_CONNECTED_METRIC_NAME, () -> _helixManager.isConnected() ? 1L : 0L);
     _helixManager.addPreConnectCallback(
@@ -900,6 +898,13 @@ public abstract class BaseServerStarter implements ServiceStartable {
    */
   protected void preServeQueries() {
     _segmentOperationsThrottler.startServingQueries();
+  }
+
+  /**
+   * Can be overridden to create a custom WorkloadBudgetManager.
+   */
+  protected WorkloadBudgetManager createWorkloadBudgetManager(PinotConfiguration config) {
+    return new WorkloadBudgetManager(config);
   }
 
   @Override
