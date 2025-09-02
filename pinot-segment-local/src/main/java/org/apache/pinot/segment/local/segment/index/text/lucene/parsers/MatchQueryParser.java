@@ -68,7 +68,7 @@ import org.apache.lucene.search.TermQuery;
  * <p>This parser extends Lucene's QueryParserBase and implements the required abstract methods.
  * It uses the provided Analyzer for tokenization and creates appropriate Lucene Boolean queries.</p>
  */
-public class MinimumShouldMatchQueryParser extends QueryParserBase {
+public class MatchQueryParser extends QueryParserBase {
   /** The field name to search in */
   private final String _field;
 
@@ -91,7 +91,7 @@ public class MinimumShouldMatchQueryParser extends QueryParserBase {
    * @param analyzer the analyzer to use for tokenizing queries (must not be null)
    * @throws IllegalArgumentException if field or analyzer is null
    */
-  public MinimumShouldMatchQueryParser(String field, Analyzer analyzer) {
+  public MatchQueryParser(String field, Analyzer analyzer) {
     super();
     _field = field;
     _analyzer = analyzer;
@@ -214,9 +214,8 @@ public class MinimumShouldMatchQueryParser extends QueryParserBase {
       return builder.build();
     }
 
-    // For other query types, throw exception
-    throw new ParseException("MinimumShouldMatchQueryParser only supports Boolean queries and single term queries. "
-        + "Received: " + parsedQuery.getClass().getSimpleName());
+    //All the other queries are returned as is
+    return parsedQuery;
   }
 
   /**

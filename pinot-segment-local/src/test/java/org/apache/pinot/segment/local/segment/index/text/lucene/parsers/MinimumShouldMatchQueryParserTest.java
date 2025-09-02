@@ -40,7 +40,7 @@ public class MinimumShouldMatchQueryParserTest {
    */
   private Query parseQueryWithMinimumShouldMatch(String query, String minimumShouldMatch)
       throws ParseException {
-    MinimumShouldMatchQueryParser parser = new MinimumShouldMatchQueryParser(FIELD_NAME, new StandardAnalyzer());
+    MatchQueryParser parser = new MatchQueryParser(FIELD_NAME, new StandardAnalyzer());
     if (minimumShouldMatch != null) {
       parser.setMinimumShouldMatch(minimumShouldMatch);
     }
@@ -150,7 +150,8 @@ public class MinimumShouldMatchQueryParserTest {
   }
 
   @Test
-  public void testNegativeCases() {
+  public void testNegativeCases()
+      throws ParseException {
     // Case 1: Invalid percentage value (> 100%)
     try {
       parseQueryWithMinimumShouldMatch("java OR python", "101%");
@@ -218,24 +219,8 @@ public class MinimumShouldMatchQueryParserTest {
 
 
     // Case 9: Non-Boolean query (phrase query)
-    try {
-      parseQueryWithMinimumShouldMatch("\"java programming\"", null);
-      Assert.fail("Should throw ParseException for non-Boolean query (phrase)");
-    } catch (ParseException e) {
-      // Expected - should contain the error message about Boolean queries
-      Assert.assertTrue(e.getMessage().contains("Boolean queries"),
-          "Error message should mention Boolean queries, got: " + e.getMessage());
-    }
-
-    // Case 10: Non-Boolean query (wildcard query)
-    try {
-      parseQueryWithMinimumShouldMatch("java*", null);
-      Assert.fail("Should throw ParseException for non-Boolean query (wildcard)");
-    } catch (ParseException e) {
-      // Expected - should contain the error message about Boolean queries
-      Assert.assertTrue(e.getMessage().contains("Boolean queries"),
-          "Error message should mention Boolean queries, got: " + e.getMessage());
-    }
+    parseQueryWithMinimumShouldMatch("\"java programming\"", null);
+    parseQueryWithMinimumShouldMatch("java*", null);
   }
 
 

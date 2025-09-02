@@ -2353,13 +2353,13 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     String queryMin2Of3 =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'AWS hadoop big', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=2') LIMIT 50000";
+            + ", 'AWS hadoop big', 'parser=MATCH,minimumShouldMatch=2') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryMin2Of3, expectedMin2Of3.size(), false, expectedMin2Of3);
 
     // Test 2: Percentage minimum_should_match - require at least 60% (2 out of 3 terms)
     String queryMin80Percent =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'AWS hadoop big', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=80%') LIMIT 50000";
+            + ", 'AWS hadoop big', 'parser=MATCH,minimumShouldMatch=80%') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryMin80Percent, expectedMin2Of3.size(), false, expectedMin2Of3);
 
     // Test 3: Require at least 1 out of 2 terms (minimumShouldMatch=1) - Stanford Tensor
@@ -2378,7 +2378,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     String queryMin1Of2 =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'Stanford Tensor', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=1') LIMIT 50000";
+            + ", 'Stanford Tensor', 'parser=MATCH,minimumShouldMatch=1') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryMin1Of2, expectedMin1Of2.size(), false, expectedMin1Of2);
 
     // Test 4: Require at least 3 out of 4 terms (minimumShouldMatch=3) - Apache Kafka publish subscribe
@@ -2390,7 +2390,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     String queryMin3Of4 =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'Apache Kafka publish subscribe', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=3') LIMIT 50000";
+            + ", 'Apache Kafka publish subscribe', 'parser=MATCH,minimumShouldMatch=3') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryMin3Of4, expectedMin3Of4.size(), false, expectedMin3Of4);
 
     // Test 5: Require all 3 terms (minimumShouldMatch=3) - AWS hadoop spark
@@ -2402,7 +2402,7 @@ public class TextSearchQueriesTest extends BaseQueriesTest {
 
     String queryMin3Of3 =
         "SELECT INT_COL, SKILLS_TEXT_COL FROM " + TABLE_NAME + " WHERE TEXT_MATCH(" + SKILLS_TEXT_COL_NAME
-            + ", 'AWS hadoop spark', 'parser=MINIMUM_SHOULD_MATCH,minimumShouldMatch=3') LIMIT 50000";
+            + ", 'AWS hadoop spark', 'parser=MATCH,minimumShouldMatch=3') LIMIT 50000";
     testTextSearchSelectQueryHelper(queryMin3Of3, expectedMin3Of3.size(), false, expectedMin3Of3);
   }
 }

@@ -49,7 +49,7 @@ public class LuceneTextIndexUtils {
   public static final String PARSER_STANDARD = "STANDARD";
   public static final String PARSER_COMPLEX = "COMPLEX";
   public static final String PARSER_MATCHPHRASE = "MATCHPHRASE";
-  public static final String PARSER_MINIMUM_SHOULD_MATCH = "MINIMUM_SHOULD_MATCH";
+  public static final String PARSER_MATCH = "MATCH";
 
   // Default operator constants
   public static final String DEFAULT_OPERATOR_AND = "AND";
@@ -92,8 +92,8 @@ public class LuceneTextIndexUtils {
   public static final String CLASSIC_QUERY_PARSER = "org.apache.lucene.queryparser.classic.QueryParser";
   public static final String MATCHPHRASE_QUERY_PARSER_CLASS =
       "org.apache.pinot.segment.local.segment.index.text.lucene.parsers.PrefixPhraseQueryParser";
-  public static final String MINIMUM_SHOULD_MATCH_QUERY_PARSER_CLASS =
-      "org.apache.pinot.segment.local.segment.index.text.lucene.parsers.MinimumShouldMatchQueryParser";
+  public static final String MATCH_QUERY_PARSER_CLASS =
+      "org.apache.pinot.segment.local.segment.index.text.lucene.parsers.MatchQueryParser";
 
   private LuceneTextIndexUtils() {
   }
@@ -160,8 +160,8 @@ public class LuceneTextIndexUtils {
       case PARSER_MATCHPHRASE:
         parserClassName = MATCHPHRASE_QUERY_PARSER_CLASS;
         break;
-      case PARSER_MINIMUM_SHOULD_MATCH:
-        parserClassName = MINIMUM_SHOULD_MATCH_QUERY_PARSER_CLASS;
+      case PARSER_MATCH:
+        parserClassName = MATCH_QUERY_PARSER_CLASS;
         break;
       default:
         parserClassName = CLASSIC_QUERY_PARSER;
