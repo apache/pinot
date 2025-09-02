@@ -29,9 +29,13 @@ public class OpenTelemetryHttpReporter implements PinotMetricReporter {
   public static final OtlpHttpMetricExporter DEFAULT_HTTP_METRIC_EXPORTER = OtlpHttpMetricExporter
       .builder()
       //.setEndpoint("http://[::1]:22784/v1/metrics") // default OpenTelemetry collector endpoint
-      .setEndpoint("http://[::1]:4318/v1/metrics") // default OpenTelemetry collector endpoint
+      .setEndpoint("http://127.0.0.1:4318/v1/metrics") // default OpenTelemetry collector endpoint
       .build();
-  public static final int DEFAULT_EXPORT_INTERVAL_SECONDS = 5;
+  // by default export metrics every second, as we want to report QPS and OpenTelemetryMeter implementation use
+  // ObservableLongCounter which fetch the current value the at reporting time by calling a callback function. If we
+  // set an export interval longer than 1 second, the QPS metric will not be accurate (during an export interval, the
+  // QPS will be same).
+  public static final int DEFAULT_EXPORT_INTERVAL_SECONDS = 1;
 
   public OpenTelemetryHttpReporter() {
   }
