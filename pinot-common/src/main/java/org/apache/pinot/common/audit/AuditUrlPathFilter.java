@@ -30,20 +30,28 @@ import org.slf4j.LoggerFactory;
 
 
 /**
- * URL path filter utility that uses Java's PathMatcher with glob patterns
+ * URL path filter utility that uses Java's PathMatcher with glob and regex patterns
  * to determine if a URL path should be excluded from processing.
  *
  * This class provides powerful pattern matching capabilities including:
  * - Wildcards: * (within path segment), ** (across path segments), ? (single character)
  * - Character sets: [abc], [a-z], [!abc]
  * - Grouping: {api,v1,v2}
+ * - Regular expressions with regex: prefix
  *
- * Examples:
+ * Glob pattern examples:
  * - health - exact match
  * - api/* - matches api/users but not api/v1/users
  * - api/** - matches api/users and api/v1/users
  * - api/v[12]/users - matches api/v1/users and api/v2/users
  * - api/{users,groups}/list - matches api/users/list and api/groups/list
+ *
+ * Regex pattern examples (must be prefixed with "regex:"):
+ * - regex:api/v[0-9]+/users - matches api/v1/users, api/v2/users, api/v123/users
+ * - regex:^health(check)?$ - matches only "health" or "healthcheck"
+ * - regex:.*\.(jpg|png|gif)$ - matches paths ending with image extensions
+ * - regex:api/(user|group|role)/[0-9]+ - matches api/user/123, api/group/456
+ * - regex:^(ping|status|healthz?)$ - matches ping, status, health, or healthz
  */
 @Singleton
 public class AuditUrlPathFilter {
@@ -51,7 +59,7 @@ public class AuditUrlPathFilter {
   private static final String PREFIX_GLOB = "glob:";
   private static final String PREFIX_REGEX = "regex:";
 
-  private static boolean testPattern(Path path, String pattern) {
+  private static boolean matches(Path path, String pattern) {
     try {
       String globPattern = pattern;
       if (!globPattern.startsWith(PREFIX_GLOB) && !globPattern.startsWith(PREFIX_REGEX)) {
@@ -63,7 +71,7 @@ public class AuditUrlPathFilter {
         return true;
       }
     } catch (Exception e) {
-      LOG.error("Invalid pattern '{}', skipping", pattern, e);
+      LOG.warn("Invalid pattern '{}', skipping", pattern, e);
     }
     return false;
   }
@@ -87,7 +95,7 @@ public class AuditUrlPathFilter {
       if (Arrays.stream(patterns)
           .map(String::trim)
           .filter(StringUtils::isNotBlank)
-          .anyMatch(p -> testPattern(path, p))) {
+          .anyMatch(p -> matches(path, p))) {
         return true;
       }
     } catch (Exception e) {

@@ -151,10 +151,8 @@ public class AuditUrlPathFilterTest {
     assertThat(_filter.isExcluded("anything", patterns)).isFalse();
   }
 
-  // ===== Integration Test =====
-
   @Test
-  public void testBasicIntegrationScenario() {
+  public void testBasicIntegrationWithPathMatcher() {
     String patterns = "health,api/*,admin/**";
 
     assertThat(_filter.isExcluded("health", patterns)).isTrue();
