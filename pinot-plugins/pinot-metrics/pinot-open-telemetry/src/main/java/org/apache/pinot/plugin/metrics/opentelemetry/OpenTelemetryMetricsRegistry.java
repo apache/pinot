@@ -220,8 +220,8 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
   public Object getMetricsRegistry() {
     // This method is here because some metric libraries (e.g. Dropwizard and Yammer) have built-in metrics registry
     // and its reporter needs to access the metrics registry instance to get all the metrics. However, OpenTelemetry
-    // does not have a concept of metrics registry but a MetricsProvider (or MeterProvider in OpenTelemetry
-    // terminology) instead. In addition, OpenTelemetry HTTP reporter/exporter accesses the global static
+    // does not have a concept of metrics registry but a "MetricsProvider" (more precisely, a MeterProvider in
+    // OpenTelemetry terminology) instead. In addition, OpenTelemetry HTTP reporter/exporter accesses the global static
     // MetricsProvider, so we can return anything here.
     return ImmutableMap.of(
         "counters", PINOT_COUNTER_MAP,

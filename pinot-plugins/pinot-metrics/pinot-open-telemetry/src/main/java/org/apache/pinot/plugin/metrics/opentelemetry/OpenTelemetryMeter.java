@@ -46,7 +46,9 @@ public class OpenTelemetryMeter implements PinotMeter {
     _counter = OpenTelemetryMetricsRegistry.getOtelMeterProvider().counterBuilder(metricName.getOtelMetricName())
         .setUnit(rateUnit.name())
         .buildWithCallback(
-            // a callback to report the current value of the counter
+            // Register a callback to report the current value of the counter. Unlike synchronous counters, which are
+            // incremented by the user at the time of measurement, an ObservableLongCounter periodically calls a
+            // user-defined callback to fetch the current value.
             counter -> counter.record(_value.get(), _metricName.getOtelAttributes())
         );
   }
