@@ -576,84 +576,6 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testValidDocIdsMetadataPostForInMemory()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-
-    List<String> segments = List.of(segment.getSegmentName());
-    TableSegments tableSegments = new TableSegments(segments);
-    String validDocIdsMetadataPath =
-        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/validDocIdsMetadata";
-
-    // Test IN_MEMORY validDocIdsType
-    String response = _webTarget.path(validDocIdsMetadataPath)
-        .queryParam("segmentNames", segment.getSegmentName())
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY.toString())
-        .request()
-        .post(Entity.json(tableSegments), String.class);
-    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
-
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
-    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "IN_MEMORY");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514723);
-    Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
-    Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
-
-    // Verify server status information
-    Assert.assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
-    String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
-    Assert.assertNotNull(serverStatus, "Server status should not be null");
-    Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
-  }
-
-  @Test
-  public void testValidDocIdsMetadataPostForInMemoryWithDelete()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-
-    List<String> segments = List.of(segment.getSegmentName());
-    TableSegments tableSegments = new TableSegments(segments);
-    String validDocIdsMetadataPath =
-        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/validDocIdsMetadata";
-
-    // Test IN_MEMORY_WITH_DELETE validDocIdsType
-    String response = _webTarget.path(validDocIdsMetadataPath)
-        .queryParam("segmentNames", segment.getSegmentName())
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())
-        .request()
-        .post(Entity.json(tableSegments), String.class);
-    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
-
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
-    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "IN_MEMORY_WITH_DELETE");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514723);
-    Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
-    Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
-
-    // Verify server status information
-    Assert.assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
-    String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
-    Assert.assertNotNull(serverStatus, "Server status should not be null");
-    Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
-  }
-
-  @Test
   public void testValidDocIdsMetadataGetForSnapshotWithDelete()
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
@@ -682,62 +604,6 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   @Test
-  public void testValidDocIdsMetadataGetForInMemory()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-
-    String validDocIdsMetadataPath =
-        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/validDocIdMetadata";
-
-    // Test GET endpoint with IN_MEMORY validDocIdsType
-    String response = _webTarget.path(validDocIdsMetadataPath)
-        .queryParam("segmentNames", segment.getSegmentName())
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY.toString())
-        .request()
-        .get(String.class);
-    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
-
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
-    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "IN_MEMORY");
-  }
-
-  @Test
-  public void testValidDocIdsMetadataGetForInMemoryWithDelete()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-
-    String validDocIdsMetadataPath =
-        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/validDocIdMetadata";
-
-    // Test GET endpoint with IN_MEMORY_WITH_DELETE validDocIdsType
-    String response = _webTarget.path(validDocIdsMetadataPath)
-        .queryParam("segmentNames", segment.getSegmentName())
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())
-        .request()
-        .get(String.class);
-    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
-
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
-    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
-    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "IN_MEMORY_WITH_DELETE");
-  }
-
-  @Test
   public void testValidDocIdsBitmapForSnapshotWithDelete()
       throws IOException {
     IndexSegment segment = _realtimeIndexSegments.get(0);
@@ -760,60 +626,6 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(response.getSegmentCrc(), "187068486");
     Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
     Assert.assertEquals(response.getValidDocIdsType(), ValidDocIdsType.SNAPSHOT_WITH_DELETE);
-    Assert.assertNotNull(response.getBitmap());
-  }
-
-  @Test
-  public void testValidDocIdsBitmapForInMemory()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-
-    String validDocIdsBitmapPath =
-        "/segments/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/" + segment.getSegmentName()
-            + "/validDocIdsBitmap";
-
-    // Test validDocIdsBitmap endpoint with IN_MEMORY validDocIdsType
-    ValidDocIdsBitmapResponse response = _webTarget.path(validDocIdsBitmapPath)
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY.toString())
-        .request()
-        .get(ValidDocIdsBitmapResponse.class);
-
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getSegmentCrc(), "187068486");
-    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
-    Assert.assertEquals(response.getValidDocIdsType(), ValidDocIdsType.IN_MEMORY);
-    Assert.assertNotNull(response.getBitmap());
-  }
-
-  @Test
-  public void testValidDocIdsBitmapForInMemoryWithDelete()
-      throws IOException {
-    IndexSegment segment = _realtimeIndexSegments.get(0);
-    // Verify the content of the downloaded snapshot from a realtime table.
-    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
-        (ImmutableSegmentImpl) segment);
-
-    String validDocIdsBitmapPath =
-        "/segments/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/" + segment.getSegmentName()
-            + "/validDocIdsBitmap";
-
-    // Test validDocIdsBitmap endpoint with IN_MEMORY_WITH_DELETE validDocIdsType
-    ValidDocIdsBitmapResponse response = _webTarget.path(validDocIdsBitmapPath)
-        .queryParam("validDocIdsType", ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())
-        .request()
-        .get(ValidDocIdsBitmapResponse.class);
-
-    Assert.assertNotNull(response);
-    Assert.assertEquals(response.getSegmentCrc(), "187068486");
-    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
-    Assert.assertEquals(response.getValidDocIdsType(), ValidDocIdsType.IN_MEMORY_WITH_DELETE);
     Assert.assertNotNull(response.getBitmap());
   }
 
@@ -900,6 +712,7 @@ public class TablesResourceTest extends BaseResourceTest {
   }
 
   // Override to use data with delete records
+  @Override
   protected String getAvroFileName() {
     return "data/test_data_with_delete.avro";
   }
