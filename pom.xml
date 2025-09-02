@@ -183,7 +183,7 @@
     <azure.msal4j.version>1.23.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
+    <sslcontext.kickstart.version>9.2.0</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <scala-xml.version>2.4.0</scala-xml.version>
