@@ -1278,6 +1278,8 @@ public class CommonConstants {
 
     // Config for realtime consumption message rate limit
     public static final String CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT = "pinot.server.consumption.rate.limit";
+    public static final String CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES =
+        "pinot.server.consumption.rate.limit.bytes";
     // Default to 0.0 (no limit)
     public static final double DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT = 0.0;
 
