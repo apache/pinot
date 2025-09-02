@@ -117,6 +117,31 @@ public class TextIndexConfig extends IndexConfig {
         LUCENE_INDEX_DEFAULT_CASE_SENSITIVE_INDEX, LUCENE_INDEX_DEFAULT_USE_COMBINE_FILES);
   }
 
+  /**
+   * @deprecated Use the new constructor with useCombineFiles parameter instead.
+   * This constructor will be removed in a future version.
+   */
+  @Deprecated
+  public TextIndexConfig(Boolean luceneUseCompoundFile, FSTType fstType, Object rawValue,
+                        boolean noRawData, boolean enableQueryCache, List<String> stopWordsInclude,
+                        List<String> stopWordsExclude, Boolean useAndForMultiTermQueries,
+                        Integer maxResultCacheSize, String stopWordsIncludeKey, String stopWordsExcludeKey,
+                        String useAndForMultiTermQueriesKey, String maxResultCacheSizeKey,
+                        Boolean enablePrefixSuffixMatching, Boolean enablePrefixSuffixPhraseMatching,
+                        Integer maxResultCacheSizeKeyInt, Boolean useCombineFiles,
+                        DocIdTranslatorMode docIdTranslatorMode, Boolean enablePrefixSuffixMatchingKey) {
+    // Call the new constructor with default useCombineFiles value
+    this(useCombineFiles, fstType, rawValue, enableQueryCache,
+         useAndForMultiTermQueries != null ? useAndForMultiTermQueries : false,
+         stopWordsInclude != null ? stopWordsInclude : new ArrayList<>(),
+         stopWordsExclude != null ? stopWordsExclude : new ArrayList<>(),
+         luceneUseCompoundFile, maxResultCacheSize, null, null, null, null,
+         enablePrefixSuffixPhraseMatching != null ? enablePrefixSuffixPhraseMatching : false,
+         false, 0, false, docIdTranslatorMode,
+         enablePrefixSuffixMatchingKey != null ? enablePrefixSuffixMatchingKey : false,
+         useCombineFiles != null ? useCombineFiles : false);
+  }
+
   @JsonCreator
   public TextIndexConfig(@JsonProperty("disabled") Boolean disabled,
       @JsonProperty("fst") FSTType fstType,

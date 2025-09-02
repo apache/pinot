@@ -67,7 +67,10 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   public static final String INDEX_DISPLAY_NAME = "text";
   // TODO: Should V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION be added here?
   private static final List<String> EXTENSIONS = Lists.newArrayList(
-      V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION);
+      V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION, V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
 
   protected TextIndexType() {
     super(StandardIndexes.TEXT_ID);

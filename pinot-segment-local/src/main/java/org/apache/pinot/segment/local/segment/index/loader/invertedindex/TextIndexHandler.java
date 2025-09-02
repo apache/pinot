@@ -89,6 +89,14 @@ public class TextIndexHandler extends BaseIndexHandler {
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
     // Check if any existing index need to be removed.
+    // Check if existing indexes need configuration updates based on useCombineFiles
+    for (String column : columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      if (columnMetadata != null && hasTextIndexConfigurationChanged(column, segmentReader)) {
+        LOGGER.info("Need to update text index configuration for segment: {}, column: {}", segmentName, column);
+        return true;
+      }
+    }
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Need to remove existing text index from segment: {}, column: {}", segmentName, column);
@@ -103,13 +111,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         return true;
       }
     }
-    // Check if existing indexes need configuration updates based on useCombineFiles
-    for (String column : existingColumns) {
-      if (hasTextIndexConfigurationChanged(column, segmentReader)) {
-        LOGGER.info("Need to update text index configuration for segment: {}, column: {}", segmentName, column);
-        return true;
-      }
-    }
+
     return false;
   }
 
@@ -120,6 +122,16 @@ public class TextIndexHandler extends BaseIndexHandler {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentWriter.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
+    // Handle configuration changes for existing indexes
+    for (String column : columnsToAddIdx) {
+      ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
+      if (columnMetadata != null && hasTextIndexConfigurationChanged(column, segmentWriter)) {
+        LOGGER.info("Updating text index configuration for segment: {}, column: {}", segmentName, column);
+        // Remove existing index and recreate with new configuration
+        segmentWriter.removeIndex(column, StandardIndexes.text());
+        createTextIndexForColumn(segmentWriter, columnMetadata);
+      }
+    }
     for (String column : existingColumns) {
       if (!columnsToAddIdx.remove(column)) {
         LOGGER.info("Removing existing text index from segment: {}, column: {}", segmentName, column);
@@ -130,16 +142,6 @@ public class TextIndexHandler extends BaseIndexHandler {
     for (String column : columnsToAddIdx) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
       if (shouldCreateTextIndex(columnMetadata)) {
-        createTextIndexForColumn(segmentWriter, columnMetadata);
-      }
-    }
-    // Handle configuration changes for existing indexes
-    for (String column : existingColumns) {
-      if (hasTextIndexConfigurationChanged(column, segmentWriter)) {
-        LOGGER.info("Updating text index configuration for segment: {}, column: {}", segmentName, column);
-        // Remove existing index and recreate with new configuration
-        segmentWriter.removeIndex(column, StandardIndexes.text());
-        ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
         createTextIndexForColumn(segmentWriter, columnMetadata);
       }
     }
