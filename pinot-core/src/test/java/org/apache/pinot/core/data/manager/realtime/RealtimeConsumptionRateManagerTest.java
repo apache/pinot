@@ -72,7 +72,15 @@ public class RealtimeConsumptionRateManagerTest {
 
     when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
-    when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+    if (Math.random() < 0.5) {
+      when(SERVER_CONFIG_1.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
+          CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(5.0);
+    }
+    if (Math.random() < 0.5) {
+      when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+          CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(2.5);
+    }
+    when(SERVER_CONFIG_2.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(2.5);
     when(SERVER_CONFIG_3.getProperty(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
         CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT)).thenReturn(0.0);
@@ -111,6 +119,7 @@ public class RealtimeConsumptionRateManagerTest {
     serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_2, null);
     try {
       assertEquals(((ServerRateLimiter) rateLimiter).getRate(), 2.5, DELTA);
+      assertEquals(serverRateLimiter.getRate(), 2.5, DELTA);
     } finally {
       serverRateLimiter.close();
     }
@@ -123,13 +132,14 @@ public class RealtimeConsumptionRateManagerTest {
     rateLimiter = _consumptionRateManager.createServerRateLimiter(SERVER_CONFIG_4, null);
     assertEquals(rateLimiter, NOOP_RATE_LIMITER);
 
-    _consumptionRateManager.updateServerRateLimiter(1, null);
+    ServerRateLimitConfig serverRateLimitConfig = new ServerRateLimitConfig(1, MessageCountThrottlingStrategy.INSTANCE);
+    _consumptionRateManager.updateServerRateLimiter(serverRateLimitConfig, null);
     serverRateLimiter = (ServerRateLimiter) _consumptionRateManager.getServerRateLimiter();
     try {
       assertEquals(serverRateLimiter.getRate(), 1);
       assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 1);
 
-      serverRateLimiter.updateRateLimit(12_000);
+      serverRateLimiter.updateRateLimit(12_000, ByteCountThrottlingStrategy.INSTANCE);
       assertEquals(serverRateLimiter.getRate(), 12_000);
       assertEquals(serverRateLimiter.getMetricEmitter().getRate(), 12_000);
     } finally {
@@ -245,7 +255,7 @@ public class RealtimeConsumptionRateManagerTest {
         CompletableFuture.runAsync(() -> emitter.record(1));
       }
       TestUtils.waitForCondition(
-          aVoid -> (emitter.getMessageCount().intValue() == 0) && (emitter.getTracker().getAggregateNumMessages() > 0),
+          aVoid -> (emitter.getMessageCount().intValue() == 0) && (emitter.getTracker().getAggregateUnits() > 0),
           5000,
           "Expected messageCount to be zero because messageCount is always reset before emitter calls "
               + "quotaUtilisationTracker");
@@ -260,7 +270,7 @@ public class RealtimeConsumptionRateManagerTest {
         CompletableFuture.runAsync(() -> emitter1.record(1));
       }
       TestUtils.waitForCondition(
-          aVoid -> ((emitter1.getMessageCount().intValue() > 0) && (emitter1.getTracker().getAggregateNumMessages()
+          aVoid -> ((emitter1.getMessageCount().intValue() > 0) && (emitter1.getTracker().getAggregateUnits()
               == 0)), 5000,
           "Expected messageCount to be greater than zero because messageCount will reset post initial delay (first "
               + "run).");
