@@ -161,7 +161,8 @@ public class TextIndexConfig extends IndexConfig {
       @JsonProperty("luceneNRTCachingDirectoryMaxBufferSizeMB") Integer luceneNRTCachingDirectoryMaxBufferSizeMB,
       @JsonProperty("useLogByteSizeMergePolicy") Boolean useLogByteSizeMergePolicy,
       @JsonProperty("docIdTranslatorMode") DocIdTranslatorMode docIdTranslatorMode,
-      @JsonProperty("caseSensitive") Boolean caseSensitive, @JsonProperty("storeInSegmentFile") Boolean storeInSegmentFile) {
+      @JsonProperty("caseSensitive") Boolean caseSensitive,
+      @JsonProperty("storeInSegmentFile") Boolean storeInSegmentFile) {
     super(disabled);
     _fstType = fstType;
     _rawValueForTextIndex = rawValueForTextIndex;
@@ -303,7 +304,8 @@ public class TextIndexConfig extends IndexConfig {
 
   /**
    * Whether to store text index in segment file and cleanup the directory structure.
-   * @return true if text index should be stored in segment file and directory cleaned up, false to keep directory structure
+   * @return true if text index should be stored in segment file and directory cleaned up,
+   *         false to keep directory structure
    */
   public boolean isStoreInSegmentFile() {
     return _storeInSegmentFile;
