@@ -336,6 +336,24 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
+  public void testForceCommitWithNonConsumingSegmentsIsIgnored() {
+    // Set up a new table with 1 replica, 2 instances, 1 partition
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager._numReplicas = 1;
+    segmentManager.makeTableConfig();
+    segmentManager._numInstances = 2;
+    segmentManager.makeConsumingInstancePartitions();
+    segmentManager._numPartitions = 1;
+    segmentManager.setUpNewTable();
+
+    // Provide a segment that is not in CONSUMING state (non-existent); should be ignored without exception
+    String nonConsumingSegment = "nonExistingSegment";
+    Set<String> committed = segmentManager.forceCommit(REALTIME_TABLE_NAME, null, nonConsumingSegment,
+        org.apache.pinot.controller.api.resources.ForceCommitBatchConfig.of(1, 1, 5));
+    assertTrue(committed.isEmpty(), "Expected no segments to be committed when only non-consuming segments provided");
+  }
+
+  @Test
   public void testCommitSegmentWithOffsetAutoResetOnOffset()
       throws Exception {
     // Set up a new table with 2 replicas, 5 instances, 4 partition

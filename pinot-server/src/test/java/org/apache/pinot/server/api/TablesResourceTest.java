@@ -213,10 +213,10 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertEquals(jsonResponse.get("columns").size(), 2);
     Assert.assertEquals(jsonResponse.get("indexes").size(), 2);
     Assert.assertNotNull(jsonResponse.get("columns").get(0).get("indexSizeMap"));
-    Assert.assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("forward_index").asText(), "200008");
+    Assert.assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("forward_index").asText(), "400008");
     Assert.assertEquals(jsonResponse.get("columns").get(0).get("indexSizeMap").get("dictionary").asText(), "206384");
     Assert.assertNotNull(jsonResponse.get("columns").get(1).get("indexSizeMap"));
-    Assert.assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("forward_index").asText(), "200008");
+    Assert.assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("forward_index").asText(), "400008");
     Assert.assertEquals(jsonResponse.get("columns").get(1).get("indexSizeMap").get("dictionary").asText(), "168976");
     Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("h3-index").asText(), "NO");
     Assert.assertEquals(jsonResponse.get("indexes").get("column1").get("fst-index").asText(), "NO");
@@ -320,10 +320,10 @@ public class TablesResourceTest extends BaseResourceTest {
             .get(String.class);
     JsonNode validDocIdMetadata = JsonUtils.stringToJsonNode(metadataResponse).get(0);
 
-    Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 100000);
+    Assert.assertEquals(validDocIdMetadata.get("totalDocs").asInt(), 200000);
     Assert.assertEquals(validDocIdMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 99992);
-    Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "1894900283");
+    Assert.assertEquals(validDocIdMetadata.get("totalInvalidDocs").asInt(), 199992);
+    Assert.assertEquals(validDocIdMetadata.get("segmentCrc").asText(), "187068486");
     Assert.assertEquals(validDocIdMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
   }
 
@@ -346,12 +346,51 @@ public class TablesResourceTest extends BaseResourceTest {
             .post(Entity.json(tableSegments), String.class);
     JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
 
-    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 100000);
+    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
     Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
-    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 99992);
-    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "1894900283");
+    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
     Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT");
-    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 1877636);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514723);
+    Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
+    Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
+
+    // Verify server status information
+    Assert.assertTrue(validDocIdsMetadata.has("serverStatus"), "Server status should be included in response");
+    String serverStatus = validDocIdsMetadata.get("serverStatus").asText();
+    Assert.assertNotNull(serverStatus, "Server status should not be null");
+    Assert.assertEquals(serverStatus, "NOT_STARTED", serverStatus);
+  }
+
+  @Test
+  public void testValidDocIdsMetadataPostForSnapshotWithDelete()
+      throws IOException {
+    IndexSegment segment = _realtimeIndexSegments.get(0);
+    // Verify the content of the downloaded snapshot from a realtime table.
+    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
+
+    List<String> segments = List.of(segment.getSegmentName());
+    TableSegments tableSegments = new TableSegments(segments);
+    String validDocIdsMetadataPath =
+        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/validDocIdsMetadata";
+
+    // Test the new SNAPSHOT_WITH_DELETE validDocIdsType
+    String response = _webTarget.path(validDocIdsMetadataPath)
+        .queryParam("segmentNames", segment.getSegmentName())
+        .queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT_WITH_DELETE.toString())
+        .request()
+        .post(Entity.json(tableSegments), String.class);
+    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
+
+    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
+    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
+    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
+    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
+    Assert.assertEquals(validDocIdsMetadata.get("segmentSizeInBytes").asLong(), 4514723);
     Assert.assertTrue(validDocIdsMetadata.has("segmentCreationTimeMillis"));
     Assert.assertTrue(validDocIdsMetadata.get("segmentCreationTimeMillis").asLong() > 0);
 
@@ -413,6 +452,13 @@ public class TablesResourceTest extends BaseResourceTest {
     FileUtils.writeByteArrayToFile(validDocIdsSnapshotFile,
         RoaringBitmapUtils.serialize(validDocIdsSnapshot.getMutableRoaringBitmap()));
 
+    // Create the queryableDocIds snapshot file needed for SNAPSHOT_WITH_DELETE
+    File queryableDocIdsSnapshotFile =
+        new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
+            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+    FileUtils.writeByteArrayToFile(queryableDocIdsSnapshotFile,
+        RoaringBitmapUtils.serialize(queryableDocIds.getMutableRoaringBitmap()));
+
     // Check no type (default should be validDocIdsSnapshot)
     Response response = _webTarget.path(snapshotPath).request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.OK.getStatusCode());
@@ -472,7 +518,15 @@ public class TablesResourceTest extends BaseResourceTest {
             V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME);
     FileUtils.writeByteArrayToFile(validDocIdsSnapshotFile,
         RoaringBitmapUtils.serialize(validDocIdsSnapshot.getMutableRoaringBitmap()));
-    String expectedSegmentCrc = "1894900283";
+
+    // Create the queryableDocIds snapshot file needed for SNAPSHOT_WITH_DELETE
+    File queryableDocIdsSnapshotFile =
+        new File(SegmentDirectoryPaths.findSegmentDirectory(segment.getSegmentMetadata().getIndexDir()),
+            V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME);
+    FileUtils.writeByteArrayToFile(queryableDocIdsSnapshotFile,
+        RoaringBitmapUtils.serialize(queryableDocIds.getMutableRoaringBitmap()));
+
+    String expectedSegmentCrc = "187068486";
 
     // Check no type (default should be validDocIdsSnapshot)
     ValidDocIdsBitmapResponse response = _webTarget.path(snapshotPath).request().get(ValidDocIdsBitmapResponse.class);
@@ -519,6 +573,60 @@ public class TablesResourceTest extends BaseResourceTest {
     Assert.assertNotNull(validDocIdsSnapshotBitmap);
     Assert.assertEquals(new ImmutableRoaringBitmap(ByteBuffer.wrap(validDocIdsSnapshotBitmap)).toMutableRoaringBitmap(),
         queryableDocIds.getMutableRoaringBitmap());
+  }
+
+  @Test
+  public void testValidDocIdsMetadataGetForSnapshotWithDelete()
+      throws IOException {
+    IndexSegment segment = _realtimeIndexSegments.get(0);
+    // Verify the content of the downloaded snapshot from a realtime table.
+    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
+
+    String validDocIdsMetadataPath =
+        "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/validDocIdMetadata";
+
+    // Test GET endpoint with SNAPSHOT_WITH_DELETE validDocIdsType
+    String response = _webTarget.path(validDocIdsMetadataPath)
+        .queryParam("segmentNames", segment.getSegmentName())
+        .queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT_WITH_DELETE.toString())
+        .request()
+        .get(String.class);
+    JsonNode validDocIdsMetadata = JsonUtils.stringToJsonNode(response).get(0);
+
+    Assert.assertEquals(validDocIdsMetadata.get("totalDocs").asInt(), 200000);
+    Assert.assertEquals(validDocIdsMetadata.get("totalValidDocs").asInt(), 8);
+    Assert.assertEquals(validDocIdsMetadata.get("totalInvalidDocs").asInt(), 199992);
+    Assert.assertEquals(validDocIdsMetadata.get("segmentCrc").asText(), "187068486");
+    Assert.assertEquals(validDocIdsMetadata.get("validDocIdsType").asText(), "SNAPSHOT_WITH_DELETE");
+  }
+
+  @Test
+  public void testValidDocIdsBitmapForSnapshotWithDelete()
+      throws IOException {
+    IndexSegment segment = _realtimeIndexSegments.get(0);
+    // Verify the content of the downloaded snapshot from a realtime table.
+    downLoadAndVerifyValidDocIdsSnapshot(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
+    downLoadAndVerifyValidDocIdsSnapshotBitmap(TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME),
+        (ImmutableSegmentImpl) segment);
+
+    String validDocIdsBitmapPath = "/segments/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME)
+        + "/" + segment.getSegmentName() + "/validDocIdsBitmap";
+
+    // Test validDocIdsBitmap endpoint with SNAPSHOT_WITH_DELETE validDocIdsType
+    ValidDocIdsBitmapResponse response = _webTarget.path(validDocIdsBitmapPath)
+        .queryParam("validDocIdsType", ValidDocIdsType.SNAPSHOT_WITH_DELETE.toString())
+        .request()
+        .get(ValidDocIdsBitmapResponse.class);
+
+    Assert.assertNotNull(response);
+    Assert.assertEquals(response.getSegmentCrc(), "187068486");
+    Assert.assertEquals(response.getSegmentName(), segment.getSegmentName());
+    Assert.assertEquals(response.getValidDocIdsType(), ValidDocIdsType.SNAPSHOT_WITH_DELETE);
+    Assert.assertNotNull(response.getBitmap());
   }
 
   @Test
@@ -601,5 +709,11 @@ public class TablesResourceTest extends BaseResourceTest {
             "/tables/" + TableNameBuilder.REALTIME.tableNameWithType(TABLE_NAME) + "/segments/UNKNOWN_SEGMENT")
         .request().get(Response.class);
     Assert.assertEquals(response.getStatus(), Response.Status.NOT_FOUND.getStatusCode());
+  }
+
+  // Override to use data with delete records
+  @Override
+  protected String getAvroFileName() {
+    return "data/test_data_with_delete.avro";
   }
 }
