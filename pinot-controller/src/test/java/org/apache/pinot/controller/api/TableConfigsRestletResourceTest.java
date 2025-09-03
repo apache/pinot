@@ -730,6 +730,139 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaDelete(tableName));
   }
 
+  @Test
+  public void testPreviewTableConfigs()
+      throws IOException {
+    String previewUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().getBaseUrl() + "/tables/preview";
+
+    String tableName = "testPreview";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    TableConfig realtimeTableConfig = createRealtimeTableConfig(tableName);
+    Schema schema = createDummySchema(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
+
+    // Test successful preview
+    String response = sendPostRequest(previewUrl, tableConfigs.toPrettyJsonString());
+    TableConfigs previewResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertEquals(previewResponse.getTableName(), tableName);
+    Assert.assertEquals(previewResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
+    Assert.assertEquals(previewResponse.getRealtime().getTableName(), realtimeTableConfig.getTableName());
+    Assert.assertEquals(previewResponse.getSchema().getSchemaName(), schema.getSchemaName());
+
+    // Verify defaults are applied (replica check)
+    Assert.assertEquals(previewResponse.getOffline().getReplication(), DEFAULT_MIN_NUM_REPLICAS);
+    Assert.assertEquals(previewResponse.getRealtime().getReplication(), DEFAULT_MIN_NUM_REPLICAS);
+
+    // Test preview with tuner config applies tuning
+    TableConfig offlineTunerTableConfig = createOfflineTunerTableConfig(tableName + "Tuner");
+    TableConfig realtimeTunerTableConfig = createRealtimeTunerTableConfig(tableName + "Tuner");
+    TableConfigs tunerTableConfigs = new TableConfigs(tableName + "Tuner", createDummySchema(tableName + "Tuner"),
+        offlineTunerTableConfig, realtimeTunerTableConfig);
+    response = sendPostRequest(previewUrl, tunerTableConfigs.toPrettyJsonString());
+    TableConfigs tunerPreviewResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+
+    // Verify tuning was applied
+    Assert.assertTrue(tunerPreviewResponse.getOffline().getIndexingConfig().getInvertedIndexColumns()
+        .containsAll(schema.getDimensionNames()));
+    Assert.assertTrue(tunerPreviewResponse.getOffline().getIndexingConfig().getNoDictionaryColumns()
+        .containsAll(schema.getMetricNames()));
+    Assert.assertTrue(tunerPreviewResponse.getRealtime().getIndexingConfig().getInvertedIndexColumns()
+        .containsAll(schema.getDimensionNames()));
+    Assert.assertTrue(tunerPreviewResponse.getRealtime().getIndexingConfig().getNoDictionaryColumns()
+        .containsAll(schema.getMetricNames()));
+
+    // Test preview with invalid config fails
+    try {
+      TableConfigs invalidTableConfigs = new TableConfigs(tableName, schema, null, null);
+      sendPostRequest(previewUrl, invalidTableConfigs.toPrettyJsonString());
+      fail("Preview with invalid config should have failed");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Test preview with dim table applies quota constraints
+    TableConfig offlineDimTableConfig = createOfflineDimTableConfig(tableName + "Dim");
+    Schema dimSchema = createDummySchemaWithPrimaryKey(tableName + "Dim");
+    TableConfigs dimTableConfigs = new TableConfigs(tableName + "Dim", dimSchema, offlineDimTableConfig, null);
+    response = sendPostRequest(previewUrl, dimTableConfigs.toPrettyJsonString());
+    TableConfigs dimPreviewResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertEquals(dimPreviewResponse.getOffline().getQuotaConfig().getStorage(),
+        DEFAULT_INSTANCE.getControllerConfig().getDimTableMaxSize());
+  }
+
+  @Test
+  public void testPreviewUpdateTableConfigs()
+      throws IOException {
+    // First create a table to update
+    String tableName = "testPreviewUpdate";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = createDummySchema(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+    sendPostRequest(_createTableConfigsUrl, tableConfigs.toPrettyJsonString());
+
+    String previewUpdateUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().getBaseUrl() + "/tables/" + tableName
+        + "/preview";
+
+    // Test successful preview update - add realtime config
+    TableConfig realtimeTableConfig = createRealtimeTableConfig(tableName);
+    TableConfigs updateTableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
+    String response = sendPutRequest(previewUpdateUrl, updateTableConfigs.toPrettyJsonString());
+    TableConfigs previewResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertEquals(previewResponse.getTableName(), tableName);
+    Assert.assertEquals(previewResponse.getOffline().getTableName(), offlineTableConfig.getTableName());
+    Assert.assertEquals(previewResponse.getRealtime().getTableName(), realtimeTableConfig.getTableName());
+    Assert.assertEquals(previewResponse.getSchema().getSchemaName(), schema.getSchemaName());
+
+    // Verify defaults are applied
+    Assert.assertEquals(previewResponse.getOffline().getReplication(), DEFAULT_MIN_NUM_REPLICAS);
+    Assert.assertEquals(previewResponse.getRealtime().getReplication(), DEFAULT_MIN_NUM_REPLICAS);
+
+    // Test preview update with schema changes
+    Schema updatedSchema = createDummySchema(tableName);
+    updatedSchema.addField(new MetricFieldSpec("newMetric", FieldSpec.DataType.LONG));
+    TableConfigs schemaUpdateConfigs = new TableConfigs(tableName, updatedSchema, offlineTableConfig,
+        realtimeTableConfig);
+    response = sendPutRequest(previewUpdateUrl, schemaUpdateConfigs.toPrettyJsonString());
+    previewResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+    Assert.assertTrue(previewResponse.getSchema().getMetricNames().contains("newMetric"));
+
+    // Test preview update with tuner config applies tuning
+    TableConfig offlineTunerTableConfig = createOfflineTunerTableConfig(tableName);
+    TableConfig realtimeTunerTableConfig = createRealtimeTunerTableConfig(tableName);
+    TableConfigs tunerUpdateConfigs = new TableConfigs(tableName, updatedSchema, offlineTunerTableConfig,
+        realtimeTunerTableConfig);
+    response = sendPutRequest(previewUpdateUrl, tunerUpdateConfigs.toPrettyJsonString());
+    previewResponse = JsonUtils.stringToObject(response, TableConfigs.class);
+
+    // Verify tuning was applied
+    Assert.assertTrue(previewResponse.getOffline().getIndexingConfig().getInvertedIndexColumns()
+        .containsAll(updatedSchema.getDimensionNames()));
+    Assert.assertTrue(previewResponse.getOffline().getIndexingConfig().getNoDictionaryColumns()
+        .containsAll(updatedSchema.getMetricNames()));
+
+    // Test preview update for non-existent table fails
+    try {
+      String nonExistentPreviewUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().getBaseUrl()
+          + "/tables/nonExistent/preview";
+      sendPutRequest(nonExistentPreviewUrl, updateTableConfigs.toPrettyJsonString());
+      fail("Preview update for non-existent table should have failed");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Test preview update with table name mismatch fails
+    try {
+      TableConfigs mismatchConfigs = new TableConfigs("differentName", schema, offlineTableConfig, null);
+      sendPutRequest(previewUpdateUrl, mismatchConfigs.toPrettyJsonString());
+      fail("Preview update with table name mismatch should have failed");
+    } catch (Exception e) {
+      // expected
+    }
+
+    // Cleanup
+    sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsDelete(tableName));
+  }
+
   @AfterClass
   public void tearDown() {
     DEFAULT_INSTANCE.cleanup();
