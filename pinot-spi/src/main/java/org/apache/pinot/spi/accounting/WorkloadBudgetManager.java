@@ -178,6 +178,14 @@ public class WorkloadBudgetManager {
     return new BudgetStats(totalCpuBudget, totalMemoryBudget, totalCpuRemaining, totalMemRemaining);
   }
 
+  public BudgetStats getBudgetStats(String workload) {
+    if (!_isEnabled) {
+      return null;
+    }
+    Budget budget = _workloadBudgets.get(workload);
+    return budget != null ? budget.getStats() : null;
+  }
+
   /**
    * Periodically resets budgets at the end of each enforcement window (Thread-Safe).
    */
