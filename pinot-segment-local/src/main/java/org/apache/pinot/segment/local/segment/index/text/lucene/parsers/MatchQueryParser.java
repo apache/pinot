@@ -214,7 +214,7 @@ public class MatchQueryParser extends QueryParserBase {
       return builder.build();
     }
 
-    //All the other queries are returned as is
+    // All the other queries are returned as is
     return parsedQuery;
   }
 
