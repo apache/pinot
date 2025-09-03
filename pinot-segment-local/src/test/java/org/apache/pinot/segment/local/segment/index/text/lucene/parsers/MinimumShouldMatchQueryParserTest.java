@@ -220,8 +220,6 @@ public class MinimumShouldMatchQueryParserTest {
     parseQueryWithMinimumShouldMatch("java*", null);
   }
 
-
-
   @Test
   public void testEdgeCases()
       throws ParseException {
