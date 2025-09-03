@@ -69,39 +69,48 @@ import org.slf4j.LoggerFactory;
 public class LuceneTextIndexReader implements TextIndexReader {
   private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LuceneTextIndexReader.class);
 
-  private IndexReader _indexReader;
-  private Directory _indexDirectory;
-  private IndexSearcher _indexSearcher;
+  private final IndexReader _indexReader;
+  private final Directory _indexDirectory;
+  private final IndexSearcher _indexSearcher;
   private final String _column;
-  private DocIdTranslator _docIdTranslator;
-  private Analyzer _analyzer;
+  private final DocIdTranslator _docIdTranslator;
+  private final Analyzer _analyzer;
   private boolean _useANDForMultiTermQueries = false;
-  private String _queryParserClass;
-  private Constructor<QueryParserBase> _queryParserClassConstructor;
+  private final String _queryParserClass;
+  private final Constructor<QueryParserBase> _queryParserClassConstructor;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {
     _column = column;
     try {
       File indexFile = getTextIndexFile(indexDir);
-      Directory indexDirectory = FSDirectory.open(indexFile.toPath());
-
-      // Load properties from file if exists
+      _indexDirectory = FSDirectory.open(indexFile.toPath());
+      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexSearcher = new IndexSearcher(_indexReader);
+      if (!config.isEnableQueryCache()) {
+        // Disable Lucene query result cache. While it helps a lot with performance for
+        // repeated queries, on the downside it can cause heap issues.
+        _indexSearcher.setQueryCache(null);
+      }
+      if (config.isUseANDForMultiTermQueries()) {
+        _useANDForMultiTermQueries = true;
+      }
+      if (config.isEnablePrefixSuffixMatchingInPhraseQueries()) {
+        _enablePrefixSuffixMatchingInPhraseQueries = true;
+      }
+      // TODO: consider using a threshold of num docs per segment to decide between building
+      // mapping file upfront on segment load v/s on-the-fly during query processing
+      // If the properties file exists, use the analyzer properties and query parser class from the properties file
       File propertiesFile = new File(indexFile, V1Constants.Indexes.LUCENE_TEXT_INDEX_PROPERTIES_FILE);
       if (propertiesFile.exists()) {
         config = TextIndexUtils.getUpdatedConfigFromPropertiesFile(propertiesFile, config);
       }
 
-      // Initialize from components
-      initializeFromComponents(indexDirectory, config);
-      // Initialize docId translator
       _docIdTranslator = prepareDocIdTranslator(indexDir, _column, numDocs, _indexSearcher, config, indexFile);
-      // Initialize analyzer and query parser
       _analyzer = TextIndexUtils.getAnalyzer(config);
       _queryParserClass = config.getLuceneQueryParserClass();
       _queryParserClassConstructor =
           TextIndexUtils.getQueryParserWithStringAndAnalyzerTypeConstructor(_queryParserClass);
-
       LOGGER.info("Successfully read lucene index for {} from {}", _column, indexDir);
     } catch (Exception e) {
       LOGGER.error("Failed to instantiate Lucene text index reader for column {}, exception {}", column,
@@ -149,7 +158,23 @@ public class LuceneTextIndexReader implements TextIndexReader {
       }
 
       // Initialize from components
-      initializeFromComponents(indexDirectory, config);
+      _indexDirectory = indexDirectory;
+      _indexReader = DirectoryReader.open(_indexDirectory);
+      _indexSearcher = new IndexSearcher(_indexReader);
+
+      if (!config.isEnableQueryCache()) {
+        // Disable Lucene query result cache. While it helps a lot with performance for
+        // repeated queries, on the downside it can cause heap issues.
+        _indexSearcher.setQueryCache(null);
+      }
+
+      if (config.isUseANDForMultiTermQueries()) {
+        _useANDForMultiTermQueries = true;
+      }
+
+      if (config.isEnablePrefixSuffixMatchingInPhraseQueries()) {
+        _enablePrefixSuffixMatchingInPhraseQueries = true;
+      }
       PinotDataBuffer docIdMappingBuffer = LuceneTextIndexBufferReader.extractDocIdMappingBuffer(indexBuffer, column);
       // Initialize docId translator
       _docIdTranslator = createDocIdTranslator(docIdMappingBuffer, config, numDocs);
@@ -273,30 +298,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
   }
 
   /**
-   * Initializes the reader from components (directory, docId mapping buffer, and config)
-   */
-  private void initializeFromComponents(Directory indexDirectory, TextIndexConfig config)
-      throws IOException, ReflectiveOperationException {
-    _indexDirectory = indexDirectory;
-    _indexReader = DirectoryReader.open(_indexDirectory);
-    _indexSearcher = new IndexSearcher(_indexReader);
-
-    if (!config.isEnableQueryCache()) {
-      // Disable Lucene query result cache. While it helps a lot with performance for
-      // repeated queries, on the downside it can cause heap issues.
-      _indexSearcher.setQueryCache(null);
-    }
-
-    if (config.isUseANDForMultiTermQueries()) {
-      _useANDForMultiTermQueries = true;
-    }
-
-    if (config.isEnablePrefixSuffixMatchingInPhraseQueries()) {
-      _enablePrefixSuffixMatchingInPhraseQueries = true;
-    }
-  }
-
-  /**
    * Updates TextIndexConfig from Properties object
    */
   private TextIndexConfig updateConfigFromProperties(Properties properties, TextIndexConfig config) {
@@ -332,9 +333,6 @@ public class LuceneTextIndexReader implements TextIndexReader {
     return builder.build();
   }
 
-  /**
-   * Prepares docId translator by loading or creating the mapping file as needed
-   */
   DocIdTranslator prepareDocIdTranslator(File segmentIndexDir, String column, int numDocs, IndexSearcher indexSearcher,
       TextIndexConfig config, File indexDir)
       throws IOException {
