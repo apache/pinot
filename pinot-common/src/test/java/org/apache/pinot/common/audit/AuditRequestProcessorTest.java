@@ -51,24 +51,27 @@ public class AuditRequestProcessorTest {
   @Mock
   private UriInfo _uriInfo;
 
+  @Mock
+  private AuditUrlPathFilter _auditUrlPathFilter;
+
   private AuditRequestProcessor _processor;
   private AuditConfig _defaultConfig;
 
   @BeforeMethod
   public void setUp() {
     MockitoAnnotations.openMocks(this);
-    _processor = new AuditRequestProcessor(_configManager, mock(AuditIdentityResolver.class));
+    _processor = new AuditRequestProcessor(_configManager, mock(AuditIdentityResolver.class), _auditUrlPathFilter);
 
     _defaultConfig = new AuditConfig();
     _defaultConfig.setEnabled(true);
     _defaultConfig.setCaptureRequestPayload(false);
     _defaultConfig.setCaptureRequestHeaders("");
     _defaultConfig.setMaxPayloadSize(10240);
-    _defaultConfig.setExcludedEndpoints("");
+    _defaultConfig.setUrlFilterExcludePatterns("");
 
     when(_configManager.isEnabled()).thenReturn(true);
     when(_configManager.getCurrentConfig()).thenReturn(_defaultConfig);
-    when(_configManager.isEndpointExcluded(any())).thenReturn(false);
+    when(_auditUrlPathFilter.isExcluded(any(), any())).thenReturn(false);
   }
 
   private MultivaluedMap<String, String> createHeaders(String... headerPairs) {
