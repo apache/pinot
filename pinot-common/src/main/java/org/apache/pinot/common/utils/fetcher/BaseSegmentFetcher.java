@@ -19,6 +19,7 @@
 package org.apache.pinot.common.utils.fetcher;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -76,6 +77,9 @@ public abstract class BaseSegmentFetcher implements SegmentFetcher {
         fetchSegmentToLocalWithoutRetry(uri, dest);
         _logger.info("Fetched segment from: {} to: {} of size: {}", uri, dest, dest.length());
         return true;
+      } catch (FileNotFoundException e) {
+        _logger.error("Could not fetch segment from URI location: {} to: {}", uri, dest, e);
+        throw e;
       } catch (Exception e) {
         _logger.warn("Caught exception while fetching segment from: {} to: {}", uri, dest, e);
         return false;
