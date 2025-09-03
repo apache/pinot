@@ -215,9 +215,6 @@ public class MinimumShouldMatchQueryParserTest {
     } catch (ParseException e) {
       // Expected
     }
-
-
-
     // Case 9: Non-Boolean query (phrase query)
     parseQueryWithMinimumShouldMatch("\"java programming\"", null);
     parseQueryWithMinimumShouldMatch("java*", null);
