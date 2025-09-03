@@ -1017,7 +1017,7 @@ public class PinotLLCRealtimeSegmentManager {
       return nextOffset;
     }
     try {
-      if (timeThreshold > 0 && offsetAtSLA != null && offsetAtSLA.compareTo(nextOffsetWithType) < 0) {
+      if (timeThreshold > 0 && offsetAtSLA != null && offsetAtSLA.compareTo(nextOffsetWithType) > 0) {
         LOGGER.info("Auto reset offset from {} to {} on partition {} because time threshold reached", nextOffset,
             latestOffset, partitionId);
         return latestOffset.toString();
