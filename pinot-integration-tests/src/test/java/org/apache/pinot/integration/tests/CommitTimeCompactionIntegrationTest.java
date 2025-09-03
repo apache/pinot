@@ -1267,4 +1267,128 @@ public class CommitTimeCompactionIntegrationTest extends BaseClusterIntegrationT
     deleteSchema(tableNameWithCompaction);
     deleteSchema(tableNameWithoutCompaction);
   }
+
+  @Test
+  public void testCommitTimeCompactionPreservesDeletedRecords()
+      throws Exception {
+    // Test Case: Deleted Records Preservation with Commit-Time Compaction
+    // Goal: Ensure commit-time compaction preserves deleted records (soft deletes) in the committed
+    // segment to maintain data consistency. Deleted records should not be physically removed during
+    // compaction as this could lead to data inconsistency issues.
+
+    String kafkaTopicNameCompacted = getKafkaTopic() + "-deleted-records-compaction-enabled";
+    String kafkaTopicNameNormal = getKafkaTopic() + "-deleted-records-compaction-disabled";
+
+    // Set up identical data for both tables - using small dataset for faster test execution
+    setUpKafka(kafkaTopicNameCompacted, INPUT_DATA_SMALL_TAR_FILE);
+    setUpKafka(kafkaTopicNameNormal, INPUT_DATA_SMALL_TAR_FILE);
+
+    // TABLE 1: With commit-time compaction ENABLED and delete record column configured
+    String tableNameWithCompaction = "gameScoresDeletedRecordsCompactionEnabled";
+    UpsertConfig upsertConfigWithCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithCompaction.setEnableCommitTimeCompaction(true);  // ENABLE commit-time compaction
+    upsertConfigWithCompaction.setDeleteRecordColumn("deleted");     // Configure delete record column
+    TableConfig tableConfigWithCompaction =
+        setUpTable(tableNameWithCompaction, kafkaTopicNameCompacted, upsertConfigWithCompaction);
+
+    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
+    tableConfigWithCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    updateTableConfig(tableConfigWithCompaction);
+
+    // TABLE 2: With commit-time compaction DISABLED but same delete record column configuration
+    String tableNameWithoutCompaction = "gameScoresDeletedRecordsCompactionDisabled";
+    UpsertConfig upsertConfigWithoutCompaction = new UpsertConfig(UpsertConfig.Mode.FULL);
+    upsertConfigWithoutCompaction.setEnableCommitTimeCompaction(false);  // DISABLE commit-time compaction
+    upsertConfigWithoutCompaction.setDeleteRecordColumn("deleted");      // Configure delete record column
+    TableConfig tableConfigWithoutCompaction =
+        setUpTable(tableNameWithoutCompaction, kafkaTopicNameNormal, upsertConfigWithoutCompaction);
+
+    // Ensure _columnMajorSegmentBuilderEnabled = false as specified
+    tableConfigWithoutCompaction.getIndexingConfig().setColumnMajorSegmentBuilderEnabled(false);
+    updateTableConfig(tableConfigWithoutCompaction);
+
+    // Wait for both tables to load the same initial data (3 unique records after upserts)
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 10);
+
+    // Verify initial state - both tables should show the same upserted data count (3 unique records)
+    validateInitialState(tableNameWithCompaction, tableNameWithoutCompaction, 3);
+
+    // Create update patterns including some deleted records to test preservation
+    // Use playerIds that match the initial data to ensure consistent partitioning
+    List<String> updateRecords = List.of(
+        "100,Zook-Updated1,counter-strike,1000,1681300000000,false",  // Regular update
+        "101,Alice-Updated1,dota,2000,1681300001000,true",            // Mark as deleted
+        "102,Bob-Updated1,cs2,3000,1681300002000,false",              // Regular update
+        "100,Zook-Updated2,valorant,1500,1681300003000,false",       // Another regular update
+        "103,Charlie-New,chess,2500,1681300004000,true"              // New record marked as deleted
+    );
+
+    // Push all updates at once to reduce wait times and ensure consistent partitioning
+    pushDataWithKeyToBothTopics(updateRecords, kafkaTopicNameCompacted, kafkaTopicNameNormal, 0);
+    // Wait for all additional records to be processed
+    waitForAllDocsLoadedInBothTables(tableNameWithCompaction, tableNameWithoutCompaction, 90_000L, 15);
+
+    // Verify state before commit - both tables should show the same logical result
+    // Note: Deleted records should not be counted in regular queries (logical view)
+    long preCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long preCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+
+    assertEquals(preCommitLogicalCountCompacted, 2, "Compacted table should show 2 non-deleted logical records");
+    assertEquals(preCommitLogicalCountNormal, 2, "Normal table should show 2 non-deleted logical records");
+    assertEquals(preCommitLogicalCountCompacted, preCommitLogicalCountNormal,
+        "Both tables should have same logical count before commit");
+
+    // Perform commit and wait for completion
+    performCommitAndWait(tableNameWithCompaction, tableNameWithoutCompaction, 30_000L, 4, 2);
+
+    // Validate post-commit state
+    long postCommitLogicalCountCompacted = queryCountStar(tableNameWithCompaction);
+    long postCommitLogicalCountNormal = queryCountStar(tableNameWithoutCompaction);
+    long postCommitPhysicalCountCompacted = queryCountStarWithoutUpsert(tableNameWithCompaction);
+    long postCommitPhysicalCountNormal = queryCountStarWithoutUpsert(tableNameWithoutCompaction);
+
+    // Key assertions for deleted records preservation:
+    // 1. Logical counts should remain the same (2 non-deleted records)
+    assertEquals(postCommitLogicalCountCompacted, 2,
+        "Compacted table should still show 2 non-deleted logical records after commit");
+    assertEquals(postCommitLogicalCountNormal, 2,
+        "Normal table should still show 2 non-deleted logical records after commit");
+
+    assertEquals(postCommitPhysicalCountCompacted, 4,
+        "Compacted table should still show 3 physical records(2 valid + 2 deleted) after commit");
+    assertEquals(postCommitPhysicalCountNormal, 15,
+        "Normal table should still have 15 physical records after commit");
+
+    // 2. Physical count for compacted table should still include deleted records
+    // The compacted table should have fewer physical records than normal table (due to obsolete record removal)
+    // but should still contain the deleted records
+    assertTrue(postCommitPhysicalCountCompacted < postCommitPhysicalCountNormal,
+        String.format("Compacted table (%d) should have fewer physical docs than normal table (%d) due to compaction",
+            postCommitPhysicalCountCompacted, postCommitPhysicalCountNormal));
+
+    // 3. Verify that we can still query for deleted records using skipUpsert=true
+    String deletedRecordsQuery = String.format(
+        "SELECT COUNT(*) FROM %s WHERE deleted = true OPTION(skipUpsert=true)",
+        tableNameWithCompaction);
+    ResultSet deletedResult = getPinotConnection().execute(deletedRecordsQuery).getResultSet(0);
+    long deletedRecordsCount = deletedResult.getLong(0, 0);
+    assertTrue(deletedRecordsCount > 0,
+        "Should be able to find deleted records in compacted table using skipUpsert=true");
+
+    // 5. Verify that deleted records are not visible in regular queries (logical view)
+    String regularQuery = String.format(
+        "SELECT COUNT(*) FROM %s WHERE deleted = true",
+        tableNameWithCompaction);
+    ResultSet regularResult = getPinotConnection().execute(regularQuery).getResultSet(0);
+    long visibleDeletedCount = regularResult.getLong(0, 0);
+    assertEquals(visibleDeletedCount, 0,
+        "Deleted records should not be visible in regular queries (logical view)");
+
+    // 6. Verify data integrity for non-deleted records
+    verifyTablesHaveIdenticalData(tableNameWithCompaction, tableNameWithoutCompaction);
+
+    // Clean up
+    dropRealtimeTable(tableNameWithCompaction);
+    dropRealtimeTable(tableNameWithoutCompaction);
+  }
 }
