@@ -18,6 +18,12 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.google.common.io.ByteStreams;
+import java.io.BufferedInputStream;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -26,15 +32,14 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.UriInfo;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 
 /**
@@ -358,5 +363,266 @@ public class AuditRequestProcessorTest {
     assertThat(capturedHeaders).containsEntry("content-type", "application/json");
     assertThat(capturedHeaders).containsEntry("X-REQUEST-ID", "req-123");
     assertThat(capturedHeaders).containsEntry("user-agent", "test-client");
+  }
+
+  // Tests for readRequestBody method
+
+  @Test
+  public void testReadRequestBodyPreservesStreamForDownstream()
+      throws IOException {
+    String testData = "test request body";
+    ByteArrayInputStream originalStream = new ByteArrayInputStream(testData.getBytes());
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(originalStream);
+
+    String result = _processor.readRequestBody(_requestContext, 100);
+
+    assertThat(result).isEqualTo(testData);
+
+    ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
+    verify(_requestContext).setEntityStream(streamCaptor.capture());
+
+    // Verify downstream can read the stream
+    InputStream capturedStream = streamCaptor.getValue();
+    byte[] readBytes = new byte[testData.length()];
+    int bytesRead = capturedStream.read(readBytes);
+    assertThat(bytesRead).isEqualTo(testData.length());
+    assertThat(new String(readBytes)).isEqualTo(testData);
+  }
+
+  @Test
+  public void testReadRequestBodyTruncatesLargePayload() {
+    String largeData = "This is a very long message that exceeds the limit";
+    ByteArrayInputStream originalStream = new ByteArrayInputStream(largeData.getBytes());
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(originalStream);
+
+    int maxSize = 10;
+    String result = _processor.readRequestBody(_requestContext, maxSize);
+
+    assertThat(result).isEqualTo("This is a " + AuditRequestProcessor.TRUNCATION_MARKER);
+
+    // Verify stream is still set for downstream
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyHandlesResetFailure() {
+    // This test verifies that even if reset fails internally, the method still returns content
+    String testData = "test data for reset failure";
+    ByteArrayInputStream originalStream = new ByteArrayInputStream(testData.getBytes());
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(originalStream);
+
+    String result = _processor.readRequestBody(_requestContext, 100);
+
+    assertThat(result).isEqualTo(testData);
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyNoEntity() {
+    when(_requestContext.hasEntity()).thenReturn(false);
+
+    String result = _processor.readRequestBody(_requestContext, 100);
+
+    assertThat(result).isNull();
+    verify(_requestContext, times(0)).getEntityStream();
+  }
+
+  @Test
+  public void testReadRequestBodyNullEntityStream() {
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(null);
+
+    String result = _processor.readRequestBody(_requestContext, 100);
+
+    assertThat(result).isNull();
+    verify(_requestContext, times(0)).setEntityStream(any());
+  }
+
+  @Test
+  public void testReadRequestBodyEmptyStream() {
+    ByteArrayInputStream emptyStream = new ByteArrayInputStream(new byte[0]);
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(emptyStream);
+
+    String result = _processor.readRequestBody(_requestContext, 100);
+
+    assertThat(result).isNull();
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyIOException()
+      throws IOException {
+    InputStream failingStream = mock(InputStream.class);
+    when(failingStream.read(any(byte[].class))).thenThrow(new IOException("Test IO error"));
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(failingStream);
+
+    String result = _processor.readRequestBody(_requestContext, 100);
+
+    assertThat(result).isNull();
+    // BufferedInputStream wrapper should be set even if read fails
+    verify(_requestContext).setEntityStream(any(BufferedInputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyExactMaxSize() {
+    String exactData = "1234567890"; // 10 bytes
+    ByteArrayInputStream stream = new ByteArrayInputStream(exactData.getBytes());
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(stream);
+
+    String result = _processor.readRequestBody(_requestContext, 10);
+
+    assertThat(result).isEqualTo(exactData + AuditRequestProcessor.TRUNCATION_MARKER);
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyOneLessThanMax() {
+    String data = "123456789"; // 9 bytes
+    ByteArrayInputStream stream = new ByteArrayInputStream(data.getBytes());
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(stream);
+
+    String result = _processor.readRequestBody(_requestContext, 10);
+
+    assertThat(result).isEqualTo(data); // No truncation marker
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyUTF8Characters() {
+    String utf8Data = "Hello 世界 🌍"; // Mixed ASCII, Chinese, Emoji
+    ByteArrayInputStream stream = new ByteArrayInputStream(utf8Data.getBytes(StandardCharsets.UTF_8));
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(stream);
+
+    String result = _processor.readRequestBody(_requestContext, 100);
+
+    assertThat(result).isEqualTo(utf8Data);
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyTruncationAtMultibyteChar() {
+    // Test truncation in middle of multibyte character
+    String utf8Data = "Hello 世界"; // "Hello " = 6 bytes, "世" = 3 bytes, "界" = 3 bytes
+    ByteArrayInputStream stream = new ByteArrayInputStream(utf8Data.getBytes(StandardCharsets.UTF_8));
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(stream);
+
+    // Truncate at 8 bytes (will cut in middle of "世")
+    String result = _processor.readRequestBody(_requestContext, 8);
+
+    // The result should handle the truncation gracefully
+    assertThat(result).isNotNull();
+    assertThat(result).endsWith(AuditRequestProcessor.TRUNCATION_MARKER);
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyLargePayload() {
+    // Test with payload larger than default buffer size
+    byte[] largeData = new byte[100000]; // 100KB
+    Arrays.fill(largeData, (byte) 'A');
+    ByteArrayInputStream stream = new ByteArrayInputStream(largeData);
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(stream);
+
+    int maxSize = 1000;
+    String result = _processor.readRequestBody(_requestContext, maxSize);
+
+    assertThat(result).hasSize(maxSize + AuditRequestProcessor.TRUNCATION_MARKER.length());
+    assertThat(result).startsWith("AAAAAAAAAA");
+    assertThat(result).endsWith(AuditRequestProcessor.TRUNCATION_MARKER);
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyValidJsonPayload()
+      throws IOException {
+    String jsonPayload = "{\"name\":\"John Doe\",\"age\":30,\"email\":\"john@example.com\"}";
+    ByteArrayInputStream stream = new ByteArrayInputStream(jsonPayload.getBytes(StandardCharsets.UTF_8));
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(stream);
+
+    String result = _processor.readRequestBody(_requestContext, 1000);
+
+    assertThat(result).isEqualTo(jsonPayload);
+
+    // Verify the stream can still be read downstream
+    ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
+    verify(_requestContext).setEntityStream(streamCaptor.capture());
+
+    InputStream capturedStream = streamCaptor.getValue();
+    byte[] readBytes = ByteStreams.toByteArray(capturedStream);
+    assertThat(new String(readBytes, StandardCharsets.UTF_8)).isEqualTo(jsonPayload);
+  }
+
+  @Test
+  public void testReadRequestBodyLargeJsonPayloadTruncated() {
+    // Create a large JSON payload that will be truncated
+    StringBuilder jsonBuilder = new StringBuilder("{\"users\":[");
+    for (int i = 0; i < 100; i++) {
+      if (i > 0) {
+        jsonBuilder.append(",");
+      }
+      jsonBuilder.append("{\"id\":").append(i).append(",\"name\":\"User").append(i).append("\"}");
+    }
+    jsonBuilder.append("]}");
+    String jsonPayload = jsonBuilder.toString();
+
+    ByteArrayInputStream stream = new ByteArrayInputStream(jsonPayload.getBytes(StandardCharsets.UTF_8));
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(stream);
+
+    int maxSize = 50;
+    String result = _processor.readRequestBody(_requestContext, maxSize);
+
+    assertThat(result).hasSize(maxSize + AuditRequestProcessor.TRUNCATION_MARKER.length());
+    assertThat(result).startsWith("{\"users\":[{\"id\":0");
+    assertThat(result).endsWith(AuditRequestProcessor.TRUNCATION_MARKER);
+
+    // Even though truncated, it should still be valid for downstream
+    verify(_requestContext).setEntityStream(any(InputStream.class));
+  }
+
+  @Test
+  public void testReadRequestBodyNestedJsonPayload()
+      throws IOException {
+    String nestedJson = "{\"user\":{\"name\":\"Alice\",\"address\":{\"city\":\"NYC\",\"zip\":\"10001\"},"
+        + "\"hobbies\":[\"reading\",\"coding\"]}}";
+    ByteArrayInputStream stream = new ByteArrayInputStream(nestedJson.getBytes(StandardCharsets.UTF_8));
+
+    when(_requestContext.hasEntity()).thenReturn(true);
+    when(_requestContext.getEntityStream()).thenReturn(stream);
+
+    String result = _processor.readRequestBody(_requestContext, 1000);
+
+    assertThat(result).isEqualTo(nestedJson);
+
+    // Verify stream preservation
+    ArgumentCaptor<InputStream> streamCaptor = ArgumentCaptor.forClass(InputStream.class);
+    verify(_requestContext).setEntityStream(streamCaptor.capture());
+
+    InputStream capturedStream = streamCaptor.getValue();
+    byte[] readBytes = ByteStreams.toByteArray(capturedStream);
+    assertThat(new String(readBytes, StandardCharsets.UTF_8)).isEqualTo(nestedJson);
   }
 }

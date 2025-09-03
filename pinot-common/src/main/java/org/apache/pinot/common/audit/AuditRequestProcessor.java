@@ -19,6 +19,11 @@
 package org.apache.pinot.common.audit;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.io.ByteStreams;
+import java.io.BufferedInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -46,6 +51,7 @@ import org.slf4j.LoggerFactory;
 public class AuditRequestProcessor {
 
   private static final Logger LOG = LoggerFactory.getLogger(AuditRequestProcessor.class);
+  static final String TRUNCATION_MARKER = "...[truncated]";
 
   private final AuditConfigManager _configManager;
   private final AuditIdentityResolver _identityResolver;
@@ -226,8 +232,43 @@ public class AuditRequestProcessor {
    * @param maxPayloadSize maximum bytes to read from the request body
    * @return the request body as string (potentially truncated)
    */
-  private String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
-    // TODO spyne to be implemented
+  @VisibleForTesting
+  String readRequestBody(ContainerRequestContext requestContext, int maxPayloadSize) {
+    if (!requestContext.hasEntity()) {
+      return null;
+    }
+
+    final InputStream originalStream = requestContext.getEntityStream();
+    if (originalStream == null) {
+      return null;
+    }
+
+    try {
+      final int bufferSize = Math.min(maxPayloadSize + 1024, AuditConfig.MAX_AUDIT_PAYLOAD_SIZE_BYTES);
+      final BufferedInputStream bufferedStream = new BufferedInputStream(originalStream, bufferSize);
+      requestContext.setEntityStream(bufferedStream);
+      bufferedStream.mark(maxPayloadSize + 1);
+
+      final InputStream limitedStream = ByteStreams.limit(bufferedStream, maxPayloadSize);
+      final byte[] capturedBytes = ByteStreams.toByteArray(limitedStream);
+
+      try {
+        bufferedStream.reset();
+      } catch (IOException resetException) {
+        // error because it can affect downstream consumers from processing the request. This API call will fail.
+        LOG.error("Failed to reset stream for downstream consumers", resetException);
+      }
+
+      if (capturedBytes.length > 0) {
+        String requestBody = new String(capturedBytes, StandardCharsets.UTF_8);
+        if (capturedBytes.length >= maxPayloadSize) {
+          requestBody += TRUNCATION_MARKER;
+        }
+        return requestBody;
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to capture request body", e);
+    }
     return null;
   }
 }
