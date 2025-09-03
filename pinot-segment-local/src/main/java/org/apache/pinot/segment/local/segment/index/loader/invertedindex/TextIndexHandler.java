@@ -130,6 +130,7 @@ public class TextIndexHandler extends BaseIndexHandler {
         // Remove existing index and recreate with new configuration
         segmentWriter.removeIndex(column, StandardIndexes.text());
         createTextIndexForColumn(segmentWriter, columnMetadata);
+        columnsToAddIdx.remove(column);
       }
     }
     for (String column : existingColumns) {
