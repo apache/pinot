@@ -77,7 +77,7 @@ public class LuceneTextIndexReader implements TextIndexReader {
   private final Analyzer _analyzer;
   private boolean _useANDForMultiTermQueries = false;
   private final String _queryParserClass;
-  private final Constructor<QueryParserBase> _queryParserClassConstructor;
+  private Constructor<QueryParserBase> _queryParserClassConstructor;
   private boolean _enablePrefixSuffixMatchingInPhraseQueries = false;
 
   public LuceneTextIndexReader(String column, File indexDir, int numDocs, TextIndexConfig config) {

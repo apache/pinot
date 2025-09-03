@@ -119,7 +119,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       return new NativeTextIndexCreator(context.getFieldSpec().getName(), context.getTableNameWithType(),
           context.isContinueOnError(), context.getIndexDir());
     } else {
-      return new LuceneTextIndexCreator(context, indexConfig.isUseCombineFiles(), indexConfig);
+      return new LuceneTextIndexCreator(context, indexConfig.isStoreInSegmentFile(), indexConfig);
     }
   }
 
@@ -149,15 +149,20 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
     @Override
     public TextIndexReader createIndexReader(SegmentDirectory.Reader segmentReader, FieldIndexConfigs fieldIndexConfigs,
         ColumnMetadata metadata)
-        throws IndexReaderConstraintException, IOException {
+        throws IndexReaderConstraintException {
       if (metadata.getDataType() != FieldSpec.DataType.STRING) {
         throw new IndexReaderConstraintException(metadata.getColumnName(), StandardIndexes.text(),
             "Text index is currently only supported on STRING type columns");
       }
       File segmentDir = segmentReader.toSegmentDirectory().getPath().toFile();
       TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
-      if (indexConfig.isUseCombineFiles()) {
-        PinotDataBuffer textIndexBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.text());
+      if (indexConfig.isStoreInSegmentFile()) {
+        PinotDataBuffer textIndexBuffer = null;
+        try {
+          textIndexBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.text());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
         return new LuceneTextIndexReader(metadata.getColumnName(), textIndexBuffer, metadata.getTotalDocs(),
             indexConfig);
       }

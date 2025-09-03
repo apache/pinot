@@ -109,9 +109,9 @@ public class LuceneTextIndexConfigReloadTest {
    */
   private TableConfig createTableConfigWithTextIndex(boolean useNewFormat) {
     // Create field config for text index with custom properties
-    // For new format (combined files), set useCombineFiles=true
-    // For old format (directory structure), set useCombineFiles=false
-    Map<String, String> properties = Map.of("useCombineFiles", String.valueOf(useNewFormat));
+    // For new format (combined files), set storeInSegmentFile=true
+    // For old format (directory structure), set storeInSegmentFile=false
+    Map<String, String> properties = Map.of("storeInSegmentFile", String.valueOf(useNewFormat));
     FieldConfig fieldConfig =
         new FieldConfig(TEST_COLUMN, FieldConfig.EncodingType.DICTIONARY, Arrays.asList(FieldConfig.IndexType.TEXT),
             null, properties);
@@ -135,7 +135,7 @@ public class LuceneTextIndexConfigReloadTest {
   @Test
   public void testFormatUpgradeProcess()
       throws Exception {
-    //Create segment with useCombineFiles = false and test queries
+    //Create segment with storeInSegmentFile = false and test queries
     TableConfig oldConfig = createTableConfigWithTextIndex(false);
     Schema schema = createSchema();
     File segmentFile = createSegment(oldConfig, schema);
@@ -147,12 +147,12 @@ public class LuceneTextIndexConfigReloadTest {
     boolean needsUpdate = checkNeedUpdateIndices(segmentFile, oldConfig, schema);
     Assert.assertFalse(needsUpdate, "needUpdateIndices should return false when config is not changed");
 
-    //Update table config with useCombineFiles = true and create new segment
+    //Update table config with storeInSegmentFile = true and create new segment
     TableConfig newConfig = createTableConfigWithTextIndex(true);
 
     // Different config - should return true
     needsUpdate = checkNeedUpdateIndices(segmentFile, newConfig, schema);
-    Assert.assertTrue(needsUpdate, "needUpdateIndices should return true when useCombineFiles config is changed");
+    Assert.assertTrue(needsUpdate, "needUpdateIndices should return true when storeInSegmentFile config is changed");
 
     File newSegmentFile = createSegment(newConfig, schema);
 
@@ -236,8 +236,8 @@ public class LuceneTextIndexConfigReloadTest {
     reader.close();
     segmentDirectory.close();
 
-    LOGGER.info("needUpdateIndices returned: {} for config with useCombineFiles: {}", needsUpdate,
-        tableConfig.getFieldConfigList().get(0).getProperties().get("useCombineFiles"));
+    LOGGER.info("needUpdateIndices returned: {} for config with storeInSegmentFile: {}", needsUpdate,
+        tableConfig.getFieldConfigList().get(0).getProperties().get("storeInSegmentFile"));
 
     return needsUpdate;
   }

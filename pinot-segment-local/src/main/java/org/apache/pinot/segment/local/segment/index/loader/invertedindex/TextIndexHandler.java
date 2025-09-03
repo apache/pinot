@@ -83,18 +83,21 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   @Override
-  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader)
-      throws Exception {
+  public boolean needUpdateIndices(SegmentDirectory.Reader segmentReader) {
     String segmentName = _segmentDirectory.getSegmentMetadata().getName();
     Set<String> columnsToAddIdx = new HashSet<>(_columnsToAddIdx);
     Set<String> existingColumns = segmentReader.toSegmentDirectory().getColumnsWithIndex(StandardIndexes.text());
     // Check if any existing index need to be removed.
-    // Check if existing indexes need configuration updates based on useCombineFiles
+    // Check if existing indexes need configuration updates based on storeInSegmentFile
     for (String column : existingColumns) {
       ColumnMetadata columnMetadata = _segmentDirectory.getSegmentMetadata().getColumnMetadataFor(column);
-      if (columnMetadata != null && hasTextIndexConfigurationChanged(column, segmentReader)) {
-        LOGGER.info("Need to update text index configuration for segment: {}, column: {}", segmentName, column);
-        return true;
+      try {
+        if (columnMetadata != null && hasTextIndexConfigurationChanged(column, segmentReader)) {
+          LOGGER.info("Need to update text index configuration for segment: {}, column: {}", segmentName, column);
+          return true;
+        }
+      } catch (Exception e) {
+        throw new RuntimeException(e);
       }
     }
     for (String column : existingColumns) {
@@ -186,12 +189,12 @@ public class TextIndexHandler extends BaseIndexHandler {
     // Create a temporary forward index if it is disabled and does not exist
     columnMetadata = createForwardIndexIfNeeded(segmentWriter, columnName, true);
 
-    // Get text index configuration to check if useCombineFiles is enabled
+    // Get text index configuration to check if storeInSegmentFile is enabled
     TextIndexConfig config = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
-    boolean useCombineFiles = config.isUseCombineFiles();
+    boolean storeInSegmentFile = config.isStoreInSegmentFile();
 
-    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}, useCombineFiles: {}",
-        columnName, segmentName, hasDictionary, useCombineFiles);
+    LOGGER.info("Creating new text index for column: {} in segment: {}, hasDictionary: {}, storeInSegmentFile: {}",
+        columnName, segmentName, hasDictionary, storeInSegmentFile);
 
     // Create in-progress marker file for recovery
     File inProgress = new File(indexDir, columnName + ".text.inprogress");
@@ -238,8 +241,8 @@ public class TextIndexHandler extends BaseIndexHandler {
       textIndexCreator.seal();
     }
 
-    // If useCombineFiles is true, convert to combined format
-    if (useCombineFiles && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
+    // If storeInSegmentFile is true, convert to combined format
+    if (storeInSegmentFile && _segmentDirectory.getSegmentMetadata().getVersion() == SegmentVersion.v3) {
       LOGGER.info("Converting text index to V3 combined format for column: {} in segment: {}", columnName, segmentName);
       convertTextIndexToV3Format(segmentWriter, columnName, segmentDirectory);
     }
@@ -303,7 +306,7 @@ public class TextIndexHandler extends BaseIndexHandler {
   }
 
   /**
-   * Checks if text index configuration has changed based on useCombineFiles field config flag.
+   * Checks if text index configuration has changed based on storeInSegmentFile field config flag.
    *
    * The method uses TextIndexUtils.hasTextIndex() to determine the current format and compare with desired format:
    * - If TextIndexUtils.hasTextIndex() returns true: means text index in directory format
@@ -320,7 +323,7 @@ public class TextIndexHandler extends BaseIndexHandler {
     TextIndexConfig currentConfig = _fieldIndexConfigs.get(columnName).getConfig(StandardIndexes.text());
 
     // Check if current config expects combined format
-    boolean expectedFormat = currentConfig.isUseCombineFiles();
+    boolean expectedFormat = currentConfig.isStoreInSegmentFile();
 
     // Check if existing index is in combined format using TextIndexUtils
     File indexDir = _segmentDirectory.getSegmentMetadata().getIndexDir();

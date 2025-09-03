@@ -24,8 +24,8 @@ import java.util.Map;
 import org.apache.pinot.spi.config.table.FieldConfig;
 
 /**
- * Test class that runs all the same tests as TextSearchQueriesTest but with useCombineFiles=true.
- * This ensures that all text search functionality works correctly with the combined files configuration.
+ * Test class that runs all the same tests as TextSearchQueriesTest but with storeInSegmentFile=true.
+ * This ensures that all text search functionality works correctly with the store in segment file configuration.
  */
 public class TextSearchQueriesWithCombinedFilesTest extends TextSearchQueriesTest {
 
@@ -33,7 +33,7 @@ public class TextSearchQueriesWithCombinedFilesTest extends TextSearchQueriesTes
   protected List<FieldConfig> createFieldConfigs() {
     List<FieldConfig> fieldConfigs = super.createFieldConfigs();
 
-    // Override all text index configurations to use useCombineFiles=true
+    // Override all text index configurations to use storeInSegmentFile=true
     for (int i = 0; i < fieldConfigs.size(); i++) {
       FieldConfig fieldConfig = fieldConfigs.get(i);
       if (fieldConfig.getIndexTypes().contains(FieldConfig.IndexType.TEXT)) {
@@ -41,7 +41,7 @@ public class TextSearchQueriesWithCombinedFilesTest extends TextSearchQueriesTes
         if (fieldConfig.getProperties() != null) {
           properties.putAll(fieldConfig.getProperties());
         }
-        properties.put("useCombineFiles", "true");
+        properties.put("storeInSegmentFile", "true");
 
         fieldConfigs.set(i, new FieldConfig(
             fieldConfig.getName(),

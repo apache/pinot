@@ -107,21 +107,21 @@ public class TextIndexConfigBuilder extends TextIndexConfig.AbstractBuilder {
         }
       }
 
-      if (textIndexProperties.get("useCombineFiles") != null) {
-        withUseCombineFiles(Boolean.parseBoolean(textIndexProperties.get("useCombineFiles")));
+      if (textIndexProperties.get("storeInSegmentFile") != null) {
+        withStoreInSegmentFile(Boolean.parseBoolean(textIndexProperties.get("storeInSegmentFile")));
       }
     }
     return this;
   }
 
   /**
-   * Sets whether to combine text index files into a single file and cleanup the directory structure.
+   * Sets whether to store text index in segment file and cleanup the directory structure.
    *
-   * @param useCombineFiles true if files should be combined and directory cleaned up, false to keep directory structure
+   * @param storeInSegmentFile true if text index should be stored in segment file and directory cleaned up, false to keep directory structure
    * @return this builder
    */
-  public TextIndexConfigBuilder setUseCombineFiles(boolean useCombineFiles) {
-    withUseCombineFiles(useCombineFiles);
+  public TextIndexConfigBuilder setStoreInSegmentFile(boolean storeInSegmentFile) {
+    withStoreInSegmentFile(storeInSegmentFile);
     return this;
   }
 }
