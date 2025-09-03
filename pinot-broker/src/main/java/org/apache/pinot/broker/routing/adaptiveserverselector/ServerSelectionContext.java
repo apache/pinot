@@ -67,7 +67,7 @@ public class ServerSelectionContext {
     return _queryOptions;
   }
 
-  public Boolean isUseFixedReplica() {
+  public boolean isUseFixedReplica() {
     return _isUseFixedReplica;
   }
 
