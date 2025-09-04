@@ -260,7 +260,7 @@
     </dependency>
     <dependency>
       <groupId>io.github.hakky54</groupId>
-      <artifactId>sslcontext-kickstart-for-netty</artifactId>
+      <artifactId>ayza-for-netty</artifactId>
     </dependency>
     <dependency>
       <groupId>com.google.re2j</groupId>
