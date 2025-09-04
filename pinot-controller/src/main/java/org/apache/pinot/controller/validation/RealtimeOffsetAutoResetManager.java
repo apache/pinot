@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
@@ -112,16 +113,20 @@ public class RealtimeOffsetAutoResetManager extends ControllerPeriodicTask<Realt
       StreamConfig topicStreamConfig = IngestionConfigUtils.getStreamConfigs(tableConfig).stream()
           .filter(config -> topicName.equals(config.getTopicName()))
           .findFirst().orElseThrow(() -> new RuntimeException("No matching topic found"));
-      LOGGER.info("Trigger backfill jobs with StreamConfig {}, topicName {}, properties {}",
+      LOGGER.info("Triggering backfill jobs with StreamConfig {}, topicName {}, properties {}",
           topicStreamConfig, topicName, context._backfillJobProperties);
       try {
-        // TODO: use the returned boolean value to ensure at least once delivery of the backfill job
-        _tableToHandler.get(tableNameWithType).triggerBackfillJob(tableNameWithType,
+        long startOffset = Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_FROM));
+        long endOffset = Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_TO));
+        if (_tableToHandler.get(tableNameWithType).triggerBackfillJob(tableNameWithType,
             topicStreamConfig,
             topicName,
             Integer.parseInt(context._backfillJobProperties.get(Constants.RESET_OFFSET_TOPIC_PARTITION)),
-            Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_FROM)),
-            Long.parseLong(context._backfillJobProperties.get(Constants.RESET_OFFSET_TO)));
+            startOffset,
+            endOffset)) {
+          _controllerMetrics.addMeteredTableValue(tableNameWithType, ControllerMeter.OFFSET_AUTO_RESET_BACKFILL_OFFSETS,
+              endOffset - startOffset);
+        }
       } catch (NumberFormatException e) {
         LOGGER.error("Invalid backfill job properties for table: {}, properties: {}, error: {}",
             tableNameWithType, context._backfillJobProperties, e.getMessage(), e);

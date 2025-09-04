@@ -30,7 +30,6 @@ import java.util.stream.Collectors;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.realtime.PinotLLCRealtimeSegmentManager;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamConfigProperties;
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
@@ -159,10 +158,6 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
       return false;
     }
     streamConfig.put(StreamConfigProperties.BACKFILL_TOPIC, String.valueOf(true));
-    streamConfig.put(
-        StreamConfigProperties.constructStreamProperty(
-            STREAM_TYPE, StreamConfigProperties.STREAM_CONSUMER_OFFSET_CRITERIA),
-        OffsetCriteria.SMALLEST_OFFSET_CRITERIA.getOffsetString());
     IngestionConfigUtils.getStreamConfigMaps(tableConfig).add(streamConfig);
     return true;
   }

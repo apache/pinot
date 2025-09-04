@@ -935,6 +935,8 @@ public class PinotLLCRealtimeSegmentManager {
     String nextOffset = committingSegmentDescriptor.getNextOffset();
     String startOffset = computeStartOffset(nextOffset, streamConfig, newLLCSegmentName.getPartitionGroupId());
     if (!startOffset.equals(nextOffset)) {
+      _controllerMetrics.addMeteredTableValue(realtimeTableName, ControllerMeter.OFFSET_AUTO_RESET_SKIPPED_OFFSETS,
+          Long.parseLong(startOffset) - Long.parseLong(nextOffset));
       Map<String, String> taskProperties = new HashMap<>();
       taskProperties.put(Constants.RESET_OFFSET_FROM, nextOffset);
       taskProperties.put(Constants.RESET_OFFSET_TO, startOffset);
