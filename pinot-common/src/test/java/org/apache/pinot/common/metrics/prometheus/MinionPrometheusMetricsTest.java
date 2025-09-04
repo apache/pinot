@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics.prometheus;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.common.metrics.MinionGauge;
@@ -47,10 +48,11 @@ public abstract class MinionPrometheusMetricsTest extends PinotPrometheusMetrics
       _minionMetrics.addTimedValue(timer, 30L, TimeUnit.MILLISECONDS);
       assertTimerExportedCorrectly(timer.getTimerName(), EXPORTED_METRIC_PREFIX);
     } else {
-      _minionMetrics.addTimedValue(ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer, 30L, TimeUnit.MILLISECONDS);
+      _minionMetrics.addTimedValue(ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer, 30L,
+          TimeUnit.MILLISECONDS, ImmutableMap.of());
       assertTimerExportedCorrectly(timer.getTimerName(),
           List.of(ExportedLabelKeys.ID, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT), EXPORTED_METRIC_PREFIX);
-      _minionMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer,
+      _minionMetrics.addTimedTableTaskValue(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, timer,
           30L, TimeUnit.MILLISECONDS);
       assertTimerExportedCorrectly(timer.getTimerName(), ExportedLabels.TABLENAME_TABLETYPE_MINION_TASKTYPE,
           EXPORTED_METRIC_PREFIX);
@@ -77,7 +79,7 @@ public abstract class MinionPrometheusMetricsTest extends PinotPrometheusMetrics
       assertMeterExportedCorrectly(meter.getMeterName(), List.of(ExportedLabelKeys.ID, ExportedLabelValues.TABLENAME),
           EXPORTED_METRIC_PREFIX);
 
-      _minionMetrics.addMeteredValue(ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, meter, 1L);
+      _minionMetrics.addMeteredValue(ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, meter, 1L, ImmutableMap.of());
       assertMeterExportedCorrectly(meter.getMeterName(),
           List.of(ExportedLabelKeys.ID, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT), EXPORTED_METRIC_PREFIX);
     } else if (meter == MinionMeter.SEGMENT_UPLOAD_FAIL_COUNT || meter == MinionMeter.SEGMENT_DOWNLOAD_FAIL_COUNT) {
@@ -88,7 +90,7 @@ public abstract class MinionPrometheusMetricsTest extends PinotPrometheusMetrics
       //all remaining meters are also being used as global meters, check their usage
       _minionMetrics.addMeteredGlobalValue(meter, 1L);
       _minionMetrics.addMeteredTableValue(TABLE_NAME_WITH_TYPE, ExportedLabelValues.MINION_TASK_SEGMENT_IMPORT, meter,
-          1L);
+          1L, ImmutableMap.of());
       assertMeterExportedCorrectly(meter.getMeterName(), EXPORTED_METRIC_PREFIX);
       assertMeterExportedCorrectly(meter.getMeterName(), ExportedLabels.TABLENAME_TABLETYPE_MINION_TASKTYPE,
           EXPORTED_METRIC_PREFIX);

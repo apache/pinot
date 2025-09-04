@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.function.Function;
@@ -140,31 +141,39 @@ public class CompoundPinotMetricsFactory implements PinotMetricsFactory {
     return _registry;
   }
 
+  @Deprecated
   @Override
   public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
+    throw new UnsupportedOperationException("Please use makePinotMetricName(Class, String, String, Map) instead");
+  }
+
+  @Override
+  public PinotMetricName makePinotMetricName(Class<?> klass, String fullName, String simplifiedName,
+      Map<String, String> attributes) {
     List<PinotMetricName> names = _factories.stream()
-        .map(factory -> factory.makePinotMetricName(klass, name))
+        .map(factory -> factory.makePinotMetricName(klass, fullName, simplifiedName, attributes))
         .collect(Collectors.toList());
-    return new CompoundPinotMetricName(name, names);
+    return new CompoundPinotMetricName(fullName, simplifiedName, attributes, names);
   }
 
   @Override
   @Deprecated
   public <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
-    List<PinotGauge<T>> gauges = _factories.stream()
-        .map(factory -> factory.makePinotGauge(condition))
-        .collect(Collectors.toList());
-    return new CompoundPinotGauge<T>(gauges);
+    throw new UnsupportedOperationException("Please use makePinotGauge(PinotMetricName, Function) instead");
   }
 
+  @Deprecated
   @Override
   public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+    throw new UnsupportedOperationException("Please use makePinotGauge(PinotMetricName, Function) instead");
+  }
+
+  public <T> PinotGauge<T> makePinotGauge(PinotMetricName pinotMetricName, Function<Void, T> condition) {
     List<PinotGauge<T>> gauges = _factories.stream()
-        .map(factory -> factory.makePinotGauge(metricName, condition))
+        .map(factory -> factory.makePinotGauge(pinotMetricName, condition))
         .collect(Collectors.toList());
     return new CompoundPinotGauge<T>(gauges);
   }
-
   /**
    * @deprecated Use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
    */

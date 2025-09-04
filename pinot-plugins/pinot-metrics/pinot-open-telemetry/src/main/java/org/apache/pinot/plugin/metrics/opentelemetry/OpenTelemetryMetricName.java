@@ -18,50 +18,34 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
-import io.opentelemetry.api.common.Attributes;
-import io.opentelemetry.api.common.AttributesBuilder;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
 /**
  * OpenTelemetryMetricName is the implementation of PinotMetricName for OpenTelemetry.
- * It parses pinot metric name (which has dimensions/attributes being concatenated in the metric name) to
- * the Otel metric name and dimensions/attributes.
+ * It all to set a simplified metricName and add attributes.
  */
 public class OpenTelemetryMetricName implements PinotMetricName {
-  // _pinotMetricName is the metric name given by pinot-core, which concatenating the metric name with dimensions
-  private final String _pinotMetricName;
-  // _otelMetricName is the actual metric name used when emitting metrics to OpenTelemetry.
-  private final String _otelMetricName;
-  // _otelDimensions is parsed from _pinotMetricName and will be attached to the Otel metric as metric
-  // attribute/dimensions when emitting to OpenTelemetry.
-  private final Map<String, String> _otelDimensions;
+  private final String _fullMetricName;
+  private String _simplifiedMetricName;
+  private Map<String, String> _attributes;
 
-  public OpenTelemetryMetricName(String pinotMetricName) {
-    _pinotMetricName = pinotMetricName;
-    Pair<String, Map<String, String>> otelMetricNameAndDims =
-        OpenTelemetryUtil.parseOtelMetricNameAndDimensions(pinotMetricName);
-    _otelMetricName = otelMetricNameAndDims.getLeft();
-    _otelDimensions = otelMetricNameAndDims.getRight();
+  public OpenTelemetryMetricName(String fullMetricName, String simplifiedMetricName, Map<String, String> attributes) {
+    _fullMetricName = fullMetricName;
+    _simplifiedMetricName = simplifiedMetricName;
+    _attributes = ImmutableMap.copyOf(attributes);
   }
 
-  public String getOtelMetricName() {
-    return _otelMetricName;
-  }
-
-  public Attributes getOtelAttributes() {
-    AttributesBuilder attributesBuilder = Attributes.builder();
-    for (Map.Entry<String, String> entry : _otelDimensions.entrySet()) {
-      attributesBuilder.put(entry.getKey(), entry.getValue());
-    }
-    return attributesBuilder.build();
+  public OpenTelemetryMetricName(PinotMetricName pinotMetricName) {
+    this(pinotMetricName.getMetricName().toString(), pinotMetricName.getSimplifiedMetricName(),
+        pinotMetricName.getAttributes());
   }
 
   @Override
   public String getMetricName() {
-    return _pinotMetricName;
+    return _fullMetricName;
   }
 
   /**
@@ -76,7 +60,7 @@ public class OpenTelemetryMetricName implements PinotMetricName {
       return false;
     }
     OpenTelemetryMetricName that = (OpenTelemetryMetricName) obj;
-    return _pinotMetricName.equals(that._pinotMetricName);
+    return _fullMetricName.equals(that._fullMetricName);
   }
 
   /**
@@ -84,11 +68,21 @@ public class OpenTelemetryMetricName implements PinotMetricName {
    */
   @Override
   public int hashCode() {
-    return _pinotMetricName.hashCode();
+    return _fullMetricName.hashCode();
   }
 
   @Override
   public String toString() {
-    return _pinotMetricName;
+    return _fullMetricName;
+  }
+
+  @Override
+  public String getSimplifiedMetricName() {
+    return _simplifiedMetricName;
+  }
+
+  @Override
+  public Map<String, String> getAttributes() {
+    return _attributes;
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.DoubleHistogram;
 import java.util.concurrent.TimeUnit;
 import org.apache.pinot.spi.metrics.PinotTimer;
@@ -27,22 +28,19 @@ import org.apache.pinot.spi.metrics.PinotTimer;
  * OpenTelemetry does not have a direct Timer metric, so we use a Histogram to record the durations.
  */
 public class OpenTelemetryTimer implements PinotTimer {
-  private final OpenTelemetryMetricName _metricName;
   private final DoubleHistogram _histogram;
+  private final Attributes _attributes;
   private final TimeUnit _rateUnit;
 
-  public OpenTelemetryTimer(OpenTelemetryMetricName metricName, TimeUnit rateUnit) {
-    _metricName = metricName;
+  public OpenTelemetryTimer(DoubleHistogram histogram, Attributes attributes, TimeUnit rateUnit) {
+    _histogram = histogram;
+    _attributes = attributes;
     _rateUnit = rateUnit;
-    _histogram = OpenTelemetryMetricsRegistry.getOtelMeterProvider().histogramBuilder(metricName.getOtelMetricName())
-        .setUnit(rateUnit.name())
-        .build();
   }
 
   @Override
   public void update(long duration, TimeUnit unit) {
-    // records the metric with a value with a set of attributes parsed from Pinot metric name
-    _histogram.record(_rateUnit.convert(duration, unit), _metricName.getOtelAttributes());
+    _histogram.record(_rateUnit.convert(duration, unit), _attributes);
   }
 
   @Override
@@ -57,12 +55,12 @@ public class OpenTelemetryTimer implements PinotTimer {
 
   @Override
   public TimeUnit rateUnit() {
-    return TimeUnit.MILLISECONDS;
+    return _rateUnit;
   }
 
   @Override
   public String eventType() {
-    return _metricName.getMetricName();
+    return _histogram.getClass().getName();
   }
 
   @Override

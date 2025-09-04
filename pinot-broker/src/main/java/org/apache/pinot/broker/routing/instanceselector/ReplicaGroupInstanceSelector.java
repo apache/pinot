@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -33,6 +35,7 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSele
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 
@@ -146,8 +149,11 @@ public class ReplicaGroupInstanceSelector extends BaseInstanceSelector {
       replicaOffset = (replicaOffset + 1) % numReplicaGroups;
     }
     for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
+      String poolTag = BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions());
+      String poolId = String.valueOf(entry.getKey());
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
-          BrokerMetrics.getTagForPreferredPool(ctx.getQueryOptions()), String.valueOf(entry.getKey()));
+          ImmutableList.of(poolTag, poolId),
+          ImmutableMap.of(MetricAttributeConstants.POOL_TAG, poolTag, MetricAttributeConstants.POOL_ID, poolId));
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }

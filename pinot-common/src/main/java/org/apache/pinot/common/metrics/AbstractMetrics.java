@@ -19,9 +19,11 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -141,7 +143,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public void addPhaseTiming(String tableName, QP phase, long duration, TimeUnit timeUnit) {
     String fullTimerName = _metricPrefix + getTableName(tableName) + "." + phase.getQueryPhaseName();
-    addValueToTimer(fullTimerName, duration, timeUnit);
+    addValueToTimer(fullTimerName,
+        phase.getQueryPhaseName(),
+        duration,
+        timeUnit,
+        ImmutableMap.of(MetricAttributeConstants.TABLE_NAME, tableName)
+    );
   }
 
   public void addPhaseTiming(String tableName, QP phase, long nanos) {
@@ -158,21 +165,34 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void addTimedTableValue(final String tableName, T timer, final long duration, final TimeUnit timeUnit) {
     final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + timer.getTimerName();
-    addValueToTimer(fullTimerName, duration, timeUnit);
+    addValueToTimer(fullTimerName,
+        timer.getTimerName(),
+        duration,
+        timeUnit,
+        ImmutableMap.of(MetricAttributeConstants.TABLE_NAME, tableName)
+    );
   }
 
   /**
    * Logs the timing for a table with an additional key
    * @param tableName The table associated with this timer
-   * @param key The additional key associated with this timer
+   * @param taskType The additional taskType associated with this timer
    * @param timer The name of timer
    * @param duration The log time duration time value
    * @param timeUnit The log time duration time unit
    */
-  public void addTimedTableValue(final String tableName, final String key, final T timer, final long duration,
+  public void addTimedTableTaskValue(final String tableName, final String taskType, final T timer, final long duration,
       final TimeUnit timeUnit) {
-    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + key + "." + timer.getTimerName();
-    addValueToTimer(fullTimerName, duration, timeUnit);
+    final String fullTimerName = _metricPrefix + getTableName(tableName) + "." + taskType + "." + timer.getTimerName();
+    addValueToTimer(fullTimerName,
+        timer.getTimerName(),
+        duration,
+        timeUnit,
+        ImmutableMap.of(
+            MetricAttributeConstants.TABLE_NAME, tableName,
+            MetricAttributeConstants.TASK_TYPE, taskType
+        )
+    );
   }
 
   /**
@@ -183,7 +203,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void addTimedValue(T timer, final long duration, final TimeUnit timeUnit) {
     final String fullTimerName = _metricPrefix + timer.getTimerName();
-    addValueToTimer(fullTimerName, duration, timeUnit);
+    addValueToTimer(fullTimerName,
+        timer.getTimerName(),
+        duration,
+        timeUnit,
+        ImmutableMap.of()
+    );
   }
 
   /**
@@ -192,21 +217,32 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param timer The name of timer
    * @param duration The log time duration time value
    * @param timeUnit The log time duration time unit
+   * @param attributes Additional attributes to be added to the metric
    */
-  public void addTimedValue(final String key, final T timer, final long duration, final TimeUnit timeUnit) {
+  public void addTimedValue(final String key, final T timer, final long duration, final TimeUnit timeUnit,
+      Map<String, String> attributes) {
     final String fullTimerName = _metricPrefix + key + "." + timer.getTimerName();
-    addValueToTimer(fullTimerName, duration, timeUnit);
+    addValueToTimer(fullTimerName, timer.getTimerName(), duration, timeUnit, attributes);
   }
 
   /**
    * Logs the timing for a metric
    *
    * @param fullTimerName The full name of timer
+   * @param simplifiedTimerName The simplified name of timer
    * @param duration The log time duration time value
    * @param timeUnit The log time duration time unit
+   * @param attributes Additional attributes to be added to the metric
    */
-  private void addValueToTimer(String fullTimerName, final long duration, final TimeUnit timeUnit) {
-    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName);
+  private void addValueToTimer(String fullTimerName, String simplifiedTimerName, final long duration,
+      final TimeUnit timeUnit, Map<String, String> attributes) {
+    Map<String, String> fullAttributes = ImmutableMap.<String, String>builder()
+        .putAll(attributes)
+        .put(MetricAttributeConstants.PINOT_METRIC_NAME, fullTimerName)
+        .build();
+
+    final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName,
+        simplifiedTimerName, fullAttributes);
     PinotTimer timer =
         PinotMetricUtils.makePinotTimer(_metricsRegistry, metricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS);
     if (timer != null) {
@@ -215,8 +251,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public void removeTimer(final String fullTimerName) {
-    PinotMetricUtils
-        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName));
+    PinotMetricUtils.removeMetric(_metricsRegistry,
+            PinotMetricUtils.makePinotMetricName(_clazz, fullTimerName, fullTimerName, ImmutableMap.of()));
   }
 
   public void removeTableTimer(final String tableName, final T timer) {
@@ -249,7 +285,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       final String fullMeterName;
       String meterName = meter.getMeterName();
       fullMeterName = _metricPrefix + meterName;
-      final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
+
+      Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.PINOT_METRIC_NAME, fullMeterName);
+      final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName,
+          meterName, attributes);
 
       final PinotMeter newMeter =
           PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
@@ -258,15 +297,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     }
   }
 
-  /**
-   * Logs a value to a meter with a key.
-   *
-   * @param key The key associated with this meter
-   * @param meter The meter to use
-   * @param unitCount The number of units to add to the meter
-   */
-  public void addMeteredValue(final String key, final M meter, final long unitCount) {
-    addMeteredValue(key, meter, unitCount, null);
+  public void addMeteredValue(final String key, final M meter, final long unitCount, Map<String, String> attributes) {
+    addMeteredValue(key, meter, unitCount, null, attributes);
   }
 
   /**
@@ -277,10 +309,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param unitCount The number of units to add to the meter
    * @param reusedMeter The meter to reuse
    */
-  public PinotMeter addMeteredValue(final String key, final M meter, final long unitCount, PinotMeter reusedMeter) {
+  public PinotMeter addMeteredValue(final String key, final M meter, final long unitCount,
+      PinotMeter reusedMeter, Map<String, String> attributes) {
     String meterName = meter.getMeterName();
     final String fullMeterName = _metricPrefix + key + "." + meterName;
-    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+    return addValueToMeter(fullMeterName, meterName, meter.getUnit(), unitCount, reusedMeter, attributes);
   }
 
   /**
@@ -303,7 +336,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public PinotMeter addMeteredTableValue(final String tableName, final M meter, final long unitCount,
       PinotMeter reusedMeter) {
-    return addValueToMeter(getTableFullMeterName(tableName, meter), meter.getUnit(), unitCount, reusedMeter);
+    return addValueToMeter(getTableFullMeterName(tableName, meter), meter.getMeterName(),
+        meter.getUnit(), unitCount, reusedMeter, ImmutableMap.of());
   }
 
   /**
@@ -312,9 +346,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param key The additional key associated with this meter
    * @param meter The meter to use
    * @param unitCount The number of units to add to the meter
+   * @param attributes The attributes to attach to the meter
    */
-  public void addMeteredTableValue(final String tableName, final String key, final M meter, final long unitCount) {
-    addMeteredTableValue(tableName, key, meter, unitCount, null);
+  public void addMeteredTableValue(final String tableName, final String key, final M meter, final long unitCount,
+      Map<String, String> attributes) {
+    addMeteredTableValue(tableName, key, meter, unitCount, null, attributes);
   }
 
   /**
@@ -324,27 +360,46 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param meter The meter to use
    * @param unitCount The number of units to add to the meter
    * @param reusedMeter The meter to reuse
+   * @param attributes The attributes to attach to the meter
    */
   public PinotMeter addMeteredTableValue(final String tableName, final String key, final M meter, final long unitCount,
-      PinotMeter reusedMeter) {
+      PinotMeter reusedMeter, Map<String, String> attributes) {
     String meterName = meter.getMeterName();
     final String fullMeterName = _metricPrefix + getTableName(tableName) + "." + key + "." + meterName;
-    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, reusedMeter);
+    Map<String, String> fullAttributes = ImmutableMap.<String, String>builder()
+        .putAll(attributes)
+        .put(MetricAttributeConstants.TABLE_NAME, tableName)
+        .build();
+    return addValueToMeter(fullMeterName, meterName, meter.getUnit(), unitCount, reusedMeter, fullAttributes);
   }
 
-  public PinotMeter addMeteredValue(final M meter, final long unitCount, final String... tags) {
+  public PinotMeter addMeteredValue(final M meter, final long unitCount, final List<String> tags,
+      @Nullable Map<String, String> attributes) {
     String meterName = meter.getMeterName();
     final String fullMeterName = _metricPrefix + meterName + "." + String.join(".", tags);
-    return addValueToMeter(fullMeterName, meter.getUnit(), unitCount, null);
+    return addValueToMeter(fullMeterName, meterName, meter.getUnit(), unitCount, null,
+        attributes == null ? ImmutableMap.of() : attributes);
   }
 
-  private PinotMeter addValueToMeter(final String fullMeterName, final String unit, final long unitCount,
-      PinotMeter reusedMeter) {
+  private PinotMeter addValueToMeter(
+      final String fullMeterName,
+      final String simplifiedMeterName,
+      final String unit, final long unitCount,
+      PinotMeter reusedMeter,
+      Map<String, String> attributes
+  ) {
     if (reusedMeter != null) {
       reusedMeter.mark(unitCount);
       return reusedMeter;
     } else {
-      final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName);
+      Map<String, String> fullAttributes = ImmutableMap.<String, String>builder()
+          .putAll(attributes)
+          .put(MetricAttributeConstants.PINOT_METRIC_NAME, fullMeterName)
+          .build();
+
+      final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName,
+          simplifiedMeterName, fullAttributes);
+
       final PinotMeter newMeter =
           PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, unit, TimeUnit.SECONDS);
       newMeter.mark(unitCount);
@@ -354,14 +409,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public PinotMeter getMeteredTableValue(final String tableName, final M meter) {
     final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz,
-        getTableFullMeterName(tableName, meter));
+        getTableFullMeterName(tableName, meter), meter.getMeterName(), ImmutableMap.of());
 
     return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
   }
 
   public PinotMeter getMeteredValue(final M meter) {
     final PinotMetricName metricName =
-        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + meter.getMeterName());
+        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + meter.getMeterName(),
+        meter.getMeterName(), ImmutableMap.of());
     return PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
   }
 
@@ -383,19 +439,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   @Deprecated
   public void addValueToTableGauge(final String tableName, final G gauge, final long unitCount) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
-
+    Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.TABLE_NAME, tableName);
     AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
     if (gaugeValue == null) {
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(fullGaugeName)) {
           _gaugeValues.put(fullGaugeName, new AtomicLong(unitCount));
-          addCallbackGauge(fullGaugeName, new Callable<Long>() {
-            @Override
-            public Long call()
-                throws Exception {
-              return _gaugeValues.get(fullGaugeName).get();
-            }
-          });
+          addCallbackGauge(fullGaugeName, gauge.getGaugeName(), attributes,
+              () -> _gaugeValues.get(fullGaugeName).get());
         } else {
           _gaugeValues.get(fullGaugeName).addAndGet(unitCount);
         }
@@ -414,7 +465,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void setValueOfTableGauge(final String tableName, final G gauge, final long value) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
-    setValueOfGauge(value, fullGaugeName);
+    Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.TABLE_NAME, tableName);
+    setValueOfGauge(value, fullGaugeName, gauge.getGaugeName(), attributes);
   }
 
   /**
@@ -427,7 +479,11 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void setValueOfPartitionGauge(final String tableName, final int partitionId, final G gauge, final long value) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-    setValueOfGauge(value, fullGaugeName);
+    Map<String, String> attributes = ImmutableMap.of(
+        MetricAttributeConstants.TABLE_NAME, tableName,
+        MetricAttributeConstants.PARTITION_ID, String.valueOf(partitionId)
+    );
+    setValueOfGauge(value, fullGaugeName, gauge.getGaugeName(), attributes);
   }
 
   /**
@@ -436,13 +492,14 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param suffix The suffix to attach to the gauge name
    * @param gauge The gauge to use
    * @param value The value to set the gauge to
+   * @param attributes Additional attributes to be added to the metric
    */
-  public void setValueOfGlobalGauge(final G gauge, final String suffix, final long value) {
+  public void setValueOfGlobalGauge(final G gauge, final String suffix, final long value,
+      Map<String, String> attributes) {
     final String fullGaugeName;
     String gaugeName = gauge.getGaugeName();
     fullGaugeName = gaugeName + "." + suffix;
-
-    setValueOfGauge(value, fullGaugeName);
+    setValueOfGauge(value, fullGaugeName, gaugeName, attributes);
   }
 
   /**
@@ -453,19 +510,21 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void setValueOfGlobalGauge(final G gauge, final long value) {
     final String gaugeName = gauge.getGaugeName();
-
-    setValueOfGauge(value, gaugeName);
+    // global gauge has no extra attributes
+    setValueOfGauge(value, gaugeName, gaugeName, ImmutableMap.of());
   }
 
-  protected void setValueOfGauge(long value, String gaugeName) {
-    AtomicLong gaugeValue = _gaugeValues.get(gaugeName);
+  protected void setValueOfGauge(long value, String fullGaugeName, String simplifiedGaugeName,
+      Map<String, String> attributes) {
+    AtomicLong gaugeValue = _gaugeValues.get(fullGaugeName);
     if (gaugeValue == null) {
       synchronized (_gaugeValues) {
-        if (!_gaugeValues.containsKey(gaugeName)) {
-          _gaugeValues.put(gaugeName, new AtomicLong(value));
-          setOrUpdateGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
+        if (!_gaugeValues.containsKey(fullGaugeName)) {
+          _gaugeValues.put(fullGaugeName, new AtomicLong(value));
+          setOrUpdateGauge(fullGaugeName, simplifiedGaugeName, attributes,
+              () -> _gaugeValues.get(fullGaugeName).get());
         } else {
-          _gaugeValues.get(gaugeName).set(value);
+          _gaugeValues.get(fullGaugeName).set(value);
         }
       }
     } else {
@@ -491,7 +550,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(gaugeName)) {
           _gaugeValues.put(gaugeName, new AtomicLong(unitCount));
-          setOrUpdateGauge(gaugeName, () -> _gaugeValues.get(gaugeName).get());
+          setOrUpdateGauge(gaugeName, gaugeName, ImmutableMap.of(), () -> _gaugeValues.get(gaugeName).get());
         } else {
           _gaugeValues.get(gaugeName).addAndGet(unitCount);
         }
@@ -548,7 +607,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   @Deprecated
   public void addCallbackTableGaugeIfNeeded(final String tableName, final G gauge, final Callable<Long> valueCallback) {
     final String fullGaugeName = composeTableGaugeName(tableName, gauge);
-    addCallbackGaugeIfNeeded(fullGaugeName, valueCallback);
+    Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.TABLE_NAME, tableName);
+    addCallbackGaugeIfNeeded(fullGaugeName, gauge.getGaugeName(), attributes, valueCallback);
   }
 
   /**
@@ -561,8 +621,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void setOrUpdatePartitionGauge(final String tableName, final int partitionId, final G gauge,
       final Supplier<Long> valueSupplier) {
+    Map<String, String> attributes = ImmutableMap.of(
+        MetricAttributeConstants.TABLE_NAME, tableName,
+        MetricAttributeConstants.PARTITION_ID, String.valueOf(partitionId)
+    );
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
-    setOrUpdateGauge(fullGaugeName, valueSupplier);
+    setOrUpdateGauge(fullGaugeName, gauge.getGaugeName(), attributes, valueSupplier::get);
   }
 
   /**
@@ -577,12 +641,15 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
   @Deprecated
-  public void addCallbackGaugeIfNeeded(final String metricName, final Callable<Long> valueCallback) {
+  public void addCallbackGaugeIfNeeded(final String metricName,
+      final String simplifiedMetricName,
+      final Map<String, String> attributes,
+      final Callable<Long> valueCallback) {
     if (!_gaugeValues.containsKey(metricName)) {
       synchronized (_gaugeValues) {
         if (!_gaugeValues.containsKey(metricName)) {
           _gaugeValues.put(metricName, new AtomicLong(0L));
-          addCallbackGauge(metricName, valueCallback);
+          addCallbackGauge(metricName, simplifiedMetricName, attributes, valueCallback);
         }
       }
     }
@@ -599,11 +666,38 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param metricName The name of the metric
    * @param valueCallback The callback function used to retrieve the value of the gauge
    */
+  public void addCallbackGauge(final String metricName,
+      final Callable<Long> valueCallback) {
+    addCallbackGauge(metricName, metricName, ImmutableMap.of(), valueCallback);
+  }
+  /**
+   * @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
+   *
+   * Adds a new gauge whose values are retrieved from a callback function.
+   * Once added, the callback function cannot be updated.
+   *
+   * It's actually same as addCallbackGaugeIfNeeded(final String metricName, final Callable<Long> valueCallback) method
+   *
+   * @param metricName The name of the metric
+   * @param simplifiedMetricName The simplified name of the metric
+   * @param attributes Additional attributes to be added to the metric
+   * @param valueCallback The callback function used to retrieve the value of the gauge
+   */
   @Deprecated
-  public void addCallbackGauge(final String metricName, final Callable<Long> valueCallback) {
+  public void addCallbackGauge(final String metricName,
+      String simplifiedMetricName,
+      Map<String, String> attributes,
+      final Callable<Long> valueCallback) {
+    Map<String, String> fullAttributes = ImmutableMap.<String, String>builder()
+        .putAll(attributes)
+        .put(MetricAttributeConstants.PINOT_METRIC_NAME, metricName)
+        .build();
+    PinotMetricName pinotMetricName = PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName,
+        simplifiedMetricName, fullAttributes);
+
     PinotMetricUtils
-        .makeGauge(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-            PinotMetricUtils.makePinotGauge(_metricPrefix + metricName, avoid -> {
+        .makeGauge(_metricsRegistry, pinotMetricName,
+            PinotMetricUtils.makePinotGauge(pinotMetricName, avoid -> {
               try {
                 return valueCallback.call();
               } catch (Exception e) {
@@ -621,11 +715,12 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param tableName The table name
    * @param key The key associated with this gauge
    * @param gauge The gauge to use
+   * @param attributes Additional attributes to be added to the metric
    * @param value The value of the gauge
    */
-  public void setOrUpdateTableGauge(final String tableName, final String key, final G gauge, final long value) {
-    String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
-    setOrUpdateGauge(fullGaugeName, value);
+  public void setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
+      final Map<String, String> attributes, final long value) {
+    setOrUpdateTableGauge(tableName, key, gauge, attributes, () -> value);
   }
 
   /**
@@ -635,12 +730,19 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param tableName The table name
    * @param key The key associated with this gauge
    * @param gauge The gauge to use
+   * @param attributes Additional attributes to be added to the metric
    * @param valueSupplier The supplier function used to retrieve the value of the gauge
    */
   public void setOrUpdateTableGauge(final String tableName, final String key, final G gauge,
-      final Supplier<Long> valueSupplier) {
+      Map<String, String> attributes, final Supplier<Long> valueSupplier) {
     String fullGaugeName = composeTableGaugeName(tableName, key, gauge);
-    setOrUpdateGauge(fullGaugeName, valueSupplier);
+
+    Map<String, String> fullAttributes = ImmutableMap.<String, String>builder()
+        .putAll(attributes)
+        .put(MetricAttributeConstants.TABLE_NAME, tableName)
+        .build();
+
+    setOrUpdateGauge(fullGaugeName, gauge.getGaugeName(), fullAttributes, valueSupplier::get);
   }
 
   /**
@@ -653,7 +755,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void setOrUpdateTableGauge(final String tableName, final G gauge, final long value) {
     String fullGaugeName = composeTableGaugeName(tableName, gauge);
-    setOrUpdateGauge(fullGaugeName, value);
+    Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.TABLE_NAME, tableName);
+    setOrUpdateGauge(fullGaugeName, gauge.getGaugeName(), attributes, () -> value);
   }
 
   /**
@@ -667,9 +770,13 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   public void setOrUpdateTableGauge(final String tableName, final G gauge,
       final Supplier<Long> valueSupplier) {
     String fullGaugeName = composeTableGaugeName(tableName, gauge);
-    setOrUpdateGauge(fullGaugeName, valueSupplier);
+    setOrUpdateGauge(fullGaugeName, valueSupplier.get());
   }
 
+
+  public void setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) {
+    setOrUpdateGauge(metricName, valueSupplier.get());
+  }
   /**
    * Sets or updates a gauge to the given value.
    * The value can be updated by calling this method again.
@@ -678,9 +785,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param value The value of the gauge
    */
   public void setOrUpdateGauge(final String metricName, long value) {
-    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
-        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-        PinotMetricUtils.makePinotGauge(_metricPrefix + metricName, avoid -> value));
+    PinotMetricName pinotMetricName = PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName,
+        metricName, ImmutableMap.of());
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry, pinotMetricName,
+        PinotMetricUtils.makePinotGauge(pinotMetricName, avoid -> value));
     pinotGauge.setValue(value);
   }
 
@@ -691,39 +799,58 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    * @param metricName The name of the metric
    * @param valueSupplier The supplier function used to retrieve the value of the gauge
    */
-  public void setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) {
-    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
-        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-        PinotMetricUtils.makePinotGauge(_metricPrefix + metricName, avoid -> valueSupplier.get()));
+  public void setOrUpdateGlobalGauge(final String metricName, final Supplier<Long> valueSupplier) {
+    PinotMetricName pinotMetricName = PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName,
+        metricName, ImmutableMap.of());
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry, pinotMetricName,
+        PinotMetricUtils.makePinotGauge(pinotMetricName, avoid -> valueSupplier.get()));
     pinotGauge.setValueSupplier(valueSupplier);
   }
 
   /**
-   * Like {@link #setOrUpdateGauge(String, Supplier)}
+   * Like {@link #setOrUpdateGlobalGauge(String, Supplier)}
    */
-  public void setOrUpdateGauge(final String metricName, final LongSupplier valueSupplier) {
-    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry,
-        PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName),
-        PinotMetricUtils.makePinotGauge(_metricPrefix + metricName, avoid -> valueSupplier.getAsLong()));
-    pinotGauge.setValueSupplier((Supplier<Long>) () -> (Long) valueSupplier.getAsLong());
+  public void setOrUpdateGlobalGauge(final String metricName, final LongSupplier valueSupplier) {
+    PinotMetricName pinotMetricName = PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName,
+        metricName, ImmutableMap.of());
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry, pinotMetricName,
+        PinotMetricUtils.makePinotGauge(pinotMetricName, avoid -> valueSupplier.getAsLong()));
+    pinotGauge.setValueSupplier(valueSupplier::getAsLong);
+  }
+
+  public void setOrUpdateGauge(final String metricName, final String simplifiedMetricName,
+      Map<String, String> attributes, final LongSupplier valueSupplier) {
+    Map<String, String> fullAttributes = ImmutableMap.<String, String>builder()
+        .putAll(attributes)
+        .put(MetricAttributeConstants.PINOT_METRIC_NAME, metricName)
+        .build();
+
+    PinotMetricName pinotMetricName = PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName,
+        simplifiedMetricName, fullAttributes);
+
+    PinotGauge<Long> pinotGauge = PinotMetricUtils.makeGauge(_metricsRegistry, pinotMetricName,
+        PinotMetricUtils.makePinotGauge(pinotMetricName, avoid -> valueSupplier.getAsLong()));
+
+    pinotGauge.setValueSupplier(valueSupplier::getAsLong);
   }
 
   /**
-   * Like {@link #setOrUpdateGauge(String, Supplier)} but using a global gauge
+   * Like {@link #setOrUpdateGlobalGauge(String, Supplier)} but providing a Gauge not String
    * @throws IllegalArgumentException if the gauge is not global
    */
   public void setOrUpdateGlobalGauge(final G gauge, final Supplier<Long> valueSupplier) {
     Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
-    setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
+    setOrUpdateGauge(gauge.getGaugeName(), gauge.getGaugeName(), ImmutableMap.of(), valueSupplier::get);
   }
 
   /**
-   * Like {@link #setOrUpdateGauge(String, LongSupplier)} but using a global gauge
+   * Like {@link #setOrUpdateGauge(String, String, Map, LongSupplier)} but providing a global gauge so no simplified
+   * metric name or attributes are needed.
    * @throws IllegalArgumentException if the gauge is not global
    */
   public void setOrUpdateGlobalGauge(final G gauge, final LongSupplier valueSupplier) {
     Preconditions.checkArgument(gauge.isGlobal(), "Only global gauges should be sent to this method");
-    setOrUpdateGauge(gauge.getGaugeName(), valueSupplier);
+    setOrUpdateGauge(gauge.getGaugeName(), gauge.getGaugeName(), ImmutableMap.of(), valueSupplier);
   }
 
   /**
@@ -801,7 +928,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
 
   public void removeTableMeter(final String tableName, final M meter) {
     PinotMetricUtils.removeMetric(_metricsRegistry,
-        PinotMetricUtils.makePinotMetricName(_clazz, getTableFullMeterName(tableName, meter)));
+        PinotMetricUtils.makePinotMetricName(_clazz, getTableFullMeterName(tableName, meter),
+            meter.getMeterName(), ImmutableMap.of()));
   }
 
   /**
@@ -810,7 +938,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   private void removeGaugeFromMetricRegistry(String metricName) {
     PinotMetricUtils
-        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName));
+        .removeMetric(_metricsRegistry, PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName,
+            metricName, ImmutableMap.of()));
   }
 
   protected abstract QP[] getQueryPhases();

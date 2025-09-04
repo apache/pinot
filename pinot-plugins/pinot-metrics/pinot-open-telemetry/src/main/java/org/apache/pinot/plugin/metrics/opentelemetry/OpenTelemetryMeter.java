@@ -18,7 +18,8 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
-import io.opentelemetry.api.metrics.ObservableLongCounter;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.metrics.LongUpDownCounter;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.pinot.spi.metrics.PinotMeter;
@@ -33,24 +34,17 @@ import org.apache.pinot.spi.metrics.PinotMeter;
  * backend for calculation and visualization.
  */
 public class OpenTelemetryMeter implements PinotMeter {
-  private final OpenTelemetryMetricName _metricName;
   private final String _eventType;
   private final TimeUnit _rateUnit;
-  private final ObservableLongCounter _counter;
+  private final LongUpDownCounter _counter;
+  private final Attributes _attributes;
   private final AtomicLong _value = new AtomicLong(0);
 
-  public OpenTelemetryMeter(OpenTelemetryMetricName metricName, String eventType, TimeUnit rateUnit) {
-    _metricName = metricName;
+  public OpenTelemetryMeter(LongUpDownCounter counter, Attributes attributes, String eventType, TimeUnit rateUnit) {
+    _counter = counter;
+    _attributes = attributes;
     _eventType = eventType;
     _rateUnit = rateUnit;
-    _counter = OpenTelemetryMetricsRegistry.getOtelMeterProvider().counterBuilder(metricName.getOtelMetricName())
-        .setUnit(rateUnit.name())
-        .buildWithCallback(
-            // Register a callback to report the current value of the counter. Unlike synchronous counters, which are
-            // incremented by the user at the time of measurement, an ObservableLongCounter periodically calls a
-            // user-defined callback to fetch the current value.
-            counter -> counter.record(_value.get(), _metricName.getOtelAttributes())
-        );
   }
 
   @Override
@@ -60,6 +54,7 @@ public class OpenTelemetryMeter implements PinotMeter {
 
   @Override
   public void mark(long unitCount) {
+    _counter.add(unitCount - _value.get(), _attributes);
     _value.set(unitCount);
   }
 

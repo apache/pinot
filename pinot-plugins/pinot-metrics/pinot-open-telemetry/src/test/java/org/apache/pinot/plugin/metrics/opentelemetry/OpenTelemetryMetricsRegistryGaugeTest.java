@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
+import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -29,14 +30,12 @@ public class OpenTelemetryMetricsRegistryGaugeTest {
   public void testNewGaugeGenerics() {
     OpenTelemetryMetricsFactory factory = new OpenTelemetryMetricsFactory();
     OpenTelemetryMetricsRegistry registry = new OpenTelemetryMetricsRegistry();
-    PinotGauge<Long> pinotLongGauge = registry.newGauge(
-        new OpenTelemetryMetricName("testLongGauge"),
-        factory.makePinotGauge("testLongGauge", (v) -> 1L)
-    );
-    PinotGauge<Double> pinotDoubleGauge = registry.newGauge(
-        new OpenTelemetryMetricName("testDoubleGauge"),
-        factory.makePinotGauge("testDoubleGauge", (v) -> 1.0)
-    );
+    PinotMetricsFactory.SimpleMetricName longGaugeName = new PinotMetricsFactory.SimpleMetricName("testLongGauge");
+    PinotGauge<Long> pinotLongGauge = registry.newGauge(longGaugeName,
+        factory.makePinotGauge(longGaugeName, (v) -> 1L));
+    PinotMetricsFactory.SimpleMetricName doubleGaugeName = new PinotMetricsFactory.SimpleMetricName("testDoubleGauge");
+    PinotGauge<Double> pinotDoubleGauge = registry.newGauge(doubleGaugeName,
+        factory.makePinotGauge(doubleGaugeName, (v) -> 1.0));
     Assert.assertEquals(pinotLongGauge.value(), Long.valueOf(1L));
     Assert.assertEquals(pinotDoubleGauge.value(), Double.valueOf(1.0));
   }

@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.minion.tasks;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.net.URI;
 import java.util.Collections;
@@ -27,6 +28,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
 import org.apache.pinot.common.utils.TarCompressionUtils;
@@ -108,7 +110,8 @@ public abstract class BaseTaskExecutor implements PinotTaskExecutor {
   private void addTaskMeterMetrics(MinionMeter meter, long unitCount, String tableName, String taskType) {
     _minionMetrics.addMeteredGlobalValue(meter, unitCount);
     _minionMetrics.addMeteredTableValue(tableName, meter, unitCount);
-    _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount);
+    _minionMetrics.addMeteredTableValue(tableName, taskType, meter, unitCount,
+        ImmutableMap.of(MetricAttributeConstants.TASK_TYPE, taskType));
   }
 
   protected File downloadSegmentToLocalAndUntar(String tableNameWithType, String segmentName, String deepstoreURL,

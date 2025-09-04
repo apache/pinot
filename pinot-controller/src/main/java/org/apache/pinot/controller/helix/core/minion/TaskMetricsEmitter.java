@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.minion;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.Properties;
 import java.util.Set;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.LeadControllerManager;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -80,6 +82,7 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
         taskTypeLastUpdateTime.forEach((taskType, lastUpdateTimeMs) ->
             _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
                 ControllerGauge.TIME_MS_SINCE_LAST_MINION_TASK_METADATA_UPDATE,
+                ImmutableMap.of(MetricAttributeConstants.TASK_TYPE, taskType),
                 () -> System.currentTimeMillis() - lastUpdateTimeMs)));
 
     // The call to get task types can take time if there are a lot of tasks.
@@ -106,52 +109,56 @@ public class TaskMetricsEmitter extends BasePeriodicTask {
           });
         }
         // Emit metrics for taskType.
+        Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.TASK_TYPE, taskType);
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_TASKS_IN_PROGRESS, taskType,
-            numRunningTasks);
+            numRunningTasks, attributes);
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_RUNNING, taskType,
-            taskTypeAccumulatedCount.getRunning());
+            taskTypeAccumulatedCount.getRunning(), attributes);
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_WAITING, taskType,
-            taskTypeAccumulatedCount.getWaiting());
+            taskTypeAccumulatedCount.getWaiting(), attributes);
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_ERROR, taskType,
-            taskTypeAccumulatedCount.getError());
+            taskTypeAccumulatedCount.getError(), attributes);
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN, taskType,
-            taskTypeAccumulatedCount.getUnknown());
+            taskTypeAccumulatedCount.getUnknown(), attributes);
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_DROPPED, taskType,
-            taskTypeAccumulatedCount.getDropped());
+            taskTypeAccumulatedCount.getDropped(), attributes);
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_TIMED_OUT, taskType,
-            taskTypeAccumulatedCount.getTimedOut());
+            taskTypeAccumulatedCount.getTimedOut(), attributes);
         _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.NUM_MINION_SUBTASKS_ABORTED, taskType,
-            taskTypeAccumulatedCount.getAborted());
+            taskTypeAccumulatedCount.getAborted(), attributes);
         int total = taskTypeAccumulatedCount.getTotal();
         int percent = total != 0
             ? (taskTypeAccumulatedCount.getWaiting() + taskTypeAccumulatedCount.getRunning()) * 100 / total : 0;
-        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, taskType, percent);
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE,
+            taskType, percent, attributes);
         percent = total != 0 ? taskTypeAccumulatedCount.getError() * 100 / total : 0;
-        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, taskType, percent);
+        _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR,
+            taskType, percent, attributes);
 
         // Emit metrics for table taskType
         tableAccumulatedCount.forEach((tableNameWithType, taskCount) -> {
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.NUM_MINION_SUBTASKS_RUNNING, () -> (long) taskCount.getRunning());
+              ControllerGauge.NUM_MINION_SUBTASKS_RUNNING, attributes,
+              () -> (long) taskCount.getRunning());
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.NUM_MINION_SUBTASKS_WAITING, taskCount.getWaiting());
+              ControllerGauge.NUM_MINION_SUBTASKS_WAITING, attributes, taskCount.getWaiting());
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.NUM_MINION_SUBTASKS_ERROR, taskCount.getError());
+              ControllerGauge.NUM_MINION_SUBTASKS_ERROR, attributes, taskCount.getError());
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN, taskCount.getUnknown());
+              ControllerGauge.NUM_MINION_SUBTASKS_UNKNOWN, attributes, taskCount.getUnknown());
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.NUM_MINION_SUBTASKS_DROPPED, taskCount.getDropped());
+              ControllerGauge.NUM_MINION_SUBTASKS_DROPPED, attributes, taskCount.getDropped());
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.NUM_MINION_SUBTASKS_TIMED_OUT, taskCount.getTimedOut());
+              ControllerGauge.NUM_MINION_SUBTASKS_TIMED_OUT, attributes, taskCount.getTimedOut());
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.NUM_MINION_SUBTASKS_ABORTED, taskCount.getAborted());
+              ControllerGauge.NUM_MINION_SUBTASKS_ABORTED, attributes, taskCount.getAborted());
           int tableTotal = taskCount.getTotal();
           int tablePercent = tableTotal != 0 ? (taskCount.getWaiting() + taskCount.getRunning()) * 100 / tableTotal : 0;
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, tablePercent);
+              ControllerGauge.PERCENT_MINION_SUBTASKS_IN_QUEUE, attributes, tablePercent);
           tablePercent = tableTotal != 0 ? taskCount.getError() * 100 / tableTotal : 0;
           _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, taskType,
-              ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, tablePercent);
+              ControllerGauge.PERCENT_MINION_SUBTASKS_IN_ERROR, attributes, tablePercent);
         });
 
         if (_preReportedTables.containsKey(taskType)) {

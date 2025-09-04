@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.metrics.dropwizard;
 
 import com.google.auto.service.AutoService;
+import java.util.Map;
 import java.util.function.Function;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -53,8 +54,15 @@ public class DropwizardMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  @Deprecated
   public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
-    return new DropwizardMetricName(klass, name);
+    throw new UnsupportedOperationException("Please use makePinotMetricName(Class, String, String, Map) instead");
+  }
+
+  @Override
+  public PinotMetricName makePinotMetricName(Class<?> klass, String fullName, String simplifiedName,
+      Map<String, String> attributes) {
+    return new DropwizardMetricName(klass, fullName);
   }
 
   @Override
@@ -64,7 +72,13 @@ public class DropwizardMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  @Deprecated
   public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+    throw new UnsupportedOperationException("Please use makePinotGauge(PinotMetricName, Function) instead");
+  }
+
+  @Override
+  public <T> PinotGauge<T> makePinotGauge(PinotMetricName pinotMetricName, Function<Void, T> condition) {
     return new DropwizardGauge<T>(condition);
   }
 

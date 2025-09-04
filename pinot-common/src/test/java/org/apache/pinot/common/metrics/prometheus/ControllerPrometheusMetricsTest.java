@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics.prometheus;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.StringUtils;
@@ -142,10 +143,12 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
   @Test(dataProvider = "controllerGauges")
   public void gaugeTest(ControllerGauge controllerGauge) {
     if (controllerGauge.isGlobal()) {
-      _controllerMetrics.setValueOfGlobalGauge(controllerGauge, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, 1L);
+      _controllerMetrics.setValueOfGlobalGauge(controllerGauge, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, 1L,
+          ImmutableMap.of());
       //some global gauges also accept the taskType (which should not be). todo: this should be fixed
       if (GLOBAL_GAUGES_ACCEPTING_TASKTYPE.contains(controllerGauge)) {
-        _controllerMetrics.setValueOfGlobalGauge(controllerGauge, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, 1L);
+        _controllerMetrics.setValueOfGlobalGauge(controllerGauge, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC, 1L,
+            ImmutableMap.of());
         String strippedMetricName = getStrippedMetricName(controllerGauge);
         assertGaugeExportedCorrectly(strippedMetricName,
             List.of(LABEL_KEY_TASK_TYPE, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC), EXPORTED_METRIC_PREFIX);
@@ -162,7 +165,7 @@ public abstract class ControllerPrometheusMetricsTest extends PinotPrometheusMet
             EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_TASKTYPE.contains(controllerGauge)) {
         _controllerMetrics.setOrUpdateTableGauge(TABLE_NAME_WITH_TYPE, ExportedLabelValues.CONTROLLER_PERIODIC_TASK_CHC,
-            controllerGauge, () -> 50L);
+            controllerGauge, ImmutableMap.of(), () -> 50L);
         assertGaugeExportedCorrectly(controllerGauge.getGaugeName(),
             ExportedLabels.TABLENAME_TABLETYPE_CONTROLLER_TASKTYPE, EXPORTED_METRIC_PREFIX);
       } else if (GAUGES_ACCEPTING_RAW_TABLENAME.contains(controllerGauge)) {
