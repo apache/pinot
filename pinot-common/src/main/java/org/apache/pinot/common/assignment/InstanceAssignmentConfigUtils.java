@@ -30,6 +30,7 @@ import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
 import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.utils.CommonConstants.Segment.AssignmentStrategy;
+import java.util.Objects;
 
 
 public class InstanceAssignmentConfigUtils {
@@ -39,14 +40,24 @@ public class InstanceAssignmentConfigUtils {
   /**
    * Returns whether the COMPLETED segments should be relocated (offloaded from CONSUMING instances to COMPLETED
    * instances) for a LLC real-time table based on the given table config.
-   * <p>COMPLETED segments should be relocated iff the COMPLETED instance assignment is configured or (for
+   * <p>COMPLETED segments should be relocated if the COMPLETED instance assignment is configured or (for
    * backward-compatibility) COMPLETED server tag is overridden to be different from the CONSUMING server tag.
    */
   public static boolean shouldRelocateCompletedSegments(TableConfig tableConfig) {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
-    return (instanceAssignmentConfigMap != null
-        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED.toString()) != null)
+    return isDifferentInstanceAssignmentGroup(instanceAssignmentConfigMap)
         || TagNameUtils.isRelocateCompletedSegments(tableConfig.getTenantConfig());
+  }
+
+  /**
+   * Helper function to check if instanceAssignmentConfig is different for CONSUMING and COMPLETED type
+   */
+  public static boolean isDifferentInstanceAssignmentGroup(Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+    return (instanceAssignmentConfigMap != null
+        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED.toString()) != null
+        && instanceAssignmentConfigMap.get(InstancePartitionsType.CONSUMING.toString()) != null) &&
+        !(Objects.equals(instanceAssignmentConfigMap.get(InstancePartitionsType.CONSUMING.toString()),
+            instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED.toString())));
   }
 
   /**

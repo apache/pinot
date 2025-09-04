@@ -43,13 +43,27 @@ import org.testng.annotations.Test;
 public class InstanceAssignmentConfigUtilsTest {
 
   @Test
-  public void testShouldRelocateCompletedSegmentsWhenInstancePartitionIsCompleted() {
+  public void testShouldRelocateCompletedSegmentsWhenInstancePartitionIsCompletedAndInstanceAssignmentIsDifferent() {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
     instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.toString(),
         getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR));
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.toString(),
+        getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR));
     TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
     Assert.assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig));
+  }
+
+  @Test
+  public void testShouldNotRelocateCompletedSegmentsWhenInstancePartitionIsCompletedAndInstanceAssignmentIsSame() {
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = new HashMap<>();
+    instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.toString(),
+        getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR));
+    instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.toString(),
+        getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR));
+    TableConfig tableConfig = new TableConfigBuilder(TableType.OFFLINE).setTableName("testTable")
+        .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
+    Assert.assertFalse(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig));
   }
 
   @Test

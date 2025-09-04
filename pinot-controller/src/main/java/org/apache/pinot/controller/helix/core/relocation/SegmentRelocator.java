@@ -36,6 +36,8 @@ import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.ClusterMessagingService;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.metrics.ControllerGauge;
+import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -248,6 +250,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
           break;
         default:
           LOGGER.error("Relocation failed for table: {}", tableNameWithType);
+          _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_RELOCATION_FAILURE, 1);
           break;
       }
     } catch (Throwable t) {
