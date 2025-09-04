@@ -38,11 +38,11 @@ import org.testng.annotations.Test;
 public class JsonFunctionsTest {
 
   private void testFunction(String functionExpression, List<String> expectedArguments, GenericRow row,
-      Object expectedResult) {
-    InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
-    Assert.assertEquals(evaluator.getArguments(), expectedArguments);
-    Assert.assertEquals(evaluator.evaluate(row), expectedResult);
-  }
+    Object expectedResult) {
+  InbuiltFunctionEvaluator evaluator = new InbuiltFunctionEvaluator(functionExpression);
+  Assert.assertEquals(evaluator.getArguments(), expectedArguments);
+  Assert.assertEquals(evaluator.evaluate(row), expectedResult);
+}
 
   @Test(dataProvider = "jsonFunctionsDataProvider")
   public void testJsonFunctions(String functionExpression, List<String> expectedArguments, GenericRow row,
