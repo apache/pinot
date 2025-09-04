@@ -58,14 +58,14 @@ public class BrokerMeter implements AbstractMetrics.Meter {
    */
   public static final BrokerMeter POOL_QUERIES = create("POOL_QUERIES", "routing", false);
   /**
-   * Number of segment selected per pool during query execution.
+   * Number of segments selected per pool during query execution.
    * <p>
    * This metric is not global and is attached to a particular pool.
-   * Currently this counter include single stage queries only.
+   * Currently, this counter includes single-stage queries only.
    * <p>
-   * Let's say the query option orderedReferredPools is set and a few nodes in the preferred pool are down.
-   * The other metric {@link #POOL_QUERIES} shows the traffic are relatively equal over pool.
-   * This metric is still going to show that most of segments are still selected from the preferred pool.
+   * Let's say the query option orderedPreferredPools is set and a few nodes in the preferred pool are down.
+   * The other metric {@link #POOL_QUERIES} shows the traffic is relatively equal over pool.
+   * This metric is still going to show that most of the segments are still selected from the preferred pool.
    */
   public static final BrokerMeter POOL_SEG_QUERIES = create("POOL_SEG_QUERIES", "routing", false);
   /**
