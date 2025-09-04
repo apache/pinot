@@ -30,6 +30,9 @@ import java.util.StringJoiner;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class AuditConfig {
 
+  public static final int MAX_AUDIT_PAYLOAD_SIZE_BYTES = 65536; // Hard max. This overrides _maxPayloadSize
+  public static final int MAX_AUDIT_PAYLOAD_SIZE_BYTES_DEFAULT = 8192;
+
   @JsonProperty("enabled")
   private boolean _enabled = false;
 
@@ -39,8 +42,8 @@ public final class AuditConfig {
   @JsonProperty("capture.request.headers")
   private String _captureRequestHeaders = "";
 
-  @JsonProperty("payload.size.max.bytes")
-  private int _maxPayloadSize = 10_240;
+  @JsonProperty("request.payload.size.max.bytes")
+  private int _maxPayloadSize = MAX_AUDIT_PAYLOAD_SIZE_BYTES_DEFAULT;
 
   @JsonProperty("url.filter.exclude.patterns")
   private String _urlFilterExcludePatterns = "";
