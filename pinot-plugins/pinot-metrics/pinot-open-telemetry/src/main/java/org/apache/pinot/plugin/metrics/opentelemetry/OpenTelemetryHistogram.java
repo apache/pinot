@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.DoubleHistogram;
 import org.apache.pinot.spi.metrics.PinotHistogram;
 
@@ -26,14 +27,12 @@ import org.apache.pinot.spi.metrics.PinotHistogram;
  * Actually Pinot-Core does NOT use {@link PinotHistogram} anywhere, so this is just a dummy implementation
  */
 public class OpenTelemetryHistogram implements PinotHistogram {
-  private final OpenTelemetryMetricName _metricName;
   private final DoubleHistogram _histogram;
+  private final Attributes _attributes;
 
-  public OpenTelemetryHistogram(OpenTelemetryMetricName metricName) {
-    _metricName = metricName;
-    _histogram = OpenTelemetryMetricsRegistry.getOtelMeterProvider()
-        .histogramBuilder(metricName.getOtelMetricName())
-        .build();
+  public OpenTelemetryHistogram(DoubleHistogram histogram, Attributes attributes) {
+    _histogram = histogram;
+    _attributes = attributes;
   }
 
   @Override

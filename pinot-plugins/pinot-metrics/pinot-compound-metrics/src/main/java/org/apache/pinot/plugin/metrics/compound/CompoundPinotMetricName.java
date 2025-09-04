@@ -19,27 +19,43 @@
 package org.apache.pinot.plugin.metrics.compound;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
 public class CompoundPinotMetricName implements PinotMetricName {
-  private final String _pinotMetricName;
+  private final String _fullMetricName;
+  private final String _simplifiedMetricName;
+  private final Map<String, String> _attributes;
   private final List<PinotMetricName> _subMetricNames;
 
-  public CompoundPinotMetricName(String pinotMetricName, List<PinotMetricName> subMetricNames) {
-    _pinotMetricName = pinotMetricName;
+  public CompoundPinotMetricName(String fullMetricName, String simplifiedMetricName, Map<String, String> attributes,
+      List<PinotMetricName> subMetricNames) {
+    _fullMetricName = fullMetricName;
+    _simplifiedMetricName = simplifiedMetricName;
+    _attributes = attributes;
     _subMetricNames = subMetricNames;
   }
 
   @Override
   public String toString() {
-    return _pinotMetricName;
+    return _fullMetricName;
+  }
+
+  @Override
+  public String getSimplifiedMetricName() {
+    return _simplifiedMetricName;
+  }
+
+  @Override
+  public Map<String, String> getAttributes() {
+    return _attributes;
   }
 
   @Override
   public String getMetricName() {
-    return _pinotMetricName;
+    return _fullMetricName;
   }
 
   public PinotMetricName getSubMetricName(int index) {

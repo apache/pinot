@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
+import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.metrics.LongGauge;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -29,16 +30,13 @@ import org.apache.pinot.spi.metrics.PinotGauge;
  * setting a value supplier to get the current value when calling {@link #value()}.
  */
 public class OpenTelemetryLongGauge<T> implements PinotGauge<T> {
-  private final OpenTelemetryMetricName _metricName;
   private final LongGauge _longGauge;
+  private final Attributes _attributes;
   private Supplier<T> _valueSupplier;
 
-  public OpenTelemetryLongGauge(OpenTelemetryMetricName metricName, Function<Void, T> valueSupplier) {
-    _longGauge = OpenTelemetryMetricsRegistry.getOtelMeterProvider()
-          .gaugeBuilder(metricName.getOtelMetricName())
-          .ofLongs()
-          .build();
-    _metricName = metricName;
+  public OpenTelemetryLongGauge(LongGauge longGauge, Attributes attributes, Function<Void, T> valueSupplier) {
+    _longGauge = longGauge;
+    _attributes = attributes;
     setValueSupplier(() -> valueSupplier.apply(null));
   }
 
@@ -59,8 +57,7 @@ public class OpenTelemetryLongGauge<T> implements PinotGauge<T> {
 
   @Override
   public void setValue(T value) {
-    // records the metric with a value with a set of attributes parsed from Pinot metric name
-    _longGauge.set((Long) value, _metricName.getOtelAttributes());
+    _longGauge.set((Long) value, _attributes);
     _valueSupplier = () -> value;
   }
 

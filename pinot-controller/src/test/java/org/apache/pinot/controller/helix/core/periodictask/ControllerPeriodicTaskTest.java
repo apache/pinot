@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.periodictask;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -96,7 +97,8 @@ public class ControllerPeriodicTaskTest {
     _stopTaskCalled.set(false);
     _processTablesCalled.set(false);
     _tablesProcessed.set(0);
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME, 0);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.PERIODIC_TASK_NUM_TABLES_PROCESSED, TASK_NAME, 0,
+        ImmutableMap.of());
   }
 
   @Test

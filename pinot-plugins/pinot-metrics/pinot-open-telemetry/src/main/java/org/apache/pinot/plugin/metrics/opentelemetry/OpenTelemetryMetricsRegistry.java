@@ -19,6 +19,12 @@
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
 import com.google.common.collect.ImmutableMap;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.metrics.DoubleGauge;
+import io.opentelemetry.api.metrics.DoubleHistogram;
+import io.opentelemetry.api.metrics.LongCounter;
+import io.opentelemetry.api.metrics.LongGauge;
+import io.opentelemetry.api.metrics.LongUpDownCounter;
 import io.opentelemetry.api.metrics.Meter;
 import io.opentelemetry.exporter.otlp.http.metrics.OtlpHttpMetricExporter;
 import io.opentelemetry.sdk.metrics.SdkMeterProvider;
@@ -30,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import org.apache.pinot.spi.metrics.PinotCounter;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotHistogram;
@@ -45,13 +50,15 @@ import org.apache.pinot.spi.metrics.PinotTimer;
  * OpenTelemetryMetricsRegistry is the implementation of {@link PinotMetricsRegistry} for OpenTelemetry.
  */
 public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
-  private static final Map<PinotMetricName, OpenTelemetryCounter> PINOT_COUNTER_MAP = new ConcurrentHashMap<>();
+  private static final Map<OpenTelemetryMetricName, OpenTelemetryCounter> PINOT_COUNTER_MAP = new ConcurrentHashMap<>();
   private static final Map<PinotMetricName, OpenTelemetryMeter> PINOT_METER_MAP = new ConcurrentHashMap<>();
-  private static final Map<PinotMetricName, OpenTelemetryLongGauge> PINOT_LONG_GAUGE_MAP = new ConcurrentHashMap<>();
-  private static final Map<PinotMetricName, OpenTelemetryDoubleGauge> PINOT_DOUBLE_GAUGE_MAP =
+  private static final Map<OpenTelemetryMetricName, OpenTelemetryLongGauge> PINOT_LONG_GAUGE_MAP =
       new ConcurrentHashMap<>();
-  private static final Map<PinotMetricName, OpenTelemetryHistogram> PINOT_HISTOGRAM_MAP = new ConcurrentHashMap<>();
-  private static final Map<PinotMetricName, OpenTelemetryTimer> PINOT_TIMER_MAP = new ConcurrentHashMap<>();
+  private static final Map<OpenTelemetryMetricName, OpenTelemetryDoubleGauge> PINOT_DOUBLE_GAUGE_MAP =
+      new ConcurrentHashMap<>();
+  private static final Map<OpenTelemetryMetricName, OpenTelemetryHistogram> PINOT_HISTOGRAM_MAP =
+      new ConcurrentHashMap<>();
+  private static final Map<OpenTelemetryMetricName, OpenTelemetryTimer> PINOT_TIMER_MAP = new ConcurrentHashMap<>();
   private static final List<OpenTelemetryMetricsRegistryListener> LISTENERS = new LinkedList<>();
 
   // _otelMeterProvider is the metric provider for OpenTelemetry metrics.
@@ -77,10 +84,6 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
     _otelMeterProvider = sdkMeterProvider.get(OpenTelemetryUtil.OTEL_METRICS_SCOPE);
   }
 
-  public static Meter getOtelMeterProvider() {
-    return _otelMeterProvider;
-  }
-
   @Override
   public void removeMetric(PinotMetricName pinotMetricname) {
     PINOT_COUNTER_MAP.remove(pinotMetricname);
@@ -90,8 +93,9 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
     PINOT_HISTOGRAM_MAP.remove(pinotMetricname);
     PINOT_TIMER_MAP.remove(pinotMetricname);
 
+
     if (!LISTENERS.isEmpty()) {
-      OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname.getMetricName().toString());
+      OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname);
       for (OpenTelemetryMetricsRegistryListener listener : LISTENERS) {
         listener.onMetricRemoved(metricName);
       }
@@ -99,14 +103,34 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
   }
 
   @Override
+  public PinotCounter newCounter(PinotMetricName pinotMetricname) {
+    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname);
+    String simpleMetricName = metricName.getSimplifiedMetricName();
+
+    return PINOT_COUNTER_MAP.computeIfAbsent(metricName, n -> {
+      OpenTelemetryCounter otelCounter = new OpenTelemetryCounter(
+          SharedOtelMetricRegistry.getOrCreateLongCounter(simpleMetricName));
+      if (!LISTENERS.isEmpty()) {
+        for (OpenTelemetryMetricsRegistryListener listener : LISTENERS) {
+          listener.onMetricAdded(metricName, otelCounter);
+        }
+      }
+      return otelCounter;
+    });
+  }
+
+  @Override
   public <T> PinotGauge<T> newGauge(PinotMetricName pinotMetricname, PinotGauge<T> gauge) {
-    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname.getMetricName().toString());
+    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname);
+    String simpleMetricName = metricName.getSimplifiedMetricName();
+    Attributes attributes = OpenTelemetryUtil.toOpenTelemetryAttributes(metricName.getAttributes());
     T value = gauge.value();
 
     if (value instanceof Integer || value instanceof Long) {
       return PINOT_LONG_GAUGE_MAP.computeIfAbsent(metricName, n -> {
-        OpenTelemetryLongGauge<Long> otelLongGauge = SharedOtelMetricRegistry
-            .getOrCreateOtelLongGauge(metricName, v -> (long) value);
+        OpenTelemetryLongGauge<Long> otelLongGauge = new OpenTelemetryLongGauge<>(
+            SharedOtelMetricRegistry.getOrCreateLongGauge(simpleMetricName), attributes, v -> (long) value
+        );
         if (!LISTENERS.isEmpty()) {
           for (OpenTelemetryMetricsRegistryListener listener : LISTENERS) {
             listener.onMetricAdded(metricName, otelLongGauge);
@@ -118,8 +142,9 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
 
     if (value instanceof Double) {
       return PINOT_DOUBLE_GAUGE_MAP.computeIfAbsent(metricName, n -> {
-        OpenTelemetryDoubleGauge<Double> otelDoubleGauge = SharedOtelMetricRegistry
-            .getOrCreateOtelDoubleGauge(metricName, v -> (double) value);
+        OpenTelemetryDoubleGauge<Double> otelDoubleGauge = new OpenTelemetryDoubleGauge<>(
+            SharedOtelMetricRegistry.getOrCreateDoubleGauge(simpleMetricName), attributes, v -> (double) value
+        );
         if (!LISTENERS.isEmpty()) {
           for (OpenTelemetryMetricsRegistryListener listener : LISTENERS) {
             listener.onMetricAdded(metricName, otelDoubleGauge);
@@ -135,10 +160,13 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
 
   @Override
   public PinotMeter newMeter(PinotMetricName pinotMetricname, String eventType, TimeUnit unit) {
-    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname.getMetricName().toString());
+    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname);
+    String simpleMetricName = metricName.getSimplifiedMetricName();
+    Attributes attributes = OpenTelemetryUtil.toOpenTelemetryAttributes(metricName.getAttributes());
 
-    return PINOT_METER_MAP.computeIfAbsent(metricName, n -> {
-      OpenTelemetryMeter otelMeter = SharedOtelMetricRegistry.getOrCreateOtelMeter(metricName, eventType, unit);
+    return PINOT_METER_MAP.computeIfAbsent(pinotMetricname, n -> {
+      OpenTelemetryMeter otelMeter = new OpenTelemetryMeter(
+          SharedOtelMetricRegistry.getOrCreateLongUpDownCounter(simpleMetricName, unit), attributes, eventType, unit);
       if (!LISTENERS.isEmpty()) {
         for (OpenTelemetryMetricsRegistryListener listener : LISTENERS) {
           listener.onMetricAdded(metricName, otelMeter);
@@ -148,20 +176,6 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
     });
   }
 
-  @Override
-  public PinotCounter newCounter(PinotMetricName pinotMetricname) {
-    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname.getMetricName().toString());
-
-    return PINOT_COUNTER_MAP.computeIfAbsent(metricName, n -> {
-      OpenTelemetryCounter otelCounter = SharedOtelMetricRegistry.getOrCreateOtelCounter(metricName);
-      if (!LISTENERS.isEmpty()) {
-        for (OpenTelemetryMetricsRegistryListener listener : LISTENERS) {
-          listener.onMetricAdded(metricName, otelCounter);
-        }
-      }
-      return otelCounter;
-    });
-  }
 
   /**
    * Creates a new timer. A timer's duration is the total amount of time it is set to run, while its rate is the
@@ -169,10 +183,13 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
    */
   @Override
   public PinotTimer newTimer(PinotMetricName pinotMetricname, TimeUnit durationUnit, TimeUnit rateUnit) {
-    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname.getMetricName().toString());
+    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname);
+    String simpleMetricName = metricName.getSimplifiedMetricName();
+    Attributes attributes = OpenTelemetryUtil.toOpenTelemetryAttributes(metricName.getAttributes());
 
     return PINOT_TIMER_MAP.computeIfAbsent(metricName, n -> {
-      OpenTelemetryTimer otelTimer = SharedOtelMetricRegistry.getOrCreateOtelTimer(metricName, rateUnit);
+      OpenTelemetryTimer otelTimer = new OpenTelemetryTimer(
+          SharedOtelMetricRegistry.getOrCreateDoubleHistogram(simpleMetricName), attributes, rateUnit);
       if (!LISTENERS.isEmpty()) {
         for (OpenTelemetryMetricsRegistryListener listener : LISTENERS) {
           listener.onMetricAdded(metricName, otelTimer);
@@ -184,10 +201,13 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
 
   @Override
   public PinotHistogram newHistogram(PinotMetricName pinotMetricname, boolean biased) {
-    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname.getMetricName().toString());
+    OpenTelemetryMetricName metricName = new OpenTelemetryMetricName(pinotMetricname);
+    String simpleMetricName = metricName.getSimplifiedMetricName();
+    Attributes attributes = OpenTelemetryUtil.toOpenTelemetryAttributes(metricName.getAttributes());
 
     return PINOT_HISTOGRAM_MAP.computeIfAbsent(metricName, n -> {
-      OpenTelemetryHistogram otelHistogram = SharedOtelMetricRegistry.getOrCreateOtelHistogram(metricName);
+      OpenTelemetryHistogram otelHistogram = new OpenTelemetryHistogram(
+          SharedOtelMetricRegistry.getOrCreateDoubleHistogram(simpleMetricName), attributes);
       if (!LISTENERS.isEmpty()) {
         for (OpenTelemetryMetricsRegistryListener listener : LISTENERS) {
           listener.onMetricAdded(metricName, otelHistogram);
@@ -247,58 +267,69 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
     LISTENERS.clear();
   }
 
-  // SharedOtelMetricRegistry maintains a map of OpenTelemetry metrics that can be reused by multiple Pinot metrics.
-  // For example, two Pinot metrics with the same metric name but different tableName can share the same underlying
-  // OpenTelemetry metric where tableName will be a dimension/attribute. This avoids creating too many OpenTelemetry
-  // metric instances.
+
+  /**
+   * It's OpenTelemetry's rule that you cannot create two different metric instruments with the same name. However,
+   * Two different Pinot metrics may have the same simplified metric name but different attributes. So we need to
+   * use a shared registry to ensure that we only create one metric instrument for each simplified metric name.
+   */
   static class SharedOtelMetricRegistry {
-    private static final Map<String, OpenTelemetryCounter> OTEL_COUNTER_MAP = new ConcurrentHashMap<>();
-    private static final Map<String, OpenTelemetryMeter> OTEL_METER_MAP = new ConcurrentHashMap<>();
-    private static final Map<String, OpenTelemetryLongGauge<Long>> OTEL_LONG_GAUGE_MAP = new ConcurrentHashMap<>();
-    private static final Map<String, OpenTelemetryDoubleGauge<Double>> OTEL_DOUBLE_GAUGE_MAP =
-        new ConcurrentHashMap<>();
-    private static final Map<String, OpenTelemetryHistogram> OTEL_HISTOGRAM_MAP = new ConcurrentHashMap<>();
-    private static final Map<String, OpenTelemetryTimer> OTEL_TIMER_MAP = new ConcurrentHashMap<>();
+    private static final Map<String, LongCounter> LONG_COUNTER_MAP = new ConcurrentHashMap<>();
+    private static final Map<String, LongUpDownCounter> LONG_UP_DOWN_COUNTER_MAP = new ConcurrentHashMap<>();
+    private static final Map<String, LongGauge> LONG_GAUGE_MAP = new ConcurrentHashMap<>();
+    private static final Map<String, DoubleGauge> DOUBLE_GAUGE_MAP = new ConcurrentHashMap<>();
+    private static final Map<String, DoubleHistogram> DOUBLE_HISTOGRAM_MAP = new ConcurrentHashMap<>();
 
-    public static OpenTelemetryCounter getOrCreateOtelCounter(OpenTelemetryMetricName metricName) {
-      return OTEL_COUNTER_MAP.computeIfAbsent(metricName.getMetricName(), n -> new OpenTelemetryCounter(metricName));
+    public static LongCounter getOrCreateLongCounter(String simpleMetricName) {
+      return LONG_COUNTER_MAP.computeIfAbsent(simpleMetricName,
+          avoid -> _otelMeterProvider
+              .counterBuilder(simpleMetricName)
+              .build()
+      );
     }
 
-    public static OpenTelemetryMeter getOrCreateOtelMeter(OpenTelemetryMetricName metricName, String eventType,
-        TimeUnit unit) {
-      return OTEL_METER_MAP.computeIfAbsent(metricName.getMetricName(),
-          n -> new OpenTelemetryMeter(metricName, eventType, unit));
+    // There is no such thing that two PinotTimer with the same name but different time units.
+    // So it's safe to just use the simplified metric name as the key here.
+    public static LongUpDownCounter getOrCreateLongUpDownCounter(String simpleMetricName, TimeUnit unit) {
+      return LONG_UP_DOWN_COUNTER_MAP.computeIfAbsent(simpleMetricName,
+          avoid -> _otelMeterProvider
+              .upDownCounterBuilder(simpleMetricName)
+              .setUnit(unit.name())
+              .build()
+      );
     }
 
-    public static OpenTelemetryLongGauge<Long> getOrCreateOtelLongGauge(OpenTelemetryMetricName metricName,
-        Function<Void, Long> valueSupplier) {
-      return OTEL_LONG_GAUGE_MAP.computeIfAbsent(metricName.getMetricName(),
-          n -> new OpenTelemetryLongGauge<>(metricName, valueSupplier));
+    public static LongGauge getOrCreateLongGauge(String simpleMetricName) {
+      return LONG_GAUGE_MAP.computeIfAbsent(simpleMetricName,
+          avoid -> _otelMeterProvider
+              .gaugeBuilder(simpleMetricName)
+              .ofLongs()
+              .build()
+      );
     }
 
-    public static OpenTelemetryDoubleGauge<Double> getOrCreateOtelDoubleGauge(OpenTelemetryMetricName metricName,
-        Function<Void, Double> valueSupplier) {
-      return OTEL_DOUBLE_GAUGE_MAP.computeIfAbsent(metricName.getMetricName(),
-          n -> new OpenTelemetryDoubleGauge<>(metricName, valueSupplier));
+    public static DoubleGauge getOrCreateDoubleGauge(String simpleMetricName) {
+      return DOUBLE_GAUGE_MAP.computeIfAbsent(simpleMetricName,
+          avoid -> _otelMeterProvider
+              .gaugeBuilder(simpleMetricName)
+              .build()
+      );
     }
 
-    public static OpenTelemetryHistogram getOrCreateOtelHistogram(OpenTelemetryMetricName metricName) {
-      return OTEL_HISTOGRAM_MAP.computeIfAbsent(metricName.getMetricName(),
-          n -> new OpenTelemetryHistogram(metricName));
-    }
-
-    public static OpenTelemetryTimer getOrCreateOtelTimer(OpenTelemetryMetricName metricName, TimeUnit rateUnit) {
-      return OTEL_TIMER_MAP.computeIfAbsent(metricName.getMetricName(),
-          n -> new OpenTelemetryTimer(metricName, rateUnit));
+    public static DoubleHistogram getOrCreateDoubleHistogram(String simpleMetricName) {
+      return DOUBLE_HISTOGRAM_MAP.computeIfAbsent(simpleMetricName,
+          avoid -> _otelMeterProvider
+              .histogramBuilder(simpleMetricName)
+              .build()
+      );
     }
 
     public static void clear() {
-      OTEL_COUNTER_MAP.clear();
-      OTEL_METER_MAP.clear();
-      OTEL_LONG_GAUGE_MAP.clear();
-      OTEL_DOUBLE_GAUGE_MAP.clear();
-      OTEL_HISTOGRAM_MAP.clear();
-      OTEL_TIMER_MAP.clear();
+      LONG_COUNTER_MAP.clear();
+      LONG_UP_DOWN_COUNTER_MAP.clear();
+      LONG_GAUGE_MAP.clear();
+      DOUBLE_GAUGE_MAP.clear();
+      DOUBLE_HISTOGRAM_MAP.clear();
     }
   }
 }

@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.metrics.yammer;
 
 import com.google.auto.service.AutoService;
+import java.util.Map;
 import java.util.function.Function;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -48,8 +49,15 @@ public class YammerMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  @Deprecated
   public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
-    return new YammerMetricName(klass, name);
+    throw new UnsupportedOperationException("Deprecated, use makePinotMetricName(Class, String, String, Map) instead");
+  }
+
+  @Override
+  public PinotMetricName makePinotMetricName(Class<?> klass, String fullName, String simplifiedName,
+      Map<String, String> attributes) {
+    return new YammerMetricName(klass, fullName);
   }
 
   @Override
@@ -59,7 +67,12 @@ public class YammerMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  @Deprecated
   public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+    throw new UnsupportedOperationException("Deprecated, use makePinotGauge(PinotMetricName, Function) instead");
+  }
+
+  public <T> PinotGauge<T> makePinotGauge(PinotMetricName pinotMetricName, Function<Void, T> condition) {
     return new YammerGauge<T>(condition);
   }
 

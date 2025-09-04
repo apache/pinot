@@ -66,7 +66,7 @@ public class PurgeTaskExecutor extends BaseSingleSegmentConversionExecutor {
     long purgeTaskStartTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
     File purgedSegmentFile = segmentPurger.purgeSegment();
     long purgeTaskEndTimeNs = ThreadResourceUsageProvider.getCurrentThreadCpuTime();
-    _minionMetrics.addTimedTableValue(tableNameWithType, taskType, MinionTimer.TASK_THREAD_CPU_TIME_NS,
+    _minionMetrics.addTimedTableTaskValue(tableNameWithType, taskType, MinionTimer.TASK_THREAD_CPU_TIME_NS,
         purgeTaskEndTimeNs - purgeTaskStartTimeNs, TimeUnit.NANOSECONDS);
     if (purgedSegmentFile == null) {
       purgedSegmentFile = indexDir;

@@ -74,7 +74,7 @@ public class CompoundPinotMetricRegistry implements PinotMetricsRegistry {
     }
 
     CompoundPinotGauge<T> compoundGauge = (CompoundPinotGauge<T>) PinotMetricUtils
-        .makePinotGauge(name.getMetricName().toString(), avoid -> gauge.value());
+        .makePinotGauge(name, avoid -> gauge.value());
 
     Function<PinotMetricName, CompoundPinotGauge<?>> creator = key -> {
       CompoundPinotMetricName compoundName = (CompoundPinotMetricName) key;

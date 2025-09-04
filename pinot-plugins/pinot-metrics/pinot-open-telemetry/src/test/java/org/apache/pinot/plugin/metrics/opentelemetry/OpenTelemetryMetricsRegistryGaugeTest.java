@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
+import com.google.common.collect.ImmutableMap;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -30,11 +31,11 @@ public class OpenTelemetryMetricsRegistryGaugeTest {
     OpenTelemetryMetricsFactory factory = new OpenTelemetryMetricsFactory();
     OpenTelemetryMetricsRegistry registry = new OpenTelemetryMetricsRegistry();
     PinotGauge<Long> pinotLongGauge = registry.newGauge(
-        new OpenTelemetryMetricName("testLongGauge"),
+        new OpenTelemetryMetricName("testLongGauge", "testLongGauge", ImmutableMap.of()),
         factory.makePinotGauge("testLongGauge", (v) -> 1L)
     );
     PinotGauge<Double> pinotDoubleGauge = registry.newGauge(
-        new OpenTelemetryMetricName("testDoubleGauge"),
+        new OpenTelemetryMetricName("testDoubleGauge", "testDoubleGauge", ImmutableMap.of()),
         factory.makePinotGauge("testDoubleGauge", (v) -> 1.0)
     );
     Assert.assertEquals(pinotLongGauge.value(), Long.valueOf(1L));

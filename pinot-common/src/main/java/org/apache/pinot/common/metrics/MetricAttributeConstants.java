@@ -16,30 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.plugin.metrics.opentelemetry;
+package org.apache.pinot.common.metrics;
 
-import io.opentelemetry.api.metrics.LongCounter;
-import org.apache.pinot.spi.metrics.PinotCounter;
+public class MetricAttributeConstants {
 
-
-/**
- * OpenTelemetryCounter is the implementation of {@link PinotCounter} for OpenTelemetry.
- * Actually Pinot-Core does NOT use {@link PinotCounter} anywhere, so this is just a dummy implementation
- */
-public class OpenTelemetryCounter implements PinotCounter {
-  private final LongCounter _counter;
-
-  public OpenTelemetryCounter(LongCounter counter) {
-    _counter = counter;
+  private MetricAttributeConstants() {
   }
 
-  @Override
-  public Object getCounter() {
-    return _counter;
-  }
-
-  @Override
-  public Object getMetric() {
-    return _counter;
-  }
+  public static final String TABLE_NAME = "TableName";
+  public static final String TASK_TYPE = "TaskType";
+  public static final String TASK_NAME = "TaskName";
+  public static final String SEGMENT_NAME = "SegmentName";
+  public static final String RESOURCE_NAME = "ResourceName";
+  public static final String TOPIC_NAME = "TopicName";
+  public static final String PARTITION_ID = "PartitionId";
+  public static final String COLUMN_NAME = "ColumnName";
+  public static final String POOL_TAG = "PoolTag";
+  public static final String POOL_ID = "PoolId";
+  public static final String PINOT_METRIC_NAME = "PinotMetricName";
+  public static final String WORKLOAD_NAME = "WorkloadName";
 }

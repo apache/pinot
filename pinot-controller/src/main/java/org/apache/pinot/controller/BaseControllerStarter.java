@@ -20,6 +20,7 @@ package org.apache.pinot.controller;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Longs;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
@@ -767,7 +768,8 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(_config.subset(METRICS_REGISTRY_NAME));
     _controllerMetrics = new ControllerMetrics(_config.getMetricsPrefix(), _metricsRegistry);
     _controllerMetrics.initializeGlobalMeters();
-    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME,
+        1, ImmutableMap.of());
     // log zookeeper's JUTE_MAX_BUFFER value, default is 0xfffff bytes (just under 1MB)
     _controllerMetrics.setValueOfGlobalGauge(ControllerGauge.ZK_JUTE_MAX_BUFFER,
         Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));

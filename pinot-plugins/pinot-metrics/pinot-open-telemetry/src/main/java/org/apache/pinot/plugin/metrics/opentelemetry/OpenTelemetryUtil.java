@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.common.AttributesBuilder;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -44,6 +46,16 @@ public class OpenTelemetryUtil {
 
   private OpenTelemetryUtil() {
     // Utility class, no instantiation
+  }
+
+  public static Attributes toOpenTelemetryAttributes(Map<String, String> attributes) {
+    AttributesBuilder attributesBuilder = Attributes.builder();
+    if (attributes != null) {
+      for (Map.Entry<String, String> entry : attributes.entrySet()) {
+        attributesBuilder.put(entry.getKey(), entry.getValue());
+      }
+    }
+    return attributesBuilder.build();
   }
 
   public static final String TABLE_TYPE_OFFLINE = "OFFLINE";
@@ -317,7 +329,7 @@ public class OpenTelemetryUtil {
       otelMetricName = extractOtelMetricName(pinotMetricName, maybeMinionSegmentCreationIndex);
       String tableNameWithType = part[2];
 
-      dimensions.put(OTEL_ATTRIBUTE_TASK_TYPE, tableNameWithType);
+      dimensions.put(OTEL_ATTRIBUTE_TABLE_NAME_WITH_TYPE, tableNameWithType);
       return Pair.of(otelMetricName, dimensions);
     }
 
@@ -366,7 +378,8 @@ public class OpenTelemetryUtil {
     }
 
     // Remaining Pinot metrics follow the pattern of:
-    // pinot.<component>.<metricName>.<rawTableNameOrTableNameWithType>
+    // if it's a Pinot Gauge: pinot.<component>.<metricName>.<tableNameWithTypeOrRawTableName>
+    // if it's a Pinot Timer or Pinot Meter: pinot.<component>.<tableNameWithTypeOrRawTableName>.<metricName>
     otelMetricName = part[2];
     String rawTableNameOrTableNameWithType = part[3];
     String tableNameWithType = OTEL_MISSING_DIMENSION_VALUE;

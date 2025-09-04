@@ -19,6 +19,7 @@
 package org.apache.pinot.minion;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.File;
 import java.io.IOException;
@@ -231,7 +232,8 @@ public abstract class BaseMinionStarter implements ServiceStartable {
 
     MinionMetrics minionMetrics = new MinionMetrics(_config.getMetricsPrefix(), metricsRegistry);
     minionMetrics.initializeGlobalMeters();
-    minionMetrics.setValueOfGlobalGauge(MinionGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    minionMetrics.setValueOfGlobalGauge(MinionGauge.VERSION, PinotVersion.VERSION_METRIC_NAME,
+        1, ImmutableMap.of());
     minionMetrics.setValueOfGlobalGauge(MinionGauge.ZK_JUTE_MAX_BUFFER,
         Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     MinionMetrics.register(minionMetrics);
@@ -297,7 +299,7 @@ public abstract class BaseMinionStarter implements ServiceStartable {
         new TaskFactoryRegistry(_taskExecutorFactoryRegistry, _eventObserverFactoryRegistry).getTaskFactoryRegistry()));
     _helixManager.connect();
     updateInstanceConfigIfNeeded();
-    minionMetrics.setOrUpdateGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
+    minionMetrics.setOrUpdateGlobalGauge(CommonConstants.Helix.INSTANCE_CONNECTED_METRIC_NAME,
             () -> _helixManager.isConnected() ? 1L : 0L);
     minionContext.setHelixPropertyStore(_helixManager.getHelixPropertyStore());
     minionContext.setHelixManager(_helixManager);

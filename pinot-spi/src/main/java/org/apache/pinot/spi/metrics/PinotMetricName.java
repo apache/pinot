@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.spi.metrics;
 
+import java.util.Map;
+
 /**
  * Metric Name in Pinot.
  */
@@ -46,4 +48,8 @@ public interface PinotMetricName {
    * This could be used to print out the actual metrics name instead of the memory address under this wrapper.
    */
   String toString();
+
+  String getSimplifiedMetricName();
+
+  Map<String, String> getAttributes();
 }

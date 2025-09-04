@@ -19,6 +19,10 @@
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
 import com.google.auto.service.AutoService;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.metrics.DoubleGauge;
+import io.opentelemetry.api.metrics.LongGauge;
+import java.util.Map;
 import java.util.function.Function;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -45,26 +49,45 @@ public class OpenTelemetryMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  @Deprecated
   public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
-    // It's OK to just throw away the class name. Adding the class name to into pinot metric name will make
-    // the dimension/attribute parsing logic more complicated as not all pinot metric having it.
-    return new OpenTelemetryMetricName(name);
+    throw new UnsupportedOperationException("Please use makePinotMetricName(Class, String, String, Map) instead");
+  }
+
+  @Override
+  public PinotMetricName makePinotMetricName(Class<?> klass, String fullName, String simplifiedName,
+      Map<String, String> attributes) {
+    return new OpenTelemetryMetricName(fullName, simplifiedName, attributes);
   }
 
   @Override
   @Deprecated
   public <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
-    return makePinotGauge("UnknownPinotMetricName", condition);
+    throw new UnsupportedOperationException("Please use makePinotGauge(PinotMetricName, Function) instead");
   }
 
   @Override
+  @Deprecated
   public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+    throw new UnsupportedOperationException("Please use makePinotGauge(PinotMetricName, Function) instead");
+  }
+
+  @Override
+  public <T> PinotGauge<T> makePinotGauge(PinotMetricName pinotMetricName, Function<Void, T> condition) {
     T value = condition.apply(null);
+
+    String simplifiedMetricName = pinotMetricName.getSimplifiedMetricName();
+    Attributes attributes = OpenTelemetryUtil.toOpenTelemetryAttributes(pinotMetricName.getAttributes());
+
     if (value instanceof Integer || value instanceof Long) {
-      return new OpenTelemetryLongGauge<>(new OpenTelemetryMetricName(metricName), condition);
+      LongGauge longGauge = OpenTelemetryMetricsRegistry.SharedOtelMetricRegistry
+          .getOrCreateLongGauge(simplifiedMetricName);
+      return new OpenTelemetryLongGauge<>(longGauge, attributes, condition);
     }
     if (value instanceof Double) {
-      return new OpenTelemetryDoubleGauge<>(new OpenTelemetryMetricName(metricName), condition);
+      DoubleGauge doubleGauge = OpenTelemetryMetricsRegistry.SharedOtelMetricRegistry
+          .getOrCreateDoubleGauge(simplifiedMetricName);
+      return new OpenTelemetryDoubleGauge<>(doubleGauge, attributes, condition);
     }
     throw new IllegalArgumentException("Unsupported supplier type: " + condition.getClass().getName());
   }

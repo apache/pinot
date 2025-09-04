@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.broker.helix;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
@@ -309,12 +310,13 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
         _brokerConf.getProperty(Broker.CONFIG_OF_ENABLE_TABLE_LEVEL_METRICS, Broker.DEFAULT_ENABLE_TABLE_LEVEL_METRICS),
         _brokerConf.getProperty(Broker.CONFIG_OF_ALLOWED_TABLES_FOR_EMITTING_METRICS, Collections.emptyList()));
     _brokerMetrics.initializeGlobalMeters();
-    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME,
+        1, ImmutableMap.of());
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ZK_JUTE_MAX_BUFFER,
         Integer.getInteger(ZkSystemPropertyKeys.JUTE_MAXBUFFER, 0xfffff));
     _brokerMetrics.setValueOfGlobalGauge(BrokerGauge.ADAPTIVE_SERVER_SELECTOR_TYPE,
         _brokerConf.getProperty(Broker.AdaptiveServerSelector.CONFIG_OF_TYPE,
-            Broker.AdaptiveServerSelector.DEFAULT_TYPE), 1);
+            Broker.AdaptiveServerSelector.DEFAULT_TYPE), 1, ImmutableMap.of());
     BrokerMetrics.register(_brokerMetrics);
     // Set up request handling classes
     _serverRoutingStatsManager = new ServerRoutingStatsManager(_brokerConf, _brokerMetrics);
