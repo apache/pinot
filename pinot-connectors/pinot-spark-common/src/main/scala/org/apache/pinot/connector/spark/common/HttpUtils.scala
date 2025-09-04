@@ -45,8 +45,13 @@ private[pinot] object HttpUtils extends Logging {
     .setDefaultRequestConfig(requestConfig)
     .build()
 
-  def sendGetRequest(uri: URI): String = {
+  def sendGetRequest(uri: URI, authorization: String = ""): String = {
     val requestBuilder = ClassicRequestBuilder.get(uri)
+
+    if (authorization.nonEmpty) {
+      requestBuilder.addHeader("Authorization", s"$authorization")
+    }
+
     executeRequest(requestBuilder.build())
   }
 
