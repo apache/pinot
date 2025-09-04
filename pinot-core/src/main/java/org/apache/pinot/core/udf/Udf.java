@@ -18,9 +18,11 @@
  */
 package org.apache.pinot.core.udf;
 
+import com.google.auto.service.AutoService;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -28,6 +30,7 @@ import org.apache.arrow.util.Preconditions;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.PinotScalarFunction;
+import org.apache.pinot.common.function.ScalarFunctionLookupMechanism;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.core.operator.transform.function.TransformFunction;
 import org.apache.pinot.spi.annotations.ScalarFunction;
@@ -129,6 +132,16 @@ public abstract class Udf {
   @Nullable
   public abstract PinotScalarFunction getScalarFunction();
 
+  /// Returns the priority of the UDF.
+  ///
+  /// Whenever two or more UDFs are registered with the same name, signature or TransformFunctionType, the priority is
+  /// used to determine which one should be used. UDFs with higher priority are preferred over those with lower.
+  ///
+  /// The default priority is 0.
+  public int priority() {
+    return 0;
+  }
+
   @Override
   public String toString() {
     return getMainName();
@@ -164,6 +177,40 @@ public abstract class Udf {
     public PinotScalarFunction getScalarFunction() {
       return PinotScalarFunction.fromMethod(_method, _annotation.isVarArg(),
           _annotation.nullableParameters(), _annotation.names());
+    }
+  }
+
+  /// This class is used to register UDFs in the FunctionRegistry as scalar functions.
+  ///
+  /// Ideally, this should be the only mechanism to register scalar functions in Pinot, but given we don't have a
+  /// UDF for each scalar function, we still use the legacy mechanisms (with lower priority) for now.
+  @AutoService(ScalarFunctionLookupMechanism.class)
+  public static class UdfScalarFunctionLookupMechanism implements ScalarFunctionLookupMechanism {
+    @Override
+    public Set<ScalarFunctionProvider> getProviders() {
+      return ServiceLoader.load(Udf.class).stream()
+          .map(ServiceLoader.Provider::get)
+          .map(udf -> new ScalarFunctionProvider() {
+            @Override
+            public String name() {
+              return udf.getMainCanonicalName() + " (UDF)";
+            }
+
+            @Override
+            public int priority() {
+              return udf.priority();
+            }
+
+            @Override
+            public Set<PinotScalarFunction> getFunctions() {
+              PinotScalarFunction scalarFunction = udf.getScalarFunction();
+              if (scalarFunction == null) {
+                return Set.of();
+              }
+              return Set.of(scalarFunction);
+            }
+          })
+          .collect(Collectors.toSet());
     }
   }
 }
