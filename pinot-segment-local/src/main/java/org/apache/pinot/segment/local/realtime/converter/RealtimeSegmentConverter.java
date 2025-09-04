@@ -128,7 +128,7 @@ public class RealtimeSegmentConverter {
       }
       // Use CompactedPinotSegmentRecordReader to remove obsolete/invalidated records
       try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
-          validDocIdsSnapshot, _realtimeSegmentImpl.getDeleteRecordColumn())) {
+          validDocIdsSnapshot)) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
         buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, validDocIdsSnapshot);
         publishCompactionMetrics(serverMetrics, preCommitRowCount, driver, compactionStartTime);
