@@ -52,8 +52,7 @@ public abstract class SortedDocIdIterator implements BlockDocIdIterator {
   private static class Asc extends SortedDocIdIterator {
     private Asc(List<IntPair> docIdRanges) {
       super(docIdRanges);
-      _currentRangeId = 0;
-      _nextDocId = 0;
+      _nextDocId = docIdRanges.get(0).getLeft();
     }
 
     @Override
