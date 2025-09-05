@@ -265,9 +265,8 @@ public abstract class MVScanDocIdIterator implements ScanBasedDocIdIterator {
     }
   }
 
-  public static class Desc extends MVScanDocIdIterator {
-    public Desc(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
       super(predicateEvaluator, dataSource, numDocs);
+      _nextDocId = numDocs - 1;
     }
 
     @Override
