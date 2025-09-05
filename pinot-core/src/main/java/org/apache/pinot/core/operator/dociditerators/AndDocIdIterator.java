@@ -27,7 +27,7 @@ import org.apache.pinot.segment.spi.Constants;
  * <p>It keeps calling {@link BlockDocIdIterator#advance(int)} to gather the common matching document ids from all child
  * BlockDocIdIterators until one of them hits the end.
  */
-public class AndDocIdIterator implements BlockDocIdIterator {
+public abstract class AndDocIdIterator implements BlockDocIdIterator {
   public final BlockDocIdIterator[] _docIdIterators;
 
   protected int _nextDocId;
