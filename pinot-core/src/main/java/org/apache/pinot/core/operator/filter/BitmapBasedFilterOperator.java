@@ -86,6 +86,6 @@ public class BitmapBasedFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BaseFilterOperator reverse() {
-    return new BitmapBasedFilterOperator(_docIds, _ascending, _numDocs, !_ascending);
+    return new BitmapBasedFilterOperator(_docIds, _exclusive, _numDocs, !_ascending);
   }
 }
