@@ -289,7 +289,7 @@ public class InnerSegmentSelectionSingleValueQueriesTest extends BaseSingleValue
     // Test query order by single sorted column in descending order
     orderBy = " ORDER BY column5 DESC";
     selectionOrderByOperator = getOperator(SELECTION_QUERY + orderBy);
-    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByDescOperation);
+    assertTrue(selectionOrderByOperator instanceof SelectionPartiallyOrderedByLinearOperator);
     resultsBlock = selectionOrderByOperator.nextBlock();
     executionStatistics = selectionOrderByOperator.getExecutionStatistics();
     assertEquals(executionStatistics.getNumDocsScanned(), 30000L);
