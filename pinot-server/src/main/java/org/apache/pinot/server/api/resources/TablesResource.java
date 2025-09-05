@@ -762,6 +762,10 @@ public class TablesResource {
       case SNAPSHOT:
         return Pair.of(validDocIdsType,
             ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(V1Constants.VALID_DOC_IDS_SNAPSHOT_FILE_NAME));
+      case SNAPSHOT_WITH_DELETE:
+        return Pair.of(validDocIdsType,
+            ((ImmutableSegmentImpl) indexSegment).loadDocIdsFromSnapshot(
+                V1Constants.QUERYABLE_DOC_IDS_SNAPSHOT_FILE_NAME));
       case IN_MEMORY:
         return Pair.of(validDocIdsType, indexSegment.getValidDocIds().getMutableRoaringBitmap());
       case IN_MEMORY_WITH_DELETE:

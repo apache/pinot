@@ -19,6 +19,9 @@
 package org.apache.pinot.core.metadata;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.utils.TarCompressionUtils;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
@@ -30,12 +33,32 @@ import org.apache.pinot.segment.spi.index.metadata.SegmentMetadataImpl;
  */
 public class DefaultMetadataExtractor implements MetadataExtractor {
 
+  static final String SEGMENT_METADATA_DIR_NAME = "segment_metadata";
+
   @Override
   public SegmentMetadata extractMetadata(File tarredSegmentFile, File unzippedSegmentDir)
       throws Exception {
     // NOTE: While there is TarGzCompressionUtils.untarOneFile(), we use untar() here to unpack all files in the segment
     //       in order to ensure the segment is not corrupted.
-    File indexDir = TarCompressionUtils.untar(tarredSegmentFile, unzippedSegmentDir).get(0);
-    return new SegmentMetadataImpl(indexDir);
+    List<File> untarredFiles = TarCompressionUtils.untar(tarredSegmentFile, unzippedSegmentDir);
+    File indexDir = untarredFiles.get(0);
+    if (indexDir.isDirectory()) {
+      return new SegmentMetadataImpl(indexDir);
+    } else {
+      // If the first file is not a directory, create a subdirectory and move all files into it
+      File segmentMetadataDir = new File(unzippedSegmentDir, SEGMENT_METADATA_DIR_NAME);
+      if (!segmentMetadataDir.exists() && !segmentMetadataDir.mkdirs()) {
+        throw new IOException("Failed to create segment_metadata directory: " + segmentMetadataDir.getAbsolutePath());
+      }
+      for (File file : untarredFiles) {
+        File targetFile = new File(segmentMetadataDir, file.getName());
+        if (file.isDirectory()) {
+          FileUtils.moveDirectory(file, targetFile);
+        } else {
+          FileUtils.moveFile(file, targetFile);
+        }
+      }
+      return new SegmentMetadataImpl(segmentMetadataDir);
+    }
   }
 }
