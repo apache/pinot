@@ -20,6 +20,7 @@ package org.apache.pinot.segment.local.upsert;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.AtomicDouble;
 import java.io.File;
 import java.io.IOException;
@@ -38,6 +39,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import org.apache.helix.HelixManager;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
@@ -1001,11 +1003,15 @@ public abstract class BasePartitionUpsertMetadataManager implements PartitionUps
     int numMissedSegments = numTrackedSegments - numImmutableSegments - numConsumingSegments - numUnchangedSegments;
     if (numMissedSegments > 0) {
       _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
-          ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
+          ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, numMissedSegments,
+          ImmutableMap.of(MetricAttributeConstants.PARTITION_ID, String.valueOf(_partitionId))
+      );
       _logger.warn("Missed taking snapshot for {} immutable segments", numMissedSegments);
       if (_deleteRecordColumn != null) {
         _serverMetrics.addMeteredTableValue(_tableNameWithType, String.valueOf(_partitionId),
-            ServerMeter.UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT, numMissedSegments);
+            ServerMeter.UPSERT_MISSED_QUERYABLE_DOC_ID_SNAPSHOT_COUNT, numMissedSegments,
+            ImmutableMap.of(MetricAttributeConstants.PARTITION_ID, String.valueOf(_partitionId))
+        );
       }
     }
   }

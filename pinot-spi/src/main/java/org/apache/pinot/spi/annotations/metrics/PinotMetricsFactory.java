@@ -18,12 +18,15 @@
  */
 package org.apache.pinot.spi.annotations.metrics;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import java.util.function.Function;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.NoopPinotMetricsRegistry;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotJmxReporter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
@@ -44,18 +47,35 @@ public interface PinotMetricsFactory {
 
   /**
    * Makes a {@link PinotMetricName} given the class and the metric name.
+   * @deprecated use {@link #makePinotMetricName(Class, String, String, Map)} instead.
    */
+  @Deprecated
   PinotMetricName makePinotMetricName(Class<?> klass, String name);
+
+  PinotMetricName makePinotMetricName(Class<?> klass, String fullName, String simplifiedName,
+      Map<String, String> attributes);
 
   /**
    * Makes a {@link PinotGauge} given a function.
+   * @deprecated use {@link #makePinotGauge(PinotMetricName, Function)} instead.
    */
-  <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition);
+  @Deprecated
+  <T> PinotGauge<T> makePinotGauge(Function<Void, T> valueSupplier);
+
+  @Deprecated
+  <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> valueSupplier);
+
+  <T> PinotGauge<T> makePinotGauge(PinotMetricName pinotMetricName, Function<Void, T> valueSupplier);
 
   /**
    * Makes a {@link PinotJmxReporter} given a {@link PinotMetricsRegistry}.
+   *
+   * @deprecated Use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
    */
+  @Deprecated
   PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry);
+
+  PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry);
 
   /**
    * Returns the name of metrics factory.
@@ -74,8 +94,15 @@ public interface PinotMetricsFactory {
     }
 
     @Override
+    @Deprecated
     public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
-      return () -> "noopMetricName";
+      throw new UnsupportedOperationException("Please use makePinotMetricName(Class, String, String, Map) instead");
+    }
+
+    @Override
+    public PinotMetricName makePinotMetricName(Class<?> klass, String fullName, String simplifiedName,
+        Map<String, String> attributes) {
+      return new SimpleMetricName("noopMetricName");
     }
 
     @Override
@@ -83,8 +110,28 @@ public interface PinotMetricsFactory {
       return _registry.newGauge();
     }
 
+    @Deprecated
     @Override
+    public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+      return _registry.newGauge();
+    }
+
+    @Override
+    public <T> PinotGauge<T> makePinotGauge(PinotMetricName pinotMetricName, Function<Void, T> condition) {
+      return _registry.newGauge();
+    }
+
+    /**
+     * @deprecated Use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
+     */
+    @Override
+    @Deprecated
     public PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
+      return () -> {
+      };
+    }
+
+    public PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry) {
       return () -> {
       };
     }
@@ -92,6 +139,29 @@ public interface PinotMetricsFactory {
     @Override
     public String getMetricsFactoryName() {
       return "noop";
+    }
+  }
+
+  /**
+   * Simple implementation of {@link PinotMetricName} with full metric name is the same as simplified metric name and
+   * has no attributes.
+   */
+  class SimpleMetricName implements PinotMetricName {
+    private final String _metricName;
+    public SimpleMetricName(String metricName) {
+      _metricName = metricName;
+    }
+    @Override
+    public Object getMetricName() {
+      return _metricName;
+    }
+    @Override
+    public String getSimplifiedMetricName() {
+      return _metricName;
+    }
+    @Override
+    public Map<String, String> getAttributes() {
+      return ImmutableMap.of();
     }
   }
 }

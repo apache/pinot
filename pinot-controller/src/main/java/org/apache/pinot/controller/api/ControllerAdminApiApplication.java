@@ -161,7 +161,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
       mc.addProbes(probe);
     }
 
-    metrics.setOrUpdateGauge(ControllerGauge.HTTP_THREAD_UTILIZATION.getGaugeName(), () -> {
+    metrics.setOrUpdateGlobalGauge(ControllerGauge.HTTP_THREAD_UTILIZATION, () -> {
       int max = poolCfg.getMaxPoolSize();
       if (max <= 0) {
         return 0L;

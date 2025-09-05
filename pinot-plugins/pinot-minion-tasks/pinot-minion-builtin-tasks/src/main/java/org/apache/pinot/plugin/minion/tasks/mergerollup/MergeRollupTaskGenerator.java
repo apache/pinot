@@ -828,7 +828,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
                     ? _tableLowestLevelMaxValidBucketEndTimeMs.get(tableNameWithType)
                     : watermarkForTable.get(lowerMergeLevel),
                 bufferTimeMs, bucketTimeMs));
-        controllerMetrics.addCallbackGaugeIfNeeded(getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
+        controllerMetrics.addCallbackGaugeIfNeeded(
+            getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
+            MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS,
+            getMetricsAttributesForTaskDelay(tableNameWithType, mergeLevel),
             (() -> getMergeRollupTaskDelayInNumTimeBuckets(watermarkForTable.getOrDefault(k, -1L),
                 lowerMergeLevel == null ? _tableLowestLevelMaxValidBucketEndTimeMs.get(tableNameWithType)
                     : watermarkForTable.get(lowerMergeLevel), bufferTimeMs, bucketTimeMs)));
@@ -1050,7 +1053,19 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS + "." + tableNameWithType + "." + mergeLevel;
   }
 
+  private Map<String, String> getMetricsAttributesForTaskDelay(String tableNameWithType, String mergeLevel) {
+    Map<String, String> attributes = new HashMap<>();
+    attributes.put("mergeLevel", mergeLevel);
+    return attributes;
+  }
+
   private String getMetricNameForNumBucketsToProcess(String tableNameWithType, String mergeLevel) {
     return MERGE_ROLLUP_TASK_NUM_BUCKETS_TO_PROCESS + "." + tableNameWithType + "." + mergeLevel;
+  }
+
+  private Map<String, String> getMetricsAttributesForNumBucketsToProcess(String tableNameWithType, String mergeLevel) {
+    Map<String, String> attributes = new HashMap<>();
+    attributes.put("mergeLevel", mergeLevel);
+    return attributes;
   }
 }
