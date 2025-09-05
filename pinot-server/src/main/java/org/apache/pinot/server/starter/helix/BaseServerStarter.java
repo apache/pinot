@@ -103,6 +103,7 @@ import org.apache.pinot.server.realtime.ControllerLeaderLocator;
 import org.apache.pinot.server.realtime.ServerSegmentCompletionProtocolHandler;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.server.starter.ServerQueriesDisabledTracker;
+import org.apache.pinot.spi.accounting.ThreadAccounting;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
@@ -115,7 +116,6 @@ import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.plugin.PluginManager;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.apache.pinot.spi.services.ServiceStartable;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Helix;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.Instance;
@@ -173,8 +173,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
   protected SegmentOperationsThrottler _segmentOperationsThrottler;
   protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
   protected volatile boolean _isServerReadyToServeQueries = false;
-  private ScheduledExecutorService _helixMessageCountScheduler;
-  protected ThreadResourceUsageAccountant _resourceUsageAccountant;
+  protected ScheduledExecutorService _helixMessageCountScheduler;
 
   @Override
   public void init(PinotConfiguration serverConf)
@@ -673,19 +672,17 @@ public abstract class BaseServerStarter implements ServiceStartable {
     ThreadResourceUsageProvider.setThreadMemoryMeasurementEnabled(
         _serverConf.getProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT,
             Server.DEFAULT_THREAD_ALLOCATED_BYTES_MEASUREMENT));
-    // Initialize the thread accountant for query killing
-    PinotConfiguration threadAccountantConfigs = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
-    // This allows for custom implementations of WorkloadBudgetManager.
-    WorkloadBudgetManager workloadBudgetManager = createWorkloadBudgetManager(threadAccountantConfigs);
-    _resourceUsageAccountant = Tracing.ThreadAccountantOps.createThreadAccountant(
-        _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX), _instanceId,
-        org.apache.pinot.spi.config.instance.InstanceType.SERVER, workloadBudgetManager);
-    Preconditions.checkNotNull(_resourceUsageAccountant);
+    // Initialize workload budget manager and thread resource usage accountant. Workload budget manager must be
+    // initialized first because it might be used by the accountant.
+    PinotConfiguration schedulerConfig = _serverConf.subset(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX);
+    WorkloadBudgetManager.set(createWorkloadBudgetManager(schedulerConfig));
+    ThreadAccounting.init(schedulerConfig, _instanceId, org.apache.pinot.spi.config.instance.InstanceType.SERVER);
 
     SendStatsPredicate sendStatsPredicate = SendStatsPredicate.create(_serverConf, _helixManager);
     ServerConf serverConf = new ServerConf(_serverConf);
-    _serverInstance = new ServerInstance(serverConf, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
-        sendStatsPredicate, _resourceUsageAccountant);
+    _serverInstance =
+        new ServerInstance(serverConf, _instanceId, _helixManager, _accessControlFactory, _segmentOperationsThrottler,
+            sendStatsPredicate);
     ServerMetrics serverMetrics = _serverInstance.getServerMetrics();
 
     InstanceDataManager instanceDataManager = _serverInstance.getInstanceDataManager();
@@ -783,9 +780,9 @@ public abstract class BaseServerStarter implements ServiceStartable {
     preServeQueries();
 
     // Start the thread accountant
-    Tracing.ThreadAccountantOps.startThreadAccountant();
-    PinotClusterConfigChangeListener threadAccountantListener =
-        _resourceUsageAccountant.getClusterConfigChangeListener();
+    ThreadResourceUsageAccountant threadAccountant = ThreadAccounting.getServerAccountant();
+    threadAccountant.startWatcherTask();
+    PinotClusterConfigChangeListener threadAccountantListener = threadAccountant.getClusterConfigChangeListener();
     if (threadAccountantListener != null) {
       _clusterConfigChangeHandler.registerClusterConfigChangeListener(threadAccountantListener);
     }
@@ -931,6 +928,7 @@ public abstract class BaseServerStarter implements ServiceStartable {
     if (_serverQueriesDisabledTracker != null) {
       _serverQueriesDisabledTracker.stop();
     }
+    ThreadAccounting.getServerAccountant().stopWatcherTask();
     try {
       // Close PinotFS after all data managers are shutdown. Otherwise, segments which are being committed will not
       // be uploaded to the deep-store.
@@ -1156,9 +1154,5 @@ public abstract class BaseServerStarter implements ServiceStartable {
     } catch (Exception e) {
       LOGGER.warn("Failed to refresh Helix message count", e);
     }
-  }
-
-  public ThreadResourceUsageAccountant getResourceUsageAccountant() {
-    return _resourceUsageAccountant;
   }
 }

@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
@@ -36,8 +35,7 @@ public class UnboundedResourceManagerTest {
 
   @Test
   public void testDefault() {
-    UnboundedResourceManager rm =
-        new UnboundedResourceManager(new PinotConfiguration(), new Tracing.DefaultThreadResourceUsageAccountant());
+    UnboundedResourceManager rm = new UnboundedResourceManager(new PinotConfiguration());
     assertTrue(rm.getNumQueryRunnerThreads() > 1);
     assertTrue(rm.getNumQueryWorkerThreads() >= 1);
     assertEquals(rm.getTableThreadsHardLimit(), rm.getNumQueryRunnerThreads() + rm.getNumQueryWorkerThreads());
@@ -53,8 +51,7 @@ public class UnboundedResourceManagerTest {
     properties.put(ResourceManager.QUERY_RUNNER_CONFIG_KEY, runners);
     properties.put(ResourceManager.QUERY_WORKER_CONFIG_KEY, workers);
 
-    UnboundedResourceManager rm = new UnboundedResourceManager(new PinotConfiguration(properties),
-        new Tracing.DefaultThreadResourceUsageAccountant());
+    UnboundedResourceManager rm = new UnboundedResourceManager(new PinotConfiguration(properties));
     assertEquals(rm.getNumQueryWorkerThreads(), workers);
     assertEquals(rm.getNumQueryRunnerThreads(), runners);
     assertEquals(rm.getTableThreadsHardLimit(), runners + workers);

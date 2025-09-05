@@ -40,7 +40,6 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.datasource.DataSourceMetadata;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
-import org.apache.pinot.spi.trace.Tracing;
 
 
 /**
@@ -110,7 +109,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
         new IntDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+        checkTerminationAndSampleUsagePeriodically(i);
         distinctTable.addUnbounded(dictionary.getIntValue(i));
       }
       _numDocsScanned = numValuesToKeep;
@@ -118,20 +117,20 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getIntValue(i));
           }
           _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getIntValue(dictLength - 1 - i));
           }
           _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+          checkTerminationAndSampleUsagePeriodically(i);
           distinctTable.addWithOrderBy(dictionary.getIntValue(i));
         }
         _numDocsScanned = dictLength;
@@ -149,7 +148,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
         new LongDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+        checkTerminationAndSampleUsagePeriodically(i);
         distinctTable.addUnbounded(dictionary.getLongValue(i));
       }
       _numDocsScanned = numValuesToKeep;
@@ -157,20 +156,20 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getLongValue(i));
           }
           _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getLongValue(dictLength - 1 - i));
           }
           _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+          checkTerminationAndSampleUsagePeriodically(i);
           distinctTable.addWithOrderBy(dictionary.getLongValue(i));
         }
         _numDocsScanned = dictLength;
@@ -188,7 +187,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
         new FloatDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+        checkTerminationAndSampleUsagePeriodically(i);
         distinctTable.addUnbounded(dictionary.getFloatValue(i));
       }
       _numDocsScanned = numValuesToKeep;
@@ -196,20 +195,20 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getFloatValue(i));
           }
           _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getFloatValue(dictLength - 1 - i));
           }
           _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+          checkTerminationAndSampleUsagePeriodically(i);
           distinctTable.addWithOrderBy(dictionary.getFloatValue(i));
         }
         _numDocsScanned = dictLength;
@@ -227,7 +226,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
         new DoubleDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+        checkTerminationAndSampleUsagePeriodically(i);
         distinctTable.addUnbounded(dictionary.getDoubleValue(i));
       }
       _numDocsScanned = numValuesToKeep;
@@ -235,20 +234,20 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getDoubleValue(i));
           }
           _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getDoubleValue(dictLength - 1 - i));
           }
           _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+          checkTerminationAndSampleUsagePeriodically(i);
           distinctTable.addWithOrderBy(dictionary.getDoubleValue(i));
         }
         _numDocsScanned = dictLength;
@@ -266,7 +265,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
         new BigDecimalDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+        checkTerminationAndSampleUsagePeriodically(i);
         distinctTable.addUnbounded(dictionary.getBigDecimalValue(i));
       }
       _numDocsScanned = numValuesToKeep;
@@ -274,20 +273,20 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getBigDecimalValue(i));
           }
           _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getBigDecimalValue(dictLength - 1 - i));
           }
           _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+          checkTerminationAndSampleUsagePeriodically(i);
           distinctTable.addWithOrderBy(dictionary.getBigDecimalValue(i));
         }
         _numDocsScanned = dictLength;
@@ -305,7 +304,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
         new StringDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+        checkTerminationAndSampleUsagePeriodically(i);
         distinctTable.addUnbounded(dictionary.getStringValue(i));
       }
       _numDocsScanned = numValuesToKeep;
@@ -313,20 +312,20 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getStringValue(i));
           }
           _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getStringValue(dictLength - 1 - i));
           }
           _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+          checkTerminationAndSampleUsagePeriodically(i);
           distinctTable.addWithOrderBy(dictionary.getStringValue(i));
         }
         _numDocsScanned = dictLength;
@@ -344,7 +343,7 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
         new BytesDistinctTable(dataSchema, limit, _queryContext.isNullHandlingEnabled(), orderByExpression);
     if (orderByExpression == null) {
       for (int i = 0; i < numValuesToKeep; i++) {
-        Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+        checkTerminationAndSampleUsagePeriodically(i);
         distinctTable.addUnbounded(dictionary.getByteArrayValue(i));
       }
       _numDocsScanned = numValuesToKeep;
@@ -352,20 +351,20 @@ public class DictionaryBasedDistinctOperator extends BaseOperator<DistinctResult
       if (dictionary.isSorted()) {
         if (orderByExpression.isAsc()) {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getByteArrayValue(i));
           }
           _numDocsScanned = numValuesToKeep;
         } else {
           for (int i = 0; i < numValuesToKeep; i++) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+            checkTerminationAndSampleUsagePeriodically(i);
             distinctTable.addUnbounded(dictionary.getByteArrayValue(dictLength - 1 - i));
           }
           _numDocsScanned = numValuesToKeep;
         }
       } else {
         for (int i = 0; i < dictLength; i++) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(i);
+          checkTerminationAndSampleUsagePeriodically(i);
           distinctTable.addWithOrderBy(dictionary.getByteArrayValue(i));
         }
         _numDocsScanned = dictLength;

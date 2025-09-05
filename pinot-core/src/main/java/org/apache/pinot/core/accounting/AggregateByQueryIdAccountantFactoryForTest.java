@@ -20,48 +20,19 @@ package org.apache.pinot.core.accounting;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.apache.commons.lang3.NotImplementedException;
-import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.query.QueryExecutionContext;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 public class AggregateByQueryIdAccountantFactoryForTest implements ThreadAccountantFactory {
+
   @Override
   public ThreadResourceUsageAccountant init(PinotConfiguration config, String instanceId, InstanceType instanceType) {
     return new AggregateByQueryIdAccountant(config, instanceId, instanceType);
-  }
-
-  public static class QueryResourceTrackerImpl implements QueryResourceTracker {
-    private final String _queryId;
-    private long _allocatedBytes;
-
-    public QueryResourceTrackerImpl(String queryId) {
-      _queryId = queryId;
-      _allocatedBytes = 0;
-    }
-
-    @Override
-    public String getQueryId() {
-      return _queryId;
-    }
-
-    @Override
-    public long getAllocatedBytes() {
-      return _allocatedBytes;
-    }
-
-    @Override
-    public long getCpuTimeNs() {
-      throw new NotImplementedException("getCpuTimeNs is not implemented");
-    }
-
-    public void setAllocatedBytes(long allocatedBytes) {
-      _allocatedBytes = allocatedBytes;
-    }
   }
 
   /**
@@ -74,25 +45,23 @@ public class AggregateByQueryIdAccountantFactoryForTest implements ThreadAccount
    */
   public static class AggregateByQueryIdAccountant
       extends PerQueryCPUMemAccountantFactory.PerQueryCPUMemResourceUsageAccountant {
-    Map<String, QueryResourceTrackerImpl> _queryMemUsage = new ConcurrentHashMap<>();
+    Map<String, QueryResourceTrackerImpl> _queryResourceUsages = new ConcurrentHashMap<>();
 
     public AggregateByQueryIdAccountant(PinotConfiguration config, String instanceId, InstanceType instanceType) {
       super(config, instanceId, instanceType);
     }
 
     @Override
-    public void sampleThreadBytesAllocated() {
-      super.sampleThreadBytesAllocated();
-      ThreadExecutionContext context = getThreadExecutionContext();
-      QueryResourceTrackerImpl queryResourceTracker =
-          _queryMemUsage.computeIfAbsent(context.getQueryId(), s -> new QueryResourceTrackerImpl(context.getQueryId()));
-      queryResourceTracker.setAllocatedBytes(
-          queryResourceTracker.getAllocatedBytes() + getThreadEntry().getAllocatedBytes());
+    public void sampleUsage() {
+      super.sampleUsage();
+      QueryExecutionContext executionContext = QueryThreadContext.get().getExecutionContext();
+      _queryResourceUsages.computeIfAbsent(executionContext.getCid(),
+          s -> new QueryResourceTrackerImpl(executionContext, 0, 0)).merge(0, getThreadEntry().getAllocatedBytes());
     }
 
     @Override
-    public Map<String, ? extends QueryResourceTracker> getQueryResources() {
-      return _queryMemUsage;
+    public Map<String, QueryResourceTrackerImpl> getQueryResources() {
+      return _queryResourceUsages;
     }
   }
 }

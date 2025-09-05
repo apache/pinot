@@ -21,7 +21,6 @@ package org.apache.pinot.tools;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -292,18 +291,12 @@ public class MultistageEngineQuickStart extends Quickstart {
 
   @Override
   protected Map<String, Object> getConfigOverrides() {
-    Map<String, Object> configOverrides = new HashMap<>();
-    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
-    configOverrides.put(CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_QUERY_CANCELLATION, true);
-    configOverrides.put(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_CANCELLATION, true);
-    return configOverrides;
+    return Map.of(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
   }
 
   @Override
   protected Map<String, String> getClusterConfigOverrides() {
-    return Map.of(
-        CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "50"
-    );
+    return Map.of(CommonConstants.Helix.CONFIG_OF_MULTI_STAGE_ENGINE_MAX_SERVER_QUERY_THREADS, "50");
   }
 
   @Override

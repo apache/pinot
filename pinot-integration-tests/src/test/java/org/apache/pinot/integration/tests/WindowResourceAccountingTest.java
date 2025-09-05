@@ -27,13 +27,16 @@ import org.apache.commons.io.FileUtils;
 import org.apache.pinot.core.accounting.AggregateByQueryIdAccountantFactoryForTest;
 import org.apache.pinot.integration.tests.window.utils.WindowFunnelUtils;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadAccounting;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
+import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.builder.ControllerRequestURLBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -41,7 +44,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
@@ -53,37 +55,37 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
     return WindowFunnelUtils._countStarResult;
   }
 
-  protected void overrideServerConf(PinotConfiguration serverConf) {
-    serverConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+  @Override
+  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
+    brokerConf.setProperty(Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_FACTORY_NAME,
         AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    serverConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
-    serverConf.setProperty(CommonConstants.Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    brokerConf.setProperty(prefix + Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
   }
 
-  protected void overrideBrokerConf(PinotConfiguration brokerConf) {
-    brokerConf.setProperty(
-        CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME,
+  @Override
+  protected void overrideServerConf(PinotConfiguration serverConf) {
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+
+    String prefix = CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + ".";
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_FACTORY_NAME,
         AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
-    brokerConf.setProperty(CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "."
-        + CommonConstants.Accounting.CONFIG_OF_OOM_PROTECTION_KILLING_QUERY, true);
-    brokerConf.setProperty(CommonConstants.Broker.CONFIG_OF_ENABLE_THREAD_ALLOCATED_BYTES_MEASUREMENT, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_MEMORY_SAMPLING, true);
+    serverConf.setProperty(prefix + Accounting.CONFIG_OF_ENABLE_THREAD_CPU_SAMPLING, false);
   }
 
   @BeforeClass
   public void setUp()
       throws Exception {
     TestUtils.ensureDirectoriesExistAndEmpty(_tempDir, _segmentDir, _tarDir);
+
     // Start the Pinot cluster
     startZk();
     startController();
     startBroker();
-    Tracing.unregisterThreadAccountant();
     startServer();
 
     if (_controllerRequestURLBuilder == null) {
@@ -130,15 +132,8 @@ public class WindowResourceAccountingTest extends BaseClusterIntegrationTest {
         getTableName(), getCountStarResult());
 
     JsonNode response = postQuery(query);
-    ThreadResourceUsageAccountant accountant = Tracing.getThreadAccountant();
-    assertEquals(getBrokerConf(0).getProperty(
-            CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME),
-        AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());
-    assertEquals(getServerConf(0).getProperty(
-            CommonConstants.PINOT_QUERY_SCHEDULER_PREFIX + "." + CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME),
-        AggregateByQueryIdAccountantFactoryForTest.class.getCanonicalName());
-    assertEquals(accountant.getClass().getCanonicalName(),
-        AggregateByQueryIdAccountantFactoryForTest.AggregateByQueryIdAccountant.class.getCanonicalName());
+    ThreadResourceUsageAccountant accountant = ThreadAccounting.getServerAccountant();
+    assertTrue(accountant instanceof AggregateByQueryIdAccountantFactoryForTest.AggregateByQueryIdAccountant);
     Map<String, ? extends QueryResourceTracker> queryMemUsage = accountant.getQueryResources();
     assertFalse(queryMemUsage.isEmpty());
     boolean foundRequestId = false;

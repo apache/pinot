@@ -102,7 +102,7 @@ public class AsofJoinOperator extends BaseJoinOperator {
       if (matchKey == null) {
         // Rows with null match keys cannot be matched with any right rows
         if (needUnmatchedLeftRows()) {
-          sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size());
           rows.add(joinRow(leftRow, null));
         }
         continue;
@@ -111,18 +111,18 @@ public class AsofJoinOperator extends BaseJoinOperator {
       NavigableMap<Comparable<?>, Object[]> rightRows = _rightTable.get(hashKey);
       if (rightRows == null) {
         if (needUnmatchedLeftRows()) {
-          sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size());
           rows.add(joinRow(leftRow, null));
         }
       } else {
         Object[] rightRow = closestMatch(matchKey, rightRows);
         if (rightRow == null) {
           if (needUnmatchedLeftRows()) {
-            sampleAndCheckInterruptionPeriodically(rows.size());
+            checkTerminationAndSampleUsagePeriodically(rows.size());
             rows.add(joinRow(leftRow, null));
           }
         } else {
-          sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size());
           rows.add(joinRow(leftRow, rightRow));
         }
       }

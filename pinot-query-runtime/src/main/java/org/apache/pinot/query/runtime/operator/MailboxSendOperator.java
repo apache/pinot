@@ -214,7 +214,7 @@ public class MailboxSendOperator extends MultiStageOperator {
           earlyTerminate();
         }
       }
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       return block;
     } catch (QueryCancelledException e) {
       LOGGER.debug("Query was cancelled! for opChain: {}", _context.getId());

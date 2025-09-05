@@ -224,7 +224,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
 
       addRowsToRightTable(rows);
       numRows += rows.size();
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       rightBlock = _rightInput.nextBlock();
     }
 
@@ -270,7 +270,7 @@ public abstract class BaseJoinOperator extends MultiStageOperator {
         }
       }
       List<Object[]> rows = buildJoinedRows((MseBlock.Data) leftBlock);
-      sampleAndCheckInterruption();
+      checkTerminationAndSampleUsage();
       if (!rows.isEmpty()) {
         return new RowHeapDataBlock(rows, _resultSchema);
       }

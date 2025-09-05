@@ -19,7 +19,6 @@
 package org.apache.pinot.core.query.scheduler.tokenbucket;
 
 import java.util.concurrent.atomic.LongAccumulator;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.scheduler.MultiLevelPriorityQueue;
 import org.apache.pinot.core.query.scheduler.PriorityScheduler;
@@ -28,7 +27,6 @@ import org.apache.pinot.core.query.scheduler.SchedulerGroupFactory;
 import org.apache.pinot.core.query.scheduler.TableBasedGroupMapper;
 import org.apache.pinot.core.query.scheduler.resources.PolicyBasedResourceManager;
 import org.apache.pinot.core.query.scheduler.resources.ResourceManager;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 
 
@@ -42,30 +40,25 @@ public class TokenPriorityScheduler extends PriorityScheduler {
   public static final String TOKEN_LIFETIME_MS_KEY = "token_lifetime_ms";
   private static final int DEFAULT_TOKEN_LIFETIME_MS = 100;
 
-  public static TokenPriorityScheduler create(PinotConfiguration config, QueryExecutor queryExecutor,
-      ServerMetrics metrics, LongAccumulator latestQueryTime, ThreadResourceUsageAccountant resourceUsageAccountant) {
-    final ResourceManager rm = new PolicyBasedResourceManager(config, resourceUsageAccountant);
-    final SchedulerGroupFactory groupFactory = new SchedulerGroupFactory() {
-      @Override
-      public SchedulerGroup create(PinotConfiguration config, String groupName) {
-        // max available tokens per millisecond equals number of threads (total execution capacity)
-        // we are over provisioning tokens here because its better to keep pipe full rather than empty
-        int maxTokensPerMs = rm.getNumQueryRunnerThreads() + rm.getNumQueryWorkerThreads();
-        int tokensPerMs = config.getProperty(TOKENS_PER_MS_KEY, maxTokensPerMs);
-        int tokenLifetimeMs = config.getProperty(TOKEN_LIFETIME_MS_KEY, DEFAULT_TOKEN_LIFETIME_MS);
-
-        return new TokenSchedulerGroup(groupName, tokensPerMs, tokenLifetimeMs);
-      }
+  public static TokenPriorityScheduler create(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      LongAccumulator latestQueryTime) {
+    ResourceManager resourceManager = new PolicyBasedResourceManager(config);
+    SchedulerGroupFactory groupFactory = (config1, groupName) -> {
+      // max available tokens per millisecond equals number of threads (total execution capacity)
+      // we are over provisioning tokens here because its better to keep pipe full rather than empty
+      int maxTokensPerMs = resourceManager.getNumQueryRunnerThreads() + resourceManager.getNumQueryWorkerThreads();
+      int tokensPerMs = config1.getProperty(TOKENS_PER_MS_KEY, maxTokensPerMs);
+      int tokenLifetimeMs = config1.getProperty(TOKEN_LIFETIME_MS_KEY, DEFAULT_TOKEN_LIFETIME_MS);
+      return new TokenSchedulerGroup(groupName, tokensPerMs, tokenLifetimeMs);
     };
-
-    MultiLevelPriorityQueue queue = new MultiLevelPriorityQueue(config, rm, groupFactory, new TableBasedGroupMapper());
-    return new TokenPriorityScheduler(config, rm, queryExecutor, queue, metrics, latestQueryTime);
+    MultiLevelPriorityQueue queue =
+        new MultiLevelPriorityQueue(config, resourceManager, groupFactory, new TableBasedGroupMapper());
+    return new TokenPriorityScheduler(config, instanceId, queryExecutor, latestQueryTime, resourceManager, queue);
   }
 
-  private TokenPriorityScheduler(PinotConfiguration config, ResourceManager resourceManager,
-      QueryExecutor queryExecutor, MultiLevelPriorityQueue queue, ServerMetrics metrics,
-      LongAccumulator latestQueryTime) {
-    super(config, resourceManager, queryExecutor, queue, metrics, latestQueryTime);
+  private TokenPriorityScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      LongAccumulator latestQueryTime, ResourceManager resourceManager, MultiLevelPriorityQueue queue) {
+    super(config, instanceId, queryExecutor, latestQueryTime, resourceManager, queue);
   }
 
   @Override

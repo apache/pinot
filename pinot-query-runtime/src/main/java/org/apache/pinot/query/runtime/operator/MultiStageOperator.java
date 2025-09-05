@@ -41,8 +41,7 @@ import org.apache.pinot.query.runtime.operator.set.SetOperator;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
-import org.apache.pinot.spi.exception.EarlyTerminationException;
-import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.InvocationScope;
 import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
@@ -79,28 +78,17 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
     return _context.getActiveDeadlineMs();
   }
 
-  /// This method should be called periodically by the operator to check whether the execution should be interrupted.
-  ///
-  /// This could happen when the request deadline is reached, or the thread accountant decides to interrupt the query
-  /// due to resource constraints.
-  protected void checkInterruption() {
-    if (System.currentTimeMillis() >= getDeadlineMs()) {
-      throw QueryErrorCode.EXECUTION_TIMEOUT.asException("Timing out on: " + getExplainName());
-    }
-    if (Tracing.ThreadAccountantOps.isInterrupted()) {
-      throw new EarlyTerminationException("Interrupted on: " + getExplainName());
-    }
+  protected void checkTermination() {
+    QueryThreadContext.checkTermination(this::getExplainName, getDeadlineMs());
   }
 
-  protected void sampleAndCheckInterruption() {
-    checkInterruption();
-    Tracing.ThreadAccountantOps.sample();
+  protected void checkTerminationAndSampleUsage() {
+    QueryThreadContext.checkTerminationAndSampleUsage(this::getExplainName, getDeadlineMs());
   }
 
-  protected void sampleAndCheckInterruptionPeriodically(int numRecordsProcessed) {
-    if ((numRecordsProcessed & Tracing.ThreadAccountantOps.MAX_ENTRIES_KEYS_MERGED_PER_INTERRUPTION_CHECK_MASK) == 0) {
-      sampleAndCheckInterruption();
-    }
+  protected void checkTerminationAndSampleUsagePeriodically(int numRecordsProcessed) {
+    QueryThreadContext.checkTerminationAndSampleUsagePeriodically(numRecordsProcessed, this::getExplainName,
+        getDeadlineMs());
   }
 
   /**
@@ -117,7 +105,7 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
       MseBlock nextBlock;
       Stopwatch executeStopwatch = Stopwatch.createStarted();
       try {
-        checkInterruption();
+        checkTermination();
         nextBlock = getNextBlock();
       } catch (Exception e) {
         logger().warn("Operator {}: Exception while processing next block", _operatorId, e);

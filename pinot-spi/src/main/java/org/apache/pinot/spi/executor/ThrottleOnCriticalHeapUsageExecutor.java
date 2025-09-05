@@ -22,6 +22,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.query.QueryThreadContext;
 
 
 /**
@@ -29,16 +30,13 @@ import org.apache.pinot.spi.exception.QueryErrorCode;
  * Heap Usage level is obtained from {@link ThreadResourceUsageAccountant#throttleQuerySubmission()}.
  */
 public class ThrottleOnCriticalHeapUsageExecutor extends DecoratorExecutorService {
-  ThreadResourceUsageAccountant _threadResourceUsageAccountant;
 
-  public ThrottleOnCriticalHeapUsageExecutor(ExecutorService executorService,
-      ThreadResourceUsageAccountant threadResourceUsageAccountant) {
+  public ThrottleOnCriticalHeapUsageExecutor(ExecutorService executorService) {
     super(executorService);
-    _threadResourceUsageAccountant = threadResourceUsageAccountant;
   }
 
   protected void checkTaskAllowed() {
-    if (_threadResourceUsageAccountant.throttleQuerySubmission()) {
+    if (QueryThreadContext.get().getResourceUsageAccountant().throttleQuerySubmission()) {
       throw QueryErrorCode.SERVER_RESOURCE_LIMIT_EXCEEDED.asException("Tasks throttled due to high heap usage.");
     }
   }

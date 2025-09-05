@@ -33,7 +33,6 @@ import org.apache.pinot.core.operator.combine.merger.ResultsBlockMerger;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.util.QueryMultiThreadingUtils;
 import org.apache.pinot.core.util.trace.TraceRunnable;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
@@ -97,21 +96,17 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
    */
   protected void startProcess() {
     Tracing.activeRecording().setNumTasks(_numTasks);
-    ThreadExecutionContext parentContext = Tracing.getThreadAccountant().getThreadExecutionContext();
     for (int i = 0; i < _numTasks; i++) {
-      int taskId = i;
       _futures[i] = _executorService.submit(new TraceRunnable() {
         @Override
         public void runJob() {
           ThreadResourceSnapshot resourceSnapshot = new ThreadResourceSnapshot();
-          Tracing.ThreadAccountantOps.setupWorker(taskId, parentContext);
 
           // Register the task to the phaser
           // NOTE: If the phaser is terminated (returning negative value) when trying to register the task, that means
           //       the query execution has finished, and the main thread has deregistered itself and returned the
           //       result. Directly return as no execution result will be taken.
           if (_phaser.register() < 0) {
-            Tracing.ThreadAccountantOps.clear();
             return;
           }
           try {
@@ -132,7 +127,6 @@ public abstract class BaseCombineOperator<T extends BaseResultsBlock> extends Ba
           } finally {
             onProcessSegmentsFinish();
             _phaser.arriveAndDeregister();
-            Tracing.ThreadAccountantOps.clear();
           }
 
           _totalWorkerThreadCpuTimeNs.getAndAdd(resourceSnapshot.getCpuTimeNs());

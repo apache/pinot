@@ -43,6 +43,7 @@ import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.JsonIndexConfig;
+import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
@@ -51,7 +52,9 @@ import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.testng.Assert.*;
 
 
@@ -470,7 +473,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     String colName = "col";
     try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, "myTable_OFFLINE",
         false, getIndexConfig());
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col")) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col");
+        QueryThreadContext ignored = QueryThreadContext.openForSseTest()) {
       for (String record : records) {
         offHeapCreator.add(record);
         mutableIndex.add(record);
@@ -540,7 +544,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     String colName = "col";
     try (JsonIndexCreator offHeapCreator = new OffHeapJsonIndexCreator(INDEX_DIR, colName, "myTable_OFFLINE",
         false, getIndexConfig());
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col")) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(getIndexConfig(), "table__0__1", "col");
+        QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
       for (String record : records) {
         offHeapCreator.add(record);
         mutableIndex.add(record);
@@ -807,7 +812,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapIndex = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapIndex = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col");
+        QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
       for (String record : records) {
         mutableIndex.add(record);
       }
@@ -852,7 +858,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col");
+        QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -885,7 +892,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+        MutableJsonIndexImpl mutableJsonIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col");
+        QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
       for (String record : records) {
         mutableJsonIndex.add(record);
       }
@@ -917,7 +925,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     try (PinotDataBuffer onHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(onHeapIndexFile);
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         JsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
-        JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length)) {
+        JsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
+        QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
       Map<String, RoaringBitmap> onHeapRes = getMatchingDocsMap(onHeapReader, "$");
       Map<String, RoaringBitmap> offHeapRes = getMatchingDocsMap(offHeapReader, "$");
       Object expectedRes = Collections.singletonMap(JsonUtils.SKIPPED_VALUE_REPLACEMENT, RoaringBitmap.bitmapOf(0));
@@ -986,7 +995,8 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
         PinotDataBuffer offHeapBuffer = PinotDataBuffer.mapReadOnlyBigEndianFile(offHeapIndexFile);
         ImmutableJsonIndexReader onHeapReader = new ImmutableJsonIndexReader(onHeapBuffer, records.length);
         ImmutableJsonIndexReader offHeapReader = new ImmutableJsonIndexReader(offHeapBuffer, records.length);
-        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col")) {
+        MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table__0__1", "col");
+        QueryThreadContext ignore = QueryThreadContext.openForSseTest()) {
       for (String record : records) {
         mutableIndex.add(record);
       }
