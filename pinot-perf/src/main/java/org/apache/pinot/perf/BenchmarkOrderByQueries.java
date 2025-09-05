@@ -115,14 +115,16 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
       .addSingleValueDimension(LOW_CARDINALITY_STRING_COL, FieldSpec.DataType.STRING)
       .build();
 
+  @Param({"true", "false"})
+  private boolean _zasc; // called zasc just to force this parameter to be the last used in the report
   @Param("1500000")
   private int _numRows;
-  @Param({"naive", "null"})
-  private String _orderByAlgorithm;
-  @Param({"EXP(0.5)"})
-  String _scenario;
+  //@Param({"EXP(0.5)"})
+  String _scenario = "EXP(0.5)";
   @Param({"1", "1000"})
   int _primaryRepetitions;
+  @Param({"1500", "150000"})
+  int _limit;
   private IndexSegment _indexSegment;
   private List<IndexSegment> _indexSegments;
   private LongSupplier _supplier;
@@ -194,42 +196,36 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   }
 
   @Benchmark
-  public BrokerResponseNative sortedAsc() {
+  public BrokerResponseNative sortedTotally() {
+    if (_zasc) {
     return getBrokerResponse(
         "SELECT SORTED_COL "
-            + "FROM MyTable "
+              + "FROM MyTable "
             + "ORDER BY SORTED_COL ASC "
-            + "LIMIT 1052 "
-            + "option(orderByAlgorithm=" + _orderByAlgorithm + ")");
-  }
-  @Benchmark
-  public BrokerResponseNative sortedAscPartially() {
+              + "LIMIT " + _limit);
+    } else {
     return getBrokerResponse(
         "SELECT SORTED_COL "
-            + "FROM MyTable "
-            + "ORDER BY SORTED_COL ASC, LOW_CARDINALITY_STRING_COL "
-            + "LIMIT 1052 "
-            + "option(orderByAlgorithm=" + _orderByAlgorithm + ")");
+              + "FROM MyTable "
+              + "ORDER BY SORTED_COL DESC "
+              + "LIMIT " + _limit);
+    }
   }
-
   @Benchmark
-  public BrokerResponseNative sortedDesc() {
+  public BrokerResponseNative sortedPartially() {
+    if (_zasc) {
     return getBrokerResponse(
         "SELECT SORTED_COL "
-            + "FROM MyTable "
-            + "ORDER BY SORTED_COL DESC "
-            + "LIMIT 1052 "
-            + "option(orderByAlgorithm=" + _orderByAlgorithm + ")");
-  }
-
-  @Benchmark
-  public BrokerResponseNative sortedDescPartially() {
+              + "FROM MyTable "
+              + "ORDER BY SORTED_COL ASC, LOW_CARDINALITY_STRING_COL "
+              + "LIMIT " + _limit);
+    } else {
     return getBrokerResponse(
         "SELECT SORTED_COL "
-            + "FROM MyTable "
+              + "FROM MyTable "
             + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
-            + "LIMIT 1052 "
-            + "option(orderByAlgorithm=" + _orderByAlgorithm + ")");
+              + "LIMIT " + _limit);
+    }
   }
 
   @Override
