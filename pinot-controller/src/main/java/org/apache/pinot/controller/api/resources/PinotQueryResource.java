@@ -163,25 +163,28 @@ public class PinotQueryResource {
   public List<MultiStageQueryValidationResponse> validateMultiStageQuery(MultiStageQueryValidationRequest request,
       @Context HttpHeaders httpHeaders) {
 
-    List<String> sqlQueries = request.getSql();
+    List<String> sqlQueries = request.getSqls();
+    String sql = request.getSql();
     List<MultiStageQueryValidationResponse> multiStageQueryValidationResponses = new ArrayList<>();
-    if (request.getSql() == null || sqlQueries.isEmpty()) {
+    if ((sql == null || sql.isEmpty()) && (sqlQueries == null || sqlQueries.isEmpty())) {
       MultiStageQueryValidationResponse multiStageQueryValidationResponse =
           new MultiStageQueryValidationResponse(false, "Request is missing the queries string field 'sql'", null, null);
       multiStageQueryValidationResponses.add(multiStageQueryValidationResponse);
     }
+    if (sqlQueries == null || sqlQueries.isEmpty()) {
+      sqlQueries = new ArrayList<>();
+      sqlQueries.add(sql);
+    }
     for (String sqlQuery : sqlQueries) {
       Map<String, String> queryOptionsMap = RequestUtils.parseQuery(sqlQuery).getOptions();
       String database = DatabaseUtils.extractDatabaseFromQueryRequest(queryOptionsMap, httpHeaders);
-
       try {
         TableCache tableCache;
         if (CollectionUtils.isNotEmpty(request.getTableConfigs()) && CollectionUtils.isNotEmpty(request.getSchemas())) {
           tableCache =
               new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
                   request.isIgnoreCase());
-          LOGGER.info("Validating multi-stage query: {} compilation using static table cache ",
-              request.getSql());
+          LOGGER.info("Validating multi-stage query: {} compilation using static table cache ", request.getSql());
         } else {
           // Use TableCache from environment if static fields are not specified
           tableCache = _pinotHelixResourceManager.getTableCache();
@@ -243,26 +246,32 @@ public class PinotQueryResource {
   }
 
   public static class MultiStageQueryValidationRequest {
-    private final List<String> _sql;
+    private final String _sql;
     private final List<TableConfig> _tableConfigs;
     private final List<Schema> _schemas;
     private final List<LogicalTableConfig> _logicalTableConfigs;
     private final boolean _ignoreCase;
+    private final List<String> _sqls;
 
     @JsonCreator
-    public MultiStageQueryValidationRequest(@JsonProperty("sql") List<String> sql,
+    public MultiStageQueryValidationRequest(@JsonProperty("sql") String sql,
         @JsonProperty("tableConfigs") @Nullable List<TableConfig> tableConfigs,
         @JsonProperty("schemas") @Nullable List<Schema> schemas,
         @JsonProperty("logicalTableConfigs") @Nullable List<LogicalTableConfig> logicalTableConfigs,
-        @JsonProperty("ignoreCase") boolean ignoreCase) {
+        @JsonProperty("sqls") List<String> sqls, @JsonProperty("ignoreCase") boolean ignoreCase) {
       _sql = sql;
       _tableConfigs = tableConfigs;
       _schemas = schemas;
       _logicalTableConfigs = logicalTableConfigs;
       _ignoreCase = ignoreCase;
+      _sqls = sqls;
     }
 
-    public List<String> getSql() {
+    public List<String> getSqls() {
+      return _sqls;
+    }
+
+    public String getSql() {
       return _sql;
     }
 

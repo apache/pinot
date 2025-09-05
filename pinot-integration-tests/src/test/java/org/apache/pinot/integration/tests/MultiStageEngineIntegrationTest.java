@@ -1718,8 +1718,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testValidateQueryApiSuccess()
       throws Exception {
     MultiStageQueryValidationRequest request =
-        new MultiStageQueryValidationRequest(Collections.singletonList("SELECT * FROM mytable"), null, null, null,
-            false);
+        new MultiStageQueryValidationRequest("SELECT * FROM mytable", null, null, null, null, false);
     String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
@@ -1737,8 +1736,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
   public void testValidateQueryApiError()
       throws Exception {
     MultiStageQueryValidationRequest request =
-        new MultiStageQueryValidationRequest(Collections.singletonList("SELECT invalidColumn FROM invalidTable"), null,
-            null, null, false);
+        new MultiStageQueryValidationRequest("SELECT invalidColumn FROM invalidTable", null, null, null, null, false);
     String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
         sendPostRequest(getControllerBaseApiUrl() + "/validateMultiStageQuery", requestJson, null));
@@ -1751,9 +1749,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertFalse(queryResponse.get("errorMessage").isNull());
     assertEquals("SELECT invalidColumn FROM invalidTable", queryResponse.get("sql").asText());
 
-    request =
-        new MultiStageQueryValidationRequest(Collections.singletonList("SELECT CAST('abc' AS INT)"), null, null, null,
-            false);
+    request = new MultiStageQueryValidationRequest("SELECT CAST('abc' AS INT)", null, null, null, null, false);
 
     requestJson = JsonUtils.objectToString(request);
     result = JsonUtils.stringToJsonNode(
@@ -1796,7 +1792,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<Schema> schemas = Collections.singletonList(schema);
 
     MultiStageQueryValidationRequest request =
-        new MultiStageQueryValidationRequest(successfulQueries, tableConfigs, schemas, null, false);
+        new MultiStageQueryValidationRequest(null, tableConfigs, schemas, null, successfulQueries, false);
 
     String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
@@ -1837,7 +1833,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<Schema> schemas = Collections.singletonList(schema);
 
     MultiStageQueryValidationRequest request =
-        new MultiStageQueryValidationRequest(mixedQueries, tableConfigs, schemas, null, false);
+        new MultiStageQueryValidationRequest(null, tableConfigs, schemas, null, mixedQueries, false);
 
     String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
@@ -1886,8 +1882,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<Schema> schemas = Collections.singletonList(schema);
 
     MultiStageQueryValidationRequest request =
-        new MultiStageQueryValidationRequest(Collections.singletonList("SELECT nonExistentColumn FROM mytable"),
-            tableConfigs, schemas, null, true);
+        new MultiStageQueryValidationRequest("SELECT nonExistentColumn FROM mytable",
+            tableConfigs, schemas, null, null, true);
 
     String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
@@ -1900,8 +1896,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(queryResponse.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
 
     String query = "SELECT DivAirportSeqIDs FROM mytable WHERE DivAirportSeqIDs > 0 LIMIT 10";
-    request =
-        new MultiStageQueryValidationRequest(Collections.singletonList(query), tableConfigs, schemas, null, false);
+    request = new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, null, false);
 
     requestJson = JsonUtils.objectToString(request);
     result = JsonUtils.stringToJsonNode(
@@ -1916,8 +1911,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertFalse(queryResponse.get("errorMessage").isNull(), "Error message should not be null for: " + query);
 
     query = "SELECT count(*) FROM nonExistentTable";
-    request =
-        new MultiStageQueryValidationRequest(Collections.singletonList(query), tableConfigs, schemas, null, false);
+    request = new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, null, false);
 
     requestJson = JsonUtils.objectToString(request);
     result = JsonUtils.stringToJsonNode(
@@ -1997,7 +1991,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     String query = "SELECT nonExistentColumn FROM staticTableTest";
 
     MultiStageQueryValidationRequest request =
-        new MultiStageQueryValidationRequest(Collections.singletonList(query), tableConfigs, schemas, null, true);
+        new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, null, true);
 
     String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
@@ -2010,8 +2004,7 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertEquals(queryResponse.get("errorCode").asText(), QueryErrorCode.QUERY_VALIDATION.name());
 
     query = "SELECT event_id FROM staticTableTest";
-    request =
-        new MultiStageQueryValidationRequest(Collections.singletonList(query), tableConfigs, schemas, null, false);
+    request = new MultiStageQueryValidationRequest(query, tableConfigs, schemas, null, null, false);
 
     requestJson = JsonUtils.objectToString(request);
     result = JsonUtils.stringToJsonNode(
@@ -2045,8 +2038,8 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     List<Schema> schemas = Collections.singletonList(schema);
 
     MultiStageQueryValidationRequest request =
-        new MultiStageQueryValidationRequest(Collections.singletonList("SELECT divairportseqids FROM mytable"),
-            tableConfigs, schemas, null, false);
+        new MultiStageQueryValidationRequest("SELECT divairportseqids FROM mytable", tableConfigs, schemas, null, null,
+            false);
 
     String requestJson = JsonUtils.objectToString(request);
     JsonNode result = JsonUtils.stringToJsonNode(
@@ -2060,8 +2053,9 @@ public class MultiStageEngineIntegrationTest extends BaseClusterIntegrationTestS
     assertTrue(queryResponse.get("errorCode").isNull(), "Error code should be null in case-sensitive mode");
     assertTrue(queryResponse.get("errorMessage").isNull(), "Error message should be null in case-sensitive mode");
 
-    request = new MultiStageQueryValidationRequest(Collections.singletonList("SELECT divairportseqids FROM mytable"),
-        tableConfigs, schemas, null, true);
+    request =
+        new MultiStageQueryValidationRequest("SELECT divairportseqids FROM mytable", tableConfigs, schemas, null, null,
+            true);
 
     requestJson = JsonUtils.objectToString(request);
     result = JsonUtils.stringToJsonNode(
