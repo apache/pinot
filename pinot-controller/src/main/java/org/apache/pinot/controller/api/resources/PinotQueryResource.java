@@ -184,11 +184,11 @@ public class PinotQueryResource {
           tableCache =
               new StaticTableCache(request.getTableConfigs(), request.getSchemas(), request.getLogicalTableConfigs(),
                   request.isIgnoreCase());
-          LOGGER.info("Validating multi-stage query: {} compilation using static table cache ", request.getSql());
+          LOGGER.info("Validating multi-stage query: {} compilation using static table cache ", sqlQuery);
         } else {
           // Use TableCache from environment if static fields are not specified
           tableCache = _pinotHelixResourceManager.getTableCache();
-          LOGGER.info("Validating multi-stage query: {} compilation using Zk table cache", request.getSql());
+          LOGGER.info("Validating multi-stage query: {} compilation using Zk table cache", sqlQuery);
         }
         try (QueryEnvironment.CompiledQuery compiledQuery = new QueryEnvironment(database, tableCache, null).compile(
             sqlQuery)) {
