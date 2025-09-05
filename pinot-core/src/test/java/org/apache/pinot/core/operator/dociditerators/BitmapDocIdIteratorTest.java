@@ -33,7 +33,7 @@ public class BitmapDocIdIteratorTest {
     MutableRoaringBitmap bitmap = new MutableRoaringBitmap();
     bitmap.add(docIds);
     int numDocs = 25;
-    BitmapDocIdIterator docIdIterator = new BitmapDocIdIterator(bitmap, numDocs);
+    BitmapDocIdIterator docIdIterator = BitmapDocIdIterator.create(bitmap, numDocs, true);
     assertEquals(docIdIterator.advance(2), 2);
     assertEquals(docIdIterator.advance(3), 4);
     assertEquals(docIdIterator.next(), 5);

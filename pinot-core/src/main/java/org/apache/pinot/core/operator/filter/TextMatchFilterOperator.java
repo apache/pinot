@@ -49,7 +49,12 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
       int numDocs) {
-    super(numDocs, false);
+    this(column, textIndexReader, predicate, numDocs, true);
+  }
+
+  public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
+      int numDocs, boolean ascending) {
+    super(numDocs, false, ascending);
     _column = column;
     _textIndexReader = textIndexReader;
     _predicate = predicate;
@@ -57,7 +62,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   }
 
   public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
-    this(null, textIndexReader, predicate, numDocs);
+    this(null, textIndexReader, predicate, numDocs, true);
   }
 
   @Override
@@ -141,5 +146,10 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
       recording.setColumnName(_predicate.getLhs().getIdentifier());
       recording.setFilter(FilterType.INDEX, "LUCENE_TEXT");
     }
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new TextMatchFilterOperator(_column, _textIndexReader, _predicate, _numDocs, !_ascending);
   }
 }

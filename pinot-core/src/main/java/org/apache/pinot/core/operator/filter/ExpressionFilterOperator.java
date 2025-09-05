@@ -54,7 +54,12 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
-    super(numDocs, queryContext.isNullHandlingEnabled());
+    this(segment, queryContext, predicate, numDocs, true);
+  }
+
+  public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs,
+      boolean ascending) {
+    super(numDocs, queryContext.isNullHandlingEnabled(), ascending);
     _queryContext = queryContext;
 
     Set<String> columns = new HashSet<>();
@@ -79,6 +84,15 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     }
   }
 
+  private ExpressionFilterOperator(ExpressionFilterOperator other, boolean ascending) {
+    super(other._numDocs, other._nullHandlingEnabled, ascending);
+    _queryContext = other._queryContext;
+    _dataSourceMap = other._dataSourceMap;
+    _transformFunction = other._transformFunction;
+    _predicateType = other._predicateType;
+    _predicateEvaluator = other._predicateEvaluator;
+  }
+
   @Override
   protected BlockDocIdSet getTrues() {
     if (_predicateType == Predicate.Type.IS_NULL) {
@@ -87,14 +101,14 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       return new NotDocIdSet(getNulls(), _numDocs);
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, _queryContext);
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, _queryContext, _ascending);
     }
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
     return new ExpressionDocIdSet(_transformFunction, null, _dataSourceMap, _numDocs,
-        ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, _queryContext);
+        ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, _queryContext, _ascending);
   }
 
   @Override
@@ -105,7 +119,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       return getNulls();
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, _queryContext);
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, _queryContext, _ascending);
     }
   }
 
@@ -132,5 +146,10 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     super.explainAttributes(attributeBuilder);
     attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
     attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new ExpressionFilterOperator(this, !_ascending);
   }
 }

@@ -36,7 +36,7 @@ import org.apache.pinot.spi.trace.Tracing;
  * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
  * matched documents) or already gathered enough documents (for selection queries).
  */
-public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+public class DocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -105,5 +105,23 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   public ExecutionStatistics getExecutionStatistics() {
     long numEntriesScannedInFilter = _blockDocIdSet != null ? _blockDocIdSet.getNumEntriesScannedInFilter() : 0;
     return new ExecutionStatistics(0, numEntriesScannedInFilter, 0, 0);
+  }
+
+  @Override
+  public boolean isAscending() {
+    return _filterOperator.isAscending();
+  }
+
+  @Override
+  public boolean isDescending() {
+    return _filterOperator.isDescending();
+  }
+
+  @Override
+  public BaseDocIdSetOperator withOrder(boolean ascending) {
+    if (isAscending() == ascending) {
+      return this;
+    }
+    return new DocIdSetOperator(_filterOperator.withOrder(ascending), _maxSizeOfDocIdSet);
   }
 }

@@ -40,14 +40,14 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
   protected static final String EXPLAIN_NAME = "PROJECT";
 
   protected final Map<String, DataSource> _dataSourceMap;
-  protected final BaseOperator<DocIdSetBlock> _docIdSetOperator;
+  protected final BaseDocIdSetOperator _docIdSetOperator;
   protected final DataFetcher _dataFetcher;
   protected final DataBlockCache _dataBlockCache;
   protected final Map<String, ColumnContext> _columnContextMap;
   protected final QueryContext _queryContext;
 
   public ProjectionOperator(Map<String, DataSource> dataSourceMap,
-      @Nullable BaseOperator<DocIdSetBlock> docIdSetOperator, QueryContext queryContext) {
+      @Nullable BaseDocIdSetOperator docIdSetOperator, QueryContext queryContext) {
     _dataSourceMap = dataSourceMap;
     _docIdSetOperator = docIdSetOperator;
     _dataFetcher = new DataFetcher(dataSourceMap);
@@ -93,7 +93,7 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
   public String toExplainString() {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append('(');
     // SQL statements such as SELECT 'literal' FROM myTable don't have any projection columns.
-    if (!_dataSourceMap.keySet().isEmpty()) {
+    if (!_dataSourceMap.isEmpty()) {
       int count = 0;
       for (String col : _dataSourceMap.keySet()) {
         if (count == _dataSourceMap.keySet().size() - 1) {
@@ -121,6 +121,22 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     return _docIdSetOperator != null ? _docIdSetOperator.getExecutionStatistics() : new ExecutionStatistics(0, 0, 0, 0);
+  }
+
+  @Override
+  public boolean isAscending() {
+    return _docIdSetOperator == null || _docIdSetOperator.isAscending();
+  }
+
+  @Override
+  public boolean isDescending() {
+    return _docIdSetOperator == null || _docIdSetOperator.isDescending();
+  }
+
+  @Override
+  public BaseProjectOperator<ProjectionBlock> withOrder(boolean ascending) {
+    BaseDocIdSetOperator orderedOperator = _docIdSetOperator.withOrder(ascending);
+    return new ProjectionOperator(_dataSourceMap, orderedOperator, _queryContext);
   }
 
   @Override

@@ -60,7 +60,12 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
   private final double _upperBound;
 
   public H3IndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
-    super(numDocs, false);
+    this(segment, queryContext, predicate, numDocs, true);
+  }
+
+  public H3IndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs,
+      boolean ascending) {
+    super(numDocs, false, ascending);
     _segment = segment;
     _queryContext = queryContext;
     _predicate = predicate;
@@ -93,6 +98,21 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     }
   }
 
+  /// copy constructor
+  private H3IndexFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate,
+      int numDocs, H3IndexReader h3IndexReader, long h3Id, double edgeLength, double lowerBound, double upperBound,
+      boolean ascending) {
+    super(numDocs, false, ascending);
+    _segment = segment;
+    _queryContext = queryContext;
+    _predicate = predicate;
+    _h3IndexReader = h3IndexReader;
+    _h3Id = h3Id;
+    _edgeLength = edgeLength;
+    _lowerBound = lowerBound;
+    _upperBound = upperBound;
+  }
+
   @Override
   protected BlockDocIdSet getTrues() {
     if (_upperBound < 0 || _lowerBound > _upperBound) {
@@ -106,7 +126,7 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
 
         if (Double.isNaN(_upperBound)) {
           // No bound, return a match-all block
-          return new MatchAllDocIdSet(_numDocs);
+          return MatchAllDocIdSet.create(_numDocs, _ascending);
         }
 
         // Upper bound only
@@ -268,5 +288,11 @@ public class H3IndexFilterOperator extends BaseFilterOperator {
     attributeBuilder.putString("indexLookUp", "h3_index");
     attributeBuilder.putString("operator", _predicate.getType().name());
     attributeBuilder.putString("predicate", _predicate.toString());
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new H3IndexFilterOperator(_segment, _queryContext, _predicate, _numDocs, _h3IndexReader, _h3Id,
+        _edgeLength, _lowerBound, _upperBound, !_ascending);
   }
 }

@@ -118,7 +118,7 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
   public StarTreeFilterOperator(QueryContext queryContext, StarTreeV2 starTreeV2,
       Map<String, List<CompositePredicateEvaluator>> predicateEvaluatorsMap, @Nullable Set<String> groupByColumns) {
     // This filter operator does not support AND/OR/NOT operations.
-    super(0, false);
+    super(0, false, true);
     _queryContext = queryContext;
     _starTreeV2 = starTreeV2;
     _predicateEvaluatorsMap = predicateEvaluatorsMap;
@@ -468,5 +468,10 @@ public class StarTreeFilterOperator extends BaseFilterOperator {
       }
       return matchingDictIds;
     }
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    throw new UnsupportedOperationException("Reverse operation is not supported for StarTreeFilterOperator");
   }
 }

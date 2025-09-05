@@ -43,7 +43,12 @@ public class TextContainsFilterOperator extends BaseFilterOperator {
   private final TextContainsPredicate _predicate;
 
   public TextContainsFilterOperator(TextIndexReader textIndexReader, TextContainsPredicate predicate, int numDocs) {
-    super(numDocs, false);
+    this(textIndexReader, predicate, numDocs, true);
+  }
+
+  public TextContainsFilterOperator(TextIndexReader textIndexReader, TextContainsPredicate predicate, int numDocs,
+      boolean ascending) {
+    super(numDocs, false, ascending);
     _textIndexReader = textIndexReader;
     _predicate = predicate;
   }
@@ -108,5 +113,10 @@ public class TextContainsFilterOperator extends BaseFilterOperator {
       recording.setColumnName(_predicate.getLhs().getIdentifier());
       recording.setFilter(FilterType.INDEX, "NATIVE_TEXT");
     }
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new TextContainsFilterOperator(_textIndexReader, _predicate, _numDocs, !_ascending);
   }
 }

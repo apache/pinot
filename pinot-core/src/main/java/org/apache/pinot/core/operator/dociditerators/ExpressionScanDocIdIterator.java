@@ -25,8 +25,9 @@ import java.util.Map;
 import java.util.OptionalInt;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.BaseOperator;
+import org.apache.pinot.core.operator.BaseDocIdSetOperator;
 import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
+import org.apache.pinot.core.operator.IntIteratorDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
@@ -67,10 +68,11 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   // NOTE: Number of entries scanned is not accurate because we might need to scan multiple columns in order to solve
   //       the expression, but we only track the number of entries scanned for the resolved expression.
   private long _numEntriesScanned = 0L;
+  private final boolean _ascending;
 
   public ExpressionScanDocIdIterator(TransformFunction transformFunction,
       @Nullable PredicateEvaluator predicateEvaluator, Map<String, DataSource> dataSourceMap, int numDocs,
-      PredicateEvaluationResult predicateEvaluationResult, QueryContext queryContext) {
+      PredicateEvaluationResult predicateEvaluationResult, QueryContext queryContext, boolean ascending) {
     _transformFunction = transformFunction;
     _predicateEvaluator = predicateEvaluator;
     _dataSourceMap = dataSourceMap;
@@ -78,6 +80,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     _predicateEvaluationResult = predicateEvaluationResult;
     _queryContext = queryContext;
     _nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
+    _ascending = ascending;
   }
 
   @Override
@@ -91,8 +94,9 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     while (_blockEndDocId < _endDocId) {
       int blockStartDocId = _blockEndDocId;
       _blockEndDocId = Math.min(blockStartDocId + DocIdSetPlanNode.MAX_DOC_PER_CALL, _endDocId);
+      RangeDocIdSetOperator docIdRange = new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId, _ascending);
       try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-          new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId), _queryContext)) {
+          docIdRange, _queryContext)) {
         ProjectionBlock projectionBlock = projectionOperator.nextBlock();
         RoaringBitmap matchingDocIds = new RoaringBitmap();
         processProjectionBlock(projectionBlock, matchingDocIds);
@@ -127,8 +131,9 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
     IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
-    try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-        new BitmapDocIdSetOperator(intIterator, _docIdBuffer), _queryContext)) {
+    IntIteratorDocIdSetOperator docIdOperator = new IntIteratorDocIdSetOperator(intIterator, _docIdBuffer, true);
+    try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(
+        _dataSourceMap, docIdOperator, _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       ProjectionBlock projectionBlock;
       while ((projectionBlock = projectionOperator.nextBlock()) != null) {
@@ -141,7 +146,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-        new BitmapDocIdSetOperator(docIds, _docIdBuffer), _queryContext)) {
+        BitmapDocIdSetOperator.ascending(docIds, _docIdBuffer), _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       ProjectionBlock projectionBlock;
       while ((projectionBlock = projectionOperator.nextBlock()) != null) {
@@ -420,24 +425,38 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   /**
    * NOTE: This operator contains only one block.
    */
-  private class RangeDocIdSetOperator extends BaseOperator<DocIdSetBlock> {
+  private class RangeDocIdSetOperator extends BaseDocIdSetOperator {
     static final String EXPLAIN_NAME = "DOC_ID_SET_RANGE";
 
-    DocIdSetBlock _docIdSetBlock;
+    private final int _start;
+    private final int _end;
+    private final boolean _ascending;
+    private boolean _consumed = false;
 
-    RangeDocIdSetOperator(int startDocId, int endDocId) {
-      int numDocs = endDocId - startDocId;
-      for (int i = 0; i < numDocs; i++) {
-        _docIdBuffer[i] = startDocId + i;
-      }
-      _docIdSetBlock = new DocIdSetBlock(_docIdBuffer, numDocs);
+    RangeDocIdSetOperator(int startDocId, int endDocId, boolean ascending) {
+      _start = startDocId;
+      _end = endDocId;
+      _ascending = ascending;
     }
 
     @Override
     protected DocIdSetBlock getNextBlock() {
-      DocIdSetBlock docIdSetBlock = _docIdSetBlock;
-      _docIdSetBlock = null;
-      return docIdSetBlock;
+      if (_consumed) {
+        return null;
+      }
+      _consumed = true;
+
+      int numDocs = _end - _start;
+      if (_ascending) {
+        for (int i = 0; i < numDocs; i++) {
+          _docIdBuffer[i] = _start + i;
+        }
+      } else {
+        for (int i = 0; i < numDocs; i++) {
+          _docIdBuffer[i] = _end - 1 - i;
+        }
+      }
+      return new DocIdSetBlock(_docIdBuffer, numDocs);
     }
 
     @Override
@@ -448,6 +467,25 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     @Override
     public List<Operator> getChildOperators() {
       return Collections.emptyList();
+    }
+
+    @Override
+    public boolean isAscending() {
+      return _ascending;
+    }
+
+    @Override
+    public boolean isDescending() {
+      return !_ascending;
+    }
+
+    @Override
+    public BaseDocIdSetOperator withOrder(boolean ascending)
+        throws IllegalArgumentException {
+      if (_ascending == ascending) {
+        return this;
+      }
+      return new RangeDocIdSetOperator(_start, _end, ascending);
     }
   }
 

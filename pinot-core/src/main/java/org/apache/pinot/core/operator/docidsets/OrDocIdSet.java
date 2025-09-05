@@ -47,7 +47,7 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  *   </li>
  * </ul>
  */
-public final class OrDocIdSet implements BlockDocIdSet {
+public final class OrDocIdSet extends BlockDocIdSet.Base {
   // Keep the scan based BlockDocIdSets to be accessed when collecting query execution stats
   private final AtomicReference<List<BlockDocIdSet>> _scanBasedDocIdSets = new AtomicReference<>();
   private final int _numDocs;
@@ -55,6 +55,7 @@ public final class OrDocIdSet implements BlockDocIdSet {
   private volatile long _numEntriesScannedInFilter = 0L;
 
   public OrDocIdSet(List<BlockDocIdSet> docIdSets, int numDocs) {
+    super(getCommonAscending(docIdSets));
     _docIdSets = docIdSets;
     _numDocs = numDocs;
   }
@@ -108,7 +109,7 @@ public final class OrDocIdSet implements BlockDocIdSet {
       for (BitmapBasedDocIdIterator bitmapBasedDocIdIterator : bitmapBasedDocIdIterators) {
         docIds.or(bitmapBasedDocIdIterator.getDocIds());
       }
-      BitmapDocIdIterator bitmapDocIdIterator = new BitmapDocIdIterator(docIds, _numDocs);
+      BitmapDocIdIterator bitmapDocIdIterator = BitmapDocIdIterator.create(docIds, _numDocs, _ascending);
       int numRemainingDocIdIterators = remainingDocIdIterators.size();
       if (numRemainingDocIdIterators == 0) {
         return bitmapDocIdIterator;
@@ -118,12 +119,12 @@ public final class OrDocIdSet implements BlockDocIdSet {
         for (int i = 0; i < numRemainingDocIdIterators; i++) {
           docIdIterators[i + 1] = remainingDocIdIterators.get(i);
         }
-        return new OrDocIdIterator(docIdIterators);
+        return OrDocIdIterator.create(docIdIterators, _ascending);
       }
     } else {
       // Otherwise, construct and return an OrDocIdIterator with all BlockDocIdIterators.
 
-      return new OrDocIdIterator(allDocIdIterators);
+      return OrDocIdIterator.create(allDocIdIterators, _ascending);
     }
   }
 

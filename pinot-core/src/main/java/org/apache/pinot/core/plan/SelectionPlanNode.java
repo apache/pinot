@@ -20,18 +20,16 @@ package org.apache.pinot.core.plan;
 
 import java.util.ArrayList;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
-import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
 import org.apache.pinot.core.operator.query.SelectionOrderByOperator;
-import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByAscOperator;
 import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByDescOperation;
+import org.apache.pinot.core.operator.query.SelectionPartiallyOrderedByLinearOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.selection.SelectionOperatorUtils;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -79,24 +77,32 @@ public class SelectionPlanNode implements PlanNode {
     // Although it is a break of abstraction, some code, specially merging, assumes that if there is an order by
     // expression the operator will return a block whose selection result is a priority queue.
     int sortedColumnsPrefixSize = getSortedColumnsPrefix(orderByExpressions, _queryContext.isNullHandlingEnabled());
-    OrderByAlgorithm orderByAlgorithm = OrderByAlgorithm.fromQueryContext(_queryContext);
-    if (sortedColumnsPrefixSize > 0 && orderByAlgorithm != OrderByAlgorithm.NAIVE) {
+    if (sortedColumnsPrefixSize > 0) {
       int maxDocsPerCall = DocIdSetPlanNode.MAX_DOC_PER_CALL;
       // The first order by expressions are sorted (either asc or desc).
       // ie: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column DESC LIMIT 10 OFFSET 5
       // or: SELECT ... FROM Table WHERE predicates ORDER BY sorted_column, not_sorted LIMIT 10 OFFSET 5
       // but not SELECT ... FROM Table WHERE predicates ORDER BY not_sorted, sorted_column LIMIT 10 OFFSET 5
-      if (orderByExpressions.get(0).isAsc()) {
-        if (sortedColumnsPrefixSize == orderByExpressions.size()) {
-          maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
-        }
-        BaseProjectOperator<?> projectOperator =
-            new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall).run();
-        return new SelectionPartiallyOrderedByAscOperator(_indexSegment, _queryContext, expressions, projectOperator,
+
+      if (sortedColumnsPrefixSize == orderByExpressions.size()) {
+        maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
+      }
+
+      BaseProjectOperator<?> projectOperator =
+          new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall).run();
+      BaseProjectOperator<?> sortedProjectOperator;
+      try {
+        sortedProjectOperator = projectOperator.withOrder(orderByExpressions.get(0).isAsc());
+      } catch (IllegalArgumentException | UnsupportedOperationException e) {
+        // This happens when the operator cannot provide the required order between blocks
+        // Fallback to SelectionOrderByOperator
+        sortedProjectOperator = null;
+      }
+      if (sortedProjectOperator != null) {
+        return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions,
+            sortedProjectOperator,
             sortedColumnsPrefixSize);
       } else {
-        BaseProjectOperator<?> projectOperator =
-            new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall).run();
         return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
       }
@@ -172,19 +178,6 @@ public class SelectionPlanNode implements PlanNode {
       default: {
         return false;
       }
-    }
-  }
-
-  public enum OrderByAlgorithm {
-    NAIVE;
-
-    @Nullable
-    public static OrderByAlgorithm fromQueryContext(QueryContext queryContext) {
-      String orderByAlgorithm = QueryOptionsUtils.getOrderByAlgorithm(queryContext.getQueryOptions());
-      if (orderByAlgorithm == null) {
-        return null;
-      }
-      return OrderByAlgorithm.valueOf(orderByAlgorithm.toUpperCase());
     }
   }
 }

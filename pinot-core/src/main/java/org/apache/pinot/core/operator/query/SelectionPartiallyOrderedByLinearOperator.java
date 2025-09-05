@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.core.operator.query;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -31,24 +30,39 @@ import org.apache.pinot.segment.spi.IndexSegment;
 
 
 /**
- * An operator for order-by queries ASC that are partially sorted over the sorting keys.
+ * The operator used when selecting with order-by on a way that the segment layout can be used to prune results.
+ *
+ * This requires that the first order-by expression is on a column that is sorted in the segment and:
+ * 1. The order-by is ASC
+ * 2. The order-by is DESC and the input operators support descending iteration (e.g. full scan)
+ *
  * @see LinearSelectionOrderByOperator
  */
-public class SelectionPartiallyOrderedByAscOperator extends LinearSelectionOrderByOperator {
+public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOrderByOperator {
 
-  private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_ASC";
+  private static final String EXPLAIN_NAME = "SELECT_PARTIAL_ORDER_BY_LINEAR";
 
   private int _numDocsScanned = 0;
 
-  public SelectionPartiallyOrderedByAscOperator(IndexSegment indexSegment, QueryContext queryContext,
+  public SelectionPartiallyOrderedByLinearOperator(IndexSegment indexSegment, QueryContext queryContext,
       List<ExpressionContext> expressions, BaseProjectOperator<?> projectOperator, int numSortedExpressions) {
     super(indexSegment, queryContext, expressions, projectOperator, numSortedExpressions);
-    Preconditions.checkArgument(queryContext.getOrderByExpressions().stream()
-            .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
-            .findFirst()
-            .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
-            .isAsc(),
-        "%s can only be used when the first column in order by is ASC", EXPLAIN_NAME);
+    boolean firstColIsAsc = queryContext.getOrderByExpressions().stream()
+        .filter(expr -> expr.getExpression().getType() == ExpressionContext.Type.IDENTIFIER)
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
+        .isAsc();
+    if (firstColIsAsc) {
+      if (!projectOperator.isAscending()) {
+        throw new IllegalArgumentException(EXPLAIN_NAME + " cannot be used when order by asc if the input operator "
+            + "cannot be iterated in ascending order");
+      }
+    } else {
+      if (!projectOperator.isDescending()) {
+        throw new IllegalArgumentException(EXPLAIN_NAME + " cannot be used when order by desc if the input operator "
+            + "cannot be iterated in descending order");
+      }
+    }
   }
 
   @Override

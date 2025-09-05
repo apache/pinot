@@ -44,21 +44,31 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   private final JsonMatchPredicate _predicate;
   private final FilterContext _filterContext;
 
+  public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate, int numDocs) {
+    this(jsonIndex, predicate, numDocs, true);
+  }
+
   /**
    * Constructor that takes a Json Predicate
    */
-  public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate, int numDocs) {
-    super(numDocs, false);
+  public JsonMatchFilterOperator(JsonIndexReader jsonIndex, JsonMatchPredicate predicate, int numDocs,
+      boolean ascending) {
+    super(numDocs, false, ascending);
     _jsonIndex = jsonIndex;
     _predicate = predicate;
     _filterContext = null;
   }
 
+  public JsonMatchFilterOperator(JsonIndexReader jsonIndex, FilterContext filterContext, int numDocs) {
+    this(jsonIndex, filterContext, numDocs, true);
+  }
+
   /**
    * Constructor that takes a FilterContext
    */
-  public JsonMatchFilterOperator(JsonIndexReader jsonIndex, FilterContext filterContext, int numDocs) {
-    super(numDocs, false);
+  public JsonMatchFilterOperator(JsonIndexReader jsonIndex, FilterContext filterContext, int numDocs,
+      boolean ascending) {
+    super(numDocs, false, ascending);
     _jsonIndex = jsonIndex;
     _filterContext = filterContext;
     _predicate = null;
@@ -68,7 +78,7 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getTrues() {
     ImmutableRoaringBitmap bitmap = getMatchingDocIdBitmap();
     record(bitmap);
-    return new BitmapDocIdSet(bitmap, _numDocs);
+    return new BitmapDocIdSet(bitmap, _numDocs, _ascending);
   }
 
   @Override
@@ -133,5 +143,10 @@ public class JsonMatchFilterOperator extends BaseFilterOperator {
     } else {
       return _jsonIndex.getMatchingDocIds(_filterContext);
     }
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new JsonMatchFilterOperator(_jsonIndex, _predicate, _numDocs, !_ascending);
   }
 }

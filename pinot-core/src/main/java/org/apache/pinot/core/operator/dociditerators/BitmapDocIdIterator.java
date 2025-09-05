@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import org.apache.pinot.segment.spi.Constants;
+import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.PeekableIntIterator;
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
@@ -26,36 +27,90 @@ import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 /**
  * The {@code BitmapDocIdIterator} is the bitmap-based iterator to iterate on a bitmap of matching document ids.
  */
-public final class BitmapDocIdIterator implements BitmapBasedDocIdIterator {
-  private final ImmutableRoaringBitmap _docIds;
-  private final PeekableIntIterator _docIdIterator;
-  private final int _numDocs;
+public abstract class BitmapDocIdIterator implements BitmapBasedDocIdIterator {
+  protected final ImmutableRoaringBitmap _docIds;
+  protected final int _numDocs;
 
-  public BitmapDocIdIterator(ImmutableRoaringBitmap docIds, int numDocs) {
+  private BitmapDocIdIterator(ImmutableRoaringBitmap docIds, int numDocs) {
     _docIds = docIds;
-    _docIdIterator = docIds.getIntIterator();
     _numDocs = numDocs;
   }
+
+  public static BitmapDocIdIterator create(ImmutableRoaringBitmap docIds, int numDocs, boolean ascending) {
+    return ascending ? new Asc(docIds, numDocs) : new Desc(docIds, numDocs);
+  }
+
+  public abstract boolean isAscending();
 
   @Override
   public ImmutableRoaringBitmap getDocIds() {
     return _docIds;
   }
 
-  @Override
-  public int next() {
-    if (_docIdIterator.hasNext()) {
-      int docId = _docIdIterator.next();
-      if (docId < _numDocs) {
-        return docId;
-      }
+  private static final class Asc extends BitmapDocIdIterator {
+    private final PeekableIntIterator _docIdIterator;
+
+    private Asc(ImmutableRoaringBitmap docIds, int numDocs) {
+      super(docIds, numDocs);
+      _docIdIterator = docIds.getIntIterator();
     }
-    return Constants.EOF;
+
+    @Override
+    public int next() {
+      if (_docIdIterator.hasNext()) {
+        int docId = _docIdIterator.next();
+        if (docId < _numDocs) {
+          return docId;
+        }
+      }
+      return Constants.EOF;
+    }
+
+    @Override
+    public int advance(int targetDocId) {
+      _docIdIterator.advanceIfNeeded(targetDocId);
+      return next();
+    }
+
+    @Override
+    public boolean isAscending() {
+      return true;
+    }
   }
 
-  @Override
-  public int advance(int targetDocId) {
-    _docIdIterator.advanceIfNeeded(targetDocId);
-    return next();
+  private static final class Desc extends BitmapDocIdIterator {
+    private final IntIterator _docIdIterator;
+
+    private Desc(ImmutableRoaringBitmap docIds, int numDocs) {
+      super(docIds, numDocs);
+      _docIdIterator = docIds.getReverseIntIterator();
+    }
+
+    @Override
+    public int next() {
+      while (_docIdIterator.hasNext()) {
+        int docId = _docIdIterator.next();
+        if (docId >= _numDocs) { // this should not happen very often
+          continue;
+        }
+        return docId;
+      }
+      return Constants.EOF;
+    }
+
+    @Override
+    public int advance(int targetDocId) {
+      int next = next();
+      while (next > targetDocId) {
+        assert next != Constants.EOF : "This code assumes that Constants.EOF is < 0";
+        next = next();
+      }
+      return next;
+    }
+
+    @Override
+    public boolean isAscending() {
+      return false;
+    }
   }
 }
