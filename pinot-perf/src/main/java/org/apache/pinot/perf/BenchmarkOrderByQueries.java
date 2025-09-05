@@ -200,13 +200,13 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
     if (_zasc) {
     return getBrokerResponse(
         "SELECT SORTED_COL "
-              + "FROM sorted "
+              + "FROM MyTable "
             + "ORDER BY SORTED_COL ASC "
               + "LIMIT " + _limit);
     } else {
     return getBrokerResponse(
         "SELECT SORTED_COL "
-              + "FROM sorted "
+              + "FROM MyTable "
               + "ORDER BY SORTED_COL DESC "
               + "LIMIT " + _limit);
     }
@@ -216,13 +216,13 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
     if (_zasc) {
     return getBrokerResponse(
         "SELECT SORTED_COL "
-              + "FROM sorted "
+              + "FROM MyTable "
               + "ORDER BY SORTED_COL ASC, LOW_CARDINALITY_STRING_COL "
               + "LIMIT " + _limit);
     } else {
     return getBrokerResponse(
         "SELECT SORTED_COL "
-              + "FROM sorted "
+              + "FROM MyTable "
             + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
               + "LIMIT " + _limit);
     }
