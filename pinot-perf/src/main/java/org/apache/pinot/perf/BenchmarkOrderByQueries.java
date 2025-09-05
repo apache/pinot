@@ -59,16 +59,15 @@ import org.openjdk.jmh.runner.options.OptionsBuilder;
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.MILLISECONDS)
 @Fork(1)
-@Warmup(iterations = 1, time = 1)
-@Measurement(iterations = 1, time = 1)
+@Warmup(iterations = 5, time = 1)
+@Measurement(iterations = 5, time = 1)
 @State(Scope.Benchmark)
 public class BenchmarkOrderByQueries extends BaseQueriesTest {
 
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder()
-        .include(BenchmarkOrderByQueries.class.getSimpleName())
-        .addProfiler(JavaFlightRecorderProfiler.class);
+        .include(BenchmarkOrderByQueries.class.getSimpleName());
     new Runner(opt.build()).run();
   }
 
@@ -77,11 +76,11 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
 
   @Param({"true", "false"})
-  private boolean _asc;
+  private boolean _zasc; // called zasc just to force this parameter to be the last used in the report
   @Param("1500000")
   private int _numRows;
-  @Param({"EXP(0.5)"})
-  String _scenario;
+  //@Param({"EXP(0.5)"})
+  String _scenario = "EXP(0.5)";
   @Param({"1", "1000"})
   int _primaryRepetitions;
   @Param({"1500", "150000"})
@@ -143,7 +142,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
 
   @Benchmark
   public BrokerResponseNative sortedTotally() {
-    if (_asc) {
+    if (_zasc) {
       return getBrokerResponse(
           "SELECT SORTED_COL "
               + "FROM sorted "
@@ -159,7 +158,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   }
   @Benchmark
   public BrokerResponseNative sortedPartially() {
-    if (_asc) {
+    if (_zasc) {
       return getBrokerResponse(
           "SELECT SORTED_COL "
               + "FROM sorted "
