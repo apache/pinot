@@ -23,6 +23,7 @@ import org.apache.pinot.common.audit.AuditIdentityResolver;
 import org.apache.pinot.common.audit.AuditRequestProcessor;
 import org.apache.pinot.common.audit.AuditUrlPathFilter;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
+import org.apache.pinot.spi.services.ServiceRole;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 
 
@@ -32,15 +33,17 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
  */
 public class AuditServiceBinder extends AbstractBinder {
   private final DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
+  private final ServiceRole _serviceRole;
 
-  public AuditServiceBinder(DefaultClusterConfigChangeHandler clusterConfigChangeHandler) {
+  public AuditServiceBinder(DefaultClusterConfigChangeHandler clusterConfigChangeHandler, ServiceRole serviceRole) {
     _clusterConfigChangeHandler = clusterConfigChangeHandler;
+    _serviceRole = serviceRole;
   }
 
   @Override
   protected void configure() {
     // Create and initialize AuditConfigManager
-    AuditConfigManager auditConfigManager = new AuditConfigManager();
+    AuditConfigManager auditConfigManager = new AuditConfigManager(_serviceRole);
 
     // Register with cluster config change handler
     _clusterConfigChangeHandler.registerClusterConfigChangeListener(auditConfigManager);
