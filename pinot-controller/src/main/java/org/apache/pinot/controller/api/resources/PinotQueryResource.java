@@ -267,10 +267,12 @@ public class PinotQueryResource {
       _sqls = sqls;
     }
 
+    @Nullable
     public List<String> getSqls() {
       return _sqls;
     }
 
+    @Nullable
     public String getSql() {
       return _sql;
     }
