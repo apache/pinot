@@ -88,4 +88,216 @@ public class SortedDescDocIdIteratorTest {
       }
     }
   }
+
+  @Test
+  public void testAdvanceToDocumentBeforeFirstRange() {
+    // Test advancing to a document ID that's before all ranges
+    List<Pairs.IntPair> docIdRanges = Arrays.asList(
+        new Pairs.IntPair(10, 15),
+        new Pairs.IntPair(20, 25)
+    );
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      // Advance to document 5, which is before all ranges
+      assertEquals(iterator.advance(5), Constants.EOF);
+    }
+  }
+
+  @Test
+  public void testAdvanceToDocumentAfterLastRange() {
+    // Test advancing to a document ID that's after all ranges
+    List<Pairs.IntPair> docIdRanges = Arrays.asList(
+        new Pairs.IntPair(10, 15),
+        new Pairs.IntPair(20, 25)
+    );
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      // Advance to document 30, which is after all ranges
+      assertEquals(iterator.advance(30), 25);
+      assertEquals(iterator.next(), 24);
+    }
+  }
+
+  @Test
+  public void testAdvanceToExactRangeBoundaries() {
+    // Test advancing to exact start and end boundaries of ranges
+    List<Pairs.IntPair> docIdRanges = Arrays.asList(
+        new Pairs.IntPair(10, 15),
+        new Pairs.IntPair(20, 25)
+    );
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      // Advance to exact end of first range
+      assertEquals(iterator.advance(15), 15);
+      assertEquals(iterator.next(), 14);
+
+      // Advance to exact start of second range
+      assertEquals(iterator.advance(20), 20);
+      assertEquals(iterator.next(), Constants.EOF);
+    }
+  }
+
+  @Test
+  public void testAdvanceToGapBetweenRanges() {
+    // Test advancing to document IDs in gaps between ranges
+    List<Pairs.IntPair> docIdRanges = Arrays.asList(
+        new Pairs.IntPair(10, 15),
+        new Pairs.IntPair(20, 25),
+        new Pairs.IntPair(30, 35)
+    );
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      // Advance to gap between first and second range
+      assertEquals(iterator.advance(18), 15);
+
+      // Advance to gap between second and third range
+      assertEquals(iterator.advance(28), 25);
+    }
+  }
+
+  @Test
+  public void testEmptyRangesList() {
+    // Test with empty list of ranges
+    List<Pairs.IntPair> docIdRanges = Collections.emptyList();
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.next(), Constants.EOF);
+      assertEquals(iterator.advance(10), Constants.EOF);
+    }
+  }
+
+  @Test
+  public void testSingleDocumentRanges() {
+    // Test with multiple single-document ranges
+    List<Pairs.IntPair> docIdRanges = Arrays.asList(
+        new Pairs.IntPair(5, 5),
+        new Pairs.IntPair(10, 10),
+        new Pairs.IntPair(15, 15)
+    );
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.next(), 15);
+      assertEquals(iterator.next(), 10);
+      assertEquals(iterator.next(), 5);
+      assertEquals(iterator.next(), Constants.EOF);
+    }
+  }
+
+  @Test
+  public void testAdvanceWithinCurrentRange() {
+    // Test advancing to different positions within the current range
+    List<Pairs.IntPair> docIdRanges = Collections.singletonList(new Pairs.IntPair(10, 20));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.next(), 20);
+      assertEquals(iterator.next(), 19);
+
+      // Advance within current range to a lower value
+      assertEquals(iterator.advance(15), 15);
+      assertEquals(iterator.next(), 14);
+
+      // Advance within current range to an even lower value
+      assertEquals(iterator.advance(12), 12);
+    }
+  }
+
+  @Test
+  public void testAdvanceToCurrentDocId() {
+    // Test advancing to the current document ID
+    List<Pairs.IntPair> docIdRanges = Collections.singletonList(new Pairs.IntPair(10, 15));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.next(), 15);
+
+      // Advance to current position
+      assertEquals(iterator.advance(15), Constants.EOF); // Should be EOF since we already consumed 15
+    }
+  }
+
+  @Test
+  public void testLargeRangeWithManyDocuments() {
+    // Test with a large range to ensure performance
+    List<Pairs.IntPair> docIdRanges = Collections.singletonList(new Pairs.IntPair(1000, 2000));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.next(), 2000);
+      assertEquals(iterator.advance(1500), 1500);
+      assertEquals(iterator.advance(1200), 1200);
+      assertEquals(iterator.next(), 1199);
+    }
+  }
+
+  @Test
+  public void testAdvanceWithNegativeDocId() {
+    // Test advancing to negative document ID (edge case)
+    List<Pairs.IntPair> docIdRanges = Collections.singletonList(new Pairs.IntPair(5, 10));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.advance(-1), Constants.EOF);
+    }
+  }
+
+  @Test
+  public void testAdvanceToZero() {
+    // Test advancing to document ID 0
+    List<Pairs.IntPair> docIdRanges = Arrays.asList(
+        new Pairs.IntPair(0, 5),
+        new Pairs.IntPair(10, 15)
+    );
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.advance(0), 0);
+      assertEquals(iterator.next(), Constants.EOF);
+    }
+  }
+
+  @Test
+  public void testMixedAdvanceAndNextAfterExhaustion() {
+    // Test behavior after iterator is exhausted
+    List<Pairs.IntPair> docIdRanges = Collections.singletonList(new Pairs.IntPair(5, 7));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.next(), 7);
+      assertEquals(iterator.next(), 6);
+      assertEquals(iterator.next(), 5);
+      assertEquals(iterator.next(), Constants.EOF);
+
+      // After exhaustion, both next() and advance() should return EOF
+      assertEquals(iterator.next(), Constants.EOF);
+      assertEquals(iterator.advance(10), Constants.EOF);
+      assertEquals(iterator.advance(3), Constants.EOF);
+    }
+  }
+
+  @Test
+  public void testDocIdRangeAtMaxValue() {
+    // Test with document IDs near Integer.MAX_VALUE
+    List<Pairs.IntPair> docIdRanges = Collections.singletonList(
+        new Pairs.IntPair(Integer.MAX_VALUE - 5, Integer.MAX_VALUE - 1)
+    );
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.next(), Integer.MAX_VALUE - 1);
+      assertEquals(iterator.advance(Integer.MAX_VALUE - 3), Integer.MAX_VALUE - 3);
+      assertEquals(iterator.next(), Integer.MAX_VALUE - 4);
+    }
+  }
+
+  @Test
+  public void testSequentialAdvanceCalls() {
+    // Test multiple sequential advance calls
+    List<Pairs.IntPair> docIdRanges = Arrays.asList(
+        new Pairs.IntPair(10, 20),
+        new Pairs.IntPair(30, 40)
+    );
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
+    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      assertEquals(iterator.advance(35), 35);
+      assertEquals(iterator.advance(32), 32);
+      assertEquals(iterator.advance(25), 20);
+      assertEquals(iterator.advance(15), 15);
+      assertEquals(iterator.advance(10), 10);
+      assertEquals(iterator.advance(5), Constants.EOF);
+    }
+  }
 }
