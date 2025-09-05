@@ -20,6 +20,7 @@ package org.apache.pinot.common.audit;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -41,7 +42,7 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
   private static final Logger LOG = LoggerFactory.getLogger(AuditConfigManager.class);
   private static final String AUDIT_CONFIG_PREFIX = "pinot.audit";
   private static final Map<ServiceRole, String> SERVICE_ROLE_CONFIG_PREFIX_MAP =
-      Map.of(ServiceRole.CONTROLLER, "controller");
+      Map.of(ServiceRole.CONTROLLER, "controller", ServiceRole.SERVER, "server", ServiceRole.BROKER, "broker");
 
   private final String _configPrefix;
   private AuditConfig _currentConfig = new AuditConfig();
@@ -64,8 +65,9 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
   }
 
   private static String constructAuditConfigPrefix(ServiceRole serviceRole) {
-    // TODO Implement broker handling of audit config. Currently hardcoded to controller always
-    return AUDIT_CONFIG_PREFIX + "." + SERVICE_ROLE_CONFIG_PREFIX_MAP.get(ServiceRole.CONTROLLER);
+    String componentPrefix = SERVICE_ROLE_CONFIG_PREFIX_MAP.get(serviceRole);
+    Objects.requireNonNull(componentPrefix, "Unsupported service role: " + serviceRole);
+    return AUDIT_CONFIG_PREFIX + "." + componentPrefix;
   }
 
   public AuditConfig getCurrentConfig() {

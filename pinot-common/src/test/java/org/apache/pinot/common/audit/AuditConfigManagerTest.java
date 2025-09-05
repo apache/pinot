@@ -265,4 +265,37 @@ public class AuditConfigManagerTest {
     AuditConfig config4 = AuditConfigManager.buildFromClusterConfig(properties, "pinot.audit.controller");
     assertThat(config4.getCaptureRequestHeaders()).isEqualTo("Content-Type,X-Request-ID,User-Agent,X-Custom-123");
   }
+
+  @Test
+  public void testControllerConfigIgnoresBrokerConfig() {
+    // Given - Both controller and broker configs are present
+    Map<String, String> properties = new HashMap<>();
+
+    // Controller configs (should be read)
+    properties.put("pinot.audit.controller.enabled", "true");
+    properties.put("pinot.audit.controller.capture.request.payload.enabled", "true");
+    properties.put("pinot.audit.controller.capture.request.headers", "X-Controller-Header");
+    properties.put("pinot.audit.controller.request.payload.size.max.bytes", "10000");
+    properties.put("pinot.audit.controller.url.filter.exclude.patterns", "/controller/health");
+
+    // Broker configs (should be ignored by controller)
+    properties.put("pinot.audit.broker.enabled", "false");
+    properties.put("pinot.audit.broker.capture.request.payload.enabled", "false");
+    properties.put("pinot.audit.broker.capture.request.headers", "X-Broker-Header");
+    properties.put("pinot.audit.broker.request.payload.size.max.bytes", "5000");
+    properties.put("pinot.audit.broker.url.filter.exclude.patterns", "/broker/health");
+
+    AuditConfigManager controllerManager = new AuditConfigManager(ServiceRole.CONTROLLER);
+
+    // When
+    controllerManager.onChange(properties.keySet(), properties);
+
+    // Then - Verify controller reads only controller configs, ignoring broker configs
+    AuditConfig config = controllerManager.getCurrentConfig();
+    assertThat(config.isEnabled()).isTrue(); // From controller config, not broker
+    assertThat(config.isCaptureRequestPayload()).isTrue(); // From controller config, not broker
+    assertThat(config.getCaptureRequestHeaders()).isEqualTo("X-Controller-Header"); // Controller header, not broker
+    assertThat(config.getMaxPayloadSize()).isEqualTo(10000); // Controller size, not broker
+    assertThat(config.getUrlFilterExcludePatterns()).isEqualTo("/controller/health"); // Controller pattern, not broker
+  }
 }
