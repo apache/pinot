@@ -1087,7 +1087,7 @@ public class TablesResource {
         }
       }
     } catch (ConcurrentModificationException e) {
-      LOGGER.warn("Multi-threaded access is unsafe for KafkaConsumer, caught exception while fetching stream offset",
+      LOGGER.warn("Multi-threaded access is unsafe for KafkaConsumer, caught exception when fetching stream offset",
           e);
       return segmentConsumerInfoList;
     } catch (Exception e) {
