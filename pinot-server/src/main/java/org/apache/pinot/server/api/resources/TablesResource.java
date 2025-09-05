@@ -1084,11 +1084,10 @@ public class TablesResource {
               new SegmentConsumerInfo.PartitionOffsetInfo(partitiionToOffsetMap, partitionStateMap.entrySet().stream()
                   .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUpstreamLatestOffset().toString())),
                   recordsLagMap, availabilityLagMsMap)));
-          throw new ConcurrentModificationException("concurrent modification is not possible when multiple access on Kafka Consumer");
         }
       }
     } catch (ConcurrentModificationException e) {
-      LOGGER.warn("Multi-threaded access is not safe for KafkaConsumer, caught exception while fetching stream offset",
+      LOGGER.warn("Multi-threaded access is unsafe for KafkaConsumer, caught exception while fetching stream offset",
           e);
       return segmentConsumerInfoList;
     } catch (Exception e) {
