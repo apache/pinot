@@ -18,10 +18,6 @@
  */
 package org.apache.pinot.server.starter.helix;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import java.util.concurrent.TimeUnit;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.NotificationContext;
 import org.apache.helix.model.Message;
 import org.apache.helix.participant.statemachine.StateModel;
@@ -30,7 +26,6 @@ import org.apache.helix.participant.statemachine.StateModelInfo;
 import org.apache.helix.participant.statemachine.Transition;
 import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
-import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,12 +37,6 @@ import org.slf4j.LoggerFactory;
  * 3. Delete an existed segment.
  */
 public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<StateModel> {
-  // NOTE: Helix might process CONSUMING -> DROPPED transition as 2 separate transitions: CONSUMING -> OFFLINE followed
-  // by OFFLINE -> DROPPED. Use this cache to track the segments that just went through CONSUMING -> OFFLINE transition
-  // to detect CONSUMING -> DROPPED transition.
-  // TODO: Check how Helix handle CONSUMING -> DROPPED transition and remove this cache if it's not needed.
-  private final Cache<Pair<String, String>, Boolean> _recentlyOffloadedConsumingSegments =
-      CacheBuilder.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).build();
 
   private final String _instanceId;
   private final InstanceDataManager _instanceDataManager;
@@ -114,7 +103,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         String realtimeTableName = message.getResourceName();
         String segmentName = message.getPartitionName();
         _instanceDataManager.offloadSegment(realtimeTableName, segmentName);
-        _recentlyOffloadedConsumingSegments.put(Pair.of(realtimeTableName, segmentName), true);
         onConsumingToOffline(realtimeTableName, segmentName);
       } catch (Exception e) {
         _logger.error(
@@ -210,15 +198,6 @@ public class SegmentOnlineOfflineStateModelFactory extends StateModelFactory<Sta
         String tableNameWithType = message.getResourceName();
         String segmentName = message.getPartitionName();
         _instanceDataManager.deleteSegment(tableNameWithType, segmentName);
-
-        // Check if the segment is recently offloaded from CONSUMING to OFFLINE
-        if (TableNameBuilder.isRealtimeTableResource(tableNameWithType)) {
-          Pair<String, String> tableSegmentPair = Pair.of(tableNameWithType, segmentName);
-          if (_recentlyOffloadedConsumingSegments.getIfPresent(tableSegmentPair) != null) {
-            _recentlyOffloadedConsumingSegments.invalidate(tableSegmentPair);
-            onConsumingToDropped(tableNameWithType, segmentName);
-          }
-        }
       } catch (Exception e) {
         _logger.error(
             "Caught exception while processing SegmentOnlineOfflineStateModel.onBecomeDroppedFromOffline() for table: "
