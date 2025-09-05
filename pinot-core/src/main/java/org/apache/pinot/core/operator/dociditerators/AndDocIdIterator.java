@@ -110,11 +110,11 @@ public class AndDocIdIterator implements BlockDocIdIterator {
       super(docIdIterators);
       _nextDocId = Integer.MAX_VALUE;
     }
-  }
 
-  @Override
-  public int next() {
-    _nextDocId = findNextCommonMatch();
-    return _nextDocId--;
+    @Override
+    public int next() {
+      _nextDocId = findNextCommonMatch();
+      return _nextDocId--;
+    }
   }
 }
