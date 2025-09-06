@@ -18,6 +18,10 @@ bin/
 out/
 .DS_Store
 test-output
+
+# Claude Code local files
+.claude/
+CLAUDE.md
 pinot-broker/test-output/
 pinot-core/test-output/
 *.log

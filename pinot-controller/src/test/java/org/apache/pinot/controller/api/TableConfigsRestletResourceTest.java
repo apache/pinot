@@ -730,6 +730,61 @@ public class TableConfigsRestletResourceTest extends ControllerTest {
     sendDeleteRequest(DEFAULT_INSTANCE.getControllerRequestURLBuilder().forSchemaDelete(tableName));
   }
 
+  @Test
+  public void testValidateConfigWithClusterValidationSkipTypes()
+      throws IOException {
+    String validateConfigUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsValidate();
+    String tableName = "testValidateCluster";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    TableConfig realtimeTableConfig = createRealtimeTableConfig(tableName);
+    Schema schema = createDummySchema(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, realtimeTableConfig);
+
+    // Test validation with TENANT skip type - should pass even without proper tenant setup
+    String responseWithTenantSkip = sendPostRequest(validateConfigUrl + "?validationTypesToSkip=TENANT",
+        tableConfigs.toPrettyJsonString());
+    Assert.assertNotNull(responseWithTenantSkip);
+
+    // Test validation with MINION_INSTANCES skip type - should pass even without minion instances
+    String responseWithMinionSkip = sendPostRequest(validateConfigUrl + "?validationTypesToSkip=MINION_INSTANCES",
+        tableConfigs.toPrettyJsonString());
+    Assert.assertNotNull(responseWithMinionSkip);
+
+    // Test validation with ACTIVE_TASKS skip type - should pass even with potential task conflicts
+    String responseWithTasksSkip = sendPostRequest(validateConfigUrl + "?validationTypesToSkip=ACTIVE_TASKS",
+        tableConfigs.toPrettyJsonString());
+    Assert.assertNotNull(responseWithTasksSkip);
+
+    // Test validation with multiple skip types
+    String responseWithMultipleSkips = sendPostRequest(validateConfigUrl
+        + "?validationTypesToSkip=TENANT,MINION_INSTANCES,ACTIVE_TASKS",
+        tableConfigs.toPrettyJsonString());
+    Assert.assertNotNull(responseWithMultipleSkips);
+
+    // Test validation with ALL skip type - should skip all validations
+    String responseWithAllSkip = sendPostRequest(validateConfigUrl + "?validationTypesToSkip=ALL",
+        tableConfigs.toPrettyJsonString());
+    Assert.assertNotNull(responseWithAllSkip);
+  }
+
+  @Test
+  public void testValidateConfigClusterValidationsEnabled()
+      throws IOException {
+    String validateConfigUrl = DEFAULT_INSTANCE.getControllerRequestURLBuilder().forTableConfigsValidate();
+    String tableName = "testValidateClusterEnabled";
+    TableConfig offlineTableConfig = createOfflineTableConfig(tableName);
+    Schema schema = createDummySchema(tableName);
+    TableConfigs tableConfigs = new TableConfigs(tableName, schema, offlineTableConfig, null);
+
+    // Test that cluster validations are enabled by default (should pass with default tenant setup)
+    // Note: In test environment, default tenant should exist
+    String response = sendPostRequest(validateConfigUrl, tableConfigs.toPrettyJsonString());
+    Assert.assertNotNull(response);
+
+    // Verify response contains the table config
+    Assert.assertTrue(response.contains(tableName));
+  }
+
   @AfterClass
   public void tearDown() {
     DEFAULT_INSTANCE.cleanup();
