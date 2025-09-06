@@ -238,7 +238,7 @@ rules:
     table: "$1$3"
     tableType: "$4"
 
-  # Pinot Broker
+# Pinot Broker
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"BrokerMetrics\", name=\"pinot\\.broker\\.(([^.]+)\\.)?([^.]*)\\.authorization\"><>(\\w+)"
   name: "pinot_broker_authorization_$4"
   cache: true
@@ -592,10 +592,43 @@ rules:
     table: "$1$3"
     tableType: "$4"
     partition: "$5"
-  #grpc related metrics
+# grpc related metrics
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"ServerMetrics\", name=\"pinot\\.server\\.grpc(.+)\"><>(\\w+)"
   name: "pinot_server_grpc$1_$2"
   cache: true
+
+# Kafka Consumer Metrics with Scope-based Approach
+# Consumer-level metrics (most aggregated, usually most reliable)
+- pattern: "kafka\\.consumer<type=consumer-fetch-manager-metrics, client-id=(([^.]+)\\.)?([^,]+)_REALTIME-([^,]+)-(\\d+)><>(fetch-rate|fetch-latency-avg|fetch-throttle-time-avg|bytes-consumed-rate|records-consumed-rate|fetch-size-avg|fetch-size-max|records-per-request-avg)"
+  name: "kafka_consumer_$6"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$3"
+    topic_name: "$4"
+    partition: "$5"
+    scope: "consumer"
+# Topic-level metrics (includes topic information from MBean)
+- pattern: "kafka\\.consumer<type=consumer-fetch-manager-metrics, client-id=(([^.]+)\\.)?([^,]+)_REALTIME-([^,]+)-(\\d+), topic=([^\"]+)><>(bytes-consumed-rate|records-consumed-rate|fetch-size-avg|fetch-size-max|records-per-request-avg)"
+  name: "kafka_consumer_$7"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$3"
+    topic_name: "$4"
+    partition: "$5"
+    scope: "topic"
+# Partition-level metrics (most granular, includes both topic and partition from MBean)
+- pattern: "kafka\\.consumer<type=consumer-fetch-manager-metrics, client-id=(([^.]+)\\.)?([^,]+)_REALTIME-([^,]+)-(\\d+), topic=([^,\"]+), partition=([^\"]+)><>(records-lag-avg|records-lag-max|records-lead-avg|records-lead-min)"
+  name: "kafka_consumer_$8"
+  cache: true
+  labels:
+    database: "$2"
+    table: "$3"
+    topic_name: "$4"
+    partition: "$5"
+    scope: "partition"
+
 
 # Pinot Minions
 - pattern: "\"org\\.apache\\.pinot\\.common\\.metrics\"<type=\"MinionMetrics\", name=\"pinot\\.minion\\.numberOfTasks\\.(([^.]+)\\.)?([^.]*)_(OFFLINE|REALTIME)\"><>(\\w+)"
@@ -628,11 +661,11 @@ rules:
     version: "$2"
 
 
-  ## Metrics that fit the catch-all patterns above should not be added to this file.
-  ## In case a metric does not fit the catch-all patterns, add them before this comment
+## Metrics that fit the catch-all patterns above should not be added to this file.
+## In case a metric does not fit the catch-all patterns, add them before this comment
 
-  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix without topic but containing partition
-  # Patterns after this line may be skipped.
+# This is a catch-all pattern for pinot table metrics with offline/realtime suffix without topic but containing partition
+# Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\d+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$8"
   cache: true
@@ -641,8 +674,8 @@ rules:
     table: "$3$5"
     tableType: "$6"
     partition: "$7"
-  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix without topic or partition info
-  # Patterns after this line may be skipped.
+# This is a catch-all pattern for pinot table metrics with offline/realtime suffix without topic or partition info
+# Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$6_$7"
   cache: true
@@ -650,8 +683,8 @@ rules:
     database: "$3"
     table: "$2$4"
     tableType: "$5"
-  # This is a catch-all pattern for pinot table metrics with offline/realtime suffix with topic and partition
-  # Patterns after this line may be skipped.
+# This is a catch-all pattern for pinot table metrics with offline/realtime suffix with topic and partition
+# Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\\.((\\w+)\\.)?(\\w+)_(OFFLINE|REALTIME)\\-(.+)\\-(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$9"
   cache: true
@@ -668,14 +701,14 @@ rules:
     database: "$4"
     table: "$2$5"
     tableType: "$6"
-  # This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
+# This is a catch-all pattern for pinot table metrics. Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.((\\w+)\\.)?(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$5_$6"
   cache: true
   labels:
     database: "$3"
     table: "$2$4"
-  # This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
+# This is a catch-all pattern for pinot controller metrics not related to tables. Patterns after this line may be skipped.
 - pattern: "\"?org\\.apache\\.pinot\\.common\\.metrics\"?<type=\"?\\w+\"?, name=\"?pinot\\.(\\w+)\\.(\\w+)\"?><>(\\w+)"
   name: "pinot_$1_$2_$3"
   cache: true
