@@ -1159,7 +1159,8 @@ public class MutableSegmentImpl implements MutableSegment {
     FieldSpec fieldSpec = _schema.getFieldSpecFor(column);
     if (fieldSpec != null && fieldSpec.isVirtualColumn()) {
       // Virtual column
-      VirtualColumnContext virtualColumnContext = new VirtualColumnContext(fieldSpec, _numDocsIndexed);
+      VirtualColumnContext virtualColumnContext =
+          new VirtualColumnContext(fieldSpec, _numDocsIndexed, _segmentMetadata);
       return VirtualColumnProviderFactory.buildProvider(virtualColumnContext).buildDataSource(virtualColumnContext);
     }
     return null;
@@ -1174,7 +1175,8 @@ public class MutableSegmentImpl implements MutableSegment {
     FieldSpec fieldSpec = schema.getFieldSpecFor(column);
     Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema: %s", column,
         schema.getSchemaName());
-    return IndexSegmentUtils.createVirtualDataSource(new VirtualColumnContext(fieldSpec, _numDocsIndexed));
+    return IndexSegmentUtils.createVirtualDataSource(
+        new VirtualColumnContext(fieldSpec, _numDocsIndexed, _segmentMetadata));
   }
 
   @Nullable

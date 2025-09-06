@@ -155,6 +155,9 @@ public interface TableCache extends PinotConfigProvider {
     if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true));
     }
+    if (!schema.hasColumn(BuiltInVirtualColumn.PARTITIONID)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.STRING, false));
+    }
   }
 
   static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,

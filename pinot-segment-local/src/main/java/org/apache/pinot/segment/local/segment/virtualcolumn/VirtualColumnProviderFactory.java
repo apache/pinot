@@ -58,5 +58,10 @@ public class VirtualColumnProviderFactory {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true,
           DefaultNullValueVirtualColumnProvider.class, segmentName));
     }
+
+    if (!schema.hasColumn(BuiltInVirtualColumn.PARTITIONID)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.STRING, false,
+          PartitionIdVirtualColumnProvider.class));
+    }
   }
 }
