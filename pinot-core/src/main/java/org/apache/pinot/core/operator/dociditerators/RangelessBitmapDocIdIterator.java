@@ -44,7 +44,7 @@ public final class RangelessBitmapDocIdIterator implements BitmapBasedDocIdItera
 
   @Override
   public int next() {
-    if (_docIdIterator.hasNext()) {
+    if (hasNext()) {
       return _docIdIterator.next();
     } else {
       return Constants.EOF;
@@ -55,5 +55,9 @@ public final class RangelessBitmapDocIdIterator implements BitmapBasedDocIdItera
   public int advance(int targetDocId) {
     _docIdIterator.advanceIfNeeded(targetDocId);
     return next();
+  }
+
+  public boolean hasNext() {
+    return _docIdIterator.hasNext();
   }
 }

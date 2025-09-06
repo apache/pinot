@@ -27,6 +27,8 @@ import java.util.List;
 import java.util.TreeSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.pinot.core.common.BlockDocIdIterator;
+import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
+import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 import org.apache.pinot.segment.spi.Constants;
 import org.testng.Assert;
 import org.testng.annotations.Test;
@@ -180,5 +182,33 @@ public class OrFilterOperatorTest {
 
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getTrues()), Collections.emptyList());
     Assert.assertEquals(TestUtils.getDocIds(orFilterOperator.getFalses()), Arrays.asList(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
+  }
+
+  @Test
+  public void testOrWithMatchAllFilterEarlyTermination() {
+    int numDocs = 10;
+    int[] regularDocIds = new int[]{1, 2, 3};
+
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        Arrays.asList(
+            new TestFilterOperator(regularDocIds, numDocs),
+            new MatchAllFilterOperator(numDocs)
+        ), null, numDocs, false);
+
+    Assert.assertTrue((orFilterOperator.getTrues()).getOptimizedDocIdSet() instanceof MatchAllDocIdSet);
+  }
+
+  @Test
+  public void testOrWithOnlyEmptyFilterEarlyTermination() {
+    int numDocs = 10;
+    int[] emptyDocIds = new int[0];
+
+    OrFilterOperator orFilterOperator = new OrFilterOperator(
+        Arrays.asList(
+            new TestFilterOperator(emptyDocIds, numDocs),
+            new TestFilterOperator(emptyDocIds, numDocs)
+        ), null, numDocs, false);
+
+    Assert.assertTrue(orFilterOperator.getTrues().getOptimizedDocIdSet() instanceof EmptyDocIdSet);
   }
 }

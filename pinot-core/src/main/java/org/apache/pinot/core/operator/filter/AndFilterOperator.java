@@ -53,7 +53,18 @@ public class AndFilterOperator extends BaseFilterOperator {
     Tracing.activeRecording().setNumChildren(_filterOperators.size());
     List<BlockDocIdSet> blockDocIdSets = new ArrayList<>(_filterOperators.size());
     for (BaseFilterOperator filterOperator : _filterOperators) {
-      blockDocIdSets.add(filterOperator.getTrues());
+      BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
+      BlockDocIdSet optimizedDocIdSet = blockDocIdSet.getOptimizedDocIdSet();
+      if (optimizedDocIdSet instanceof EmptyDocIdSet) {
+        return new AndDocIdSet(blockDocIdSets, _queryOptions, true);
+      }
+      if (optimizedDocIdSet instanceof MatchAllDocIdSet) {
+        continue;
+      }
+      blockDocIdSets.add(optimizedDocIdSet);
+    }
+    if (blockDocIdSets.isEmpty()) {
+      return new MatchAllDocIdSet(_numDocs);
     }
     return new AndDocIdSet(blockDocIdSets, _queryOptions);
   }
