@@ -269,14 +269,56 @@ public final class TableConfigUtils {
     }
 
     // Retention may not be specified. Ignore validation in that case.
-    String timeUnitString = segmentsConfig.getRetentionTimeUnit();
-    if (timeUnitString == null || timeUnitString.isEmpty()) {
-      return;
+    String retentionTimeUnitString = segmentsConfig.getRetentionTimeUnit();
+    if (retentionTimeUnitString != null && !retentionTimeUnitString.isEmpty()) {
+      try {
+        TimeUnit.valueOf(retentionTimeUnitString.toUpperCase());
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid retention time unit: %s", tableName, retentionTimeUnitString));
+      }
     }
-    try {
-      TimeUnit.valueOf(timeUnitString.toUpperCase());
-    } catch (Exception e) {
-      throw new IllegalStateException(String.format("Table: %s, invalid time unit: %s", tableName, timeUnitString));
+
+    // Untracked segments retention may not be specified. Ignore validation in that case.
+    String untrackedSegmentsRetentionTimeUnitString = segmentsConfig.getUntrackedSegmentsRetentionTimeUnit();
+    String untrackedSegmentsRetentionTimeValueString = segmentsConfig.getUntrackedSegmentsRetentionTimeValue();
+
+    boolean hasUntrackedTimeUnit =
+        untrackedSegmentsRetentionTimeUnitString != null && !untrackedSegmentsRetentionTimeUnitString.isEmpty();
+    boolean hasUntrackedTimeValue =
+        untrackedSegmentsRetentionTimeValueString != null && !untrackedSegmentsRetentionTimeValueString.isEmpty();
+
+    if (hasUntrackedTimeUnit && !hasUntrackedTimeValue) {
+      throw new IllegalStateException(String.format(
+          "Table: %s, untracked retention time value must be specified when untracked retention time unit is provided",
+          tableName));
+    }
+    if (hasUntrackedTimeValue && !hasUntrackedTimeUnit) {
+      throw new IllegalStateException(String.format(
+          "Table: %s, untracked retention time unit must be specified when untracked retention time value is provided",
+          tableName));
+    }
+
+    if (hasUntrackedTimeUnit) {
+      try {
+        TimeUnit.valueOf(untrackedSegmentsRetentionTimeUnitString.toUpperCase());
+      } catch (Exception e) {
+        throw new IllegalStateException(String.format("Table: %s, invalid untracked retention time unit: %s", tableName,
+            untrackedSegmentsRetentionTimeUnitString));
+      }
+
+      try {
+        long timeValue = Long.parseLong(untrackedSegmentsRetentionTimeValueString);
+        if (timeValue <= 0) {
+          throw new IllegalStateException(
+              String.format("Table: %s, untracked retention time value must be positive: %s", tableName,
+                  untrackedSegmentsRetentionTimeValueString));
+        }
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid untracked retention time value: %s", tableName,
+                untrackedSegmentsRetentionTimeValueString));
+      }
     }
   }
 
