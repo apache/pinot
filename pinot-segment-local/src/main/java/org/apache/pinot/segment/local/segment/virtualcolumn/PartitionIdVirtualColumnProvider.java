@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.segment.local.segment.virtualcolumn;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +34,6 @@ import org.apache.pinot.segment.spi.index.reader.ForwardIndexReaderContext;
 import org.apache.pinot.segment.spi.index.reader.InvertedIndexReader;
 import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
-
 
 
 /**
@@ -154,7 +154,7 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
 
     @Override
     public int[] getDictIdMV(int docId, ForwardIndexReaderContext context) {
-      return _dictIds.clone();
+      return _dictIds;
     }
 
     @Override
@@ -173,12 +173,19 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
    */
   private static class MultiValueConstantStringDictionary extends BaseImmutableDictionary {
     private final List<String> _values;
+    private final Object2IntOpenHashMap<String> _valueToIndexMap;
 
     public MultiValueConstantStringDictionary(List<String> values) {
       super(Math.max(1, values.size())); // Use virtual dictionary constructor
       _values = new ArrayList<>(values);
       if (_values.isEmpty()) {
         _values.add(""); // Ensure at least one value
+      }
+
+      _valueToIndexMap = new Object2IntOpenHashMap<>(_values.size());
+      _valueToIndexMap.defaultReturnValue(-1);
+      for (int i = 0; i < _values.size(); i++) {
+        _valueToIndexMap.put(_values.get(i), i);
       }
     }
 
@@ -189,7 +196,7 @@ public class PartitionIdVirtualColumnProvider implements VirtualColumnProvider {
 
     @Override
     public int insertionIndexOf(String stringValue) {
-      return _values.indexOf(stringValue);
+      return _valueToIndexMap.getInt(stringValue);
     }
 
     @Override

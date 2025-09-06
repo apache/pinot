@@ -191,7 +191,10 @@ public class MutableSegmentImplRawMVTest implements PinotBuffersAfterClassCheckR
     for (FieldSpec fieldSpec : _schema.getAllFieldSpecs()) {
       if (!fieldSpec.isSingleValueField()) {
         String column = fieldSpec.getName();
-        // Skip $partitionId virtual columns as they have different dictionary behavior
+        // Skip $partitionId virtual column because this test is specifically for "raw MV" columns
+        // (MV columns with NO dictionary). $partitionId always has a dictionary
+        // (MultiValueConstantStringDictionary), so it doesn't fit the "raw MV" test pattern
+        // where getDictionary() is expected to return null.
         if (BuiltInVirtualColumn.PARTITIONID.equals(column)) {
           continue;
         }

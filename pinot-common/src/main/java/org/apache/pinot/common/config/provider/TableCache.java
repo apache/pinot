@@ -156,7 +156,7 @@ public interface TableCache extends PinotConfigProvider {
       schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true));
     }
     if (!schema.hasColumn(BuiltInVirtualColumn.PARTITIONID)) {
-    schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.STRING, false));
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.STRING, false));
     }
   }
 

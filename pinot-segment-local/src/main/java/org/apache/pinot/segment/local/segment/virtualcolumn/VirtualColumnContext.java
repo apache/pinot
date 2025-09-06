@@ -30,6 +30,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 public class VirtualColumnContext {
   private final FieldSpec _fieldSpec;
   private final int _totalDocCount;
+  @Nullable
   private final SegmentMetadata _segmentMetadata;
 
   public VirtualColumnContext(FieldSpec fieldSpec, int totalDocCount) {
