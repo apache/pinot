@@ -20,6 +20,7 @@ package org.apache.pinot.common.assignment;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.pinot.common.utils.config.TableConfigUtils;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -40,14 +41,27 @@ public class InstanceAssignmentConfigUtils {
   /**
    * Returns whether the COMPLETED segments should be relocated (offloaded from CONSUMING instances to COMPLETED
    * instances) for a LLC real-time table based on the given table config.
-   * <p>COMPLETED segments should be relocated iff the COMPLETED instance assignment is configured or (for
-   * backward-compatibility) COMPLETED server tag is overridden to be different from the CONSUMING server tag.
+   * <p>COMPLETED segments should be relocated if the COMPLETED instance assignment is configured differently
+   * from CONSUMING instance assignment OR (for backward-compatibility) COMPLETED server tag is overridden to be
+   * different from the CONSUMING server tag.
+   * As of now, tagOverrideConfig is not the source of truth and if configs are different we go with relocation.
+   * If config difference is due to manual error, we still go with relocation.
    */
   public static boolean shouldRelocateCompletedSegments(TableConfig tableConfig) {
     Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
-    return (instanceAssignmentConfigMap != null
-        && instanceAssignmentConfigMap.get(InstancePartitionsType.COMPLETED.toString()) != null)
+    return isDifferentInstanceAssignmentGroup(instanceAssignmentConfigMap)
         || TagNameUtils.isRelocateCompletedSegments(tableConfig.getTenantConfig());
+  }
+
+  /**
+   * Helper function to check if instanceAssignmentConfig is different for CONSUMING and COMPLETED type
+   */
+  private static boolean isDifferentInstanceAssignmentGroup(Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+    String completed = InstancePartitionsType.COMPLETED.toString();
+    String consuming = InstancePartitionsType.CONSUMING.toString();
+    return (instanceAssignmentConfigMap != null
+        && instanceAssignmentConfigMap.get(completed) != null
+        && !(Objects.equals(instanceAssignmentConfigMap.get(completed), instanceAssignmentConfigMap.get(consuming))));
   }
 
   /**

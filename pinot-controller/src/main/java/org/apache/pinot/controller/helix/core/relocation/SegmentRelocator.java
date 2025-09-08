@@ -37,6 +37,7 @@ import org.apache.helix.Criteria;
 import org.apache.helix.InstanceType;
 import org.apache.pinot.common.assignment.InstanceAssignmentConfigUtils;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.utils.config.TierConfigUtils;
 import org.apache.pinot.controller.ControllerConf;
@@ -222,6 +223,7 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
         return;
       }
     }
+    boolean failure = false;
     try {
       // Relocating segments to new tiers needs two sequential actions: table rebalance and local tier migration.
       // Table rebalance moves segments to the new ideal servers, which can change for a segment when its target
@@ -248,16 +250,23 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
           break;
         default:
           LOGGER.error("Relocation failed for table: {}", tableNameWithType);
+          failure = true;
           break;
       }
     } catch (Throwable t) {
       LOGGER.error("Caught exception/error while rebalancing table: {}", tableNameWithType, t);
+      failure = true;
     } finally {
       if (_tablesUndergoingRebalance != null) {
         LOGGER.debug("Done rebalancing table: {}, removing from tablesUndergoingRebalance", tableNameWithType);
         _tablesUndergoingRebalance.remove(tableNameWithType);
       }
+      emitTableRelocationErrorMetrics(tableNameWithType, failure);
     }
+  }
+
+  private void emitTableRelocationErrorMetrics(String tableNameWithType, boolean failure) {
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_RELOCATION_FAILURE, failure ? 1 : 0);
   }
 
   /**
