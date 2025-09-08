@@ -30,20 +30,27 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
   private final String _functionName;
   private final int _numPartitions;
   private final Map<String, String> _functionConfig;
+  private final boolean _allowPartitionRemapping;
 
   public ColumnPartitionConfig(String functionName, int numPartitions) {
-    this(functionName, numPartitions, null);
+    this(functionName, numPartitions, null, null);
+  }
+
+  public ColumnPartitionConfig(String functionName, int numPartitions, @Nullable Map<String, String> functionConfig) {
+    this(functionName, numPartitions, functionConfig, null);
   }
 
   @JsonCreator
   public ColumnPartitionConfig(@JsonProperty(value = "functionName", required = true) String functionName,
       @JsonProperty(value = "numPartitions", required = true) int numPartitions,
-      @JsonProperty(value = "functionConfig") @Nullable Map<String, String> functionConfig) {
+      @JsonProperty(value = "functionConfig") @Nullable Map<String, String> functionConfig,
+      @JsonProperty(value = "allowPartitionRemapping") @Nullable Boolean allowPartitionRemapping) {
     Preconditions.checkArgument(functionName != null, "'functionName' must be configured");
     Preconditions.checkArgument(numPartitions > 0, "'numPartitions' must be positive");
     _functionName = functionName;
     _numPartitions = numPartitions;
     _functionConfig = functionConfig;
+    _allowPartitionRemapping = (allowPartitionRemapping != null) ? allowPartitionRemapping : false;
   }
 
   /**
@@ -72,5 +79,13 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
    */
   public int getNumPartitions() {
     return _numPartitions;
+  }
+
+  /**
+   * Allow partition remapping for this column. This is used when you expand (usually multiple) the number of
+   * partitions for a column. But want to keep the existing partition assignment.
+   */
+  public boolean isAllowPartitionRemapping() {
+    return _allowPartitionRemapping;
   }
 }

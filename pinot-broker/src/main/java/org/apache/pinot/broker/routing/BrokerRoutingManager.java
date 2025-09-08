@@ -772,7 +772,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
                 tableNameWithType, partitionConfig.getKey());
             partitionMetadataManager =
                 new SegmentPartitionMetadataManager(tableNameWithType, partitionConfig.getKey(),
-                    partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions());
+                    partitionConfig.getValue().getFunctionName(), partitionConfig.getValue().getNumPartitions(),
+                    partitionConfig.getValue().isAllowPartitionRemapping());
           } else {
             LOGGER.warn(
                 "Cannot enable SegmentPartitionMetadataManager for table: {} with multiple partition columns: {}",
