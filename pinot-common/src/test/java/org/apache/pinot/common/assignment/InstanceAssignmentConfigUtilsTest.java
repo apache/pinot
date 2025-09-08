@@ -48,7 +48,8 @@ public class InstanceAssignmentConfigUtilsTest {
     instanceAssignmentConfigMap.put(InstancePartitionsType.COMPLETED.toString(),
         getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.FD_AWARE_INSTANCE_PARTITION_SELECTOR));
     instanceAssignmentConfigMap.put(InstancePartitionsType.CONSUMING.toString(),
-        getInstanceAssignmentConfig(InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR));
+        getInstanceAssignmentConfig(
+            InstanceAssignmentConfig.PartitionSelector.IMPLICIT_REALTIME_TABLE_PARTITION_SELECTOR));
     TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName("testTable")
         .setInstanceAssignmentConfigMap(instanceAssignmentConfigMap).build();
     Assert.assertTrue(InstanceAssignmentConfigUtils.shouldRelocateCompletedSegments(tableConfig));

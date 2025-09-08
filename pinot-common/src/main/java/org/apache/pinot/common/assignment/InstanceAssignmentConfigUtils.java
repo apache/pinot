@@ -48,7 +48,8 @@ public class InstanceAssignmentConfigUtils {
    * If config difference is due to manual error, we still go with relocation.
    */
   public static boolean shouldRelocateCompletedSegments(TableConfig tableConfig) {
-    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap = tableConfig.getInstanceAssignmentConfigMap();
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
+        tableConfig.getInstanceAssignmentConfigMap();
     return isDifferentInstanceAssignmentGroup(instanceAssignmentConfigMap)
         || TagNameUtils.isRelocateCompletedSegments(tableConfig.getTenantConfig());
   }
@@ -56,7 +57,8 @@ public class InstanceAssignmentConfigUtils {
   /**
    * Helper function to check if instanceAssignmentConfig is different for CONSUMING and COMPLETED type
    */
-  private static boolean isDifferentInstanceAssignmentGroup(Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap) {
+  private static boolean isDifferentInstanceAssignmentGroup(Map<String,
+      InstanceAssignmentConfig> instanceAssignmentConfigMap) {
     String completed = InstancePartitionsType.COMPLETED.toString();
     String consuming = InstancePartitionsType.CONSUMING.toString();
     return (instanceAssignmentConfigMap != null

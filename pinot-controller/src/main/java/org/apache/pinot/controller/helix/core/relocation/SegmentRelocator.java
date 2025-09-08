@@ -266,7 +266,8 @@ public class SegmentRelocator extends ControllerPeriodicTask<Void> {
   }
 
   private void emitTableRelocationErrorMetrics(String tableNameWithType, boolean failure) {
-    _controllerMetrics.setValueOfTableGauge(tableNameWithType, ControllerGauge.SEGMENT_RELOCATION_FAILURE, failure ? 1 : 0);
+    _controllerMetrics.setValueOfTableGauge(tableNameWithType,
+        ControllerGauge.SEGMENT_RELOCATION_FAILURE, failure ? 1 : 0);
   }
 
   /**
