@@ -99,6 +99,11 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     SegmentPartitionInfo segmentPartitionInfo =
         SegmentPartitionUtils.extractPartitionInfo(_tableNameWithType, _partitionColumn, segment, znRecord);
     if (segmentPartitionInfo == null || segmentPartitionInfo == SegmentPartitionUtils.INVALID_PARTITION_INFO) {
+      // Fall back to derive partition id from segment name (works for consuming LLC segments)
+      Integer partitionIdFromName = SegmentUtils.getPartitionIdFromSegmentName(segment);
+      if (partitionIdFromName != null) {
+        return _allowPartitionRemapping ? (partitionIdFromName % _numPartitions) : partitionIdFromName;
+      }
       return INVALID_PARTITION_ID;
     }
     if (!_partitionColumn.equals(segmentPartitionInfo.getPartitionColumn())) {

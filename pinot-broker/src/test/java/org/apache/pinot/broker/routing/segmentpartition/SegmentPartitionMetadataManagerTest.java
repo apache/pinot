@@ -51,6 +51,7 @@ import static org.testng.Assert.assertTrue;
 
 public class SegmentPartitionMetadataManagerTest extends ControllerTest {
   private static final String OFFLINE_TABLE_NAME = "testTable_OFFLINE";
+  private static final String REALTIME_TABLE_NAME = "testTable_REALTIME";
   private static final String PARTITION_COLUMN = "memberId";
   private static final String PARTITION_COLUMN_FUNC = "Murmur";
   private static final int NUM_PARTITIONS = 2;
@@ -75,6 +76,54 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
   public void tearDown() {
     _zkClient.close();
     stopZk();
+  }
+
+  @Test
+  public void testConsumingSegmentPartitionRemappingFromName() {
+    ExternalView externalView = new ExternalView(REALTIME_TABLE_NAME);
+    Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
+    Set<String> onlineSegments = new HashSet<>();
+    IdealState idealState = new IdealState(REALTIME_TABLE_NAME);
+
+    // Enable remapping to 4 table partitions, and do not set any ZK partition metadata for segments.
+    // The partition id should be derived from the LLC segment name and modulo-applied.
+    SegmentPartitionMetadataManager partitionMetadataManager =
+        new SegmentPartitionMetadataManager(REALTIME_TABLE_NAME, PARTITION_COLUMN, PARTITION_COLUMN_FUNC, 4, true);
+    SegmentZkMetadataFetcher segmentZkMetadataFetcher =
+        new SegmentZkMetadataFetcher(REALTIME_TABLE_NAME, _propertyStore);
+    segmentZkMetadataFetcher.register(partitionMetadataManager);
+
+    // Init with empty state
+    segmentZkMetadataFetcher.init(idealState, externalView, onlineSegments);
+
+    // Add two consuming (LLC) segments whose names encode partition ids 1 and 5 respectively.
+    // With 4 table partitions and remapping enabled, both should map to partition 1 (1 % 4 = 1, 5 % 4 = 1).
+    String llcSegmentP1 = "testTable__1__100__1716185755000";
+    String llcSegmentP5 = "testTable__5__101__1716185756000";
+    onlineSegments.add(llcSegmentP1);
+    onlineSegments.add(llcSegmentP5);
+    segmentAssignment.put(llcSegmentP1, Collections.singletonMap(SERVER_0, ONLINE));
+    segmentAssignment.put(llcSegmentP5, Collections.singletonMap(SERVER_0, ONLINE));
+
+    // Do NOT write any ZK metadata for these segments so that the code falls back to parsing from the name.
+    segmentZkMetadataFetcher.onAssignmentChange(idealState, externalView, onlineSegments);
+
+    TablePartitionReplicatedServersInfo tablePartitionReplicatedServersInfo = partitionMetadataManager
+        .getTablePartitionReplicatedServersInfo();
+    TablePartitionReplicatedServersInfo.PartitionInfo[] partitionInfoMap =
+        tablePartitionReplicatedServersInfo.getPartitionInfoMap();
+
+    // Partition 1 should contain both segments and be fully replicated on SERVER_0
+    assertEquals(partitionInfoMap[1]._fullyReplicatedServers, Collections.singleton(SERVER_0));
+    assertEqualsNoOrder(partitionInfoMap[1]._segments.toArray(), new String[]{llcSegmentP1, llcSegmentP5});
+
+    // Other partitions should be null
+    assertNull(partitionInfoMap[0]);
+    assertNull(partitionInfoMap[2]);
+    assertNull(partitionInfoMap[3]);
+
+    // No invalid segments expected
+    assertTrue(tablePartitionReplicatedServersInfo.getSegmentsWithInvalidPartition().isEmpty());
   }
 
   @Test
@@ -276,7 +325,6 @@ public class SegmentPartitionMetadataManagerTest extends ControllerTest {
   public void testPartitionIdRemappingLogic() {
     ExternalView externalView = new ExternalView(OFFLINE_TABLE_NAME);
     Map<String, Map<String, String>> segmentAssignment = externalView.getRecord().getMapFields();
-    Map<String, String> onlineInstanceStateMap = ImmutableMap.of(SERVER_0, ONLINE, SERVER_1, ONLINE);
     Set<String> onlineSegments = new HashSet<>();
     IdealState idealState = new IdealState(OFFLINE_TABLE_NAME);
 
