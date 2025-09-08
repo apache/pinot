@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.config.table;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -85,6 +86,7 @@ public class ColumnPartitionConfig extends BaseJsonConfig {
    * Allow partition remapping for this column. This is used when you expand (usually multiple) the number of
    * partitions for a column. But want to keep the existing partition assignment.
    */
+  @JsonInclude(JsonInclude.Include.NON_DEFAULT)
   public boolean isAllowPartitionRemapping() {
     return _allowPartitionRemapping;
   }
