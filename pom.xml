@@ -178,12 +178,12 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.33.1</aws.sdk.version>
-    <azure.sdk.version>1.2.37</azure.sdk.version>
+    <aws.sdk.version>2.33.3</aws.sdk.version>
+    <azure.sdk.version>1.2.38</azure.sdk.version>
     <azure.msal4j.version>1.23.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
     <janino.version>3.1.12</janino.version>
-    <sslcontext.kickstart.version>9.1.0</sslcontext.kickstart.version>
+    <sslcontext.kickstart.version>9.2.1</sslcontext.kickstart.version>
     <jbcrypt.version>0.4</jbcrypt.version>
     <plexus-classworlds.version>2.9.0</plexus-classworlds.version>
     <scala-xml.version>2.4.0</scala-xml.version>
@@ -257,7 +257,7 @@
     <jline.version>3.30.5</jline.version>
     <wildfly.version>2.0.1</wildfly.version>
     <jettison.version>1.5.4</jettison.version>
-    <nimbus-jose-jwt.version>10.4.2</nimbus-jose-jwt.version>
+    <nimbus-jose-jwt.version>10.5</nimbus-jose-jwt.version>
     <dnsjava.version>3.6.3</dnsjava.version>
     <eclipse.jetty.version>9.4.58.v20250814</eclipse.jetty.version>
     <woodstox.version>7.1.1</woodstox.version>
@@ -2355,7 +2355,7 @@
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
           <artifactId>versions-maven-plugin</artifactId>
-          <version>2.18.0</version>
+          <version>2.19.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>

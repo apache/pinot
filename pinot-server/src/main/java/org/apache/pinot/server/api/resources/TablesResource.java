@@ -34,6 +34,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -1089,6 +1090,10 @@ public class TablesResource {
                   recordsLagMap, availabilityLagMsMap)));
         }
       }
+    } catch (ConcurrentModificationException e) {
+      LOGGER.warn("Multi-threaded access is unsafe for KafkaConsumer, caught exception when fetching stream offset",
+          e);
+      return segmentConsumerInfoList;
     } catch (Exception e) {
       throw new WebApplicationException("Caught exception when getting consumer info for table: " + realtimeTableName);
     } finally {
