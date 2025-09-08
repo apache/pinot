@@ -80,6 +80,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
   public static final int DEFAULT_UNTRACKED_SEGMENTS_DELETION_BATCH_SIZE = 100;
   private static final RetryPolicy DEFAULT_RETRY_POLICY = RetryPolicies.randomDelayRetryPolicy(20, 100L, 200L);
   private final boolean _untrackedSegmentDeletionEnabled;
+  private final int _untrackedSegmentsRetentionTimeInDays;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RetentionManager.class);
   private final boolean _isHybridTableRetentionStrategyEnabled;
@@ -92,6 +93,7 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
         config.getRetentionManagerInitialDelayInSeconds(), pinotHelixResourceManager, leadControllerManager,
         controllerMetrics);
     _untrackedSegmentDeletionEnabled = config.getUntrackedSegmentDeletionEnabled();
+    _untrackedSegmentsRetentionTimeInDays = config.getUntrackedSegmentsRetentionTimeInDays();
     _isHybridTableRetentionStrategyEnabled = config.isHybridTableRetentionStrategyEnabled();
     _brokerServiceHelper = brokerServiceHelper;
     LOGGER.info("Starting RetentionManager with runFrequencyInSeconds: {}", getIntervalInSeconds());
@@ -510,6 +512,6 @@ public class RetentionManager extends ControllerPeriodicTask<Void> {
             validationConfig.getUntrackedSegmentsRetentionTimeValue(), tableNameWithType, e);
       }
     }
-    return new TimeRetentionStrategy(TimeUnit.DAYS, 3);
+    return new TimeRetentionStrategy(TimeUnit.DAYS, _untrackedSegmentsRetentionTimeInDays);
   }
 }
