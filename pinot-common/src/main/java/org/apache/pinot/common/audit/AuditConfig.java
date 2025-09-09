@@ -30,6 +30,9 @@ import java.util.StringJoiner;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class AuditConfig {
 
+  public static final int MAX_AUDIT_PAYLOAD_SIZE_BYTES = 65536; // Hard max. This overrides _maxPayloadSize
+  public static final int MAX_AUDIT_PAYLOAD_SIZE_BYTES_DEFAULT = 8192;
+
   @JsonProperty("enabled")
   private boolean _enabled = false;
 
@@ -39,11 +42,11 @@ public final class AuditConfig {
   @JsonProperty("capture.request.headers")
   private String _captureRequestHeaders = "";
 
-  @JsonProperty("payload.size.max.bytes")
-  private int _maxPayloadSize = 10_240;
+  @JsonProperty("request.payload.size.max.bytes")
+  private int _maxPayloadSize = MAX_AUDIT_PAYLOAD_SIZE_BYTES_DEFAULT;
 
-  @JsonProperty("excluded.endpoints")
-  private String _excludedEndpoints = "";
+  @JsonProperty("url.filter.exclude.patterns")
+  private String _urlFilterExcludePatterns = "";
 
   @JsonProperty("userid.header")
   private String _useridHeader = "";
@@ -83,12 +86,12 @@ public final class AuditConfig {
     _maxPayloadSize = maxPayloadSize;
   }
 
-  public String getExcludedEndpoints() {
-    return _excludedEndpoints;
+  public String getUrlFilterExcludePatterns() {
+    return _urlFilterExcludePatterns;
   }
 
-  public void setExcludedEndpoints(String excludedEndpoints) {
-    _excludedEndpoints = excludedEndpoints;
+  public void setUrlFilterExcludePatterns(String urlFilterExcludePatterns) {
+    _urlFilterExcludePatterns = urlFilterExcludePatterns;
   }
 
   public String getUseridHeader() {
@@ -113,7 +116,7 @@ public final class AuditConfig {
         .add("_captureRequestPayload=" + _captureRequestPayload)
         .add("_captureRequestHeaders='" + _captureRequestHeaders + "'")
         .add("_maxPayloadSize=" + _maxPayloadSize)
-        .add("_excludedEndpoints='" + _excludedEndpoints + "'")
+        .add("_urlFilterExcludePatterns='" + _urlFilterExcludePatterns + "'")
         .add("_useridHeader='" + _useridHeader + "'")
         .add("_useridJwtClaimName='" + _useridJwtClaimName + "'")
         .toString();

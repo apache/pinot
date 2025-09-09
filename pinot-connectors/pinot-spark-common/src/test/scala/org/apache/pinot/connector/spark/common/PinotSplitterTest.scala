@@ -58,7 +58,27 @@ class PinotSplitterTest extends BaseTest {
       1000,
       false,
       Set(),
-      false)
+      false,
+      false,
+      None,
+      None,
+      None,
+      None,
+      None,
+      None,
+      false,  // proxyEnabled
+      8090,   // grpcPort
+      134217728L, // grpcMaxInboundMessageSize
+      true,   // grpcUsePlainText
+      "JKS",  // grpcTlsKeystoreType
+      None,   // grpcTlsKeystorePath
+      None,   // grpcTlsKeystorePassword
+      "JKS",  // grpcTlsTruststoreType
+      None,   // grpcTlsTruststorePath
+      None,   // grpcTlsTruststorePassword
+      "JDK",  // grpcTlsSslProvider
+      None    // grpcProxyUri
+    )
   }
 
   test("Total 5 partition splits should be created for maxNumSegmentPerServerRequest = 3") {
@@ -116,7 +136,27 @@ class PinotSplitterTest extends BaseTest {
       1000,
       true,
       Set(),
-      false)
+      false,
+      false,
+      None,
+      None,
+      None,
+      None,
+      None,
+      None,
+      false,  // proxyEnabled
+      8090,   // grpcPort
+      134217728L, // grpcMaxInboundMessageSize
+      true,   // grpcUsePlainText
+      "JKS",  // grpcTlsKeystoreType
+      None,   // grpcTlsKeystorePath
+      None,   // grpcTlsKeystorePassword
+      "JKS",  // grpcTlsTruststoreType
+      None,   // grpcTlsTruststorePath
+      None,   // grpcTlsTruststorePassword
+      "JDK",  // grpcTlsSslProvider
+      None    // grpcProxyUri
+    )
 
     val inputGrpcPortReader = (server: String) => {
       InstanceInfo(server, "192.168.1.100", "9000", 8090)

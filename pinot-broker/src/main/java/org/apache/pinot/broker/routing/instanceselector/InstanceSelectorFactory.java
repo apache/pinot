@@ -69,11 +69,11 @@ public class InstanceSelectorFactory {
     long newSegmentExpirationTimeInSeconds =
         brokerConfig.getProperty(CommonConstants.Broker.CONFIG_OF_NEW_SEGMENT_EXPIRATION_SECONDS,
         CommonConstants.Broker.DEFAULT_VALUE_OF_NEW_SEGMENT_EXPIRATION_SECONDS);
-    boolean emitSinglePoolSegments = brokerConfig.getProperty(
+    boolean emitSinglePoolSegmentsMetric = brokerConfig.getProperty(
             CommonConstants.Broker.CONFIG_OF_BROKER_ENABLE_SINGLE_POOL_SEGMENTS_METRIC,
             CommonConstants.Broker.DEFAULT_ENABLE_SINGLE_POOL_SEGMENTS_METRIC);
     InstanceSelectorConfig config = new InstanceSelectorConfig(useFixedReplica, newSegmentExpirationTimeInSeconds,
-            emitSinglePoolSegments);
+            emitSinglePoolSegmentsMetric);
     if (routingConfig != null) {
       if (RoutingConfig.REPLICA_GROUP_INSTANCE_SELECTOR_TYPE.equalsIgnoreCase(routingConfig.getInstanceSelectorType())
           || (tableConfig.getTableType() == TableType.OFFLINE && LEGACY_REPLICA_GROUP_OFFLINE_ROUTING.equalsIgnoreCase(
