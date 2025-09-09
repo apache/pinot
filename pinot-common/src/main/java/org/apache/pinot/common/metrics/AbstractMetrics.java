@@ -282,9 +282,8 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       String meterName = meter.getMeterName();
       fullMeterName = _metricPrefix + meterName;
 
-      Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.PINOT_METRIC_NAME, fullMeterName);
       final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName,
-          meterName, attributes);
+          meterName, ImmutableMap.of());
 
       final PinotMeter newMeter =
           PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, meter.getUnit(), TimeUnit.SECONDS);
@@ -369,11 +368,10 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
   }
 
   public PinotMeter addMeteredValue(final M meter, final long unitCount, final List<String> tags,
-      @Nullable Map<String, String> attributes) {
+      Map<String, String> attributes) {
     String meterName = meter.getMeterName();
     final String fullMeterName = _metricPrefix + meterName + "." + String.join(".", tags);
-    return addValueToMeter(fullMeterName, meterName, meter.getUnit(), unitCount, null,
-        attributes == null ? ImmutableMap.of() : attributes);
+    return addValueToMeter(fullMeterName, meterName, meter.getUnit(), unitCount, null, attributes);
   }
 
   private PinotMeter addValueToMeter(
@@ -388,7 +386,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       return reusedMeter;
     } else {
       final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(_clazz, fullMeterName,
-          simplifiedMeterName, new HashMap<>(attributes));
+          simplifiedMeterName, attributes);
 
       final PinotMeter newMeter =
           PinotMetricUtils.makePinotMeter(_metricsRegistry, metricName, unit, TimeUnit.SECONDS);
@@ -679,7 +677,7 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
       Map<String, String> attributes,
       final Callable<Long> valueCallback) {
     PinotMetricName pinotMetricName = PinotMetricUtils.makePinotMetricName(_clazz, _metricPrefix + metricName,
-        simplifiedMetricName, new HashMap<>(attributes));
+        simplifiedMetricName, attributes);
 
     PinotMetricUtils
         .makeGauge(_metricsRegistry, pinotMetricName,

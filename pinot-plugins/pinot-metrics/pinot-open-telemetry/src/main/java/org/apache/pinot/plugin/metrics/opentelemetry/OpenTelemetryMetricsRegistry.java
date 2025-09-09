@@ -50,6 +50,8 @@ import org.apache.pinot.spi.metrics.PinotTimer;
  * OpenTelemetryMetricsRegistry is the implementation of {@link PinotMetricsRegistry} for OpenTelemetry.
  */
 public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
+  public static final String OTEL_METRICS_SCOPE = "Pinot";
+
   private static final Map<OpenTelemetryMetricName, OpenTelemetryCounter> PINOT_COUNTER_MAP = new ConcurrentHashMap<>();
   private static final Map<PinotMetricName, OpenTelemetryMeter> PINOT_METER_MAP = new ConcurrentHashMap<>();
   private static final Map<OpenTelemetryMetricName, OpenTelemetryLongGauge> PINOT_LONG_GAUGE_MAP =
@@ -81,7 +83,7 @@ public class OpenTelemetryMetricsRegistry implements PinotMetricsRegistry {
             .build())
         .build();
     // Initialize the static _otelMeterProvider
-    _otelMeterProvider = sdkMeterProvider.get(OpenTelemetryUtil.OTEL_METRICS_SCOPE);
+    _otelMeterProvider = sdkMeterProvider.get(OTEL_METRICS_SCOPE);
   }
 
   @Override
