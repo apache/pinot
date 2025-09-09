@@ -95,14 +95,12 @@ public class IngestionDelayTracker {
     long _ingestionTimeMs;
     long _firstStreamIngestionTimeMs;
     StreamPartitionMsgOffset _currentOffset;
-    StreamPartitionMsgOffset _latestOffset;
 
     IngestionInfo(long ingestionTimeMs, long firstStreamIngestionTimeMs,
         @Nullable StreamPartitionMsgOffset currentOffset, @Nullable StreamPartitionMsgOffset latestOffset) {
       _ingestionTimeMs = ingestionTimeMs;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
       _currentOffset = currentOffset;
-      _latestOffset = latestOffset;
     }
 
     IngestionInfo() {
@@ -113,11 +111,9 @@ public class IngestionDelayTracker {
       _ingestionTimeMs = ingestionTimeMs;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
       _currentOffset = currentOffset;
-      _latestOffset = latestOffset;
     }
   }
 
-  private Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IngestionDelayTracker.class);
 
@@ -183,6 +179,8 @@ public class IngestionDelayTracker {
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     clientId = IngestionConfigUtils.getTableTopicUniqueClientId(IngestionDelayTracker.class.getSimpleName(), streamConfig);
     _streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(clientId);
+    _partitionsTracked = new ConcurrentHashMap<>();
+    _partitionIdToLatestOffset = new ConcurrentHashMap<>();
 
     if (_streamMetadataProvider.supportsOffsetLag()) {
       _partitionIdToLatestOffset = new HashMap<>();
@@ -194,6 +192,8 @@ public class IngestionDelayTracker {
   }
 
   private Set<Integer> _partitionsHostedByThisServer;
+  private Map<Integer, Boolean> _partitionsTracked;
+  private Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
 
   private void trackIngestionDelay() {
     Set<Integer> partitionsHosted = _partitionsHostedByThisServer;
@@ -203,23 +203,14 @@ public class IngestionDelayTracker {
       partitionsHosted.addAll(_ingestionInfoMap.keySet());
     }
 
-    Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset;
     if (_streamMetadataProvider.supportsOffsetLag()) {
-      partitionIdToLatestOffset = _streamMetadataProvider.fetchLatestStreamOffset(partitionsHosted, 5000);
-    } else {
-      partitionIdToLatestOffset = null;
+      _partitionIdToLatestOffset = _streamMetadataProvider.fetchLatestStreamOffset(partitionsHosted, 5000);
     }
 
     for (Integer partitionId: partitionsHosted) {
-      _ingestionInfoMap.compute(partitionId, (pid,ingestionInfo) -> {
-        if (ingestionInfo == null) {
-          createIngestionMetrics(partitionId);
-          ingestionInfo = new IngestionInfo();
-        }
-        if (partitionIdToLatestOffset != null) {
-          ingestionInfo._latestOffset = partitionIdToLatestOffset.get(pid);
-        }
-        return ingestionInfo;
+      _partitionsTracked.computeIfAbsent(partitionId, k -> {
+        createIngestionMetrics(partitionId);
+        return true;
       });
     }
   }
@@ -487,7 +478,7 @@ public class IngestionDelayTracker {
       return 0;
     }
     StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
-    StreamPartitionMsgOffset latestOffset = ingestionInfo._latestOffset;
+    StreamPartitionMsgOffset latestOffset = _partitionIdToLatestOffset.get(partitionId);
     if (currentOffset == null || latestOffset == null) {
       return 0;
     }
@@ -521,7 +512,7 @@ public class IngestionDelayTracker {
     if (ingestionInfo == null) {
       return 0;
     }
-    StreamPartitionMsgOffset latestOffset = ingestionInfo._latestOffset;
+    StreamPartitionMsgOffset latestOffset = _partitionIdToLatestOffset.get(partitionId);
     if (latestOffset == null) {
       return 0;
     }
