@@ -228,7 +228,7 @@ public class SortedIndexBasedFilterOperator extends BaseColumnFilterOperator {
     StringBuilder stringBuilder = new StringBuilder(EXPLAIN_NAME).append("(indexLookUp:sorted_index");
     stringBuilder.append(",operator:").append(_predicateEvaluator.getPredicateType());
     stringBuilder.append(",predicate:").append(_predicateEvaluator.getPredicate().toString());
-    stringBuilder.append(",order:").append(_ascending ? "ASC" : "DESC");
+    stringBuilder.append(",order:").append(_ascending ? "asc" : "desc");
     return stringBuilder.append(')').toString();
   }
 

@@ -121,6 +121,10 @@ public interface BlockDocIdSet {
       boolean descendingSoFar = true;
       while (iterator.hasNext() && (ascendingSoFar || descendingSoFar)) {
         BlockDocIdSet block = iterator.next();
+        if (!block.isAscending() && !block.isDescending()) {
+          // this should only happen on test mocks
+          continue;
+        }
         ascendingSoFar &= block.isAscending();
         descendingSoFar &= block.isDescending();
       }
