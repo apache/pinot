@@ -32,11 +32,13 @@ public class BrokerResponse {
   private JsonNode _resultTable;
   private JsonNode _exceptions;
   private ExecutionStats _executionStats;
+  private JsonNode _originalResponse; // Store original JSON for cursor metadata access
 
   private BrokerResponse() {
   }
 
   private BrokerResponse(JsonNode brokerResponse) {
+    _originalResponse = brokerResponse; // Store original response for cursor metadata
     _requestId = brokerResponse.get("requestId") != null ? brokerResponse.get("requestId").asText() : "unknown";
     _brokerId = brokerResponse.get("brokerId") != null ? brokerResponse.get("brokerId").asText() : "unknown";
     _aggregationResults = brokerResponse.get("aggregationResults");
@@ -92,5 +94,9 @@ public class BrokerResponse {
 
   public String getBrokerId() {
     return _brokerId;
+  }
+
+  public JsonNode getOriginalResponse() {
+    return _originalResponse;
   }
 }

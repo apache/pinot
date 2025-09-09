@@ -152,6 +152,224 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
+  /**
+   * Executes a query with cursor pagination support.
+   *
+   * @param brokerAddress The broker address in "host:port" format
+   * @param query The SQL query to execute
+   * @param numRows The number of rows to return in the first page
+   * @return BrokerResponse containing the first page and cursor metadata
+   * @throws PinotClientException If query execution fails
+   */
+  public BrokerResponse executeQueryWithCursor(String brokerAddress, String query, int numRows)
+      throws PinotClientException {
+    try {
+      return executeQueryWithCursorAsync(brokerAddress, query, numRows).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
+   * Executes a query asynchronously with cursor pagination support.
+   *
+   * @param brokerAddress The broker address in "host:port" format
+   * @param query The SQL query to execute
+   * @param numRows The number of rows to return in the first page
+   * @return CompletableFuture containing BrokerResponse with first page and cursor metadata
+   */
+  public CompletableFuture<BrokerResponse> executeQueryWithCursorAsync(String brokerAddress, String query,
+      int numRows) {
+    try {
+      ObjectNode json = JsonNodeFactory.instance.objectNode();
+      json.put("sql", query);
+      json.put("queryOptions", _extraOptionStr);
+
+      LOGGER.debug("Cursor query will use Multistage Engine = {}", _useMultistageEngine);
+
+      String url = String.format("%s://%s%s?getCursor=true&numRows=%d", _scheme, brokerAddress,
+          _useMultistageEngine ? "/query" : "/query/sql", numRows);
+      BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
+
+      if (_headers != null) {
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      }
+      LOGGER.debug("Sending cursor query {} to {}", query, url);
+      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
+          .execute().toCompletableFuture().thenApply(httpResponse -> {
+            LOGGER.debug("Completed cursor query, HTTP status is {}", httpResponse.getStatusCode());
+
+            if (httpResponse.getStatusCode() != 200) {
+              throw new PinotClientException(
+                  "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
+            }
+
+            try {
+              return BrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+            } catch (IOException e) {
+              throw new CompletionException(e);
+            }
+          });
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
+   * Fetches results from an existing cursor.
+   *
+   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+   * @param requestId The unique identifier of the cursor
+   * @param offset The starting row offset for the page
+   * @param numRows The number of rows to fetch
+   * @return BrokerResponse containing the requested page of results
+   * @throws PinotClientException If fetch fails
+   */
+  public BrokerResponse fetchCursorResults(String brokerAddress, String requestId, int offset, int numRows)
+      throws PinotClientException {
+    try {
+      return fetchCursorResultsAsync(brokerAddress, requestId, offset, numRows).get(_brokerReadTimeout,
+          TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
+   * Fetches results from an existing cursor using offset-based pagination.
+   *
+   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+   * @param requestId The unique identifier of the cursor
+   * @param offset The starting row offset for the page
+   * @param numRows The number of rows to fetch
+   * @return CompletableFuture containing BrokerResponse with the requested page
+   */
+  public CompletableFuture<BrokerResponse> fetchCursorResultsAsync(String brokerAddress, String requestId, int offset,
+      int numRows) {
+    try {
+      String url = String.format("%s://%s/responseStore/%s/results?offset=%d&numRows=%d", _scheme, brokerAddress,
+          requestId, offset, numRows);
+      BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
+
+      if (_headers != null) {
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      }
+      LOGGER.debug("Fetching cursor results from {}", url);
+      return requestBuilder.execute().toCompletableFuture().thenApply(httpResponse -> {
+        LOGGER.debug("Completed cursor fetch, HTTP status is {}", httpResponse.getStatusCode());
+
+        if (httpResponse.getStatusCode() != 200) {
+          throw new PinotClientException(
+              "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
+        }
+
+        try {
+          return BrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+      });
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
+   * Retrieves metadata for an existing cursor.
+   *
+   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+   * @param requestId The unique identifier of the cursor
+   * @return BrokerResponse containing cursor metadata
+   * @throws PinotClientException If metadata retrieval fails
+   */
+  public BrokerResponse getCursorMetadata(String brokerAddress, String requestId) throws PinotClientException {
+    try {
+      return getCursorMetadataAsync(brokerAddress, requestId).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
+   * Retrieves metadata for an existing cursor asynchronously.
+   *
+   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+   * @param requestId The unique identifier of the cursor
+   * @return CompletableFuture containing BrokerResponse with cursor metadata
+   */
+  public CompletableFuture<BrokerResponse> getCursorMetadataAsync(String brokerAddress, String requestId) {
+    try {
+      String url = String.format("%s://%s/responseStore/%s/", _scheme, brokerAddress, requestId);
+      BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
+
+      if (_headers != null) {
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      }
+      LOGGER.debug("Getting cursor metadata from {}", url);
+      return requestBuilder.execute().toCompletableFuture().thenApply(httpResponse -> {
+        LOGGER.debug("Completed cursor metadata fetch, HTTP status is {}", httpResponse.getStatusCode());
+
+        if (httpResponse.getStatusCode() != 200) {
+          throw new PinotClientException(
+              "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
+        }
+
+        try {
+          return BrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+        } catch (IOException e) {
+          throw new CompletionException(e);
+        }
+      });
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
+   * Deletes a cursor and cleans up its resources.
+   *
+   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+   * @param requestId The unique identifier of the cursor to delete
+   * @throws PinotClientException If cursor deletion fails
+   */
+  public void deleteCursor(String brokerAddress, String requestId) throws PinotClientException {
+    try {
+      deleteCursorAsync(brokerAddress, requestId).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  /**
+   * Deletes a cursor and cleans up its resources asynchronously.
+   *
+   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
+   * @param requestId The unique identifier of the cursor to delete
+   * @return CompletableFuture that completes when the cursor is deleted
+   */
+  public CompletableFuture<Void> deleteCursorAsync(String brokerAddress, String requestId) {
+    try {
+      String url = String.format("%s://%s/responseStore/%s/", _scheme, brokerAddress, requestId);
+      BoundRequestBuilder requestBuilder = _httpClient.prepareDelete(url);
+
+      if (_headers != null) {
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      }
+      LOGGER.debug("Deleting cursor at {}", url);
+      return requestBuilder.execute().toCompletableFuture().thenApply(httpResponse -> {
+        LOGGER.debug("Completed cursor deletion, HTTP status is {}", httpResponse.getStatusCode());
+
+        if (httpResponse.getStatusCode() != 200) {
+          throw new PinotClientException(
+              "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
+        }
+        return null;
+      });
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
   @Override
   public ClientStats getClientMetrics() {
     return _httpClient.getClientStats();

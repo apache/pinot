@@ -20,6 +20,7 @@ package org.apache.pinot.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -119,5 +120,54 @@ public class ConnectionFactoryTest {
 
     Assert.assertNotNull(connection.getTransport());
     Assert.assertNotNull(connection.getTransport().getClientMetrics());
+  }
+
+  @Test
+  public void testCursorConnectionFactoryMethodsPreserved() {
+    // Verify all existing ConnectionFactory methods are preserved after cursor additions
+    Method[] methods = ConnectionFactory.class.getDeclaredMethods();
+
+    boolean hasFromZookeeper = false;
+    boolean hasFromController = false;
+    boolean hasFromHostList = false;
+    boolean hasFromProperties = false;
+    boolean hasCursorFromController = false;
+    boolean hasCursorFromHostList = false;
+    boolean hasCursorFromProperties = false;
+
+    for (Method method : methods) {
+      if (method.getName().equals("fromZookeeper") && method.getReturnType() == Connection.class) {
+        hasFromZookeeper = true;
+      }
+      if (method.getName().equals("fromController") && method.getReturnType() == Connection.class) {
+        hasFromController = true;
+      }
+      if (method.getName().equals("fromHostList") && method.getReturnType() == Connection.class) {
+        hasFromHostList = true;
+      }
+      if (method.getName().equals("fromProperties") && method.getReturnType() == Connection.class) {
+        hasFromProperties = true;
+      }
+      if (method.getName().equals("createCursorConnectionFromController")) {
+        hasCursorFromController = true;
+      }
+      if (method.getName().equals("createCursorConnectionFromHostList")) {
+        hasCursorFromHostList = true;
+      }
+      if (method.getName().equals("createCursorConnectionFromProperties")) {
+        hasCursorFromProperties = true;
+      }
+    }
+
+    // Verify existing methods are preserved
+    Assert.assertTrue(hasFromZookeeper, "fromZookeeper methods should be preserved");
+    Assert.assertTrue(hasFromController, "fromController methods should be preserved");
+    Assert.assertTrue(hasFromHostList, "fromHostList methods should be preserved");
+    Assert.assertTrue(hasFromProperties, "fromProperties methods should be preserved");
+
+    // Verify new cursor methods are available
+    Assert.assertTrue(hasCursorFromController, "createCursorConnectionFromController should be available");
+    Assert.assertTrue(hasCursorFromHostList, "createCursorConnectionFromHostList should be available");
+    Assert.assertTrue(hasCursorFromProperties, "createCursorConnectionFromProperties should be available");
   }
 }
