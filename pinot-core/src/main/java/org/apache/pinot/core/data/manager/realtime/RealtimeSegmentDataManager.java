@@ -2013,10 +2013,9 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
   private void updateIngestionMetrics(StreamMessageMetadata metadata) {
     if (metadata != null) {
       try {
-        StreamPartitionMsgOffset latestOffset = fetchLatestStreamOffset(5000, true);
         _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
             metadata.getRecordIngestionTimeMs(), metadata.getFirstStreamRecordIngestionTimeMs(), metadata.getOffset(),
-            latestOffset);
+            null);
       } catch (Exception e) {
         _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
       }
