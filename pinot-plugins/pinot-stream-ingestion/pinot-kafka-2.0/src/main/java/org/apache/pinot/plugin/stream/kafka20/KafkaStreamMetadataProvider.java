@@ -23,6 +23,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +36,7 @@ import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.pinot.plugin.stream.kafka.KafkaConsumerPartitionLag;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
@@ -89,6 +91,26 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
         partitionIds.add(partitionInfo.partition());
       }
       return partitionIds;
+    } catch (TimeoutException e) {
+      throw new TransientConsumerException(e);
+    }
+  }
+
+  @Override
+  public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
+    List<TopicPartition> topicPartitions = new ArrayList<>();
+    for (Integer streamPartition: partitionIds) {
+      topicPartitions.add(new TopicPartition(_topic, streamPartition));
+    }
+    try {
+      Map<TopicPartition, Long> topicPartitionLongMap =
+          _consumer.endOffsets(topicPartitions, Duration.ofMillis(timeoutMillis));
+      Map<Integer, StreamPartitionMsgOffset> partitionIdToOffset = new HashMap<>();
+      for (TopicPartition topicPartition: topicPartitionLongMap.keySet()) {
+        partitionIdToOffset.put(topicPartition.partition(),
+            new LongMsgOffset(topicPartitionLongMap.get(topicPartition)));
+      }
+      return partitionIdToOffset;
     } catch (TimeoutException e) {
       throw new TransientConsumerException(e);
     }
@@ -185,6 +207,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } catch (ExecutionException | InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public boolean supportsOffsetLag() {
+    return true;
   }
 
   @Override

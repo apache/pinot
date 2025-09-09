@@ -24,6 +24,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
@@ -33,11 +34,15 @@ import software.amazon.awssdk.http.apache.ApacheSdkHttpService;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.kinesis.KinesisClient;
 import software.amazon.awssdk.services.kinesis.KinesisClientBuilder;
+import software.amazon.awssdk.services.kinesis.model.GetRecordsRequest;
+import software.amazon.awssdk.services.kinesis.model.GetRecordsResponse;
+import software.amazon.awssdk.services.kinesis.model.GetShardIteratorRequest;
 import software.amazon.awssdk.services.kinesis.model.ListShardsRequest;
 import software.amazon.awssdk.services.kinesis.model.ListShardsResponse;
 import software.amazon.awssdk.services.kinesis.model.ListStreamsRequest;
 import software.amazon.awssdk.services.kinesis.model.ListStreamsResponse;
 import software.amazon.awssdk.services.kinesis.model.Shard;
+import software.amazon.awssdk.services.kinesis.model.ShardIteratorType;
 import software.amazon.awssdk.services.sts.StsClient;
 import software.amazon.awssdk.services.sts.auth.StsAssumeRoleCredentialsProvider;
 import software.amazon.awssdk.services.sts.model.AssumeRoleRequest;
@@ -116,6 +121,30 @@ public class KinesisConnectionHandler implements Closeable {
     ListShardsResponse listShardsResponse =
         _kinesisClient.listShards(ListShardsRequest.builder().streamName(_config.getStreamTopicName()).build());
     return listShardsResponse.shards();
+  }
+
+  @Nullable
+  public String getLatestRecord(String shardId) {
+    // open shard, must query LATEST
+    String iterator = _kinesisClient.getShardIterator(GetShardIteratorRequest.builder()
+            .streamName(_config.getStreamTopicName())
+            .shardId(shardId)
+            .shardIteratorType(ShardIteratorType.LATEST)
+            .build())
+        .shardIterator();
+
+    GetRecordsResponse resp =
+        _kinesisClient.getRecords(GetRecordsRequest.builder().shardIterator(iterator).limit(1).build());
+    String latestSeq;
+
+    if (!resp.records().isEmpty()) {
+      latestSeq = resp.records().get(0).sequenceNumber();
+    } else {
+      // No new records yet, iterator is at the tip
+      latestSeq = null;
+    }
+
+    return latestSeq;
   }
 
   public List<String> getStreamNames() {

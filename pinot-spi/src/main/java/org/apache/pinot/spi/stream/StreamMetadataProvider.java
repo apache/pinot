@@ -53,6 +53,8 @@ public interface StreamMetadataProvider extends Closeable {
     throw new UnsupportedOperationException();
   }
 
+  Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis);
+
   /**
    * Fetches the offset for a given partition and offset criteria
    * @param offsetCriteria offset criteria to fetch{@link StreamPartitionMsgOffset}.
@@ -141,6 +143,8 @@ public interface StreamMetadataProvider extends Closeable {
   default List<TopicMetadata> getTopics() {
     throw new UnsupportedOperationException();
   }
+
+  boolean supportsOffsetLag();
 
   /**
    * Represents the metadata of a topic. This can be used to represent the topic name and other metadata in the future.

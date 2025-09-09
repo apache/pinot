@@ -34,6 +34,7 @@ import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.ingestion.batch.BatchConfigProperties;
 import org.apache.pinot.spi.stream.StreamConfig;
+import org.apache.pinot.spi.stream.StreamConsumerFactory;
 
 
 /**
@@ -312,5 +313,13 @@ public final class IngestionConfigUtils {
       return Long.parseLong(pushRetryIntervalMillis);
     }
     return DEFAULT_PUSH_RETRY_INTERVAL_MILLIS;
+  }
+
+  /**
+   * Returns a unique client id which can be used for Stream providers
+   */
+  public static String getTableTopicUniqueClientId(String className, StreamConfig streamConfig) {
+    return StreamConsumerFactory.getUniqueClientId(
+        className + "-" + streamConfig.getTableNameWithType() + "-" + streamConfig.getTopicName());
   }
 }

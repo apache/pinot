@@ -97,6 +97,40 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
+  public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
+    Map<Integer, StreamPartitionMsgOffset> result = new HashMap<>();
+    List<Shard> allShards = _kinesisConnectionHandler.getShards();
+    Map<Integer, Shard> partitionIdToShard = new HashMap<>();
+
+    for (Shard shard: allShards) {
+      int partitionIdFromShardId = getPartitionGroupIdFromShardId(shard.shardId());
+      partitionIdToShard.put(partitionIdFromShardId, shard);
+    }
+
+    for (Integer partition: partitionIds) {
+      Shard shard = partitionIdToShard.get(partition);
+      if (shard == null) {
+        LOGGER.warn("Failed to find shard in upstream for partitionId: {}", partition);
+        continue;
+      }
+
+      String latestSeq;
+
+      if (shard.sequenceNumberRange().endingSequenceNumber() != null) {
+        // closed shard, latest is endingSequenceNumber
+        latestSeq = shard.sequenceNumberRange().endingSequenceNumber();
+      } else {
+        // open shard, must query LATEST
+        latestSeq = _kinesisConnectionHandler.getLatestRecord(shard.shardId());
+      }
+
+      result.put(partition, new KinesisPartitionGroupOffset(shard.shardId(), latestSeq));
+    }
+
+    return result;
+  }
+
+  @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     // fetch offset for _partitionId
     Shard foundShard = _kinesisConnectionHandler.getShards().stream()
@@ -285,6 +319,11 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         .stream()
         .map(streamName -> new KinesisTopicMetadata().setName(streamName))
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public boolean supportsOffsetLag() {
+    return false;
   }
 
   public static class KinesisTopicMetadata implements TopicMetadata {
