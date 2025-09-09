@@ -68,17 +68,35 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   @Override
-  public int getNumConcurrentTasksPerInstance() {
+  public int getNumConcurrentTasksPerInstance(String minionTag) {
     String taskType = getTaskType();
-    String configKey = taskType + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
-    String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
+
+    // Priority 1: Check minion tenant specific cluster config
+    if (minionTag != null) {
+      String tenantSpecificConfigKey = taskType + "." + minionTag
+          + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
+      String configValue = _clusterInfoAccessor.getClusterConfig(tenantSpecificConfigKey);
+      if (configValue != null) {
+        try {
+          return Integer.parseInt(configValue);
+        } catch (Exception e) {
+          LOGGER.error("Invalid config {}: '{}'", tenantSpecificConfigKey, configValue, e);
+        }
+      }
+    }
+
+    // Priority 2: Check task type specific cluster config
+    String taskTypeConfigKey = taskType + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
+    String configValue = _clusterInfoAccessor.getClusterConfig(taskTypeConfigKey);
     if (configValue != null) {
       try {
         return Integer.parseInt(configValue);
       } catch (Exception e) {
-        LOGGER.error("Invalid config {}: '{}'", configKey, configValue, e);
+        LOGGER.error("Invalid config {}: '{}'", taskTypeConfigKey, configValue, e);
       }
     }
+
+    // Priority 3: Default value
     return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
   }
 

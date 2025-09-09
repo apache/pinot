@@ -262,7 +262,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_ADHOC_TASKS_SUBMITTED, 1);
       responseMap.put(tableNameWithType,
           _helixTaskResourceManager.submitTask(parentTaskName, pinotTaskConfigs, minionInstanceTag,
-              taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(),
+              taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(minionInstanceTag),
               taskGenerator.getMaxAttemptsPerTask()));
     }
     if (responseMap.isEmpty()) {
@@ -837,7 +837,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
           pinotTaskConfigs.forEach(pinotTaskConfig ->
               pinotTaskConfig.getConfigs().computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> triggeredBy));
           String submittedTaskName = _helixTaskResourceManager.submitTask(pinotTaskConfigs, minionInstanceTag,
-              taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(),
+              taskGenerator.getTaskTimeoutMs(), taskGenerator.getNumConcurrentTasksPerInstance(minionInstanceTag),
               taskGenerator.getMaxAttemptsPerTask());
           submittedTaskNames.add(submittedTaskName);
           _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_TASKS_SUBMITTED, numTasks);

@@ -616,7 +616,7 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
       }
 
       @Override
-      public int getNumConcurrentTasksPerInstance() {
+      public int getNumConcurrentTasksPerInstance(String minionTag) {
         return 5;
       }
 
