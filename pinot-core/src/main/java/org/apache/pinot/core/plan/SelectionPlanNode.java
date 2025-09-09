@@ -36,6 +36,7 @@ import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.SegmentContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.segment.spi.index.reader.NullValueVectorReader;
+import org.apache.pinot.spi.utils.CommonConstants;
 
 
 /**
@@ -88,19 +89,12 @@ public class SelectionPlanNode implements PlanNode {
         maxDocsPerCall = Math.min(limit + _queryContext.getOffset(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
       }
 
-      BaseProjectOperator<?> projectOperator =
-          new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall).run();
-      BaseProjectOperator<?> sortedProjectOperator;
-      try {
-        sortedProjectOperator = projectOperator.withOrder(orderByExpressions.get(0).isAsc());
-      } catch (IllegalArgumentException | UnsupportedOperationException e) {
-        // This happens when the operator cannot provide the required order between blocks
-        // Fallback to SelectionOrderByOperator
-        sortedProjectOperator = null;
-      }
-      if (sortedProjectOperator != null) {
-        return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions,
-            sortedProjectOperator,
+      BaseProjectOperator<?> projectOperator = getSortedByProject(expressions, maxDocsPerCall, orderByExpressions);
+      boolean asc = orderByExpressions.get(0).isAsc();
+      // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
+      // both ascending and descending
+      if (asc && projectOperator.isAscending() || !asc && projectOperator.isDescending()) {
+        return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
       } else {
         return new SelectionPartiallyOrderedByDescOperation(_indexSegment, _queryContext, expressions, projectOperator,
@@ -124,6 +118,32 @@ public class SelectionPlanNode implements PlanNode {
     BaseProjectOperator<?> projectOperator = new ProjectPlanNode(_segmentContext, _queryContext, expressionsToTransform,
         DocIdSetPlanNode.MAX_DOC_PER_CALL).run();
     return new SelectionOrderByOperator(_indexSegment, _queryContext, expressions, projectOperator);
+  }
+
+  private BaseProjectOperator<?> getSortedByProject(List<ExpressionContext> expressions, int maxDocsPerCall,
+      List<OrderByExpressionContext> orderByExpressions) {
+    BaseProjectOperator<?> projectOperator =
+        new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall).run();
+
+    boolean asc = orderByExpressions.get(0).isAsc();
+    if (!asc && reverseOptimizationEnabled(_queryContext) && !projectOperator.isDescending()) {
+      try {
+        return projectOperator.withOrder(false);
+      } catch (IllegalArgumentException | UnsupportedOperationException e) {
+        // This happens when the operator cannot provide the required order between blocks
+        // Fallback to SelectionOrderByOperator
+        return projectOperator;
+      }
+    }
+    return projectOperator;
+  }
+
+  private boolean reverseOptimizationEnabled(QueryContext queryContext) {
+    String value = queryContext.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.REVERSE_ORDER);
+    if (value == null) {
+      return CommonConstants.Broker.Request.QueryOptionKey.DEFAULT_REVERSE_ORDER;
+    }
+    return Boolean.parseBoolean(value);
   }
 
   /**

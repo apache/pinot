@@ -74,8 +74,8 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   private static final String FIRST_SEGMENT_NAME = "firstTestSegment";
   private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
 
-  @Param({"true", "false"})
-  private boolean _zasc; // called zasc just to force this parameter to be the last used in the report
+  @Param({"ASC", "NAIVE_DESC", "OPTIMIZED_DESC"})
+  private Mode _zMode; // called zMode just to force this parameter to be the last used in the report
   @Param("1500000")
   private int _numRows;
   //@Param({"EXP(0.5)"})
@@ -141,34 +141,57 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
 
   @Benchmark
   public BrokerResponseNative sortedTotally() {
-    if (_zasc) {
-      return getBrokerResponse(
-          "SELECT SORTED_COL "
-              + "FROM sorted "
-              + "ORDER BY SORTED_COL ASC "
-              + "LIMIT " + _limit);
-    } else {
-      return getBrokerResponse(
-          "SELECT SORTED_COL "
-              + "FROM sorted "
-              + "ORDER BY SORTED_COL DESC "
-              + "LIMIT " + _limit);
+    switch (_zMode) {
+      case ASC:
+        return getBrokerResponse(
+            "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "ORDER BY SORTED_COL ASC "
+                + "LIMIT " + _limit);
+      case NAIVE_DESC:
+        return getBrokerResponse(
+            "SET allowReverseOrder=false;"
+                + "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "ORDER BY SORTED_COL DESC "
+                + "LIMIT " + _limit);
+      case OPTIMIZED_DESC:
+        return getBrokerResponse(
+            "SET allowReverseOrder=true;"
+                + "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "ORDER BY SORTED_COL DESC "
+                + "LIMIT " + _limit);
+      default:
+        throw new IllegalStateException("Unknown mode: " + _zMode);
     }
   }
+
   @Benchmark
   public BrokerResponseNative sortedPartially() {
-    if (_zasc) {
-      return getBrokerResponse(
-          "SELECT SORTED_COL "
-              + "FROM sorted "
-              + "ORDER BY SORTED_COL ASC, LOW_CARDINALITY_STRING_COL "
-              + "LIMIT " + _limit);
-    } else {
-      return getBrokerResponse(
-          "SELECT SORTED_COL "
-              + "FROM sorted "
-              + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
-              + "LIMIT " + _limit);
+    switch (_zMode) {
+      case ASC:
+        return getBrokerResponse(
+            "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "ORDER BY SORTED_COL ASC, LOW_CARDINALITY_STRING_COL "
+                + "LIMIT " + _limit);
+      case NAIVE_DESC:
+        return getBrokerResponse(
+            "SET allowReverseOrder=false;"
+                + "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
+                + "LIMIT " + _limit);
+      case OPTIMIZED_DESC:
+        return getBrokerResponse(
+            "SET allowReverseOrder=true;"
+                + "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
+                + "LIMIT " + _limit);
+      default:
+        throw new IllegalStateException("Unknown mode: " + _zMode);
     }
   }
 
@@ -185,5 +208,9 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   @Override
   protected List<IndexSegment> getIndexSegments() {
     return _indexSegments;
+  }
+
+  public enum Mode {
+    ASC, NAIVE_DESC, OPTIMIZED_DESC
   }
 }
