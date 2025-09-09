@@ -25,7 +25,6 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
-import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.OrDocIdIterator;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.spi.utils.Pairs;
@@ -54,16 +53,10 @@ public final class OrDocIdSet implements BlockDocIdSet {
   private final int _numDocs;
   private List<BlockDocIdSet> _docIdSets;
   private volatile long _numEntriesScannedInFilter = 0L;
-  private boolean _isAlwaysFalse;
 
   public OrDocIdSet(List<BlockDocIdSet> docIdSets, int numDocs) {
-    this(docIdSets, numDocs, false);
-  }
-
-  public OrDocIdSet(List<BlockDocIdSet> docIdSets, int numDocs, boolean isAlwaysFalse) {
     _docIdSets = docIdSets;
     _numDocs = numDocs;
-    _isAlwaysFalse = isAlwaysFalse;
   }
 
   @Override
@@ -96,9 +89,6 @@ public final class OrDocIdSet implements BlockDocIdSet {
     _docIdSets = null;
     _numEntriesScannedInFilter = numEntriesScannedForNonScanBasedDocIdSets;
     _scanBasedDocIdSets.set(scanBasedDocIdSets);
-    if (_isAlwaysFalse) {
-      return EmptyDocIdIterator.getInstance();
-    }
 
     int numSortedDocIdIterators = sortedDocIdIterators.size();
     int numBitmapBasedDocIdIterators = bitmapBasedDocIdIterators.size();
@@ -151,9 +141,6 @@ public final class OrDocIdSet implements BlockDocIdSet {
 
   @Override
   public BlockDocIdSet getOptimizedDocIdSet() {
-    if (_isAlwaysFalse) {
-      return EmptyDocIdSet.getInstance();
-    }
     return this;
   }
 }
