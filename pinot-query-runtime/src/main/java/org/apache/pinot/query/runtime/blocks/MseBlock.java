@@ -131,6 +131,7 @@ public interface MseBlock extends Block {
     interface Visitor<R, A> {
       R visit(RowHeapDataBlock block, A arg);
       R visit(SerializedDataBlock block, A arg);
+      R visit(LazyDataBlock block, A arg);
     }
   }
 

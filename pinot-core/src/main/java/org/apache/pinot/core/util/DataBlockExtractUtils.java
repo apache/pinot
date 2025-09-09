@@ -66,7 +66,7 @@ public final class DataBlockExtractUtils {
     return rows;
   }
 
-  private static Object extractValue(DataBlock dataBlock, ColumnDataType storedType, int rowId, int colId) {
+  public static Object extractValue(DataBlock dataBlock, ColumnDataType storedType, int rowId, int colId) {
     switch (storedType) {
       // Single-value column
       case INT:

@@ -93,6 +93,11 @@ public class HashExchangeTest {
     }
 
     @Override
+    public int[] getColumnIds() {
+      throw new UnsupportedOperationException("Should not be called");
+    }
+
+    @Override
     public Object getKey(Object[] input) {
       throw new UnsupportedOperationException("Should not be called");
     }

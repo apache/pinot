@@ -48,4 +48,6 @@ public interface KeySelector<T> {
   default String hashAlgorithm() {
     return DEFAULT_HASH_ALGORITHM;
   }
+
+  int[] getColumnIds();
 }

@@ -19,11 +19,13 @@
 package org.apache.pinot.query.runtime.operator.join;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.roaringbitmap.RoaringBitmap;
 
 
 public abstract class LookupTable {
@@ -31,6 +33,19 @@ public abstract class LookupTable {
   protected static final int INITIAL_CAPACITY = 10000;
 
   protected boolean _keysUnique = true;
+
+  public RoaringBitmap matches(Object[] keyColumns, boolean invert) {
+    throw new UnsupportedOperationException("Matches not supported");
+  }
+
+  public Object[] getAll(Object[] keyColumns) {
+    return getAll(keyColumns, null, null);
+  }
+
+  public Object[] getAll(Object[] keyColumns, @Nullable Map<Object, BitSet> matchedRecord,
+      @Nullable BitSet placeholder) {
+    throw new UnsupportedOperationException("GetAll not supported");
+  }
 
   /**
    * Adds a row to the lookup table.

@@ -20,9 +20,11 @@ package org.apache.pinot.query.runtime.operator.join;
 
 import it.unimi.dsi.fastutil.doubles.Double2ObjectMap;
 import it.unimi.dsi.fastutil.doubles.Double2ObjectOpenHashMap;
+import java.util.BitSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -31,6 +33,37 @@ import javax.annotation.Nullable;
 @SuppressWarnings("unchecked")
 public class DoubleLookupTable extends PrimitiveLookupTable {
   private final Double2ObjectOpenHashMap<Object> _lookupTable = new Double2ObjectOpenHashMap<>(INITIAL_CAPACITY);
+
+  @Override
+  public RoaringBitmap matches(Object[] keyColumns, boolean invert) {
+    assert keyColumns.length == 1;
+    double[] keys = (double[]) keyColumns[0];
+    RoaringBitmap result = new RoaringBitmap();
+    for (int rowId = 0; rowId < keys.length; rowId++) {
+      if (!invert == _lookupTable.containsKey(keys[rowId])) {
+        result.add(rowId);
+      }
+    }
+    return result;
+  }
+
+  @Override
+  public Object[] getAll(Object[] keyColumns, @Nullable Map<Object, BitSet> record, BitSet placeholder) {
+    assert keyColumns.length == 1;
+    double[] keys = (double[]) keyColumns[0];
+    Object[] result = new Object[keys.length];
+    for (int rowId = 0; rowId < keys.length; rowId++) {
+      result[rowId] = _lookupTable.get(keys[rowId]);
+      if (record != null) {
+        record.put(keys[rowId], placeholder);
+      }
+    }
+    return result;
+  }
+
+  public Object getDoubleValue(double key) {
+    return _lookupTable.get(key);
+  }
 
   @Override
   public void addRowNotNullKey(Object key, Object[] row) {

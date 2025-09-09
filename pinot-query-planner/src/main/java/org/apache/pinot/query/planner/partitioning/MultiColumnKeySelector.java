@@ -67,4 +67,9 @@ public class MultiColumnKeySelector implements KeySelector<Key> {
     // return a positive number because this is used directly to modulo-index
     return hashCode & Integer.MAX_VALUE;
   }
+
+  @Override
+  public int[] getColumnIds() {
+    return _keyIds;
+  }
 }

@@ -29,7 +29,11 @@ import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.planner.partitioning.KeySelector;
 import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.planner.plannode.JoinNode;
+import org.apache.pinot.query.runtime.blocks.LazyDataBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
+import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
+import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
+import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.operator.join.DoubleLookupTable;
 import org.apache.pinot.query.runtime.operator.join.FloatLookupTable;
 import org.apache.pinot.query.runtime.operator.join.IntLookupTable;
@@ -37,6 +41,7 @@ import org.apache.pinot.query.runtime.operator.join.LongLookupTable;
 import org.apache.pinot.query.runtime.operator.join.LookupTable;
 import org.apache.pinot.query.runtime.operator.join.ObjectLookupTable;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
+import org.roaringbitmap.RoaringBitmap;
 
 
 /**
@@ -112,6 +117,121 @@ public class HashJoinOperator extends BaseJoinOperator {
   protected void onEosProduced() {
     _rightTable = null;
     _matchedRightRows = null;
+  }
+
+  @Override
+  protected MseBlock buildJoinedDataBlock() {
+    while (true) {
+      if (_eos != null) {
+        return _eos;
+      }
+      LOGGER.trace("Processing next block on left input");
+      MseBlock leftBlock = _leftInput.nextBlock();
+      if (leftBlock.isEos()) {
+        MseBlock.Eos eosBlock = (MseBlock.Eos) leftBlock;
+        if (eosBlock.isError()) {
+          return eosBlock;
+        } else {
+          if (needUnmatchedRightRows()) {
+            List<Object[]> rows = buildNonMatchRightRows();
+            if (!rows.isEmpty()) {
+              _eos = SuccessMseBlock.INSTANCE;
+              return new RowHeapDataBlock(rows, _resultSchema);
+            }
+          }
+          return leftBlock;
+        }
+      }
+      MseBlock.Data dataBlock = (MseBlock.Data) leftBlock;
+      if (dataBlock.isSerialized()) {
+        // For serialized data blocks, try and keep the left block columnar -- asRowHeap is really expensive
+        MseBlock.Data joinedBlock = buildJoinedDataBlockColumnar((SerializedDataBlock) leftBlock);
+        sampleAndCheckInterruption();
+        if (joinedBlock != null && joinedBlock.getNumRows() > 0) {
+          return joinedBlock.asRowHeap();
+        }
+      } else {
+        // For data blocks that are already expanded to rows, use the existing logic
+        List<Object[]> rows = buildJoinedRows((MseBlock.Data) leftBlock);
+        sampleAndCheckInterruption();
+        if (!rows.isEmpty()) {
+          return new RowHeapDataBlock(rows, _resultSchema);
+        }
+      }
+    }
+  }
+
+  @Nullable
+  private MseBlock.Data buildJoinedDataBlockColumnar(SerializedDataBlock leftBlock) {
+    assert _rightTable != null : "Right table should not be null when building joined rows";
+    switch (_joinType) {
+      case SEMI:
+        return buildJoinedDataBlockSemiColumnar(leftBlock, true);
+      case ANTI:
+        return buildJoinedDataBlockSemiColumnar(leftBlock, false);
+      default:
+        if (_rightTable.isKeysUnique()) {
+          // TODO: Support non-equi conditions
+          if (_nonEquiEvaluators.isEmpty()) {
+            return buildJoinedDataBlockDefaultColumnar(leftBlock);
+          } else {
+            List<Object[]> rows = buildJoinedDataBlockUniqueKeys(leftBlock);
+            if (!rows.isEmpty()) {
+              return new RowHeapDataBlock(rows, _resultSchema);
+            }
+            return null;
+          }
+        } else {
+          // For duplicate keys, think about this later
+          List<Object[]> rows = buildJoinedDataBlockDuplicateKeys(leftBlock);
+          if (!rows.isEmpty()) {
+            return new RowHeapDataBlock(rows, _resultSchema);
+          }
+          return null;
+        }
+    }
+  }
+
+  // Semi-join => check if the key is in the right table
+  private MseBlock.Data buildJoinedDataBlockSemiColumnar(SerializedDataBlock leftBlock, boolean include) {
+    LazyDataBlock resultBlock = new LazyDataBlock(leftBlock.getDataBlock(), _resultSchema);
+    Object[] keyColumns = resultBlock.getKeyColumns(_leftKeySelector.getColumnIds());
+    RoaringBitmap includedRowIds = _rightTable.matches(keyColumns, !include);
+    resultBlock.setIncludedRowIds(includedRowIds);
+    return resultBlock;
+  }
+
+  private MseBlock.Data buildJoinedDataBlockDefaultColumnar(SerializedDataBlock leftBlock) {
+    // TODOs:
+    // max rows limit reached
+    // handle non-equi conditions
+    LazyDataBlock resultBlock = new LazyDataBlock(leftBlock.getDataBlock(), _resultSchema);
+    Object[] keyColumns = resultBlock.getKeyColumns(_leftKeySelector.getColumnIds());
+    Object[] rightRowObjects = _rightTable.getAll(keyColumns, _matchedRightRows, BIT_SET_PLACEHOLDER);
+    List<Object[]> rightRows = new ArrayList<>(resultBlock.getNumRows());
+    for (int i = 0; i < rightRowObjects.length; i++) {
+      rightRows.add((Object[]) rightRowObjects[i]);
+    }
+    if (!needUnmatchedLeftRows()) {
+      RoaringBitmap includedRowIds = new RoaringBitmap();
+      int count = 0;
+      for (int rowId = 0; rowId < rightRows.size(); rowId++) {
+        if (isMaxRowsLimitReached(count)) {
+          break;
+        }
+        if (rightRows.get(rowId) != null) {
+          includedRowIds.add(rowId);
+          count++;
+        }
+      }
+      resultBlock.setIncludedRowIds(includedRowIds);
+    } else if (resultBlock.getNumRows() > _maxRowsInJoin) {
+      RoaringBitmap includedRowIds = new RoaringBitmap();
+      includedRowIds.add(0L, (long) _maxRowsInJoin - 1);
+      resultBlock.setIncludedRowIds(includedRowIds);
+    }
+    resultBlock.setRightRows(rightRows);
+    return resultBlock;
   }
 
   @Override

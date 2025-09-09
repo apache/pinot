@@ -93,5 +93,10 @@ public interface BlockSplitter {
       }
       return Iterators.singletonIterator(block);
     }
+
+    @Override
+    public Iterator<MseBlock.Data> visit(LazyDataBlock block, Integer maxBlockSize) {
+      return Iterators.singletonIterator(block);
+    }
   }
 }

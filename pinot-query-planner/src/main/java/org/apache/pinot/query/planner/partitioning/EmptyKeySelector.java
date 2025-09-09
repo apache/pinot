@@ -37,4 +37,9 @@ public class EmptyKeySelector implements KeySelector<Integer> {
   public int computeHash(Object[] input) {
     return 0;
   }
+
+  @Override
+  public int[] getColumnIds() {
+    return new int[0];
+  }
 }

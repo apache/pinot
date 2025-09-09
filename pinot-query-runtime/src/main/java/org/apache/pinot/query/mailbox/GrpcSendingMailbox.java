@@ -43,6 +43,7 @@ import org.apache.pinot.query.mailbox.channel.ChannelManager;
 import org.apache.pinot.query.mailbox.channel.ChannelUtils;
 import org.apache.pinot.query.mailbox.channel.MailboxStatusObserver;
 import org.apache.pinot.query.runtime.blocks.ErrorMseBlock;
+import org.apache.pinot.query.runtime.blocks.LazyDataBlock;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.RowHeapDataBlock;
 import org.apache.pinot.query.runtime.blocks.SerializedDataBlock;
@@ -232,6 +233,14 @@ public class GrpcSendingMailbox implements SendingMailbox {
         throw new UnsupportedOperationException("Cannot serialize stats with SerializedDataBlock");
       }
       return block.getDataBlock();
+    }
+
+    @Override
+    public DataBlock visit(LazyDataBlock block, List<DataBuffer> serializedStats) {
+      if (serializedStats != null && !serializedStats.isEmpty()) {
+        throw new UnsupportedOperationException("Cannot serialize stats with LazyDataBlock");
+      }
+      return block.asSerialized().getDataBlock();
     }
 
     @Override

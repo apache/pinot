@@ -23,9 +23,11 @@ import javax.annotation.Nullable;
 
 public class SingleColumnKeySelector implements KeySelector<Object> {
   private final int _keyId;
+  private final int[] _columnIds;
 
   public SingleColumnKeySelector(int keyId) {
     _keyId = keyId;
+    _columnIds = new int[] { keyId };
   }
 
   @Nullable
@@ -38,5 +40,10 @@ public class SingleColumnKeySelector implements KeySelector<Object> {
   public int computeHash(Object[] input) {
     Object key = input[_keyId];
     return key != null ? key.hashCode() & Integer.MAX_VALUE : 0;
+  }
+
+  @Override
+  public int[] getColumnIds() {
+    return _columnIds;
   }
 }
