@@ -168,6 +168,10 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
     boolean descendingSoFar = true;
     while (iterator.hasNext() && (ascendingSoFar || descendingSoFar)) {
       BaseFilterOperator filterOperator = iterator.next();
+      if (!filterOperator.isAscending() && !filterOperator.isDescending()) {
+        // this should only happen on test mocks
+        continue;
+      }
       ascendingSoFar &= filterOperator.isAscending();
       descendingSoFar &= filterOperator.isDescending();
     }
@@ -184,6 +188,6 @@ public abstract class BaseFilterOperator extends BaseOperator<FilterBlock> {
   protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
     super.explainAttributes(attributeBuilder);
     attributeBuilder.putLong("numDocs", _numDocs);
-    attributeBuilder.putString("order", isAscending() ? "ASC" : "DESC");
+    attributeBuilder.putString("order", isAscending() ? "asc" : "desc");
   }
 }

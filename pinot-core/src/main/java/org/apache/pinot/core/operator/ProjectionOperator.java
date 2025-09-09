@@ -58,6 +58,17 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
     _queryContext = queryContext;
   }
 
+  private ProjectionOperator(Map<String, DataSource> dataSourceMap,
+      @Nullable BaseDocIdSetOperator docIdSetOperator, DataFetcher dataFetcher, DataBlockCache dataBlockCache,
+      Map<String, ColumnContext> columnContextMap, QueryContext queryContext) {
+    _dataSourceMap = dataSourceMap;
+    _docIdSetOperator = docIdSetOperator;
+    _dataFetcher = dataFetcher;
+    _dataBlockCache = dataBlockCache;
+    _columnContextMap = columnContextMap;
+    _queryContext = queryContext;
+  }
+
   @Override
   public Map<String, ColumnContext> getSourceColumnContextMap() {
     return _columnContextMap;
@@ -136,7 +147,11 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
   @Override
   public BaseProjectOperator<ProjectionBlock> withOrder(boolean ascending) {
     BaseDocIdSetOperator orderedOperator = _docIdSetOperator.withOrder(ascending);
-    return new ProjectionOperator(_dataSourceMap, orderedOperator, _queryContext);
+    if (orderedOperator == _docIdSetOperator) {
+      return this;
+    }
+    return new ProjectionOperator(_dataSourceMap, orderedOperator, _dataFetcher, _dataBlockCache, _columnContextMap,
+        _queryContext);
   }
 
   @Override

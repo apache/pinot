@@ -672,7 +672,8 @@ public class CommonConstants {
         // Query option key used to enable a given set of defaultly disabled rules
         public static final String USE_PLANNER_RULES = "usePlannerRules";
 
-        public static final String ORDER_BY_ALGORITHM = "orderByAlgorithm";
+        public static final String REVERSE_ORDER = "allowReverseOrder";
+        public static final boolean DEFAULT_REVERSE_ORDER = true;
 
         public static final String MULTI_STAGE_LEAF_LIMIT = "multiStageLeafLimit";
 
@@ -1751,7 +1752,8 @@ public class CommonConstants {
       public static final String DOCID = "$docId";
       public static final String HOSTNAME = "$hostName";
       public static final String SEGMENTNAME = "$segmentName";
-      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME);
+      public static final String PARTITIONID = "$partitionId";
+      public static final Set<String> BUILT_IN_VIRTUAL_COLUMNS = Set.of(DOCID, HOSTNAME, SEGMENTNAME, PARTITIONID);
     }
   }
 

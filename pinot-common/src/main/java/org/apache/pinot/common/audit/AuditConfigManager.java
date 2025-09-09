@@ -20,11 +20,14 @@ package org.apache.pinot.common.audit;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.configuration2.MapConfiguration;
 import org.apache.pinot.spi.config.provider.PinotClusterConfigChangeListener;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.services.ServiceRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,12 +41,15 @@ import org.slf4j.LoggerFactory;
 public final class AuditConfigManager implements PinotClusterConfigChangeListener {
   private static final Logger LOG = LoggerFactory.getLogger(AuditConfigManager.class);
   private static final String AUDIT_CONFIG_PREFIX = "pinot.audit";
+  private static final Map<ServiceRole, String> SERVICE_ROLE_CONFIG_PREFIX_MAP =
+      Map.of(ServiceRole.CONTROLLER, "controller", ServiceRole.SERVER, "server", ServiceRole.BROKER, "broker");
 
+  private final String _configPrefix;
   private AuditConfig _currentConfig = new AuditConfig();
 
-  @VisibleForTesting
-  static AuditConfig buildFromClusterConfig(Map<String, String> clusterConfigs) {
-    return mapPrefixedConfigToObject(clusterConfigs, AUDIT_CONFIG_PREFIX, AuditConfig.class);
+  @Inject
+  public AuditConfigManager(ServiceRole serviceRole) {
+    _configPrefix = constructAuditConfigPrefix(serviceRole);
   }
 
   /**
@@ -51,11 +57,17 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
    * Uses PinotConfiguration.subset() to extract properties with the given prefix and
    * Jackson's convertValue() for automatic object mapping.
    */
-  private static <T> T mapPrefixedConfigToObject(Map<String, String> clusterConfigs, String prefix,
-      Class<T> configClass) {
+  @VisibleForTesting
+  static AuditConfig buildFromClusterConfig(Map<String, String> clusterConfigs, String auditConfigPrefix) {
     final MapConfiguration mapConfig = new MapConfiguration(clusterConfigs);
-    final PinotConfiguration subsetConfig = new PinotConfiguration(mapConfig).subset(prefix);
-    return AuditLogger.OBJECT_MAPPER.convertValue(subsetConfig.toMap(), configClass);
+    final PinotConfiguration subsetConfig = new PinotConfiguration(mapConfig).subset(auditConfigPrefix);
+    return AuditLogger.OBJECT_MAPPER.convertValue(subsetConfig.toMap(), AuditConfig.class);
+  }
+
+  private static String constructAuditConfigPrefix(ServiceRole serviceRole) {
+    String componentPrefix = SERVICE_ROLE_CONFIG_PREFIX_MAP.get(serviceRole);
+    Objects.requireNonNull(componentPrefix, "Unsupported service role: " + serviceRole);
+    return AUDIT_CONFIG_PREFIX + "." + componentPrefix;
   }
 
   public AuditConfig getCurrentConfig() {
@@ -68,8 +80,7 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    boolean hasAuditConfigChanges =
-        changedConfigs.stream().anyMatch(configKey -> configKey.startsWith(AUDIT_CONFIG_PREFIX));
+    boolean hasAuditConfigChanges = changedConfigs.stream().anyMatch(key -> key.startsWith(_configPrefix));
 
     if (!hasAuditConfigChanges) {
       LOG.info("No audit-related configs changed, skipping configuration rebuild");
@@ -77,7 +88,7 @@ public final class AuditConfigManager implements PinotClusterConfigChangeListene
     }
 
     try {
-      _currentConfig = buildFromClusterConfig(clusterConfigs);
+      _currentConfig = buildFromClusterConfig(clusterConfigs, _configPrefix);
       LOG.info("Successfully updated audit configuration");
     } catch (Exception e) {
       LOG.error("Failed to update audit configuration from cluster configs", e);
