@@ -50,11 +50,11 @@ public class AbstractMetricsTest {
     ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
     String metricName = "test";
     // add gauge
-    controllerMetrics.setOrUpdateGauge(metricName, () -> 1L);
+    controllerMetrics.setOrUpdateGlobalGauge(metricName, () -> 1L);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 1);
 
     // update gauge
-    controllerMetrics.setOrUpdateGauge(metricName, () -> 2L);
+    controllerMetrics.setOrUpdateGlobalGauge(metricName, () -> 2L);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 2);
 
     // remove gauge
@@ -73,7 +73,7 @@ public class AbstractMetricsTest {
 
     // update and remove gauge simultaneously
     IntStream.range(0, 1000).forEach(i -> {
-      controllerMetrics.setOrUpdateGauge(metricName, () -> (long) i);
+      controllerMetrics.setOrUpdateGlobalGauge(metricName, () -> (long) i);
     });
 
     // Verify final value
@@ -108,8 +108,8 @@ public class AbstractMetricsTest {
     String metricName2 = "testMultiple2";
 
     // Add multiple gauges
-    controllerMetrics.setOrUpdateGauge(metricName1, () -> 1L);
-    controllerMetrics.setOrUpdateGauge(metricName2, () -> 2L);
+    controllerMetrics.setOrUpdateGlobalGauge(metricName1, () -> 1L);
+    controllerMetrics.setOrUpdateGlobalGauge(metricName2, () -> 2L);
 
     // Verify values
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName1), 1);

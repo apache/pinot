@@ -26,6 +26,7 @@ public class MetricAttributeConstants {
   public static final String TABLE_NAME = "TableName";
   public static final String TASK_TYPE = "TaskType";
   public static final String TASK_NAME = "TaskName";
+  public static final String MERGE_LEVEL = "MergeLevel";
   public static final String SEGMENT_NAME = "SegmentName";
   public static final String RESOURCE_NAME = "ResourceName";
   public static final String TOPIC_NAME = "TopicName";

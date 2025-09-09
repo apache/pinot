@@ -52,7 +52,7 @@ public class OpenTelemetryUtil {
     AttributesBuilder attributesBuilder = Attributes.builder();
     if (attributes != null) {
       for (Map.Entry<String, String> entry : attributes.entrySet()) {
-        attributesBuilder.put(entry.getKey(), entry.getValue());
+        attributesBuilder.put(entry.getKey(), entry.getValue() == null ? "-" : entry.getValue());
       }
     }
     return attributesBuilder.build();

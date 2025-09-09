@@ -18,8 +18,9 @@
  */
 package org.apache.pinot.plugin.metrics.opentelemetry;
 
-import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
@@ -35,7 +36,8 @@ public class OpenTelemetryMetricName implements PinotMetricName {
   public OpenTelemetryMetricName(String fullMetricName, String simplifiedMetricName, Map<String, String> attributes) {
     _fullMetricName = fullMetricName;
     _simplifiedMetricName = simplifiedMetricName;
-    _attributes = ImmutableMap.copyOf(attributes);
+    _attributes = new HashMap<>(attributes);
+    _attributes.put(MetricAttributeConstants.PINOT_METRIC_NAME, fullMetricName);
   }
 
   public OpenTelemetryMetricName(PinotMetricName pinotMetricName) {
