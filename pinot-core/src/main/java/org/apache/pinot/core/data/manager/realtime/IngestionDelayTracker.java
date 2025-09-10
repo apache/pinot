@@ -55,8 +55,8 @@ import org.slf4j.LoggerFactory;
  * Highlights:
  * 1-An object of this class is hosted by each RealtimeTableDataManager.
  * 2-The object tracks ingestion delays for all partitions hosted by the current server for the given Realtime table.
- * 3-Partition delays are updated by all RealtimeSegmentDataManager objects hosted in the corresponding
- *   RealtimeTableDataManager.
+ * 3-The current consumption status of partitions are updated by the RealtimeSegmentDataManager objects hosted in the
+ * corresponding RealtimeTableDataManager.
  * 4-Individual metrics are associated with each partition being tracked.
  * 5-Delays for partitions that do not have events to consume are reported as zero.
  * 6-Partitions whose Segments go from CONSUMING to DROPPED state stop being tracked so their delays do not cloud
@@ -66,6 +66,8 @@ import org.slf4j.LoggerFactory;
  *   partition. If not, we stop tracking the respective partition.
  * 8-A scheduled executor thread is started by this object to track timeouts of partitions and drive the reading
  * of their ideal state.
+ * 9-A scheduled executor thread is started by this object to fetch the latest stream offset from upstream and create
+ * metrics for new partitions for which there is no consumer present on the server.
  *
  *  The following diagram illustrates the object interactions with main external APIs
  *
@@ -85,7 +87,6 @@ import org.slf4j.LoggerFactory;
  *   | TimerTrackingTask |          (CONSUMING -> DROPPED state change)
  *   |___________________|
  *
- * TODO: handle bug situations like the one where a partition is not allocated to a given server due to a bug.
  */
 
 public class IngestionDelayTracker {
