@@ -158,21 +158,11 @@ public class PipelineBreakerOperator extends MultiStageOperator {
     /**
      * Allocated memory in bytes for this operator or its children in the same stage.
      */
-    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG) {
-      @Override
-      public boolean includeDefaultInJson() {
-        return true;
-      }
-    },
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
     /**
      * Time spent on GC while this operator or its children in the same stage were running.
      */
-    GC_TIME_MS(StatMap.Type.LONG) {
-      @Override
-      public boolean includeDefaultInJson() {
-        return true;
-      }
-    };
+    GC_TIME_MS(StatMap.Type.LONG);
     private final StatMap.Type _type;
 
     StatKey(StatMap.Type type) {
