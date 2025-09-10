@@ -123,6 +123,10 @@ public class AscDocIdSetOperator extends BaseDocIdSetOperator {
     if (isAscending() == ascending) {
       return this;
     }
-    return new AscDocIdSetOperator(_filterOperator.withOrder(ascending), _maxSizeOfDocIdSet);
+    // TODO: REMOVE THIS BEFORE MERGE
+    if (System.getProperty("USE_REVERSE_ITERATOR") != null) {
+      return new AscDocIdSetOperator(_filterOperator.withOrder(ascending), _maxSizeOfDocIdSet);
+    }
+    return new DescDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
   }
 }

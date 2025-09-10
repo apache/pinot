@@ -1,5 +1,5 @@
 /**
- * Licensed to the Apache Software Foundation (ASF) under one
+ * Licensed to the Apache Softwa' Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
@@ -74,7 +74,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   private static final String FIRST_SEGMENT_NAME = "firstTestSegment";
   private static final String SECOND_SEGMENT_NAME = "secondTestSegment";
 
-  @Param({"ASC", "NAIVE_DESC", "OPTIMIZED_DESC"})
+  @Param({"ASC", "NAIVE_DESC", "REVERSE_ITERATOR", "REVERSE_OPERATOR"})
   private Mode _zMode; // called zMode just to force this parameter to be the last used in the report
   @Param("1500000")
   private int _numRows;
@@ -91,6 +91,10 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   @Setup
   public void setUp()
       throws Exception {
+    if (_zMode == Mode.REVERSE_ITERATOR) {
+      System.setProperty("USE_REVERSE_ITERATOR", "true");
+    }
+
     _supplier = Distribution.createSupplier(42, _scenario);
     FileUtils.deleteQuietly(INDEX_DIR);
 
@@ -155,7 +159,8 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
                 + "FROM sorted "
                 + "ORDER BY SORTED_COL DESC "
                 + "LIMIT " + _limit);
-      case OPTIMIZED_DESC:
+      case REVERSE_ITERATOR:
+      case REVERSE_OPERATOR:
         return getBrokerResponse(
             "SET allowReverseOrder=true;"
                 + "SELECT SORTED_COL "
@@ -183,7 +188,8 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
                 + "FROM sorted "
                 + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
                 + "LIMIT " + _limit);
-      case OPTIMIZED_DESC:
+      case REVERSE_ITERATOR:
+      case REVERSE_OPERATOR:
         return getBrokerResponse(
             "SET allowReverseOrder=true;"
                 + "SELECT SORTED_COL "
@@ -211,6 +217,6 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   }
 
   public enum Mode {
-    ASC, NAIVE_DESC, OPTIMIZED_DESC
+    ASC, NAIVE_DESC, REVERSE_ITERATOR, REVERSE_OPERATOR
   }
 }
