@@ -22,24 +22,32 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.pinot.common.metrics.ServerGauge;
+import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.indexsegment.mutable.MutableSegmentImpl;
 import org.apache.pinot.segment.local.realtime.converter.stats.RealtimeSegmentSegmentCreationDataSource;
 import org.apache.pinot.segment.local.segment.creator.TransformPipeline;
 import org.apache.pinot.segment.local.segment.creator.impl.SegmentIndexCreationDriverImpl;
+import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
+import org.apache.pinot.segment.local.utils.TableConfigUtils;
 import org.apache.pinot.segment.spi.creator.SegmentGeneratorConfig;
 import org.apache.pinot.segment.spi.creator.SegmentVersion;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.spi.config.table.ColumnPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentPartitionConfig;
 import org.apache.pinot.spi.config.table.SegmentZKPropsConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.RecordReader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 public class RealtimeSegmentConverter {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RealtimeSegmentConverter.class);
+
   private final MutableSegmentImpl _realtimeSegmentImpl;
   private final SegmentZKPropsConfig _segmentZKPropsConfig;
   private final String _outputPath;
@@ -96,23 +104,40 @@ public class RealtimeSegmentConverter {
     _realtimeSegmentImpl.commit();
 
     SegmentIndexCreationDriverImpl driver = new SegmentIndexCreationDriverImpl();
-    try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
-      String sortedColumn = null;
-      List<String> columnSortOrder = genConfig.getColumnSortOrder();
-      if (CollectionUtils.isNotEmpty(columnSortOrder)) {
-        sortedColumn = columnSortOrder.get(0);
-      }
-      int[] sortedDocIds =
-          sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn) : null;
-      recordReader.init(_realtimeSegmentImpl, sortedDocIds);
-      RealtimeSegmentSegmentCreationDataSource dataSource =
-          new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader);
-      driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName)); // initializes reader
 
-      if (!_enableColumnMajor) {
-        driver.build();
-      } else {
-        driver.buildByColumn(_realtimeSegmentImpl);
+    // Check if commit-time compaction is enabled for upsert tables
+    boolean useCompactedReader = TableConfigUtils.isCommitTimeCompactionEnabled(_tableConfig);
+
+    String sortedColumn = null;
+    List<String> columnSortOrder = genConfig.getColumnSortOrder();
+    if (columnSortOrder != null && !columnSortOrder.isEmpty()) {
+      sortedColumn = columnSortOrder.get(0);
+    }
+    int[] sortedDocIds =
+        sortedColumn != null ? _realtimeSegmentImpl.getSortedDocIdIterationOrderWithSortedColumn(sortedColumn) : null;
+
+    long compactionStartTime = System.currentTimeMillis();
+    int preCommitRowCount = _realtimeSegmentImpl.getNumDocsIndexed();
+
+    if (useCompactedReader) {
+      // Take a snapshot of validDocIds at the beginning of conversion to ensure consistency
+      ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = getValidDocIdSnapshot();
+      if (validDocIdsSnapshot == null) {
+        throw new IllegalStateException("Cannot use CompactedPinotSegmentRecordReader without valid document IDs. "
+            + "Segment may be corrupted.");
+      }
+      // Use CompactedPinotSegmentRecordReader to remove obsolete/invalidated records
+      try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
+          validDocIdsSnapshot)) {
+        recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, validDocIdsSnapshot);
+        publishCompactionMetrics(serverMetrics, preCommitRowCount, driver, compactionStartTime);
+      }
+    } else {
+      // Use regular PinotSegmentRecordReader (existing behavior)
+      try (PinotSegmentRecordReader recordReader = new PinotSegmentRecordReader()) {
+        recordReader.init(_realtimeSegmentImpl, sortedDocIds);
+        buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, null);
       }
     }
 
@@ -122,6 +147,78 @@ public class RealtimeSegmentConverter {
         int numPartitions = driver.getSegmentStats().getColumnProfileFor(columnName).getPartitions().size();
         serverMetrics.addValueToTableGauge(_tableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, numPartitions);
       }
+    }
+  }
+
+  private @Nullable ThreadSafeMutableRoaringBitmap getValidDocIdSnapshot() {
+    ThreadSafeMutableRoaringBitmap validDocIdsSnapshot = null;
+    if (_realtimeSegmentImpl.getValidDocIds() != null) {
+      validDocIdsSnapshot = new ThreadSafeMutableRoaringBitmap(
+          _realtimeSegmentImpl.getValidDocIds().getMutableRoaringBitmap());
+    }
+    return validDocIdsSnapshot;
+  }
+
+  /**
+   * Publishes segment build metrics including common metrics (always published) and compaction-specific metrics
+   * (published only when compaction is enabled)
+   */
+  private void publishCompactionMetrics(@Nullable ServerMetrics serverMetrics,
+      int preCommitRowCount, SegmentIndexCreationDriverImpl driver, long buildStartTime) {
+    if (serverMetrics == null) {
+      return;
+    }
+    try {
+      int postCommitRowCount = driver.getSegmentStats().getTotalDocCount();
+      long buildProcessingTime = System.currentTimeMillis() - buildStartTime;
+
+      int rowsRemoved = preCommitRowCount - postCommitRowCount;
+
+      // Only publish compaction-specific metrics when compaction is actually enabled
+      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ENABLED_SEGMENTS, 1L);
+      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_PRE_COMPACTION,
+          preCommitRowCount);
+      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_POST_COMPACTION,
+          postCommitRowCount);
+      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_ROWS_REMOVED, rowsRemoved);
+      serverMetrics.addMeteredTableValue(_tableName, ServerMeter.COMMIT_TIME_COMPACTION_BUILD_TIME_MS,
+          buildProcessingTime);
+
+      // Calculate and publish compaction ratio percentage (only if we had rows to compact)
+      if (preCommitRowCount > 0) {
+        double compactionRatioPercent = (double) rowsRemoved / preCommitRowCount * 100.0;
+        serverMetrics.setOrUpdateTableGauge(_tableName, ServerGauge.COMMIT_TIME_COMPACTION_RATIO_PERCENT,
+            (long) compactionRatioPercent);
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Failed to publish segment build metrics for table: {}, segment: {}", _tableName,
+          _segmentName, e);
+    }
+  }
+
+  /**
+   * Common method to build segment with the provided record reader
+   */
+  private void buildSegmentWithReader(SegmentIndexCreationDriverImpl driver, SegmentGeneratorConfig genConfig,
+      RecordReader recordReader, int[] sortedDocIds, boolean useCompactedReader,
+      @Nullable ThreadSafeMutableRoaringBitmap validDocIdsSnapshot)
+      throws Exception {
+    RealtimeSegmentSegmentCreationDataSource dataSource;
+    if (useCompactedReader) {
+      // For compacted readers, use the constructor that takes sortedDocIds and pass the validDocIds snapshot
+      dataSource = new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, recordReader, sortedDocIds,
+          validDocIdsSnapshot);
+    } else {
+      // For regular readers, use the original constructor
+      dataSource =
+          new RealtimeSegmentSegmentCreationDataSource(_realtimeSegmentImpl, (PinotSegmentRecordReader) recordReader);
+    }
+    driver.init(genConfig, dataSource, TransformPipeline.getPassThroughPipeline(_tableName)); // initializes reader
+
+    if (!_enableColumnMajor) {
+      driver.build();
+    } else {
+      driver.buildByColumn(_realtimeSegmentImpl);
     }
   }
 

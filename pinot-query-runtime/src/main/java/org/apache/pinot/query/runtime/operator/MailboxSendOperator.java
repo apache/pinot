@@ -227,7 +227,7 @@ public class MailboxSendOperator extends MultiStageOperator {
     } catch (Exception e) {
       ErrorMseBlock errorBlock = ErrorMseBlock.fromException(e);
       try {
-        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId());
+        LOGGER.error("Exception while transferring data on opChain: {}", _context.getId(), e);
         sendEos(errorBlock);
       } catch (Exception e2) {
         LOGGER.error("Exception while sending error block.", e2);
@@ -237,9 +237,9 @@ public class MailboxSendOperator extends MultiStageOperator {
   }
 
   @Override
-  protected void sampleAndCheckInterruption() {
+  protected long getDeadlineMs() {
     // mailbox send operator uses passive deadline instead of the active one
-    sampleAndCheckInterruption(_context.getPassiveDeadlineMs());
+    return _context.getPassiveDeadlineMs();
   }
 
   private void sendEos(MseBlock.Eos eosBlockWithoutStats)

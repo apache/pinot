@@ -106,6 +106,7 @@ public class KinesisConsumerTest {
       assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
     }
     assertFalse(kinesisMessageBatch.isEndOfPartitionGroup());
+    assertTrue(kinesisMessageBatch.getSizeInBytes() > 0);
 
     // Fetch second batch
     kinesisMessageBatch = kinesisConsumer.fetchMessages(kinesisMessageBatch.getOffsetOfNextBatch(), TIMEOUT);
@@ -114,6 +115,7 @@ public class KinesisConsumerTest {
       assertEquals(baToString(kinesisMessageBatch.getStreamMessage(i).getValue()), DUMMY_RECORD_PREFIX + i);
     }
     assertFalse(kinesisMessageBatch.isEndOfPartitionGroup());
+    assertTrue(kinesisMessageBatch.getSizeInBytes() > 0);
 
     // Expect only 1 call to get shard iterator and 2 calls to get records
     verify(kinesisClient, times(1)).getShardIterator(any(GetShardIteratorRequest.class));

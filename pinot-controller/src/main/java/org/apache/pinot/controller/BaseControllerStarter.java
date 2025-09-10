@@ -59,6 +59,7 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.helix.zookeeper.constant.ZkSystemPropertyKeys;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.common.config.TlsConfig;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.http.PoolingHttpClientConnectionManagerHelper;
@@ -86,6 +87,7 @@ import org.apache.pinot.common.utils.tls.TlsUtils;
 import org.apache.pinot.common.version.PinotVersion;
 import org.apache.pinot.controller.api.ControllerAdminApiApplication;
 import org.apache.pinot.controller.api.access.AccessControlFactory;
+import org.apache.pinot.controller.api.audit.AuditServiceBinder;
 import org.apache.pinot.controller.api.events.MetadataEventNotifierFactory;
 import org.apache.pinot.controller.api.resources.ControllerFilePathProvider;
 import org.apache.pinot.controller.api.resources.InvalidControllerConfigException;
@@ -105,7 +107,7 @@ import org.apache.pinot.controller.helix.core.rebalance.RebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreChecker;
 import org.apache.pinot.controller.helix.core.rebalance.RebalancePreCheckerFactory;
 import org.apache.pinot.controller.helix.core.rebalance.TableRebalanceManager;
-import org.apache.pinot.controller.helix.core.rebalance.tenant.DefaultTenantRebalancer;
+import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalanceChecker;
 import org.apache.pinot.controller.helix.core.rebalance.tenant.TenantRebalancer;
 import org.apache.pinot.controller.helix.core.relocation.SegmentRelocator;
 import org.apache.pinot.controller.helix.core.retention.RetentionManager;
@@ -218,6 +220,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected ResourceUtilizationManager _resourceUtilizationManager;
   protected RebalancePreChecker _rebalancePreChecker;
   protected TableRebalanceManager _tableRebalanceManager;
+  protected DefaultClusterConfigChangeHandler _clusterConfigChangeHandler;
 
   @Override
   public void init(PinotConfiguration pinotConfiguration)
@@ -540,6 +543,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     // TODO: Need to put this inside HelixResourceManager when HelixControllerLeadershipManager is removed.
     _helixResourceManager.registerPinotLLCRealtimeSegmentManager(_pinotLLCRealtimeSegmentManager);
 
+    // Initialize cluster config change handler
+    LOGGER.info("Initializing cluster config change handler");
+    _clusterConfigChangeHandler = new DefaultClusterConfigChangeHandler();
+    try {
+      // Register cluster config change handler with Helix
+      _helixParticipantManager.addClusterfigChangeListener(_clusterConfigChangeHandler);
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to register cluster config change handler", e);
+    }
+
+
     SegmentCompletionConfig segmentCompletionConfig = new SegmentCompletionConfig(_config);
 
     _segmentCompletionManager =
@@ -570,7 +584,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         new TableRebalanceManager(_helixResourceManager, _controllerMetrics, _rebalancePreChecker, _tableSizeReader,
             _rebalancerExecutorService);
     _tenantRebalancer =
-        new DefaultTenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
+        new TenantRebalancer(_tableRebalanceManager, _helixResourceManager, _rebalancerExecutorService);
 
     // Setting up periodic tasks
     List<PeriodicTask> controllerPeriodicTasks = setupControllerPeriodicTasks();
@@ -627,6 +641,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         bind(_diskUtilizationChecker).to(DiskUtilizationChecker.class);
         bind(_resourceUtilizationManager).to(ResourceUtilizationManager.class);
         bind(controllerStartTime).named(ControllerAdminApiApplication.START_TIME);
+
         String loggerRootDir = _config.getProperty(CommonConstants.Controller.CONFIG_OF_LOGGER_ROOT_DIR);
         if (loggerRootDir != null) {
           bind(new LocalLogFileServer(loggerRootDir)).to(LogFileServer.class);
@@ -635,6 +650,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
         }
       }
     });
+
+    // Register audit services binder
+    _adminApp.registerBinder(new AuditServiceBinder(_clusterConfigChangeHandler, getServiceRole()));
 
     LOGGER.info("Starting controller admin application on: {}", ListenerConfigUtil.toString(_listenerConfigs));
     _adminApp.start(_listenerConfigs, _controllerMetrics);
@@ -912,6 +930,9 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     PeriodicTask resourceUtilizationChecker = new ResourceUtilizationChecker(_config, _connectionManager,
         _controllerMetrics, _utilizationCheckers, _executorService, _helixResourceManager);
     periodicTasks.add(resourceUtilizationChecker);
+    PeriodicTask tenantRebalanceChecker =
+        new TenantRebalanceChecker(_config, _helixResourceManager, _tenantRebalancer);
+    periodicTasks.add(tenantRebalanceChecker);
 
     return periodicTasks;
   }
@@ -925,12 +946,16 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     LOGGER.info("Creating TaskManager with class: {}", taskManagerClass);
     try {
       return PluginManager.get().createInstance(taskManagerClass,
-          new Class[]{PinotHelixTaskResourceManager.class, PinotHelixResourceManager.class, LeadControllerManager.class,
+          new Class[]{
+              PinotHelixTaskResourceManager.class, PinotHelixResourceManager.class, LeadControllerManager.class,
               ControllerConf.class, ControllerMetrics.class, TaskManagerStatusCache.class,
-              Executor.class, PoolingHttpClientConnectionManager.class, ResourceUtilizationManager.class},
-          new Object[]{_helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
+              Executor.class, PoolingHttpClientConnectionManager.class, ResourceUtilizationManager.class
+          },
+          new Object[]{
+              _helixTaskResourceManager, _helixResourceManager, _leadControllerManager,
               _config, _controllerMetrics, _taskManagerStatusCache, _executorService,
-              _connectionManager, _resourceUtilizationManager});
+              _connectionManager, _resourceUtilizationManager
+          });
     } catch (Exception e) {
       LOGGER.error("Failed to create task manager with class: {}", taskManagerClass, e);
       throw new RuntimeException("Failed to create task manager with class: " + taskManagerClass, e);

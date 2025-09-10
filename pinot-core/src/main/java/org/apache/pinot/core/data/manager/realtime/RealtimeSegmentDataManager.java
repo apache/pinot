@@ -24,6 +24,7 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.nio.BufferOverflowException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -573,8 +574,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
    */
   private boolean processStreamEvents(MessageBatch messageBatch, long idlePipeSleepTimeMillis) {
     int messageCount = messageBatch.getMessageCount();
-    _partitionRateLimiter.throttle(messageCount);
-    _serverRateLimiter.throttle(messageCount);
+    _partitionRateLimiter.throttle(messageBatch);
+    _serverRateLimiter.throttle(messageBatch);
 
     PinotMeter realtimeBytesIngestedMeter = null;
     PinotMeter realtimeBytesDroppedMeter = null;
@@ -1161,8 +1162,8 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
       } catch (Exception e) {
         String errorMessage = "Could not build segment";
         FileUtils.deleteQuietly(tempSegmentFolder);
-        if (e instanceof IllegalStateException) {
-          // Precondition checks fail, the segment build would fail consistently
+        if (e instanceof IllegalStateException || e instanceof BufferOverflowException) {
+          // Index or forward index too large issue, the segment build would fail consistently
           _segmentBuildFailedWithDeterministicError = true;
         }
         reportSegmentBuildFailure(errorMessage, e);

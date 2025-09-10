@@ -140,8 +140,8 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
 
   @Override
   public boolean hasIndexFor(String column, IndexType<?, ?, ?> type) {
-    if (type == StandardIndexes.text()) {
-      return TextIndexUtils.hasTextIndex(_segmentDirectory, column);
+    if (type == StandardIndexes.text() && TextIndexUtils.hasTextIndex(_segmentDirectory, column)) {
+      return true;
     }
     if (type == StandardIndexes.vector()) {
       return VectorIndexUtils.hasVectorIndex(_segmentDirectory, column);
@@ -387,7 +387,6 @@ class SingleFileIndexDirectory extends ColumnIndexDirectory {
           columns.add(column);
         }
       }
-      return columns;
     }
     if (type == StandardIndexes.vector()) {
       for (String column : _segmentMetadata.getAllColumns()) {

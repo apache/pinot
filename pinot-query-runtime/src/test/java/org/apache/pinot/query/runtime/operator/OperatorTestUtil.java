@@ -18,8 +18,6 @@
  */
 package org.apache.pinot.query.runtime.operator;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -28,6 +26,7 @@ import org.apache.pinot.common.datatable.StatMap;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.query.mailbox.MailboxService;
 import org.apache.pinot.query.mailbox.ReceivingMailbox;
+import org.apache.pinot.query.planner.physical.DispatchablePlanFragment;
 import org.apache.pinot.query.routing.StageMetadata;
 import org.apache.pinot.query.routing.StagePlan;
 import org.apache.pinot.query.routing.WorkerMetadata;
@@ -48,9 +47,10 @@ import static org.mockito.Mockito.when;
 
 public class OperatorTestUtil {
   // simple key-value collision schema/data test set: "Aa" and "BB" have same hash code in java.
-  private static final List<List<Object[]>> SIMPLE_KV_DATA_ROWS =
-      ImmutableList.of(ImmutableList.of(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}),
-          ImmutableList.of(new Object[]{1, "AA"}, new Object[]{2, "Aa"}));
+  private static final List<List<Object[]>> SIMPLE_KV_DATA_ROWS = List.of(
+      List.of(new Object[]{1, "Aa"}, new Object[]{2, "BB"}, new Object[]{3, "BB"}),
+      List.of(new Object[]{1, "AA"}, new Object[]{2, "Aa"})
+  );
   private static final MockDataBlockOperatorFactory MOCK_OPERATOR_FACTORY;
 
   public static final DataSchema SIMPLE_KV_DATA_SCHEMA = new DataSchema(new String[]{"foo", "bar"},
@@ -61,14 +61,14 @@ public class OperatorTestUtil {
 
   public static MultiStageQueryStats getDummyStats(int stageId) {
     MultiStageQueryStats stats = MultiStageQueryStats.emptyStats(stageId);
-    stats.getCurrentStats()
-        .addLastOperator(MultiStageOperator.Type.LEAF, new StatMap<>(LeafOperator.StatKey.class));
+    stats.getCurrentStats().addLastOperator(MultiStageOperator.Type.LEAF, new StatMap<>(LeafOperator.StatKey.class));
     return stats;
   }
 
   static {
     MOCK_OPERATOR_FACTORY = new MockDataBlockOperatorFactory().registerOperator(OP_1, SIMPLE_KV_DATA_SCHEMA)
-        .registerOperator(OP_2, SIMPLE_KV_DATA_SCHEMA).addRows(OP_1, SIMPLE_KV_DATA_ROWS.get(0))
+        .registerOperator(OP_2, SIMPLE_KV_DATA_SCHEMA)
+        .addRows(OP_1, SIMPLE_KV_DATA_ROWS.get(0))
         .addRows(OP_2, SIMPLE_KV_DATA_ROWS.get(1));
   }
 
@@ -109,12 +109,12 @@ public class OperatorTestUtil {
 
   public static OpChainExecutionContext getOpChainContext(MailboxService mailboxService, long deadlineMs,
       StageMetadata stageMetadata) {
-    return new OpChainExecutionContext(mailboxService, 0, deadlineMs, ImmutableMap.of(), stageMetadata,
+    return new OpChainExecutionContext(mailboxService, 0, deadlineMs, deadlineMs, Map.of(), stageMetadata,
         stageMetadata.getWorkerMetadataList().get(0), null, null, true);
   }
 
   public static OpChainExecutionContext getTracingContext() {
-    return getTracingContext(ImmutableMap.of(CommonConstants.Broker.Request.TRACE, "true"));
+    return getTracingContext(Map.of(CommonConstants.Broker.Request.TRACE, "true"));
   }
 
   public static OpChainExecutionContext getContext(Map<String, String> opChainMetadata) {
@@ -122,22 +122,21 @@ public class OperatorTestUtil {
   }
 
   public static OpChainExecutionContext getNoTracingContext() {
-    return getTracingContext(ImmutableMap.of());
+    return getTracingContext(Map.of());
   }
 
   private static OpChainExecutionContext getTracingContext(Map<String, String> opChainMetadata) {
     MailboxService mailboxService = mock(MailboxService.class);
     when(mailboxService.getHostname()).thenReturn("localhost");
     when(mailboxService.getPort()).thenReturn(1234);
-    WorkerMetadata workerMetadata = new WorkerMetadata(0, ImmutableMap.of(), ImmutableMap.of());
-    StageMetadata stageMetadata = new StageMetadata(0, ImmutableList.of(workerMetadata), ImmutableMap.of());
-    OpChainExecutionContext opChainExecutionContext = new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE,
-        opChainMetadata, stageMetadata, workerMetadata, null, null, true);
-
-    StagePlan stagePlan = new StagePlan(null, stageMetadata);
-
+    WorkerMetadata workerMetadata = new WorkerMetadata(0, Map.of(), Map.of());
+    StageMetadata stageMetadata =
+        new StageMetadata(0, List.of(workerMetadata), Map.of(DispatchablePlanFragment.TABLE_NAME_KEY, "testTable"));
+    OpChainExecutionContext opChainExecutionContext =
+        new OpChainExecutionContext(mailboxService, 123L, Long.MAX_VALUE, Long.MAX_VALUE, opChainMetadata,
+            stageMetadata, workerMetadata, null, null, true);
     opChainExecutionContext.setLeafStageContext(
-        new ServerPlanRequestContext(stagePlan, null, null, null));
+        new ServerPlanRequestContext(new StagePlan(null, stageMetadata), null, null, null));
     return opChainExecutionContext;
   }
 

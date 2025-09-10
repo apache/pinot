@@ -412,16 +412,23 @@ public class DefaultRebalancePreChecker implements RebalancePreChecker {
     }
 
     // --- Batch size per server recommendation check using summary ---
-    int maxSegmentsToAddOnServer = rebalanceSummaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer();
-    int batchSizePerServer = rebalanceConfig.getBatchSizePerServer();
-    if (maxSegmentsToAddOnServer > SEGMENT_ADD_THRESHOLD) {
-      if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
-          || batchSizePerServer > RECOMMENDED_BATCH_SIZE) {
-        pass = false;
-        warnings.add("Number of segments to add to a single server (" + maxSegmentsToAddOnServer + ") is high (>"
-            + SEGMENT_ADD_THRESHOLD + "). It is recommended to set batchSizePerServer to " + RECOMMENDED_BATCH_SIZE
-            + " or lower to avoid excessive load on servers.");
+    if (rebalanceSummaryResult != null) {
+      int maxSegmentsToAddOnServer = rebalanceSummaryResult.getSegmentInfo().getMaxSegmentsAddedToASingleServer();
+      int batchSizePerServer = rebalanceConfig.getBatchSizePerServer();
+      if (maxSegmentsToAddOnServer > SEGMENT_ADD_THRESHOLD) {
+        if (batchSizePerServer == RebalanceConfig.DISABLE_BATCH_SIZE_PER_SERVER
+            || batchSizePerServer > RECOMMENDED_BATCH_SIZE) {
+          pass = false;
+          warnings.add("Number of segments to add to a single server (" + maxSegmentsToAddOnServer + ") is high (>"
+              + SEGMENT_ADD_THRESHOLD + "). It is recommended to set batchSizePerServer to " + RECOMMENDED_BATCH_SIZE
+              + " or lower to avoid excessive load on servers.");
+        }
       }
+    } else {
+      // Rebalance summary should not be null when pre-checks are enabled unless an exception was thrown while
+      // calculating it
+      pass = false;
+      warnings.add("Could not assess batchSizePerServer recommendation as rebalance summary could not be calculated");
     }
 
     return pass ? RebalancePreCheckerResult.pass("All rebalance parameters look good")

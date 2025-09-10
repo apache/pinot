@@ -34,7 +34,6 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
-import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 import org.apache.pinot.broker.api.AccessControl;
 import org.apache.pinot.broker.broker.AccessControlFactory;
@@ -44,7 +43,6 @@ import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerTimer;
 import org.apache.pinot.common.response.BrokerResponse;
-import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.utils.HumanReadableDuration;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
@@ -53,12 +51,15 @@ import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.apache.pinot.tsdb.planner.TimeSeriesQueryEnvironment;
 import org.apache.pinot.tsdb.planner.physical.TimeSeriesDispatchablePlan;
 import org.apache.pinot.tsdb.spi.RangeTimeSeriesRequest;
 import org.apache.pinot.tsdb.spi.TimeSeriesLogicalPlanResult;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.apache.pinot.tsdb.spi.series.TimeSeriesBuilderFactoryProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,10 +71,12 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   private final TimeSeriesQueryEnvironment _queryEnvironment;
   private final QueryDispatcher _queryDispatcher;
 
-  public TimeSeriesRequestHandler(PinotConfiguration config, String brokerId, BrokerRoutingManager routingManager,
+  public TimeSeriesRequestHandler(PinotConfiguration config, String brokerId,
+      BrokerRequestIdGenerator requestIdGenerator, BrokerRoutingManager routingManager,
       AccessControlFactory accessControlFactory, QueryQuotaManager queryQuotaManager, TableCache tableCache,
       QueryDispatcher queryDispatcher, ThreadResourceUsageAccountant accountant) {
-    super(config, brokerId, routingManager, accessControlFactory, queryQuotaManager, tableCache, accountant);
+    super(config, brokerId, requestIdGenerator, routingManager, accessControlFactory, queryQuotaManager, tableCache,
+        accountant);
     _queryEnvironment = new TimeSeriesQueryEnvironment(config, routingManager, tableCache);
     _queryEnvironment.init(config);
     _queryDispatcher = queryDispatcher;
@@ -106,9 +109,10 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
   }
 
   @Override
-  public PinotBrokerTimeSeriesResponse handleTimeSeriesRequest(String lang, String rawQueryParamString,
-      RequestContext requestContext, RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
-    PinotBrokerTimeSeriesResponse timeSeriesResponse = null;
+  public TimeSeriesBlock handleTimeSeriesRequest(String lang, String rawQueryParamString,
+      Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
+      HttpHeaders httpHeaders) throws QueryException {
+    TimeSeriesBlock timeSeriesBlock = null;
     long queryStartTime = System.currentTimeMillis();
     try {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES, 1);
@@ -117,33 +121,32 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
       RangeTimeSeriesRequest timeSeriesRequest = null;
       firstStageAccessControlCheck(requesterIdentity);
       try {
-        timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString);
+        timeSeriesRequest = buildRangeTimeSeriesRequest(lang, rawQueryParamString, queryParams);
       } catch (URISyntaxException e) {
-        return PinotBrokerTimeSeriesResponse.newErrorResponse("BAD_REQUEST", "Error building RangeTimeSeriesRequest");
+        throw new QueryException(QueryErrorCode.TIMESERIES_PARSING, "Error building RangeTimeSeriesRequest", e);
       }
       TimeSeriesLogicalPlanResult logicalPlanResult = _queryEnvironment.buildLogicalPlan(timeSeriesRequest);
       // If there are no buckets in the logical plan, return an empty response.
       if (logicalPlanResult.getTimeBuckets().getNumBuckets() == 0) {
-        return PinotBrokerTimeSeriesResponse.newEmptyResponse();
+        return new TimeSeriesBlock(logicalPlanResult.getTimeBuckets(), new HashMap<>());
       }
       TimeSeriesDispatchablePlan dispatchablePlan =
           _queryEnvironment.buildPhysicalPlan(timeSeriesRequest, requestContext, logicalPlanResult);
 
       tableLevelAccessControlCheck(httpHeaders, dispatchablePlan.getTableNames());
-      timeSeriesResponse = _queryDispatcher.submitAndGet(requestContext, dispatchablePlan,
-          timeSeriesRequest.getTimeout().toMillis(), new HashMap<>());
-      return timeSeriesResponse;
+      timeSeriesBlock = _queryDispatcher.submitAndGet(requestContext.getRequestId(), dispatchablePlan,
+          timeSeriesRequest.getTimeout().toMillis(), requestContext);
+      return timeSeriesBlock;
+    } catch (Exception e) {
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
+      if (e instanceof QueryException) {
+        throw (QueryException) e;
+      } else {
+        throw new QueryException(QueryErrorCode.UNKNOWN, "Error processing time-series query", e);
+      }
     } finally {
       _brokerMetrics.addTimedValue(BrokerTimer.QUERY_TOTAL_TIME_MS, System.currentTimeMillis() - queryStartTime,
           TimeUnit.MILLISECONDS);
-      if (timeSeriesResponse == null
-          || timeSeriesResponse.getStatus().equals(PinotBrokerTimeSeriesResponse.ERROR_STATUS)) {
-        _brokerMetrics.addMeteredGlobalValue(BrokerMeter.TIME_SERIES_GLOBAL_QUERIES_FAILED, 1);
-        final String errorMessage = timeSeriesResponse == null ? "null time-series response"
-            : timeSeriesResponse.getError();
-        // TODO(timeseries): Remove logging for failed queries.
-        LOGGER.warn("time-series query failed with error: {}", errorMessage);
-      }
     }
   }
 
@@ -169,57 +172,41 @@ public class TimeSeriesRequestHandler extends BaseBrokerRequestHandler {
     return false;
   }
 
-  private RangeTimeSeriesRequest buildRangeTimeSeriesRequest(String language, String queryParamString)
+  private RangeTimeSeriesRequest buildRangeTimeSeriesRequest(String language, String queryParamString,
+      Map<String, String> queryParams)
       throws URISyntaxException {
-    List<NameValuePair> pairs = URLEncodedUtils.parse(
-        new URI("http://localhost?" + queryParamString), "UTF-8");
-    String query = null;
-    Long startTs = null;
-    Long endTs = null;
-    String step = null;
-    String timeoutStr = null;
-    int limit = RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT;
-    int numGroupsLimit = RangeTimeSeriesRequest.DEFAULT_NUM_GROUPS_LIMIT;
-    for (NameValuePair nameValuePair : pairs) {
-      switch (nameValuePair.getName()) {
-        case "query":
-          query = nameValuePair.getValue();
-          break;
-        case "start":
-          startTs = Long.parseLong(nameValuePair.getValue());
-          break;
-        case "end":
-          endTs = Long.parseLong(nameValuePair.getValue());
-          break;
-        case "step":
-          step = nameValuePair.getValue();
-          break;
-        case "timeout":
-          timeoutStr = nameValuePair.getValue();
-          break;
-        case "limit":
-          limit = Integer.parseInt(nameValuePair.getValue());
-          break;
-        case "numGroupsLimit":
-          numGroupsLimit = Integer.parseInt(nameValuePair.getValue());
-          break;
-        default:
-          /* Okay to ignore unknown parameters since the language implementor may be using them. */
-          break;
-      }
+    Map<String, String> mergedParams = new HashMap<>(queryParams);
+    // If queryParams is empty, parse the queryParamString to extract parameters.
+    if (queryParams.isEmpty()) {
+      URLEncodedUtils.parse(new URI("http://localhost?" + queryParamString), "UTF-8")
+          .forEach(pair -> mergedParams.putIfAbsent(pair.getName(), pair.getValue()));
     }
-    Long stepSeconds = getStepSeconds(step);
+
+    String query = mergedParams.get("query");
+    Long startTs = parseLongSafe(mergedParams.get("start"));
+    Long endTs = parseLongSafe(mergedParams.get("end"));
+    Long stepSeconds = getStepSeconds(mergedParams.get("step"));
+    Duration timeout = StringUtils.isNotBlank(mergedParams.get("timeout"))
+        ? HumanReadableDuration.from(mergedParams.get("timeout")) : Duration.ofMillis(_brokerTimeoutMs);
+
     Preconditions.checkNotNull(query, "Query cannot be null");
     Preconditions.checkNotNull(startTs, "Start time cannot be null");
     Preconditions.checkNotNull(endTs, "End time cannot be null");
     Preconditions.checkState(stepSeconds != null && stepSeconds > 0, "Step must be a positive integer");
-    Duration timeout = Duration.ofMillis(_brokerTimeoutMs);
-    if (StringUtils.isNotBlank(timeoutStr)) {
-      timeout = HumanReadableDuration.from(timeoutStr);
-    }
-    // TODO: Pass full raw query param string to the request
-    return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout, limit, numGroupsLimit,
-        queryParamString);
+
+    return new RangeTimeSeriesRequest(language, query, startTs, endTs, stepSeconds, timeout,
+        parseIntOrDefault(mergedParams.get("limit"), RangeTimeSeriesRequest.DEFAULT_SERIES_LIMIT),
+        parseIntOrDefault(mergedParams.get("numGroupsLimit"), RangeTimeSeriesRequest.DEFAULT_NUM_GROUPS_LIMIT),
+        queryParamString
+    );
+  }
+
+  private Long parseLongSafe(String value) {
+    return value != null ? Long.parseLong(value) : null;
+  }
+
+  private int parseIntOrDefault(String value, int defaultValue) {
+    return value != null ? Integer.parseInt(value) : defaultValue;
   }
 
   public static Long getStepSeconds(@Nullable String step) {

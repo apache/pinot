@@ -43,6 +43,7 @@ public class TransformPipeline {
   private final List<RecordTransformer> _transformers;
   @Nullable
   private final FilterTransformer _filterTransformer;
+  private final Set<String> _inputColumns;
 
   private long _numRowsProcessed;
   private long _numRowsFiltered;
@@ -53,12 +54,16 @@ public class TransformPipeline {
     _tableNameWithType = tableNameWithType;
     _transformers = transformers;
     FilterTransformer filterTransformer = null;
-    for (RecordTransformer recordTransformer : transformers) {
+    Set<String> cumulativeInputColumns = new HashSet<>();
+    for (int i = transformers.size() - 1; i >= 0; i--) {
+      RecordTransformer recordTransformer = transformers.get(i);
       if (recordTransformer instanceof FilterTransformer) {
         filterTransformer = (FilterTransformer) recordTransformer;
-        break;
       }
+      recordTransformer.withInputColumnsForDownstreamTransformers(cumulativeInputColumns);
+      cumulativeInputColumns.addAll(recordTransformer.getInputColumns());
     }
+    _inputColumns = cumulativeInputColumns;
     _filterTransformer = filterTransformer;
   }
 
@@ -71,11 +76,7 @@ public class TransformPipeline {
   }
 
   public Set<String> getInputColumns() {
-    Set<String> inputColumns = new HashSet<>();
-    for (RecordTransformer transformer : _transformers) {
-      inputColumns.addAll(transformer.getInputColumns());
-    }
-    return inputColumns;
+    return _inputColumns;
   }
 
   public Result processRow(GenericRow decodedRow) {

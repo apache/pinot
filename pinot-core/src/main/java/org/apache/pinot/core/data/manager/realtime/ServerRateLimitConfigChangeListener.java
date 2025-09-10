@@ -37,24 +37,44 @@ public class ServerRateLimitConfigChangeListener implements PinotClusterConfigCh
 
   @Override
   public void onChange(Set<String> changedConfigs, Map<String, String> clusterConfigs) {
-    if (!changedConfigs.contains(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)) {
-      LOGGER.info("ChangedConfigs: {} does not contain: {}. Skipping updates", changedConfigs,
-          CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT);
+    if (!changedConfigs.contains(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)
+        && !changedConfigs.contains(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES)) {
+      LOGGER.info("ChangedConfigs: {} does not contain: {} or {}. Skipping updates", changedConfigs,
+          CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT,
+          CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES);
       return;
     }
-    // Init serverRateLimit as default rate limit in-case serverRateLimit config is deleted/removed from cluster
-    // configs.
-    double serverRateLimit = CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
-    if (clusterConfigs.containsKey(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)) {
+
+    double messageRateLimit = CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
+    double byteRateLimit = CommonConstants.Server.DEFAULT_SERVER_CONSUMPTION_RATE_LIMIT;
+
+    if (clusterConfigs.containsKey(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES)) {
       try {
-        serverRateLimit =
-            Double.parseDouble(clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+        byteRateLimit = Double.parseDouble(
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES));
       } catch (NumberFormatException e) {
-        LOGGER.error("Invalid rate limit config value: {}. Ignoring the config change",
-            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT), e);
+        LOGGER.error("Invalid rate limit config value: {} of {}. Ignoring the config change",
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES),
+            CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT_BYTES, e);
         return;
       }
     }
-    RealtimeConsumptionRateManager.getInstance().updateServerRateLimiter(serverRateLimit, _serverMetrics);
+
+    if (clusterConfigs.containsKey(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT)) {
+      try {
+        messageRateLimit =
+            Double.parseDouble(clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT));
+      } catch (NumberFormatException e) {
+        LOGGER.error("Invalid rate limit config value: {} of {}. Ignoring the config change",
+            clusterConfigs.get(CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT),
+            CommonConstants.Server.CONFIG_OF_SERVER_CONSUMPTION_RATE_LIMIT, e);
+        return;
+      }
+    }
+
+    RealtimeConsumptionRateManager.ServerRateLimitConfig config =
+        RealtimeConsumptionRateManager.resolveServerRateLimit(messageRateLimit, byteRateLimit);
+
+    RealtimeConsumptionRateManager.getInstance().updateServerRateLimiter(config, _serverMetrics);
   }
 }

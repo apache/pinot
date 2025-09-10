@@ -39,10 +39,15 @@ public class RebalanceConfig {
   private boolean _dryRun = false;
 
   // Whether to perform pre-checks for rebalance. This only returns the status of each pre-check and does not fail
-  // rebalance
+  // rebalance. Summary is required to calculate pre-checks, so if 'disableSummary=true', it will be reset to false
   @JsonProperty("preChecks")
   @ApiModelProperty(example = "false")
   private boolean _preChecks = false;
+
+  // Whether to disable the summary or not. If set to true the summary will not be calculated
+  @JsonProperty("disableSummary")
+  @ApiModelProperty(example = "false")
+  private boolean _disableSummary = false;
 
   // Whether to reassign instances before reassigning segments
   @JsonProperty("reassignInstances")
@@ -184,6 +189,14 @@ public class RebalanceConfig {
 
   public void setPreChecks(boolean preChecks) {
     _preChecks = preChecks;
+  }
+
+  public boolean isDisableSummary() {
+    return _disableSummary;
+  }
+
+  public void setDisableSummary(boolean disableSummary) {
+    _disableSummary = disableSummary;
   }
 
   public boolean isReassignInstances() {
@@ -366,9 +379,9 @@ public class RebalanceConfig {
 
   @Override
   public String toString() {
-    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _reassignInstances="
-        + _reassignInstances + ", _includeConsuming=" + _includeConsuming + ", _minimizeDataMovement="
-        + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime
+    return "RebalanceConfig{" + "_dryRun=" + _dryRun + ", preChecks=" + _preChecks + ", _disableSummary="
+        + _disableSummary + ", _reassignInstances=" + _reassignInstances + ", _includeConsuming=" + _includeConsuming
+        + ", _minimizeDataMovement=" + _minimizeDataMovement + ", _bootstrap=" + _bootstrap + ", _downtime=" + _downtime
         + ", _allowPeerDownloadDataLoss=" + _allowPeerDownloadDataLoss + ", _minAvailableReplicas="
         + _minAvailableReplicas + ", _bestEfforts=" + _bestEfforts + ", batchSizePerServer="
         + _batchSizePerServer + ", _externalViewCheckIntervalInMs=" + _externalViewCheckIntervalInMs
@@ -382,8 +395,9 @@ public class RebalanceConfig {
   }
 
   public String toQueryString() {
-    return "dryRun=" + _dryRun + "&preChecks=" + _preChecks + "&reassignInstances=" + _reassignInstances
-        + "&includeConsuming=" + _includeConsuming + "&bootstrap=" + _bootstrap + "&downtime=" + _downtime
+    return "dryRun=" + _dryRun + "&preChecks=" + _preChecks + "&disableSummary=" + _disableSummary
+        + "&reassignInstances=" + _reassignInstances + "&includeConsuming=" + _includeConsuming
+        + "&bootstrap=" + _bootstrap + "&downtime=" + _downtime
         + "&allowPeerDownloadDataLoss=" + _allowPeerDownloadDataLoss + "&minAvailableReplicas=" + _minAvailableReplicas
         + "&bestEfforts=" + _bestEfforts + "&minimizeDataMovement=" + _minimizeDataMovement.name()
         + "&batchSizePerServer=" + _batchSizePerServer
@@ -402,6 +416,7 @@ public class RebalanceConfig {
     RebalanceConfig rc = new RebalanceConfig();
     rc._dryRun = cfg._dryRun;
     rc._preChecks = cfg._preChecks;
+    rc._disableSummary = cfg._disableSummary;
     rc._reassignInstances = cfg._reassignInstances;
     rc._includeConsuming = cfg._includeConsuming;
     rc._bootstrap = cfg._bootstrap;

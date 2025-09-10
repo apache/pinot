@@ -68,6 +68,7 @@ import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.PinotBrokerTimeSeriesResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
+import org.apache.pinot.common.response.mapper.TimeSeriesResponseMapper;
 import org.apache.pinot.common.utils.DataSchema;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
@@ -81,6 +82,7 @@ import org.apache.pinot.core.query.request.context.utils.QueryContextUtils;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.trace.RequestScope;
@@ -90,6 +92,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Broker.Request;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.sql.parsers.PinotSqlType;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
+import org.apache.pinot.tsdb.spi.series.TimeSeriesBlock;
 import org.glassfish.jersey.server.ManagedAsync;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -280,6 +283,35 @@ public class PinotClientRequest {
     }
   }
 
+  @POST
+  @ManagedAsync
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("query/timeseries")
+  @ApiOperation(value = "Query Pinot using the Time Series Engine")
+  @ManualAuthorization
+  public void processTimeSeriesQueryEngine(Map<String, String> queryParams, @Suspended AsyncResponse asyncResponse,
+      @Context org.glassfish.grizzly.http.server.Request requestCtx, @Context HttpHeaders httpHeaders) {
+    try {
+      if (!queryParams.containsKey(Request.QUERY)) {
+        throw new IllegalStateException("Payload is missing the query string field 'query'");
+      }
+      String language = queryParams.get(Request.LANGUAGE);
+      String queryString = queryParams.get(Request.QUERY);
+      try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
+        TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, queryParams,
+            requestContext, makeHttpIdentity(requestCtx), httpHeaders);
+        asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(timeSeriesBlock));
+      }
+    } catch (QueryException e) {
+      asyncResponse.resume(TimeSeriesResponseMapper.toBrokerResponse(e));
+    } catch (Exception e) {
+      LOGGER.error("Caught exception while processing POST timeseries request", e);
+      _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
+      asyncResponse.resume(new WebApplicationException(e,
+          Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity(e.getMessage()).build()));
+    }
+  }
+
   @GET
   @ManagedAsync
   @Produces(MediaType.APPLICATION_JSON)
@@ -293,20 +325,21 @@ public class PinotClientRequest {
     try {
       try (RequestScope requestContext = Tracing.getTracer().createRequestScope()) {
         String queryString = requestCtx.getQueryString();
-        PinotBrokerTimeSeriesResponse response = executeTimeSeriesQuery(language, queryString, requestContext,
+        TimeSeriesBlock timeSeriesBlock = executeTimeSeriesQuery(language, queryString, Map.of(), requestContext,
           makeHttpIdentity(requestCtx), httpHeaders);
+        PinotBrokerTimeSeriesResponse response = PinotBrokerTimeSeriesResponse.fromTimeSeriesBlock(timeSeriesBlock);
         if (response.getErrorType() != null && !response.getErrorType().isEmpty()) {
           asyncResponse.resume(Response.serverError().entity(response).build());
           return;
         }
         asyncResponse.resume(response);
       }
+    } catch (QueryException e) {
+      asyncResponse.resume(PinotBrokerTimeSeriesResponse.fromException(e));
     } catch (Exception e) {
       LOGGER.error("Caught exception while processing GET request", e);
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.UNCAUGHT_POST_EXCEPTIONS, 1L);
-      asyncResponse.resume(Response.serverError().entity(
-              new PinotBrokerTimeSeriesResponse("error", null, e.getClass().getSimpleName(), e.getMessage()))
-          .build());
+      asyncResponse.resume(PinotBrokerTimeSeriesResponse.fromException(e));
     }
   }
 
@@ -537,10 +570,11 @@ public class PinotClientRequest {
     }
   }
 
-  private PinotBrokerTimeSeriesResponse executeTimeSeriesQuery(String language, String queryString,
-    RequestContext requestContext, RequesterIdentity requesterIdentity, HttpHeaders httpHeaders) {
-    return _requestHandler.handleTimeSeriesRequest(language, queryString, requestContext, requesterIdentity,
-      httpHeaders);
+  private TimeSeriesBlock executeTimeSeriesQuery(String language, String queryString,
+      Map<String, String> queryParams, RequestContext requestContext, RequesterIdentity requesterIdentity,
+      HttpHeaders httpHeaders) throws QueryException {
+    return _requestHandler.handleTimeSeriesRequest(language, queryString, queryParams, requestContext,
+        requesterIdentity, httpHeaders);
   }
 
   public static HttpRequesterIdentity makeHttpIdentity(org.glassfish.grizzly.http.server.Request context) {

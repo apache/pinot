@@ -576,8 +576,8 @@ public final class TableConfigUtils {
             expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName
-                    + "', exception: " + e.getMessage(), e);
+                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "', exception: "
+                    + e.getMessage(), e);
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {
@@ -628,6 +628,12 @@ public final class TableConfigUtils {
       streamConfigs.add(streamConfig);
     }
     if (numStreamConfigs > 1) {
+      IngestionConfig ingestionConfig = tableConfig.getIngestionConfig();
+      if (ingestionConfig != null && ingestionConfig.getStreamIngestionConfig() != null) {
+        Preconditions.checkState(
+            !tableConfig.getIngestionConfig().getStreamIngestionConfig().isPauselessConsumptionEnabled(),
+            "Multiple stream configs are not supported with pauseless consumption enabled");
+      }
       Preconditions.checkState(!tableConfig.isUpsertEnabled(),
           "Multiple stream configs are not supported for upsert table");
 
@@ -768,6 +774,10 @@ public final class TableConfigUtils {
                 deleteRecordColumn));
       }
 
+      // Validate commit-time compaction compatibility with column major segment builder
+      // todo: Remove this after commit time compaction is supported with column major build
+      validateCommitTimeCompactionConfig(tableConfig);
+
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       if (outOfOrderRecordColumn != null) {
         Preconditions.checkState(!Boolean.TRUE.equals(upsertConfig.isDropOutOfOrderRecord()),
@@ -798,8 +808,8 @@ public final class TableConfigUtils {
 
         // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-        Preconditions.checkState(taskConfig != null
-                && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
+        Preconditions.checkState(
+            taskConfig != null && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
                 || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
             "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
                 + " / UpsertCompactMergeTask for upsert table");
@@ -938,7 +948,8 @@ public final class TableConfigUtils {
       return;
     }
     for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
-        : tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+        : tableConfig.getInstanceAssignmentConfigMap()
+        .entrySet()) {
       String instancePartitionsType = instanceAssignmentConfigMapEntry.getKey();
       InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMapEntry.getValue();
       if (instanceAssignmentConfig.getPartitionSelector()
@@ -1438,8 +1449,7 @@ public final class TableConfigUtils {
     }
 
     if (!duplicates.isEmpty()) {
-      throw new IllegalStateException(
-          "Cannot create TEXT index on duplicate columns: " + duplicates);
+      throw new IllegalStateException("Cannot create TEXT index on duplicate columns: " + duplicates);
     }
   }
 
@@ -1518,12 +1528,47 @@ public final class TableConfigUtils {
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
-            .withIndexTypes(null).withProperties(null).build());
+        cleanFieldConfigList.add(
+            new FieldConfig.Builder(fieldConfig).withIndexTypes(null).withProperties(null).build());
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }
     return clone;
+  }
+
+  public static boolean isCommitTimeCompactionEnabled(TableConfig tableConfig) {
+    if (tableConfig.getUpsertConfig() == null) {
+      return false;
+    }
+    return tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
+  }
+
+  /**
+   * Validates that commit-time compaction is compatible with column major segment builder settings.
+   *
+   * @param tableConfig The table configuration to validate
+   * @throws IllegalStateException if commit-time compaction is enabled with column major segment builder
+   */
+  public static void validateCommitTimeCompactionConfig(TableConfig tableConfig) {
+    boolean commitTimeCompactionEnabled = isCommitTimeCompactionEnabled(tableConfig);
+
+    if (commitTimeCompactionEnabled) {
+      boolean isColumnMajorEnabled = false;
+      if (tableConfig.getIngestionConfig() != null
+          && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
+        isColumnMajorEnabled =
+            tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
+      } else {
+        isColumnMajorEnabled = tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
+      }
+
+      String tableNameForError = tableConfig.getTableName();
+
+      Preconditions.checkState(!isColumnMajorEnabled,
+          "Commit-time compaction is not supported when column major segment builder is enabled. "
+              + "Please disable column major segment builder (set columnMajorSegmentBuilderEnabled=false) "
+              + "to use commit-time compaction for table: " + tableNameForError);
+    }
   }
 
   /**
@@ -1711,8 +1756,7 @@ public final class TableConfigUtils {
     Set<String> relevantTags = new HashSet<>();
     String serverTenantName = tableConfig.getTenantConfig().getServer();
     if (serverTenantName != null) {
-      String serverTenantTag =
-          TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
+      String serverTenantTag = TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
       relevantTags.add(serverTenantTag);
     }
     TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
@@ -1744,8 +1788,7 @@ public final class TableConfigUtils {
 
   public static boolean isRelevantToTenant(TableConfig tableConfig, String tenantName) {
     Set<String> relevantTenants =
-        getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(
-            Collectors.toSet());
+        getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(Collectors.toSet());
     return relevantTenants.contains(tenantName);
   }
 }

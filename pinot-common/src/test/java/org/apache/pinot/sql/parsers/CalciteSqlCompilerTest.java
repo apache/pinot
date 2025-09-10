@@ -1794,7 +1794,7 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "column1");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
-        "VARCHAR");
+        "STRING");
 
     pinotQuery = compileToPinotQuery("SELECT CAST(column1 AS varchar) from myTable");
     Assert.assertEquals(pinotQuery.getSelectListSize(), 1);
@@ -1803,7 +1803,7 @@ public class CalciteSqlCompilerTest {
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(0).getIdentifier().getName(), "column1");
     Assert.assertEquals(
         pinotQuery.getSelectList().get(0).getFunctionCall().getOperands().get(1).getLiteral().getStringValue(),
-        "VARCHAR");
+        "STRING");
 
     pinotQuery = compileToPinotQuery(
         "SELECT SUM(CAST(CAST(ArrTime AS STRING) AS LONG)) FROM mytable WHERE DaysSinceEpoch <> 16312 AND Carrier = "

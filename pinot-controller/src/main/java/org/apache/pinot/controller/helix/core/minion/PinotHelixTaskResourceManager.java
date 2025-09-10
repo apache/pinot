@@ -996,7 +996,7 @@ public class PinotHelixTaskResourceManager {
       }
       String triggeredBy = jobConfig.getTaskConfigMap().values().stream().findFirst()
           .map(TaskConfig::getConfigMap)
-          .map(taskConfigs -> taskConfigs.get(PinotTaskManager.TRIGGERED_BY))
+          .map(taskConfigs -> taskConfigs.get(MinionConstants.TRIGGERED_BY))
           .orElse("");
       taskDebugInfo.setTriggeredBy(triggeredBy);
       Set<Integer> partitionSet = jobContext.getPartitionSet();

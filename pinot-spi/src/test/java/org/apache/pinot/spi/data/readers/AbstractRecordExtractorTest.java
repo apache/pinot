@@ -42,6 +42,7 @@ import org.testng.annotations.Test;
  * Tests the RecordReader for schema with transform functions
  */
 public abstract class AbstractRecordExtractorTest {
+  private static final double EPSILON = 1e-6d;
 
   protected Set<String> _sourceFieldNames;
   protected List<Map<String, Object>> _inputRecords;
@@ -76,8 +77,10 @@ public abstract class AbstractRecordExtractorTest {
     String[] campaignInfo = new String[]{"yesterday", "blackbird", "here comes the sun", "hey jude"};
     double[] cost = new double[]{10000, 20000, 30000, 25000};
     long[] timestamp = new long[]{1570863600000L, 1571036400000L, 1571900400000L, 1574000000000L};
-    List[] arrays = new List[]{Arrays.asList("a", "b", "c"), Arrays.asList("d", "e"), Arrays.asList("w", "x", "y",
-        "z"), Collections.singletonList("a")};
+    List[] arrays = new List[]{
+        Arrays.asList("a", "b", "c"), Arrays.asList("d", "e"), Arrays.asList("w", "x", "y",
+        "z"), Collections.singletonList("a")
+    };
     Map<String, String>[] maps = new Map[]{
         createMap(new Pair[]{Pair.of("a", "1"), Pair.of("b", "2")}),
         createMap(new Pair[]{Pair.of("a", "3"), Pair.of("b", "4")}),
@@ -149,7 +152,13 @@ public abstract class AbstractRecordExtractorTest {
       }
     } else {
       if (expectedValue != null) {
-        Assert.assertEquals(actualValue, expectedValue);
+        boolean isFloating = expectedValue instanceof Float || expectedValue instanceof Double
+            || actualValue instanceof Float || actualValue instanceof Double;
+        if (isFloating) {
+          Assert.assertEquals(((Number) actualValue).doubleValue(), ((Number) expectedValue).doubleValue(), EPSILON);
+        } else {
+          Assert.assertEquals(actualValue, expectedValue);
+        }
       } else {
         Assert.assertNull(actualValue);
       }

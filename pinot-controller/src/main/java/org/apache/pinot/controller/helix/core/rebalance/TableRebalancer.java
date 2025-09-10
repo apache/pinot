@@ -221,6 +221,7 @@ public class TableRebalancer {
     }
     boolean dryRun = rebalanceConfig.isDryRun();
     boolean preChecks = rebalanceConfig.isPreChecks();
+    boolean disableSummary = rebalanceConfig.isDisableSummary();
     boolean reassignInstances = rebalanceConfig.isReassignInstances();
     boolean includeConsuming = rebalanceConfig.isIncludeConsuming();
     boolean bootstrap = rebalanceConfig.isBootstrap();
@@ -244,15 +245,15 @@ public class TableRebalancer {
       forceCommit = false;
     }
     tableRebalanceLogger.info(
-        "Start rebalancing with dryRun: {}, preChecks: {}, reassignInstances: {}, "
+        "Start rebalancing with dryRun: {}, preChecks: {}, disableSummary: {}, reassignInstances: {}, "
             + "includeConsuming: {}, bootstrap: {}, downtime: {}, allowPeerDownloadDataLoss: {}, "
             + "minReplicasToKeepUpForNoDowntime: {}, enableStrictReplicaGroup: {}, lowDiskMode: {}, bestEfforts: {}, "
             + "batchSizePerServer: {}, externalViewCheckIntervalInMs: {}, externalViewStabilizationTimeoutInMs: {}, "
             + "minimizeDataMovement: {}, forceCommit: {}, forceCommitBatchSize: {}, "
             + "forceCommitBatchStatusCheckIntervalMs: {}, forceCommitBatchStatusCheckTimeoutMs: {}",
-        dryRun, preChecks, reassignInstances, includeConsuming, bootstrap, downtime, allowPeerDownloadDataLoss,
-        minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts, batchSizePerServer,
-        externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
+        dryRun, preChecks, disableSummary, reassignInstances, includeConsuming, bootstrap, downtime,
+        allowPeerDownloadDataLoss, minReplicasToKeepUpForNoDowntime, enableStrictReplicaGroup, lowDiskMode, bestEfforts,
+        batchSizePerServer, externalViewCheckIntervalInMs, externalViewStabilizationTimeoutInMs, minimizeDataMovement,
         forceCommit, rebalanceConfig.getForceCommitBatchSize(),
         rebalanceConfig.getForceCommitBatchStatusCheckIntervalMs(),
         rebalanceConfig.getForceCommitBatchStatusCheckTimeoutMs());
@@ -263,6 +264,12 @@ public class TableRebalancer {
       tableRebalanceLogger.error(errorMsg);
       return new RebalanceResult(rebalanceJobId, RebalanceResult.Status.FAILED, errorMsg, null, null, null, null,
           null);
+    }
+
+    if (preChecks && disableSummary) {
+      tableRebalanceLogger.warn("disableSummary must be set to false to enable preChecks, but was set to true. "
+          + "Setting to false, as summary calculation is needed for preChecks");
+      disableSummary = false;
     }
 
     // Fetch ideal state
@@ -355,18 +362,29 @@ public class TableRebalancer {
 
     // Calculate summary here itself so that even if the table is already balanced, the caller can verify whether that
     // is expected or not based on the summary results
-    RebalanceSummaryResult summaryResult =
-        calculateDryRunSummary(currentAssignment, targetAssignment, tableNameWithType, tableSubTypeSizeDetails,
-            tableConfig, tableRebalanceLogger);
+    RebalanceSummaryResult summaryResult = null;
+    if (!disableSummary) {
+      try {
+        summaryResult = calculateRebalanceSummary(currentAssignment, targetAssignment, tableNameWithType,
+            tableSubTypeSizeDetails, tableConfig, tableRebalanceLogger);
+      } catch (Exception e) {
+        tableRebalanceLogger.warn("Caught exception while trying to calculate the rebalance summary, skipping summary "
+            + "calculation", e);
+      }
+    }
 
     if (preChecks) {
       if (_rebalancePreChecker == null) {
         tableRebalanceLogger.warn("Pre-checks are enabled but the pre-checker is not set, skipping pre-checks");
       } else {
-        RebalancePreChecker.PreCheckContext preCheckContext =
-            new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType, tableConfig, currentAssignment,
-                targetAssignment, tableSubTypeSizeDetails, rebalanceConfig, summaryResult);
-        preChecksResult = _rebalancePreChecker.check(preCheckContext);
+        try {
+          RebalancePreChecker.PreCheckContext preCheckContext =
+              new RebalancePreChecker.PreCheckContext(rebalanceJobId, tableNameWithType, tableConfig, currentAssignment,
+                  targetAssignment, tableSubTypeSizeDetails, rebalanceConfig, summaryResult);
+          preChecksResult = _rebalancePreChecker.check(preCheckContext);
+        } catch (Exception e) {
+          tableRebalanceLogger.warn("Caught exception while trying to run the rebalance pre-checks, skipping", e);
+        }
       }
     }
 
@@ -802,7 +820,7 @@ public class TableRebalancer {
     return tableSizeDetails == null ? -1 : tableSizeDetails._reportedSizePerReplicaInBytes;
   }
 
-  private RebalanceSummaryResult calculateDryRunSummary(Map<String, Map<String, String>> currentAssignment,
+  private RebalanceSummaryResult calculateRebalanceSummary(Map<String, Map<String, String>> currentAssignment,
       Map<String, Map<String, String>> targetAssignment, String tableNameWithType,
       TableSizeReader.TableSubTypeSizeDetails tableSubTypeSizeDetails, TableConfig tableConfig,
       Logger tableRebalanceLogger) {
@@ -1006,20 +1024,20 @@ public class TableRebalancer {
     Map<String, SegmentZKMetadata> consumingSegmentZKMetadata = new HashMap<>();
     uniqueConsumingSegments.forEach(segment -> consumingSegmentZKMetadata.put(segment,
         ZKMetadataProvider.getSegmentZKMetadata(_helixManager.getHelixPropertyStore(), tableNameWithType, segment)));
-    Map<String, Integer> consumingSegmentsOffsetsToCatchUp =
+    Map<String, Long> consumingSegmentsOffsetsToCatchUp =
         getConsumingSegmentsOffsetsToCatchUp(tableConfig, consumingSegmentZKMetadata, tableRebalanceLogger);
-    Map<String, Integer> consumingSegmentsAge =
+    Map<String, Long> consumingSegmentsAge =
         getConsumingSegmentsAge(consumingSegmentZKMetadata, tableRebalanceLogger);
 
-    Map<String, Integer> consumingSegmentsOffsetsToCatchUpTopN;
+    Map<String, Long> consumingSegmentsOffsetsToCatchUpTopN;
     Map<String, RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer>
         consumingSegmentSummaryPerServer = new HashMap<>();
     if (consumingSegmentsOffsetsToCatchUp != null) {
       consumingSegmentsOffsetsToCatchUpTopN =
           getTopNConsumingSegmentWithValue(consumingSegmentsOffsetsToCatchUp, TOP_N_IN_CONSUMING_SEGMENT_SUMMARY);
       newServersToConsumingSegmentMap.forEach((server, segments) -> {
-        int totalOffsetsToCatchUp =
-            segments.stream().mapToInt(consumingSegmentsOffsetsToCatchUp::get).sum();
+        long totalOffsetsToCatchUp =
+            segments.stream().mapToLong(consumingSegmentsOffsetsToCatchUp::get).sum();
         consumingSegmentSummaryPerServer.put(server,
             new RebalanceSummaryResult.ConsumingSegmentToBeMovedSummary.ConsumingSegmentSummaryPerServer(
                 segments.size(), totalOffsetsToCatchUp));
@@ -1033,7 +1051,7 @@ public class TableRebalancer {
       });
     }
 
-    Map<String, Integer> consumingSegmentsOldestTopN =
+    Map<String, Long> consumingSegmentsOldestTopN =
         consumingSegmentsAge == null ? null
             : getTopNConsumingSegmentWithValue(consumingSegmentsAge, TOP_N_IN_CONSUMING_SEGMENT_SUMMARY);
 
@@ -1042,9 +1060,9 @@ public class TableRebalancer {
         consumingSegmentSummaryPerServer);
   }
 
-  private static Map<String, Integer> getTopNConsumingSegmentWithValue(
-      Map<String, Integer> consumingSegmentsWithValue, @Nullable Integer topN) {
-    Map<String, Integer> topNConsumingSegments = new LinkedHashMap<>();
+  private static Map<String, Long> getTopNConsumingSegmentWithValue(
+      Map<String, Long> consumingSegmentsWithValue, @Nullable Integer topN) {
+    Map<String, Long> topNConsumingSegments = new LinkedHashMap<>();
     consumingSegmentsWithValue.entrySet()
         .stream()
         .sorted(Collections.reverseOrder(Map.Entry.comparingByValue()))
@@ -1061,9 +1079,9 @@ public class TableRebalancer {
    * segment name to the age of that consuming segment. Return null if failed to obtain info for any consuming segment.
    */
   @Nullable
-  private Map<String, Integer> getConsumingSegmentsAge(Map<String, SegmentZKMetadata> consumingSegmentZKMetadata,
+  private Map<String, Long> getConsumingSegmentsAge(Map<String, SegmentZKMetadata> consumingSegmentZKMetadata,
       Logger tableRebalanceLogger) {
-    Map<String, Integer> consumingSegmentsAge = new HashMap<>();
+    Map<String, Long> consumingSegmentsAge = new HashMap<>();
     long now = System.currentTimeMillis();
     try {
       consumingSegmentZKMetadata.forEach(((s, segmentZKMetadata) -> {
@@ -1076,7 +1094,7 @@ public class TableRebalancer {
           tableRebalanceLogger.warn("Creation time is not found for segment: {}", s);
           throw new RuntimeException("Creation time is not found");
         }
-        consumingSegmentsAge.put(s, (int) (now - creationTime) / 60_000);
+        consumingSegmentsAge.put(s, (now - creationTime) / 60_000L);
       }));
     } catch (Exception e) {
       return null;
@@ -1091,9 +1109,9 @@ public class TableRebalancer {
    * segment. Return null if failed to obtain info for any consuming segment.
    */
   @Nullable
-  private Map<String, Integer> getConsumingSegmentsOffsetsToCatchUp(TableConfig tableConfig,
+  private Map<String, Long> getConsumingSegmentsOffsetsToCatchUp(TableConfig tableConfig,
       Map<String, SegmentZKMetadata> consumingSegmentZKMetadata, Logger tableRebalanceLogger) {
-    Map<String, Integer> segmentToOffsetsToCatchUp = new HashMap<>();
+    Map<String, Long> segmentToOffsetsToCatchUp = new HashMap<>();
     try {
       for (Map.Entry<String, SegmentZKMetadata> entry : consumingSegmentZKMetadata.entrySet()) {
         String segmentName = entry.getKey();
@@ -1113,11 +1131,11 @@ public class TableRebalancer {
           tableRebalanceLogger.warn("Cannot determine partition id for realtime segment: {}", segmentName);
           return null;
         }
-        Integer latestOffset = getLatestOffsetOfStream(tableConfig, partitionId, tableRebalanceLogger);
+        Long latestOffset = getLatestOffsetOfStream(tableConfig, partitionId, tableRebalanceLogger);
         if (latestOffset == null) {
           return null;
         }
-        int offsetsToCatchUp = latestOffset - Integer.parseInt(startOffset);
+        long offsetsToCatchUp = latestOffset - Long.parseLong(startOffset);
         segmentToOffsetsToCatchUp.put(segmentName, offsetsToCatchUp);
       }
     } catch (Exception e) {
@@ -1142,7 +1160,7 @@ public class TableRebalancer {
   }
 
   @Nullable
-  private Integer getLatestOffsetOfStream(TableConfig tableConfig, int partitionId,
+  private Long getLatestOffsetOfStream(TableConfig tableConfig, int partitionId,
       Logger tableRebalanceLogger) {
     try {
       StreamPartitionMsgOffset partitionMsgOffset = fetchStreamPartitionOffset(tableConfig, partitionId);
@@ -1150,7 +1168,7 @@ public class TableRebalancer {
         tableRebalanceLogger.warn("Unsupported stream partition message offset type: {}", partitionMsgOffset);
         return null;
       }
-      return (int) ((LongMsgOffset) partitionMsgOffset).getOffset();
+      return ((LongMsgOffset) partitionMsgOffset).getOffset();
     } catch (Exception e) {
       tableRebalanceLogger.warn("Caught exception while trying to fetch stream partition of partitionId: {}",
           partitionId, e);

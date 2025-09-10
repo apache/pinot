@@ -213,7 +213,7 @@ public class Tracing {
     }
 
     @Override
-    public void setupRunner(String queryId, int taskId, ThreadExecutionContext.TaskType taskType, String workloadName) {
+    public void setupRunner(@Nullable String queryId, ThreadExecutionContext.TaskType taskType, String workloadName) {
     }
 
     @Override
@@ -264,8 +264,7 @@ public class Tracing {
 
     public static void setupRunner(String queryId, ThreadExecutionContext.TaskType taskType, String workloadName) {
       // Set up the runner thread with the given query ID and workload name
-      Tracing.getThreadAccountant()
-          .setupRunner(queryId, CommonConstants.Accounting.ANCHOR_TASK_ID, taskType, workloadName);
+      Tracing.getThreadAccountant().setupRunner(queryId, taskType, workloadName);
     }
 
     /**
@@ -296,8 +295,13 @@ public class Tracing {
     }
 
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
-        InstanceType instanceType) {
-      _workloadBudgetManager = new WorkloadBudgetManager(config);
+                                                                       InstanceType instanceType) {
+      return createThreadAccountant(config, instanceId, instanceType, new WorkloadBudgetManager(config));
+    }
+
+    public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
+        InstanceType instanceType, WorkloadBudgetManager workloadBudgetManager) {
+      _workloadBudgetManager = workloadBudgetManager;
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
       ThreadResourceUsageAccountant accountant = null;
       if (factoryName != null) {
