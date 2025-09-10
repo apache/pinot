@@ -21,8 +21,6 @@ package org.apache.pinot.query.runtime.operator;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
-import java.lang.management.GarbageCollectorMXBean;
-import java.lang.management.ManagementFactory;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +43,7 @@ import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
 import org.apache.pinot.query.runtime.plan.pipeline.PipelineBreakerOperator;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
+import org.apache.pinot.spi.accounting.ThreadResourceUsageProvider;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.apache.pinot.spi.trace.InvocationScope;
@@ -230,22 +229,10 @@ public abstract class MultiStageOperator implements Operator<MseBlock>, AutoClos
   }
 
   private long getGcTimeMillis() {
-    if (!isCollectGcStats(_context.getOpChainMetadata())) {
+    if (!QueryOptionsUtils.isCollectGcStats(_context.getOpChainMetadata())) {
       return -1;
     }
-    long totalGCTime = 0;
-    List<GarbageCollectorMXBean> gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
-    for (GarbageCollectorMXBean gcBean : gcBeans) {
-      long gcTime = gcBean.getCollectionTime();
-      if (gcTime > 0) {
-        totalGCTime += gcTime;
-      }
-    }
-    return totalGCTime;
-  }
-
-  private static boolean isCollectGcStats(Map<String, String> opChainMetadata) {
-    return QueryOptionsUtils.isCollectGcStats(opChainMetadata);
+    return ThreadResourceUsageProvider.getGcTime();
   }
 
   /**
