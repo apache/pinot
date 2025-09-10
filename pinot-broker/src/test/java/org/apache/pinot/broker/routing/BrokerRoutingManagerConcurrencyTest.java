@@ -100,7 +100,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
 
     // Create and upload test table configs and schemas to ZooKeeper
     setupTestTablesInZooKeeper();
-    
+
     // Trigger instance config processing to populate _routableServers
     triggerInstanceConfigProcessing();
   }
@@ -115,7 +115,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     // Add server instances that will be referenced in IdealState and ExternalView
     String serverInstanceId = "Server_localhost_8000";
     String clusterName = getHelixClusterName();
-    
+
     // Add server instance to Helix cluster
     if (!_helixAdmin.getInstancesInCluster(clusterName).contains(serverInstanceId)) {
       // Create InstanceConfig for the server
@@ -123,9 +123,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
       instanceConfig.setHostName("localhost");
       instanceConfig.setPort("8000");
       instanceConfig.setInstanceEnabled(true);
-      
+
       _helixAdmin.addInstance(clusterName, instanceConfig);
-      
+
       // Mark the instance as live (simulate server joining)
       _helixAdmin.enableInstance(clusterName, serverInstanceId, true);
     }
@@ -144,8 +144,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
   private void clearRoutingEntries() {
     // Clear existing routing entries to ensure test isolation
     try {
-      java.lang.reflect.Field routingEntryMapField = 
-          BrokerRoutingManager.class.getDeclaredField("_routingEntryMap");
+      java.lang.reflect.Field routingEntryMapField = BrokerRoutingManager.class.getDeclaredField("_routingEntryMap");
       routingEntryMapField.setAccessible(true);
       Map<?, ?> routingEntryMap = (Map<?, ?>) routingEntryMapField.get(_routingManager);
       routingEntryMap.clear();
@@ -215,7 +214,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
   public void testConcurrentHybridTableBuildNoTimeBoundaryManagerRace() throws Exception {
     // Clean any existing routing entries to ensure test isolation
     clearRoutingEntries();
-    
+
     // Test concurrent execution
     ExecutorService executor = Executors.newFixedThreadPool(2);
     CountDownLatch startLatch = new CountDownLatch(1);
