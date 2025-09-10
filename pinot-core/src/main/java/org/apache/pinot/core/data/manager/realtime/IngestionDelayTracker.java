@@ -476,8 +476,10 @@ public class IngestionDelayTracker {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     long currentOffset = 0;
     if (ingestionInfo != null) {
+      assert ingestionInfo._currentOffset instanceof LongMsgOffset;
       currentOffset = ((LongMsgOffset) (ingestionInfo._currentOffset)).getOffset();
     }
+    assert latestOffset instanceof LongMsgOffset;
     return Math.max(0, ((LongMsgOffset) latestOffset).getOffset() - currentOffset);
   }
 
