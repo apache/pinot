@@ -28,7 +28,7 @@ import org.testng.annotations.Test;
 public class ResultCursorTest {
 
   private static class MockCursorTransport extends JsonAsyncHttpPinotClientTransport {
-    private int _currentPage = 0;
+    private int _currentPage = 1;
     private final int _totalPages = 3;
     private final int _pageSize = 10;
 
@@ -38,41 +38,47 @@ public class ResultCursorTest {
 
     @Override
     public CursorAwareBrokerResponse executeQueryWithCursor(String brokerHostPort, String query, int numRows) {
-      return createMockResponse(0, true, false);
+      _currentPage = 1;
+      return createMockResponse(1, true, false);
     }
 
     @Override
-    public CursorAwareBrokerResponse fetchNextPage(String brokerHostPort, String cursorId) {
+    public CursorAwareBrokerResponse fetchNextPage(String brokerHostPort, String cursorId, int offset, int numRows) {
       _currentPage++;
-      return createMockResponse(_currentPage, _currentPage < _totalPages - 1, _currentPage > 0);
+      return createMockResponse(_currentPage, _currentPage < _totalPages, _currentPage > 1);
     }
 
     @Override
-    public CompletableFuture<CursorAwareBrokerResponse> fetchNextPageAsync(String brokerHostPort, String cursorId) {
-      return CompletableFuture.completedFuture(fetchNextPage(brokerHostPort, cursorId));
+    public CompletableFuture<CursorAwareBrokerResponse> fetchNextPageAsync(String brokerHostPort, String cursorId,
+        int offset, int numRows) {
+      return CompletableFuture.completedFuture(fetchNextPage(brokerHostPort, cursorId, offset, numRows));
     }
 
     @Override
-    public CursorAwareBrokerResponse fetchPreviousPage(String brokerHostPort, String cursorId) {
+    public CursorAwareBrokerResponse fetchPreviousPage(String brokerHostPort, String cursorId, int offset,
+        int numRows) {
       _currentPage--;
-      return createMockResponse(_currentPage, _currentPage < _totalPages - 1, _currentPage > 0);
+      return createMockResponse(_currentPage, _currentPage < _totalPages, _currentPage > 1);
     }
 
     @Override
-    public CompletableFuture<CursorAwareBrokerResponse> fetchPreviousPageAsync(String brokerHostPort, String cursorId) {
-      return CompletableFuture.completedFuture(fetchPreviousPage(brokerHostPort, cursorId));
+    public CompletableFuture<CursorAwareBrokerResponse> fetchPreviousPageAsync(String brokerHostPort, String cursorId,
+        int offset, int numRows) {
+      return CompletableFuture.completedFuture(fetchPreviousPage(brokerHostPort, cursorId, offset, numRows));
     }
 
     @Override
-    public CursorAwareBrokerResponse seekToPage(String brokerHostPort, String cursorId, int pageNumber) {
-      _currentPage = pageNumber;
-      return createMockResponse(_currentPage, _currentPage < _totalPages - 1, _currentPage > 0);
+    public CursorAwareBrokerResponse seekToPage(String brokerHostPort, String cursorId, int offset, int numRows) {
+      _currentPage = (offset / _pageSize);
+      return createMockResponse(_currentPage + 1, (_currentPage + 1) < _totalPages, _currentPage > 0);
     }
 
     @Override
     public CompletableFuture<CursorAwareBrokerResponse> seekToPageAsync(String brokerHostPort, String cursorId,
-        int pageNumber) {
-      return CompletableFuture.completedFuture(seekToPage(brokerHostPort, cursorId, pageNumber));
+        int offset, int numRows) {
+      _currentPage = (offset / _pageSize);
+      return CompletableFuture.completedFuture(
+          createMockResponse(_currentPage + 1, (_currentPage + 1) < _totalPages, _currentPage > 0));
     }
 
     private CursorAwareBrokerResponse createMockResponse(int pageNum, boolean hasNext, boolean hasPrevious) {
@@ -98,7 +104,7 @@ public class ResultCursorTest {
             + "  ]"
             + "}"
             + "}",
-            pageNum, totalRows, _pageSize, pageNum * _pageSize,
+            pageNum, totalRows, _pageSize, (pageNum - 1) * _pageSize,
             System.currentTimeMillis() + 300000, // 5 minutes from now
             pageNum, pageNum * 10,
             pageNum, pageNum * 10 + 1
@@ -120,7 +126,7 @@ public class ResultCursorTest {
 
     try (ResultCursor cursor = new ResultCursorImpl(transport, "localhost:8000", initialResponse, false)) {
       Assert.assertNotNull(cursor.getCurrentPage());
-      Assert.assertEquals(cursor.getCurrentPageNumber(), 0);
+      Assert.assertEquals(cursor.getCurrentPageNumber(), 1);
       Assert.assertEquals(cursor.getPageSize(), 10);
       Assert.assertTrue(cursor.hasNext());
       Assert.assertFalse(cursor.hasPrevious());
@@ -141,28 +147,28 @@ public class ResultCursorTest {
       Assert.assertTrue(cursor.hasNext());
       CursorResultSetGroup page1 = cursor.next();
       Assert.assertNotNull(page1);
-      Assert.assertEquals(cursor.getCurrentPageNumber(), 1);
+      Assert.assertEquals(cursor.getCurrentPageNumber(), 2);
       Assert.assertTrue(cursor.hasNext());
       Assert.assertTrue(cursor.hasPrevious());
 
       // Test next again
       CursorResultSetGroup page2 = cursor.next();
       Assert.assertNotNull(page2);
-      Assert.assertEquals(cursor.getCurrentPageNumber(), 2);
+      Assert.assertEquals(cursor.getCurrentPageNumber(), 3);
       Assert.assertFalse(cursor.hasNext());
       Assert.assertTrue(cursor.hasPrevious());
 
       // Test previous navigation
-      CursorResultSetGroup page1Again = cursor.previous();
-      Assert.assertNotNull(page1Again);
-      Assert.assertEquals(cursor.getCurrentPageNumber(), 1);
+      CursorResultSetGroup page2Again = cursor.previous();
+      Assert.assertNotNull(page2Again);
+      Assert.assertEquals(cursor.getCurrentPageNumber(), 2);
       Assert.assertTrue(cursor.hasNext());
       Assert.assertTrue(cursor.hasPrevious());
 
       // Test previous to first page
-      CursorResultSetGroup page0 = cursor.previous();
-      Assert.assertNotNull(page0);
-      Assert.assertEquals(cursor.getCurrentPageNumber(), 0);
+      CursorResultSetGroup page1Back = cursor.previous();
+      Assert.assertNotNull(page1Back);
+      Assert.assertEquals(cursor.getCurrentPageNumber(), 1);
       Assert.assertTrue(cursor.hasNext());
       Assert.assertFalse(cursor.hasPrevious());
     }
@@ -179,13 +185,13 @@ public class ResultCursorTest {
       CursorResultSetGroup page2 = cursor.seekToPage(2);
       Assert.assertNotNull(page2);
       Assert.assertEquals(cursor.getCurrentPageNumber(), 2);
-      Assert.assertFalse(cursor.hasNext());
+      Assert.assertTrue(cursor.hasNext());
       Assert.assertTrue(cursor.hasPrevious());
 
-      // Seek back to page 0
-      CursorResultSetGroup page0 = cursor.seekToPage(0);
-      Assert.assertNotNull(page0);
-      Assert.assertEquals(cursor.getCurrentPageNumber(), 0);
+      // Seek back to page 1
+      CursorResultSetGroup page1 = cursor.seekToPage(1);
+      Assert.assertNotNull(page1);
+      Assert.assertEquals(cursor.getCurrentPageNumber(), 1);
       Assert.assertTrue(cursor.hasNext());
       Assert.assertFalse(cursor.hasPrevious());
     }
@@ -200,20 +206,20 @@ public class ResultCursorTest {
     try (ResultCursor cursor = new ResultCursorImpl(transport, "localhost:8000", initialResponse, false)) {
       // Test async next
       CompletableFuture<CursorResultSetGroup> nextFuture = cursor.nextAsync();
-      CursorResultSetGroup page1 = nextFuture.get();
-      Assert.assertNotNull(page1);
-      Assert.assertEquals(cursor.getCurrentPageNumber(), 1);
+      CursorResultSetGroup page2 = nextFuture.get();
+      Assert.assertNotNull(page2);
+      Assert.assertEquals(cursor.getCurrentPageNumber(), 2);
 
       // Test async previous
       CompletableFuture<CursorResultSetGroup> prevFuture = cursor.previousAsync();
-      CursorResultSetGroup page0 = prevFuture.get();
-      Assert.assertNotNull(page0);
-      Assert.assertEquals(cursor.getCurrentPageNumber(), 0);
+      CursorResultSetGroup page1 = prevFuture.get();
+      Assert.assertNotNull(page1);
+      Assert.assertEquals(cursor.getCurrentPageNumber(), 1);
 
       // Test async seek
       CompletableFuture<CursorResultSetGroup> seekFuture = cursor.seekToPageAsync(2);
-      CursorResultSetGroup page2 = seekFuture.get();
-      Assert.assertNotNull(page2);
+      CursorResultSetGroup page2Seek = seekFuture.get();
+      Assert.assertNotNull(page2Seek);
       Assert.assertEquals(cursor.getCurrentPageNumber(), 2);
     }
   }
@@ -291,7 +297,7 @@ public class ResultCursorTest {
         cursor.seekToPage(-1);
         Assert.fail("Expected IllegalArgumentException");
       } catch (IllegalArgumentException e) {
-        Assert.assertEquals(e.getMessage(), "Page number must be non-negative");
+        Assert.assertEquals(e.getMessage(), "Page number must be positive (1-based)");
       }
     }
   }
@@ -334,7 +340,7 @@ public class ResultCursorTest {
         Assert.fail("Expected ExecutionException");
       } catch (ExecutionException e) {
         Assert.assertTrue(e.getCause() instanceof IllegalArgumentException);
-        Assert.assertEquals(e.getCause().getMessage(), "Page number must be non-negative");
+        Assert.assertEquals(e.getCause().getMessage(), "Page number must be positive (1-based)");
       }
     }
   }

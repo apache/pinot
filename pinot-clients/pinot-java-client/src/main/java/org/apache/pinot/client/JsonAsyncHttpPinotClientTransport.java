@@ -185,15 +185,14 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
       json.put("sql", query);
-      json.put("numRowsToKeep", numRows);
       if (_extraOptionStr != null && !_extraOptionStr.isEmpty()) {
         json.put("queryOptions", _extraOptionStr);
       }
 
       LOGGER.debug("Cursor query will use Multistage Engine = {}", _useMultistageEngine);
 
-      String url = String.format("%s://%s%s", _scheme, brokerAddress,
-          _useMultistageEngine ? "/query" : "/query/sql");
+      String url = String.format("%s://%s%s?getCursor=true&numRows=%d", _scheme, brokerAddress,
+          _useMultistageEngine ? "/query" : "/query/sql", numRows);
       BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
       if (_headers != null) {

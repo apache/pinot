@@ -152,7 +152,8 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     assertFalse(response.hasExceptions());
     assertEquals(response.getRequestId(), "cursor-123");
     assertNotNull(response.getResultTable());
-    assertTrue(_requestBody.contains("\"numRowsToKeep\":100"));
+    assertTrue(_requestPath.contains("getCursor=true"));
+    assertTrue(_requestPath.contains("numRows=100"));
     assertTrue(_requestBody.contains("\"sql\":\"select * from planets\""));
   }
 
@@ -183,12 +184,13 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     assertFalse(response.hasExceptions());
     assertEquals(response.getRequestId(), "cursor-123");
     assertNotNull(response.getResultTable());
-    assertTrue(_requestBody.contains("\"numRowsToKeep\":50"));
+    assertTrue(_requestPath.contains("getCursor=true"));
+    assertTrue(_requestPath.contains("numRows=50"));
     assertTrue(_requestBody.contains("\"sql\":\"select * from planets\""));
   }
 
   @Test
-  public void testFetchCursorResults() {
+  public void testFetchCursorResultsWithOffsetAndNumRows() {
     _responseJson = _CURSOR_RESPONSE_JSON;
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     JsonAsyncHttpPinotClientTransport transport = (JsonAsyncHttpPinotClientTransport) factory.buildTransport();

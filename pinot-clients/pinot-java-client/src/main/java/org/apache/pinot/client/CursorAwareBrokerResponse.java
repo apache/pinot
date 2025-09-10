@@ -48,20 +48,17 @@ public class CursorAwareBrokerResponse extends BrokerResponse {
   private CursorAwareBrokerResponse(JsonNode brokerResponse) {
     super(brokerResponse); // Initialize base BrokerResponse fields
 
-    // Parse cursor-specific fields
-    _offset = brokerResponse.has("offset") ? brokerResponse.get("offset").asLong() : null;
-    _numRows = brokerResponse.has("numRows") ? brokerResponse.get("numRows").asInt() : null;
-    _numRowsResultSet = brokerResponse.has("numRowsResultSet") ? brokerResponse.get("numRowsResultSet").asLong() : null;
-    JsonNode cursorResultWriteTimeMsNode = brokerResponse.get("cursorResultWriteTimeMs");
-    _cursorResultWriteTimeMs = cursorResultWriteTimeMsNode != null ? cursorResultWriteTimeMsNode.asLong() : null;
-    JsonNode expirationTimeMsNode = brokerResponse.get("expirationTimeMs");
-    _expirationTimeMs = expirationTimeMsNode != null ? expirationTimeMsNode.asLong() : null;
-    _submissionTimeMs = brokerResponse.has("submissionTimeMs") ? brokerResponse.get("submissionTimeMs").asLong() : null;
-    _brokerHost = brokerResponse.has("brokerHost") ? brokerResponse.get("brokerHost").asText() : null;
-    _brokerPort = brokerResponse.has("brokerPort") ? brokerResponse.get("brokerPort").asInt() : null;
-    _bytesWritten = brokerResponse.has("bytesWritten") ? brokerResponse.get("bytesWritten").asLong() : null;
-    _cursorFetchTimeMs = brokerResponse.has("cursorFetchTimeMs")
-        ? brokerResponse.get("cursorFetchTimeMs").asLong() : null;
+    // Parse cursor-specific fields using helper methods
+    _offset = getLongOrNull(brokerResponse, "offset");
+    _numRows = getIntOrNull(brokerResponse, "numRows");
+    _numRowsResultSet = getLongOrNull(brokerResponse, "numRowsResultSet");
+    _cursorResultWriteTimeMs = getLongOrNull(brokerResponse, "cursorResultWriteTimeMs");
+    _expirationTimeMs = getLongOrNull(brokerResponse, "expirationTimeMs");
+    _submissionTimeMs = getLongOrNull(brokerResponse, "submissionTimeMs");
+    _brokerHost = getTextOrNull(brokerResponse, "brokerHost");
+    _brokerPort = getIntOrNull(brokerResponse, "brokerPort");
+    _bytesWritten = getLongOrNull(brokerResponse, "bytesWritten");
+    _cursorFetchTimeMs = getLongOrNull(brokerResponse, "cursorFetchTimeMs");
   }
 
 
@@ -105,5 +102,21 @@ public class CursorAwareBrokerResponse extends BrokerResponse {
 
   public Long getCursorFetchTimeMs() {
     return _cursorFetchTimeMs;
+  }
+
+  // Helper methods for extracting values from JsonNode with null checks
+  private static Long getLongOrNull(JsonNode node, String fieldName) {
+    JsonNode valueNode = node.get(fieldName);
+    return (valueNode != null && !valueNode.isNull()) ? valueNode.asLong() : null;
+  }
+
+  private static Integer getIntOrNull(JsonNode node, String fieldName) {
+    JsonNode valueNode = node.get(fieldName);
+    return (valueNode != null && !valueNode.isNull()) ? valueNode.asInt() : null;
+  }
+
+  private static String getTextOrNull(JsonNode node, String fieldName) {
+    JsonNode valueNode = node.get(fieldName);
+    return (valueNode != null && !valueNode.isNull()) ? valueNode.asText() : null;
   }
 }

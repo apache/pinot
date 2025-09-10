@@ -104,7 +104,7 @@ public class ResultCursorImpl implements ResultCursor {
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
     try {
-      int nextOffset = (_currentPageNumber + 1) * _pageSize;
+      int nextOffset = _currentPageNumber * _pageSize;
       CursorAwareBrokerResponse response = cursorTransport.fetchNextPage(_brokerHostPort, getCursorId(),
           nextOffset, _pageSize);
       if (response.hasExceptions() && _failOnExceptions) {
@@ -114,7 +114,7 @@ public class ResultCursorImpl implements ResultCursor {
       _currentPage = new CursorResultSetGroup(response);
       _currentPageNumber++;
       return _currentPage;
-    } catch (Exception e) {
+    } catch (PinotClientException e) {
       throw new PinotClientException("Failed to fetch next page", e);
     }
   }
@@ -143,7 +143,7 @@ public class ResultCursorImpl implements ResultCursor {
       _currentPage = new CursorResultSetGroup(response);
       _currentPageNumber--;
       return _currentPage;
-    } catch (Exception e) {
+    } catch (PinotClientException e) {
       throw new PinotClientException("Failed to fetch previous page", e);
     }
   }
@@ -151,8 +151,8 @@ public class ResultCursorImpl implements ResultCursor {
   @Override
   public CursorResultSetGroup seekToPage(int pageNumber) throws PinotClientException {
     checkNotClosed();
-    if (pageNumber < 0) {
-      throw new IllegalArgumentException("Page number must be non-negative");
+    if (pageNumber <= 0) {
+      throw new IllegalArgumentException("Page number must be positive (1-based)");
     }
 
     if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
@@ -162,7 +162,7 @@ public class ResultCursorImpl implements ResultCursor {
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
     try {
-      int seekOffset = pageNumber * _pageSize;
+      int seekOffset = (pageNumber - 1) * _pageSize;
       CursorAwareBrokerResponse response = cursorTransport.seekToPage(_brokerHostPort, getCursorId(),
           seekOffset, _pageSize);
       if (response.hasExceptions() && _failOnExceptions) {
@@ -170,9 +170,9 @@ public class ResultCursorImpl implements ResultCursor {
       }
 
       _currentPage = new CursorResultSetGroup(response);
-      _currentPageNumber = pageNumber;
+      _currentPageNumber = pageNumber - 1; // Store 0-based internally
       return _currentPage;
-    } catch (Exception e) {
+    } catch (PinotClientException e) {
       throw new PinotClientException("Failed to seek to page " + pageNumber, e);
     }
   }
@@ -234,8 +234,8 @@ public class ResultCursorImpl implements ResultCursor {
   @Override
   public CompletableFuture<CursorResultSetGroup> seekToPageAsync(int pageNumber) {
     checkNotClosed();
-    if (pageNumber < 0) {
-      return CompletableFuture.failedFuture(new IllegalArgumentException("Page number must be non-negative"));
+    if (pageNumber <= 0) {
+      return CompletableFuture.failedFuture(new IllegalArgumentException("Page number must be positive (1-based)"));
     }
 
     if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
@@ -245,7 +245,7 @@ public class ResultCursorImpl implements ResultCursor {
 
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
-    int seekOffset = pageNumber * _pageSize;
+    int seekOffset = (pageNumber - 1) * _pageSize;
     return cursorTransport.seekToPageAsync(_brokerHostPort, getCursorId(), seekOffset, _pageSize)
         .thenApply(response -> {
           if (response.hasExceptions() && _failOnExceptions) {
@@ -253,7 +253,7 @@ public class ResultCursorImpl implements ResultCursor {
           }
 
           _currentPage = new CursorResultSetGroup(response);
-          _currentPageNumber = pageNumber;
+          _currentPageNumber = pageNumber - 1; // Store 0-based internally
           return _currentPage;
         });
   }
@@ -267,7 +267,7 @@ public class ResultCursorImpl implements ResultCursor {
   @Override
   public int getCurrentPageNumber() {
     checkNotClosed();
-    return _currentPageNumber;
+    return _currentPageNumber + 1; // Convert 0-based internal to 1-based public API
   }
 
   @Override
@@ -306,7 +306,7 @@ public class ResultCursorImpl implements ResultCursor {
     String cursorId = null;
     try {
       cursorId = getCursorId();
-    } catch (Exception e) {
+    } catch (RuntimeException e) {
       // Ignore if we can't get cursor ID
     }
 

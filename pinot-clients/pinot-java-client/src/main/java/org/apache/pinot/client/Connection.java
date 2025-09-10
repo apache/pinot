@@ -217,6 +217,10 @@ public class Connection {
    * @throws PinotClientException If an exception occurs while processing the query
    */
   public ResultCursor openCursor(String query, int pageSize) throws PinotClientException {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      throw new UnsupportedOperationException("Cursor operations not supported by this connection type");
+    }
+
     // Select broker for cursor operation
     String brokerHostPort = _brokerSelector.selectBroker((String) null);
     if (brokerHostPort == null) {
@@ -232,7 +236,7 @@ public class Connection {
       return new ResultCursorImpl(_transport, brokerHostPort, initialResponse, _failOnExceptions);
     } catch (UnsupportedOperationException e) {
       throw new UnsupportedOperationException("Cursor operations not supported by this connection type", e);
-    } catch (Exception e) {
+    } catch (PinotClientException e) {
       throw new PinotClientException("Failed to open cursor", e);
     }
   }
@@ -248,6 +252,10 @@ public class Connection {
    */
   @Deprecated
   public CursorResultSetGroup executeCursorQuery(String query, int numRows) throws PinotClientException {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      throw new UnsupportedOperationException("Cursor operations not supported by this connection type");
+    }
+
     // Select broker for the query
     String[] tableNames = resolveTableName(query);
     String brokerHostPort = _brokerSelector.selectBroker(tableNames);
@@ -266,7 +274,7 @@ public class Connection {
       return new CursorResultSetGroup(response);
     } catch (UnsupportedOperationException e) {
       throw new UnsupportedOperationException("Cursor operations not supported by this connection type", e);
-    } catch (Exception e) {
+    } catch (PinotClientException e) {
       throw new PinotClientException("Failed to execute cursor query", e);
     }
   }
@@ -279,6 +287,10 @@ public class Connection {
    * @return CompletableFuture containing CursorResultSet
    */
   public CompletableFuture<CursorResultSetGroup> executeCursorQueryAsync(String query, int pageSize) {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      return CompletableFuture.failedFuture(
+          new UnsupportedOperationException("Cursor operations not supported by this connection type"));
+    }
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
     // Select broker for the query
