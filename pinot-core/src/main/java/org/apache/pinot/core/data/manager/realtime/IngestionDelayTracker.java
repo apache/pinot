@@ -113,10 +113,12 @@ public class IngestionDelayTracker {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(IngestionDelayTracker.class);
   // Sleep interval for scheduled executor service thread that triggers read of ideal state
-  private static final long METRICS_CLEANUP_INTERVAL_MS = TimeUnit.MINUTES.toMillis(5); // 5 minutes +/- precision in timeouts
-  private static final long METRICS_TRACKING_INTERVAL_MS = TimeUnit.SECONDS.toMillis(30); // 30 seconds +/- precision in timeouts
+  // 5 minutes +/- precision in timeouts
+  private static final long METRICS_CLEANUP_INTERVAL_MS = TimeUnit.MINUTES.toMillis(5);
+  // 30 seconds +/- precision in timeouts
+  private static final long METRICS_TRACKING_INTERVAL_MS = TimeUnit.SECONDS.toMillis(30);
   // Once a partition is marked for verification, we wait 10 minutes to pull its ideal state.
-  private static final int PARTITION_TIMEOUT_MS = 600000;          // 10 minutes timeouts
+  private static final int PARTITION_TIMEOUT_MS = 600000;
   // Delay scheduled executor service for this amount of time after starting service
   private static final int INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS = 100;
   // Cache expire time for ignored segment if there is no update from the segment.
@@ -124,7 +126,7 @@ public class IngestionDelayTracker {
 
   private final Cache<String, Boolean> _segmentsToIgnore =
       CacheBuilder.newBuilder().expireAfterAccess(IGNORED_SEGMENT_CACHE_TIME_MINUTES, TimeUnit.MINUTES).build();
-  private final Map<Integer, Boolean> _partitionsTracked = new ConcurrentHashMap<>();;
+  private final Map<Integer, Boolean> _partitionsTracked = new ConcurrentHashMap<>();
   private final Map<Integer, IngestionInfo> _ingestionInfoMap = new ConcurrentHashMap<>();
   private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _metricsCleanupScheduler;
@@ -159,8 +161,8 @@ public class IngestionDelayTracker {
     _realTimeTableDataManager = realtimeTableDataManager;
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
 
-    _metricsCleanupScheduler = Executors.newSingleThreadScheduledExecutor(
-        getThreadFactory("IngestionDelayMetricsRemovalThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
+    _metricsCleanupScheduler = Executors.newSingleThreadScheduledExecutor(getThreadFactory(
+        "IngestionDelayMetricsRemovalThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
     _metricsCleanupScheduler.scheduleWithFixedDelay(this::timeoutInactivePartitions,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricsCleanupIntervalMs, TimeUnit.MILLISECONDS);
 
@@ -176,12 +178,14 @@ public class IngestionDelayTracker {
   }
 
   @VisibleForTesting
-  StreamMetadataProvider createStreamMetadataProvider(String tableNameWithType, RealtimeTableDataManager realtimeTableDataManager) {
+  StreamMetadataProvider createStreamMetadataProvider(String tableNameWithType,
+      RealtimeTableDataManager realtimeTableDataManager) {
     Map<String, String> streamConfigMap = IngestionConfigUtils.getFirstStreamConfigMap(
         realtimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
     StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    String clientId = IngestionConfigUtils.getTableTopicUniqueClientId(IngestionDelayTracker.class.getSimpleName(), streamConfig);
+    String clientId =
+        IngestionConfigUtils.getTableTopicUniqueClientId(IngestionDelayTracker.class.getSimpleName(), streamConfig);
     return streamConsumerFactory.createStreamMetadataProvider(clientId);
   }
 

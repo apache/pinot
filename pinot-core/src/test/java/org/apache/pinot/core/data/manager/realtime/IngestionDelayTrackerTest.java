@@ -63,13 +63,16 @@ public class IngestionDelayTrackerTest {
       super(serverMetrics, tableNameWithType, realtimeTableDataManager, isServerReadyToServeQueries);
     }
 
-    public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType, RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs, Supplier<Boolean> isServerReadyToServeQueries) {
+    public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+        RealtimeTableDataManager realtimeTableDataManager, int timerThreadTickIntervalMs,
+        Supplier<Boolean> isServerReadyToServeQueries) {
       super(serverMetrics, tableNameWithType, realtimeTableDataManager, timerThreadTickIntervalMs,
           isServerReadyToServeQueries);
     }
 
     @Override
-    StreamMetadataProvider createStreamMetadataProvider(String tableNameWithType, RealtimeTableDataManager realtimeTableDataManager) {
+    StreamMetadataProvider createStreamMetadataProvider(String tableNameWithType,
+        RealtimeTableDataManager realtimeTableDataManager) {
       return new FakeStreamMetadataProvider(new StreamConfig(tableNameWithType, getStreamConfigs()));
     }
 
@@ -99,8 +102,9 @@ public class IngestionDelayTrackerTest {
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     ingestionDelayTracker.shutdown();
     // Test constructor with timer arguments
-    ingestionDelayTracker = new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
-        TIMER_THREAD_TICK_INTERVAL_MS, () -> true);
+    ingestionDelayTracker =
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
+            TIMER_THREAD_TICK_INTERVAL_MS, () -> true);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(0), 0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     // Test bad timer args to the constructor

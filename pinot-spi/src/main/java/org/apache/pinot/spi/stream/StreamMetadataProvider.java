@@ -53,7 +53,8 @@ public interface StreamMetadataProvider extends Closeable {
     throw new UnsupportedOperationException();
   }
 
-  default Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
+  default Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds,
+      long timeoutMillis) {
     throw new UnsupportedOperationException();
   }
 
