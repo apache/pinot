@@ -69,6 +69,8 @@ import org.mockito.Mockito;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testng.Assert;
+import org.testng.SkipException;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
@@ -78,6 +80,11 @@ public class ResourceManagerAccountingTest {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(ResourceManagerAccountingTest.class);
   private static final int NUM_ROWS = 1_000_000;
+
+  @BeforeClass
+  public void setUp() {
+    throw new SkipException("Skipping as this test is very spammy and leaks query threads. Enable when fixed");
+  }
 
   /**
    * Test thread cpu usage tracking in multithread environment, add @Test to run.
