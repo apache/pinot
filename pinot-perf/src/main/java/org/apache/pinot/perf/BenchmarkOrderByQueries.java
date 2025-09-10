@@ -80,8 +80,10 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
   private int _numRows;
   //@Param({"EXP(0.5)"})
   String _scenario = "EXP(0.5)";
+  /// How many times values of the SORTED_COL are repeated
+  /// 1 means that all values are unique, while 1000 means that each value is repeated 1000 times
   @Param({"1", "1000"})
-  int _primaryRepetitions;
+  int _reps;
   @Param({"1500", "150000"})
   int _limit;
   private IndexSegment _indexSegment;
@@ -126,7 +128,7 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
 
   private void buildSegment(String segmentName)
       throws Exception {
-    List<GenericRow> rows = SortedColumnQuickstart.SortedTable.streamData(_primaryRepetitions, _supplier)
+    List<GenericRow> rows = SortedColumnQuickstart.SortedTable.streamData(_reps, _supplier)
         .limit(_numRows)
         .collect(Collectors.toCollection(() -> new ArrayList<>(_numRows)));
     SegmentGeneratorConfig config = new SegmentGeneratorConfig(
