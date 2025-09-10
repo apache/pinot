@@ -188,6 +188,10 @@ public class IngestionDelayTracker {
   }
 
   private void trackIngestionDelay() {
+    if(!_isServerReadyToServeQueries.get()) {
+      return;
+    }
+
     Set<Integer> partitionsHosted = _partitionsHostedByThisServer;
 
     if (_ingestionInfoMap.size() > partitionsHosted.size()) {
