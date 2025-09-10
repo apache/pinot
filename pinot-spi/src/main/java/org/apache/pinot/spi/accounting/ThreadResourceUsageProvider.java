@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,6 +76,19 @@ public class ThreadResourceUsageProvider {
       LOGGER.error("Exception happened during the invocation of getting current bytes allocated", e);
       return 0;
     }
+  }
+
+  /// Returns an approximation of the total garbage collection time in milliseconds.
+  public static long getGcTime() {
+    long totalGCTime = 0;
+    List<GarbageCollectorMXBean> gcBeans = ManagementFactory.getGarbageCollectorMXBeans();
+    for (GarbageCollectorMXBean gcBean : gcBeans) {
+      long gcTime = gcBean.getCollectionTime();
+      if (gcTime > 0) {
+        totalGCTime += gcTime;
+      }
+    }
+    return totalGCTime;
   }
 
   public static boolean isThreadCpuTimeMeasurementEnabled() {
