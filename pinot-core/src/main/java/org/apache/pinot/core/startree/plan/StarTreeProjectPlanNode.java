@@ -27,7 +27,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.operator.AscDocIdSetOperator;
+import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
@@ -77,7 +77,7 @@ public class StarTreeProjectPlanNode implements PlanNode {
     } else {
       groupByColumns = null;
     }
-    AscDocIdSetOperator docIdSetOperator =
+    DocIdSetOperator docIdSetOperator =
         new StarTreeDocIdSetPlanNode(_queryContext, _starTreeV2, _predicateEvaluatorsMap, groupByColumns).run();
     Map<String, DataSource> dataSourceMap = new HashMap<>(HashUtil.getHashMapCapacity(projectionColumns.size()));
     projectionColumns.forEach(column -> dataSourceMap.put(column, _starTreeV2.getDataSource(column)));

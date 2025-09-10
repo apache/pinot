@@ -133,6 +133,6 @@ public class DescDocIdSetOperator extends BaseDocIdSetOperator {
     if (isAscending() == ascending) {
       return this;
     }
-    return new AscDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
+    return new DocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
   }
 }

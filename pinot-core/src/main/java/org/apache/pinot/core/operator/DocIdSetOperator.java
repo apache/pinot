@@ -37,7 +37,7 @@ import org.apache.pinot.spi.trace.Tracing;
  * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
  * matched documents) or already gathered enough documents (for selection queries).
  */
-public class AscDocIdSetOperator extends BaseDocIdSetOperator {
+public class DocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -50,7 +50,7 @@ public class AscDocIdSetOperator extends BaseDocIdSetOperator {
   private BlockDocIdIterator _blockDocIdIterator;
   private int _currentDocId = 0;
 
-  public AscDocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
+  public DocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
     Preconditions.checkArgument(maxSizeOfDocIdSet > 0 && maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _filterOperator = filterOperator;
     _maxSizeOfDocIdSet = maxSizeOfDocIdSet;
@@ -125,8 +125,13 @@ public class AscDocIdSetOperator extends BaseDocIdSetOperator {
     }
     // TODO: REMOVE THIS BEFORE MERGE
     if (System.getProperty("USE_REVERSE_ITERATOR") != null) {
-      return new AscDocIdSetOperator(_filterOperator.withOrder(ascending), _maxSizeOfDocIdSet);
+      try {
+        return new DocIdSetOperator(_filterOperator.withOrder(ascending), _maxSizeOfDocIdSet);
+      } catch (UnsupportedOperationException e) {
+        // The filter operator does not support order change, use DescDocIdSetOperator instead
+        return new ReverseDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
+      }
     }
-    return new DescDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
+    return new ReverseDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
   }
 }

@@ -26,7 +26,7 @@ import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.request.context.ExpressionContext;
-import org.apache.pinot.core.operator.AscDocIdSetOperator;
+import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.TransformBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
@@ -128,8 +128,8 @@ public class DefaultAggregationExecutorTest {
     }
     int totalDocs = _indexSegment.getSegmentMetadata().getTotalDocs();
     MatchAllFilterOperator matchAllFilterOperator = new MatchAllFilterOperator(totalDocs);
-    AscDocIdSetOperator docIdSetOperator =
-        new AscDocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    DocIdSetOperator docIdSetOperator =
+        new DocIdSetOperator(matchAllFilterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator =
         new ProjectionOperator(dataSourceMap, docIdSetOperator, new QueryContext.Builder().build());
     TransformOperator transformOperator = new TransformOperator(_queryContext, projectionOperator, expressions);
