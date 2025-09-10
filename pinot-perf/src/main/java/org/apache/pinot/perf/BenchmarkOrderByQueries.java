@@ -203,6 +203,70 @@ public class BenchmarkOrderByQueries extends BaseQueriesTest {
     }
   }
 
+  @Benchmark
+  public BrokerResponseNative sortedTotallyFiltered() {
+    switch (_zMode) {
+      case ASC:
+        return getBrokerResponse(
+            "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "WHERE LOW_CARDINALITY_STRING_COL > 'value4' "
+                + "ORDER BY SORTED_COL ASC "
+                + "LIMIT " + _limit);
+      case NAIVE_DESC:
+        return getBrokerResponse(
+            "SET allowReverseOrder=false;"
+                + "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "WHERE LOW_CARDINALITY_STRING_COL > 'value4' "
+                + "ORDER BY SORTED_COL DESC "
+                + "LIMIT " + _limit);
+      case REVERSE_ITERATOR:
+      case REVERSE_OPERATOR:
+        return getBrokerResponse(
+            "SET allowReverseOrder=true;"
+                + "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "WHERE LOW_CARDINALITY_STRING_COL > 'value4' "
+                + "ORDER BY SORTED_COL DESC "
+                + "LIMIT " + _limit);
+      default:
+        throw new IllegalStateException("Unknown mode: " + _zMode);
+    }
+  }
+
+  @Benchmark
+  public BrokerResponseNative sortedPartiallyFiltered() {
+    switch (_zMode) {
+      case ASC:
+        return getBrokerResponse(
+            "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "WHERE LOW_CARDINALITY_STRING_COL > 'value4' "
+                + "ORDER BY SORTED_COL ASC, LOW_CARDINALITY_STRING_COL "
+                + "LIMIT " + _limit);
+      case NAIVE_DESC:
+        return getBrokerResponse(
+            "SET allowReverseOrder=false;"
+                + "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "WHERE LOW_CARDINALITY_STRING_COL > 'value4' "
+                + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
+                + "LIMIT " + _limit);
+      case REVERSE_ITERATOR:
+      case REVERSE_OPERATOR:
+        return getBrokerResponse(
+            "SET allowReverseOrder=true;"
+                + "SELECT SORTED_COL "
+                + "FROM sorted "
+                + "WHERE LOW_CARDINALITY_STRING_COL > 'value4' "
+                + "ORDER BY SORTED_COL DESC, LOW_CARDINALITY_STRING_COL "
+                + "LIMIT " + _limit);
+      default:
+        throw new IllegalStateException("Unknown mode: " + _zMode);
+    }
+  }
+
   @Override
   protected String getFilter() {
     return null;
