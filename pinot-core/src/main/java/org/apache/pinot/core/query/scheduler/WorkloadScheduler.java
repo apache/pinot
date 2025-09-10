@@ -20,22 +20,17 @@ package org.apache.pinot.core.query.scheduler;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.LongAccumulator;
 import org.apache.pinot.common.metrics.ServerMeter;
-import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.metrics.ServerQueryPhase;
 import org.apache.pinot.common.utils.config.QueryOptionsUtils;
 import org.apache.pinot.core.query.executor.QueryExecutor;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.resources.QueryExecutorService;
 import org.apache.pinot.core.query.scheduler.resources.UnboundedResourceManager;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.query.QueryThreadContext;
-import org.apache.pinot.spi.trace.Tracing;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Accounting;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,21 +47,17 @@ import org.slf4j.LoggerFactory;
  *
  */
 public class WorkloadScheduler extends QueryScheduler {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(WorkloadScheduler.class);
 
   private final WorkloadBudgetManager _workloadBudgetManager;
-  private final ServerMetrics _serverMetrics;
-  private String _secondaryWorkloadName;
+  private final String _secondaryWorkloadName;
 
-  public WorkloadScheduler(PinotConfiguration config, QueryExecutor queryExecutor, ServerMetrics metrics,
-                           LongAccumulator latestQueryTime, ThreadResourceUsageAccountant resourceUsageAccountant) {
-    super(config, queryExecutor, new UnboundedResourceManager(config, resourceUsageAccountant), metrics,
-        latestQueryTime);
-    _serverMetrics = metrics;
-    _workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
-    _secondaryWorkloadName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME,
-        CommonConstants.Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
+  public WorkloadScheduler(PinotConfiguration config, String instanceId, QueryExecutor queryExecutor,
+      LongAccumulator latestQueryTime) {
+    super(config, instanceId, queryExecutor, latestQueryTime, new UnboundedResourceManager(config));
+    _workloadBudgetManager = WorkloadBudgetManager.get();
+    _secondaryWorkloadName =
+        config.getProperty(Accounting.CONFIG_OF_SECONDARY_WORKLOAD_NAME, Accounting.DEFAULT_SECONDARY_WORKLOAD_NAME);
   }
 
   @Override
@@ -83,8 +74,7 @@ public class WorkloadScheduler extends QueryScheduler {
     boolean isSecondary = QueryOptionsUtils.isSecondaryWorkload(queryRequest.getQueryContext().getQueryOptions());
     // This is for backward compatibility, where we want to honor the isSecondary query option to use the secondary
     // workload budget.
-    String workloadName = isSecondary
-        ? _secondaryWorkloadName
+    String workloadName = isSecondary ? _secondaryWorkloadName
         : QueryOptionsUtils.getWorkloadName(queryRequest.getQueryContext().getQueryOptions());
     if (!_workloadBudgetManager.canAdmitQuery(workloadName)) {
       // TODO: Explore queuing the query instead of rejecting it.
@@ -97,9 +87,8 @@ public class WorkloadScheduler extends QueryScheduler {
       return outOfCapacity(queryRequest);
     }
     queryRequest.getTimerContext().startNewPhaseTimer(ServerQueryPhase.SCHEDULER_WAIT);
-    QueryExecutorService queryExecutorService = _resourceManager.getExecutorService(queryRequest, null);
-    ExecutorService innerExecutorService = QueryThreadContext.contextAwareExecutorService(queryExecutorService);
-    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, innerExecutorService);
+    QueryExecutorService executorService = _resourceManager.getExecutorService(queryRequest, null);
+    ListenableFutureTask<byte[]> queryTask = createQueryFutureTask(queryRequest, executorService);
     _resourceManager.getQueryRunners().submit(queryTask);
     return queryTask;
   }

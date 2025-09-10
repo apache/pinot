@@ -23,10 +23,10 @@ import java.util.TimerTask;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
+import org.apache.pinot.spi.accounting.ThreadAccounting;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
 
@@ -44,7 +44,8 @@ public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFac
     return new HeapUsagePublishingResourceUsageAccountant(period);
   }
 
-  public static class HeapUsagePublishingResourceUsageAccountant extends Tracing.DefaultThreadResourceUsageAccountant {
+  public static class HeapUsagePublishingResourceUsageAccountant
+      extends ThreadAccounting.DefaultThreadResourceUsageAccountant {
     private final Timer _timer;
     private final int _period;
 
@@ -65,6 +66,11 @@ public class HeapUsagePublishingAccountantFactory implements ThreadAccountantFac
           publishHeapUsageMetrics();
         }
       }, _period, _period);
+    }
+
+    @Override
+    public void stopWatcherTask() {
+      _timer.cancel();
     }
   }
 }

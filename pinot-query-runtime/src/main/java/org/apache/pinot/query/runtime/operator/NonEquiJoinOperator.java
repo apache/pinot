@@ -90,7 +90,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
             maxRowsLimitReached = true;
             break;
           }
-          sampleAndCheckInterruptionPeriodically(rows.size());
+          checkTerminationAndSampleUsagePeriodically(rows.size());
           rows.add(joinRowView.toArray());
           hasMatchForLeftRow = true;
           if (_matchedRightRows != null) {
@@ -105,7 +105,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
         if (isMaxRowsLimitReached(rows.size())) {
           break;
         }
-        sampleAndCheckInterruptionPeriodically(rows.size());
+        checkTerminationAndSampleUsagePeriodically(rows.size());
         rows.add(joinRow(leftRow, null));
       }
     }
@@ -123,7 +123,7 @@ public class NonEquiJoinOperator extends BaseJoinOperator {
     List<Object[]> rows = new ArrayList<>(numRightRows - numMatchedRightRows);
     int unmatchedIndex = 0;
     while ((unmatchedIndex = _matchedRightRows.nextClearBit(unmatchedIndex)) < numRightRows) {
-      sampleAndCheckInterruptionPeriodically(rows.size());
+      checkTerminationAndSampleUsagePeriodically(rows.size());
       rows.add(joinRow(null, _rightTable.get(unmatchedIndex++)));
     }
     return rows;

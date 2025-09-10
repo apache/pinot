@@ -51,7 +51,6 @@ import org.apache.pinot.server.access.AllowAllAccessFactory;
 import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.starter.helix.SendStatsPredicate;
 import org.apache.pinot.server.worker.WorkerQueryServer;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
@@ -68,6 +67,8 @@ import org.slf4j.LoggerFactory;
 public class ServerInstance {
   private static final Logger LOGGER = LoggerFactory.getLogger(ServerInstance.class);
 
+  private final HelixManager _helixManager;
+  private final String _instanceId;
   private final ServerMetrics _serverMetrics;
   private final InstanceDataManager _instanceDataManager;
   private final QueryExecutor _queryExecutor;
@@ -77,7 +78,6 @@ public class ServerInstance {
   private final QueryServer _nettyTlsQueryServer;
   private final GrpcQueryServer _grpcQueryServer;
   private final AccessControl _accessControl;
-  private final HelixManager _helixManager;
 
   private final WorkerQueryServer _workerQueryServer;
   private ChannelHandler _instanceRequestHandler;
@@ -85,12 +85,13 @@ public class ServerInstance {
   private boolean _dataManagerStarted = false;
   private boolean _queryServerStarted = false;
 
-  public ServerInstance(ServerConf serverConf, HelixManager helixManager, AccessControlFactory accessControlFactory,
-      @Nullable SegmentOperationsThrottler segmentOperationsThrottler, SendStatsPredicate sendStatsPredicate,
-      ThreadResourceUsageAccountant resourceUsageAccountant)
+  public ServerInstance(ServerConf serverConf, String instanceId, HelixManager helixManager,
+      AccessControlFactory accessControlFactory, @Nullable SegmentOperationsThrottler segmentOperationsThrottler,
+      SendStatsPredicate sendStatsPredicate)
       throws Exception {
-    LOGGER.info("Initializing server instance");
+    LOGGER.info("Initializing server instance: {}", instanceId);
     _helixManager = helixManager;
+    _instanceId = instanceId;
 
     LOGGER.info("Initializing server metrics");
     PinotMetricsRegistry metricsRegistry = PinotMetricUtils.getPinotMetricsRegistry(serverConf.getMetricsConfig());
@@ -124,8 +125,7 @@ public class ServerInstance {
     LOGGER.info("Initializing query scheduler");
     _latestQueryTime = new LongAccumulator(Long::max, 0);
     _queryScheduler =
-        QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _queryExecutor, _serverMetrics, _latestQueryTime,
-            resourceUsageAccountant);
+        QuerySchedulerFactory.create(serverConf.getSchedulerConfig(), _instanceId, _queryExecutor, _latestQueryTime);
 
     TlsConfig tlsConfig =
         TlsUtils.extractTlsConfig(serverConf.getPinotConfig(), CommonConstants.Server.SERVER_TLS_PREFIX);
@@ -138,7 +138,7 @@ public class ServerInstance {
     if (serverConf.isMultiStageServerEnabled()) {
       LOGGER.info("Initializing Multi-stage query engine");
       _workerQueryServer = new WorkerQueryServer(serverConf.getPinotConfig(), _instanceDataManager,
-          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, sendStatsPredicate, resourceUsageAccountant);
+          serverConf.isMultiStageEngineTlsEnabled() ? tlsConfig : null, sendStatsPredicate);
     } else {
       _workerQueryServer = null;
     }

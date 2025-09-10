@@ -36,12 +36,10 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
 import org.apache.pinot.core.transport.ServerRoutingInstance;
 import org.apache.pinot.core.util.GapfillUtils;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
 import org.apache.pinot.spi.exception.QueryErrorCode;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -56,17 +54,11 @@ import org.slf4j.LoggerFactory;
 public class BrokerReduceService extends BaseReduceService {
   private static final Logger LOGGER = LoggerFactory.getLogger(BrokerReduceService.class);
 
-  private final ThreadResourceUsageAccountant _resourceUsageAccountant;
-
   public BrokerReduceService(PinotConfiguration config) {
-    this(config, new Tracing.DefaultThreadResourceUsageAccountant());
-  }
-
-  public BrokerReduceService(PinotConfiguration config, ThreadResourceUsageAccountant resourceUsageAccountant) {
     super(config);
-    _resourceUsageAccountant = resourceUsageAccountant;
   }
 
+  /// [org.apache.pinot.spi.query.QueryThreadContext] must already be set up before calling this method.
   public BrokerResponseNative reduceOnDataTable(BrokerRequest brokerRequest, BrokerRequest serverBrokerRequest,
       Map<ServerRoutingInstance, DataTable> dataTableMap, long reduceTimeOutMs, BrokerMetrics brokerMetrics) {
     if (dataTableMap.isEmpty()) {
@@ -156,8 +148,7 @@ public class BrokerReduceService extends BaseReduceService {
     }
 
     QueryContext serverQueryContext = QueryContextConverterUtils.getQueryContext(serverBrokerRequest.getPinotQuery());
-    DataTableReducer dataTableReducer =
-        ResultReducerFactory.getResultReducer(serverQueryContext, _resourceUsageAccountant);
+    DataTableReducer dataTableReducer = ResultReducerFactory.getResultReducer(serverQueryContext);
 
     Integer minGroupTrimSizeQueryOption = null;
     Integer groupTrimThresholdQueryOption = null;
