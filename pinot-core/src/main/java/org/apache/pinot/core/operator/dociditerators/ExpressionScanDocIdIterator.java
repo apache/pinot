@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.math.BigDecimal;
-import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
