@@ -23,7 +23,6 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -164,7 +163,7 @@ public class IngestionDelayTracker {
     _streamMetadataProvider = createStreamMetadataProvider(tableNameWithType, realtimeTableDataManager);
 
     if (_streamMetadataProvider.supportsOffsetLag()) {
-      _partitionIdToLatestOffset = new HashMap<>();
+      _partitionIdToLatestOffset = new ConcurrentHashMap<>();
     }
     _ingestionDelayTrackingScheduler = Executors.newSingleThreadScheduledExecutor(
         getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
@@ -193,6 +192,9 @@ public class IngestionDelayTracker {
     }
 
     if (_streamMetadataProvider.supportsOffsetLag()) {
+      if (partitionsHosted.isEmpty()) {
+        return;
+      }
       _partitionIdToLatestOffset = _streamMetadataProvider.fetchLatestStreamOffset(partitionsHosted, 5000);
     }
 
@@ -234,7 +236,7 @@ public class IngestionDelayTracker {
     return agedIngestionDelayMs;
   }
 
-  /*
+  /**
    * Helper function to be called when we should stop tracking a given partition. Removes the partition from
    * all our maps.
    *
@@ -263,7 +265,7 @@ public class IngestionDelayTracker {
     _partitionsMarkedForVerification.remove(partitionId);
   }
 
-  /*
+  /**
    * Helper functions that creates a list of all the partitions that are marked for verification and whose
    * timeouts are expired. This helps us optimize checks of the ideal state.
    */
@@ -298,7 +300,7 @@ public class IngestionDelayTracker {
           ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET, () -> getPartitionIngestionConsumingOffset(partitionId));
 
       _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getPartitionIngestionUpstreamOffset(partitionId));
+          ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET, () -> getLatestPartitionOffset(partitionId));
     }
     _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
         () -> getPartitionIngestionDelayMs(partitionId));
@@ -345,7 +347,7 @@ public class IngestionDelayTracker {
     _partitionsMarkedForVerification.remove(partitionId);
   }
 
-  /*
+  /**
    * Handle partition removal event. This must be invoked when we stop serving a given partition for
    * this table in the current server.
    *
@@ -379,7 +381,7 @@ public class IngestionDelayTracker {
     removePartitionId(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
 
-  /*
+  /**
    * This method is used for timing out inactive partitions, so we don't display their metrics on current server.
    * When the inactive time exceeds some threshold, we read from ideal state to confirm we still host the partition,
    * if not we remove the partition from being tracked locally.
@@ -426,7 +428,7 @@ public class IngestionDelayTracker {
     _partitionsMarkedForVerification.put(new LLCSegmentName(segmentName).getPartitionGroupId(), _clock.millis());
   }
 
-  /*
+  /**
    * Method to get timestamp used for the ingestion delay for a given partition.
    *
    * @param partitionId partition for which we are retrieving the delay
@@ -438,7 +440,7 @@ public class IngestionDelayTracker {
     return ingestionInfo != null ? ingestionInfo._ingestionTimeMs : Long.MIN_VALUE;
   }
 
-  /*
+  /**
    * Method to get ingestion delay for a given partition.
    *
    * @param partitionId partition for which we are retrieving the delay
@@ -447,61 +449,71 @@ public class IngestionDelayTracker {
    */
   public long getPartitionIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    return ingestionInfo != null ? getIngestionDelayMs(ingestionInfo._ingestionTimeMs) : 0;
+    long ingestionTimeMs = 0;
+    if ((ingestionInfo != null) && (ingestionInfo._ingestionTimeMs > 0)) {
+      ingestionTimeMs = ingestionInfo._ingestionTimeMs;
+    }
+    // Compute aged delay for current partition
+    long agedIngestionDelayMs = _clock.millis() - ingestionTimeMs;
+    // Correct to zero for any time shifts due to NTP or time reset.
+    return Math.max(agedIngestionDelayMs, 0);
   }
 
+  /**
+   * Computes the ingestion lag for the given partition based on offset difference.
+   * <p>
+   * The lag is calculated as the difference between the latest upstream offset
+   * and the current consuming offset. Only {@link LongMsgOffset} types are supported.
+   *
+   * @param partitionId partition for which the ingestion lag is computed
+   * @return offset lag for the given partition
+   */
   public long getPartitionIngestionOffsetLag(int partitionId) {
-    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    if (ingestionInfo == null) {
-      return 0;
-    }
-    StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
     StreamPartitionMsgOffset latestOffset = _partitionIdToLatestOffset.get(partitionId);
-    if (currentOffset == null || latestOffset == null) {
+    if (latestOffset == null) {
       return 0;
     }
-    // TODO: Support other types of offsets
-    if (!(currentOffset instanceof LongMsgOffset && latestOffset instanceof LongMsgOffset)) {
-      return 0;
+    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
+    long currentOffset = 0;
+    if (ingestionInfo != null) {
+      currentOffset = ((LongMsgOffset) (ingestionInfo._currentOffset)).getOffset();
     }
-    return Math.max(0, ((LongMsgOffset) latestOffset).getOffset() - ((LongMsgOffset) currentOffset).getOffset());
+    return Math.max(0, ((LongMsgOffset) latestOffset).getOffset() - currentOffset);
   }
 
-  // Get the consuming offset for a given partition
+  /**
+   * Retrieves the latest offset consumed for the given partition.
+   *
+   * @param partitionId partition for which the consuming offset was retrieved
+   * @return consuming offset value for the given partition, or {@code 0} if no ingestion info is available
+   */
   public long getPartitionIngestionConsumingOffset(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     if (ingestionInfo == null) {
       return 0;
     }
     StreamPartitionMsgOffset currentOffset = ingestionInfo._currentOffset;
-    if (currentOffset == null) {
-      return 0;
-    }
-    // TODO: Support other types of offsets
-    if (!(currentOffset instanceof LongMsgOffset)) {
-      return 0;
-    }
+    assert currentOffset != null;
+    assert currentOffset instanceof LongMsgOffset;
     return ((LongMsgOffset) currentOffset).getOffset();
   }
 
-  // Get the latest offset in upstream data source for a given partition
-  public long getPartitionIngestionUpstreamOffset(int partitionId) {
-    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    if (ingestionInfo == null) {
-      return 0;
-    }
+  /**
+   * Retrieves the latest offset in the upstream data source for the given partition.
+   *
+   * @param partitionId partition for which the latest upstream offset is retrieved
+   * @return latest offset value for the given partition, or {@code 0} if not available
+   */
+  public long getLatestPartitionOffset(int partitionId) {
     StreamPartitionMsgOffset latestOffset = _partitionIdToLatestOffset.get(partitionId);
     if (latestOffset == null) {
       return 0;
     }
-    // TODO: Support other types of offsets
-    if (!(latestOffset instanceof LongMsgOffset)) {
-      return 0;
-    }
+    assert latestOffset instanceof LongMsgOffset;
     return ((LongMsgOffset) latestOffset).getOffset();
   }
 
-  /*
+  /**
    * We use this method to clean up when a table is being removed. No updates are expected at this time as all
    * RealtimeSegmentManagers should be down now.
    */

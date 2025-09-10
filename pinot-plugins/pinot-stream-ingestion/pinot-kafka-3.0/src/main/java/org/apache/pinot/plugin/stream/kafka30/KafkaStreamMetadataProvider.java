@@ -95,6 +95,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
   }
 
   @Override
+  public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds, long timeoutMillis) {
+    return StreamMetadataProvider.super.fetchLatestStreamOffset(partitionIds, timeoutMillis);
+  }
+
+  @Override
   public StreamPartitionMsgOffset fetchStreamPartitionOffset(OffsetCriteria offsetCriteria, long timeoutMillis) {
     Preconditions.checkNotNull(offsetCriteria);
     long offset;
@@ -185,6 +190,11 @@ public class KafkaStreamMetadataProvider extends KafkaPartitionLevelConnectionHa
     } catch (ExecutionException | InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  @Override
+  public boolean supportsOffsetLag() {
+    return true;
   }
 
   public static class KafkaTopicMetadata implements TopicMetadata {

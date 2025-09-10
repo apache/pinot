@@ -327,7 +327,7 @@ public class IngestionDelayTrackerTest {
     partitionMsgOffsetMap.put(partition0, latestOffset0);
     ingestionDelayTracker.updateMetrics(segment0, partition0, Long.MIN_VALUE, msgOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 100);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition0), 150);
+    Assert.assertEquals(ingestionDelayTracker.getLatestPartitionOffset(partition0), 150);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition0), 50);
 
     // Test tracking offset lag for another partition
@@ -336,7 +336,7 @@ public class IngestionDelayTrackerTest {
     partitionMsgOffsetMap.put(partition1, latestOffset1);
     ingestionDelayTracker.updateMetrics(segment1, partition1, Long.MIN_VALUE, msgOffset1);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition1), 100);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition1), 150);
+    Assert.assertEquals(ingestionDelayTracker.getLatestPartitionOffset(partition1), 150);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition1), 50);
 
     // Update offset lag for partition0
@@ -345,7 +345,7 @@ public class IngestionDelayTrackerTest {
     partitionMsgOffsetMap.put(partition0, latestOffset0);
     ingestionDelayTracker.updateMetrics(segment0, partition0, Long.MIN_VALUE, msgOffset0);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionOffsetLag(partition0), 50);
-    Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionUpstreamOffset(partition0), 200);
+    Assert.assertEquals(ingestionDelayTracker.getLatestPartitionOffset(partition0), 200);
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionConsumingOffset(partition0), 150);
 
     ingestionDelayTracker.shutdown();

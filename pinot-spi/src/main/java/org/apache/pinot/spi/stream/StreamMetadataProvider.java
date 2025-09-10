@@ -53,6 +53,12 @@ public interface StreamMetadataProvider extends Closeable {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * Fetches the latest offset for a set of given partition Ids.
+   * @param partitionIds partition Ids of the stream
+   * @param timeoutMillis fetch timeout
+   * @return latest {@link StreamPartitionMsgOffset} for each partition Id.
+   */
   default Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds,
       long timeoutMillis) {
     throw new UnsupportedOperationException();
@@ -147,6 +153,10 @@ public interface StreamMetadataProvider extends Closeable {
     throw new UnsupportedOperationException();
   }
 
+  /**
+   * @return true if the stream supports computing ingestion lag by subtracting the last consumed offset from the
+   * latest offset.
+   */
   boolean supportsOffsetLag();
 
   /**
