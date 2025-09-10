@@ -19,6 +19,8 @@
 package org.apache.pinot.core.accounting;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,7 +28,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.metrics.AbstractMetrics;
 import org.apache.pinot.common.metrics.BrokerGauge;
 import org.apache.pinot.common.metrics.BrokerMeter;
@@ -34,17 +38,13 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
+import org.apache.pinot.spi.accounting.MseCancelCallback;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.ResourceUsageUtils;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
-import org.apache.pinot.spi.accounting.MseCancelCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -89,7 +89,7 @@ public class QueryAggregator implements ResourceAggregator {
   private long _usedBytes;
   private int _sleepTime;
   protected Map<String, AggregatedStats> _aggregatedUsagePerActiveQuery;
-  private TriggeringLevel _triggeringLevel;
+  protected TriggeringLevel _triggeringLevel = TriggeringLevel.Normal;
 
   // metrics class
   private final AbstractMetrics _metrics;
@@ -257,23 +257,19 @@ public class QueryAggregator implements ResourceAggregator {
     LOGGER.debug("Running pre-aggregate for QueryAggregator.");
     QueryMonitorConfig config = getQueryMonitorConfig();
     _sleepTime = config.getNormalSleepTime();
-    _triggeringLevel = TriggeringLevel.Normal;
+    _aggregatedUsagePerActiveQuery = null;
     collectTriggerMetrics();
     evalTriggers();
     if (_triggeringLevel == TriggeringLevel.HeapMemoryPanic) {
       killAllQueries(anchorThreadEntries);
-      LOGGER.error("Killed all queries and triggered gc!");
-      // Set the triggering level back to normal for aggregation phase.
-      _triggeringLevel = TriggeringLevel.Normal;
     }
-
-    _aggregatedUsagePerActiveQuery = null;
     if (isTriggered()) {
       _aggregatedUsagePerActiveQuery = new HashMap<>();
     }
   }
 
   public void aggregate(Thread thread, CPUMemThreadLevelAccountingObjects.ThreadEntry threadEntry) {
+    Set<String> cancellingQueries = new HashSet<>();
     // ThreadEntry returns 0 if CPU/Mem sampling is not enabled.
     long currentCPUSample = threadEntry._currentThreadCPUTimeSampleMS;
     long currentMemSample = threadEntry._currentThreadMemoryAllocationSampleBytes;
@@ -307,6 +303,10 @@ public class QueryAggregator implements ResourceAggregator {
       String queryId = currentTaskStatus.getQueryId();
       // update inactive queries for cleanInactive()
       _inactiveQuery.remove(queryId);
+      // If query is in cancelling set, retain it.
+      if (_cancelSentQueries.contains(queryId)) {
+        cancellingQueries.add(queryId);
+      }
       // if triggered, accumulate active query task stats
       if (isTriggered()) {
         Thread anchorThread = currentTaskStatus.getAnchorThread();
@@ -317,6 +317,7 @@ public class QueryAggregator implements ResourceAggregator {
                 : v.merge(currentCPUSample, currentMemSample, isAnchorThread, threadEntry._errorStatus));
       }
     }
+    _cancelSentQueries = cancellingQueries;
   }
 
   public void postAggregate() {
@@ -405,7 +406,8 @@ public class QueryAggregator implements ResourceAggregator {
     logTerminatedQuery(queryResourceTracker, totalHeapMemoryUsage, false);
   }
 
-  protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage, boolean hasCallback) {
+  protected void logTerminatedQuery(QueryResourceTracker queryResourceTracker, long totalHeapMemoryUsage,
+                                    boolean hasCallback) {
     LOGGER.warn("Query {} terminated. Memory Usage: {}. Cpu Usage: {}. Total Heap Usage: {}. Used Callback: {}",
         queryResourceTracker.getQueryId(), queryResourceTracker.getAllocatedBytes(),
         queryResourceTracker.getCpuTimeNs(), totalHeapMemoryUsage, hasCallback);
@@ -568,10 +570,10 @@ public class QueryAggregator implements ResourceAggregator {
 
     // Retain queries that are currently being cancelled
     for (String queryId : _cancelSentQueries) {
-      if (_finishedTaskCPUStatsAggregator.containsKey(queryId) ||
-          _finishedTaskMemStatsAggregator.containsKey(queryId) ||
-          _concurrentTaskCPUStatsAggregator.containsKey(queryId) ||
-          _concurrentTaskMemStatsAggregator.containsKey(queryId)) {
+      if (_finishedTaskCPUStatsAggregator.containsKey(queryId)
+          || _finishedTaskMemStatsAggregator.containsKey(queryId)
+          || _concurrentTaskCPUStatsAggregator.containsKey(queryId)
+          || _concurrentTaskMemStatsAggregator.containsKey(queryId)) {
         cancellingQueries.add(queryId);
       }
     }

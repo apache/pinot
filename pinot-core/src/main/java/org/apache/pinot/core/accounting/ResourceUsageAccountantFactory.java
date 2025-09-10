@@ -27,7 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.annotation.Nullable;
-
 import org.apache.pinot.spi.accounting.MseCancelCallback;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadAccountantFactory;
@@ -264,8 +263,8 @@ public class ResourceUsageAccountantFactory implements ThreadAccountantFactory {
 
     @Override
     public boolean throttleQuerySubmission() {
-      QueryAggregator _queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
-      return _queryAggregator.getHeapUsageBytes() > _queryAggregator.getQueryMonitorConfig().getAlarmingLevel();
+      QueryAggregator queryAggregator = (QueryAggregator) _resourceAggregators.get(TrackingScope.QUERY);
+      return queryAggregator.getHeapUsageBytes() > queryAggregator.getQueryMonitorConfig().getAlarmingLevel();
     }
 
     /**
