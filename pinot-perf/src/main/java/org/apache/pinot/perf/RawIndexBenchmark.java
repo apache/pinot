@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
-import org.apache.pinot.core.operator.DocIdSetOperator;
+import org.apache.pinot.core.operator.AscDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.docvalsets.ProjectionBlockValSet;
@@ -222,7 +222,7 @@ public class RawIndexBenchmark {
   private long profileLookups(IndexSegment segment, String column, int[] docIds) {
     BaseFilterOperator filterOperator =
         new TestFilterOperator(docIds, segment.getDataSource(column).getDataSourceMetadata().getNumDocs());
-    DocIdSetOperator docIdSetOperator = new DocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    AscDocIdSetOperator docIdSetOperator = new AscDocIdSetOperator(filterOperator, DocIdSetPlanNode.MAX_DOC_PER_CALL);
     ProjectionOperator projectionOperator =
         new ProjectionOperator(buildDataSourceMap(segment), docIdSetOperator, new QueryContext.Builder().build());
 

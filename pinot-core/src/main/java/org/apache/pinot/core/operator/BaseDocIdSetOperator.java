@@ -30,9 +30,9 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 ///
 /// Filter operators return a [org.apache.pinot.core.operator.blocks.FilterBlock], whose method
 /// [getBlockDocIdSet()][org.apache.pinot.core.operator.blocks.FilterBlock#getBlockDocIdSet()] is used
-/// to build different types of [BaseDocIdSetOperator]s (e.g. [DocIdSetOperator]). Contrary to filter operators, whose
-/// [nextBlock()][org.apache.pinot.core.operator.filter.BaseFilterOperator#nextBlock()] method returns always the same
-/// block (which contains all the matched document ids for the segment),
+/// to build different types of [BaseDocIdSetOperator]s (e.g. [AscDocIdSetOperator]). Contrary to filter operators,
+/// whose [nextBlock()][org.apache.pinot.core.operator.filter.BaseFilterOperator#nextBlock()] method returns always
+/// the same block (which contains all the matched document ids for the segment),
 /// **DocIdSetOperator[.nextBlock()][BaseDocIdSetOperator#nextBlock()] split the segment in multiple blocks and
 /// therefore must be called multiple times until it returns `null`**.
 ///
