@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -161,7 +162,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
    * @return BrokerResponse containing the first page and cursor metadata
    * @throws PinotClientException If query execution fails
    */
-  public BrokerResponse executeQueryWithCursor(String brokerAddress, String query, int numRows)
+  @Override
+  public CursorAwareBrokerResponse executeQueryWithCursor(String brokerAddress, String query, int numRows)
       throws PinotClientException {
     try {
       return executeQueryWithCursorAsync(brokerAddress, query, numRows).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
@@ -178,7 +180,8 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
    * @param numRows The number of rows to return in the first page
    * @return CompletableFuture containing BrokerResponse with first page and cursor metadata
    */
-  public CompletableFuture<BrokerResponse> executeQueryWithCursorAsync(String brokerAddress, String query,
+  @Override
+  public CompletableFuture<CursorAwareBrokerResponse> executeQueryWithCursorAsync(String brokerAddress, String query,
       int numRows) {
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
@@ -205,7 +208,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
             }
 
             try {
-              return BrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+              return CursorAwareBrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
             } catch (IOException e) {
               throw new CompletionException(e);
             }
@@ -368,6 +371,85 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     } catch (Exception e) {
       throw new PinotClientException(e);
     }
+  }
+
+  @Override
+  public CursorAwareBrokerResponse fetchNextPage(String brokerAddress, String cursorId) throws PinotClientException {
+    try {
+      return fetchNextPageAsync(brokerAddress, cursorId).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  @Override
+  public CompletableFuture<CursorAwareBrokerResponse> fetchNextPageAsync(String brokerAddress, String cursorId) {
+    String url = String.format("%s://%s/responseStore/%s/next", _scheme, brokerAddress, cursorId);
+    return executeCursorRequest(url);
+  }
+
+  @Override
+  public CursorAwareBrokerResponse fetchPreviousPage(String brokerAddress, String cursorId)
+      throws PinotClientException {
+    try {
+      return fetchPreviousPageAsync(brokerAddress, cursorId).get(_brokerReadTimeout,
+          TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  @Override
+  public CompletableFuture<CursorAwareBrokerResponse> fetchPreviousPageAsync(String brokerAddress, String cursorId) {
+    String url = String.format("%s://%s/responseStore/%s/previous", _scheme, brokerAddress, cursorId);
+    return executeCursorRequest(url);
+  }
+
+  @Override
+  public CursorAwareBrokerResponse seekToPage(String brokerAddress, String cursorId, int pageNumber)
+      throws PinotClientException {
+    try {
+      return seekToPageAsync(brokerAddress, cursorId, pageNumber).get(_brokerReadTimeout,
+          TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      throw new PinotClientException(e);
+    }
+  }
+
+  @Override
+  public CompletableFuture<CursorAwareBrokerResponse> seekToPageAsync(String brokerAddress,
+      String cursorId, int pageNumber) {
+    String url = String.format("%s://%s/responseStore/%s/seek/%d", _scheme, brokerAddress, cursorId,
+        pageNumber);
+    return executeCursorRequest(url);
+  }
+
+  /**
+   * Helper method to execute cursor navigation requests.
+   */
+  private CompletableFuture<CursorAwareBrokerResponse> executeCursorRequest(String url) {
+    BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
+
+    if (_headers != null) {
+      _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+    }
+
+    LOGGER.debug("Sending cursor request to {}", url);
+    return requestBuilder.execute().toCompletableFuture().thenApply(httpResponse -> {
+      LOGGER.debug("Completed cursor request, HTTP status is {}", httpResponse.getStatusCode());
+
+      if (httpResponse.getStatusCode() != 200) {
+        throw new PinotClientException(
+            "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
+      }
+
+      try {
+        JsonNode brokerResponse = OBJECT_READER.readTree(httpResponse.getResponseBody());
+        return CursorAwareBrokerResponse.fromJson(brokerResponse);
+      } catch (Exception e) {
+        throw new PinotClientException("Unable to parse broker response", e);
+      }
+    });
   }
 
   @Override

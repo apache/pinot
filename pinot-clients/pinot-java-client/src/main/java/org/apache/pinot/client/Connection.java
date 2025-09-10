@@ -26,7 +26,6 @@ import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-
 /**
  * A connection to Pinot, normally created through calls to the {@link ConnectionFactory}.
  */
@@ -204,5 +203,282 @@ public class Connection {
    */
   public PinotClientTransport<?> getTransport() {
     return _transport;
+  }
+
+  // ========== Cursor Methods (Default implementations for backward compatibility) ==========
+
+  /**
+   * Opens a cursor for paginated query execution using the Cursor Handle Pattern.
+   * The returned cursor starts with the first page already loaded.
+   *
+   * @param query the query to execute
+   * @param pageSize the number of rows per page
+   * @return ResultCursor with the first page loaded and ready for navigation
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public ResultCursor openCursor(String query, int pageSize) throws PinotClientException {
+    // Select broker for cursor operation
+    String brokerHostPort = _brokerSelector.selectBroker((String) null);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to execute cursor query");
+    }
+
+    try {
+      CursorAwareBrokerResponse initialResponse = _transport.executeQueryWithCursor(brokerHostPort, query, pageSize);
+      if (initialResponse.hasExceptions() && _failOnExceptions) {
+        throw new PinotClientException("Query had processing exceptions: \n" + initialResponse.getExceptions());
+      }
+
+      return new ResultCursorImpl(_transport, brokerHostPort, initialResponse, _failOnExceptions);
+    } catch (UnsupportedOperationException e) {
+      throw new UnsupportedOperationException("Cursor operations not supported by this connection type", e);
+    } catch (Exception e) {
+      throw new PinotClientException("Failed to open cursor", e);
+    }
+  }
+
+  /**
+   * Executes a query with cursor support for pagination.
+   *
+   * @deprecated Use openCursor(String, int) instead for better resource management
+   * @param query the query to execute
+   * @param numRows the number of rows per page
+   * @return CursorResultSetGroup containing the first page and cursor metadata
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  @Deprecated
+  public CursorResultSetGroup executeCursorQuery(String query, int numRows) throws PinotClientException {
+    // Select broker for the query
+    String[] tableNames = resolveTableName(query);
+    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to execute cursor query");
+    }
+
+    try {
+      // Execute query with cursor support
+      CursorAwareBrokerResponse response = _transport.executeQueryWithCursor(brokerHostPort, query, numRows);
+      if (response.hasExceptions() && _failOnExceptions) {
+        throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
+      }
+
+      // Create cursor result set group
+      return new CursorResultSetGroup(response);
+    } catch (UnsupportedOperationException e) {
+      throw new UnsupportedOperationException("Cursor operations not supported by this connection type", e);
+    } catch (Exception e) {
+      throw new PinotClientException("Failed to execute cursor query", e);
+    }
+  }
+
+  /**
+   * Executes a query with cursor support asynchronously.
+   *
+   * @param query The SQL query to execute
+   * @param pageSize The number of rows per page
+   * @return CompletableFuture containing CursorResultSet
+   */
+  public CompletableFuture<CursorResultSetGroup> executeCursorQueryAsync(String query, int pageSize) {
+    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
+
+    // Select broker for the query
+    String[] tableNames = resolveTableName(query);
+    String brokerHostPort = _brokerSelector.selectBroker(tableNames);
+    if (brokerHostPort == null) {
+      return CompletableFuture.failedFuture(new PinotClientException("Could not find broker to execute cursor query"));
+    }
+
+    return cursorTransport.executeQueryWithCursorAsync(brokerHostPort, query, pageSize)
+        .thenApply(response -> {
+          if (response.hasExceptions() && _failOnExceptions) {
+            throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
+          }
+          return new CursorResultSetGroup(response);
+        });
+  }
+
+  /**
+   * Fetches the next page for a cursor.
+   *
+   * @param cursorId The cursor identifier
+   * @return CursorResultSet containing the next page
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public CursorResultSetGroup fetchNext(String cursorId) throws PinotClientException {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      throw new UnsupportedOperationException("Cursor operations not supported by this connection type");
+    }
+
+    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
+
+    // Select broker for cursor operation - could use cursor metadata or select new one
+    String brokerHostPort = _brokerSelector.selectBroker((String) null);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to fetch next page");
+    }
+
+    try {
+      CursorAwareBrokerResponse response = cursorTransport.fetchNextPage(brokerHostPort, cursorId);
+      if (response.hasExceptions() && _failOnExceptions) {
+        throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
+      }
+      return new CursorResultSetGroup(response);
+    } catch (Exception e) {
+      throw new PinotClientException("Failed to fetch next page", e);
+    }
+  }
+
+  /**
+   * Fetches the next page for a cursor asynchronously.
+   *
+   * @param cursorId The cursor identifier
+   * @return CompletableFuture containing the next page
+   */
+  public CompletableFuture<CursorResultSetGroup> fetchNextAsync(String cursorId) {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      return CompletableFuture.failedFuture(
+          new UnsupportedOperationException("Cursor operations not supported by this connection type"));
+    }
+
+    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
+
+    // Select broker for cursor operation
+    String brokerHostPort = _brokerSelector.selectBroker((String) null);
+    if (brokerHostPort == null) {
+      return CompletableFuture.failedFuture(
+          new PinotClientException("Could not find broker to fetch next page"));
+    }
+
+    return cursorTransport.fetchNextPageAsync(brokerHostPort, cursorId)
+        .thenApply(response -> {
+          if (response.hasExceptions() && _failOnExceptions) {
+            throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
+          }
+          return new CursorResultSetGroup(response);
+        });
+  }
+
+  /**
+   * Fetches the previous page for a cursor.
+   *
+   * @param cursorId The cursor identifier
+   * @return CursorResultSet containing the previous page
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public CursorResultSetGroup fetchPrevious(String cursorId) throws PinotClientException {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      throw new UnsupportedOperationException("Cursor operations not supported by this connection type");
+    }
+
+    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
+
+    // Select broker for cursor operation
+    String brokerHostPort = _brokerSelector.selectBroker((String) null);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to fetch previous page");
+    }
+
+    try {
+      CursorAwareBrokerResponse response = cursorTransport.fetchPreviousPage(brokerHostPort, cursorId);
+      if (response.hasExceptions() && _failOnExceptions) {
+        throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
+      }
+      return new CursorResultSetGroup(response);
+    } catch (Exception e) {
+      throw new PinotClientException("Failed to fetch previous page", e);
+    }
+  }
+
+  /**
+   * Fetches the previous page for a cursor asynchronously.
+   *
+   * @param cursorId The cursor identifier
+   * @return CompletableFuture containing the previous page
+   */
+  public CompletableFuture<CursorResultSetGroup> fetchPreviousAsync(String cursorId) {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      return CompletableFuture.failedFuture(
+          new UnsupportedOperationException("Cursor operations not supported by this connection type"));
+    }
+
+    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
+
+    // Select broker for cursor operation
+    String brokerHostPort = _brokerSelector.selectBroker((String) null);
+    if (brokerHostPort == null) {
+      return CompletableFuture.failedFuture(
+          new PinotClientException("Could not find broker to fetch previous page"));
+    }
+
+    return cursorTransport.fetchPreviousPageAsync(brokerHostPort, cursorId)
+        .thenApply(response -> {
+          if (response.hasExceptions() && _failOnExceptions) {
+            throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
+          }
+          return new CursorResultSetGroup(response);
+        });
+  }
+
+  /**
+   * Seeks to a specific page for a cursor.
+   *
+   * @param cursorId The cursor identifier
+   * @param pageNumber The page number to seek to (0-based)
+   * @return CursorResultSet containing the specified page
+   * @throws PinotClientException If an exception occurs while processing the query
+   */
+  public CursorResultSetGroup seekToPage(String cursorId, int pageNumber) throws PinotClientException {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      throw new UnsupportedOperationException("Cursor operations not supported by this connection type");
+    }
+
+    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
+
+    // Select broker for cursor operation
+    String brokerHostPort = _brokerSelector.selectBroker((String) null);
+    if (brokerHostPort == null) {
+      throw new PinotClientException("Could not find broker to seek to page");
+    }
+
+    try {
+      CursorAwareBrokerResponse response = cursorTransport.seekToPage(brokerHostPort, cursorId, pageNumber);
+      if (response.hasExceptions() && _failOnExceptions) {
+        throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
+      }
+      return new CursorResultSetGroup(response);
+    } catch (Exception e) {
+      throw new PinotClientException("Failed to seek to page " + pageNumber, e);
+    }
+  }
+
+  /**
+   * Seeks to a specific page for a cursor asynchronously.
+   *
+   * @param cursorId The cursor identifier
+   * @param pageNumber The page number to seek to (0-based)
+   * @return CompletableFuture containing the specified page
+   */
+  public CompletableFuture<CursorResultSetGroup> seekToPageAsync(String cursorId, int pageNumber) {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      return CompletableFuture.failedFuture(
+          new UnsupportedOperationException("Cursor operations not supported by this connection type"));
+    }
+
+    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
+
+    // Select broker for cursor operation
+    String brokerHostPort = _brokerSelector.selectBroker((String) null);
+    if (brokerHostPort == null) {
+      return CompletableFuture.failedFuture(
+          new PinotClientException("Could not find broker to seek to page"));
+    }
+
+    return cursorTransport.seekToPageAsync(brokerHostPort, cursorId, pageNumber)
+        .thenApply(response -> {
+          if (response.hasExceptions() && _failOnExceptions) {
+            throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
+          }
+          return new CursorResultSetGroup(response);
+        });
   }
 }

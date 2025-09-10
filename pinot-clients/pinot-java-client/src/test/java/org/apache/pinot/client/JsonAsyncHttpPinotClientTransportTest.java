@@ -157,10 +157,10 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     _responseJson = _CURSOR_RESPONSE_JSON;
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     JsonAsyncHttpPinotClientTransport transport = (JsonAsyncHttpPinotClientTransport) factory.buildTransport();
-    CompletableFuture<BrokerResponse> future = transport.executeQueryWithCursorAsync(
+    CompletableFuture<CursorAwareBrokerResponse> future = transport.executeQueryWithCursorAsync(
         "localhost:" + _dummyServer.getAddress().getPort(), "select * from planets", 50);
 
-    BrokerResponse response = future.get();
+    CursorAwareBrokerResponse response = future.get();
     assertFalse(response.hasExceptions());
     assertEquals(response.getRequestId(), "cursor-123");
     assertNotNull(response.getResultTable());

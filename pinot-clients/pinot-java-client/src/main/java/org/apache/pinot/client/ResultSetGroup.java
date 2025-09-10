@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
 /**
  * A Pinot result set group, containing the results given back by Pinot for a given query.
  */
-public class ResultSetGroup {
+public class ResultSetGroup implements BaseResultSetGroup {
   private final List<ResultSet> _resultSets;
   private final ExecutionStats _executionStats;
   private final List<PinotClientException> _exceptions;

@@ -123,17 +123,14 @@ public class ConnectionFactoryTest {
   }
 
   @Test
-  public void testCursorConnectionFactoryMethodsPreserved() {
-    // Verify all existing ConnectionFactory methods are preserved after cursor additions
+  public void testConnectionFactoryMethodsPreserved() {
+    // Test that the ConnectionFactory class has the expected methods
     Method[] methods = ConnectionFactory.class.getDeclaredMethods();
 
     boolean hasFromZookeeper = false;
     boolean hasFromController = false;
     boolean hasFromHostList = false;
     boolean hasFromProperties = false;
-    boolean hasCursorFromController = false;
-    boolean hasCursorFromHostList = false;
-    boolean hasCursorFromProperties = false;
 
     for (Method method : methods) {
       if (method.getName().equals("fromZookeeper") && method.getReturnType() == Connection.class) {
@@ -148,15 +145,6 @@ public class ConnectionFactoryTest {
       if (method.getName().equals("fromProperties") && method.getReturnType() == Connection.class) {
         hasFromProperties = true;
       }
-      if (method.getName().equals("createCursorConnectionFromController")) {
-        hasCursorFromController = true;
-      }
-      if (method.getName().equals("createCursorConnectionFromHostList")) {
-        hasCursorFromHostList = true;
-      }
-      if (method.getName().equals("createCursorConnectionFromProperties")) {
-        hasCursorFromProperties = true;
-      }
     }
 
     // Verify existing methods are preserved
@@ -165,9 +153,59 @@ public class ConnectionFactoryTest {
     Assert.assertTrue(hasFromHostList, "fromHostList methods should be preserved");
     Assert.assertTrue(hasFromProperties, "fromProperties methods should be preserved");
 
-    // Verify new cursor methods are available
-    Assert.assertTrue(hasCursorFromController, "createCursorConnectionFromController should be available");
-    Assert.assertTrue(hasCursorFromHostList, "createCursorConnectionFromHostList should be available");
-    Assert.assertTrue(hasCursorFromProperties, "createCursorConnectionFromProperties should be available");
+    // Verify that Connection has cursor methods (hybrid approach)
+    Method[] connectionMethods = Connection.class.getDeclaredMethods();
+    boolean hasExecuteWithCursor = false;
+    boolean hasFetchNext = false;
+    boolean hasFetchPrevious = false;
+    boolean hasSeekToPage = false;
+
+    for (Method method : connectionMethods) {
+      if (method.getName().equals("executeCursorQuery")) {
+        hasExecuteWithCursor = true;
+      }
+      if (method.getName().equals("fetchNext")) {
+        hasFetchNext = true;
+      }
+      if (method.getName().equals("fetchPrevious")) {
+        hasFetchPrevious = true;
+      }
+      if (method.getName().equals("seekToPage")) {
+        hasSeekToPage = true;
+      }
+    }
+
+    Assert.assertTrue(hasExecuteWithCursor, "Connection should have executeCursorQuery method");
+    Assert.assertTrue(hasFetchNext, "Connection should have fetchNext method");
+    Assert.assertTrue(hasFetchPrevious, "Connection should have fetchPrevious method");
+    Assert.assertTrue(hasSeekToPage, "Connection should have seekToPage method");
+  }
+
+  @Test
+  public void testConnectionCursorFunctionalityWithJsonTransport() {
+    // Test that connections created with JsonAsyncHttpPinotClientTransport support cursor operations
+    List<String> brokers = ImmutableList.of("127.0.0.1:1234");
+    JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+    Connection connection = ConnectionFactory.fromHostList(brokers, factory.buildTransport());
+
+    // Verify the connection has JsonAsyncHttpPinotClientTransport
+    Assert.assertTrue(connection.getTransport() instanceof JsonAsyncHttpPinotClientTransport,
+        "Connection should use JsonAsyncHttpPinotClientTransport for cursor support");
+  }
+
+  @Test
+  public void testConnectionCursorFunctionalityWithOtherTransports() {
+    // Test that connections created with other transports handle cursor operations gracefully
+    List<String> brokers = ImmutableList.of("127.0.0.1:1234");
+    PinotClientTransport mockTransport = Mockito.mock(PinotClientTransport.class);
+    Connection connection = ConnectionFactory.fromHostList(brokers, mockTransport);
+
+    // Verify cursor operations throw UnsupportedOperationException for non-JsonAsyncHttpPinotClientTransport
+    try {
+      connection.fetchNext("test-cursor");
+      Assert.fail("Should throw UnsupportedOperationException");
+    } catch (UnsupportedOperationException e) {
+      Assert.assertEquals(e.getMessage(), "Cursor operations not supported by this connection type");
+    }
   }
 }
