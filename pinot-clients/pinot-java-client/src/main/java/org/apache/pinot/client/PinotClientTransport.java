@@ -88,6 +88,22 @@ public interface PinotClientTransport<METRICS> {
    * @throws UnsupportedOperationException If cursor support is not implemented
    */
   default CompletableFuture<CursorAwareBrokerResponse> fetchNextPageAsync(String brokerAddress, String cursorId) {
+    return fetchNextPageAsync(brokerAddress, cursorId, 1, 1);
+  }
+
+  /**
+   * Fetches the next page for a cursor asynchronously with specified offset and number of rows.
+   * Default implementation throws UnsupportedOperationException for backward compatibility.
+   *
+   * @param brokerAddress The broker address to send the request to
+   * @param cursorId The cursor identifier
+   * @param offset The offset for pagination
+   * @param numRows The number of rows to fetch
+   * @return CompletableFuture containing the next page
+   * @throws UnsupportedOperationException If cursor support is not implemented
+   */
+  default CompletableFuture<CursorAwareBrokerResponse> fetchNextPageAsync(String brokerAddress, String cursorId,
+      int offset, int numRows) {
     throw new UnsupportedOperationException("Cursor operations not supported by this transport implementation");
   }
 
@@ -116,6 +132,22 @@ public interface PinotClientTransport<METRICS> {
    * @throws UnsupportedOperationException If cursor support is not implemented
    */
   default CompletableFuture<CursorAwareBrokerResponse> fetchPreviousPageAsync(String brokerAddress, String cursorId) {
+    return fetchPreviousPageAsync(brokerAddress, cursorId, -1, 1);
+  }
+
+  /**
+   * Fetches the previous page for a cursor asynchronously with specified offset and number of rows.
+   * Default implementation throws UnsupportedOperationException for backward compatibility.
+   *
+   * @param brokerAddress The broker address to send the request to
+   * @param cursorId The cursor identifier
+   * @param offset The offset for pagination
+   * @param numRows The number of rows to fetch
+   * @return CompletableFuture containing the previous page
+   * @throws UnsupportedOperationException If cursor support is not implemented
+   */
+  default CompletableFuture<CursorAwareBrokerResponse> fetchPreviousPageAsync(String brokerAddress, String cursorId,
+      int offset, int numRows) {
     throw new UnsupportedOperationException("Cursor operations not supported by this transport implementation");
   }
 
@@ -147,6 +179,22 @@ public interface PinotClientTransport<METRICS> {
    */
   default CompletableFuture<CursorAwareBrokerResponse> seekToPageAsync(String brokerAddress,
       String cursorId, int pageNumber) {
+    return seekToPageAsync(brokerAddress, cursorId, pageNumber, 1);
+  }
+
+  /**
+   * Seeks to a specific page for a cursor asynchronously with specified number of rows.
+   * Default implementation throws UnsupportedOperationException for backward compatibility.
+   *
+   * @param brokerAddress The broker address to send the request to
+   * @param cursorId The cursor identifier
+   * @param pageNumber The zero-based page number to seek to
+   * @param numRows The number of rows to fetch
+   * @return CompletableFuture containing the requested page
+   * @throws UnsupportedOperationException If cursor support is not implemented
+   */
+  default CompletableFuture<CursorAwareBrokerResponse> seekToPageAsync(String brokerAddress, String cursorId,
+      int pageNumber, int numRows) {
     throw new UnsupportedOperationException("Cursor operations not supported by this transport implementation");
   }
 

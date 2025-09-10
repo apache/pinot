@@ -157,6 +157,21 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
   }
 
   @Test
+  public void testFetchCursorResults()
+      throws Exception {
+    _responseJson = _CURSOR_RESPONSE_JSON;
+    JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
+    JsonAsyncHttpPinotClientTransport transport = (JsonAsyncHttpPinotClientTransport) factory.buildTransport();
+    CursorAwareBrokerResponse response = transport.fetchNextPage("localhost:"
+        + _dummyServer.getAddress().getPort(), "cursor-123");
+    assertNotNull(response);
+    assertTrue(_requestPath.contains("/responseStore/cursor-123/results"));
+    assertTrue(_requestPath.contains("offset=1"));
+    assertTrue(_requestPath.contains("numRows=1"));
+    assertEquals(_requestMethod, "GET");
+  }
+
+  @Test
   public void testExecuteQueryWithCursorAsync() throws Exception {
     _responseJson = _CURSOR_RESPONSE_JSON;
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
@@ -193,15 +208,13 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     _responseJson = _CURSOR_RESPONSE_JSON;
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     JsonAsyncHttpPinotClientTransport transport = (JsonAsyncHttpPinotClientTransport) factory.buildTransport();
-    CompletableFuture<BrokerResponse> future = transport.fetchCursorResultsAsync(
-        "localhost:" + _dummyServer.getAddress().getPort(), "cursor-123", 200, 25);
+    CompletableFuture<CursorAwareBrokerResponse> future = transport.fetchNextPageAsync(
+        "localhost:" + _dummyServer.getAddress().getPort(), "cursor-123");
 
-    BrokerResponse response = future.get();
+    CursorAwareBrokerResponse response = future.get();
     assertFalse(response.hasExceptions());
     assertEquals(response.getRequestId(), "cursor-123");
     assertTrue(_requestPath.contains("/responseStore/cursor-123/results"));
-    assertTrue(_requestPath.contains("offset=200"));
-    assertTrue(_requestPath.contains("numRows=25"));
     assertEquals(_requestMethod, "GET");
   }
 

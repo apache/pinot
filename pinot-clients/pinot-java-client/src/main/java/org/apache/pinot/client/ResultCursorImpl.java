@@ -104,7 +104,9 @@ public class ResultCursorImpl implements ResultCursor {
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
     try {
-      CursorAwareBrokerResponse response = cursorTransport.fetchNextPage(_brokerHostPort, getCursorId());
+      int nextOffset = (_currentPageNumber + 1) * _pageSize;
+      CursorAwareBrokerResponse response = cursorTransport.fetchNextPage(_brokerHostPort, getCursorId(),
+          nextOffset, _pageSize);
       if (response.hasExceptions() && _failOnExceptions) {
         throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
       }
@@ -131,7 +133,9 @@ public class ResultCursorImpl implements ResultCursor {
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
     try {
-      CursorAwareBrokerResponse response = cursorTransport.fetchPreviousPage(_brokerHostPort, getCursorId());
+      int prevOffset = (_currentPageNumber - 1) * _pageSize;
+      CursorAwareBrokerResponse response = cursorTransport.fetchPreviousPage(_brokerHostPort, getCursorId(),
+          prevOffset, _pageSize);
       if (response.hasExceptions() && _failOnExceptions) {
         throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
       }
@@ -158,7 +162,9 @@ public class ResultCursorImpl implements ResultCursor {
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
     try {
-      CursorAwareBrokerResponse response = cursorTransport.seekToPage(_brokerHostPort, getCursorId(), pageNumber);
+      int seekOffset = pageNumber * _pageSize;
+      CursorAwareBrokerResponse response = cursorTransport.seekToPage(_brokerHostPort, getCursorId(),
+          seekOffset, _pageSize);
       if (response.hasExceptions() && _failOnExceptions) {
         throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
       }
@@ -185,7 +191,8 @@ public class ResultCursorImpl implements ResultCursor {
 
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
-    return cursorTransport.fetchNextPageAsync(_brokerHostPort, getCursorId())
+    int nextOffset = (_currentPageNumber + 1) * _pageSize;
+    return cursorTransport.fetchNextPageAsync(_brokerHostPort, getCursorId(), nextOffset, _pageSize)
         .thenApply(response -> {
           if (response.hasExceptions() && _failOnExceptions) {
             throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
@@ -211,7 +218,8 @@ public class ResultCursorImpl implements ResultCursor {
 
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
-    return cursorTransport.fetchPreviousPageAsync(_brokerHostPort, getCursorId())
+    int prevOffset = (_currentPageNumber - 1) * _pageSize;
+    return cursorTransport.fetchPreviousPageAsync(_brokerHostPort, getCursorId(), prevOffset, _pageSize)
         .thenApply(response -> {
           if (response.hasExceptions() && _failOnExceptions) {
             throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
@@ -237,7 +245,8 @@ public class ResultCursorImpl implements ResultCursor {
 
     JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
 
-    return cursorTransport.seekToPageAsync(_brokerHostPort, getCursorId(), pageNumber)
+    int seekOffset = pageNumber * _pageSize;
+    return cursorTransport.seekToPageAsync(_brokerHostPort, getCursorId(), seekOffset, _pageSize)
         .thenApply(response -> {
           if (response.hasExceptions() && _failOnExceptions) {
             throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
