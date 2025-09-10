@@ -21,7 +21,9 @@ package org.apache.pinot.client;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.net.InetSocketAddress;
@@ -64,6 +66,7 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
   private long _responseDelayMs = 0;
   private String _requestPath = "";
   private String _requestMethod = "";
+  private String _requestBody = "";
 
   @BeforeClass
   public void setUp()
@@ -80,6 +83,7 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     _responseDelayMs = 0L;
     _requestPath = "";
     _requestMethod = "";
+    _requestBody = "";
   }
 
   @AfterClass
@@ -148,8 +152,8 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     assertFalse(response.hasExceptions());
     assertEquals(response.getRequestId(), "cursor-123");
     assertNotNull(response.getResultTable());
-    assertTrue(_requestPath.contains("getCursor=true"));
-    assertTrue(_requestPath.contains("numRows=100"));
+    assertTrue(_requestBody.contains("\"numRowsToKeep\":100"));
+    assertTrue(_requestBody.contains("\"sql\":\"select * from planets\""));
   }
 
   @Test
@@ -164,8 +168,8 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     assertFalse(response.hasExceptions());
     assertEquals(response.getRequestId(), "cursor-123");
     assertNotNull(response.getResultTable());
-    assertTrue(_requestPath.contains("getCursor=true"));
-    assertTrue(_requestPath.contains("numRows=50"));
+    assertTrue(_requestBody.contains("\"numRowsToKeep\":50"));
+    assertTrue(_requestBody.contains("\"sql\":\"select * from planets\""));
   }
 
   @Test
@@ -262,6 +266,20 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     // Capture request details for verification
     _requestPath = exchange.getRequestURI().toString();
     _requestMethod = exchange.getRequestMethod();
+
+    // Capture request body for POST requests
+    if ("POST".equals(_requestMethod)) {
+      BufferedReader reader = new BufferedReader(new InputStreamReader(exchange.getRequestBody()));
+      StringBuilder requestBody = new StringBuilder();
+      String line;
+      while ((line = reader.readLine()) != null) {
+        requestBody.append(line);
+      }
+      _requestBody = requestBody.toString();
+      reader.close();
+    } else {
+      _requestBody = "";
+    }
 
     if (_responseDelayMs > 0) {
       try {

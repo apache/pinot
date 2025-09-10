@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.client;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -186,12 +185,15 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     try {
       ObjectNode json = JsonNodeFactory.instance.objectNode();
       json.put("sql", query);
-      json.put("queryOptions", _extraOptionStr);
+      json.put("numRowsToKeep", numRows);
+      if (_extraOptionStr != null && !_extraOptionStr.isEmpty()) {
+        json.put("queryOptions", _extraOptionStr);
+      }
 
       LOGGER.debug("Cursor query will use Multistage Engine = {}", _useMultistageEngine);
 
-      String url = String.format("%s://%s%s?getCursor=true&numRows=%d", _scheme, brokerAddress,
-          _useMultistageEngine ? "/query" : "/query/sql", numRows);
+      String url = String.format("%s://%s%s", _scheme, brokerAddress,
+          _useMultistageEngine ? "/query" : "/query/sql");
       BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
       if (_headers != null) {
@@ -384,8 +386,35 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
 
   @Override
   public CompletableFuture<CursorAwareBrokerResponse> fetchNextPageAsync(String brokerAddress, String cursorId) {
-    String url = String.format("%s://%s/responseStore/%s/next", _scheme, brokerAddress, cursorId);
-    return executeCursorRequest(url);
+    try {
+      ObjectNode json = JsonNodeFactory.instance.objectNode();
+      json.put("sql", "SELECT * FROM cursor");
+      json.put("cursorId", cursorId);
+
+      String url = String.format("%s://%s%s", _scheme, brokerAddress,
+          _useMultistageEngine ? "/query" : "/query/sql");
+      BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
+
+      if (_headers != null) {
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      }
+
+      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
+          .execute().toCompletableFuture().thenApply(httpResponse -> {
+            if (httpResponse.getStatusCode() != 200) {
+              throw new PinotClientException(
+                  "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
+            }
+
+            try {
+              return CursorAwareBrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+            } catch (IOException e) {
+              throw new CompletionException(e);
+            }
+          });
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(new PinotClientException(e));
+    }
   }
 
   @Override
@@ -401,8 +430,36 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
 
   @Override
   public CompletableFuture<CursorAwareBrokerResponse> fetchPreviousPageAsync(String brokerAddress, String cursorId) {
-    String url = String.format("%s://%s/responseStore/%s/previous", _scheme, brokerAddress, cursorId);
-    return executeCursorRequest(url);
+    try {
+      ObjectNode json = JsonNodeFactory.instance.objectNode();
+      json.put("sql", "SELECT * FROM cursor");
+      json.put("cursorId", cursorId);
+      json.put("direction", "previous");
+
+      String url = String.format("%s://%s%s", _scheme, brokerAddress,
+          _useMultistageEngine ? "/query" : "/query/sql");
+      BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
+
+      if (_headers != null) {
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      }
+
+      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
+          .execute().toCompletableFuture().thenApply(httpResponse -> {
+            if (httpResponse.getStatusCode() != 200) {
+              throw new PinotClientException(
+                  "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
+            }
+
+            try {
+              return CursorAwareBrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+            } catch (IOException e) {
+              throw new CompletionException(e);
+            }
+          });
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(new PinotClientException(e));
+    }
   }
 
   @Override
@@ -417,40 +474,40 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   }
 
   @Override
-  public CompletableFuture<CursorAwareBrokerResponse> seekToPageAsync(String brokerAddress,
-      String cursorId, int pageNumber) {
-    String url = String.format("%s://%s/responseStore/%s/seek/%d", _scheme, brokerAddress, cursorId,
-        pageNumber);
-    return executeCursorRequest(url);
-  }
+  public CompletableFuture<CursorAwareBrokerResponse> seekToPageAsync(String brokerAddress, String cursorId,
+      int pageNumber) {
+    try {
+      ObjectNode json = JsonNodeFactory.instance.objectNode();
+      json.put("sql", "SELECT * FROM cursor");
+      json.put("cursorId", cursorId);
+      json.put("pageNumber", pageNumber);
 
-  /**
-   * Helper method to execute cursor navigation requests.
-   */
-  private CompletableFuture<CursorAwareBrokerResponse> executeCursorRequest(String url) {
-    BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
+      String url = String.format("%s://%s%s", _scheme, brokerAddress,
+          _useMultistageEngine ? "/query" : "/query/sql");
+      BoundRequestBuilder requestBuilder = _httpClient.preparePost(url);
 
-    if (_headers != null) {
-      _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      if (_headers != null) {
+        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
+      }
+
+      return requestBuilder.addHeader("Content-Type", "application/json; charset=utf-8").setBody(json.toString())
+          .execute().toCompletableFuture().thenApply(httpResponse -> {
+            if (httpResponse.getStatusCode() != 200) {
+              throw new PinotClientException(
+                  "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
+            }
+
+            try {
+              return CursorAwareBrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
+            } catch (IOException e) {
+              throw new CompletionException(e);
+            }
+          });
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(new PinotClientException(e));
     }
-
-    LOGGER.debug("Sending cursor request to {}", url);
-    return requestBuilder.execute().toCompletableFuture().thenApply(httpResponse -> {
-      LOGGER.debug("Completed cursor request, HTTP status is {}", httpResponse.getStatusCode());
-
-      if (httpResponse.getStatusCode() != 200) {
-        throw new PinotClientException(
-            "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
-      }
-
-      try {
-        JsonNode brokerResponse = OBJECT_READER.readTree(httpResponse.getResponseBody());
-        return CursorAwareBrokerResponse.fromJson(brokerResponse);
-      } catch (Exception e) {
-        throw new PinotClientException("Unable to parse broker response", e);
-      }
-    });
   }
+
 
   @Override
   public ClientStats getClientMetrics() {
