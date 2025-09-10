@@ -117,6 +117,8 @@ public class IngestionDelayTracker {
   private static final int INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS = 100;
   // Cache expire time for ignored segment if there is no update from the segment.
   private static final int IGNORED_SEGMENT_CACHE_TIME_MINUTES = 10;
+  // Timeout after 5 seconds while fetching the latest stream offset.
+  private static final long FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);;
 
   private final Cache<String, Boolean> _segmentsToIgnore =
       CacheBuilder.newBuilder().expireAfterAccess(IGNORED_SEGMENT_CACHE_TIME_MINUTES, TimeUnit.MINUTES).build();
@@ -157,6 +159,7 @@ public class IngestionDelayTracker {
 
     _metricsCleanupScheduler = Executors.newSingleThreadScheduledExecutor(getThreadFactory(
         "IngestionDelayMetricsRemovalThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
+    // schedule periodically to remove in-active partitions.
     _metricsCleanupScheduler.scheduleWithFixedDelay(this::timeoutInactivePartitions,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricsCleanupIntervalMs, TimeUnit.MILLISECONDS);
 
@@ -167,6 +170,7 @@ public class IngestionDelayTracker {
     }
     _ingestionDelayTrackingScheduler = Executors.newSingleThreadScheduledExecutor(
         getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
+    // schedule periodically to update latest upstream offset or create metrics for newly added partitions.
     _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, METRICS_TRACKING_INTERVAL_MS, TimeUnit.MILLISECONDS);
   }
@@ -195,7 +199,8 @@ public class IngestionDelayTracker {
       if (partitionsHosted.isEmpty()) {
         return;
       }
-      _partitionIdToLatestOffset = _streamMetadataProvider.fetchLatestStreamOffset(partitionsHosted, 5000);
+      _partitionIdToLatestOffset.putAll(_streamMetadataProvider.fetchLatestStreamOffset(partitionsHosted,
+          FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS));
     }
 
     for (Integer partitionId: partitionsHosted) {
@@ -305,7 +310,7 @@ public class IngestionDelayTracker {
       return;
     }
 
-    if (ingestionTimeMs < 0 && (currentOffset == null)) {
+    if ((ingestionTimeMs < 0) && (currentOffset == null)) {
       // Do not publish metrics if stream does not return valid ingestion time or offset.
       return;
     }
