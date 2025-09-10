@@ -118,6 +118,7 @@ public class BrokerMeter implements AbstractMetrics.Meter {
   public static final BrokerMeter UNKNOWN_COLUMN_EXCEPTIONS = create("UNKNOWN_COLUMN_EXCEPTIONS", "exceptions", false);
   // Queries preempted by accountant
   public static final BrokerMeter QUERIES_KILLED = create("QUERIES_KILLED", "query", true);
+  public static final BrokerMeter QUERIES_THROTTLED = create("QUERIES_THROTTLED", "query", true);
   // Scatter phase.
   public static final BrokerMeter NO_SERVER_FOUND_EXCEPTIONS = create(
       "NO_SERVER_FOUND_EXCEPTIONS", "exceptions", false);
