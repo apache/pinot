@@ -44,20 +44,10 @@ public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
       DataSource dataSource, int numDocs) {
     this(queryContext, predicateEvaluator, dataSource, numDocs, BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE);
   }
-  public ScanBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
-      DataSource dataSource, int numDocs, boolean ascending) {
-    this(queryContext, predicateEvaluator, dataSource, numDocs, BlockDocIdIterator.OPTIMAL_ITERATOR_BATCH_SIZE,
-        ascending);
-  }
 
   public ScanBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
       DataSource dataSource, int numDocs, int batchSize) {
-    this(queryContext, predicateEvaluator, dataSource, numDocs, batchSize, true);
-  }
-
-  public ScanBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
-      DataSource dataSource, int numDocs, int batchSize, boolean ascending) {
-    super(queryContext, dataSource, numDocs, ascending);
+    super(queryContext, dataSource, numDocs, true);
     _predicateEvaluator = predicateEvaluator;
     Preconditions.checkState(_dataSource.getForwardIndex() != null,
         "Forward index disabled for column: %s, scan based filtering not supported!",
@@ -69,9 +59,9 @@ public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
   protected BlockDocIdSet getNextBlockWithoutNullHandling() {
     DataSourceMetadata dataSourceMetadata = _dataSource.getDataSourceMetadata();
     if (dataSourceMetadata.isSingleValue()) {
-      return new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _batchSize, _ascending);
+      return new SVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _batchSize);
     } else {
-      return new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs, _ascending);
+      return new MVScanDocIdSet(_predicateEvaluator, _dataSource, _numDocs);
     }
   }
 
@@ -111,7 +101,6 @@ public class ScanBasedFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   protected BaseFilterOperator reverse() {
-    return new ScanBasedFilterOperator(_queryContext, _predicateEvaluator, _dataSource, _numDocs, _batchSize,
-        !_ascending);
+    throw new UnsupportedOperationException("Scan based filter operator does not support reverse operation");
   }
 }

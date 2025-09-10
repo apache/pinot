@@ -54,12 +54,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
-    this(segment, queryContext, predicate, numDocs, true);
-  }
-
-  public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs,
-      boolean ascending) {
-    super(numDocs, queryContext.isNullHandlingEnabled(), ascending);
+    super(numDocs, queryContext.isNullHandlingEnabled(), true);
     _queryContext = queryContext;
 
     Set<String> columns = new HashSet<>();
@@ -101,14 +96,14 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       return new NotDocIdSet(getNulls(), _numDocs);
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, _queryContext, _ascending);
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.TRUE, _queryContext);
     }
   }
 
   @Override
   protected BlockDocIdSet getNulls() {
     return new ExpressionDocIdSet(_transformFunction, null, _dataSourceMap, _numDocs,
-        ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, _queryContext, _ascending);
+        ExpressionScanDocIdIterator.PredicateEvaluationResult.NULL, _queryContext);
   }
 
   @Override
@@ -119,7 +114,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
       return getNulls();
     } else {
       return new ExpressionDocIdSet(_transformFunction, _predicateEvaluator, _dataSourceMap, _numDocs,
-          ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, _queryContext, _ascending);
+          ExpressionScanDocIdIterator.PredicateEvaluationResult.FALSE, _queryContext);
     }
   }
 

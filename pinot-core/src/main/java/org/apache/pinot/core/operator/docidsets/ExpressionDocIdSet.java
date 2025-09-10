@@ -33,11 +33,10 @@ public final class ExpressionDocIdSet extends BlockDocIdSet.Base {
 
   public ExpressionDocIdSet(TransformFunction transformFunction, @Nullable PredicateEvaluator predicateEvaluator,
       Map<String, DataSource> dataSourceMap, int numDocs,
-      ExpressionScanDocIdIterator.PredicateEvaluationResult predicateEvaluationResult, QueryContext queryContext,
-      boolean ascending) {
-    super(ascending);
+      ExpressionScanDocIdIterator.PredicateEvaluationResult predicateEvaluationResult, QueryContext queryContext) {
+    super(true);
     _docIdIterator = new ExpressionScanDocIdIterator(transformFunction, predicateEvaluator, dataSourceMap, numDocs,
-        predicateEvaluationResult, queryContext, ascending);
+        predicateEvaluationResult, queryContext);
   }
 
   @Override

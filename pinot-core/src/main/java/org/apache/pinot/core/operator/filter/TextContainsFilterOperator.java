@@ -43,12 +43,7 @@ public class TextContainsFilterOperator extends BaseFilterOperator {
   private final TextContainsPredicate _predicate;
 
   public TextContainsFilterOperator(TextIndexReader textIndexReader, TextContainsPredicate predicate, int numDocs) {
-    this(textIndexReader, predicate, numDocs, true);
-  }
-
-  public TextContainsFilterOperator(TextIndexReader textIndexReader, TextContainsPredicate predicate, int numDocs,
-      boolean ascending) {
-    super(numDocs, false, ascending);
+    super(numDocs, false, true);
     _textIndexReader = textIndexReader;
     _predicate = predicate;
   }
@@ -117,6 +112,6 @@ public class TextContainsFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BaseFilterOperator reverse() {
-    return new TextContainsFilterOperator(_textIndexReader, _predicate, _numDocs, !_ascending);
+    throw new UnsupportedOperationException("Text contains filter operator does not support reverse operation");
   }
 }

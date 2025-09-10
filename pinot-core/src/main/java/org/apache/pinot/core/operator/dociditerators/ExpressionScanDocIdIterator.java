@@ -19,6 +19,7 @@
 package org.apache.pinot.core.operator.dociditerators;
 
 import java.math.BigDecimal;
+import java.nio.channels.UnsupportedAddressTypeException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -68,11 +69,10 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   // NOTE: Number of entries scanned is not accurate because we might need to scan multiple columns in order to solve
   //       the expression, but we only track the number of entries scanned for the resolved expression.
   private long _numEntriesScanned = 0L;
-  private final boolean _ascending;
 
   public ExpressionScanDocIdIterator(TransformFunction transformFunction,
       @Nullable PredicateEvaluator predicateEvaluator, Map<String, DataSource> dataSourceMap, int numDocs,
-      PredicateEvaluationResult predicateEvaluationResult, QueryContext queryContext, boolean ascending) {
+      PredicateEvaluationResult predicateEvaluationResult, QueryContext queryContext) {
     _transformFunction = transformFunction;
     _predicateEvaluator = predicateEvaluator;
     _dataSourceMap = dataSourceMap;
@@ -80,7 +80,6 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     _predicateEvaluationResult = predicateEvaluationResult;
     _queryContext = queryContext;
     _nullHandlingEnabled = _queryContext.isNullHandlingEnabled();
-    _ascending = ascending;
   }
 
   @Override
@@ -94,9 +93,8 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     while (_blockEndDocId < _endDocId) {
       int blockStartDocId = _blockEndDocId;
       _blockEndDocId = Math.min(blockStartDocId + DocIdSetPlanNode.MAX_DOC_PER_CALL, _endDocId);
-      RangeDocIdSetOperator docIdRange = new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId, _ascending);
       try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-          docIdRange, _queryContext)) {
+          new RangeDocIdSetOperator(blockStartDocId, _blockEndDocId), _queryContext)) {
         ProjectionBlock projectionBlock = projectionOperator.nextBlock();
         RoaringBitmap matchingDocIds = new RoaringBitmap();
         processProjectionBlock(projectionBlock, matchingDocIds);
@@ -428,35 +426,21 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   private class RangeDocIdSetOperator extends BaseDocIdSetOperator {
     static final String EXPLAIN_NAME = "DOC_ID_SET_RANGE";
 
-    private final int _start;
-    private final int _end;
-    private final boolean _ascending;
-    private boolean _consumed = false;
+    DocIdSetBlock _docIdSetBlock;
 
-    RangeDocIdSetOperator(int startDocId, int endDocId, boolean ascending) {
-      _start = startDocId;
-      _end = endDocId;
-      _ascending = ascending;
+    RangeDocIdSetOperator(int startDocId, int endDocId) {
+      int numDocs = endDocId - startDocId;
+      for (int i = 0; i < numDocs; i++) {
+        _docIdBuffer[i] = startDocId + i;
+      }
+      _docIdSetBlock = new DocIdSetBlock(_docIdBuffer, numDocs);
     }
 
     @Override
     protected DocIdSetBlock getNextBlock() {
-      if (_consumed) {
-        return null;
-      }
-      _consumed = true;
-
-      int numDocs = _end - _start;
-      if (_ascending) {
-        for (int i = 0; i < numDocs; i++) {
-          _docIdBuffer[i] = _start + i;
-        }
-      } else {
-        for (int i = 0; i < numDocs; i++) {
-          _docIdBuffer[i] = _end - 1 - i;
-        }
-      }
-      return new DocIdSetBlock(_docIdBuffer, numDocs);
+      DocIdSetBlock docIdSetBlock = _docIdSetBlock;
+      _docIdSetBlock = null;
+      return docIdSetBlock;
     }
 
     @Override
@@ -471,21 +455,21 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
 
     @Override
     public boolean isAscending() {
-      return _ascending;
+      return true;
     }
 
     @Override
     public boolean isDescending() {
-      return !_ascending;
+      return false;
     }
 
     @Override
     public BaseDocIdSetOperator withOrder(boolean ascending)
-        throws IllegalArgumentException {
-      if (_ascending == ascending) {
+        throws UnsupportedOperationException {
+      if (ascending) {
         return this;
       }
-      return new RangeDocIdSetOperator(_start, _end, ascending);
+      throw new UnsupportedOperationException("RangeDocIdSetOperator does not support descending order");
     }
   }
 

@@ -27,13 +27,9 @@ import org.apache.pinot.segment.spi.datasource.DataSource;
 public final class MVScanDocIdSet extends BlockDocIdSet.Base {
   private final MVScanDocIdIterator _docIdIterator;
 
-  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, boolean ascending) {
-    super(ascending);
-    if (ascending) {
-      _docIdIterator = new MVScanDocIdIterator.Asc(predicateEvaluator, dataSource, numDocs);
-    } else {
-      _docIdIterator = new MVScanDocIdIterator.Desc(predicateEvaluator, dataSource, numDocs);
-    }
+  public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+    super(true);
+    _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs);
   }
 
   @Override

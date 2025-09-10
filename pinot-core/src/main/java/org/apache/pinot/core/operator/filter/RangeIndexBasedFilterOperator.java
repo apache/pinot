@@ -65,13 +65,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
   @SuppressWarnings("unchecked")
   public RangeIndexBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
       DataSource dataSource, int numDocs) {
-    this(queryContext, predicateEvaluator, dataSource, numDocs, true);
-  }
-
-  @SuppressWarnings("unchecked")
-  public RangeIndexBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
-      DataSource dataSource, int numDocs, boolean ascending) {
-    super(queryContext, dataSource, numDocs, ascending);
+    super(queryContext, dataSource, numDocs, true);
     _predicateEvaluator = predicateEvaluator;
     _rangeIndexReader = (RangeIndexReader<ImmutableRoaringBitmap>) dataSource.getRangeIndex();
     _parameterType = predicateEvaluator.isDictionaryBased() ? FieldSpec.DataType.INT : predicateEvaluator.getDataType();
@@ -99,7 +93,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     }
     // Need to scan the first and last range as they might be partially matched
     ScanBasedFilterOperator scanBasedFilterOperator =
-        new ScanBasedFilterOperator(_queryContext, _predicateEvaluator, _dataSource, _numDocs, _ascending);
+        new ScanBasedFilterOperator(_queryContext, _predicateEvaluator, _dataSource, _numDocs);
     BlockDocIdSet scanBasedDocIdSet = scanBasedFilterOperator.getTrues();
     MutableRoaringBitmap docIds = ((ScanBasedDocIdIterator) scanBasedDocIdSet.iterator()).applyAnd(partialMatches);
     if (matches != null) {
@@ -270,6 +264,6 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
 
   @Override
   protected BaseFilterOperator reverse() {
-    return new RangeIndexBasedFilterOperator(_queryContext, _predicateEvaluator, _dataSource, _numDocs, !_ascending);
+    throw new UnsupportedOperationException("Range index based filter operator does not support reverse operation");
   }
 }

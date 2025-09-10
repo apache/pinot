@@ -49,12 +49,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
       int numDocs) {
-    this(column, textIndexReader, predicate, numDocs, true);
-  }
-
-  public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
-      int numDocs, boolean ascending) {
-    super(numDocs, false, ascending);
+    super(numDocs, false, true);
     _column = column;
     _textIndexReader = textIndexReader;
     _predicate = predicate;
@@ -62,7 +57,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
   }
 
   public TextMatchFilterOperator(TextIndexReader textIndexReader, TextMatchPredicate predicate, int numDocs) {
-    this(null, textIndexReader, predicate, numDocs, true);
+    this(null, textIndexReader, predicate, numDocs);
   }
 
   @Override
@@ -150,6 +145,6 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BaseFilterOperator reverse() {
-    return new TextMatchFilterOperator(_column, _textIndexReader, _predicate, _numDocs, !_ascending);
+    throw new UnsupportedOperationException("Text match filter operator does not support reverse operation");
   }
 }

@@ -35,12 +35,12 @@ import org.roaringbitmap.buffer.MutableRoaringBitmap;
  * matching document ids.
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
-public abstract class SVScanDocIdIterator implements ScanBasedDocIdIterator {
+public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final PredicateEvaluator _predicateEvaluator;
   private final ForwardIndexReader _reader;
   private final ForwardIndexReaderContext _readerContext;
-  protected final int _numDocs;
-  protected final ValueMatcher _valueMatcher;
+  private final int _numDocs;
+  private final ValueMatcher _valueMatcher;
 
   /// A batch buffer used to:
   /// - Test a bunch of docIds for matches, using the ValueMatcher
@@ -48,18 +48,18 @@ public abstract class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   ///
   /// If [#_cursor] < [#_firstMismatch], then the next matching docId is at `_batch[_cursor]`. Else, we need to
   /// fill the batch with more matching docIds.
-  protected final int[] _batch;
+  private final int[] _batch;
   /// The first index in the [#_batch] that does not match the predicate. It must always be <= batch.length.
-  protected int _firstMismatch;
+  private int _firstMismatch;
   /// The cursor to the next matching docId in the [#_batch]. It must always be <= [#_firstMismatch].
-  protected int _cursor;
+  private int _cursor;
   private final int _cardinality;
 
   /// The docId we need to use the next time we need to fill the batch.
-  protected int _nextDocId = 0;
+  private int _nextDocId = 0;
   /// The number of entries scanned, i.e. the number of docIds for which we checked the value (whether it matched or
   /// not). This is used for tracking the efficiency of the scan and is exported as a statistic.
-  protected long _numEntriesScanned = 0L;
+  private long _numEntriesScanned = 0L;
 
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
     _batch = new int[batchSize];
@@ -80,6 +80,47 @@ public abstract class SVScanDocIdIterator implements ScanBasedDocIdIterator {
     _numDocs = numDocs;
     _valueMatcher = getValueMatcher();
     _cardinality = -1;
+  }
+
+  @Override
+  public int next() {
+    if (_cursor >= _firstMismatch) {
+      int limit;
+      int batchSize = 0;
+      do {
+        limit = Math.min(_numDocs - _nextDocId, _batch.length);
+        if (limit > 0) {
+          for (int i = 0; i < limit; i++) {
+            _batch[i] = _nextDocId + i;
+          }
+          batchSize = _valueMatcher.matchValues(limit, _batch);
+          _nextDocId += limit;
+          _numEntriesScanned += limit;
+        }
+      } while (limit > 0 & batchSize == 0);
+      _firstMismatch = batchSize;
+      _cursor = 0;
+      if (_firstMismatch == 0) {
+        close();
+        return Constants.EOF;
+      }
+    }
+    return _batch[_cursor++];
+  }
+
+  @Override
+  public int advance(int targetDocId) {
+    _nextDocId = targetDocId;
+    _firstMismatch = 0;
+    while (_nextDocId < _numDocs) {
+      int nextDocId = _nextDocId++;
+      _numEntriesScanned++;
+      if (_valueMatcher.doesValueMatch(nextDocId)) {
+        return nextDocId;
+      }
+    }
+    close();
+    return Constants.EOF;
   }
 
   @Override
@@ -297,109 +338,6 @@ public abstract class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   public void close() {
     if (_readerContext != null) {
       _readerContext.close();
-    }
-  }
-
-  public static final class Asc extends SVScanDocIdIterator {
-    public Asc(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
-      super(predicateEvaluator, dataSource, numDocs, batchSize);
-    }
-
-    public Asc(PredicateEvaluator predicateEvaluator, ForwardIndexReader reader, int numDocs) {
-      super(predicateEvaluator, reader, numDocs);
-    }
-
-    @Override
-    public int next() {
-      if (_cursor >= _firstMismatch) {
-        int limit;
-        int batchSize = 0;
-        do {
-          limit = Math.min(_numDocs - _nextDocId, _batch.length);
-          if (limit > 0) {
-            for (int i = 0; i < limit; i++) {
-              _batch[i] = _nextDocId + i;
-            }
-            batchSize = _valueMatcher.matchValues(limit, _batch);
-            _nextDocId += limit;
-            _numEntriesScanned += limit;
-          }
-        } while (limit > 0 & batchSize == 0);
-        _firstMismatch = batchSize;
-        _cursor = 0;
-        if (_firstMismatch == 0) {
-          close();
-          return Constants.EOF;
-        }
-      }
-      return _batch[_cursor++];
-    }
-
-    @Override
-    public int advance(int targetDocId) {
-      _nextDocId = targetDocId;
-      _firstMismatch = 0;
-      while (_nextDocId < _numDocs) {
-        int nextDocId = _nextDocId++;
-        _numEntriesScanned++;
-        if (_valueMatcher.doesValueMatch(nextDocId)) {
-          return nextDocId;
-        }
-      }
-      close();
-      return Constants.EOF;
-    }
-  }
-
-  public static final class Desc extends SVScanDocIdIterator {
-    public Desc(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
-      super(predicateEvaluator, dataSource, numDocs, batchSize);
-      _cursor = 0;
-      _firstMismatch = 0;
-      _nextDocId = numDocs - 1;
-    }
-
-    @Override
-    public int next() {
-      if (_cursor >= _firstMismatch) { // we to update the batch
-        int limit;
-        int batchSize = 0;
-        do {
-          limit = Math.min(_nextDocId + 1, _batch.length);
-          if (limit > 0) {
-            // fill batch with `limit` docIds starting from _nextDocId and going down
-            for (int i = 0; i < limit; i++) {
-              _batch[i] = _nextDocId - i;
-            }
-            batchSize = _valueMatcher.matchValues(limit, _batch);
-            _nextDocId -= limit;
-            _numEntriesScanned += limit;
-          }
-          // we stop id limit is 0 (we reached the beginning) or we have some matches in the batch
-        } while (limit > 0 & batchSize == 0);
-        _firstMismatch = batchSize;
-        _cursor = 0;
-        if (_firstMismatch == 0) { // we have stopped because we reached the beginning, the cursor won't be used anymore
-          close();
-          return Constants.EOF;
-        }
-      }
-      return _batch[_cursor++];
-    }
-
-    @Override
-    public int advance(int targetDocId) {
-      _nextDocId = targetDocId;
-      _firstMismatch = 0;
-      while (_nextDocId >= 0) {
-        int nextDocId = _nextDocId--;
-        _numEntriesScanned++;
-        if (_valueMatcher.doesValueMatch(nextDocId)) {
-          return nextDocId;
-        }
-      }
-      close();
-      return Constants.EOF;
     }
   }
 }

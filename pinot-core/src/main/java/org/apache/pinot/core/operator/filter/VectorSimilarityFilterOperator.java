@@ -56,12 +56,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
   public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
       int numDocs) {
-    this(vectorIndexReader, predicate, numDocs, true);
-  }
-
-  public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
-      int numDocs, boolean ascending) {
-    super(numDocs, false, ascending);
+    super(numDocs, false, true);
     _vectorIndexReader = vectorIndexReader;
     _predicate = predicate;
     _matches = null;
@@ -140,6 +135,6 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BaseFilterOperator reverse() {
-    return new VectorSimilarityFilterOperator(_vectorIndexReader, _predicate, _numDocs, !_ascending);
+    throw new UnsupportedOperationException("Vector similarity filter operator does not support reversing");
   }
 }
