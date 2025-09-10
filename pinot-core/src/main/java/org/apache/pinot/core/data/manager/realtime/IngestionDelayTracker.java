@@ -136,34 +136,35 @@ public class IngestionDelayTracker {
   private final StreamMetadataProvider _streamMetadataProvider;
 
   private ScheduledExecutorService _ingestionDelayTrackingScheduler = null;
-  private Clock _clock;
+  private Clock _clock = Clock.systemUTC();
 
   private volatile Set<Integer> _partitionsHostedByThisServer = new HashSet<>();
-  private volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
 
-  @VisibleForTesting
+  protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
+
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, Supplier<Boolean> isServerReadyToServeQueries)
       throws RuntimeException {
+    this(serverMetrics, tableNameWithType, realtimeTableDataManager, METRICS_CLEANUP_INTERVAL_MS,
+        isServerReadyToServeQueries);
+  }
+
+  @VisibleForTesting
+  public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
+      RealtimeTableDataManager realtimeTableDataManager, long metricsCleanupIntervalMs,
+      Supplier<Boolean> isServerReadyToServeQueries) {
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
     _metricName = tableNameWithType;
     _realTimeTableDataManager = realtimeTableDataManager;
-    _clock = Clock.systemUTC();
     _isServerReadyToServeQueries = isServerReadyToServeQueries;
 
     _metricsCleanupScheduler = Executors.newSingleThreadScheduledExecutor(
         getThreadFactory("IngestionDelayMetricsRemovalThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
     _metricsCleanupScheduler.scheduleWithFixedDelay(this::timeoutInactivePartitions,
-        INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, METRICS_CLEANUP_INTERVAL_MS, TimeUnit.MILLISECONDS);
+        INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricsCleanupIntervalMs, TimeUnit.MILLISECONDS);
 
-    Map<String, String> streamConfigMap = IngestionConfigUtils.getFirstStreamConfigMap(
-        realtimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
-    String clientId;
-    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
-    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
-    clientId = IngestionConfigUtils.getTableTopicUniqueClientId(IngestionDelayTracker.class.getSimpleName(), streamConfig);
-    _streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(clientId);
+    _streamMetadataProvider = createStreamMetadataProvider(tableNameWithType, realtimeTableDataManager);
 
     if (_streamMetadataProvider.supportsOffsetLag()) {
       _partitionIdToLatestOffset = new HashMap<>();
@@ -172,6 +173,16 @@ public class IngestionDelayTracker {
         getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
     _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, METRICS_TRACKING_INTERVAL_MS, TimeUnit.MILLISECONDS);
+  }
+
+  @VisibleForTesting
+  StreamMetadataProvider createStreamMetadataProvider(String tableNameWithType, RealtimeTableDataManager realtimeTableDataManager) {
+    Map<String, String> streamConfigMap = IngestionConfigUtils.getFirstStreamConfigMap(
+        realtimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
+    StreamConfig streamConfig = new StreamConfig(tableNameWithType, streamConfigMap);
+    StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
+    String clientId = IngestionConfigUtils.getTableTopicUniqueClientId(IngestionDelayTracker.class.getSimpleName(), streamConfig);
+    return streamConsumerFactory.createStreamMetadataProvider(clientId);
   }
 
   private void trackIngestionDelay() {

@@ -58,6 +58,11 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   }
 
   @Override
+  public boolean supportsOffsetLag() {
+    return false;
+  }
+
+  @Override
   public void close()
       throws IOException {
   }
