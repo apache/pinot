@@ -293,14 +293,11 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    * @param segmentName name of the consuming segment
    * @param partitionId partition id of the consuming segment (directly passed in to avoid parsing the segment name)
    * @param ingestionTimeMs ingestion time of the last consumed message (from {@link StreamMessageMetadata})
-   * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
-   *                                   {@link StreamMessageMetadata})
    * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
    */
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
-      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
-    _ingestionDelayTracker.updateMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
-        currentOffset);
+      @Nullable StreamPartitionMsgOffset currentOffset) {
+    _ingestionDelayTracker.updateMetrics(segmentName, partitionId, ingestionTimeMs, currentOffset);
   }
 
   /**

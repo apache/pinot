@@ -93,20 +93,15 @@ public class IngestionDelayTracker {
 
   private static class IngestionInfo {
     volatile long _ingestionTimeMs;
-    volatile long _firstStreamIngestionTimeMs;
     volatile StreamPartitionMsgOffset _currentOffset;
 
-    IngestionInfo(long ingestionTimeMs, long firstStreamIngestionTimeMs,
-        @Nullable StreamPartitionMsgOffset currentOffset) {
+    IngestionInfo(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
       _ingestionTimeMs = ingestionTimeMs;
-      _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
       _currentOffset = currentOffset;
     }
 
-    void update(long ingestionTimeMs, long firstStreamIngestionTimeMs,
-        @Nullable StreamPartitionMsgOffset currentOffset) {
+    void update(long ingestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
       _ingestionTimeMs = ingestionTimeMs;
-      _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
       _currentOffset = currentOffset;
     }
   }
@@ -315,19 +310,17 @@ public class IngestionDelayTracker {
    * @param segmentName name of the consuming segment
    * @param partitionId partition id of the consuming segment (directly passed in to avoid parsing the segment name)
    * @param ingestionTimeMs ingestion time of the last consumed message (from {@link StreamMessageMetadata})
-   * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
-   *                                   {@link StreamMessageMetadata})
    * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
    */
   public void updateMetrics(String segmentName, int partitionId, long ingestionTimeMs,
-      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
+      @Nullable StreamPartitionMsgOffset currentOffset) {
     if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
       // or once the table data manager has been shutdown.
       return;
     }
 
-    if (ingestionTimeMs < 0 && firstStreamIngestionTimeMs < 0 && (currentOffset == null)) {
+    if (ingestionTimeMs < 0 && (currentOffset == null)) {
       // Do not publish metrics if stream does not return valid ingestion time or offset.
       return;
     }
@@ -342,9 +335,9 @@ public class IngestionDelayTracker {
           createMetrics(partitionId);
           return true;
         });
-        return new IngestionInfo(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset);
+        return new IngestionInfo(ingestionTimeMs, currentOffset);
       }
-      v.update(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset);
+      v.update(ingestionTimeMs, currentOffset);
       return v;
     });
 
@@ -455,18 +448,6 @@ public class IngestionDelayTracker {
   public long getPartitionIngestionDelayMs(int partitionId) {
     IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
     return ingestionInfo != null ? getIngestionDelayMs(ingestionInfo._ingestionTimeMs) : 0;
-  }
-
-  /**
-   * Method to get end to end ingestion delay for a given partition.
-   *
-   * @param partitionId partition for which we are retrieving the delay
-   *
-   * @return End to end ingestion delay in milliseconds for the given partition ID.
-   */
-  public long getPartitionEndToEndIngestionDelayMs(int partitionId) {
-    IngestionInfo ingestionInfo = _ingestionInfoMap.get(partitionId);
-    return ingestionInfo != null ? getIngestionDelayMs(ingestionInfo._firstStreamIngestionTimeMs) : 0;
   }
 
   public long getPartitionIngestionOffsetLag(int partitionId) {

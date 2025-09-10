@@ -29,18 +29,16 @@ import org.apache.pinot.spi.data.readers.GenericRow;
  */
 public class StreamMessageMetadata {
   private final long _recordIngestionTimeMs;
-  private final long _firstStreamRecordIngestionTimeMs;
   private final int _recordSerializedSize;
   private final StreamPartitionMsgOffset _offset;
   private final StreamPartitionMsgOffset _nextOffset;
   private final GenericRow _headers;
   private final Map<String, String> _metadata;
 
-  private StreamMessageMetadata(long recordIngestionTimeMs, long firstStreamRecordIngestionTimeMs,
-      StreamPartitionMsgOffset offset, StreamPartitionMsgOffset nextOffset, int recordSerializedSize,
-      @Nullable GenericRow headers, @Nullable Map<String, String> metadata) {
+  private StreamMessageMetadata(long recordIngestionTimeMs, StreamPartitionMsgOffset offset,
+      StreamPartitionMsgOffset nextOffset, int recordSerializedSize, @Nullable GenericRow headers,
+      @Nullable Map<String, String> metadata) {
     _recordIngestionTimeMs = recordIngestionTimeMs;
-    _firstStreamRecordIngestionTimeMs = firstStreamRecordIngestionTimeMs;
     _offset = offset;
     _nextOffset = nextOffset;
     _recordSerializedSize = recordSerializedSize;
@@ -50,10 +48,6 @@ public class StreamMessageMetadata {
 
   public long getRecordIngestionTimeMs() {
     return _recordIngestionTimeMs;
-  }
-
-  public long getFirstStreamRecordIngestionTimeMs() {
-    return _firstStreamRecordIngestionTimeMs;
   }
 
   public int getRecordSerializedSize() {
@@ -80,7 +74,6 @@ public class StreamMessageMetadata {
 
   public static class Builder {
     private long _recordIngestionTimeMs = Long.MIN_VALUE;
-    private long _firstStreamRecordIngestionTimeMs = Long.MIN_VALUE;
     private StreamPartitionMsgOffset _offset;
     private StreamPartitionMsgOffset _nextOffset;
     private int _recordSerializedSize = Integer.MIN_VALUE;
@@ -89,11 +82,6 @@ public class StreamMessageMetadata {
 
     public Builder setRecordIngestionTimeMs(long recordIngestionTimeMs) {
       _recordIngestionTimeMs = recordIngestionTimeMs;
-      return this;
-    }
-
-    public Builder setFirstStreamRecordIngestionTimeMs(long firstStreamRecordIngestionTimeMs) {
-      _firstStreamRecordIngestionTimeMs = firstStreamRecordIngestionTimeMs;
       return this;
     }
 
@@ -120,8 +108,8 @@ public class StreamMessageMetadata {
 
     public StreamMessageMetadata build() {
       assert _offset != null && _nextOffset != null;
-      return new StreamMessageMetadata(_recordIngestionTimeMs, _firstStreamRecordIngestionTimeMs, _offset, _nextOffset,
-          _recordSerializedSize, _headers, _metadata);
+      return new StreamMessageMetadata(_recordIngestionTimeMs, _offset, _nextOffset, _recordSerializedSize, _headers,
+          _metadata);
     }
   }
 }
