@@ -31,7 +31,7 @@
 
   <groupId>org.apache.pinot</groupId>
   <artifactId>pinot</artifactId>
-  <version>1.4.0-SNAPSHOT</version>
+  <version>1.5.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Pinot</name>
   <description>A realtime distributed OLAP datastore</description>
@@ -147,11 +147,11 @@
     <zkclient.version>0.11</zkclient.version>
     <jackson.version>2.20.0</jackson.version>
     <zookeeper.version>3.9.4</zookeeper.version>
-    <async-http-client.version>3.0.2</async-http-client.version>
+    <async-http-client.version>3.0.3</async-http-client.version>
     <jersey.version>2.47</jersey.version>
     <hk2.version>2.6.1</hk2.version>
     <swagger.version>1.6.16</swagger.version>
-    <swagger-ui.version>5.28.0</swagger-ui.version>
+    <swagger-ui.version>5.28.1</swagger-ui.version>
     <hadoop.version>3.4.2</hadoop.version>
     <jsonpath.version>2.9.0</jsonpath.version>
     <jsonsmart.version>2.6.0</jsonsmart.version>
@@ -178,7 +178,7 @@
     <audienceannotations.version>0.15.1</audienceannotations.version>
     <clp-ffi.version>0.4.7</clp-ffi.version>
     <stax2-api.version>4.2.2</stax2-api.version>
-    <aws.sdk.version>2.33.3</aws.sdk.version>
+    <aws.sdk.version>2.33.5</aws.sdk.version>
     <azure.sdk.version>1.2.38</azure.sdk.version>
     <azure.msal4j.version>1.23.0</azure.msal4j.version>
     <joda-time.version>2.14.0</joda-time.version>
