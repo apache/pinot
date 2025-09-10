@@ -297,11 +297,6 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
    */
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
       @Nullable StreamPartitionMsgOffset currentOffset) {
-    try {
-      Thread.sleep(10000);
-    } catch (InterruptedException e) {
-      throw new RuntimeException(e);
-    }
     _ingestionDelayTracker.updateMetrics(segmentName, partitionId, ingestionTimeMs, currentOffset);
   }
 

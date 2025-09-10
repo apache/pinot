@@ -220,23 +220,6 @@ public class IngestionDelayTracker {
   }
 
   /**
-   * Helper function to get the ingestion delay for a given ingestion time.
-   * Ingestion delay == Current Time - Ingestion Time
-   *
-   * @param ingestionTimeMs original ingestion time in milliseconds.
-   */
-  private long getIngestionDelayMs(long ingestionTimeMs) {
-    if (ingestionTimeMs < 0) {
-      return 0;
-    }
-    // Compute aged delay for current partition
-    long agedIngestionDelayMs = _clock.millis() - ingestionTimeMs;
-    // Correct to zero for any time shifts due to NTP or time reset.
-    agedIngestionDelayMs = Math.max(agedIngestionDelayMs, 0);
-    return agedIngestionDelayMs;
-  }
-
-  /**
    * Helper function to be called when we should stop tracking a given partition. Removes the partition from
    * all our maps.
    *
