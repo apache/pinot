@@ -34,8 +34,8 @@ import org.roaringbitmap.IntIterator;
 import org.roaringbitmap.RoaringBitmap;
 import org.roaringbitmap.RoaringBitmapWriter;
 
-
-public class DescDocIdSetOperator extends BaseDocIdSetOperator {
+/// A doc id set operator that reverses an ascending filter operator to produce doc ids in descending order.
+public class ReverseDocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -48,8 +48,9 @@ public class DescDocIdSetOperator extends BaseDocIdSetOperator {
   private int _currentDocId = 0;
   private IntIterator _reverseIterator;
 
-  public DescDocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
+  public ReverseDocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
     Preconditions.checkArgument(maxSizeOfDocIdSet > 0 && maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
+    Preconditions.checkArgument(filterOperator.isAscending(), "Filter operator must be in ascending order");
     _filterOperator = filterOperator;
     _maxSizeOfDocIdSet = maxSizeOfDocIdSet;
   }
@@ -81,17 +82,19 @@ public class DescDocIdSetOperator extends BaseDocIdSetOperator {
 
   private void initializeBitmap() {
     _blockDocIdSet = _filterOperator.nextBlock().getBlockDocIdSet();
-    BlockDocIdIterator iterator = _blockDocIdSet.iterator();
-    if (iterator instanceof BitmapBasedDocIdIterator) {
-      _reverseIterator = ((BitmapBasedDocIdIterator) iterator).getDocIds().getReverseIntIterator();
-    } else {
-      RoaringBitmapWriter<RoaringBitmap> writer = RoaringBitmapWriter.writer().get();
-      int docId = iterator.next();
-      while (docId != Constants.EOF) {
-        writer.add(docId);
-        docId = iterator.next();
+    try (BlockDocIdIterator iterator = _blockDocIdSet.iterator()) {
+      if (iterator instanceof BitmapBasedDocIdIterator) {
+        // This is the most common case when the filter can be fully resolved using indexes
+        _reverseIterator = ((BitmapBasedDocIdIterator) iterator).getDocIds().getReverseIntIterator();
+      } else {
+        RoaringBitmapWriter<RoaringBitmap> writer = RoaringBitmapWriter.writer().get();
+        int docId = iterator.next();
+        while (docId != Constants.EOF) {
+          writer.add(docId);
+          docId = iterator.next();
+        }
+        _reverseIterator = writer.get().getReverseIntIterator();
       }
-      _reverseIterator = writer.get().getReverseIntIterator();
     }
   }
 
