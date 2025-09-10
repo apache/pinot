@@ -92,31 +92,26 @@ import org.slf4j.LoggerFactory;
 public class IngestionDelayTracker {
 
   private static class IngestionInfo {
-    long _ingestionTimeMs;
-    long _firstStreamIngestionTimeMs;
-    StreamPartitionMsgOffset _currentOffset;
+    volatile long _ingestionTimeMs;
+    volatile long _firstStreamIngestionTimeMs;
+    volatile StreamPartitionMsgOffset _currentOffset;
 
     IngestionInfo(long ingestionTimeMs, long firstStreamIngestionTimeMs,
-        @Nullable StreamPartitionMsgOffset currentOffset, @Nullable StreamPartitionMsgOffset latestOffset) {
+        @Nullable StreamPartitionMsgOffset currentOffset) {
       _ingestionTimeMs = ingestionTimeMs;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
       _currentOffset = currentOffset;
     }
 
-    IngestionInfo() {
-    }
-
-    void update(long ingestionTimeMs, long firstStreamIngestionTimeMs, StreamPartitionMsgOffset currentOffset,
-        StreamPartitionMsgOffset latestOffset) {
+    void update(long ingestionTimeMs, long firstStreamIngestionTimeMs,
+        @Nullable StreamPartitionMsgOffset currentOffset) {
       _ingestionTimeMs = ingestionTimeMs;
       _firstStreamIngestionTimeMs = firstStreamIngestionTimeMs;
       _currentOffset = currentOffset;
     }
   }
 
-
   private static final Logger LOGGER = LoggerFactory.getLogger(IngestionDelayTracker.class);
-
   // Sleep interval for scheduled executor service thread that triggers read of ideal state
   private static final long METRICS_CLEANUP_INTERVAL_MS = TimeUnit.MINUTES.toMillis(5); // 5 minutes +/- precision in timeouts
   private static final long METRICS_TRACKING_INTERVAL_MS = TimeUnit.SECONDS.toMillis(30); // 30 seconds +/- precision in timeouts
@@ -124,37 +119,27 @@ public class IngestionDelayTracker {
   private static final int PARTITION_TIMEOUT_MS = 600000;          // 10 minutes timeouts
   // Delay scheduled executor service for this amount of time after starting service
   private static final int INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS = 100;
-
   // Cache expire time for ignored segment if there is no update from the segment.
   private static final int IGNORED_SEGMENT_CACHE_TIME_MINUTES = 10;
 
-  // Per partition info for all partitions active for the current table.
-  private final Map<Integer, IngestionInfo> _ingestionInfoMap = new ConcurrentHashMap<>();
-
-  // We mark partitions that go from CONSUMING to ONLINE in _partitionsMarkedForVerification: if they do not
-  // go back to CONSUMING in some period of time, we verify whether they are still hosted in this server by reading
-  // ideal state. This is done with the goal of minimizing reading ideal state for efficiency reasons.
-  // TODO: Consider removing this mechanism after releasing 1.2.0, and use {@link #stopTrackingPartitionIngestionDelay}
-  //       instead.
-  private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
-
   private final Cache<String, Boolean> _segmentsToIgnore =
       CacheBuilder.newBuilder().expireAfterAccess(IGNORED_SEGMENT_CACHE_TIME_MINUTES, TimeUnit.MINUTES).build();
-
-  // TODO: Make thread pool a server/cluster level config
-  // ScheduledExecutorService to check partitions that are inactive against ideal state.
+  private final Map<Integer, Boolean> _partitionsTracked = new ConcurrentHashMap<>();;
+  private final Map<Integer, IngestionInfo> _ingestionInfoMap = new ConcurrentHashMap<>();
+  private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _metricsCleanupScheduler;
-  private ScheduledExecutorService _ingestionDelayTrackingScheduler = null;
-
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
   private final String _metricName;
-
   private final RealtimeTableDataManager _realTimeTableDataManager;
   private final Supplier<Boolean> _isServerReadyToServeQueries;
   private final StreamMetadataProvider _streamMetadataProvider;
 
+  private ScheduledExecutorService _ingestionDelayTrackingScheduler = null;
   private Clock _clock;
+
+  private volatile Set<Integer> _partitionsHostedByThisServer = new HashSet<>();
+  private volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
 
   @VisibleForTesting
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
@@ -179,21 +164,15 @@ public class IngestionDelayTracker {
     StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
     clientId = IngestionConfigUtils.getTableTopicUniqueClientId(IngestionDelayTracker.class.getSimpleName(), streamConfig);
     _streamMetadataProvider = streamConsumerFactory.createStreamMetadataProvider(clientId);
-    _partitionsTracked = new ConcurrentHashMap<>();
-    _partitionIdToLatestOffset = new ConcurrentHashMap<>();
 
     if (_streamMetadataProvider.supportsOffsetLag()) {
       _partitionIdToLatestOffset = new HashMap<>();
-      _ingestionDelayTrackingScheduler = Executors.newSingleThreadScheduledExecutor(
-          getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
-      _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
-          INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, METRICS_TRACKING_INTERVAL_MS, TimeUnit.MILLISECONDS);
     }
+    _ingestionDelayTrackingScheduler = Executors.newSingleThreadScheduledExecutor(
+        getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
+    _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
+        INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, METRICS_TRACKING_INTERVAL_MS, TimeUnit.MILLISECONDS);
   }
-
-  private Set<Integer> _partitionsHostedByThisServer;
-  private Map<Integer, Boolean> _partitionsTracked;
-  private Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
 
   private void trackIngestionDelay() {
     Set<Integer> partitionsHosted = _partitionsHostedByThisServer;
@@ -209,7 +188,7 @@ public class IngestionDelayTracker {
 
     for (Integer partitionId: partitionsHosted) {
       _partitionsTracked.computeIfAbsent(partitionId, k -> {
-        createIngestionMetrics(partitionId);
+        createMetrics(partitionId);
         return true;
       });
     }
@@ -252,17 +231,21 @@ public class IngestionDelayTracker {
    * @param partitionId partition ID which we should stop tracking.
    */
   private void removePartitionId(int partitionId) {
-    _ingestionInfoMap.compute(partitionId, (k, v) -> {
+    _partitionsTracked.compute(partitionId, (k, v) -> {
       if (v != null) {
         // Remove all metrics associated with this partition
+        if (_streamMetadataProvider.supportsOffsetLag()) {
+          _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
+          _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
+          _serverMetrics.removePartitionGauge(_metricName, partitionId,
+              ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
+        }
         _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
         _serverMetrics.removePartitionGauge(_metricName, partitionId,
             ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
-        _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG);
-        _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET);
-        _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
         LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
       }
+      _ingestionInfoMap.remove(partitionId);
       return null;
     });
 
@@ -296,7 +279,7 @@ public class IngestionDelayTracker {
     _clock = clock;
   }
 
-  public void createIngestionMetrics(int partitionId) {
+  public void createMetrics(int partitionId) {
     if (_streamMetadataProvider.supportsOffsetLag()) {
       _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
           () -> getPartitionIngestionOffsetLag(partitionId));
@@ -320,18 +303,16 @@ public class IngestionDelayTracker {
    * @param firstStreamIngestionTimeMs ingestion time of the last consumed message in the first stream (from
    *                                   {@link StreamMessageMetadata})
    * @param currentOffset offset of the last consumed message (from {@link StreamMessageMetadata})
-   * @param latestOffset offset of the latest message in the partition (from {@link StreamMetadataProvider})
    */
-  public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
-      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
-      @Nullable StreamPartitionMsgOffset latestOffset) {
+  public void updateMetrics(String segmentName, int partitionId, long ingestionTimeMs,
+      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset) {
     if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
       // or once the table data manager has been shutdown.
       return;
     }
 
-    if (ingestionTimeMs < 0 && firstStreamIngestionTimeMs < 0 && (currentOffset == null || latestOffset == null)) {
+    if (ingestionTimeMs < 0 && firstStreamIngestionTimeMs < 0 && (currentOffset == null)) {
       // Do not publish metrics if stream does not return valid ingestion time or offset.
       return;
     }
@@ -342,12 +323,13 @@ public class IngestionDelayTracker {
         return v;
       }
       if (v == null) {
-        createIngestionMetrics(partitionId);
-        return new IngestionInfo(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset, latestOffset);
+        _partitionsTracked.computeIfAbsent(partitionId, pid -> {
+          createMetrics(partitionId);
+          return true;
+        });
+        return new IngestionInfo(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset);
       }
-
-      v.update(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset, latestOffset);
-
+      v.update(ingestionTimeMs, firstStreamIngestionTimeMs, currentOffset);
       return v;
     });
 
@@ -361,7 +343,7 @@ public class IngestionDelayTracker {
    *
    * @param partitionId partition id that we should stop tracking.
    */
-  public void stopTrackingPartitionIngestionDelay(int partitionId) {
+  public void stopTrackingPartition(int partitionId) {
     removePartitionId(partitionId);
   }
 
@@ -371,7 +353,7 @@ public class IngestionDelayTracker {
    *
    * @return Set of partitionIds for which ingestion metrics were removed.
    */
-  public Set<Integer> stopTrackingIngestionDelayForAllPartitions() {
+  public Set<Integer> stopTrackingForAllPartitions() {
     Set<Integer> removedPartitionIds = new HashSet<>(_ingestionInfoMap.keySet());
     for (Integer partitionId : _ingestionInfoMap.keySet()) {
       removePartitionId(partitionId);
@@ -384,7 +366,7 @@ public class IngestionDelayTracker {
    * when we want to stop tracking the ingestion delay for a partition when the segment might still be consuming, e.g.
    * when the new consuming segment is created on a different server.
    */
-  public void stopTrackingPartitionIngestionDelay(String segmentName) {
+  public void stopTrackingPartition(String segmentName) {
     _segmentsToIgnore.put(segmentName, true);
     removePartitionId(new LLCSegmentName(segmentName).getPartitionGroupId());
   }
