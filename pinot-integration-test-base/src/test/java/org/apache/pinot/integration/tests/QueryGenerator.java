@@ -1049,8 +1049,11 @@ public class QueryGenerator {
         int indexToReplaceWithRegex = 1 + _random.nextInt(value.length() - 2);
         String regex = value.substring(1, indexToReplaceWithRegex) + ".*" + value.substring(indexToReplaceWithRegex + 1,
             value.length() - 1);
-        String regexpPredicate = String.format(" REGEXP_LIKE(%s, '%s')", columnName, regex);
-        String h2RegexpPredicate = String.format(" REGEXP_LIKE(`%s`, '%s', 'i')", columnName, regex);
+        boolean caseSensitive = _random.nextBoolean();
+        String regexpPredicate =
+            String.format(" REGEXP_LIKE(%s, '%s', '%s')", columnName, regex, caseSensitive ? "c" : "i");
+        String h2RegexpPredicate =
+            String.format(" REGEXP_LIKE(`%s`, '%s', '%s')", columnName, regex, caseSensitive ? "c" : "i");
         return new StringQueryFragment(regexpPredicate, h2RegexpPredicate);
       } else {
         String equalsPredicate = String.format("%s = %s", columnName, value);
