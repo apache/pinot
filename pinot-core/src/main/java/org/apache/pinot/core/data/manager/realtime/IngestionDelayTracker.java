@@ -119,11 +119,13 @@ public class IngestionDelayTracker {
   // Cache expire time for ignored segment if there is no update from the segment.
   private static final int IGNORED_SEGMENT_CACHE_TIME_MINUTES = 10;
   // Timeout after 5 seconds while fetching the latest stream offset.
-  private static final long FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);;
+  private static final long FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
 
   private final Cache<String, Boolean> _segmentsToIgnore =
       CacheBuilder.newBuilder().expireAfterAccess(IGNORED_SEGMENT_CACHE_TIME_MINUTES, TimeUnit.MINUTES).build();
+  // Map to describe the partitions for which the metrics are being reported.
   private final Map<Integer, Boolean> _partitionsTracked = new ConcurrentHashMap<>();
+  // Map to hold the ingestion info reported by the consumer.
   private final Map<Integer, IngestionInfo> _ingestionInfoMap = new ConcurrentHashMap<>();
   private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
   private final ScheduledExecutorService _metricsCleanupScheduler;
@@ -132,25 +134,25 @@ public class IngestionDelayTracker {
   private final String _metricName;
   private final RealtimeTableDataManager _realTimeTableDataManager;
   private final Supplier<Boolean> _isServerReadyToServeQueries;
-  private final StreamMetadataProvider _streamMetadataProvider;
 
   private ScheduledExecutorService _ingestionDelayTrackingScheduler = null;
   private Clock _clock = Clock.systemUTC();
 
-  private volatile Set<Integer> _partitionsHostedByThisServer = new HashSet<>();
+  protected volatile Set<Integer> _partitionsHostedByThisServer = new HashSet<>();
 
+  protected final StreamMetadataProvider _streamMetadataProvider;
   protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
       RealtimeTableDataManager realtimeTableDataManager, Supplier<Boolean> isServerReadyToServeQueries)
       throws RuntimeException {
     this(serverMetrics, tableNameWithType, realtimeTableDataManager, METRICS_CLEANUP_INTERVAL_MS,
-        isServerReadyToServeQueries);
+        METRICS_TRACKING_INTERVAL_MS, isServerReadyToServeQueries);
   }
 
   @VisibleForTesting
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager realtimeTableDataManager, long metricsCleanupIntervalMs,
+      RealtimeTableDataManager realtimeTableDataManager, long metricsCleanupIntervalMs, long metricTrackingIntervalMs,
       Supplier<Boolean> isServerReadyToServeQueries) {
     _serverMetrics = serverMetrics;
     _tableNameWithType = tableNameWithType;
@@ -173,7 +175,7 @@ public class IngestionDelayTracker {
         getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
     // schedule periodically to update latest upstream offset or create metrics for newly added partitions.
     _ingestionDelayTrackingScheduler.scheduleWithFixedDelay(this::trackIngestionDelay,
-        INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, METRICS_TRACKING_INTERVAL_MS, TimeUnit.MILLISECONDS);
+        INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricTrackingIntervalMs, TimeUnit.MILLISECONDS);
   }
 
   @VisibleForTesting
@@ -189,10 +191,9 @@ public class IngestionDelayTracker {
   }
 
   private void trackIngestionDelay() {
-    if(!_isServerReadyToServeQueries.get()) {
+    if (!_isServerReadyToServeQueries.get()) {
       return;
     }
-
     Set<Integer> partitionsHosted = _partitionsHostedByThisServer;
 
     if (_ingestionInfoMap.size() > partitionsHosted.size()) {
@@ -208,7 +209,7 @@ public class IngestionDelayTracker {
           FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS));
     }
 
-    for (Integer partitionId: partitionsHosted) {
+    for (Integer partitionId : partitionsHosted) {
       _partitionsTracked.computeIfAbsent(partitionId, k -> {
         createMetrics(partitionId);
         return true;
