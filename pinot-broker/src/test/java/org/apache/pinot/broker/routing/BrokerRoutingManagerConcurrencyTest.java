@@ -19,6 +19,8 @@
 package org.apache.pinot.broker.routing;
 
 import java.lang.reflect.Field;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -35,6 +37,8 @@ import org.apache.pinot.broker.routing.timeboundary.TimeBoundaryManager;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.BrokerRequest;
+import org.apache.pinot.common.request.QuerySource;
 import org.apache.pinot.controller.helix.ControllerTest;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.config.table.TableConfig;
@@ -51,6 +55,9 @@ import org.testng.Assert;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Test class to validate concurrency and race condition handling in BrokerRoutingManager,
@@ -113,21 +120,36 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
 
   private void addServerInstancesToCluster() {
     // Add server instances that will be referenced in IdealState and ExternalView
-    String serverInstanceId = "Server_localhost_8000";
     String clusterName = getHelixClusterName();
 
-    // Add server instance to Helix cluster
-    if (!_helixAdmin.getInstancesInCluster(clusterName).contains(serverInstanceId)) {
+    // Add Server_localhost_8000
+    String serverInstanceId1 = "Server_localhost_8000";
+    if (!_helixAdmin.getInstancesInCluster(clusterName).contains(serverInstanceId1)) {
       // Create InstanceConfig for the server
-      InstanceConfig instanceConfig = new InstanceConfig(serverInstanceId);
-      instanceConfig.setHostName("localhost");
-      instanceConfig.setPort("8000");
-      instanceConfig.setInstanceEnabled(true);
+      InstanceConfig instanceConfig1 = new InstanceConfig(serverInstanceId1);
+      instanceConfig1.setHostName("localhost");
+      instanceConfig1.setPort("8000");
+      instanceConfig1.setInstanceEnabled(true);
 
-      _helixAdmin.addInstance(clusterName, instanceConfig);
+      _helixAdmin.addInstance(clusterName, instanceConfig1);
 
       // Mark the instance as live (simulate server joining)
-      _helixAdmin.enableInstance(clusterName, serverInstanceId, true);
+      _helixAdmin.enableInstance(clusterName, serverInstanceId1, true);
+    }
+
+    // Add Server_localhost_8001
+    String serverInstanceId2 = "Server_localhost_8001";
+    if (!_helixAdmin.getInstancesInCluster(clusterName).contains(serverInstanceId2)) {
+      // Create InstanceConfig for the server
+      InstanceConfig instanceConfig2 = new InstanceConfig(serverInstanceId2);
+      instanceConfig2.setHostName("localhost");
+      instanceConfig2.setPort("8001");
+      instanceConfig2.setInstanceEnabled(true);
+
+      _helixAdmin.addInstance(clusterName, instanceConfig2);
+
+      // Mark the instance as live (simulate server joining)
+      _helixAdmin.enableInstance(clusterName, serverInstanceId2, true);
     }
   }
 
@@ -189,6 +211,85 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     // Store in ZooKeeper through Helix
     _helixDataAccessor.setProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType), idealState);
     _helixDataAccessor.setProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType), externalView);
+  }
+
+  private void createIdealStateAndExternalViewWithMultipleServers(String tableNameWithType, String server1,
+      String server2) {
+    // Create IdealState with multiple servers
+    IdealState idealState = new IdealState(tableNameWithType);
+    idealState.setStateModelDefRef("OnlineOffline");
+    idealState.setRebalanceMode(IdealState.RebalanceMode.CUSTOMIZED);
+    idealState.setNumPartitions(1);
+    idealState.setPartitionState("newSegment_0", server1, "ONLINE");
+    idealState.setPartitionState("newSegment_0", server2, "ONLINE");
+
+    // Create ExternalView with multiple servers
+    ExternalView externalView = new ExternalView(tableNameWithType);
+    externalView.setState("newSegment_0", server1, "ONLINE");
+    externalView.setState("newSegment_0", server2, "ONLINE");
+
+    // Store in ZooKeeper through Helix
+    _helixDataAccessor.setProperty(_helixDataAccessor.keyBuilder().idealStates(tableNameWithType), idealState);
+    _helixDataAccessor.setProperty(_helixDataAccessor.keyBuilder().externalView(tableNameWithType), externalView);
+  }
+
+  private void validateDisabledInstanceNotInRouting(String tableNameWithType, String disabledInstance) {
+    try {
+      Object routingEntry = getRoutingEntry(tableNameWithType);
+      Assert.assertNotNull(routingEntry, "Routing entry should exist for table: " + tableNameWithType);
+
+      // Get the InstanceSelector from the routing entry
+      java.lang.reflect.Field instanceSelectorField = routingEntry.getClass().getDeclaredField("_instanceSelector");
+      instanceSelectorField.setAccessible(true);
+      Object instanceSelector = instanceSelectorField.get(routingEntry);
+      Assert.assertNotNull(instanceSelector, "InstanceSelector should exist");
+
+      // Get the _enabledInstances field from BaseInstanceSelector
+      java.lang.reflect.Field enabledInstancesField =
+          instanceSelector.getClass().getSuperclass().getDeclaredField("_enabledInstances");
+      enabledInstancesField.setAccessible(true);
+      Object enabledInstancesObj = enabledInstancesField.get(instanceSelector);
+
+      if (enabledInstancesObj != null) {
+        @SuppressWarnings("unchecked")
+        java.util.Set<String> enabledInstances = (java.util.Set<String>) enabledInstancesObj;
+        Assert.assertFalse(enabledInstances.contains(disabledInstance),
+            "Disabled instance " + disabledInstance + " should NOT be in enabled instances for table "
+                + tableNameWithType + ". Enabled instances: " + enabledInstances);
+      }
+    } catch (Exception e) {
+      Assert.fail("Failed to validate disabled instance exclusion for table " + tableNameWithType + ": "
+          + e.getMessage());
+    }
+  }
+
+  private void validateEnabledInstanceInRouting(String tableNameWithType, String enabledInstance) {
+    try {
+      Object routingEntry = getRoutingEntry(tableNameWithType);
+      Assert.assertNotNull(routingEntry, "Routing entry should exist for table: " + tableNameWithType);
+
+      // Get the InstanceSelector from the routing entry
+      java.lang.reflect.Field instanceSelectorField = routingEntry.getClass().getDeclaredField("_instanceSelector");
+      instanceSelectorField.setAccessible(true);
+      Object instanceSelector = instanceSelectorField.get(routingEntry);
+      Assert.assertNotNull(instanceSelector, "InstanceSelector should exist");
+
+      // Get the _enabledInstances field from BaseInstanceSelector
+      java.lang.reflect.Field enabledInstancesField =
+          instanceSelector.getClass().getSuperclass().getDeclaredField("_enabledInstances");
+      enabledInstancesField.setAccessible(true);
+      Object enabledInstancesObj = enabledInstancesField.get(instanceSelector);
+
+      Assert.assertNotNull(enabledInstancesObj, "Enabled instances should not be null for table " + tableNameWithType);
+      @SuppressWarnings("unchecked")
+      java.util.Set<String> enabledInstances = (java.util.Set<String>) enabledInstancesObj;
+      Assert.assertTrue(enabledInstances.contains(enabledInstance),
+          "Enabled instance " + enabledInstance + " should be in enabled instances for table "
+              + tableNameWithType + ". Enabled instances: " + enabledInstances);
+    } catch (Exception e) {
+      Assert.fail("Failed to validate enabled instance inclusion for table " + tableNameWithType + ": "
+          + e.getMessage());
+    }
   }
 
   private void createSegmentMetadata(String tableNameWithType, String segmentName, long endTime) {
@@ -343,6 +444,244 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     Assert.assertEquals(startTimes.get(tableNameWithType).longValue(), futureStart);
   }
 
+  /**
+   * Test concurrent interactions between processSegmentAssignmentChange and buildRouting.
+   * This validates that the global read lock (for processSegmentAssignmentChange) and
+   * per-table locks (for buildRouting) work correctly together without deadlocks.
+   */
+  @Test
+  public void testConcurrentProcessSegmentAssignmentChangeAndBuildRouting() throws Exception {
+    clearRoutingEntries();
+
+    // First, build initial routing entries for both tables
+    _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+    _routingManager.buildRouting(REALTIME_TABLE_NAME);
+
+    Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE_NAME), "Initial offline routing should exist");
+    Assert.assertTrue(_routingManager.routingExists(REALTIME_TABLE_NAME), "Initial realtime routing should exist");
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(3);
+
+    AtomicReference<Exception> segmentAssignmentException = new AtomicReference<>();
+    AtomicReference<Exception> buildRoutingOfflineException = new AtomicReference<>();
+    AtomicReference<Exception> buildRoutingRealtimeException = new AtomicReference<>();
+
+    try {
+      // Thread 1: Process segment assignment change (takes global read lock, per-raw-table-name lock for each table one
+      // at a time)
+      Future<?> segmentAssignmentTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global read lock
+          _routingManager.processClusterChange(ChangeType.IDEAL_STATE);
+        } catch (Exception e) {
+          segmentAssignmentException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Build routing for offline table (takes per-table lock)
+      Future<?> buildOfflineTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take per-raw-table-name lock for OFFLINE table
+          _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+        } catch (Exception e) {
+          buildRoutingOfflineException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Build routing for realtime table (takes same per-table lock)
+      Future<?> buildRealtimeTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take per-raw-table-name lock for REALTIME table
+          _routingManager.buildRouting(REALTIME_TABLE_NAME);
+        } catch (Exception e) {
+          buildRoutingRealtimeException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(10, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (segmentAssignmentException.get() != null) {
+        Assert.fail("Segment assignment change failed: " + segmentAssignmentException.get().getMessage());
+      }
+      if (buildRoutingOfflineException.get() != null) {
+        Assert.fail("Offline table build failed: " + buildRoutingOfflineException.get().getMessage());
+      }
+      if (buildRoutingRealtimeException.get() != null) {
+        Assert.fail("Realtime table build failed: " + buildRoutingRealtimeException.get().getMessage());
+      }
+
+      // Verify routing entries still exist after concurrent operations
+      Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE_NAME),
+          "Offline routing should exist after concurrent operations");
+      Assert.assertTrue(_routingManager.routingExists(REALTIME_TABLE_NAME),
+          "Realtime routing should exist after concurrent operations");
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
+    }
+  }
+
+  /**
+   * Test concurrent interactions between processInstanceConfigChange and buildRouting where buildRouting adds a new
+   * table.
+   * This validates that the global write lock (for processInstanceConfigChange) and
+   * per-table locks (for buildRouting) work correctly together, especially when buildRouting creates new routing
+   * entries.
+   */
+  @Test
+  public void testConcurrentProcessInstanceConfigChangeAndBuildRoutingNewTable() throws Exception {
+    clearRoutingEntries();
+
+    // Add additional server instances for this test
+    String enabledServerInstance = "Server_localhost_8000";  // Already added in setUp()
+    String disabledServerInstance = "Server_localhost_8001"; // We'll add and then disable this one
+
+    String clusterName = getHelixClusterName();
+
+    // Add the second server instance
+    if (!_helixAdmin.getInstancesInCluster(clusterName).contains(disabledServerInstance)) {
+      InstanceConfig disabledInstanceConfig = new InstanceConfig(disabledServerInstance);
+      disabledInstanceConfig.setHostName("localhost");
+      disabledInstanceConfig.setPort("8001");
+      disabledInstanceConfig.setInstanceEnabled(true); // Initially enabled
+
+      _helixAdmin.addInstance(clusterName, disabledInstanceConfig);
+      _helixAdmin.enableInstance(clusterName, disabledServerInstance, true);
+    }
+
+    // Create test table configs for the new tables we'll add during concurrent operations
+    String newOfflineTable = "newTestTable_OFFLINE";
+    String newRealtimeTable = "newTestTable_REALTIME";
+
+    TableConfig newOfflineConfig = createTableConfig(newOfflineTable, TableType.OFFLINE);
+    TableConfig newRealtimeConfig = createTableConfig(newRealtimeTable, TableType.REALTIME);
+
+    ZKMetadataProvider.setTableConfig(_propertyStore, newOfflineConfig);
+    ZKMetadataProvider.setTableConfig(_propertyStore, newRealtimeConfig);
+
+    // Create and upload schemas for the new tables
+    Schema newSchema = createMockSchema();
+    newSchema.setSchemaName(TableNameBuilder.extractRawTableName(newOfflineTable));
+    ZKMetadataProvider.setSchema(_propertyStore, newSchema);
+
+    // Create IdealState and ExternalView for the new tables with both servers
+    createIdealStateAndExternalViewWithMultipleServers(newOfflineTable, enabledServerInstance,
+        disabledServerInstance);
+    createIdealStateAndExternalViewWithMultipleServers(newRealtimeTable, enabledServerInstance,
+        disabledServerInstance);
+
+    // Create segment metadata
+    createSegmentMetadata(newOfflineTable, "newSegment_0", System.currentTimeMillis());
+    createSegmentMetadata(newRealtimeTable, "newSegment_0", System.currentTimeMillis());
+
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(3);
+
+    AtomicReference<Exception> instanceConfigException = new AtomicReference<>();
+    AtomicReference<Exception> buildNewOfflineException = new AtomicReference<>();
+    AtomicReference<Exception> buildNewRealtimeException = new AtomicReference<>();
+
+    // Disable one of the server instances before starting concurrent operations
+    _helixAdmin.enableInstance(clusterName, disabledServerInstance, false);
+
+    try {
+      // Thread 1: Process instance config change (takes global write lock and per-raw-table-name locks for each table
+      // one at a time)
+      Future<?> instanceConfigTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global write lock and process the disabled instance
+          _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+        } catch (Exception e) {
+          instanceConfigException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Build routing for new offline table (takes per-table lock and adds new entry)
+      Future<?> buildNewOfflineTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take per-table lock and create new routing entry
+          _routingManager.buildRouting(newOfflineTable);
+        } catch (Exception e) {
+          buildNewOfflineException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Build routing for new realtime table (takes per-table lock and adds new entry)
+      Future<?> buildNewRealtimeTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take per-table lock and create new routing entry
+          _routingManager.buildRouting(newRealtimeTable);
+        } catch (Exception e) {
+          buildNewRealtimeException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(15, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (instanceConfigException.get() != null) {
+        Assert.fail("Instance config change failed: " + instanceConfigException.get().getMessage());
+      }
+      if (buildNewOfflineException.get() != null) {
+        Assert.fail("New offline table build failed: " + buildNewOfflineException.get().getMessage());
+      }
+      if (buildNewRealtimeException.get() != null) {
+        Assert.fail("New realtime table build failed: " + buildNewRealtimeException.get().getMessage());
+      }
+
+      // Verify new routing entries were created successfully
+      Assert.assertTrue(_routingManager.routingExists(newOfflineTable),
+          "New offline routing should exist after concurrent operations");
+      Assert.assertTrue(_routingManager.routingExists(newRealtimeTable),
+          "New realtime routing should exist after concurrent operations");
+
+      // Verify TimeBoundaryManager coordination for the new hybrid table
+      Object newOfflineEntry = getRoutingEntry(newOfflineTable);
+      Assert.assertNotNull(newOfflineEntry, "New offline routing entry should exist");
+      if (_routingManager.routingExists(newRealtimeTable)) {
+        TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(newOfflineEntry);
+        Assert.assertNotNull(timeBoundaryManager,
+            "New offline table should have TimeBoundaryManager when realtime exists");
+      }
+
+      // CRITICAL: Verify that the disabled instance is NOT included in the routing entries
+      validateDisabledInstanceNotInRouting(newOfflineTable, disabledServerInstance);
+      validateDisabledInstanceNotInRouting(newRealtimeTable, disabledServerInstance);
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
+    }
+  }
+
   private TableConfig createTableConfig(String tableNameWithType, TableType tableType) {
     return new TableConfigBuilder(tableType)
         .setTableName(TableNameBuilder.extractRawTableName(tableNameWithType))
@@ -380,6 +719,495 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
       return (TimeBoundaryManager) method.invoke(routingEntry);
     } catch (Exception e) {
       throw new RuntimeException("Failed to access TimeBoundaryManager", e);
+    }
+  }
+
+  /**
+   * Test concurrent interactions between excludeServerFromRouting (global write lock) and buildRouting
+   * (global read lock + per-table lock).
+   * This validates that global write lock properly blocks global read lock operations.
+   */
+  @Test
+  public void testConcurrentExcludeServerAndBuildRouting() throws Exception {
+    clearRoutingEntries();
+
+    String disabledServerInstance = "Server_localhost_8001"; // We'll disable this one
+
+    // First, build initial routing entries for both tables
+    _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+    _routingManager.buildRouting(REALTIME_TABLE_NAME);
+
+    Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE_NAME), "Initial offline routing should exist");
+    Assert.assertTrue(_routingManager.routingExists(REALTIME_TABLE_NAME), "Initial realtime routing should exist");
+
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(3);
+
+    AtomicReference<Exception> excludeServerException = new AtomicReference<>();
+    AtomicReference<Exception> buildOfflineException = new AtomicReference<>();
+    AtomicReference<Exception> buildRealtimeException = new AtomicReference<>();
+
+    // CRITICAL: Verify that the to be disabled instance is currently included in the routing entries
+    validateEnabledInstanceInRouting(OFFLINE_TABLE_NAME, disabledServerInstance);
+    validateEnabledInstanceInRouting(REALTIME_TABLE_NAME, disabledServerInstance);
+
+    try {
+      // Thread 1: Exclude server from routing (takes global write lock)
+      Future<?> excludeServerTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global write lock
+          _routingManager.excludeServerFromRouting(disabledServerInstance);
+        } catch (Exception e) {
+          excludeServerException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Build routing for offline table (takes global read lock + per-table lock)
+      Future<?> buildOfflineTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global read lock + per-table lock
+          _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+        } catch (Exception e) {
+          buildOfflineException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Build routing for realtime table (takes global read lock + per-table lock)
+      Future<?> buildRealtimeTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global read lock + different per-table lock
+          _routingManager.buildRouting(REALTIME_TABLE_NAME);
+        } catch (Exception e) {
+          buildRealtimeException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(10, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (excludeServerException.get() != null) {
+        Assert.fail("Exclude server failed: " + excludeServerException.get().getMessage());
+      }
+      if (buildOfflineException.get() != null) {
+        Assert.fail("Build offline routing failed: " + buildOfflineException.get().getMessage());
+      }
+      if (buildRealtimeException.get() != null) {
+        Assert.fail("Build realtime routing failed: " + buildRealtimeException.get().getMessage());
+      }
+
+      // Verify routing entries still exist after operations
+      Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE_NAME),
+          "Offline routing should exist after exclude server operation");
+      Assert.assertTrue(_routingManager.routingExists(REALTIME_TABLE_NAME),
+          "Realtime routing should exist after exclude server operation");
+
+      // CRITICAL: Verify that the disabled instance is NOT included in the routing entries
+      validateDisabledInstanceNotInRouting(OFFLINE_TABLE_NAME, disabledServerInstance);
+      validateDisabledInstanceNotInRouting(REALTIME_TABLE_NAME, disabledServerInstance);
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
+    }
+  }
+
+  /**
+   * Test concurrent interactions between includeServerToRouting (global write lock) and refreshSegment
+   * (global read lock + per-table lock).
+   * This validates proper coordination between global write operations and segment refresh operations.
+   */
+  @Test
+  public void testConcurrentIncludeServerAndRefreshSegment() throws Exception {
+    clearRoutingEntries();
+
+    String includedServerInstance = "Server_localhost_8001"; // We'll include this one
+
+    // First exclude the server so we can include it later and validate the inclusion
+    _routingManager.excludeServerFromRouting(includedServerInstance);
+
+    // Build initial routing entries
+    _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+    _routingManager.buildRouting(REALTIME_TABLE_NAME);
+
+    // Verify server is initially excluded from routing
+    validateDisabledInstanceNotInRouting(OFFLINE_TABLE_NAME, includedServerInstance);
+    validateDisabledInstanceNotInRouting(REALTIME_TABLE_NAME, includedServerInstance);
+
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(3);
+
+    AtomicReference<Exception> includeServerException = new AtomicReference<>();
+    AtomicReference<Exception> refreshOfflineException = new AtomicReference<>();
+    AtomicReference<Exception> refreshRealtimeException = new AtomicReference<>();
+
+    try {
+      // Thread 1: Include server to routing (takes global write lock)
+      Future<?> includeServerTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global write lock
+          _routingManager.includeServerToRouting(includedServerInstance);
+        } catch (Exception e) {
+          includeServerException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Refresh segment for offline table (takes global read lock + per-table lock)
+      Future<?> refreshOfflineTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global read lock + per-table lock
+          _routingManager.refreshSegment(OFFLINE_TABLE_NAME, "segment_0");
+        } catch (Exception e) {
+          refreshOfflineException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Refresh segment for realtime table (takes global read lock + per-table lock)
+      Future<?> refreshRealtimeTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global read lock + different per-table lock
+          _routingManager.refreshSegment(REALTIME_TABLE_NAME, "segment_0");
+        } catch (Exception e) {
+          refreshRealtimeException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(10, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (includeServerException.get() != null) {
+        Assert.fail("Include server failed: " + includeServerException.get().getMessage());
+      }
+      if (refreshOfflineException.get() != null) {
+        Assert.fail("Refresh offline segment failed: " + refreshOfflineException.get().getMessage());
+      }
+      if (refreshRealtimeException.get() != null) {
+        Assert.fail("Refresh realtime segment failed: " + refreshRealtimeException.get().getMessage());
+      }
+
+      // CRITICAL: Verify that the included instance IS now included in the routing entries
+      validateEnabledInstanceInRouting(OFFLINE_TABLE_NAME, includedServerInstance);
+      validateEnabledInstanceInRouting(REALTIME_TABLE_NAME, includedServerInstance);
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
+    }
+  }
+
+  /**
+   * Test concurrent query operations (getRoutingTable, getTimeBoundaryInfo, getQueryTimeoutMs) during routing
+   * modifications. This validates that query path operations can execute concurrently and are not blocked by
+   * routing modifications.
+   */
+  @Test
+  public void testConcurrentQueryOperationsDuringRoutingModifications() throws Exception {
+    clearRoutingEntries();
+
+    // Build initial routing entries
+    _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+    _routingManager.buildRouting(REALTIME_TABLE_NAME);
+
+    ExecutorService executor = Executors.newFixedThreadPool(6);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(6);
+
+    AtomicReference<Exception> buildRoutingException = new AtomicReference<>();
+    AtomicReference<Exception> refreshSegmentException = new AtomicReference<>();
+    AtomicReference<Exception> getRoutingTableException = new AtomicReference<>();
+    AtomicReference<Exception> getTimeBoundaryException = new AtomicReference<>();
+    AtomicReference<Exception> getQueryTimeoutException = new AtomicReference<>();
+    AtomicReference<Exception> removeRoutingException = new AtomicReference<>();
+
+    // Create a mock broker request for testing
+    BrokerRequest brokerRequest = mock(BrokerRequest.class);
+    QuerySource querySource = mock(QuerySource.class);
+    when(brokerRequest.getQuerySource()).thenReturn(querySource);
+    when(querySource.getTableName()).thenReturn(OFFLINE_TABLE_NAME);
+
+    try {
+      // Thread 1: Build routing (takes global read lock + per-table lock)
+      Future<?> buildRoutingTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          for (int i = 0; i < 5; i++) {
+            _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+            Thread.sleep(10);
+          }
+        } catch (Exception e) {
+          buildRoutingException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Refresh segment (takes global read lock + per-table lock)
+      Future<?> refreshSegmentTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          for (int i = 0; i < 5; i++) {
+            _routingManager.refreshSegment(REALTIME_TABLE_NAME, "segment_" + i);
+            Thread.sleep(10);
+          }
+        } catch (Exception e) {
+          refreshSegmentException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Get routing table (read-only, no locks in query path)
+      Future<?> getRoutingTableTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          for (int i = 0; i < 10; i++) {
+            _routingManager.getRoutingTable(brokerRequest, i);
+            Thread.sleep(5);
+          }
+        } catch (Exception e) {
+          getRoutingTableException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 4: Get time boundary info (read-only, no locks in query path)
+      Future<?> getTimeBoundaryTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          for (int i = 0; i < 10; i++) {
+            _routingManager.getTimeBoundaryInfo(OFFLINE_TABLE_NAME);
+            Thread.sleep(5);
+          }
+        } catch (Exception e) {
+          getTimeBoundaryException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 5: Get query timeout (read-only, no locks in query path)
+      Future<?> getQueryTimeoutTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          for (int i = 0; i < 10; i++) {
+            _routingManager.getQueryTimeoutMs(OFFLINE_TABLE_NAME);
+            _routingManager.getQueryTimeoutMs(REALTIME_TABLE_NAME);
+            Thread.sleep(5);
+          }
+        } catch (Exception e) {
+          getQueryTimeoutException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 6: Remove routing (takes global read lock + per-table lock)
+      Future<?> removeRoutingTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(50); // Let other operations run first
+          _routingManager.removeRouting(REALTIME_TABLE_NAME);
+        } catch (Exception e) {
+          removeRoutingException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(15, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (buildRoutingException.get() != null) {
+        Assert.fail("Build routing failed: " + buildRoutingException.get().getMessage());
+      }
+      if (refreshSegmentException.get() != null) {
+        Assert.fail("Refresh segment failed: " + refreshSegmentException.get().getMessage());
+      }
+      if (getRoutingTableException.get() != null) {
+        Assert.fail("Get routing table failed: " + getRoutingTableException.get().getMessage());
+      }
+      if (getTimeBoundaryException.get() != null) {
+        Assert.fail("Get time boundary failed: " + getTimeBoundaryException.get().getMessage());
+      }
+      if (getQueryTimeoutException.get() != null) {
+        Assert.fail("Get query timeout failed: " + getQueryTimeoutException.get().getMessage());
+      }
+      if (removeRoutingException.get() != null) {
+        Assert.fail("Remove routing failed: " + removeRoutingException.get().getMessage());
+      }
+
+      // Verify offline routing still exists but realtime was removed
+      Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE_NAME),
+          "Offline routing should still exist after concurrent operations");
+      Assert.assertFalse(_routingManager.routingExists(REALTIME_TABLE_NAME),
+          "Realtime routing should not exist after concurrent operations");
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
+    }
+  }
+
+  /**
+   * Test concurrent interactions between two global write lock methods: processInstanceConfigChange and
+   * includeServerToRouting. This validates that global write lock methods are properly serialized and don't
+   * cause deadlocks or race conditions.
+   */
+  @Test
+  public void testConcurrentGlobalWriteLockMethods() throws Exception {
+    clearRoutingEntries();
+
+    // Build initial routing entries
+    _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+    _routingManager.buildRouting(REALTIME_TABLE_NAME);
+
+    // First exclude a server so we can include it later
+    _routingManager.excludeServerFromRouting("Server_localhost_8000");
+
+    ExecutorService executor = Executors.newFixedThreadPool(3);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(3);
+
+    AtomicReference<Exception> processInstanceConfigException = new AtomicReference<>();
+    AtomicReference<Exception> includeServerException = new AtomicReference<>();
+    AtomicReference<Exception> excludeServerException = new AtomicReference<>();
+
+    // Track execution order to verify serialization
+    List<String> executionOrder = new ArrayList<>();
+
+    try {
+      // Thread 1: Process instance config change (takes global write lock)
+      Future<?> processInstanceConfigTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          synchronized (executionOrder) {
+            executionOrder.add("processInstanceConfigChange_start");
+          }
+          // This should take global write lock
+          _routingManager.processClusterChange(ChangeType.INSTANCE_CONFIG);
+          synchronized (executionOrder) {
+            executionOrder.add("processInstanceConfigChange_end");
+          }
+        } catch (Exception e) {
+          processInstanceConfigException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Include server to routing (takes global write lock)
+      Future<?> includeServerTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(10); // Small delay to encourage different ordering
+          synchronized (executionOrder) {
+            executionOrder.add("includeServerToRouting_start");
+          }
+          // This should take global write lock and be serialized with processInstanceConfigChange
+          _routingManager.includeServerToRouting("Server_localhost_8000");
+          synchronized (executionOrder) {
+            executionOrder.add("includeServerToRouting_end");
+          }
+        } catch (Exception e) {
+          includeServerException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Exclude another server (takes global write lock)
+      Future<?> excludeServerTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(20); // Small delay to encourage different ordering
+          synchronized (executionOrder) {
+            executionOrder.add("excludeServerFromRouting_start");
+          }
+          // This should take global write lock and be serialized with other global write operations
+          _routingManager.excludeServerFromRouting("Server_localhost_8001");
+          synchronized (executionOrder) {
+            executionOrder.add("excludeServerFromRouting_end");
+          }
+        } catch (Exception e) {
+          excludeServerException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(15, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (processInstanceConfigException.get() != null) {
+        Assert.fail("Process instance config failed: " + processInstanceConfigException.get().getMessage());
+      }
+      if (includeServerException.get() != null) {
+        Assert.fail("Include server failed: " + includeServerException.get().getMessage());
+      }
+      if (excludeServerException.get() != null) {
+        Assert.fail("Exclude server failed: " + excludeServerException.get().getMessage());
+      }
+
+      // Verify that operations were properly serialized (no interleaving of start/end events)
+      Assert.assertEquals(executionOrder.size(), 6, "Should have 6 execution events (3 starts, 3 ends)");
+
+      // Validate that each operation completed before the next one started
+      // (no _start event should occur between another operation's _start and _end)
+      for (int i = 0; i < executionOrder.size(); i += 2) {
+        String startEvent = executionOrder.get(i);
+        String endEvent = executionOrder.get(i + 1);
+        Assert.assertTrue(startEvent.endsWith("_start"), "Event at position " + i + " should be a start event");
+        Assert.assertTrue(endEvent.endsWith("_end"), "Event at position " + (i + 1) + " should be an end event");
+
+        // Extract operation name (everything before the last underscore)
+        String startOperation = startEvent.substring(0, startEvent.lastIndexOf("_"));
+        String endOperation = endEvent.substring(0, endEvent.lastIndexOf("_"));
+        Assert.assertEquals(startOperation, endOperation, "Start and end events should be for the same operation");
+      }
+
+      // Verify routing entries still exist and are properly updated
+      Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE_NAME),
+          "Offline routing should exist after concurrent global write operations");
+      Assert.assertTrue(_routingManager.routingExists(REALTIME_TABLE_NAME),
+          "Realtime routing should exist after concurrent global write operations");
+
+      System.out.println("Global write lock methods executed in order: " + executionOrder);
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
     }
   }
 }
