@@ -104,7 +104,7 @@ import org.slf4j.LoggerFactory;
  *
  * LOCK ORDERING RULE: Always acquire locks in this order to prevent deadlocks:
  * 1. _globalLock (read or write)
- * 2. _routingTableBuildLocks (per logical table, where logical table is the rawTableName)
+ * 2. _routingTableBuildLocks (per rawTableName, grouping OFFLINE and REALTIME tables under a single lock)
  * Never hold table locks when trying to acquire global lock.
  *
  * TODO: Expose RoutingEntry class to get a consistent view in the broker request handler and save the redundant map
