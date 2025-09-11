@@ -824,8 +824,8 @@ public final class TableConfigUtils {
 
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-            .containsKey(InstancePartitionsType.COMPLETED),
-        "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
+            .containsKey(InstancePartitionsType.COMPLETED.name()),
+        "COMPLETED instance partitions can't be configured for upsert / dedup tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
     validateTTLForDedupConfig(tableConfig, schema);
