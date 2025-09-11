@@ -20,6 +20,8 @@ package org.apache.pinot.broker.routing;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -45,8 +47,12 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DateTimeFieldSpec;
 import org.apache.pinot.spi.data.FieldSpec;
+import org.apache.pinot.spi.data.LogicalTableConfig;
+import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.mockito.Mock;
@@ -375,11 +381,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
       Assert.assertNotNull(offlineEntry, "Offline routing entry should exist");
 
       // If realtime table was built, offline should have TimeBoundaryManager
-      if (_routingManager.routingExists(REALTIME_TABLE_NAME)) {
-        TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(offlineEntry);
-        Assert.assertNotNull(timeBoundaryManager, "Offline table should have TimeBoundaryManager when realtime table "
-            + "exists - this indicates a race condition in cross-table coordination");
-      }
+      TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(offlineEntry);
+      Assert.assertNotNull(timeBoundaryManager, "Offline table should have TimeBoundaryManager when realtime table "
+          + "exists - this indicates a race condition in cross-table coordination");
     } finally {
       executor.shutdown();
       Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
@@ -530,6 +534,16 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
           "Offline routing should exist after concurrent operations");
       Assert.assertTrue(_routingManager.routingExists(REALTIME_TABLE_NAME),
           "Realtime routing should exist after concurrent operations");
+
+      // CRITICAL VERIFICATION: Check TimeBoundaryManager coordination
+      // The offline table should have a TimeBoundaryManager when realtime table exists
+      Object offlineEntry = getRoutingEntry(OFFLINE_TABLE_NAME);
+      Assert.assertNotNull(offlineEntry, "Offline routing entry should exist");
+
+      // If realtime table was built, offline should have TimeBoundaryManager
+      TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(offlineEntry);
+      Assert.assertNotNull(timeBoundaryManager, "Offline table should have TimeBoundaryManager when realtime table "
+          + "exists - this indicates a race condition in cross-table coordination");
     } finally {
       executor.shutdown();
       Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
@@ -667,11 +681,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
       // Verify TimeBoundaryManager coordination for the new hybrid table
       Object newOfflineEntry = getRoutingEntry(newOfflineTable);
       Assert.assertNotNull(newOfflineEntry, "New offline routing entry should exist");
-      if (_routingManager.routingExists(newRealtimeTable)) {
-        TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(newOfflineEntry);
-        Assert.assertNotNull(timeBoundaryManager,
-            "New offline table should have TimeBoundaryManager when realtime exists");
-      }
+      TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(newOfflineEntry);
+      Assert.assertNotNull(timeBoundaryManager,
+          "New offline table should have TimeBoundaryManager when realtime exists");
 
       // CRITICAL: Verify that the disabled instance is NOT included in the routing entries
       validateDisabledInstanceNotInRouting(newOfflineTable, disabledServerInstance);
@@ -814,6 +826,16 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
           "Offline routing should exist after exclude server operation");
       Assert.assertTrue(_routingManager.routingExists(REALTIME_TABLE_NAME),
           "Realtime routing should exist after exclude server operation");
+
+      // CRITICAL VERIFICATION: Check TimeBoundaryManager coordination
+      // The offline table should have a TimeBoundaryManager when realtime table exists
+      Object offlineEntry = getRoutingEntry(OFFLINE_TABLE_NAME);
+      Assert.assertNotNull(offlineEntry, "Offline routing entry should exist");
+
+      // If realtime table was built, offline should have TimeBoundaryManager
+      TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(offlineEntry);
+      Assert.assertNotNull(timeBoundaryManager, "Offline table should have TimeBoundaryManager when realtime table "
+          + "exists - this indicates a race condition in cross-table coordination");
 
       // CRITICAL: Verify that the disabled instance is NOT included in the routing entries
       validateDisabledInstanceNotInRouting(OFFLINE_TABLE_NAME, disabledServerInstance);
@@ -1071,6 +1093,16 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
           "Offline routing should still exist after concurrent operations");
       Assert.assertFalse(_routingManager.routingExists(REALTIME_TABLE_NAME),
           "Realtime routing should not exist after concurrent operations");
+
+      // CRITICAL VERIFICATION: Check TimeBoundaryManager coordination
+      // The offline table should have a TimeBoundaryManager when realtime table exists
+      Object offlineEntry = getRoutingEntry(OFFLINE_TABLE_NAME);
+      Assert.assertNotNull(offlineEntry, "Offline routing entry should exist");
+
+      // If realtime table wasn't built, offline shouldn't have TimeBoundaryManager
+      TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(offlineEntry);
+      Assert.assertNull(timeBoundaryManager, "Offline table shouldn't have TimeBoundaryManager when realtime table "
+          + "doesn't exist - this indicates a race condition in cross-table coordination");
     } finally {
       executor.shutdown();
       Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
@@ -1209,5 +1241,560 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
       executor.shutdown();
       Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
     }
+  }
+
+  /**
+   * Test concurrent interactions between buildRoutingForLogicalTable and buildRouting.
+   * This validates proper coordination between logical table operations, regular table operations,
+   * and global write operations. Uses a hybrid logical table configuration with both offline and realtime tables.
+   */
+  @Test
+  public void testConcurrentLogicalTableBuildAndRegularBuild() throws Exception {
+    clearRoutingEntries();
+
+    String logicalTableName = "testLogicalTable";
+    String physicalOfflineTable = "testLogicalTable_OFFLINE";
+    String physicalRealtimeTable = "testLogicalTable_REALTIME";
+
+    // Create hybrid logical table config with both offline and realtime tables
+    LogicalTableConfig logicalTableConfig = createLogicalTableConfig(logicalTableName,
+        Map.of(
+            "testLogicalTable", new PhysicalTableConfig()
+        ), physicalOfflineTable, physicalRealtimeTable);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+
+    // Create physical table configs and schemas
+    TableConfig offlineTableConfig = createTableConfig(physicalOfflineTable, TableType.OFFLINE);
+    TableConfig realtimeTableConfig = createTableConfig(physicalRealtimeTable, TableType.REALTIME);
+    ZKMetadataProvider.setTableConfig(_propertyStore, offlineTableConfig);
+    ZKMetadataProvider.setTableConfig(_propertyStore, realtimeTableConfig);
+
+    // Create schemas for each physical table
+    Schema offlineSchema = createMockSchema();
+    offlineSchema.setSchemaName(TableNameBuilder.extractRawTableName(physicalOfflineTable));
+    ZKMetadataProvider.setSchema(_propertyStore, offlineSchema);
+
+    Schema realtimeSchema = createMockSchema();
+    realtimeSchema.setSchemaName(TableNameBuilder.extractRawTableName(physicalRealtimeTable));
+    ZKMetadataProvider.setSchema(_propertyStore, realtimeSchema);
+
+    // Create ideal states and external views for physical tables
+    createIdealStateAndExternalView(physicalOfflineTable);
+    createIdealStateAndExternalView(physicalRealtimeTable);
+
+    ExecutorService executor = Executors.newFixedThreadPool(5);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(5);
+
+    AtomicReference<Exception> logicalBuildException = new AtomicReference<>();
+    AtomicReference<Exception> regularBuildException = new AtomicReference<>();
+    AtomicReference<Exception> refreshOfflineException = new AtomicReference<>();
+    AtomicReference<Exception> refreshRealtimeException = new AtomicReference<>();
+    AtomicReference<Exception> excludeServerException = new AtomicReference<>();
+
+    try {
+      // Thread 1: Build routing for logical table (global read lock + per-table locks for both physical tables)
+      Future<?> logicalBuildTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global read lock + per-table locks for both physical tables
+          _routingManager.buildRoutingForLogicalTable(logicalTableName);
+        } catch (Exception e) {
+          logicalBuildException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Build routing for regular table (global read lock + different per-table lock)
+      Future<?> regularBuildTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(5); // Small delay to encourage interleaving
+          // This should take global read lock + per-table lock for the regular table
+          _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+        } catch (Exception e) {
+          regularBuildException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Refresh segment on offline physical table (global read lock + same per-table lock as logical)
+      Future<?> refreshOfflineTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(10); // Small delay to encourage interleaving
+          // This should compete for the same per-table lock as logical table build for offline table
+          _routingManager.refreshSegment(physicalOfflineTable, "segment_0");
+        } catch (Exception e) {
+          refreshOfflineException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 4: Refresh segment on realtime physical table (global read lock + different per-table lock)
+      Future<?> refreshRealtimeTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(12); // Small delay to encourage interleaving
+          // This should compete for the different per-table lock as logical table build for realtime table
+          _routingManager.refreshSegment(physicalRealtimeTable, "segment_0");
+        } catch (Exception e) {
+          refreshRealtimeException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 5: Exclude server from routing (global write lock - should serialize with all read operations)
+      Future<?> excludeServerTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(15); // Small delay to encourage interleaving
+          // This should take global write lock and serialize with all other operations
+          _routingManager.excludeServerFromRouting("Server_localhost_8001");
+        } catch (Exception e) {
+          excludeServerException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(15, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (logicalBuildException.get() != null) {
+        Assert.fail("Logical table build failed: " + logicalBuildException.get().getMessage());
+      }
+      if (regularBuildException.get() != null) {
+        Assert.fail("Regular table build failed: " + regularBuildException.get().getMessage());
+      }
+      if (refreshOfflineException.get() != null) {
+        Assert.fail("Refresh offline segment failed: " + refreshOfflineException.get().getMessage());
+      }
+      if (refreshRealtimeException.get() != null) {
+        Assert.fail("Refresh realtime segment failed: " + refreshRealtimeException.get().getMessage());
+      }
+      if (excludeServerException.get() != null) {
+        Assert.fail("Exclude server failed: " + excludeServerException.get().getMessage());
+      }
+
+      // Verify routing entries exist for regular table
+      Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE_NAME),
+          "Regular table routing should exist after concurrent operations");
+
+      // Verify that the excluded server is not in routing for any existing tables
+      validateDisabledInstanceNotInRouting(OFFLINE_TABLE_NAME, "Server_localhost_8001");
+
+      // Verify routing entries exist for regular table
+      Assert.assertTrue(_routingManager.routingExists(physicalOfflineTable),
+          "Regular table routing should exist after concurrent operations");
+
+      // Verify that the excluded server is not in routing for any existing tables
+      validateDisabledInstanceNotInRouting(physicalOfflineTable, "Server_localhost_8001");
+
+      // Note: We don't check physical table routing existence as buildRoutingForLogicalTable only
+      // creates routing for offline tables in the time boundary configuration, and only if they
+      // don't already exist. The test validates concurrent lock coordination rather than routing creation.
+
+      // CRITICAL VERIFICATION: Check TimeBoundaryManager coordination
+      // If the logical table build actually created routing for physical tables, verify TimeBoundaryManager
+      Object offlineEntry = getRoutingEntry(physicalOfflineTable);
+      Assert.assertNotNull(offlineEntry, "Physical offline routing entry should exist");
+
+      // Physical offline table should have TimeBoundaryManager due to logical table setup
+      TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(offlineEntry);
+      Assert.assertNotNull(timeBoundaryManager, "Physical offline table should have TimeBoundaryManager if part of "
+          + "a logical table - this indicates a race condition in cross-table coordination");
+
+      Assert.assertFalse(_routingManager.routingExists(physicalRealtimeTable),
+          "Physical realtime routing entry should not exist since we never built routing entry for it");
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
+    }
+  }
+
+  /**
+   * Test concurrent interactions between buildRoutingForLogicalTable and buildRouting.
+   * This validates proper coordination between logical table operations, regular table operations,
+   * and global write operations. Uses a hybrid logical table configuration with both offline and realtime tables.
+   */
+  @Test
+  public void testConcurrentLogicalTableBuildAndRegularBuildAndRealtimeBuild() throws Exception {
+    clearRoutingEntries();
+
+    String logicalTableName = "testLogicalTable";
+    String physicalOfflineTable = "testLogicalTable_OFFLINE";
+    String physicalRealtimeTable = "testLogicalTable_REALTIME";
+
+    // Create hybrid logical table config with both offline and realtime tables
+    LogicalTableConfig logicalTableConfig = createLogicalTableConfig(logicalTableName,
+        Map.of(
+            "testLogicalTable", new PhysicalTableConfig()
+        ), physicalOfflineTable, physicalRealtimeTable);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+
+    // Create physical table configs and schemas
+    TableConfig offlineTableConfig = createTableConfig(physicalOfflineTable, TableType.OFFLINE);
+    TableConfig realtimeTableConfig = createTableConfig(physicalRealtimeTable, TableType.REALTIME);
+    ZKMetadataProvider.setTableConfig(_propertyStore, offlineTableConfig);
+    ZKMetadataProvider.setTableConfig(_propertyStore, realtimeTableConfig);
+
+    // Create schemas for each physical table
+    Schema offlineSchema = createMockSchema();
+    offlineSchema.setSchemaName(TableNameBuilder.extractRawTableName(physicalOfflineTable));
+    ZKMetadataProvider.setSchema(_propertyStore, offlineSchema);
+
+    Schema realtimeSchema = createMockSchema();
+    realtimeSchema.setSchemaName(TableNameBuilder.extractRawTableName(physicalRealtimeTable));
+    ZKMetadataProvider.setSchema(_propertyStore, realtimeSchema);
+
+    // Create ideal states and external views for physical tables
+    createIdealStateAndExternalView(physicalOfflineTable);
+    createIdealStateAndExternalView(physicalRealtimeTable);
+
+    ExecutorService executor = Executors.newFixedThreadPool(6);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(6);
+
+    AtomicReference<Exception> logicalBuildException = new AtomicReference<>();
+    AtomicReference<Exception> regularBuildException = new AtomicReference<>();
+    AtomicReference<Exception> refreshOfflineException = new AtomicReference<>();
+    AtomicReference<Exception> refreshRealtimeException = new AtomicReference<>();
+    AtomicReference<Exception> excludeServerException = new AtomicReference<>();
+    AtomicReference<Exception> realtimeBuildException = new AtomicReference<>();
+
+    try {
+      // Thread 1: Build routing for logical table (global read lock + per-table locks for both physical tables)
+      Future<?> logicalBuildTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global read lock + per-table locks for both physical tables
+          _routingManager.buildRoutingForLogicalTable(logicalTableName);
+        } catch (Exception e) {
+          logicalBuildException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Build routing for regular table (global read lock + different per-table lock)
+      Future<?> regularBuildTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(5); // Small delay to encourage interleaving
+          // This should take global read lock + per-table lock for the regular table
+          _routingManager.buildRouting(OFFLINE_TABLE_NAME);
+        } catch (Exception e) {
+          regularBuildException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Refresh segment on offline physical table (global read lock + same per-table lock as logical)
+      Future<?> refreshOfflineTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(10); // Small delay to encourage interleaving
+          // This should compete for the same per-table lock as logical table build for offline table
+          _routingManager.refreshSegment(physicalOfflineTable, "segment_0");
+        } catch (Exception e) {
+          refreshOfflineException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 4: Refresh segment on realtime physical table (global read lock + different per-table lock)
+      Future<?> refreshRealtimeTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(12); // Small delay to encourage interleaving
+          // This should compete for the different per-table lock as logical table build for realtime table
+          _routingManager.refreshSegment(physicalRealtimeTable, "segment_0");
+        } catch (Exception e) {
+          refreshRealtimeException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 5: Exclude server from routing (global write lock - should serialize with all read operations)
+      Future<?> excludeServerTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(15); // Small delay to encourage interleaving
+          // This should take global write lock and serialize with all other operations
+          _routingManager.excludeServerFromRouting("Server_localhost_8001");
+        } catch (Exception e) {
+          excludeServerException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 6: Build routing for physical realtime table (global read lock + different per-table lock)
+      Future<?> physicalRealtimeBuildTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(5); // Small delay to encourage interleaving
+          // This should take global read lock + per-table lock for the regular table
+          _routingManager.buildRouting(physicalRealtimeTable);
+        } catch (Exception e) {
+          realtimeBuildException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(15, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (logicalBuildException.get() != null) {
+        Assert.fail("Logical table build failed: " + logicalBuildException.get().getMessage());
+      }
+      if (regularBuildException.get() != null) {
+        Assert.fail("Regular table build failed: " + regularBuildException.get().getMessage());
+      }
+      if (refreshOfflineException.get() != null) {
+        Assert.fail("Refresh offline segment failed: " + refreshOfflineException.get().getMessage());
+      }
+      if (refreshRealtimeException.get() != null) {
+        Assert.fail("Refresh realtime segment failed: " + refreshRealtimeException.get().getMessage());
+      }
+      if (excludeServerException.get() != null) {
+        Assert.fail("Exclude server failed: " + excludeServerException.get().getMessage());
+      }
+      if (realtimeBuildException.get() != null) {
+        Assert.fail("Realtime table build failed: " + realtimeBuildException.get().getMessage());
+      }
+
+      // Verify routing entries exist for regular table
+      Assert.assertTrue(_routingManager.routingExists(OFFLINE_TABLE_NAME),
+          "Regular table routing should exist after concurrent operations");
+
+      // Verify that the excluded server is not in routing for any existing tables
+      validateDisabledInstanceNotInRouting(OFFLINE_TABLE_NAME, "Server_localhost_8001");
+
+      // Verify routing entries exist for regular table
+      Assert.assertTrue(_routingManager.routingExists(physicalOfflineTable),
+          "Regular table routing should exist after concurrent operations");
+
+      // Verify that the excluded server is not in routing for any existing tables
+      validateDisabledInstanceNotInRouting(physicalOfflineTable, "Server_localhost_8001");
+
+      // Note: We don't check physical table routing existence as buildRoutingForLogicalTable only
+      // creates routing for offline tables in the time boundary configuration, and only if they
+      // don't already exist. The test validates concurrent lock coordination rather than routing creation.
+
+      // CRITICAL VERIFICATION: Check TimeBoundaryManager coordination
+      // If the logical table build actually created routing for physical tables, verify TimeBoundaryManager
+      Object offlineEntry = getRoutingEntry(physicalOfflineTable);
+      Assert.assertNotNull(offlineEntry, "Physical offline routing entry should exist");
+
+      // Physical offline table should have TimeBoundaryManager due to logical table setup
+      TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(offlineEntry);
+      Assert.assertNotNull(timeBoundaryManager, "Physical offline table should have TimeBoundaryManager if part of "
+          + "a logical table - this indicates a race condition in cross-table coordination");
+
+      Assert.assertTrue(_routingManager.routingExists(physicalRealtimeTable),
+          "Physical realtime routing entry should exist since we built routing entry for it");
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "Executor didn't shutdown in time");
+    }
+  }
+
+  /**
+   * Test concurrent interactions with logical table containing multiple physical tables.
+   * This validates coordination when logical table operations affect multiple per-table locks.
+   */
+  @Test
+  public void testConcurrentMultiPhysicalTableLogicalOperations() throws Exception {
+    clearRoutingEntries();
+
+    String logicalTableName = "testMultiLogicalTable";
+    String physicalTable1 = "multiPhysical1_OFFLINE";
+    String physicalTable2 = "multiPhysical2_OFFLINE";
+    String physicalTable3 = "multiPhysical3_REALTIME";
+
+    // Create logical table config with multiple physical tables
+    LogicalTableConfig logicalTableConfig = createLogicalTableConfig(logicalTableName,
+        Map.of(
+            "multiPhysical1", new PhysicalTableConfig(),
+            "multiPhysical2", new PhysicalTableConfig(),
+            "multiPhysical3", new PhysicalTableConfig()
+        ),
+        physicalTable1, physicalTable3);
+    ZKMetadataProvider.setLogicalTableConfig(_propertyStore, logicalTableConfig);
+
+    // Create physical table configs and schemas
+    for (String tableNameWithType : Arrays.asList(physicalTable1, physicalTable2, physicalTable3)) {
+      TableType tableType = TableNameBuilder.isOfflineTableResource(tableNameWithType)
+          ? TableType.OFFLINE : TableType.REALTIME;
+      TableConfig physicalTableConfig = createTableConfig(tableNameWithType, tableType);
+      ZKMetadataProvider.setTableConfig(_propertyStore, physicalTableConfig);
+      ZKMetadataProvider.setSchema(_propertyStore, createMockSchema());
+      createIdealStateAndExternalView(tableNameWithType);
+    }
+
+    ExecutorService executor = Executors.newFixedThreadPool(5);
+    CountDownLatch startLatch = new CountDownLatch(1);
+    CountDownLatch finishLatch = new CountDownLatch(5);
+
+    AtomicReference<Exception> logicalBuildException = new AtomicReference<>();
+    AtomicReference<Exception> logicalRemoveException = new AtomicReference<>();
+    AtomicReference<Exception> regularBuild1Exception = new AtomicReference<>();
+    AtomicReference<Exception> regularBuild2Exception = new AtomicReference<>();
+    AtomicReference<Exception> includeServerException = new AtomicReference<>();
+
+    try {
+      // Thread 1: Build routing for logical table (global read lock + multiple per-table locks)
+      Future<?> logicalBuildTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          // This should take global read lock + per-table locks for all 3 physical tables
+          _routingManager.buildRoutingForLogicalTable(logicalTableName);
+        } catch (Exception e) {
+          logicalBuildException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 2: Remove routing for logical table (global read lock + multiple per-table locks)
+      Future<?> logicalRemoveTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(20); // Delay to let build start first
+          // This should take global read lock + per-table locks for all 3 physical tables
+          _routingManager.removeRoutingForLogicalTable(logicalTableName);
+        } catch (Exception e) {
+          logicalRemoveException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 3: Build routing for one of the physical tables directly (competing per-table lock)
+      Future<?> regularBuild1Task = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(5);
+          // This should compete for per-table lock with logical table operations
+          _routingManager.buildRouting(physicalTable1);
+        } catch (Exception e) {
+          regularBuild1Exception.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 4: Build routing for another physical table (different competing per-table lock)
+      Future<?> regularBuild2Task = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(10);
+          // This should compete for different per-table lock with logical table operations
+          _routingManager.buildRouting(physicalTable2);
+        } catch (Exception e) {
+          regularBuild2Exception.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Thread 5: Include server to routing (global write lock - should block all read operations)
+      Future<?> includeServerTask = executor.submit(() -> {
+        try {
+          startLatch.await();
+          Thread.sleep(15);
+          // This should take global write lock and block all other operations
+          _routingManager.includeServerToRouting("Server_localhost_8001");
+        } catch (Exception e) {
+          includeServerException.set(e);
+        } finally {
+          finishLatch.countDown();
+        }
+      });
+
+      // Start all threads simultaneously
+      startLatch.countDown();
+
+      // Wait for completion with timeout
+      Assert.assertTrue(finishLatch.await(20, TimeUnit.SECONDS), "All tasks should complete within timeout");
+
+      // Verify no exceptions occurred
+      if (logicalBuildException.get() != null) {
+        Assert.fail("Logical table build failed: " + logicalBuildException.get().getMessage());
+      }
+      if (logicalRemoveException.get() != null) {
+        Assert.fail("Logical table remove failed: " + logicalRemoveException.get().getMessage());
+      }
+      if (regularBuild1Exception.get() != null) {
+        Assert.fail("Regular table 1 build failed: " + regularBuild1Exception.get().getMessage());
+      }
+      if (regularBuild2Exception.get() != null) {
+        Assert.fail("Regular table 2 build failed: " + regularBuild2Exception.get().getMessage());
+      }
+      if (includeServerException.get() != null) {
+        Assert.fail("Include server failed: " + includeServerException.get().getMessage());
+      }
+
+      // Verify that routing can be built for all tables after operations
+      _routingManager.buildRouting(physicalTable1);
+      _routingManager.buildRouting(physicalTable2);
+      _routingManager.buildRouting(physicalTable3);
+
+      Assert.assertTrue(_routingManager.routingExists(physicalTable1),
+          "Physical table 1 routing should be buildable after concurrent operations");
+      Assert.assertTrue(_routingManager.routingExists(physicalTable2),
+          "Physical table 2 routing should be buildable after concurrent operations");
+      Assert.assertTrue(_routingManager.routingExists(physicalTable3),
+          "Physical table 3 routing should be buildable after concurrent operations");
+
+      // CRITICAL VERIFICATION: Check TimeBoundaryManager coordination
+      // If the logical table build actually created routing for physical tables, verify TimeBoundaryManager
+      Object offlineEntry = getRoutingEntry(physicalTable1);
+      Assert.assertNotNull(offlineEntry, "Physical offline routing entry should exist");
+
+      // Physical offline table shouldn't have TimeBoundaryManager due to logical table setup and then removal
+      TimeBoundaryManager timeBoundaryManager = getTimeBoundaryManager(offlineEntry);
+      Assert.assertNull(timeBoundaryManager, "Physical offline table shouldn't have TimeBoundaryManager if part of "
+          + "a logical table since logical table was removed - this indicates a race condition in cross-table "
+          + "coordination");
+    } finally {
+      executor.shutdown();
+      Assert.assertTrue(executor.awaitTermination(15, TimeUnit.SECONDS), "Executor didn't shutdown in time");
+    }
+  }
+
+  private LogicalTableConfig createLogicalTableConfig(String logicalTableName,
+      Map<String, PhysicalTableConfig> physicalTableConfigMap, String refOfflineTableName,
+      String refRealtimeTableName) {
+    Map<String, Object> parameters = new HashMap<>();
+    parameters.put("includedTables", List.of(refOfflineTableName));
+    TimeBoundaryConfig timeBoundaryConfig = new TimeBoundaryConfig("min", parameters);
+
+    return new LogicalTableConfigBuilder()
+        .setTableName(logicalTableName)
+        .setPhysicalTableConfigMap(physicalTableConfigMap)
+        .setBrokerTenant("DefaultTenant")
+        .setRefOfflineTableName(refOfflineTableName)
+        .setRefRealtimeTableName(refRealtimeTableName)
+        .setTimeBoundaryConfig(timeBoundaryConfig)
+        .build();
   }
 }
