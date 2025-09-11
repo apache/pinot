@@ -37,7 +37,6 @@ import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMetadataProvider;
 import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.StreamConfig;
-import org.apache.pinot.spi.stream.StreamMetadataProvider;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
@@ -83,9 +82,10 @@ public class IngestionDelayTrackerTest {
     }
 
     @Override
-    StreamMetadataProvider createStreamMetadataProvider(String tableNameWithType,
+    public void createStreamMetadataProvider(String tableNameWithType,
         RealtimeTableDataManager realtimeTableDataManager) {
-      return new FakeStreamMetadataProvider(new StreamConfig(tableNameWithType, getStreamConfigs()));
+      _streamMetadataProviderList =
+          List.of(new FakeStreamMetadataProvider(new StreamConfig(tableNameWithType, getStreamConfigs())));
     }
 
     @Override
@@ -96,7 +96,7 @@ public class IngestionDelayTrackerTest {
       }
       Map<String, List<Long>> metricToValues = new HashMap<>();
       _partitionToMetricToValues.put(partitionId, metricToValues);
-      if (_streamMetadataProvider.supportsOffsetLag()) {
+      if (_streamMetadataProviderList.get(0).supportsOffsetLag()) {
         metricToValues.put(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName(), new ArrayList<>());
         metricToValues.put(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName(), new ArrayList<>());
         metricToValues.put(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName(), new ArrayList<>());
@@ -105,7 +105,7 @@ public class IngestionDelayTrackerTest {
 
       _scheduledExecutorService.scheduleWithFixedDelay(() -> _partitionToMetricToValues.compute(partitionId, (k, v) -> {
         Map<String, List<Long>> metricToValuesForPartition = _partitionToMetricToValues.get(partitionId);
-        if (_streamMetadataProvider.supportsOffsetLag()) {
+        if (_streamMetadataProviderList.get(0).supportsOffsetLag()) {
           metricToValuesForPartition.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName())
               .add(getPartitionIngestionOffsetLag(partitionId));
           metricToValuesForPartition.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName())
@@ -174,7 +174,7 @@ public class IngestionDelayTrackerTest {
     final String segment1 = new LLCSegmentName(RAW_TABLE_NAME, partition1, 0, 234).getSegmentName();
 
     IngestionDelayTracker ingestionDelayTracker = createTracker();
-    // Use fixed clock so samples dont age
+    // Use fixed clock so samples don't age
     Instant now = Instant.now();
     ZoneId zoneId = ZoneId.systemDefault();
     Clock clock = Clock.fixed(now, zoneId);
