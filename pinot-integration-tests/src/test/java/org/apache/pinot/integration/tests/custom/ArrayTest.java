@@ -511,9 +511,9 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
     assertEquals(entry1.size(), 4);
     assertEquals(entry1.get(0).doubleValue(), 0.0);
     // Compare double values:
-    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(1).doubleValue(), 100.0, 0.00000000001), 0);
-    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(2).doubleValue(), 200.0, 0.00000000001), 0);
-    assertEquals(DoubleComparisonUtil.doubleCompare(entry1.get(3).doubleValue(), 300.0, 0.00000000001), 0);
+    assertEquals(DoubleComparisonUtil.defaultDoubleCompare(entry1.get(1).doubleValue(), 100.0), 0);
+    assertEquals(DoubleComparisonUtil.defaultDoubleCompare(entry1.get(2).doubleValue(), 200.0), 0);
+    assertEquals(DoubleComparisonUtil.defaultDoubleCompare(entry1.get(3).doubleValue(), 300.0), 0);
   }
 
   @Test(dataProvider = "useBothQueryEngines")

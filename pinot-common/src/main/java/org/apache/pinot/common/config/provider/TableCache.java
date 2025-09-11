@@ -18,18 +18,29 @@
  */
 package org.apache.pinot.common.config.provider;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.pinot.common.request.Expression;
 import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
+import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
+import org.apache.pinot.spi.utils.TimestampIndexUtils;
+import org.apache.pinot.sql.parsers.CalciteSqlParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -38,6 +49,8 @@ import org.apache.pinot.spi.data.Schema;
  * them in sync. It also maintains the table name map and the column name map for case-insensitive queries.
  */
 public interface TableCache extends PinotConfigProvider {
+  Logger LOGGER = LoggerFactory.getLogger(TableCache.class);
+
   /**
    * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
    */
@@ -126,6 +139,83 @@ public interface TableCache extends PinotConfigProvider {
   boolean isLogicalTable(String logicalTableName);
 
   @Override
-  boolean registerLogicalTableConfigChangeListener(
-      LogicalTableConfigChangeListener logicalTableConfigChangeListener);
+  boolean registerLogicalTableConfigChangeListener(LogicalTableConfigChangeListener logicalTableConfigChangeListener);
+
+  /**
+   * Adds the built-in virtual columns to the schema.
+   * NOTE: The virtual column provider class is not added.
+   */
+  default void addBuiltInVirtualColumns(Schema schema) {
+    if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true));
+    }
+    if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true));
+    }
+    if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true));
+    }
+    if (!schema.hasColumn(BuiltInVirtualColumn.PARTITIONID)) {
+      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.PARTITIONID, FieldSpec.DataType.STRING, false));
+    }
+  }
+
+  static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
+      QueryConfig queryConfig) {
+    Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
+    if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
+      for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
+        try {
+          Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
+          Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
+          expressionOverrideMap.put(srcExp, destExp);
+        } catch (Exception e) {
+          LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
+              entry.getKey(), entry.getValue(), physicalOrLogicalTableName);
+        }
+      }
+      int mapSize = expressionOverrideMap.size();
+      if (mapSize == 1) {
+        Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
+        return Collections.singletonMap(entry.getKey(), entry.getValue());
+      } else if (mapSize > 1) {
+        return expressionOverrideMap;
+      }
+    }
+    return null;
+  }
+
+  class TableConfigInfo {
+    final TableConfig _tableConfig;
+    final Map<Expression, Expression> _expressionOverrideMap;
+    // All the timestamp with granularity column names
+    final Set<String> _timestampIndexColumns;
+
+    public TableConfigInfo(TableConfig tableConfig) {
+      _tableConfig = tableConfig;
+      _expressionOverrideMap = createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
+      _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
+    }
+  }
+
+  class LogicalTableConfigInfo {
+    final LogicalTableConfig _logicalTableConfig;
+    final Map<Expression, Expression> _expressionOverrideMap;
+
+    LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
+      _logicalTableConfig = logicalTableConfig;
+      _expressionOverrideMap =
+          createExpressionOverrideMap(logicalTableConfig.getTableName(), logicalTableConfig.getQueryConfig());
+    }
+  }
+
+  class SchemaInfo {
+    final Schema _schema;
+    final Map<String, String> _columnNameMap;
+
+    SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
+      _schema = schema;
+      _columnNameMap = columnNameMap;
+    }
+  }
 }

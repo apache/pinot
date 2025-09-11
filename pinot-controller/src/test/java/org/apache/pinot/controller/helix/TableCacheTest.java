@@ -303,6 +303,7 @@ public class TableCacheTest {
     expectedColumnMap.put(isCaseInsensitive ? "$docid" : "$docId", "$docId");
     expectedColumnMap.put(isCaseInsensitive ? "$hostname" : "$hostName", "$hostName");
     expectedColumnMap.put(isCaseInsensitive ? "$segmentname" : "$segmentName", "$segmentName");
+    expectedColumnMap.put(isCaseInsensitive ? "$partitionid" : "$partitionId", "$partitionId");
     return expectedColumnMap;
   }
 
@@ -310,7 +311,8 @@ public class TableCacheTest {
     return new Schema.SchemaBuilder().setSchemaName(tableName).addSingleValueDimension("testColumn", DataType.INT)
         .addSingleValueDimension(BuiltInVirtualColumn.DOCID, DataType.INT)
         .addSingleValueDimension(BuiltInVirtualColumn.HOSTNAME, DataType.STRING)
-        .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING).build();
+        .addSingleValueDimension(BuiltInVirtualColumn.SEGMENTNAME, DataType.STRING)
+        .addMultiValueDimension(BuiltInVirtualColumn.PARTITIONID, DataType.STRING).build();
   }
 
   @DataProvider(name = "testTableCacheDataProvider")

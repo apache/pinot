@@ -50,6 +50,7 @@ import org.apache.pinot.segment.spi.index.creator.TextIndexCreator;
 import org.apache.pinot.segment.spi.index.mutable.MutableIndex;
 import org.apache.pinot.segment.spi.index.mutable.provider.MutableIndexContext;
 import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
+import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
 import org.apache.pinot.spi.config.table.FSTType;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -66,12 +67,11 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
   public static final String INDEX_DISPLAY_NAME = "text";
   // TODO: Should V1Constants.Indexes.LUCENE_TEXT_INDEX_DOCID_MAPPING_FILE_EXTENSION be added here?
   private static final List<String> EXTENSIONS = Lists.newArrayList(
-      V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION,
-      V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_COMBINE_TEXT_INDEX_FILE_EXTENSION,
+      V1Constants.Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION, V1Constants.Indexes.NATIVE_TEXT_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION,
       V1Constants.Indexes.LUCENE_V99_TEXT_INDEX_FILE_EXTENSION,
-      V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION
-  );
+      V1Constants.Indexes.LUCENE_V912_TEXT_INDEX_FILE_EXTENSION);
 
   protected TextIndexType() {
     super(StandardIndexes.TEXT_ID);
@@ -119,7 +119,7 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
       return new NativeTextIndexCreator(context.getFieldSpec().getName(), context.getTableNameWithType(),
           context.isContinueOnError(), context.getIndexDir());
     } else {
-      return new LuceneTextIndexCreator(context, indexConfig);
+      return new LuceneTextIndexCreator(context, indexConfig.isStoreInSegmentFile(), indexConfig);
     }
   }
 
@@ -155,12 +155,22 @@ public class TextIndexType extends AbstractIndexType<TextIndexConfig, TextIndexR
             "Text index is currently only supported on STRING type columns");
       }
       File segmentDir = segmentReader.toSegmentDirectory().getPath().toFile();
+      TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
+      if (indexConfig.isStoreInSegmentFile()) {
+        PinotDataBuffer textIndexBuffer = null;
+        try {
+          textIndexBuffer = segmentReader.getIndexFor(metadata.getColumnName(), StandardIndexes.text());
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+        return new LuceneTextIndexReader(metadata.getColumnName(), textIndexBuffer, metadata.getTotalDocs(),
+            indexConfig);
+      }
       FSTType textIndexFSTType = TextIndexUtils.getFSTTypeOfIndex(segmentDir, metadata.getColumnName());
       if (textIndexFSTType == FSTType.NATIVE) {
         // TODO: Support loading native text index from a PinotDataBuffer
         return new NativeTextIndexReader(metadata.getColumnName(), segmentDir);
       }
-      TextIndexConfig indexConfig = fieldIndexConfigs.getConfig(StandardIndexes.text());
       return new LuceneTextIndexReader(metadata.getColumnName(), segmentDir, metadata.getTotalDocs(), indexConfig);
     }
   }

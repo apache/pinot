@@ -259,7 +259,7 @@ public class ImmutableSegmentImpl implements ImmutableSegment {
     Preconditions.checkState(fieldSpec != null, "Failed to find column: %s in schema: %s", column,
         schema.getSchemaName());
     return IndexSegmentUtils.createVirtualDataSource(
-        new VirtualColumnContext(fieldSpec, _segmentMetadata.getTotalDocs()));
+        new VirtualColumnContext(fieldSpec, _segmentMetadata.getTotalDocs(), _segmentMetadata));
   }
 
   @Override

@@ -32,7 +32,6 @@ import org.apache.pinot.query.planner.partitioning.KeySelectorFactory;
 import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.trace.Tracing;
 
 
 public class AsofJoinOperator extends BaseJoinOperator {
@@ -103,7 +102,7 @@ public class AsofJoinOperator extends BaseJoinOperator {
       if (matchKey == null) {
         // Rows with null match keys cannot be matched with any right rows
         if (needUnmatchedLeftRows()) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+          sampleAndCheckInterruptionPeriodically(rows.size());
           rows.add(joinRow(leftRow, null));
         }
         continue;
@@ -112,18 +111,18 @@ public class AsofJoinOperator extends BaseJoinOperator {
       NavigableMap<Comparable<?>, Object[]> rightRows = _rightTable.get(hashKey);
       if (rightRows == null) {
         if (needUnmatchedLeftRows()) {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+          sampleAndCheckInterruptionPeriodically(rows.size());
           rows.add(joinRow(leftRow, null));
         }
       } else {
         Object[] rightRow = closestMatch(matchKey, rightRows);
         if (rightRow == null) {
           if (needUnmatchedLeftRows()) {
-            Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+            sampleAndCheckInterruptionPeriodically(rows.size());
             rows.add(joinRow(leftRow, null));
           }
         } else {
-          Tracing.ThreadAccountantOps.sampleAndCheckInterruptionPeriodically(rows.size());
+          sampleAndCheckInterruptionPeriodically(rows.size());
           rows.add(joinRow(leftRow, rightRow));
         }
       }

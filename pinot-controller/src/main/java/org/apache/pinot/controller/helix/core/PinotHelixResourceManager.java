@@ -2482,6 +2482,7 @@ public class PinotHelixResourceManager {
    * @param jobId job's UUID
    * @param jobMetadata the job metadata
    * @param jobType the type of the job to figure out where job metadata is kept in ZK
+   * @param prevJobMetadataChecker an additional check to see if there's a need to update
    * @return boolean representing success / failure of the ZK write step
    */
   public boolean addControllerJobToZK(String jobId, Map<String, String> jobMetadata, ControllerJobType jobType,
