@@ -204,7 +204,6 @@ public class PinotSegmentRecordReader implements RecordReader {
    * Returns the sorted document ids.
    */
   @Nullable
-  @Override
   public int[] getSortedDocIds() {
     return _sortedDocIds;
   }

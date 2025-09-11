@@ -68,7 +68,6 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @param sortedDocIds - If not null, then this provides the sorted order of documents.
    * @param segment - Used to get the values of the column.
    */
-  @Deprecated
   default void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment)
       throws IOException {
     indexColumn(columnName, sortedDocIds, segment, null);
@@ -81,6 +80,7 @@ public interface SegmentCreator extends Closeable, Serializable {
    * @param sortedDocIds - If not null, then this provides the sorted order of documents.
    * @param segment - Used to get the values of the column.
    * @param validDocIds - If not null, then will only iterate over valid doc ids and skip invalid doc ids.
+   *                      When null, all documents in the segment will be processed.
    */
   void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
       @Nullable ThreadSafeMutableRoaringBitmap validDocIds)

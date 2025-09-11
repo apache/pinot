@@ -356,6 +356,16 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
     _docIdCounter++;
   }
 
+  /**
+   * Indexes a column from the given segment.
+   *
+   * @param columnName The name of the column to index
+   * @param sortedDocIds If not null, provides the sorted order of documents for processing
+   * @param segment The segment containing the column data
+   * @param validDocIds If not null, only processes documents that are marked as valid in this bitmap.
+   *                    When null, all documents in the segment are processed. This is used for
+   *                    commit-time compaction to skip invalid/deleted documents during indexing.
+   */
   @Override
   public void indexColumn(String columnName, @Nullable int[] sortedDocIds, IndexSegment segment,
       @Nullable ThreadSafeMutableRoaringBitmap validDocIds)

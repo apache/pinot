@@ -44,6 +44,7 @@ import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConve
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
+import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
@@ -233,6 +234,23 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return res;
   }
 
+  /**
+   * Get sorted document IDs from the record reader if it supports this functionality.
+   * This method handles the fact that getSortedDocIds() was removed from the RecordReader interface
+   * but is still available on specific implementations.
+   *
+   * @return sorted document IDs array, or null if not available
+   */
+  @Nullable
+  private int[] getSortedDocIdsFromRecordReader() {
+    if (_recordReader instanceof PinotSegmentRecordReader) {
+      return ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+    } else if (_recordReader instanceof CompactedPinotSegmentRecordReader) {
+      return ((CompactedPinotSegmentRecordReader) _recordReader).getSortedDocIds();
+    }
+    return null;
+  }
+
   @Override
   public void build()
       throws Exception {
@@ -251,7 +269,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       int[] immutableToMutableIdMap = null;
       if (_recordReader instanceof PinotSegmentRecordReader) {
         immutableToMutableIdMap =
-            getImmutableToMutableIdMap(_recordReader.getSortedDocIds());
+            getImmutableToMutableIdMap(((PinotSegmentRecordReader) _recordReader).getSortedDocIds());
       }
 
       // Initialize the index creation using the per-column statistics information
@@ -339,7 +357,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     try {
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
-      int[] sortedDocIds = _recordReader.getSortedDocIds();
+      int[] sortedDocIds = getSortedDocIdsFromRecordReader();
       int[] immutableToMutableIdMap = getImmutableToMutableIdMap(sortedDocIds);
 
       // Initialize the index creation using the per-column statistics information
@@ -553,6 +571,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     converter.convert(segmentDirectory);
   }
 
+  @Override
   public ColumnStatistics getColumnStatisticsCollector(final String columnName)
       throws Exception {
     return _segmentStats.getColumnProfileFor(columnName);

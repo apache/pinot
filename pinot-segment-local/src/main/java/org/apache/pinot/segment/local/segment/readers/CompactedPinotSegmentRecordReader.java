@@ -122,7 +122,6 @@ public class CompactedPinotSegmentRecordReader implements RecordReader {
    * Returns the sorted document ids from the underlying PinotSegmentRecordReader.
    */
   @Nullable
-  @Override
   public int[] getSortedDocIds() {
     return _pinotSegmentRecordReader.getSortedDocIds();
   }
