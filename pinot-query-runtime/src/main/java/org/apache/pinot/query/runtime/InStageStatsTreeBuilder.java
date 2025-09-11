@@ -84,7 +84,9 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     addSelfAllocatedBytes(type, json, childrenArr, context);
     addSelfGcTime(type, json, childrenArr, context);
 
-    json.set(CHILDREN_KEY, JsonUtils.objectToJsonNode(childrenArr));
+    if (childrenArr.length > 0) {
+      json.set(CHILDREN_KEY, JsonUtils.objectToJsonNode(childrenArr));
+    }
 
     return json;
   }
