@@ -129,8 +129,8 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
   }
 
   private long getChildrenStat(
-      MultiStageOperator.Type type, JsonNode[] children, String key, boolean crossStageBoundry) {
-    if (type == MultiStageOperator.Type.MAILBOX_RECEIVE && !crossStageBoundry) {
+      MultiStageOperator.Type type, JsonNode[] children, String key, boolean crossStageBoundary) {
+    if (type == MultiStageOperator.Type.MAILBOX_RECEIVE && !crossStageBoundary) {
       return 0;
     }
     if (children == null) {
