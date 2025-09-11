@@ -20,8 +20,10 @@ package org.apache.pinot.spi.utils;
 
 import com.google.common.base.Preconditions;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -321,5 +323,14 @@ public final class IngestionConfigUtils {
   public static String getTableTopicUniqueClientId(String className, StreamConfig streamConfig) {
     return StreamConsumerFactory.getUniqueClientId(
         className + "-" + streamConfig.getTableNameWithType() + "-" + streamConfig.getTopicName());
+  }
+
+  public static Map<Integer, Set<Integer>> getStreamIndexToPartitions(Set<Integer> partitionsHosted) {
+    Map<Integer, Set<Integer>> streamIndexToPartitions = new HashMap<>();
+    for (Integer partition : partitionsHosted) {
+      streamIndexToPartitions.computeIfAbsent(getStreamConfigIndexFromPinotPartitionId(partition),
+          k -> new HashSet<>()).add(getStreamPartitionIdFromPinotPartitionId(partition));
+    }
+    return streamIndexToPartitions;
   }
 }

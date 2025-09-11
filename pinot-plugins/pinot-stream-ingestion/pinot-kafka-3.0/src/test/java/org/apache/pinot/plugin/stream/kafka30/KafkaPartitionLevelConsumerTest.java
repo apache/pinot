@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.plugin.stream.kafka30;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.consumer.Consumer;
@@ -457,20 +460,34 @@ public class KafkaPartitionLevelConsumerTest {
     }
 
     FakeKafkaPartitionLevelConsumer kafkaSimpleStreamConsumer =
-        new FakeKafkaPartitionLevelConsumer("clientId-test", getStreamConfig(), 0);
+        new FakeKafkaPartitionLevelConsumer("clientId-test", getStreamConfig("test-topic"), 0);
     KafkaMessageBatch kafkaMessageBatch = kafkaSimpleStreamConsumer.fetchMessages(new LongMsgOffset(12345L), 10000);
     Assert.assertEquals(kafkaMessageBatch.getSizeInBytes(), 14);
   }
 
-  private StreamConfig getStreamConfig() {
+  @Test
+  public void testFetchLatestStreamOffset()
+      throws IOException {
+    StreamConfig streamConfig = getStreamConfig(TEST_TOPIC_2);
+    try(KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider("clientId", streamConfig)) {
+      Set<Integer> partitions = new HashSet<>();
+      partitions.add(0);
+      partitions.add(1);
+      Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
+          streamMetadataProvider.fetchLatestStreamOffset(partitions, 1000);
+      Assert.assertEquals(((LongMsgOffset) (partitionMsgOffsetMap.get(0))).getOffset(), NUM_MSG_PRODUCED_PER_PARTITION);
+      Assert.assertEquals(((LongMsgOffset) (partitionMsgOffsetMap.get(0))).getOffset(), NUM_MSG_PRODUCED_PER_PARTITION);
+    }
+  }
+
+  private StreamConfig getStreamConfig(String topicName) {
     String streamType = "kafka";
-    String streamKafkaTopicName = "test-topic";
     String streamKafkaBrokerList = _kafkaBrokerAddress;
     String tableNameWithType = "tableName_REALTIME";
 
     Map<String, String> streamConfigMap = new HashMap<>();
     streamConfigMap.put("streamType", streamType);
-    streamConfigMap.put("stream.kafka.topic.name", streamKafkaTopicName);
+    streamConfigMap.put("stream.kafka.topic.name", topicName);
     streamConfigMap.put("stream.kafka.broker.list", streamKafkaBrokerList);
     streamConfigMap.put("stream.kafka.consumer.factory.class.name", getKafkaConsumerFactoryName());
     streamConfigMap.put("stream.kafka.decoder.class.name", "decoderClass");
