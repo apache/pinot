@@ -113,7 +113,6 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     long selfAllocatedBytes = totalAllocatedBytes - getChildrenStat(type, children, "allocatedMemoryBytes", false);
     if (selfAllocatedBytes != 0) {
       selfNode.put("selfAllocatedMB", selfAllocatedBytes / (1024 * 1024));
-      selfNode.put("individualAllocatedMB", selfAllocatedBytes / context._parallelism / (1024 * 1024));
     }
   }
 
@@ -124,7 +123,6 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     long selfGcTimeMs = totalGcTimeMs - getChildrenStat(type, children, "gcTimeMs", false);
     if (selfGcTimeMs != 0) {
       selfNode.put("selfGcTimeMs", selfGcTimeMs);
-      selfNode.put("individualGcTime", selfGcTimeMs / context._parallelism);
     }
   }
 
