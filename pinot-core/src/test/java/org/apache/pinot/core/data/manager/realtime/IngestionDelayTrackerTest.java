@@ -440,45 +440,40 @@ public class IngestionDelayTrackerTest {
 
   private void verifyMetrics(Map<Integer, Map<String, List<Long>>> partitionToMetricToValues) {
     Assert.assertEquals(partitionToMetricToValues.size(), 2);
-    Map<String, List<Long>> partition0Metrics = partitionToMetricToValues.get(0);
-    Map<String, List<Long>> partition1Metrics = partitionToMetricToValues.get(1);
+    verifyPartition0(partitionToMetricToValues.get(0));
+    verifyPartition1(partitionToMetricToValues.get(1));
+  }
 
-    Assert.assertTrue(
-        partition0Metrics.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName()).get(0) >= 150);
-    Assert.assertTrue(partition0Metrics.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName())
-        .get(partition0Metrics.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName()).size() - 1) >= 300);
-    Assert.assertTrue(
-        partition0Metrics.get(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName()).get(0) >= 200);
-    Assert.assertTrue(
-        partition0Metrics.get(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName())
-            .get(partition0Metrics.get(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName()).size() - 1)
-            >= 350);
-    Assert.assertEquals(
-        partition0Metrics.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName()).get(0), 50);
-    Assert.assertEquals(partition0Metrics.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName())
-            .get(partition0Metrics.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName()).size() - 1),
-        50);
-    Assert.assertTrue(
-        partition0Metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName())
-            .get(partition0Metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).size() - 1)
-            > partition0Metrics.get(
-            ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).get(0));
-    Assert.assertTrue(partition0Metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).get(0) > 0);
+  private void verifyPartition0(Map<String, List<Long>> metrics) {
+    assertMinMax(metrics, ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName(), 150L, 300L);
+    assertMinMax(metrics, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName(), 200L, 350L);
+    assertEqualsFirstAndLast(metrics, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName(), 50L);
+    assertIncreasing(metrics, ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName());
+    Assert.assertTrue(metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).get(0) > 0);
+  }
 
-    Assert.assertTrue(
-        partition1Metrics.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName()).get(0) >= 200);
-    Assert.assertTrue(partition1Metrics.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName())
-        .get(partition1Metrics.get(ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName()).size() - 1) >= 350);
-    Assert.assertTrue(
-        partition1Metrics.get(ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName()).get(0) >= 200);
-    Assert.assertEquals(
-        partition1Metrics.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName()).get(0), 0);
-    Assert.assertEquals(partition1Metrics.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName())
-            .get(partition1Metrics.get(ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName()).size() - 1),
-        0);
-    Assert.assertTrue(partition1Metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName())
-        .get(partition1Metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).size() - 1)
-        > partition1Metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).get(0));
-    Assert.assertTrue(partition1Metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).get(0) > 0);
+  private void verifyPartition1(Map<String, List<Long>> metrics) {
+    assertMinMax(metrics, ServerGauge.REALTIME_INGESTION_OFFSET_LAG.getGaugeName(), 200L, 350L);
+    assertMinMax(metrics, ServerGauge.REALTIME_INGESTION_UPSTREAM_OFFSET.getGaugeName(), 200L, 350L);
+    assertEqualsFirstAndLast(metrics, ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET.getGaugeName(), 0L);
+    assertIncreasing(metrics, ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName());
+    Assert.assertTrue(metrics.get(ServerGauge.REALTIME_INGESTION_DELAY_MS.getGaugeName()).get(0) > 0);
+  }
+
+  private void assertMinMax(Map<String, List<Long>> metrics, String key, long minFirst, long minLast) {
+    List<Long> values = metrics.get(key);
+    Assert.assertTrue(values.get(0) >= minFirst, key + " first value too small");
+    Assert.assertTrue(values.get(values.size() - 1) >= minLast, key + " last value too small");
+  }
+
+  private void assertEqualsFirstAndLast(Map<String, List<Long>> metrics, String key, long expected) {
+    List<Long> values = metrics.get(key);
+    Assert.assertEquals(values.get(0), expected, key + " first value mismatch");
+    Assert.assertEquals(values.get(values.size() - 1), expected, key + " last value mismatch");
+  }
+
+  private void assertIncreasing(Map<String, List<Long>> metrics, String key) {
+    List<Long> values = metrics.get(key);
+    Assert.assertTrue(values.get(values.size() - 1) > values.get(0), key + " not increasing");
   }
 }
