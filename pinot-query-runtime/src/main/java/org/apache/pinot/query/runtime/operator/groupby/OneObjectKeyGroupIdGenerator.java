@@ -41,8 +41,7 @@ public class OneObjectKeyGroupIdGenerator implements GroupIdGenerator {
 
   @Override
   public int getGroupId(Object key) {
-    int numGroups = _groupIdMap.size();
-    if (numGroups < _numGroupsLimit) {
+    if (_groupIdMap.size() < _numGroupsLimit) {
       return _groupIdMap.computeIfAbsent(key, _groupIdGenerator);
     } else {
       return _groupIdMap.getInt(key);
