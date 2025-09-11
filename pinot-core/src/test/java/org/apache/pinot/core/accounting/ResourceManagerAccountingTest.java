@@ -81,11 +81,6 @@ public class ResourceManagerAccountingTest {
   public static final Logger LOGGER = LoggerFactory.getLogger(ResourceManagerAccountingTest.class);
   private static final int NUM_ROWS = 1_000_000;
 
-  @BeforeClass
-  public void setUp() {
-    throw new SkipException("Skipping as this test is very spammy and leaks query threads. Enable when fixed");
-  }
-
   /**
    * Test thread cpu usage tracking in multithread environment, add @Test to run.
    * Default to unused as this is a proof of concept and will take a long time to run.
