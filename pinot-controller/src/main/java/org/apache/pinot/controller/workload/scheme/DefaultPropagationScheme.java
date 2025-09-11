@@ -18,9 +18,13 @@
  */
 package org.apache.pinot.controller.workload.scheme;
 
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.workload.splitter.CostSplitter;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 
 
@@ -47,5 +51,22 @@ public class DefaultPropagationScheme implements PropagationScheme {
         throw new IllegalArgumentException("Invalid node type: " + nodeType);
     }
     return instances;
+  }
+
+  @Override
+  public Map<String, InstanceCost> resolveInstanceCostMap(NodeConfig nodeConfig, CostSplitter costSplitter) {
+    Set<String> instances = resolveInstances(nodeConfig);
+    if (instances.isEmpty()) {
+      throw new IllegalArgumentException("No instances found for node config: " + nodeConfig);
+    }
+    InstanceCost instanceCost = new InstanceCost(
+        nodeConfig.getEnforcementProfile().getCpuCostNs() / instances.size(),
+        nodeConfig.getEnforcementProfile().getMemoryCostBytes() / instances.size()
+    );
+    Map<String, InstanceCost> instanceCostMap = new HashMap<>();
+    for (String instance: instances) {
+      instanceCostMap.put(instance, instanceCost);
+    }
+    return instanceCostMap;
   }
 }

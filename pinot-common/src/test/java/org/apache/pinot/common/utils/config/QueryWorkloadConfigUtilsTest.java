@@ -20,8 +20,11 @@ package org.apache.pinot.common.utils.config;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
@@ -57,14 +60,14 @@ public class QueryWorkloadConfigUtilsTest {
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
 
     // Server node
-    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
-        List.of("value1", "value2"));
+    CostSplit costSplit1 = new CostSplit("testId", 50L, 50L, null);
+    List<CostSplit> costSplits = List.of(costSplit1);
+    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, costSplits);
     NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
         serverPropagationScheme);
 
     // Broker node
-    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
-        List.of("value3", "value4"));
+    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT, costSplits);
     NodeConfig brokerNodeConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, validEnforcementProfile,
         brokerPropagationScheme);
 
@@ -125,13 +128,13 @@ public class QueryWorkloadConfigUtilsTest {
 
     EnforcementProfile validEnforcementProfile = new EnforcementProfile(100, 100);
     // Server scheme
-    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE,
-        List.of("value1", "value2"));
+    CostSplit costSplit1 = new CostSplit("testId", 50L, 50L, null);
+    List<CostSplit> costSplits = List.of(costSplit1);
+    PropagationScheme serverPropagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, costSplits);
     NodeConfig serverNodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, validEnforcementProfile,
         serverPropagationScheme);
     // Broker scheme
-    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT,
-        List.of("value3", "value4"));
+    PropagationScheme brokerPropagationScheme = new PropagationScheme(PropagationScheme.Type.TENANT, costSplits);
     NodeConfig brokerNodeConfig = new NodeConfig(NodeConfig.Type.BROKER_NODE, validEnforcementProfile,
         brokerPropagationScheme);
     List<NodeConfig> nodeConfigs = List.of(serverNodeConfig, brokerNodeConfig);
@@ -195,5 +198,376 @@ public class QueryWorkloadConfigUtilsTest {
     data.add(new Object[] { validQueryWorkloadConfig, emptyIdZnRecord, expectedEmptyIdZnRecord, false });
 
     return data.toArray(new Object[0][]);
+  }
+
+  @Test
+  public void testValidateQueryWorkloadConfigNullConfig() {
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(null);
+    Assert.assertEquals(errors.size(), 1);
+    Assert.assertEquals(errors.get(0), "QueryWorkloadConfig cannot be null");
+  }
+
+  @Test
+  public void testValidateQueryWorkloadConfigValidConfig() {
+    QueryWorkloadConfig validConfig = new QueryWorkloadConfig("testWorkload",
+        Arrays.asList(createValidServerNodeConfig()));
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(validConfig);
+    Assert.assertTrue(errors.isEmpty(), "Valid config should have no errors, but got: " + errors);
+  }
+
+  @Test(dataProvider = "workloadNameValidationProvider")
+  public void testValidateQueryWorkloadConfigWorkloadNameValidation(String workloadName, boolean shouldHaveError,
+      String expectedErrorSubstring) {
+    QueryWorkloadConfig testConfig = new QueryWorkloadConfig(workloadName,
+        Arrays.asList(createValidServerNodeConfig()));
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(testConfig);
+
+    if (shouldHaveError) {
+      Assert.assertFalse(errors.isEmpty(), "Expected validation errors for workload name: " + workloadName);
+      Assert.assertTrue(errors.stream().anyMatch(error -> error.contains(expectedErrorSubstring)),
+          "Expected error containing '" + expectedErrorSubstring + "' but got: " + errors);
+    } else {
+      Assert.assertTrue(errors.isEmpty(),
+          "Expected no errors for valid workload name: " + workloadName + ", but got: " + errors);
+    }
+  }
+
+  @DataProvider(name = "workloadNameValidationProvider")
+  public Object[][] workloadNameValidationProvider() {
+    return new Object[][] {
+        {null, true, "queryWorkloadName cannot be null or empty"},
+        {"", true, "queryWorkloadName cannot be null or empty"},
+        {"   ", true, "queryWorkloadName cannot be null or empty"},
+        {"\t\n", true, "queryWorkloadName cannot be null or empty"},
+        {"validName", false, null},
+        {"valid_name_123", false, null},
+        {"valid-name", false, null}
+    };
+  }
+
+  @Test(dataProvider = "nodeConfigsValidationProvider")
+  public void testValidateQueryWorkloadConfigNodeConfigsValidation(List<NodeConfig> nodeConfigs,
+      List<String> expectedErrors) {
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", nodeConfigs);
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+
+    if (expectedErrors.isEmpty()) {
+      Assert.assertTrue(errors.isEmpty(), "Expected no errors but got: " + errors);
+    } else {
+      for (String expectedError : expectedErrors) {
+        Assert.assertTrue(errors.stream().anyMatch(error -> error.contains(expectedError)),
+            "Expected error containing '" + expectedError + "' but got: " + errors);
+      }
+    }
+  }
+
+  @DataProvider(name = "nodeConfigsValidationProvider")
+  public Object[][] nodeConfigsValidationProvider() {
+    List<Object[]> data = new ArrayList<>();
+
+    // Null nodeConfigs
+    data.add(new Object[]{null, Arrays.asList("nodeConfigs cannot be null or empty")});
+
+    // Empty nodeConfigs
+    data.add(new Object[]{Collections.emptyList(), Arrays.asList("nodeConfigs cannot be null or empty")});
+
+    // NodeConfigs with null element
+    List<NodeConfig> nodeConfigsWithNull = new ArrayList<>();
+    nodeConfigsWithNull.add(null);
+    data.add(new Object[]{nodeConfigsWithNull, Arrays.asList("nodeConfigs[0] cannot be null")});
+
+    // Valid nodeConfigs
+    data.add(new Object[]{Arrays.asList(createValidServerNodeConfig()), Collections.emptyList()});
+
+    return data.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "enforcementProfileValidationProvider")
+  public void testValidateQueryWorkloadConfigEnforcementProfileValidation(EnforcementProfile profile,
+      List<String> expectedErrors) {
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, profile, createValidPropagationScheme());
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+
+    for (String expectedError : expectedErrors) {
+      Assert.assertTrue(errors.stream().anyMatch(error -> error.contains(expectedError)),
+          "Expected error containing '" + expectedError + "' but got: " + errors);
+    }
+  }
+
+  @DataProvider(name = "enforcementProfileValidationProvider")
+  public Object[][] enforcementProfileValidationProvider() {
+    return new Object[][] {
+        {null, Arrays.asList("enforcementProfile cannot be null")},
+        {new EnforcementProfile(-1, 100), Arrays.asList("enforcementProfile.cpuCostNs cannot be negative")},
+        {new EnforcementProfile(100, -1), Arrays.asList("enforcementProfile.memoryCostBytes cannot be negative")},
+        {new EnforcementProfile(-1, -1), Arrays.asList("enforcementProfile.cpuCostNs cannot be negative",
+            "enforcementProfile.memoryCostBytes cannot be negative")},
+        {new EnforcementProfile(0, 0), Collections.emptyList()}, // Zero values are allowed
+        {new EnforcementProfile(100, 100), Collections.emptyList()}
+    };
+  }
+
+  @Test(dataProvider = "propagationSchemeValidationProvider")
+  public void testValidateQueryWorkloadConfigPropagationSchemeValidation(PropagationScheme scheme,
+      List<String> expectedErrors) {
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+
+    for (String expectedError : expectedErrors) {
+      Assert.assertTrue(errors.stream().anyMatch(error -> error.contains(expectedError)),
+          "Expected error containing '" + expectedError + "' but got: " + errors);
+    }
+  }
+
+  @DataProvider(name = "propagationSchemeValidationProvider")
+  public Object[][] propagationSchemeValidationProvider() {
+    List<Object[]> data = new ArrayList<>();
+
+    // Null propagation scheme
+    data.add(new Object[]{null, Arrays.asList("propagationScheme cannot be null")});
+
+    // Null propagation type
+    PropagationScheme schemeWithNullType = new PropagationScheme(null, Arrays.asList(createValidCostSplit()));
+    data.add(new Object[]{schemeWithNullType, Arrays.asList("propagationScheme.type cannot be null")});
+
+    // Valid propagation scheme
+    data.add(new Object[]{createValidPropagationScheme(), Collections.emptyList()});
+
+    return data.toArray(new Object[0][]);
+  }
+
+  @Test(dataProvider = "costSplitsValidationProvider")
+  public void testValidateQueryWorkloadConfigCostSplitsValidation(List<CostSplit> costSplits,
+      List<String> expectedErrors) {
+    PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, costSplits);
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+
+    for (String expectedError : expectedErrors) {
+      Assert.assertTrue(errors.stream().anyMatch(error -> error.contains(expectedError)),
+          "Expected error containing '" + expectedError + "' but got: " + errors);
+    }
+  }
+
+  @DataProvider(name = "costSplitsValidationProvider")
+  public Object[][] costSplitsValidationProvider() {
+    List<Object[]> data = new ArrayList<>();
+
+    // Null costSplits
+    data.add(new Object[]{null, Arrays.asList("costSplits cannot be null")});
+
+    // Empty costSplits
+    data.add(new Object[]{Collections.emptyList(), Arrays.asList("costSplits cannot be empty")});
+
+    // CostSplits with null element
+    List<CostSplit> costSplitsWithNull = new ArrayList<>();
+    costSplitsWithNull.add(null);
+    data.add(new Object[]{costSplitsWithNull, Arrays.asList("costSplits[0] cannot be null")});
+
+    // CostSplit with null costId
+    CostSplit costSplitWithNullId = new CostSplit(null, 100L, 100L, null);
+    data.add(new Object[]{Arrays.asList(costSplitWithNullId), Arrays.asList("costId cannot be null or empty")});
+
+    // CostSplit with empty costId
+    CostSplit costSplitWithEmptyId = new CostSplit("", 100L, 100L, null);
+    data.add(new Object[]{Arrays.asList(costSplitWithEmptyId), Arrays.asList("costId cannot be null or empty")});
+
+    // CostSplit with whitespace-only costId
+    CostSplit costSplitWithWhitespaceId = new CostSplit("   ", 100L, 100L, null);
+    data.add(new Object[]{Arrays.asList(costSplitWithWhitespaceId),
+        Arrays.asList("costId cannot be null or empty")});
+
+    // CostSplit with negative CPU cost
+    CostSplit costSplitWithNegativeCpu = new CostSplit("test", -1L, 100L, null);
+    data.add(new Object[]{Arrays.asList(costSplitWithNegativeCpu),
+        Arrays.asList("cpuCostNs should be greater than 0")});
+
+    // Valid costSplits
+    data.add(new Object[]{Arrays.asList(createValidCostSplit()), Collections.emptyList()});
+
+    return data.toArray(new Object[0][]);
+  }
+
+  @Test
+  public void testValidateQueryWorkloadConfigDuplicateCostIds() {
+    CostSplit costSplit1 = new CostSplit("duplicate", 100L, 100L, null);
+    CostSplit costSplit2 = new CostSplit("duplicate", 200L, 200L, null);
+
+    PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE,
+        Arrays.asList(costSplit1, costSplit2));
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+    Assert.assertTrue(errors.stream().anyMatch(error -> error.contains("costId 'duplicate' is duplicated")),
+        "Expected duplicate costId error, but got: " + errors);
+  }
+
+  @Test(dataProvider = "costIdFormatValidationProvider")
+  public void testValidateQueryWorkloadConfigCostIdFormatValidation(String costId, boolean shouldHaveError) {
+    CostSplit costSplit = new CostSplit(costId, 100L, 100L, null);
+    PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(costSplit));
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+
+    if (shouldHaveError) {
+      Assert.assertTrue(errors.stream().anyMatch(error -> error.contains("contains invalid characters")),
+          "Expected invalid character error for costId: " + costId + ", but got: " + errors);
+    } else {
+      Assert.assertFalse(errors.stream().anyMatch(error -> error.contains("contains invalid characters")),
+          "Expected no invalid character error for costId: " + costId + ", but got: " + errors);
+    }
+  }
+
+  @DataProvider(name = "costIdFormatValidationProvider")
+  public Object[][] costIdFormatValidationProvider() {
+    return new Object[][] {
+        {"validId", false},
+        {"valid_id", false},
+        {"valid-id", false},
+        {"valid.id", false},
+        {"valid123", false},
+        {"123valid", false},
+        {"Valid_ID-123.test", false},
+        {"invalid id", true}, // space
+        {"invalid@id", true}, // @ symbol
+        {"invalid#id", true}, // # symbol
+        {"invalid$id", true}, // $ symbol
+        {"invalid%id", true}, // % symbol
+        {"invalid&id", true}, // & symbol
+        {"invalid*id", true}, // * symbol
+        {"invalid(id)", true}, // parentheses
+        {"invalid[id]", true}, // brackets
+        {"invalid{id}", true}, // braces
+        {"invalid/id", true}, // slash
+        {"invalid\\id", true}, // backslash
+        {"invalid|id", true}, // pipe
+        {"invalid+id", true}, // plus
+        {"invalid=id", true}, // equals
+        {"invalid?id", true}, // question mark
+        {"invalid<id>", true}, // angle brackets
+        {"invalid,id", true}, // comma
+        {"invalid;id", true}, // semicolon
+        {"invalid:id", true}, // colon
+        {"invalid\"id\"", true}, // quotes
+        {"invalid'id'", true} // single quotes
+    };
+  }
+
+  @Test
+  public void testValidateQueryWorkloadConfigCostOverflow() {
+    // Create cost splits that would cause overflow when summed
+    CostSplit costSplit1 = new CostSplit("cost1", Long.MAX_VALUE, Long.MAX_VALUE, null);
+    CostSplit costSplit2 = new CostSplit("cost2", 1L, 1L, null);
+
+    PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE,
+        Arrays.asList(costSplit1, costSplit2));
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+    Assert.assertTrue(errors.stream().anyMatch(error -> error.contains("total CPU cost would overflow")),
+        "Expected CPU overflow error, but got: " + errors);
+    Assert.assertTrue(errors.stream().anyMatch(error -> error.contains("total memory cost would overflow")),
+        "Expected memory overflow error, but got: " + errors);
+  }
+
+  @Test
+  public void testValidateQueryWorkloadConfigSubAllocationsValidation() {
+    // Create sub-allocations that exceed parent limits
+    CostSplit subAllocation1 = new CostSplit("sub1", 60L, 60L, null);
+    CostSplit subAllocation2 = new CostSplit("sub2", 60L, 60L, null);
+    List<CostSplit> subAllocations = Arrays.asList(subAllocation1, subAllocation2);
+
+    // Parent has limits of 100 each, but sub-allocations total 120 each
+    CostSplit parentCostSplit = new CostSplit("parent", 100L, 100L, subAllocations);
+
+    PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(parentCostSplit));
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+    Assert.assertTrue(errors.stream().anyMatch(error -> error.contains("exceeds parent limit")),
+        "Expected parent limit exceeded error, but got: " + errors);
+  }
+
+  @Test
+  public void testValidateQueryWorkloadConfigNestedSubAllocations() {
+    // Test that nested sub-allocations are not allowed
+    CostSplit nestedSubAllocation = new CostSplit("nested", 10L, 10L, null);
+    CostSplit subAllocation = new CostSplit("sub", 50L, 50L, Arrays.asList(nestedSubAllocation));
+    CostSplit parentCostSplit = new CostSplit("parent", 100L, 100L, Arrays.asList(subAllocation));
+
+    PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(parentCostSplit));
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+    Assert.assertTrue(errors.stream().anyMatch(error -> error.contains("nested sub-allocations are not supported")),
+        "Expected nested sub-allocations error, but got: " + errors);
+  }
+
+  @Test
+  public void testValidateQueryWorkloadConfigDuplicateSubAllocationIds() {
+    CostSplit subAllocation1 = new CostSplit("duplicate", 30L, 30L, null);
+    CostSplit subAllocation2 = new CostSplit("duplicate", 40L, 40L, null);
+    List<CostSplit> subAllocations = Arrays.asList(subAllocation1, subAllocation2);
+
+    CostSplit parentCostSplit = new CostSplit("parent", 100L, 100L, subAllocations);
+
+    PropagationScheme scheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(parentCostSplit));
+    NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), scheme);
+    QueryWorkloadConfig config = new QueryWorkloadConfig("testWorkload", Arrays.asList(nodeConfig));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+    Assert.assertTrue(errors.stream().anyMatch(error -> error.contains("is duplicated within sub-allocations")),
+        "Expected duplicate sub-allocation ID error, but got: " + errors);
+  }
+
+  @Test
+  public void testValidateQueryWorkloadConfigComplexValidConfig() {
+    // Test a complex but valid configuration with multiple nodes and sub-allocations
+    CostSplit subAllocation1 = new CostSplit("sub1", 30L, 30L, null);
+    CostSplit subAllocation2 = new CostSplit("sub2", 40L, 40L, null);
+    List<CostSplit> subAllocations = Arrays.asList(subAllocation1, subAllocation2);
+
+    CostSplit costSplit1 = new CostSplit("cost1", 100L, 100L, subAllocations);
+    CostSplit costSplit2 = new CostSplit("cost2", 200L, 200L, null);
+
+    PropagationScheme serverScheme = new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(costSplit1,
+        costSplit2));
+    NodeConfig serverNode = new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), serverScheme);
+
+    PropagationScheme brokerScheme = new PropagationScheme(PropagationScheme.Type.TENANT, Arrays.asList(costSplit2));
+    NodeConfig brokerNode = new NodeConfig(NodeConfig.Type.BROKER_NODE, createValidEnforcementProfile(), brokerScheme);
+
+    QueryWorkloadConfig config = new QueryWorkloadConfig("complexWorkload", Arrays.asList(serverNode, brokerNode));
+
+    List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(config);
+    Assert.assertTrue(errors.isEmpty(), "Complex valid config should have no errors, but got: " + errors);
+  }
+
+  private NodeConfig createValidServerNodeConfig() {
+    return new NodeConfig(NodeConfig.Type.SERVER_NODE, createValidEnforcementProfile(), createValidPropagationScheme());
+  }
+
+  private EnforcementProfile createValidEnforcementProfile() {
+    return new EnforcementProfile(1000, 1000);
+  }
+
+  private PropagationScheme createValidPropagationScheme() {
+    return new PropagationScheme(PropagationScheme.Type.TABLE, Arrays.asList(createValidCostSplit()));
+  }
+
+  private CostSplit createValidCostSplit() {
+    return new CostSplit("validCostId", 100L, 100L, null);
   }
 }

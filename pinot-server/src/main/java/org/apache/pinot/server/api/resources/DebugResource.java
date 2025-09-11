@@ -22,6 +22,8 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
 import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
@@ -34,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -42,7 +45,9 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.restlet.resources.ResourceUtils;
 import org.apache.pinot.common.restlet.resources.SegmentConsumerInfo;
 import org.apache.pinot.common.restlet.resources.SegmentErrorInfo;
 import org.apache.pinot.common.restlet.resources.SegmentServerDebugInfo;
@@ -52,14 +57,18 @@ import org.apache.pinot.core.data.manager.realtime.RealtimeSegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.SegmentDataManager;
 import org.apache.pinot.segment.local.data.manager.TableDataManager;
 import org.apache.pinot.segment.spi.ImmutableSegment;
+import org.apache.pinot.server.api.AdminApiApplication;
 import org.apache.pinot.server.starter.ServerInstance;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
 import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.stream.ConsumerPartitionState;
 import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.apache.pinot.spi.utils.CommonConstants.DATABASE;
 import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_KEY;
@@ -79,9 +88,13 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
             + "context will be considered.")}))
 @Path("/debug/")
 public class DebugResource {
+  private static final Logger LOGGER = LoggerFactory.getLogger(DebugResource.class);
 
   @Inject
   private ServerInstance _serverInstance;
+  @Inject
+  @Named(AdminApiApplication.SERVER_INSTANCE_ID)
+  private String _instanceId;
 
   @GET
   @Path("tables/{tableName}")
@@ -226,5 +239,63 @@ public class DebugResource {
                   upstreamLatest, recordsLagMap, availabilityLagMsMap));
     }
     return segmentConsumerInfo;
+  }
+
+  /**
+   * Get the instance cost (budget) information for a specific workload.
+   * Returns with CPU and memory budget information enforced on this instance for the workload.
+   * Example response:
+   * {
+   *  "workloadName": "testWorkload",
+   *  "cpuCostNs": 5000000,
+   *  "memoryCostBytes": 104857600
+   *  }
+   *  If the workload is not found, returns 404.
+   *  If the WorkloadBudgetManager is not available, returns 500.
+   *  If the workload name is invalid, returns 400.
+   */
+  @GET
+  @Path("queryWorkloadCost/{workloadName}")
+  @ApiOperation(value = "Get instance cost information for a specific workload")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 404, message = "Workload not found"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  @Produces(MediaType.APPLICATION_JSON)
+  public String getWorkloadCost(
+      @ApiParam(value = "Name of the workload", required = true) @PathParam("workloadName") String workloadName
+  ) {
+    // Input validation
+    if (workloadName == null || workloadName.trim().isEmpty()) {
+      throw new WebApplicationException("Workload name cannot be null or empty",
+          Response.Status.BAD_REQUEST);
+    }
+    try {
+      WorkloadBudgetManager workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
+      if (workloadBudgetManager == null) {
+        LOGGER.warn("WorkloadBudgetManager is not available on instance: {}", _instanceId);
+        throw new WebApplicationException("WorkloadBudgetManager is not available",
+            Response.Status.INTERNAL_SERVER_ERROR);
+      }
+
+      // Get the workload budget stats for the specific workload
+      WorkloadBudgetManager.BudgetStats budgetStats = workloadBudgetManager.getBudgetStats(workloadName);
+      if (budgetStats == null) {
+        LOGGER.warn("No budget stats found for workload: {} on instance: {}", workloadName, _instanceId);
+        throw new WebApplicationException("Workload not found: " + workloadName, Response.Status.NOT_FOUND);
+      }
+      Map<String, Object> response = new HashMap<>();
+      response.put("workloadName", workloadName);
+      response.put("cpuBudgetNs", budgetStats._initialCpuBudget);
+      response.put("memoryBudgetBytes", budgetStats._initialMemoryBudget);
+      return ResourceUtils.convertToJsonString(response);
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      LOGGER.error("Error getting workload info for workload: {} on instance: {}", workloadName, _instanceId, e);
+      throw new WebApplicationException("Failed to get workload info: " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
   }
 }
