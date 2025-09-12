@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.minion.taskfactory;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -31,6 +32,7 @@ import org.apache.helix.task.TaskDriver;
 import org.apache.helix.task.TaskFactory;
 import org.apache.helix.task.TaskResult;
 import org.apache.pinot.common.auth.AuthProviderUtils;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.metrics.MinionGauge;
 import org.apache.pinot.common.metrics.MinionMeter;
 import org.apache.pinot.common.metrics.MinionMetrics;
@@ -79,6 +81,7 @@ public class TaskFactoryRegistry {
     for (String taskType : taskExecutorFactoryRegistry.getAllTaskTypes()) {
       PinotTaskExecutorFactory taskExecutorFactory = taskExecutorFactoryRegistry.getTaskExecutorFactory(taskType);
       MinionEventObserverFactory eventObserverFactory = eventObserverFactoryRegistry.getEventObserverFactory(taskType);
+      Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.TASK_TYPE, taskType);
 
       LOGGER.info("Registering {} with task executor factory: {}, event observer factory: {}", taskType,
           taskExecutorFactory.getClass().getSimpleName(), eventObserverFactory.getClass().getSimpleName());
@@ -99,7 +102,7 @@ public class TaskFactoryRegistry {
               long jobDequeueTimeMs = System.currentTimeMillis();
               _minionMetrics
                   .addTimedValue(taskType, MinionTimer.TASK_QUEUEING, jobDequeueTimeMs - jobInQueueTimeMs,
-                      TimeUnit.MILLISECONDS);
+                      TimeUnit.MILLISECONDS, attributes);
               String tableName = null;
               try {
                 // Set taskId in MDC so that one may config logger to route task logs to separate file.
@@ -107,28 +110,31 @@ public class TaskFactoryRegistry {
                 PinotTaskConfig pinotTaskConfig = PinotTaskConfig.fromHelixTaskConfig(_taskConfig);
                 tableName = pinotTaskConfig.getTableName();
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, 1L);
-                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS, 1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS, 1L, attributes);
                 if (tableName != null) {
                   _minionMetrics
-                      .addTimedTableValue(tableName, taskType, MinionTimer.TASK_QUEUEING,
+                      .addTimedTableTaskValue(tableName, taskType, MinionTimer.TASK_QUEUEING,
                           jobDequeueTimeMs - jobInQueueTimeMs, TimeUnit.MILLISECONDS);
                   _minionMetrics.addValueToTableGauge(tableName, MinionGauge.NUMBER_OF_TASKS, 1L);
-                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS, 1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS, 1L,
+                      attributes);
                 }
                 MinionEventObservers.getInstance().addMinionEventObserver(_taskConfig.getId(), _eventObserver);
                 return runInternal(pinotTaskConfig);
               } finally {
                 MinionEventObservers.getInstance().removeMinionEventObserver(_taskConfig.getId());
                 _minionMetrics.addValueToGlobalGauge(MinionGauge.NUMBER_OF_TASKS, -1L);
-                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS, -1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS, -1L, attributes);
                 long executionTimeMs = System.currentTimeMillis() - jobDequeueTimeMs;
                 _minionMetrics
-                    .addTimedValue(taskType, MinionTimer.TASK_EXECUTION, executionTimeMs, TimeUnit.MILLISECONDS);
+                    .addTimedValue(taskType, MinionTimer.TASK_EXECUTION, executionTimeMs, TimeUnit.MILLISECONDS,
+                        attributes);
                 if (tableName != null) {
                   _minionMetrics.addValueToTableGauge(tableName, MinionGauge.NUMBER_OF_TASKS, -1L);
-                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS, -1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS, -1L,
+                      attributes);
                   _minionMetrics
-                      .addTimedTableValue(tableName, taskType, MinionTimer.TASK_EXECUTION,
+                      .addTimedTableTaskValue(tableName, taskType, MinionTimer.TASK_EXECUTION,
                           executionTimeMs, TimeUnit.MILLISECONDS);
                 }
                 LOGGER.info("Task: {} completed in: {}ms", _taskConfig.getId(), executionTimeMs);
@@ -154,45 +160,46 @@ public class TaskFactoryRegistry {
               try {
                 Object executionResult = _taskExecutor.executeTask(pinotTaskConfig);
                 _eventObserver.notifyTaskSuccess(pinotTaskConfig, executionResult);
-                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_COMPLETED, 1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_COMPLETED, 1L, attributes);
                 if (tableName != null) {
-                  _minionMetrics.addMeteredTableValue(tableName, taskType,
-                      MinionMeter.NUMBER_TASKS_COMPLETED, 1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS_COMPLETED,
+                      1L, attributes);
                 }
                 LOGGER.info("Task: {} succeeded", _taskConfig.getId());
                 return new TaskResult(TaskResult.Status.COMPLETED, "Succeeded");
               } catch (TaskCancelledException e) {
                 _eventObserver.notifyTaskCancelled(pinotTaskConfig);
-                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_CANCELLED, 1L, attributes);
                 if (tableName != null) {
-                  _minionMetrics.addMeteredTableValue(tableName, taskType,
-                      MinionMeter.NUMBER_TASKS_CANCELLED, 1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS_CANCELLED,
+                      1L, attributes);
                 }
                 LOGGER.info("Task: {} got cancelled", _taskConfig.getId(), e);
                 return new TaskResult(TaskResult.Status.CANCELED, extractAndTrimRootCauseMessage(e));
               } catch (FatalException e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
-                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED,
+                    1L, attributes);
                 if (tableName != null) {
-                  _minionMetrics.addMeteredTableValue(tableName, taskType,
-                      MinionMeter.NUMBER_TASKS_FATAL_FAILED, 1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS_FATAL_FAILED,
+                      1L, attributes);
                 }
                 LOGGER.error("Caught fatal exception while executing task: {}", _taskConfig.getId(), e);
                 return new TaskResult(TaskResult.Status.FATAL_FAILED, extractAndTrimRootCauseMessage(e));
               } catch (Exception e) {
                 _eventObserver.notifyTaskError(pinotTaskConfig, e);
-                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_FAILED, 1L, attributes);
                 if (tableName != null) {
-                  _minionMetrics.addMeteredTableValue(tableName, taskType,
-                      MinionMeter.NUMBER_TASKS_FAILED, 1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS_FAILED,
+                      1L, attributes);
                 }
                 LOGGER.error("Caught exception while executing task: {}", _taskConfig.getId(), e);
                 return new TaskResult(TaskResult.Status.FAILED, extractAndTrimRootCauseMessage(e));
               } finally {
-                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
+                _minionMetrics.addMeteredValue(taskType, MinionMeter.NUMBER_TASKS_EXECUTED, 1L, attributes);
                 if (tableName != null) {
-                  _minionMetrics.addMeteredTableValue(tableName, taskType,
-                      MinionMeter.NUMBER_TASKS_EXECUTED, 1L);
+                  _minionMetrics.addMeteredTableValue(tableName, taskType, MinionMeter.NUMBER_TASKS_EXECUTED,
+                      1L, attributes);
                 }
               }
             }

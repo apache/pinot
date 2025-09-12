@@ -19,11 +19,13 @@
 package org.apache.pinot.common.metrics;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
@@ -57,7 +59,9 @@ public class ValidationMetrics {
 
     @Override
     public Object getGauge() {
-      return PinotMetricUtils.makePinotGauge(avoid -> value()).getGauge();
+      return PinotMetricUtils.makePinotGauge(
+          new PinotMetricsFactory.SimpleMetricName(_key),
+          avoid -> value()).getGauge();
     }
 
     @Override
@@ -92,10 +96,11 @@ public class ValidationMetrics {
     public Object getMetric() {
       return getGauge();
     }
-
     @Override
     public Object getGauge() {
-      return PinotMetricUtils.makePinotGauge(avoid -> value()).getGauge();
+      return PinotMetricUtils.makePinotGauge(
+          new PinotMetricsFactory.SimpleMetricName(_key),
+          avoid -> value()).getGauge();
     }
   }
 
@@ -245,7 +250,7 @@ public class ValidationMetrics {
   }
 
   private PinotMetricName makeMetricName(final String gaugeName) {
-    return PinotMetricUtils.makePinotMetricName(ValidationMetrics.class, gaugeName);
+    return PinotMetricUtils.makePinotMetricName(ValidationMetrics.class, gaugeName, gaugeName, ImmutableMap.of());
   }
 
   private void makeGauge(final String resource, final ValidationMetricName validationMetricName,

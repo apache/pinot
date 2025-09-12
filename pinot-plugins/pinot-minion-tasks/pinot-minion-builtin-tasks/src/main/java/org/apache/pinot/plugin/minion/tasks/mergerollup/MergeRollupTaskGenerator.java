@@ -41,6 +41,7 @@ import org.apache.pinot.common.lineage.SegmentLineageUtils;
 import org.apache.pinot.common.metadata.segment.SegmentPartitionMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.minion.MergeRollupTaskMetadata;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.controller.helix.core.minion.generator.BaseTaskGenerator;
@@ -828,7 +829,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
                     ? _tableLowestLevelMaxValidBucketEndTimeMs.get(tableNameWithType)
                     : watermarkForTable.get(lowerMergeLevel),
                 bufferTimeMs, bucketTimeMs));
-        controllerMetrics.addCallbackGaugeIfNeeded(getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
+        controllerMetrics.addCallbackGaugeIfNeeded(
+            getMetricNameForTaskDelay(tableNameWithType, mergeLevel),
+            MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS,
+            getMetricsAttributesForTaskDelay(tableNameWithType, mergeLevel),
             (() -> getMergeRollupTaskDelayInNumTimeBuckets(watermarkForTable.getOrDefault(k, -1L),
                 lowerMergeLevel == null ? _tableLowestLevelMaxValidBucketEndTimeMs.get(tableNameWithType)
                     : watermarkForTable.get(lowerMergeLevel), bufferTimeMs, bucketTimeMs)));
@@ -922,7 +926,10 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
             "Creating the gauge metric for tracking the merge/roll-up number buckets to process for table: {} "
                 + "and mergeLevel: {}.(bufferTimeMs={}, bucketTimeMs={}, numTimeBucketsToProcess={})",
                 tableNameWithType, mergeLevel, bufferTimeMs, bucketTimeMs, finalCount);
-        controllerMetrics.setOrUpdateGauge(getMetricNameForNumBucketsToProcess(tableNameWithType, mergeLevel),
+        controllerMetrics.setOrUpdateGauge(
+            getMetricNameForNumBucketsToProcess(tableNameWithType, mergeLevel),
+            MERGE_ROLLUP_TASK_NUM_BUCKETS_TO_PROCESS,
+            getMetricsAttributesForNumBucketsToProcess(tableNameWithType, mergeLevel),
             () -> _tableNumberBucketsToProcess.get(tableNameWithType).getOrDefault(mergeLevel, finalCount));
       }
       return finalCount;
@@ -1050,7 +1057,21 @@ public class MergeRollupTaskGenerator extends BaseTaskGenerator {
     return MERGE_ROLLUP_TASK_DELAY_IN_NUM_BUCKETS + "." + tableNameWithType + "." + mergeLevel;
   }
 
+  private Map<String, String> getMetricsAttributesForTaskDelay(String tableNameWithType, String mergeLevel) {
+    Map<String, String> attributes = new HashMap<>();
+    attributes.put(MetricAttributeConstants.TABLE_NAME, tableNameWithType);
+    attributes.put(MetricAttributeConstants.MERGE_LEVEL, mergeLevel);
+    return attributes;
+  }
+
   private String getMetricNameForNumBucketsToProcess(String tableNameWithType, String mergeLevel) {
     return MERGE_ROLLUP_TASK_NUM_BUCKETS_TO_PROCESS + "." + tableNameWithType + "." + mergeLevel;
+  }
+
+  private Map<String, String> getMetricsAttributesForNumBucketsToProcess(String tableNameWithType, String mergeLevel) {
+    Map<String, String> attributes = new HashMap<>();
+    attributes.put(MetricAttributeConstants.TABLE_NAME, tableNameWithType);
+    attributes.put(MetricAttributeConstants.MERGE_LEVEL, mergeLevel);
+    return attributes;
   }
 }

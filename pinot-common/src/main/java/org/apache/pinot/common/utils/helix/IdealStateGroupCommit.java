@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.utils.helix;
 
+import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
@@ -37,6 +38,7 @@ import org.apache.helix.zookeeper.zkclient.exception.ZkBadVersionException;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ControllerTimer;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.spi.utils.retry.RetryPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -300,15 +302,20 @@ public class IdealStateGroupCommit {
         }
       });
       if (controllerMetrics != null) {
-        controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_RETRY, retries);
+        Map<String, String> attributes = ImmutableMap.of(MetricAttributeConstants.RESOURCE_NAME, resourceName);
+        controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_RETRY, retries, attributes);
         controllerMetrics.addTimedValue(resourceName, ControllerTimer.IDEAL_STATE_UPDATE_TIME_MS,
-            System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS);
-        controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS, 1L);
+            System.currentTimeMillis() - startTimeMs, TimeUnit.MILLISECONDS, attributes);
+        controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_SUCCESS,
+            1L, attributes);
       }
       return idealStateWrapper._idealState;
     } catch (Throwable e) {
       if (controllerMetrics != null) {
-        controllerMetrics.addMeteredValue(resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L);
+        controllerMetrics.addMeteredValue(
+            resourceName, ControllerMeter.IDEAL_STATE_UPDATE_FAILURE, 1L,
+            ImmutableMap.of(MetricAttributeConstants.RESOURCE_NAME, resourceName)
+        );
       }
       throw new RuntimeException("Caught exception while updating ideal state for resource: " + resourceName, e);
     }

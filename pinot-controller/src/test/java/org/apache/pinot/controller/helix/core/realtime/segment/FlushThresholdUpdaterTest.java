@@ -111,6 +111,7 @@ public class FlushThresholdUpdaterTest {
   private StreamConfig mockAutotuneStreamConfig(long flushSegmentDesiredSizeBytes, long flushThresholdTimeMillis,
       int flushAutotuneInitialRows) {
     StreamConfig streamConfig = mock(StreamConfig.class);
+    when(streamConfig.getTopicName()).thenReturn("testTopic");
     when(streamConfig.getTableNameWithType()).thenReturn(REALTIME_TABLE_NAME);
     when(streamConfig.getFlushThresholdRows()).thenReturn(0);
     when(streamConfig.getFlushThresholdSegmentSizeBytes()).thenReturn(flushSegmentDesiredSizeBytes);

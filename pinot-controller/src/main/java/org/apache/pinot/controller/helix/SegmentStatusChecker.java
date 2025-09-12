@@ -142,11 +142,11 @@ public class SegmentStatusChecker extends ControllerPeriodicTask<SegmentStatusCh
     context._tierBackendTableCountMap.forEach((tier, count) -> {
       String gaugeName = _controllerMetrics.composePluginGaugeName(tier, ControllerGauge.TIER_BACKEND_TABLE_COUNT);
       _tierBackendGauges.add(gaugeName);
-      _controllerMetrics.setOrUpdateGauge(gaugeName, count);
+      _controllerMetrics.setOrUpdateGlobalGauge(gaugeName, () -> count);
     });
     // metric for total number of tables having tier backend configured
-    _controllerMetrics.setOrUpdateGauge(ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(),
-        context._tierBackendConfiguredTableCount);
+    _controllerMetrics.setOrUpdateGlobalGauge(ControllerGauge.TIER_BACKEND_TABLE_COUNT.getGaugeName(),
+        () -> context._tierBackendConfiguredTableCount);
 
     //emit a 0 for tables that are not paused/disabled. This makes alert expressions simpler as we don't have to deal
     // with missing metrics

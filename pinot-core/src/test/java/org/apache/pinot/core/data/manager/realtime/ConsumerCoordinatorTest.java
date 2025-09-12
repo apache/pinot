@@ -46,6 +46,7 @@ public class ConsumerCoordinatorTest {
         boolean useIdealStateToCalculatePreviousSegment) {
       super(segmentBuildSemaphore);
       super._recentlyDeletedSegments = CacheBuilder.newBuilder().build();
+      super._tableNameWithType = "testTable";
       StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(List.of(new HashMap<>()));
       streamIngestionConfig.setEnforceConsumptionInOrder(true);
       if (useIdealStateToCalculatePreviousSegment) {
@@ -147,7 +148,6 @@ public class ConsumerCoordinatorTest {
     FakeConsumerCoordinator consumerCoordinator = new FakeConsumerCoordinator(true, realtimeTableDataManager);
     realtimeTableDataManager.setConsumerCoordinator(consumerCoordinator);
     ReentrantLock lock = (ReentrantLock) consumerCoordinator.getLock();
-    RealtimeSegmentDataManager mockedRealtimeSegmentDataManager = getMockedRealtimeSegmentDataManager();
     Map<String, String> serverSegmentStatusMap = new HashMap<>() {{
       put("server_1", "ONLINE");
       put("server_3", "ONLINE");

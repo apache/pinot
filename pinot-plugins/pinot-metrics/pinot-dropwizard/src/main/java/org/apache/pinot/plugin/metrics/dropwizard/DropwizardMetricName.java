@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.plugin.metrics.dropwizard;
 
+import java.util.Map;
 import java.util.Objects;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 
@@ -64,5 +65,15 @@ public final class DropwizardMetricName implements PinotMetricName {
   @Override
   public String toString() {
     return _metricName;
+  }
+
+  @Override
+  public String getSimplifiedMetricName() {
+    return _metricName;
+  }
+
+  @Override
+  public Map<String, String> getAttributes() {
+    return Map.of();
   }
 }

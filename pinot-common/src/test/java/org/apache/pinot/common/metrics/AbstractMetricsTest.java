@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.metrics;
 
+import com.google.common.collect.ImmutableMap;
 import com.yammer.metrics.core.MetricName;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -49,11 +50,11 @@ public class AbstractMetricsTest {
     ControllerMetrics controllerMetrics = new ControllerMetrics(new YammerMetricsRegistry());
     String metricName = "test";
     // add gauge
-    controllerMetrics.setOrUpdateGauge(metricName, () -> 1L);
+    controllerMetrics.setOrUpdateGlobalGauge(metricName, () -> 1L);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 1);
 
     // update gauge
-    controllerMetrics.setOrUpdateGauge(metricName, () -> 2L);
+    controllerMetrics.setOrUpdateGlobalGauge(metricName, () -> 2L);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName), 2);
 
     // remove gauge
@@ -72,7 +73,7 @@ public class AbstractMetricsTest {
 
     // update and remove gauge simultaneously
     IntStream.range(0, 1000).forEach(i -> {
-      controllerMetrics.setOrUpdateGauge(metricName, () -> (long) i);
+      controllerMetrics.setOrUpdateGlobalGauge(metricName, () -> (long) i);
     });
 
     // Verify final value
@@ -107,8 +108,8 @@ public class AbstractMetricsTest {
     String metricName2 = "testMultiple2";
 
     // Add multiple gauges
-    controllerMetrics.setOrUpdateGauge(metricName1, () -> 1L);
-    controllerMetrics.setOrUpdateGauge(metricName2, () -> 2L);
+    controllerMetrics.setOrUpdateGlobalGauge(metricName1, () -> 1L);
+    controllerMetrics.setOrUpdateGlobalGauge(metricName2, () -> 2L);
 
     // Verify values
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, metricName1), 1);
@@ -183,7 +184,7 @@ public class AbstractMetricsTest {
     testMetrics.addTimedTableValue(tableName, timer, 6, TimeUnit.SECONDS);
     final MetricName t1Metric = inspector.lastMetric();
     Assert.assertEquals(inspector.getTimer(t1Metric).sum(), 6000);
-    testMetrics.addTimedTableValue(tableName, keyName, timer, 500, TimeUnit.MILLISECONDS);
+    testMetrics.addTimedTableTaskValue(tableName, keyName, timer, 500, TimeUnit.MILLISECONDS);
     final MetricName t2Metric = inspector.lastMetric();
     Assert.assertEquals(inspector.getTimer(t2Metric).sum(), 500);
 
@@ -191,7 +192,7 @@ public class AbstractMetricsTest {
     testMetrics.addTimedValue(timer, 40, TimeUnit.MILLISECONDS);
     final MetricName t3Metric = inspector.lastMetric();
     Assert.assertEquals(inspector.getTimer(t3Metric).sum(), 40);
-    testMetrics.addTimedValue(keyName, timer, 3, TimeUnit.MILLISECONDS);
+    testMetrics.addTimedValue(keyName, timer, 3, TimeUnit.MILLISECONDS, ImmutableMap.of());
     final MetricName t4Metric = inspector.lastMetric();
     Assert.assertEquals(inspector.getTimer(t4Metric).sum(), 3);
 
@@ -239,13 +240,13 @@ public class AbstractMetricsTest {
     expectMeteredCount.accept(9);
 
     // Test meter with key APIs
-    testMetrics.addMeteredValue(keyName, meter, 9);
+    testMetrics.addMeteredValue(keyName, meter, 9, ImmutableMap.of());
     expectNewMetric.run();
     expectMeteredCount.accept(9);
-    PinotMeter reusedMeter = testMetrics.addMeteredValue(keyName, meter2, 13, null);
+    PinotMeter reusedMeter = testMetrics.addMeteredValue(keyName, meter2, 13, null, ImmutableMap.of());
     expectNewMetric.run();
     expectMeteredCount.accept(13);
-    testMetrics.addMeteredValue(keyName, meter2, 6, reusedMeter);
+    testMetrics.addMeteredValue(keyName, meter2, 6, reusedMeter, ImmutableMap.of());
     expectMeteredCount.accept(19);
 
     // Test table-level meter APIs
@@ -256,13 +257,13 @@ public class AbstractMetricsTest {
     expectMeteredCount.accept(18);
 
     // Test table-level meter with additional key APIs
-    testMetrics.addMeteredTableValue(tableName, keyName, meter, 21);
+    testMetrics.addMeteredTableValue(tableName, keyName, meter, 21, ImmutableMap.of());
     expectNewMetric.run();
     expectMeteredCount.accept(21);
-    reusedMeter = testMetrics.addMeteredTableValue(tableName, keyName, meter2, 23, null);
+    reusedMeter = testMetrics.addMeteredTableValue(tableName, keyName, meter2, 23, null, ImmutableMap.of());
     expectNewMetric.run();
     expectMeteredCount.accept(23);
-    testMetrics.addMeteredTableValue(tableName, keyName, meter2, 5, reusedMeter);
+    testMetrics.addMeteredTableValue(tableName, keyName, meter2, 5, reusedMeter, ImmutableMap.of());
     expectMeteredCount.accept(28);
 
     // Test removal APIs
@@ -349,7 +350,8 @@ public class AbstractMetricsTest {
     ControllerMetrics controllerMetrics = buildTestMetrics();
 
     testAsyncAddRemove(
-      () -> controllerMetrics.setValueOfGauge(1L, ControllerGauge.VERSION.getGaugeName()),
+      () -> controllerMetrics.setValueOfGauge(1L, ControllerGauge.VERSION.getGaugeName(),
+          ControllerGauge.VERSION.getGaugeName(), ImmutableMap.of()),
       () -> controllerMetrics.removeGauge(ControllerGauge.VERSION.getGaugeName())
     );
 
@@ -392,7 +394,7 @@ public class AbstractMetricsTest {
     controllerMetrics.setOrUpdateGlobalGauge(ControllerGauge.VERSION, (Supplier<Long>) () -> 2L);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics, ControllerGauge.VERSION.getGaugeName()), 2);
 
-    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, "suffix", 3L);
+    controllerMetrics.setValueOfGlobalGauge(ControllerGauge.OFFLINE_TABLE_COUNT, "suffix", 3L, ImmutableMap.of());
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
             ControllerGauge.OFFLINE_TABLE_COUNT.getGaugeName() + ".suffix"), 3);
 
@@ -413,11 +415,11 @@ public class AbstractMetricsTest {
     String table = "test_table";
     String key = "key";
 
-    controllerMetrics.setOrUpdateTableGauge(table, key, ControllerGauge.VERSION, () -> 1L);
+    controllerMetrics.setOrUpdateTableGauge(table, key, ControllerGauge.VERSION, ImmutableMap.of(), () -> 1L);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
             ControllerGauge.VERSION.getGaugeName() + "." + table + "." + key), 1);
 
-    controllerMetrics.setOrUpdateTableGauge(table, key, ControllerGauge.VERSION, 2L);
+    controllerMetrics.setOrUpdateTableGauge(table, key, ControllerGauge.VERSION, ImmutableMap.of(), 2L);
     Assert.assertEquals(MetricValueUtils.getGaugeValue(controllerMetrics,
             ControllerGauge.VERSION.getGaugeName() + "." + table + "." + key), 2);
 
