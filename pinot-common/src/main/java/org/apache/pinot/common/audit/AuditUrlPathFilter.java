@@ -131,7 +131,7 @@ public class AuditUrlPathFilter {
         return true;
       }
     } catch (Exception e) {
-      LOG.warn("Error checking URL path '{}' against patterns", urlPath, e);
+      LOG.warn("Error checking URL path '{}' against pattern: {}", urlPath, patternsCommaSeparated, e);
     }
 
     return false;
