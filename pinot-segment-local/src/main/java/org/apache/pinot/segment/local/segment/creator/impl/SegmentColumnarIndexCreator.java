@@ -70,6 +70,7 @@ import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
 import org.apache.pinot.spi.data.FieldSpec.FieldType;
 import org.apache.pinot.spi.data.Schema;
+import org.apache.pinot.spi.data.readers.ColumnReader;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.env.CommonsConfigurationUtils;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -414,6 +415,46 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
           }
         }
       }
+    }
+  }
+
+  /**
+   * Index a column using a ColumnReader (column-major approach).
+   * This method processes the column values using the iterator pattern from ColumnReader.
+   *
+   * @param columnName Name of the column to index
+   * @param columnReader ColumnReader for the column data
+   * @throws IOException if indexing fails
+   */
+  public void indexColumn(String columnName, ColumnReader columnReader) throws IOException {
+    Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
+    NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);
+    FieldSpec fieldSpec = _schema.getFieldSpecFor(columnName);
+    SegmentDictionaryCreator dictionaryCreator = _dictionaryCreatorMap.get(columnName);
+
+    // Reset column reader to start from beginning
+    columnReader.rewind();
+
+    int docId = 0;
+    while (columnReader.hasNext()) {
+      Object columnValueToIndex = columnReader.next();
+      if (columnValueToIndex == null) {
+        throw new RuntimeException("Null value for column:" + columnName);
+      }
+
+      if (fieldSpec.isSingleValueField()) {
+        indexSingleValueRow(dictionaryCreator, columnValueToIndex, creatorsByIndex);
+      } else {
+        indexMultiValueRow(dictionaryCreator, (Object[]) columnValueToIndex, creatorsByIndex);
+      }
+
+      if (nullVec != null) {
+        if (columnReader.isNull()) {
+          nullVec.setNull(docId);
+        }
+      }
+
+      docId++;
     }
   }
 
