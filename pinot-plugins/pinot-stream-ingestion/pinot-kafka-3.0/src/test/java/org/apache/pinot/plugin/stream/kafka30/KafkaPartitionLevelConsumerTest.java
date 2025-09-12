@@ -469,7 +469,8 @@ public class KafkaPartitionLevelConsumerTest {
   public void testFetchLatestStreamOffset()
       throws IOException {
     StreamConfig streamConfig = getStreamConfig(TEST_TOPIC_2);
-    try(KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider("clientId", streamConfig)) {
+    try (KafkaStreamMetadataProvider streamMetadataProvider = new KafkaStreamMetadataProvider("clientId",
+        streamConfig)) {
       Set<Integer> partitions = new HashSet<>();
       partitions.add(0);
       partitions.add(1);
