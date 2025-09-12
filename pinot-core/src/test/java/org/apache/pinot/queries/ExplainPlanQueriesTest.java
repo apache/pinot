@@ -2173,6 +2173,7 @@ public class ExplainPlanQueriesTest extends BaseQueriesTest {
     check(query10, new ResultTable(DATA_SCHEMA, result10));
   }
 
+  // TODO: Remove this test. It was added to make it easier to debug the failures of the test of this class
   @Test
   public void asdf() {
 
