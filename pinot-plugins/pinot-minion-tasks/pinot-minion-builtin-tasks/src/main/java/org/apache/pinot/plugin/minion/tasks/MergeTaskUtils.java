@@ -150,6 +150,10 @@ public class MergeTaskUtils {
     if (segmentMapperFileSizeThreshold != null) {
       segmentConfigBuilder.setIntermediateFileSizeThreshold(Long.parseLong(segmentMapperFileSizeThreshold));
     }
+    String maxDiskUsagePercentage = taskConfig.get(MergeTask.MAX_DISK_USAGE_PERCENTAGE);
+    if (maxDiskUsagePercentage != null) {
+      segmentConfigBuilder.setMaxDiskUsagePercentage(Integer.parseInt(maxDiskUsagePercentage));
+    }
     segmentConfigBuilder.setSegmentNamePrefix(taskConfig.get(MergeTask.SEGMENT_NAME_PREFIX_KEY));
     segmentConfigBuilder.setSegmentNamePostfix(taskConfig.get(MergeTask.SEGMENT_NAME_POSTFIX_KEY));
     segmentConfigBuilder.setFixedSegmentName(taskConfig.get(MergeTask.FIXED_SEGMENT_NAME_KEY));
