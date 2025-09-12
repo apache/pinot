@@ -128,7 +128,11 @@ public class MinionConstants {
     // Segment config
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+    // See AdaptiveSizeBasedWriter for documentation of these configs
     public static final String SEGMENT_MAPPER_FILE_SIZE_IN_BYTES = "segmentMapperFileSizeThresholdInBytes";
+    public static final String MAX_DISK_USAGE_PERCENTAGE = "maxDiskUsagePercentage";
+
     public static final String MAX_NUM_PARALLEL_BUCKETS = "maxNumParallelBuckets";
     public static final String SEGMENT_NAME_PREFIX_KEY = "segmentNamePrefix";
     public static final String SEGMENT_NAME_POSTFIX_KEY = "segmentNamePostfix";
