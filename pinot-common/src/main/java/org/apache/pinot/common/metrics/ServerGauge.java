@@ -85,7 +85,6 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
    */
   NETTY_POOLED_THREADLOCALCACHE("bytes", true),
   NETTY_POOLED_CHUNK_SIZE("bytes", true),
-  END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   LUCENE_INDEXING_DELAY_MS("milliseconds", false),
   LUCENE_INDEXING_DELAY_DOCS("documents", false),
   // Needed to track if valid doc id snapshots are present for faster restarts

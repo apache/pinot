@@ -290,8 +290,6 @@ public class IngestionDelayTracker {
               ServerGauge.REALTIME_INGESTION_CONSUMING_OFFSET);
         }
         _serverMetrics.removePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
-        _serverMetrics.removePartitionGauge(_metricName, partitionId,
-            ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS);
         LOGGER.info("Successfully removed ingestion metrics for partition id: {}", partitionId);
       }
       _ingestionInfoMap.remove(partitionId);
