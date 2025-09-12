@@ -164,7 +164,7 @@ public class IngestionDelayTracker {
     _metricsCleanupScheduler.scheduleWithFixedDelay(this::timeoutInactivePartitions,
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricsCleanupIntervalMs, TimeUnit.MILLISECONDS);
 
-    createStreamMetadataProvider(tableNameWithType, realtimeTableDataManager);
+    createStreamMetadataProvider(realtimeTableDataManager);
 
     _ingestionDelayTrackingScheduler = Executors.newSingleThreadScheduledExecutor(
         getThreadFactory("IngestionDelayTrackingThread-" + TableNameBuilder.extractRawTableName(tableNameWithType)));
@@ -173,8 +173,7 @@ public class IngestionDelayTracker {
         INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, metricTrackingIntervalMs, TimeUnit.MILLISECONDS);
   }
 
-  @VisibleForTesting
-  void createStreamMetadataProvider(String tableNameWithType, RealtimeTableDataManager realtimeTableDataManager) {
+  private void createStreamMetadataProvider(RealtimeTableDataManager realtimeTableDataManager) {
     List<StreamConfig> streamConfigs =
         IngestionConfigUtils.getStreamConfigs(realtimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
     _streamMetadataProviderList = new ArrayList<>();
@@ -238,8 +237,18 @@ public class IngestionDelayTracker {
         if (streamMetadataProvider.supportsOffsetLag()) {
           Set<Integer> partitions = streamIndexToPartitions.get(streamIndex);
           try {
-            _partitionIdToLatestOffset.putAll(
-                streamMetadataProvider.fetchLatestStreamOffset(partitions, FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS));
+            Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset =
+                streamMetadataProvider.fetchLatestStreamOffset(partitions, FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS);
+            if (streamIndex > 0) {
+              for (Integer partitionId: partitionIdToLatestOffset.keySet()) {
+                _partitionIdToLatestOffset.put(
+                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, streamIndex),
+                    partitionIdToLatestOffset.get(partitionId));
+              }
+            } else {
+              _partitionIdToLatestOffset.putAll(
+                  streamMetadataProvider.fetchLatestStreamOffset(partitions, FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS));
+            }
           } catch (Throwable t) {
             LOGGER.error("Failed to update latest stream offsets for partitions: {}", partitions, t);
           }

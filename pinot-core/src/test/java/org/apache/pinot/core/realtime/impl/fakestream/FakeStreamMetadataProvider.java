@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import org.apache.pinot.spi.stream.LongMsgOffset;
 import org.apache.pinot.spi.stream.OffsetCriteria;
 import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamMetadataProvider;
@@ -72,6 +73,10 @@ public class FakeStreamMetadataProvider implements StreamMetadataProvider {
   @Override
   public Map<Integer, StreamPartitionMsgOffset> fetchLatestStreamOffset(Set<Integer> partitionIds,
       long timeoutMillis) {
-    return new HashMap<>();
+    Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset = new HashMap<>();
+    for (Integer partitionId: partitionIds) {
+      partitionIdToLatestOffset.put(partitionId, new LongMsgOffset(Integer.MAX_VALUE));
+    }
+    return partitionIdToLatestOffset;
   }
 }

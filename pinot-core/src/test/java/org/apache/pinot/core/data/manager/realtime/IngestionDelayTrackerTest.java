@@ -24,26 +24,35 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
-import org.apache.pinot.core.realtime.impl.fakestream.FakeStreamMetadataProvider;
+import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.ingestion.IngestionConfig;
+import org.apache.pinot.spi.config.table.ingestion.StreamIngestionConfig;
 import org.apache.pinot.spi.stream.LongMsgOffset;
-import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.stream.StreamPartitionMsgOffset;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
+import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.util.TestUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 
 public class IngestionDelayTrackerTest {
   private static final String RAW_TABLE_NAME = "testTable";
@@ -52,7 +61,16 @@ public class IngestionDelayTrackerTest {
   private static final int METRICS_TRACKING_TICK_INTERVAL_MS = 100;
 
   private final ServerMetrics _serverMetrics = mock(ServerMetrics.class);
-  private final RealtimeTableDataManager _realtimeTableDataManager = mock(RealtimeTableDataManager.class);
+  private static final RealtimeTableDataManager REALTIME_TABLE_DATA_MANAGER = mock(RealtimeTableDataManager.class);
+
+  static {
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("ts")
+        .setNullHandlingEnabled(true)
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    when(REALTIME_TABLE_DATA_MANAGER.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, null));
+  }
 
   private static Map<String, String> getStreamConfigs() {
     Map<String, String> streamConfigs = new HashMap<>();
@@ -60,6 +78,8 @@ public class IngestionDelayTrackerTest {
     streamConfigs.put("stream.kafka.topic.name", "test");
     streamConfigs.put("stream.kafka.decoder.class.name",
         "org.apache.pinot.plugin.stream.kafka.KafkaJSONMessageDecoder");
+    streamConfigs.put("stream.kafka.consumer.factory.class.name",
+        "org.apache.pinot.core.realtime.impl.fakestream.FakeStreamConsumerFactory");
     return streamConfigs;
   }
 
@@ -81,12 +101,14 @@ public class IngestionDelayTrackerTest {
           metricTrackingIntervalMs, isServerReadyToServeQueries);
     }
 
-    @Override
-    public void createStreamMetadataProvider(String tableNameWithType,
-        RealtimeTableDataManager realtimeTableDataManager) {
-      _streamMetadataProviderList =
-          List.of(new FakeStreamMetadataProvider(new StreamConfig(tableNameWithType, getStreamConfigs())));
-    }
+//    @Override
+//    public void createStreamMetadataProvider(String tableNameWithType,
+//        RealtimeTableDataManager realtimeTableDataManager) {
+//      List<StreamConfig> streamConfigs =
+//          IngestionConfigUtils.getStreamConfigs(realtimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
+//      _streamMetadataProviderList =
+//          List.of(new FakeStreamMetadataProvider(new StreamConfig(tableNameWithType, getStreamConfigs())));
+//    }
 
     @Override
     public void createMetrics(int partitionId) {
@@ -133,14 +155,14 @@ public class IngestionDelayTrackerTest {
   }
 
   private IngestionDelayTracker createTracker() {
-    return new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, () -> true);
+    return new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, () -> true);
   }
 
   @Test
   public void testTrackerConstructors() {
     // Test regular constructor
     IngestionDelayTracker ingestionDelayTracker =
-        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, () -> true);
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, () -> true);
 
     Clock clock = Clock.systemUTC();
     ingestionDelayTracker.setClock(clock);
@@ -150,13 +172,13 @@ public class IngestionDelayTrackerTest {
     ingestionDelayTracker.shutdown();
     // Test constructor with timer arguments
     ingestionDelayTracker =
-        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER,
             METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true);
     Assert.assertTrue(ingestionDelayTracker.getPartitionIngestionDelayMs(0) <= clock.millis());
     Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionTimeMs(0), Long.MIN_VALUE);
     // Test bad timer args to the constructor
     try {
-      new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager, 0, 0, () -> true);
+      new IngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, 0, 0, () -> true);
       Assert.fail("Must have asserted due to invalid arguments"); // Constructor must assert
     } catch (Exception e) {
       if ((e instanceof NullPointerException) || !(e instanceof RuntimeException)) {
@@ -399,9 +421,48 @@ public class IngestionDelayTrackerTest {
   }
 
   @Test
+  public void testUpdateLatestStreamOffset() {
+    IngestionDelayTracker ingestionDelayTracker = createTracker();
+    Set<Integer> partitionsHosted = new HashSet<>();
+    partitionsHosted.add(0);
+    partitionsHosted.add(1);
+
+    ingestionDelayTracker.updateLatestStreamOffset(partitionsHosted);
+    Assert.assertEquals(ingestionDelayTracker._partitionIdToLatestOffset.size(), 2);
+    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(0))).getOffset(),
+        Integer.MAX_VALUE);
+    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(1))).getOffset(),
+        Integer.MAX_VALUE);
+
+    IngestionConfig ingestionConfig = new IngestionConfig();
+    List<Map<String, String>> streamConfigMaps = new ArrayList<>();
+    streamConfigMaps.add(getStreamConfigs());
+    streamConfigMaps.add(getStreamConfigs());
+    StreamIngestionConfig streamIngestionConfig = new StreamIngestionConfig(streamConfigMaps);
+    ingestionConfig.setStreamIngestionConfig(streamIngestionConfig);
+    TableConfig tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(RAW_TABLE_NAME)
+        .setTimeColumnName("ts")
+        .setNullHandlingEnabled(true)
+        .setIngestionConfig(ingestionConfig)
+        .setStreamConfigs(getStreamConfigs())
+        .build();
+    when(REALTIME_TABLE_DATA_MANAGER.getCachedTableConfigAndSchema()).thenReturn(Pair.of(tableConfig, null));
+    ingestionDelayTracker = createTracker();
+    partitionsHosted.add(IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 1));
+    ingestionDelayTracker.updateLatestStreamOffset(partitionsHosted);
+    Assert.assertEquals(ingestionDelayTracker._partitionIdToLatestOffset.size(), 3);
+    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(0))).getOffset(),
+        Integer.MAX_VALUE);
+    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(1))).getOffset(),
+        Integer.MAX_VALUE);
+    Assert.assertEquals(((LongMsgOffset) (ingestionDelayTracker._partitionIdToLatestOffset.get(
+        IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(0, 1)))).getOffset(), Integer.MAX_VALUE);
+  }
+
+  @Test
   public void testIngestionDelay() {
     MockIngestionDelayTracker ingestionDelayTracker =
-        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, _realtimeTableDataManager,
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER,
             METRICS_CLEANUP_TICK_INTERVAL_MS, METRICS_TRACKING_TICK_INTERVAL_MS, () -> true);
 
     final int partition0 = 0;
