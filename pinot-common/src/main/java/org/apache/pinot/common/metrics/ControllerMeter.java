@@ -75,7 +75,9 @@ public enum ControllerMeter implements AbstractMetrics.Meter {
   // Total Bytes written to deep store
   DEEP_STORE_WRITE_BYTES_COMPLETED("deepStoreWriteBytesCompleted", true),
   // Tracks failures encountered while fetching partition group metadata
-  PARTITION_GROUP_METADATA_FETCH_ERROR("failures", true);
+  PARTITION_GROUP_METADATA_FETCH_ERROR("failures", true),
+  OFFSET_AUTO_RESET_SKIPPED_OFFSETS("autoResetSkippedOffsets", false),
+  OFFSET_AUTO_RESET_BACKFILL_OFFSETS("autoResetBackfillOffsets", false);
 
   private final String _brokerMeterName;
   private final String _unit;

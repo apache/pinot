@@ -684,14 +684,17 @@ public final class TableConfigUtils {
       // 2. Ensure segment flush parameters consistent across all streamConfigs. We need this because Pinot is
       // predefining the values before fetching stream partition info from stream. At the construction time, we don't
       // know the value extracted from a streamConfig would be applied to which segment.
+      // 3. There should not be duplicate topic names across streamConfigs.
       // TODO: Remove these limitations
       StreamConfig firstStreamConfig = streamConfigs.get(0);
+      Set<String> topicNames = new HashSet<>();
       String streamType = firstStreamConfig.getType();
       int flushThresholdRows = firstStreamConfig.getFlushThresholdRows();
       long flushThresholdTimeMillis = firstStreamConfig.getFlushThresholdTimeMillis();
       double flushThresholdVarianceFraction = firstStreamConfig.getFlushThresholdVarianceFraction();
       long flushThresholdSegmentSizeBytes = firstStreamConfig.getFlushThresholdSegmentSizeBytes();
       int flushThresholdSegmentRows = firstStreamConfig.getFlushThresholdSegmentRows();
+      topicNames.add(firstStreamConfig.getTopicName());
       for (int i = 1; i < numStreamConfigs; i++) {
         StreamConfig streamConfig = streamConfigs.get(i);
         Preconditions.checkState(streamConfig.getType().equals(streamType),
@@ -702,6 +705,8 @@ public final class TableConfigUtils {
                 && streamConfig.getFlushThresholdSegmentSizeBytes() == flushThresholdSegmentSizeBytes
                 && streamConfig.getFlushThresholdSegmentRows() == flushThresholdSegmentRows,
             "Segment flush parameters must be consistent across all streamConfigs");
+        Preconditions.checkState(topicNames.add(streamConfig.getTopicName()),
+            "Duplicate topic names found in streamConfigs: %s", streamConfig.getTopicName());
       }
     }
   }
