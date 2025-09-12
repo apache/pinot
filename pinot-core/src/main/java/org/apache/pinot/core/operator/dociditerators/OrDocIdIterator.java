@@ -183,7 +183,9 @@ public abstract class OrDocIdIterator implements BlockDocIdIterator {
       boolean hasExhaustedIterator = false;
       for (int i = 0; i < _numNotExhaustedIterators; i++) {
         int docId = _nextDocIds[i];
-        if (docId > targetDocId) {
+        // For descending order, advance child iterators when their current docId > targetDocId
+        // or when they haven't been initialized yet (docId == -1 or docId == _previousDocId)
+        if (docId > targetDocId || docId == _previousDocId || docId == -1) {
           docId = _docIdIterators[i].advance(targetDocId);
           _nextDocIds[i] = docId;
           if (docId == Constants.EOF) {

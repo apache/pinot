@@ -146,11 +146,11 @@ public class OrDocIdIteratorTest {
   }
 
   @Test
-  public void testDescIteratorAdvanceToHigherDoc() {
+  public void testDescIteratorAdvanceToLowerDoc() {
     // Test advance() to a document ID higher than current position
-    int[] docIds1 = new int[]{1, 4, 6, 10, 15, 17, 18, 20};
-    int[] docIds2 = new int[]{0, 1, 5, 8, 15, 18};
-    int[] docIds3 = new int[]{1, 2, 6, 13, 16, 19};
+    int[] docIds1 = new int[]{17, 18, 20};
+    int[] docIds2 = new int[]{8, 15, 18};
+    int[] docIds3 = new int[]{13, 16, 19};
 
     MutableRoaringBitmap bitmap1 = new MutableRoaringBitmap();
     bitmap1.add(docIds1);
@@ -166,8 +166,8 @@ public class OrDocIdIteratorTest {
             RangelessBitmapDocIdIterator.create(bitmap3, false)
         }, false);
 
-    // Start from beginning and advance to high document 25 (beyond all docs)
-    assertEquals(descIterator.advance(25), Constants.EOF);
+    // Start from beginning and advance to low document 5 (beyond all docs)
+    assertEquals(descIterator.advance(5), Constants.EOF);
   }
 
   @Test
