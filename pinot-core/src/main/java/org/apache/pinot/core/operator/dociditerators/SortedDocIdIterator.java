@@ -38,6 +38,9 @@ public abstract class SortedDocIdIterator implements BlockDocIdIterator {
   private SortedDocIdIterator(List<IntPair> docIdRanges) {
     _docIdRanges = docIdRanges;
     _numRanges = _docIdRanges.size();
+    if (_numRanges == 0) {
+      throw new IllegalArgumentException("Document ID ranges cannot be empty");
+    }
     _nextDocId = docIdRanges.get(0).getLeft();
   }
 
@@ -119,6 +122,7 @@ public abstract class SortedDocIdIterator implements BlockDocIdIterator {
 
     @Override
     public int advance(int targetDocId) {
+      assert targetDocId <= _nextDocId : "Cannot advance to a larger document id in descending order";
       IntPair currentRange = _docIdRanges.get(_currentRangeId);
       if (targetDocId >= currentRange.getLeft()) {
         // Target document id is within the current range

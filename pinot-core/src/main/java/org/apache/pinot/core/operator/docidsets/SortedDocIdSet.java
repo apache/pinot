@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
@@ -31,6 +32,7 @@ public final class SortedDocIdSet extends BlockDocIdSet.Base {
   //       always smaller than numDocs.
   public SortedDocIdSet(List<IntPair> docIdRanges, boolean ascending) {
     super(ascending);
+    Preconditions.checkArgument(!docIdRanges.isEmpty(), "docIdRanges must not be empty");
     _docIdRanges = docIdRanges;
   }
 

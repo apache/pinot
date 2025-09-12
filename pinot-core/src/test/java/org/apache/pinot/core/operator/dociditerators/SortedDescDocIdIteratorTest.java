@@ -112,9 +112,8 @@ public class SortedDescDocIdIteratorTest {
     );
     SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
     try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
-      // Advance to document 30, which is after all ranges
-      assertEquals(iterator.advance(30), 25);
-      assertEquals(iterator.next(), 24);
+      // Advance to document 5, which is lower (and therefore after) all ranges
+      assertEquals(iterator.advance(5), Constants.EOF);
     }
   }
 
@@ -127,12 +126,18 @@ public class SortedDescDocIdIteratorTest {
     );
     SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
     try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
+      // Advance to exact start of first range
+      assertEquals(iterator.advance(25), 25);
+      assertEquals(iterator.next(), 24);
+
       // Advance to exact end of first range
-      assertEquals(iterator.advance(15), 15);
-      assertEquals(iterator.next(), 14);
+      assertEquals(iterator.advance(20), 20);
 
       // Advance to exact start of second range
-      assertEquals(iterator.advance(20), 20);
+      assertEquals(iterator.advance(15), 15);
+
+      // Advance to exact end of second range
+      assertEquals(iterator.advance(10), 10);
       assertEquals(iterator.next(), Constants.EOF);
     }
   }
@@ -148,21 +153,19 @@ public class SortedDescDocIdIteratorTest {
     SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
     try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
       // Advance to gap between first and second range
-      assertEquals(iterator.advance(18), 15);
+      assertEquals(iterator.advance(27), 25);
 
       // Advance to gap between second and third range
-      assertEquals(iterator.advance(28), 25);
+      assertEquals(iterator.advance(17), 15);
     }
   }
 
-  @Test
+  @Test(expectedExceptions = IllegalArgumentException.class)
   public void testEmptyRangesList() {
     // Test with empty list of ranges
     List<Pairs.IntPair> docIdRanges = Collections.emptyList();
     SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
     try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
-      assertEquals(iterator.next(), Constants.EOF);
-      assertEquals(iterator.advance(10), Constants.EOF);
     }
   }
 
@@ -198,19 +201,6 @@ public class SortedDescDocIdIteratorTest {
 
       // Advance within current range to an even lower value
       assertEquals(iterator.advance(12), 12);
-    }
-  }
-
-  @Test
-  public void testAdvanceToCurrentDocId() {
-    // Test advancing to the current document ID
-    List<Pairs.IntPair> docIdRanges = Collections.singletonList(new Pairs.IntPair(10, 15));
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(docIdRanges, false);
-    try (BlockDocIdIterator iterator = sortedDocIdSet.iterator()) {
-      assertEquals(iterator.next(), 15);
-
-      // Advance to current position
-      assertEquals(iterator.advance(15), Constants.EOF); // Should be EOF since we already consumed 15
     }
   }
 
@@ -264,7 +254,7 @@ public class SortedDescDocIdIteratorTest {
 
       // After exhaustion, both next() and advance() should return EOF
       assertEquals(iterator.next(), Constants.EOF);
-      assertEquals(iterator.advance(10), Constants.EOF);
+      assertEquals(iterator.advance(4), Constants.EOF);
       assertEquals(iterator.advance(3), Constants.EOF);
     }
   }
