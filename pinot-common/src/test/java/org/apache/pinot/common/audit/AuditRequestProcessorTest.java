@@ -76,7 +76,7 @@ public class AuditRequestProcessorTest {
 
     when(_configManager.isEnabled()).thenReturn(true);
     when(_configManager.getCurrentConfig()).thenReturn(_defaultConfig);
-    when(_auditUrlPathFilter.isExcluded(any(), any())).thenReturn(false);
+    when(_auditUrlPathFilter.matches(any(), any())).thenReturn(false);
   }
 
   private MultivaluedMap<String, String> createHeaders(String... headerPairs) {
