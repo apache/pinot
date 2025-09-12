@@ -2016,7 +2016,7 @@ public class RealtimeSegmentDataManager extends SegmentDataManager {
         _realtimeTableDataManager.updateIngestionMetrics(_segmentNameStr, _partitionGroupId,
             metadata.getRecordIngestionTimeMs(), metadata.getOffset());
       } catch (Exception e) {
-        _segmentLogger.warn("Failed to fetch latest offset for updating ingestion delay", e);
+        _segmentLogger.warn("Failed to update the ingestion metrics", e);
       }
     }
   }
