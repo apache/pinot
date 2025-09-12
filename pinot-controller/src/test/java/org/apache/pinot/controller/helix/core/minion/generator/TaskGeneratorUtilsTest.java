@@ -20,8 +20,10 @@ package org.apache.pinot.controller.helix.core.minion.generator;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
+import org.apache.helix.task.JobConfig;
 import org.apache.helix.task.TaskState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
@@ -135,5 +137,51 @@ public class TaskGeneratorUtilsTest {
     tableTaskConfigs.put("100days.maxNumRecordsPerSegment", "15000");
     tableTaskConfigs.put("100days.maxNumRecordsPerTask", "15000");
     return tableTaskConfigs;
+  }
+
+  @Test
+  public void testGetNumConcurrentTasksPerInstanceMerged() {
+    ClusterInfoAccessor mockClusterInfoAccessor = createMockClusterInfoAccessor();
+
+    // Create test task generator
+    TestTaskGenerator taskGenerator = new TestTaskGenerator();
+    taskGenerator.init(mockClusterInfoAccessor);
+
+    // Test 1: Default behavior (no specific configs)
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance(null),
+        JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE);
+
+    // Test 2: Task type specific config
+    String taskTypeConfigKey = "TestTask" + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
+    when(mockClusterInfoAccessor.getClusterConfig(taskTypeConfigKey)).thenReturn("3");
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance((String) null), 3);
+
+    // Test 3: Task type + tenant specific config (should override task type config)
+    String minionTenant = "tenant1";
+    String tenantConfigKey = "TestTask." + minionTenant + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
+    when(mockClusterInfoAccessor.getClusterConfig(tenantConfigKey)).thenReturn("5");
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance(minionTenant), 5);
+
+    // Test 4: Invalid tenant config value (should fallback to task type config)
+    when(mockClusterInfoAccessor.getClusterConfig(tenantConfigKey)).thenReturn("invalid");
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance(minionTenant), 3);
+
+    // Test 5: Non-existent tenant (should fallback to task type config)
+    assertEquals(taskGenerator.getNumConcurrentTasksPerInstance("nonExistentTenant"), 3);
+  }
+
+  /**
+   * Test task generator that extends BaseTaskGenerator for testing purposes
+   */
+  private static class TestTaskGenerator extends BaseTaskGenerator {
+    @Override
+    public String getTaskType() {
+      return "TestTask";
+    }
+
+    @Override
+    public List<PinotTaskConfig> generateTasks(List<TableConfig> tableConfigs) {
+      return Collections.emptyList();
+    }
   }
 }

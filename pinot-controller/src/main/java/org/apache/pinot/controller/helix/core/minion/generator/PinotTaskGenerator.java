@@ -69,8 +69,15 @@ public interface PinotTaskGenerator {
 
   /**
    * Returns the maximum number of concurrent tasks allowed per instance, 1 by default.
+   * Priority order (highest to lowest):
+   * 1. Minion tenant specific cluster config: taskType.minionTag.numConcurrentTasksPerInstance
+   * 2. Task type cluster config: taskType.numConcurrentTasksPerInstance
+   * 3. Default value
+   *
+   * @param minionTag Minion instance tag/tenant (can be null)
+   * @return Number of concurrent tasks per instance
    */
-  default int getNumConcurrentTasksPerInstance() {
+  default int getNumConcurrentTasksPerInstance(String minionTag) {
     return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
   }
 
