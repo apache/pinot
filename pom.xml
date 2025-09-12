@@ -229,7 +229,7 @@
     <javax.jaxb-api.version>2.3.1</javax.jaxb-api.version>
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <javax.ws.rs-api.version>2.1.1</javax.ws.rs-api.version>
-    <jakarta.activation-api.version>1.2.2</jakarta.activation-api.version>
+    <jakarta.activation-api.version>2.1.4</jakarta.activation-api.version>
 
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
