@@ -60,6 +60,13 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
     }
   }
 
+  private TransformOperator(
+      BaseProjectOperator<?> projectOperator,
+      Map<ExpressionContext, TransformFunction> transformFunctionMap) {
+    _projectOperator = projectOperator;
+    _transformFunctionMap = transformFunctionMap;
+  }
+
   @Override
   public Map<String, ColumnContext> getSourceColumnContextMap() {
     return _projectOperator.getSourceColumnContextMap();
@@ -109,5 +116,21 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
   @Override
   public ExecutionStatistics getExecutionStatistics() {
     return _projectOperator.getExecutionStatistics();
+  }
+
+
+  @Override
+  public boolean isAscending() {
+    return _projectOperator.isAscending();
+  }
+
+  @Override
+  public boolean isDescending() {
+    return _projectOperator.isDescending();
+  }
+
+  @Override
+  public BaseProjectOperator<TransformBlock> withOrder(boolean ascending) {
+    return new TransformOperator(_projectOperator.withOrder(ascending), _transformFunctionMap);
   }
 }

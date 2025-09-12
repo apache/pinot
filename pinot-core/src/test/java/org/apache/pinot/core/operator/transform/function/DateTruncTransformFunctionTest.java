@@ -31,7 +31,7 @@ import org.apache.pinot.common.function.DateTimeUtils;
 import org.apache.pinot.common.function.TimeZoneKey;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.core.operator.DocIdSetOperator;
+import org.apache.pinot.core.operator.AscDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
@@ -107,7 +107,7 @@ public class DateTruncTransformFunctionTest {
       }
 
       ProjectionBlock projectionBlock = new ProjectionOperator(dataSourceMap,
-          new DocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+          new AscDocIdSetOperator(new MatchAllFilterOperator(rows.size()), DocIdSetPlanNode.MAX_DOC_PER_CALL),
           new QueryContext.Builder().build()).nextBlock();
 
       ExpressionContext expression = RequestContextUtils.getExpression(

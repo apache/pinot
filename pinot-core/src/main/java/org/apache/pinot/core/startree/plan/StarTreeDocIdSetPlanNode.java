@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
-import org.apache.pinot.core.operator.DocIdSetOperator;
+import org.apache.pinot.core.operator.AscDocIdSetOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.core.plan.PlanNode;
 import org.apache.pinot.core.query.request.context.QueryContext;
@@ -40,7 +40,7 @@ public class StarTreeDocIdSetPlanNode implements PlanNode {
   }
 
   @Override
-  public DocIdSetOperator run() {
-    return new DocIdSetOperator(_starTreeFilterPlanNode.run(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
+  public AscDocIdSetOperator run() {
+    return new AscDocIdSetOperator(_starTreeFilterPlanNode.run(), DocIdSetPlanNode.MAX_DOC_PER_CALL);
   }
 }

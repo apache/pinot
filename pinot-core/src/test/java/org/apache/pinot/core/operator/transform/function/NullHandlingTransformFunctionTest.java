@@ -35,7 +35,7 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pinot.common.function.TransformFunctionType;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.RequestContextUtils;
-import org.apache.pinot.core.operator.DocIdSetOperator;
+import org.apache.pinot.core.operator.AscDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.MatchAllFilterOperator;
@@ -161,7 +161,7 @@ public class NullHandlingTransformFunctionTest {
     }
 
     _projectionBlock = new ProjectionOperator(_dataSourceMap,
-        new DocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL),
+        new AscDocIdSetOperator(new MatchAllFilterOperator(NUM_ROWS), DocIdSetPlanNode.MAX_DOC_PER_CALL),
         new QueryContext.Builder().build()).nextBlock();
   }
 
