@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
  * <p>
  * It supports two main constraints:
  * <ul>
- *   <li><b>Byte Limit:</b> The maximum number of bytes that can be written for a given instance of AdaptiveSizeBasedWriter.
+ *   <li><b>Byte Limit:</b> The maximum number of bytes that can be written for a given instance of the class
  *   Once this limit is reached, no further data is written.
  *   This config doesn't take into account other writers writing to the same file store.
  *   </li>
@@ -50,16 +50,16 @@ public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWr
   private static final Logger LOGGER = LoggerFactory.getLogger(AdaptiveSizeBasedWriter.class);
 
   private final long _bytesLimit; // Max number of bytes that can be written for this instance of the writer
-  private final int _max_disk_usage_percentage; // Max disk usage percentage for the underlying file store
+  private final int _maxDiskUsagePercentage; // Max disk usage percentage for the underlying file store
 
   private long _numBytesWritten; // Number of bytes written so far by this instance of the writer
   @Nullable
   private final FileStore _fileStore;
-  private long lastDiskUsageCheckTime = 0L;
+  private long _lastDiskUsageCheckTime = 0L;
 
   private static final long DISK_USAGE_CHECK_INTERVAL_MS = 10 * 1000L; // 10 seconds
 
-  public AdaptiveSizeBasedWriter(long bytesLimit, int max_disk_usage_percentage, File outputDir) {
+  public AdaptiveSizeBasedWriter(long bytesLimit, int maxDiskUsagePercentage, File outputDir) {
     _bytesLimit = bytesLimit;
     _numBytesWritten = 0;
 
@@ -72,7 +72,7 @@ public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWr
       fileStore = null;
     }
     _fileStore = fileStore;
-    _max_disk_usage_percentage = max_disk_usage_percentage;
+    _maxDiskUsagePercentage = maxDiskUsagePercentage;
   }
 
   public long getBytesLimit() {
@@ -93,26 +93,26 @@ public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWr
   }
 
   private boolean isDiskUsageExceeded() {
-    if (_fileStore == null || _max_disk_usage_percentage <= 0 || _max_disk_usage_percentage >= 100) {
+    if (_fileStore == null || _maxDiskUsagePercentage <= 0 || _maxDiskUsagePercentage >= 100) {
       // Unable to get the filestore or invalid or no limit on max disk usage percentage
       return false;
     }
     try {
       long currentTime = System.currentTimeMillis();
-      if (currentTime - lastDiskUsageCheckTime < DISK_USAGE_CHECK_INTERVAL_MS) {
+      if (currentTime - _lastDiskUsageCheckTime < DISK_USAGE_CHECK_INTERVAL_MS) {
         return false;
       }
-      lastDiskUsageCheckTime = currentTime;
+      _lastDiskUsageCheckTime = currentTime;
 
       long totalSpace = _fileStore.getTotalSpace();
       long usableSpace = _fileStore.getUsableSpace();
       long usedSpace = totalSpace - usableSpace;
       int usedPercentage = (int) ((usedSpace * 100) / totalSpace);
-      if (usedPercentage >= _max_disk_usage_percentage) {
+      if (usedPercentage >= _maxDiskUsagePercentage) {
         LOGGER.warn("Disk usage percentage: {}% has exceeded the max limit: {}%. Will stop writing more data",
-            usedPercentage, _max_disk_usage_percentage);
+            usedPercentage, _maxDiskUsagePercentage);
       }
-      return usedPercentage >= _max_disk_usage_percentage;
+      return usedPercentage >= _maxDiskUsagePercentage;
     } catch (Exception e) {
       LOGGER.error("Failed to get the disk usage info", e);
       return false;
