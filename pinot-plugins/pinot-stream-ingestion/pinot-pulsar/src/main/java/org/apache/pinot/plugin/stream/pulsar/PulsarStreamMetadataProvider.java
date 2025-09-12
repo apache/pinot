@@ -202,6 +202,11 @@ public class PulsarStreamMetadataProvider extends PulsarPartitionLevelConnection
     }
   }
 
+  @Override
+  public boolean supportsOffsetLag() {
+    return false;
+  }
+
   public static class PulsarTopicMetadata implements TopicMetadata {
     private String _name;
 

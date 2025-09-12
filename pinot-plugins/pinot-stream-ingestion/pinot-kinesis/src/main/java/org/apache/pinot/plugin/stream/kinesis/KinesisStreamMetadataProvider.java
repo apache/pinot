@@ -287,6 +287,11 @@ public class KinesisStreamMetadataProvider implements StreamMetadataProvider {
         .collect(Collectors.toList());
   }
 
+  @Override
+  public boolean supportsOffsetLag() {
+    return false;
+  }
+
   public static class KinesisTopicMetadata implements TopicMetadata {
     private String _name;
 
