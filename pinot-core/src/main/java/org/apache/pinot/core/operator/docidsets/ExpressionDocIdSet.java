@@ -28,12 +28,13 @@ import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
-public final class ExpressionDocIdSet implements BlockDocIdSet {
+public final class ExpressionDocIdSet extends BlockDocIdSet.Base {
   private final ExpressionScanDocIdIterator _docIdIterator;
 
   public ExpressionDocIdSet(TransformFunction transformFunction, @Nullable PredicateEvaluator predicateEvaluator,
       Map<String, DataSource> dataSourceMap, int numDocs,
       ExpressionScanDocIdIterator.PredicateEvaluationResult predicateEvaluationResult, QueryContext queryContext) {
+    super(true);
     _docIdIterator = new ExpressionScanDocIdIterator(transformFunction, predicateEvaluator, dataSourceMap, numDocs,
         predicateEvaluationResult, queryContext);
   }

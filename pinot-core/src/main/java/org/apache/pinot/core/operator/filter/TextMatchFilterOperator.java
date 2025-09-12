@@ -49,7 +49,7 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
 
   public TextMatchFilterOperator(String column, TextIndexReader textIndexReader, TextMatchPredicate predicate,
       int numDocs) {
-    super(numDocs, false);
+    super(numDocs, false, true);
     _column = column;
     _textIndexReader = textIndexReader;
     _predicate = predicate;
@@ -141,5 +141,10 @@ public class TextMatchFilterOperator extends BaseFilterOperator {
       recording.setColumnName(_predicate.getLhs().getIdentifier());
       recording.setFilter(FilterType.INDEX, "LUCENE_TEXT");
     }
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    throw new UnsupportedOperationException("Text match filter operator does not support reverse operation");
   }
 }

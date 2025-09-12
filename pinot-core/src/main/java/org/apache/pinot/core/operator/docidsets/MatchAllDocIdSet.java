@@ -18,24 +18,66 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.MatchAllDocIdIterator;
 
 
-public final class MatchAllDocIdSet implements BlockDocIdSet {
-  private final int _numDocs;
+public abstract class MatchAllDocIdSet implements BlockDocIdSet {
+  protected final int _numDocs;
 
-  public MatchAllDocIdSet(int numDocs) {
-    _numDocs = numDocs;
+  public static MatchAllDocIdSet create(int numDocs, boolean ascending) {
+    return ascending ? new Asc(numDocs) : new Desc(numDocs);
   }
 
-  @Override
-  public MatchAllDocIdIterator iterator() {
-    return new MatchAllDocIdIterator(_numDocs);
+  private MatchAllDocIdSet(int numDocs) {
+    _numDocs = numDocs;
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
     return 0L;
+  }
+
+  public static final class Asc extends MatchAllDocIdSet {
+    private Asc(int numDocs) {
+      super(numDocs);
+    }
+
+    @Override
+    public MatchAllDocIdIterator iterator() {
+      return MatchAllDocIdIterator.create(_numDocs, true);
+    }
+
+    @Override
+    public boolean isAscending() {
+      return true;
+    }
+
+    @Override
+    public boolean isDescending() {
+      return _numDocs == 0;
+    }
+  }
+
+  public static final class Desc extends MatchAllDocIdSet {
+    private Desc(int numDocs) {
+      super(numDocs);
+    }
+
+    @Override
+    public BlockDocIdIterator iterator() {
+      return MatchAllDocIdIterator.create(_numDocs, false);
+    }
+
+    @Override
+    public boolean isAscending() {
+      return _numDocs == 0;
+    }
+
+    @Override
+    public boolean isDescending() {
+      return true;
+    }
   }
 }

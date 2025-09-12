@@ -34,8 +34,9 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
   protected final QueryContext _queryContext;
   protected final DataSource _dataSource;
 
-  protected BaseColumnFilterOperator(QueryContext queryContext, DataSource dataSource, int numDocs) {
-    super(numDocs, queryContext.isNullHandlingEnabled());
+  protected BaseColumnFilterOperator(QueryContext queryContext, DataSource dataSource, int numDocs,
+      boolean ascending) {
+    super(numDocs, queryContext.isNullHandlingEnabled(), ascending);
     _queryContext = queryContext;
     _dataSource = dataSource;
   }
@@ -57,7 +58,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
   protected BlockDocIdSet getNulls() {
     ImmutableRoaringBitmap nullBitmap = getNullBitmap();
     if (nullBitmap != null && !nullBitmap.isEmpty()) {
-      return new BitmapDocIdSet(nullBitmap, _numDocs);
+      return new BitmapDocIdSet(nullBitmap, _numDocs, _ascending);
     } else {
       return EmptyDocIdSet.getInstance();
     }
@@ -65,7 +66,7 @@ public abstract class BaseColumnFilterOperator extends BaseFilterOperator {
 
   private BlockDocIdSet excludeNulls(BlockDocIdSet blockDocIdSet, ImmutableRoaringBitmap nullBitmap) {
     return new AndDocIdSet(Arrays.asList(blockDocIdSet,
-        new BitmapDocIdSet(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs), _numDocs)),
+        new BitmapDocIdSet(ImmutableRoaringBitmap.flip(nullBitmap, 0, (long) _numDocs), _numDocs, _ascending)),
         _queryContext.getQueryOptions());
   }
 

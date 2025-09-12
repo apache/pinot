@@ -25,27 +25,65 @@ import org.apache.pinot.segment.spi.Constants;
 /**
  * The {@code MatchAllDocIdIterator} is the iterator for MatchAllDocIdSet where all documents are matching.
  */
-public final class MatchAllDocIdIterator implements BlockDocIdIterator {
-  private final int _numDocs;
-
-  private int _nextDocId = 0;
+public abstract class MatchAllDocIdIterator implements BlockDocIdIterator {
+  protected final int _numDocs;
 
   public MatchAllDocIdIterator(int numDocs) {
     _numDocs = numDocs;
   }
 
-  @Override
-  public int next() {
-    if (_nextDocId < _numDocs) {
-      return _nextDocId++;
-    } else {
-      return Constants.EOF;
+  public static MatchAllDocIdIterator create(int numDocs, boolean ascending) {
+    return ascending ? new Asc(numDocs) : new Desc(numDocs);
+  }
+
+  private static class Asc extends MatchAllDocIdIterator {
+    protected int _nextDocId = 0;
+
+    private Asc(int numDocs) {
+      super(numDocs);
+    }
+
+    @Override
+    public int next() {
+      if (_nextDocId < _numDocs) {
+        return _nextDocId++;
+      } else {
+        return Constants.EOF;
+      }
+    }
+
+    @Override
+    public int advance(int targetDocId) {
+      _nextDocId = targetDocId;
+      return next();
     }
   }
 
-  @Override
-  public int advance(int targetDocId) {
-    _nextDocId = targetDocId;
-    return next();
+  private static class Desc extends MatchAllDocIdIterator {
+    private int _lastDocId;
+
+    private Desc(int numDocs) {
+      super(numDocs);
+      _lastDocId = numDocs;
+    }
+
+    @Override
+    public int next() {
+      if (_lastDocId > 0) {
+        return --_lastDocId;
+      } else {
+        return Constants.EOF;
+      }
+    }
+
+    @Override
+    public int advance(int targetDocId) {
+      if (_lastDocId <= targetDocId) {
+        throw new IllegalArgumentException("Target docId: " + targetDocId + " must be smaller than last returned "
+            + "docId: " + _lastDocId);
+      }
+      _lastDocId = targetDocId + 1;
+      return next();
+    }
   }
 }

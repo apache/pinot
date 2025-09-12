@@ -188,7 +188,7 @@ public class FilterOperatorUtilsTest {
       implements PrioritizedFilterOperator<FilterBlock> {
     public MockedPrioritizedFilterOperator() {
       // This filter operator does not support AND/OR/NOT operations.
-      super(0, false);
+      super(0, false, true);
     }
   }
 }

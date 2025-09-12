@@ -54,7 +54,7 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
   private final PredicateEvaluator _predicateEvaluator;
 
   public ExpressionFilterOperator(IndexSegment segment, QueryContext queryContext, Predicate predicate, int numDocs) {
-    super(numDocs, queryContext.isNullHandlingEnabled());
+    super(numDocs, queryContext.isNullHandlingEnabled(), true);
     _queryContext = queryContext;
 
     Set<String> columns = new HashSet<>();
@@ -77,6 +77,15 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
           PredicateEvaluatorProvider.getPredicateEvaluator(predicate, _transformFunction.getDictionary(),
               _transformFunction.getResultMetadata().getDataType());
     }
+  }
+
+  private ExpressionFilterOperator(ExpressionFilterOperator other, boolean ascending) {
+    super(other._numDocs, other._nullHandlingEnabled, ascending);
+    _queryContext = other._queryContext;
+    _dataSourceMap = other._dataSourceMap;
+    _transformFunction = other._transformFunction;
+    _predicateType = other._predicateType;
+    _predicateEvaluator = other._predicateEvaluator;
   }
 
   @Override
@@ -132,5 +141,10 @@ public class ExpressionFilterOperator extends BaseFilterOperator {
     super.explainAttributes(attributeBuilder);
     attributeBuilder.putString("operator", _predicateEvaluator.getPredicateType().name());
     attributeBuilder.putString("predicate", _predicateEvaluator.getPredicate().toString());
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new ExpressionFilterOperator(this, !_ascending);
   }
 }

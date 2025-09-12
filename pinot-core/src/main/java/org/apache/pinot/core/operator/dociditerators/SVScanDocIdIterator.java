@@ -41,12 +41,24 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
   private final ForwardIndexReaderContext _readerContext;
   private final int _numDocs;
   private final ValueMatcher _valueMatcher;
+
+  /// A batch buffer used to:
+  /// - Test a bunch of docIds for matches, using the ValueMatcher
+  /// - Store the matching docIds to respond to next() calls
+  ///
+  /// If [#_cursor] < [#_firstMismatch], then the next matching docId is at `_batch[_cursor]`. Else, we need to
+  /// fill the batch with more matching docIds.
   private final int[] _batch;
+  /// The first index in the [#_batch] that does not match the predicate. It must always be <= batch.length.
   private int _firstMismatch;
+  /// The cursor to the next matching docId in the [#_batch]. It must always be <= [#_firstMismatch].
   private int _cursor;
   private final int _cardinality;
 
+  /// The docId we need to use the next time we need to fill the batch.
   private int _nextDocId = 0;
+  /// The number of entries scanned, i.e. the number of docIds for which we checked the value (whether it matched or
+  /// not). This is used for tracking the efficiency of the scan and is exported as a statistic.
   private long _numEntriesScanned = 0L;
 
   public SVScanDocIdIterator(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs, int batchSize) {
@@ -193,12 +205,19 @@ public final class SVScanDocIdIterator implements ScanBasedDocIdIterator {
      */
     boolean doesValueMatch(int docId);
 
-    /**
-     * Filters out non matching values and compacts matching docIds in the start of the array.
-     * @param limit how much of the input to read
-     * @param docIds the docIds to match - may be modified by this method so take a copy if necessary.
-     * @return the index in the array of the first non-matching element - all elements before this index match.
-     */
+    /// Filters out non matching values and compacts matching docIds in the start of the array.
+    /// For example, if the input array is \[1, 5, 7, 6, 7\], limit is 4 and only 1 and 7 match, then the input array
+    /// will be modified to \[1, 7, 7, 6, 7\] and the return value will be 2. This means that:
+    /// - Only 1, 5, 7 and 6 are checked.
+    /// - Only 1 and 7 match
+    ///
+    /// @param limit how much of the input to read. Must be equal to or less than the length of the input array.
+    ///              Elements of docIds beyond this limit are not read or modified.
+    /// @param docIds the docIds to match - may be modified by this method so take a copy if necessary.
+    ///               After calling this method, the first N elements of the array will be the matching docIds.
+    ///               This N is the return value of this method.
+    /// @return the index in the input array of the first non-matching element - all elements before this index match.
+    ///        As corollary, the returned value is at most equal to limit.
     default int matchValues(int limit, int[] docIds) {
       int matchCount = 0;
       for (int i = 0; i < limit; i++) {

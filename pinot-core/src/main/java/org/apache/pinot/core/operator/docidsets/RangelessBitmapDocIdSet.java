@@ -23,14 +23,19 @@ import org.apache.pinot.core.operator.dociditerators.RangelessBitmapDocIdIterato
 import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 
 
-public class RangelessBitmapDocIdSet implements BlockDocIdSet {
+public class RangelessBitmapDocIdSet extends BlockDocIdSet.Base {
   private final RangelessBitmapDocIdIterator _iterator;
 
-  public RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds) {
-    _iterator = new RangelessBitmapDocIdIterator(docIds);
+  public RangelessBitmapDocIdSet(ImmutableRoaringBitmap docIds, boolean ascending) {
+    super(ascending);
+    _iterator = RangelessBitmapDocIdIterator.create(docIds, ascending);
   }
 
-  public RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator) {
+  /// Constructor for pre-created iterator.
+  ///
+  /// It is caller's responsibility to ensure the iterator is in the correct order.
+  public RangelessBitmapDocIdSet(RangelessBitmapDocIdIterator iterator, boolean ascending) {
+    super(ascending);
     _iterator = iterator;
   }
 

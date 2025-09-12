@@ -108,7 +108,7 @@ public class BenchmarkOrDocIdIterator {
     for (int i = 0; i < numIterators; i++) {
       iterators[i] = new FixedStepsDocIdIterator(NUM_DOCS, i + 1);
     }
-    return new OrDocIdIterator(iterators);
+    return OrDocIdIterator.create(iterators, true);
   }
 
   private static class FixedStepsDocIdIterator implements BlockDocIdIterator {

@@ -33,10 +33,16 @@ public class FilterBlock implements Block {
     _blockDocIdSet = blockDocIdSet;
   }
 
+  /// There was a typo in the method name, keeping the old method for backward compatibility
+  @Deprecated
+  public BlockDocIdSet getNonScanFilterBLockDocIdSet() {
+    return getNonScanFilterBlockDocIdSet();
+  }
+
   /**
    * Pre-scans the documents if needed, and returns a non-scan-based FilterBlockDocIdSet.
    */
-  public BlockDocIdSet getNonScanFilterBLockDocIdSet() {
+  public BlockDocIdSet getNonScanFilterBlockDocIdSet() {
     if (_nonScanBlockDocIdSet == null) {
       _nonScanBlockDocIdSet = _blockDocIdSet.toNonScanDocIdSet();
     }

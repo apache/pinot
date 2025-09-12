@@ -44,4 +44,19 @@ public final class EmptyDocIdSet implements BlockDocIdSet {
   public long getNumEntriesScannedInFilter() {
     return 0L;
   }
+
+  @Override
+  public BlockDocIdSet toNonScanDocIdSet() {
+    return EmptyDocIdSet.getInstance();
+  }
+
+  @Override
+  public boolean isAscending() {
+    return true;
+  }
+
+  @Override
+  public boolean isDescending() {
+    return true;
+  }
 }

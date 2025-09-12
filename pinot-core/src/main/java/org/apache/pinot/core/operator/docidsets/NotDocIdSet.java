@@ -34,11 +34,21 @@ public class NotDocIdSet implements BlockDocIdSet {
 
   @Override
   public BlockDocIdIterator iterator() {
-    return new NotDocIdIterator(_childDocIdSet.iterator(), _numDocs);
+    return NotDocIdIterator.create(_childDocIdSet.iterator(), _numDocs, isAscending());
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
     return _childDocIdSet.getNumEntriesScannedInFilter();
+  }
+
+  @Override
+  public boolean isAscending() {
+    return _childDocIdSet.isAscending();
+  }
+
+  @Override
+  public boolean isDescending() {
+    return _childDocIdSet.isDescending();
   }
 }
