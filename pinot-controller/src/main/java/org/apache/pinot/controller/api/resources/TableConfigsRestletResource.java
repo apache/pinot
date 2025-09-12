@@ -29,9 +29,12 @@ import io.swagger.annotations.Authorization;
 import io.swagger.annotations.SecurityDefinition;
 import io.swagger.annotations.SwaggerDefinition;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.ws.rs.DELETE;
@@ -105,6 +108,9 @@ import static org.apache.pinot.spi.utils.CommonConstants.SWAGGER_AUTHORIZATION_K
 public class TableConfigsRestletResource {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(TableConfigsRestletResource.class);
+
+  // Skip cluster validations during table creation/update since they're performed in the actual table operations
+  private static final String SKIP_CLUSTER_VALIDATIONS = "TENANT,MINION_INSTANCES,ACTIVE_TASKS";
 
   @Inject
   PinotHelixResourceManager _pinotHelixResourceManager;
@@ -210,7 +216,7 @@ public class TableConfigsRestletResource {
     }
     TableConfigs tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
     String databaseName = DatabaseUtils.extractDatabaseFromHttpHeaders(httpHeaders);
-    validateConfig(tableConfigs, databaseName, typesToSkip);
+    validateConfig(tableConfigs, databaseName, SKIP_CLUSTER_VALIDATIONS);
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName);
     tableConfigs.setTableName(rawTableName);
 
@@ -377,7 +383,7 @@ public class TableConfigsRestletResource {
       tableConfigsAndUnrecognizedProps =
           JsonUtils.stringToObjectAndUnrecognizedProperties(tableConfigsStr, TableConfigs.class);
       tableConfigs = tableConfigsAndUnrecognizedProps.getLeft();
-      validateConfig(tableConfigs, databaseName, typesToSkip);
+      validateConfig(tableConfigs, databaseName, SKIP_CLUSTER_VALIDATIONS);
       Preconditions.checkState(
           DatabaseUtils.translateTableName(tableConfigs.getTableName(), databaseName).equals(tableName),
           "'tableName' in TableConfigs: %s must match provided tableName: %s", tableConfigs.getTableName(), tableName);
@@ -484,6 +490,11 @@ public class TableConfigsRestletResource {
     TableConfigUtils.ensureStorageQuotaConstraints(tableConfig, _controllerConf.getDimTableMaxSize());
   }
 
+
+  /**
+   * Validates the provided TableConfigs. Hybrid table validation is performed only on the provided
+   * configs and does not check for conflicts with existing tables in the cluster.
+   */
   private void validateConfig(TableConfigs tableConfigs, String database, @Nullable String typesToSkip) {
     String rawTableName = DatabaseUtils.translateTableName(tableConfigs.getTableName(), database);
     TableConfig offlineTableConfig = tableConfigs.getOffline();
@@ -520,6 +531,39 @@ public class TableConfigsRestletResource {
       }
       if (offlineTableConfig != null && realtimeTableConfig != null) {
         TableConfigUtils.verifyHybridTableConfigs(rawTableName, offlineTableConfig, realtimeTableConfig);
+      }
+
+      // Parse validation types to skip (following same pattern as TableConfigUtils.validate)
+      Set<TableConfigUtils.ValidationType> skipTypes = typesToSkip == null ? Collections.emptySet()
+          : Arrays.stream(typesToSkip.split(",")).map(s -> TableConfigUtils.ValidationType.valueOf(s.toUpperCase()))
+              .collect(Collectors.toSet());
+
+      // Cluster-aware validations
+      if (!skipTypes.contains(TableConfigUtils.ValidationType.ALL)) {
+        if (!skipTypes.contains(TableConfigUtils.ValidationType.TENANT)) {
+          if (offlineTableConfig != null) {
+            _pinotHelixResourceManager.validateTableTenantConfig(offlineTableConfig);
+          }
+          if (realtimeTableConfig != null) {
+            _pinotHelixResourceManager.validateTableTenantConfig(realtimeTableConfig);
+          }
+        }
+        if (!skipTypes.contains(TableConfigUtils.ValidationType.MINION_INSTANCES)) {
+          if (offlineTableConfig != null) {
+            _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(offlineTableConfig);
+          }
+          if (realtimeTableConfig != null) {
+            _pinotHelixResourceManager.validateTableTaskMinionInstanceTagConfig(realtimeTableConfig);
+          }
+        }
+        if (!skipTypes.contains(TableConfigUtils.ValidationType.ACTIVE_TASKS)) {
+          if (offlineTableConfig != null) {
+            PinotTableRestletResource.tableTasksValidation(offlineTableConfig, _pinotHelixTaskResourceManager);
+          }
+          if (realtimeTableConfig != null) {
+            PinotTableRestletResource.tableTasksValidation(realtimeTableConfig, _pinotHelixTaskResourceManager);
+          }
+        }
       }
     } catch (Exception e) {
       throw new ControllerApplicationException(LOGGER,
