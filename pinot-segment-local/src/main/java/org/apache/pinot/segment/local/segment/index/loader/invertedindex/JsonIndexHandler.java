@@ -134,7 +134,7 @@ public class JsonIndexHandler extends BaseIndexHandler {
     // Create new json index for the column.
     LOGGER.info("Creating new json index for segment: {}, column: {}", segmentName, columnName);
     Preconditions.checkState(columnMetadata.isSingleValue() && (columnMetadata.getDataType() == DataType.STRING
-            || columnMetadata.getDataType() == DataType.JSON),
+            || columnMetadata.getDataType() == DataType.JSON || columnMetadata.getDataType() == DataType.MAP),
         "Json index can only be applied to single-value STRING or JSON columns");
     if (columnMetadata.hasDictionary()) {
       handleDictionaryBasedColumn(segmentWriter, columnMetadata);
