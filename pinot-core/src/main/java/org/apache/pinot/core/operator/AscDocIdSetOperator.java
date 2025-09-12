@@ -115,7 +115,7 @@ public class AscDocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   public boolean isDescending() {
-    return true;
+    return false;
   }
 
   @Override
