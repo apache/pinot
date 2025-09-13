@@ -859,6 +859,202 @@ public class RealtimeSegmentDataManagerTest {
     }
   }
 
+  @Test
+  public void testCompletionModeDownloadWithUrlValidation()
+      throws Exception {
+    // Test the new validation logic for CompletionMode.DOWNLOAD
+
+    // Test Case 1: Valid download URL - should proceed with DOWNLOAD mode
+    testCompletionModeDownloadWithValidUrl();
+
+    // Test Case 2: Missing/null download URL - should fall back to RETAINING mode
+    testCompletionModeDownloadWithMissingUrl();
+
+    // Test Case 3: Empty download URL - should fall back to RETAINING mode
+    testCompletionModeDownloadWithEmptyUrl();
+  }
+
+  private void testCompletionModeDownloadWithValidUrl()
+      throws Exception {
+    // Create table config with DOWNLOAD completion mode
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.getValidationConfig().setCompletionConfig(
+        new org.apache.pinot.spi.config.table.CompletionConfig("DOWNLOAD"));
+
+    // Create mock table data manager that returns valid download URL
+    RealtimeTableDataManager mockTableDataManager = mock(RealtimeTableDataManager.class);
+    when(mockTableDataManager.getInstanceId()).thenReturn("server-1");
+    when(mockTableDataManager.getSegmentLock(any())).thenReturn(mock(Lock.class));
+
+    // Mock fetchZKMetadata to return metadata with valid download URL
+    SegmentZKMetadata metadataWithUrl = createZkMetadata();
+    metadataWithUrl.setDownloadUrl("http://example.com/segment.tar.gz");
+    when(mockTableDataManager.fetchZKMetadata(SEGMENT_NAME_STR)).thenReturn(metadataWithUrl);
+
+    RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
+    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
+    when(mockTableDataManager.getStatsHistory()).thenReturn(statsHistory);
+    when(mockTableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
+
+    // Set up consumer coordinator in the map
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
+        new ConsumerCoordinator(false, mockTableDataManager));
+
+    // Create segment data manager with DOWNLOAD completion mode
+    SegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    segmentZKMetadata.setDownloadUrl("http://example.com/segment.tar.gz"); // Initial URL
+    LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
+    Schema schema = Fixtures.createSchema();
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, mockTableDataManager,
+            new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
+            _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, new TimeSupplier())) {
+
+      // Set up the consumer to get KEEP response
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
+      segmentDataManager._consumeOffsets.add(endOffset);
+
+      final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.KEEP)
+              .withStreamPartitionMsgOffset(endOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      // Verify that with valid download URL, we proceed to DISCARDED state (DOWNLOAD mode)
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          RealtimeSegmentDataManager.State.DISCARDED);
+      Assert.assertFalse(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._responses.isEmpty());
+      Assert.assertTrue(segmentDataManager._consumeOffsets.isEmpty());
+    }
+  }
+
+  private void testCompletionModeDownloadWithMissingUrl()
+      throws Exception {
+    // Create table config with DOWNLOAD completion mode
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.getValidationConfig().setCompletionConfig(
+        new org.apache.pinot.spi.config.table.CompletionConfig("DOWNLOAD"));
+
+    // Create mock table data manager that returns metadata with null download URL
+    RealtimeTableDataManager mockTableDataManager = mock(RealtimeTableDataManager.class);
+    when(mockTableDataManager.getInstanceId()).thenReturn("server-1");
+    when(mockTableDataManager.getSegmentLock(any())).thenReturn(mock(Lock.class));
+
+    // Mock fetchZKMetadata to return metadata with null download URL
+    SegmentZKMetadata metadataWithoutUrl = createZkMetadata();
+    metadataWithoutUrl.setDownloadUrl(null); // No download URL
+    when(mockTableDataManager.fetchZKMetadata(SEGMENT_NAME_STR)).thenReturn(metadataWithoutUrl);
+
+    RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
+    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
+    when(mockTableDataManager.getStatsHistory()).thenReturn(statsHistory);
+    when(mockTableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
+
+    // Set up consumer coordinator in the map
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
+        new ConsumerCoordinator(false, mockTableDataManager));
+
+    // Create segment data manager with DOWNLOAD completion mode
+    SegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
+    Schema schema = Fixtures.createSchema();
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, mockTableDataManager,
+            new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
+            _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, new TimeSupplier())) {
+
+      // Set up the consumer to get KEEP response
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
+      segmentDataManager._consumeOffsets.add(endOffset);
+
+      final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.KEEP)
+              .withStreamPartitionMsgOffset(endOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      // Verify that with missing download URL, we fall back to RETAINING mode
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          RealtimeSegmentDataManager.State.RETAINED);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._responses.isEmpty());
+      Assert.assertTrue(segmentDataManager._consumeOffsets.isEmpty());
+    }
+  }
+
+  private void testCompletionModeDownloadWithEmptyUrl()
+      throws Exception {
+    // Create table config with DOWNLOAD completion mode
+    TableConfig tableConfig = createTableConfig();
+    tableConfig.getValidationConfig().setCompletionConfig(
+        new org.apache.pinot.spi.config.table.CompletionConfig("DOWNLOAD"));
+
+    // Create mock table data manager that returns metadata with empty download URL
+    RealtimeTableDataManager mockTableDataManager = mock(RealtimeTableDataManager.class);
+    when(mockTableDataManager.getInstanceId()).thenReturn("server-1");
+    when(mockTableDataManager.getSegmentLock(any())).thenReturn(mock(Lock.class));
+
+    // Mock fetchZKMetadata to return metadata with empty download URL
+    SegmentZKMetadata metadataWithEmptyUrl = createZkMetadata();
+    metadataWithEmptyUrl.setDownloadUrl(""); // Empty download URL
+    when(mockTableDataManager.fetchZKMetadata(SEGMENT_NAME_STR)).thenReturn(metadataWithEmptyUrl);
+
+    RealtimeSegmentStatsHistory statsHistory = mock(RealtimeSegmentStatsHistory.class);
+    when(statsHistory.getEstimatedCardinality(anyString())).thenReturn(200);
+    when(statsHistory.getEstimatedAvgColSize(anyString())).thenReturn(32);
+    when(mockTableDataManager.getStatsHistory()).thenReturn(statsHistory);
+    when(mockTableDataManager.getConsumerDir()).thenReturn(TEMP_DIR.getAbsolutePath() + "/consumerDir");
+
+    // Set up consumer coordinator in the map
+    _partitionGroupIdToConsumerCoordinatorMap.putIfAbsent(PARTITION_GROUP_ID,
+        new ConsumerCoordinator(false, mockTableDataManager));
+
+    // Create segment data manager with DOWNLOAD completion mode
+    SegmentZKMetadata segmentZKMetadata = createZkMetadata();
+    LLCSegmentName llcSegmentName = new LLCSegmentName(SEGMENT_NAME_STR);
+    Schema schema = Fixtures.createSchema();
+    ServerMetrics serverMetrics = new ServerMetrics(PinotMetricUtils.getPinotMetricsRegistry());
+
+    try (FakeRealtimeSegmentDataManager segmentDataManager =
+        new FakeRealtimeSegmentDataManager(segmentZKMetadata, tableConfig, mockTableDataManager,
+            new File(TEMP_DIR, REALTIME_TABLE_NAME).getAbsolutePath(), schema, llcSegmentName,
+            _partitionGroupIdToConsumerCoordinatorMap, serverMetrics, new TimeSupplier())) {
+
+      // Set up the consumer to get KEEP response
+      RealtimeSegmentDataManager.PartitionConsumer consumer = segmentDataManager.createPartitionConsumer();
+      final LongMsgOffset endOffset = new LongMsgOffset(START_OFFSET_VALUE + 500);
+      segmentDataManager._consumeOffsets.add(endOffset);
+
+      final SegmentCompletionProtocol.Response response = new SegmentCompletionProtocol.Response(
+          new SegmentCompletionProtocol.Response.Params().withStatus(
+                  SegmentCompletionProtocol.ControllerResponseStatus.KEEP)
+              .withStreamPartitionMsgOffset(endOffset.toString()));
+      segmentDataManager._responses.add(response);
+
+      consumer.run();
+
+      // Verify that with empty download URL, we fall back to RETAINING mode
+      Assert.assertEquals(segmentDataManager._state.get(segmentDataManager),
+          RealtimeSegmentDataManager.State.RETAINED);
+      Assert.assertTrue(segmentDataManager._buildAndReplaceCalled);
+      Assert.assertTrue(segmentDataManager._responses.isEmpty());
+      Assert.assertTrue(segmentDataManager._consumeOffsets.isEmpty());
+    }
+  }
+
   private static class TimeSupplier implements Supplier<Long> {
     protected final AtomicInteger _timeCheckCounter = new AtomicInteger();
     protected long _timeNow = System.currentTimeMillis();
