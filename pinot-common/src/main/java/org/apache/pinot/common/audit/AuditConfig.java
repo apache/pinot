@@ -48,6 +48,9 @@ public final class AuditConfig {
   @JsonProperty("url.filter.exclude.patterns")
   private String _urlFilterExcludePatterns = "";
 
+  @JsonProperty("url.filter.include.patterns")
+  private String _urlFilterIncludePatterns = "";
+
   @JsonProperty("userid.header")
   private String _useridHeader = "";
 
@@ -94,6 +97,14 @@ public final class AuditConfig {
     _urlFilterExcludePatterns = urlFilterExcludePatterns;
   }
 
+  public String getUrlFilterIncludePatterns() {
+    return _urlFilterIncludePatterns;
+  }
+
+  public void setUrlFilterIncludePatterns(String urlFilterIncludePatterns) {
+    _urlFilterIncludePatterns = urlFilterIncludePatterns;
+  }
+
   public String getUseridHeader() {
     return _useridHeader;
   }
@@ -117,6 +128,7 @@ public final class AuditConfig {
         .add("_captureRequestHeaders='" + _captureRequestHeaders + "'")
         .add("_maxPayloadSize=" + _maxPayloadSize)
         .add("_urlFilterExcludePatterns='" + _urlFilterExcludePatterns + "'")
+        .add("_urlFilterIncludePatterns='" + _urlFilterIncludePatterns + "'")
         .add("_useridHeader='" + _useridHeader + "'")
         .add("_useridJwtClaimName='" + _useridJwtClaimName + "'")
         .toString();
