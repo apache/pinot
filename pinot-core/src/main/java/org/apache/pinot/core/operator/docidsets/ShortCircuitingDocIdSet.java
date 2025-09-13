@@ -18,40 +18,35 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
-import org.apache.pinot.core.operator.dociditerators.BitmapDocIdIterator;
-import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
+import org.apache.pinot.core.operator.dociditerators.EmptyDocIdIterator;
 
 
-public class BitmapDocIdSet implements BlockDocIdSet {
-  private final ImmutableRoaringBitmap _bitmap;
-  private final BitmapDocIdIterator _iterator;
+/**
+ * A DocIdSet used for early short-circuiting that behaves like an empty set
+ * while preserving the number of entries scanned in filters up to the
+ * short-circuit point.
+ */
+public final class ShortCircuitingDocIdSet implements BlockDocIdSet {
+  private final long _numEntriesScannedInFilter;
 
-  public BitmapDocIdSet(ImmutableRoaringBitmap docIds, int numDocs) {
-    _bitmap = docIds;
-    _iterator = new BitmapDocIdIterator(docIds, numDocs);
-  }
-
-  public BitmapDocIdSet(BitmapDocIdIterator iterator) {
-    _bitmap = null;
-    _iterator = iterator;
+  public ShortCircuitingDocIdSet(long numEntriesScannedInFilter) {
+    _numEntriesScannedInFilter = numEntriesScannedInFilter;
   }
 
   @Override
-  public BitmapDocIdIterator iterator() {
-    return _iterator;
+  public BlockDocIdIterator iterator() {
+    return EmptyDocIdIterator.getInstance();
   }
 
   @Override
   public long getNumEntriesScannedInFilter() {
-    return 0L;
+    return _numEntriesScannedInFilter;
   }
 
   @Override
   public BlockDocIdSet getOptimizedDocIdSet() {
-    if (_bitmap != null && _bitmap.isEmpty()) {
-      return EmptyDocIdSet.getInstance();
-    }
-    return this;
+    return EmptyDocIdSet.getInstance();
   }
 }
