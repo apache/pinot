@@ -129,15 +129,18 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       LOGGER.info("Skipping segment-level validation for table: {}", tableConfig.getTableName());
     }
 
-    boolean isPauselessConsumptionEnabled = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
-    if (isPauselessConsumptionEnabled) {
-      // For pauseless tables without dedup or partial upsert, repair segments in error state
-      _llcRealtimeSegmentManager.repairSegmentsInErrorStateForPauselessConsumption(tableConfig,
-          context._repairErrorSegmentsForPartialUpsertOrDedup, _segmentAutoResetOnErrorAtValidation);
-    } else if (_segmentAutoResetOnErrorAtValidation) {
-      // Reset for pauseless tables is already handled in repairSegmentsInErrorStateForPauselessConsumption method with
-      // additional checks for pauseless consumption
-      _pinotHelixResourceManager.resetSegments(tableConfig.getTableName(), null, true);
+    boolean isPauselessTable = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
+    if (isPauselessTable || _segmentAutoResetOnErrorAtValidation) {
+      // For realtime tables without dedup or partial upsert, repair segments in error state.
+      // When pauseless consumption is disabled, this behavior remains gated by
+      // _segmentAutoResetOnErrorAtValidation to preserve legacy semantics.
+      _llcRealtimeSegmentManager.repairSegmentsInErrorState(tableConfig,
+          context._repairErrorSegmentsForPartialUpsertOrDedup);
+    } else {
+      LOGGER.debug(
+          "Skipping segment error repair for table {} because pauseless consumption is disabled and "
+              + "_segmentAutoResetOnErrorAtValidation=false",
+          tableConfig.getTableName());
     }
   }
 
@@ -183,7 +186,7 @@ public class RealtimeSegmentValidationManager extends ControllerPeriodicTask<Rea
       // The table was previously paused due to exceeding resource utilization, but the current status cannot be
       // determined. To be safe, leave it as paused and once the status is available take the correct action
       LOGGER.warn("Resource utilization limit could not be determined for for table: {}, and it is paused, leave it as "
-              + "paused", tableNameWithType);
+          + "paused", tableNameWithType);
       return false;
     }
     _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
