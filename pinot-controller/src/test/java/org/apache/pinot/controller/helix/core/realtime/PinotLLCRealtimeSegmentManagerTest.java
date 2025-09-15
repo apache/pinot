@@ -131,6 +131,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
   static final int NUM_DOCS = RANDOM.nextInt(Integer.MAX_VALUE) + 1;
   static final long LATEST_OFFSET = PARTITION_OFFSET.getOffset() * 2 + NUM_DOCS;
   static final int SEGMENT_SIZE_IN_BYTES = 100000000;
+
   @AfterClass
   public void tearDown()
       throws IOException {
@@ -289,7 +290,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     // committing segment's partitionGroupId no longer in the newPartitionGroupMetadataList
     List<PartitionGroupMetadata> partitionGroupMetadataListWithout0 =
-        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfigs, Collections.emptyList());
+        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfigs, Collections.emptyList(),
+            mock(IdealState.class));
     partitionGroupMetadataListWithout0.remove(0);
     segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout0;
 
@@ -331,6 +333,24 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     consumingSegmentZKMetadata = segmentManager._segmentZKMetadataMap.get(consumingSegment);
     assertNull(consumingSegmentZKMetadata);
+  }
+
+  @Test
+  public void testForceCommitWithNonConsumingSegmentsIsIgnored() {
+    // Set up a new table with 1 replica, 2 instances, 1 partition
+    FakePinotLLCRealtimeSegmentManager segmentManager = new FakePinotLLCRealtimeSegmentManager();
+    segmentManager._numReplicas = 1;
+    segmentManager.makeTableConfig();
+    segmentManager._numInstances = 2;
+    segmentManager.makeConsumingInstancePartitions();
+    segmentManager._numPartitions = 1;
+    segmentManager.setUpNewTable();
+
+    // Provide a segment that is not in CONSUMING state (non-existent); should be ignored without exception
+    String nonConsumingSegment = "nonExistingSegment";
+    Set<String> committed = segmentManager.forceCommit(REALTIME_TABLE_NAME, null, nonConsumingSegment,
+        org.apache.pinot.controller.api.resources.ForceCommitBatchConfig.of(1, 1, 5));
+    assertTrue(committed.isEmpty(), "Expected no segments to be committed when only non-consuming segments provided");
   }
 
   @Test
@@ -743,7 +763,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
      */
     // 1 reached end of shard.
     List<PartitionGroupMetadata> partitionGroupMetadataListWithout1 =
-        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfigs, Collections.emptyList());
+        segmentManager.getNewPartitionGroupMetadataList(segmentManager._streamConfigs, Collections.emptyList(),
+            mock(IdealState.class));
     partitionGroupMetadataListWithout1.remove(1);
     segmentManager._partitionGroupMetadataList = partitionGroupMetadataListWithout1;
     // noop
@@ -1463,7 +1484,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertNull(segmentManager.getSegmentZKMetadata(REALTIME_TABLE_NAME, segmentNames.get(4), null).getDownloadUrl());
   }
 
-
   @Test
   public void testDeleteTmpSegmentFiles()
       throws Exception {
@@ -1529,7 +1549,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
         List.of(new PartitionGroupMetadata(0, new LongMsgOffset(234)),
             new PartitionGroupMetadata(1, new LongMsgOffset(345)));
     doReturn(partitionGroupMetadataList).when(segmentManagerSpy)
-        .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList);
+        .getNewPartitionGroupMetadataList(streamConfigs, partitionGroupConsumptionStatusList, idealState);
     partitionIds = segmentManagerSpy.getPartitionIds(streamConfigs, idealState);
     Assert.assertEquals(partitionIds.size(), 2);
   }
@@ -1744,7 +1764,8 @@ public class PinotLLCRealtimeSegmentManagerTest {
   }
 
   @Test
-  public void testSyncCommittingSegments() throws Exception {
+  public void testSyncCommittingSegments()
+      throws Exception {
     // Set up mocks for the resource management infrastructure
     PinotHelixResourceManager pinotHelixResourceManager = mock(PinotHelixResourceManager.class);
     HelixManager helixManager = mock(HelixManager.class);
@@ -1766,7 +1787,6 @@ public class PinotLLCRealtimeSegmentManagerTest {
     String realtimeTableName = "testTable_REALTIME";
     String committingSegmentsListPath =
         ZKMetadataProvider.constructPropertyStorePathForPauselessDebugMetadata(realtimeTableName);
-
 
     // Create test segments with different states
     String committingSegment1 = "testTable__0__0__20250210T1142Z";
@@ -1814,16 +1834,15 @@ public class PinotLLCRealtimeSegmentManagerTest {
     assertEquals(new HashSet<>(existingRecord.getListField(COMMITTING_SEGMENTS)),
         new HashSet<>(List.of(committingSegment1, committingSegment2)));
 
-
     // Test 3: Error handling during ZooKeeper operations
     when(zkHelixPropertyStore.set(eq(committingSegmentsListPath), any(), anyInt(), eq(AccessOption.PERSISTENT)))
         .thenThrow(new RuntimeException("ZooKeeper operation failed"));
     assertFalse(segmentManager.syncCommittingSegments(realtimeTableName, newSegments));
   }
 
-
   //////////////////////////////////////////////////////////////////////////////////
   // Fake classes
+
   /////////////////////////////////////////////////////////////////////////////////
 
   private static class FakePinotLLCRealtimeSegmentManager extends PinotLLCRealtimeSegmentManager {
@@ -1889,7 +1908,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     public void ensureAllPartitionsConsuming() {
       ensureAllPartitionsConsuming(_tableConfig, _streamConfigs, _idealState,
-          getNewPartitionGroupMetadataList(_streamConfigs, Collections.emptyList()), null);
+          getNewPartitionGroupMetadataList(_streamConfigs, Collections.emptyList(), mock(IdealState.class)), null);
     }
 
     @Override
@@ -1971,7 +1990,7 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList) {
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState) {
       if (_partitionGroupMetadataList != null) {
         return _partitionGroupMetadataList;
       } else {
@@ -1982,9 +2001,9 @@ public class PinotLLCRealtimeSegmentManagerTest {
 
     @Override
     List<PartitionGroupMetadata> getNewPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList,
+        List<PartitionGroupConsumptionStatus> currentPartitionGroupConsumptionStatusList, IdealState idealState,
         boolean forceGetOffsetFromStream) {
-      return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList);
+      return getNewPartitionGroupMetadataList(streamConfigs, currentPartitionGroupConsumptionStatusList, idealState);
     }
 
     @Override

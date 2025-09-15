@@ -675,6 +675,8 @@ public class BaseTableDataManagerTest {
   private static InstanceDataManagerConfig createDefaultInstanceDataManagerConfig() {
     InstanceDataManagerConfig config = mock(InstanceDataManagerConfig.class);
     when(config.getInstanceDataDir()).thenReturn(TEMP_DIR.getAbsolutePath());
+    // Check CRC matching on segment load time.
+    when(config.shouldCheckCRCOnSegmentLoad()).thenReturn(true);
     return config;
   }
 

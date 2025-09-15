@@ -35,6 +35,8 @@ import org.apache.pinot.spi.accounting.WorkloadBudgetManager;
 import org.apache.pinot.spi.config.instance.InstanceType;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.EarlyTerminationException;
+import org.apache.pinot.spi.exception.QueryErrorCode;
+import org.apache.pinot.spi.exception.QueryException;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -295,8 +297,13 @@ public class Tracing {
     }
 
     public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
-        InstanceType instanceType) {
-      _workloadBudgetManager = new WorkloadBudgetManager(config);
+                                                                       InstanceType instanceType) {
+      return createThreadAccountant(config, instanceId, instanceType, new WorkloadBudgetManager(config));
+    }
+
+    public static ThreadResourceUsageAccountant createThreadAccountant(PinotConfiguration config, String instanceId,
+        InstanceType instanceType, WorkloadBudgetManager workloadBudgetManager) {
+      _workloadBudgetManager = workloadBudgetManager;
       String factoryName = config.getProperty(CommonConstants.Accounting.CONFIG_OF_FACTORY_NAME);
       ThreadResourceUsageAccountant accountant = null;
       if (factoryName != null) {
@@ -333,6 +340,10 @@ public class Tracing {
 
     public static void sampleAndCheckInterruption() {
       if (isInterrupted()) {
+        Exception exception = Tracing.getThreadAccountant().getErrorStatus();
+        if (exception instanceof QueryException) {
+          throw (QueryException) exception;
+        }
         throw new EarlyTerminationException("Interrupted while merging records");
       }
       sample();
@@ -340,6 +351,10 @@ public class Tracing {
 
     public static void sampleAndCheckInterruption(ThreadResourceUsageAccountant accountant) {
       if (Thread.interrupted() || accountant.isAnchorThreadInterrupted() || accountant.isQueryTerminated()) {
+        Exception exception = accountant.getErrorStatus();
+        if (exception instanceof QueryException) {
+         throw (QueryException) exception;
+        }
         throw new EarlyTerminationException("Interrupted while merging records");
       }
       accountant.sampleUsage();

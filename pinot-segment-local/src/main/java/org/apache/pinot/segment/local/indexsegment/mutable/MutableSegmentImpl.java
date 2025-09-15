@@ -1196,6 +1196,11 @@ public class MutableSegmentImpl implements MutableSegment {
   }
 
   @Nullable
+  public String getDeleteRecordColumn() {
+    return _deleteRecordColumn;
+  }
+
+  @Nullable
   @Override
   public ThreadSafeMutableRoaringBitmap getQueryableDocIds() {
     return _queryableDocIds;

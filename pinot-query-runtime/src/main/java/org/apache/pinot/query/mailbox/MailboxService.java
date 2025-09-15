@@ -21,6 +21,7 @@ package org.apache.pinot.query.mailbox;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalListener;
+import java.time.Duration;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
@@ -89,7 +90,7 @@ public class MailboxService {
         CommonConstants.MultiStageQueryRunner.KEY_OF_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES,
         CommonConstants.MultiStageQueryRunner.DEFAULT_MAX_INBOUND_QUERY_DATA_BLOCK_SIZE_BYTES
     );
-    _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize);
+    _channelManager = new ChannelManager(tlsConfig, maxInboundMessageSize, getIdleTimeout(config));
     _accessControlFactory = accessControlFactory;
     boolean splitBlocks = config.getProperty(
         CommonConstants.MultiStageQueryRunner.KEY_OF_ENABLE_DATA_BLOCK_PAYLOAD_SPLIT,
@@ -138,8 +139,8 @@ public class MailboxService {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
-      return new GrpcSendingMailbox(
-          _config, mailboxId, _channelManager, hostname, port, deadlineMs, statMap, _maxByteStringSize);
+      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
+          _maxByteStringSize);
     }
   }
 
@@ -167,5 +168,16 @@ public class MailboxService {
    */
   public void releaseReceivingMailbox(ReceivingMailbox mailbox) {
     _receivingMailboxCache.invalidate(mailbox.getId());
+  }
+
+  private static Duration getIdleTimeout(PinotConfiguration config) {
+    long channelIdleTimeoutSeconds = config.getProperty(
+        CommonConstants.MultiStageQueryRunner.KEY_OF_CHANNEL_IDLE_TIMEOUT_SECONDS,
+        CommonConstants.MultiStageQueryRunner.DEFAULT_CHANNEL_IDLE_TIMEOUT_SECONDS);
+    if (channelIdleTimeoutSeconds > 0) {
+      return Duration.ofSeconds(channelIdleTimeoutSeconds);
+    }
+    // Use a reasonable maximum idle timeout (1 year) to avoid overflow.
+    return Duration.ofDays(365);
   }
 }

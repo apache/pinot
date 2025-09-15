@@ -32,6 +32,7 @@ public enum QueryErrorCode {
   JSON_PARSING(100, "JsonParsingError"),
   /// Error detected at parsing time. For example, syntax error.
   SQL_PARSING(150, "SQLParsingError"),
+  TIMESERIES_PARSING(155, "TimeseriesParsingError"),
   SQL_RUNTIME(160, "SQLRuntimeError"),
   ACCESS_DENIED(180, "AccessDenied"),
   TABLE_DOES_NOT_EXIST(190, "TableDoesNotExistError"),

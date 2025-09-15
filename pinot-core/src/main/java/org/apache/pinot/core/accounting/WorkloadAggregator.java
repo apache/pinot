@@ -68,8 +68,9 @@ public class WorkloadAggregator implements ResourceAggregator {
     _workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
     _sleepTimeMs = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_SLEEP_TIME_MS,
         CommonConstants.Accounting.DEFAULT_WORKLOAD_SLEEP_TIME_MS);
-    _enableEnforcement = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
-        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
+//    _enableEnforcement = _config.getProperty(CommonConstants.Accounting.CONFIG_OF_WORKLOAD_ENABLE_COST_ENFORCEMENT,
+//        CommonConstants.Accounting.DEFAULT_WORKLOAD_ENABLE_COST_ENFORCEMENT);
+    _enableEnforcement = true;
 
     LOGGER.info("WorkloadAggregator initialized with isThreadCPUSamplingEnabled: {}, isThreadMemorySamplingEnabled: {}",
         _isThreadCPUSamplingEnabled, _isThreadMemorySamplingEnabled);

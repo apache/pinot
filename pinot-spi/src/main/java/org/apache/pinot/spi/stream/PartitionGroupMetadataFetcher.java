@@ -38,14 +38,17 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
   private final List<PartitionGroupConsumptionStatus> _partitionGroupConsumptionStatusList;
   private final boolean _forceGetOffsetFromStream;
   private final List<PartitionGroupMetadata> _newPartitionGroupMetadataList = new ArrayList<>();
+  private final List<Integer> _pausedTopicIndices;
 
   private Exception _exception;
 
   public PartitionGroupMetadataFetcher(List<StreamConfig> streamConfigs,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, boolean forceGetOffsetFromStream) {
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
+      boolean forceGetOffsetFromStream) {
     _streamConfigs = streamConfigs;
     _partitionGroupConsumptionStatusList = partitionGroupConsumptionStatusList;
     _forceGetOffsetFromStream = forceGetOffsetFromStream;
+    _pausedTopicIndices = pausedTopicIndices;
   }
 
   public List<PartitionGroupMetadata> getPartitionGroupMetadataList() {
@@ -100,6 +103,11 @@ public class PartitionGroupMetadataFetcher implements Callable<Boolean> {
       throws Exception {
     int numStreams = _streamConfigs.size();
     for (int i = 0; i < numStreams; i++) {
+      if (_pausedTopicIndices.contains(i)) {
+        LOGGER.info("Skipping fetching PartitionGroupMetadata for paused topic: {}",
+            _streamConfigs.get(i).getTopicName());
+        continue;
+      }
       StreamConfig streamConfig = _streamConfigs.get(i);
       String topicName = streamConfig.getTopicName();
       String clientId =

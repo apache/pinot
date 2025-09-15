@@ -128,5 +128,10 @@ public class PostAggregationFunctionTest {
     assertEquals(function.getResultType(), ColumnDataType.OBJECT);
     assertNull(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, null}));
     assertEquals(function.invoke(new Object[]{null, null, null, null, null, null, null, null, null, 10}), 10);
+
+    // Test null handling
+    function = new PostAggregationFunction("plus", new ColumnDataType[]{ColumnDataType.INT, ColumnDataType.INT});
+    // The function returns null if any argument is null
+    assertNull(function.invoke(new Object[]{null, 1}));
   }
 }
