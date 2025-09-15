@@ -108,7 +108,7 @@ public class LiteModeSortInsertRule extends PRelOptRule {
         true);
   }
 
-  public static int computeLiteModeLimit(int leafStageLimit, int leafStageFanOutAdjustedLimit, int numWorkers) {
+  private int computeLiteModeLimit(int leafStageLimit, int leafStageFanOutAdjustedLimit, int numWorkers) {
     if (leafStageFanOutAdjustedLimit <= 0) {
       return leafStageLimit;
     }
