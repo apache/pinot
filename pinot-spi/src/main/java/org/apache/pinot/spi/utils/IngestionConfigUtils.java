@@ -325,9 +325,13 @@ public final class IngestionConfigUtils {
         className + "-" + streamConfig.getTableNameWithType() + "-" + streamConfig.getTopicName());
   }
 
-  public static Map<Integer, Set<Integer>> getStreamIndexToPartitions(Set<Integer> partitionsHosted) {
+  /**
+   * Returns a Map of stream config index to Set of stream partition Ids.
+   * @param pinotPartitionIds Set of pinot partition ids.
+   */
+  public static Map<Integer, Set<Integer>> getStreamConfigIndexToStreamPartitions(Set<Integer> pinotPartitionIds) {
     Map<Integer, Set<Integer>> streamIndexToPartitions = new HashMap<>();
-    for (Integer partition : partitionsHosted) {
+    for (Integer partition : pinotPartitionIds) {
       streamIndexToPartitions.computeIfAbsent(getStreamConfigIndexFromPinotPartitionId(partition),
           k -> new HashSet<>()).add(getStreamPartitionIdFromPinotPartitionId(partition));
     }

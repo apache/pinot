@@ -112,15 +112,14 @@ public class IngestionDelayTracker {
   // 30 seconds +/- precision in timeouts
   private static final long METRICS_TRACKING_INTERVAL_MS = TimeUnit.SECONDS.toMillis(30);
   // Once a partition is marked for verification, we wait 10 minutes to pull its ideal state.
-  private static final int PARTITION_TIMEOUT_MS = 600000;
+  private static final long PARTITION_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
   // Delay scheduled executor service for this amount of time after starting service
   private static final int INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS = 100;
   // Cache expire time for ignored segment if there is no update from the segment.
   private static final int IGNORED_SEGMENT_CACHE_TIME_MINUTES = 10;
   // Timeout after 5 seconds while fetching the latest stream offset.
-  private static final long FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
+  private static final long LATEST_STREAM_OFFSET_FETCH_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
 
-  private final ScheduledExecutorService _metricsCleanupScheduler;
   private final ServerMetrics _serverMetrics;
   private final String _tableNameWithType;
   private final String _metricName;
@@ -133,10 +132,12 @@ public class IngestionDelayTracker {
   // Map to hold the ingestion info reported by the consumer.
   private final Map<Integer, IngestionInfo> _ingestionInfoMap = new ConcurrentHashMap<>();
   private final Map<Integer, Long> _partitionsMarkedForVerification = new ConcurrentHashMap<>();
-
-  private final ScheduledExecutorService _ingestionDelayTrackingScheduler;
   private Clock _clock = Clock.systemUTC();
+  private final ScheduledExecutorService _metricsCleanupScheduler;
+  private final ScheduledExecutorService _ingestionDelayTrackingScheduler;
 
+  // List of StreamMetadataProvider to fetch upstream latest stream offset (List because table can have multiple
+  // upstream topics)
   protected List<StreamMetadataProvider> _streamMetadataProviderList;
   protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
   protected volatile Set<Integer> _partitionsHostedByThisServer = new HashSet<>();
@@ -222,35 +223,35 @@ public class IngestionDelayTracker {
       if (_streamMetadataProviderList.get(0).supportsOffsetLag()) {
         try {
           _partitionIdToLatestOffset.putAll(_streamMetadataProviderList.get(0)
-              .fetchLatestStreamOffset(partitionsHosted, FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS));
+              .fetchLatestStreamOffset(partitionsHosted, LATEST_STREAM_OFFSET_FETCH_TIMEOUT_MS));
         } catch (Throwable t) {
           LOGGER.error("Failed to update latest stream offsets for partitions: {}", partitionsHosted, t);
         }
       }
     } else {
-      Map<Integer, Set<Integer>> streamIndexToPartitions =
-          IngestionConfigUtils.getStreamIndexToPartitions(partitionsHosted);
-      assert streamIndexToPartitions.size() == _streamMetadataProviderList.size();
+      Map<Integer, Set<Integer>> streamIndexToStreamPartitionIds =
+          IngestionConfigUtils.getStreamConfigIndexToStreamPartitions(partitionsHosted);
+      assert streamIndexToStreamPartitionIds.size() == _streamMetadataProviderList.size();
 
       for (int streamIndex = 0; streamIndex < _streamMetadataProviderList.size(); streamIndex++) {
         StreamMetadataProvider streamMetadataProvider = _streamMetadataProviderList.get(streamIndex);
         if (streamMetadataProvider.supportsOffsetLag()) {
-          Set<Integer> partitions = streamIndexToPartitions.get(streamIndex);
+          Set<Integer> streamPartitionIds = streamIndexToStreamPartitionIds.get(streamIndex);
           try {
-            Map<Integer, StreamPartitionMsgOffset> partitionIdToLatestOffset =
-                streamMetadataProvider.fetchLatestStreamOffset(partitions, FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS);
+            Map<Integer, StreamPartitionMsgOffset> streamPartitionIdToLatestOffset =
+                streamMetadataProvider.fetchLatestStreamOffset(streamPartitionIds,
+                    LATEST_STREAM_OFFSET_FETCH_TIMEOUT_MS);
             if (streamIndex > 0) {
-              for (Integer partitionId: partitionIdToLatestOffset.keySet()) {
+              for (Map.Entry<Integer, StreamPartitionMsgOffset> entry : streamPartitionIdToLatestOffset.entrySet()) {
                 _partitionIdToLatestOffset.put(
-                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(partitionId, streamIndex),
-                    partitionIdToLatestOffset.get(partitionId));
+                    IngestionConfigUtils.getPinotPartitionIdFromStreamPartitionId(entry.getKey(), streamIndex),
+                    entry.getValue());
               }
             } else {
-              _partitionIdToLatestOffset.putAll(
-                  streamMetadataProvider.fetchLatestStreamOffset(partitions, FETCH_LATEST_STREAM_OFFSET_TIMEOUT_MS));
+              _partitionIdToLatestOffset.putAll(streamPartitionIdToLatestOffset);
             }
           } catch (Throwable t) {
-            LOGGER.error("Failed to update latest stream offsets for partitions: {}", partitions, t);
+            LOGGER.error("Failed to update latest stream offsets for partitions: {}", streamPartitionIds, t);
           }
         }
       }
