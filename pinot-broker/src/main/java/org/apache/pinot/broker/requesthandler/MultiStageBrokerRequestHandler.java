@@ -433,7 +433,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
         .defaultRunInBroker(defaultRunInBroker)
         .defaultUseBrokerPruning(defaultUseBrokerPruning)
         .defaultLiteModeLeafStageLimit(defaultLiteModeServerStageLimit)
-        .defaultLiteModeLeafStageFanoutAdjustedLimit(defaultLiteModeFanoutAdjustedLimit)
+        .defaultLiteModeLeafStageFanOutAdjustedLimit(defaultLiteModeFanoutAdjustedLimit)
         .defaultHashFunction(defaultHashFunction)
         .build();
   }
