@@ -124,12 +124,6 @@ public abstract class RealtimeOffsetAutoResetKafkaHandler implements RealtimeOff
     updateTopicIndexMap(IngestionConfigUtils.getStreamConfigMaps(currentTableConfig));
     _llcRealtimeSegmentManager.pauseTopicsConsumption(currentTableConfig.getTableName(),
         cleanedUpTopics.stream().map(_topicNameToIndexMap::get).collect(Collectors.toList()));
-    try {
-      _pinotHelixResourceManager.setExistingTableConfig(currentTableConfig);
-    } catch (IOException e) {
-      LOGGER.error("Cannot remove backfill topics {} from the table config", topicNames, e);
-      cleanedUpTopics.clear();
-    }
     return cleanedUpTopics;
   }
 
