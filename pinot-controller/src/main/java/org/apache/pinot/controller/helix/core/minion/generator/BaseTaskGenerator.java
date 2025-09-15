@@ -53,51 +53,16 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   @Override
-  public long getTaskTimeoutMs() {
-    String taskType = getTaskType();
-    String configKey = taskType + MinionConstants.TIMEOUT_MS_KEY_SUFFIX;
-    String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
-    if (configValue != null) {
-      try {
-        return Long.parseLong(configValue);
-      } catch (Exception e) {
-        LOGGER.error("Invalid cluster config {}: '{}'", configKey, configValue, e);
-      }
-    }
-    return JobConfig.DEFAULT_TIMEOUT_PER_TASK;
+  public long getTaskTimeoutMs(String minionTag) {
+    return TaskGeneratorUtils.getClusterMinionConfigValue(getTaskType(), MinionConstants.TIMEOUT_MS_KEY_SUFFIX,
+        minionTag, JobConfig.DEFAULT_TIMEOUT_PER_TASK, Long.class, _clusterInfoAccessor);
   }
 
   @Override
   public int getNumConcurrentTasksPerInstance(String minionTag) {
-    String taskType = getTaskType();
-
-    // Priority 1: Check minion tenant specific cluster config
-    if (minionTag != null) {
-      String tenantSpecificConfigKey = taskType + "." + minionTag
-          + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
-      String configValue = _clusterInfoAccessor.getClusterConfig(tenantSpecificConfigKey);
-      if (configValue != null) {
-        try {
-          return Integer.parseInt(configValue);
-        } catch (Exception e) {
-          LOGGER.error("Invalid config {}: '{}'", tenantSpecificConfigKey, configValue, e);
-        }
-      }
-    }
-
-    // Priority 2: Check task type specific cluster config
-    String taskTypeConfigKey = taskType + MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX;
-    String configValue = _clusterInfoAccessor.getClusterConfig(taskTypeConfigKey);
-    if (configValue != null) {
-      try {
-        return Integer.parseInt(configValue);
-      } catch (Exception e) {
-        LOGGER.error("Invalid config {}: '{}'", taskTypeConfigKey, configValue, e);
-      }
-    }
-
-    // Priority 3: Default value
-    return JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE;
+    return TaskGeneratorUtils.getClusterMinionConfigValue(getTaskType(),
+        MinionConstants.NUM_CONCURRENT_TASKS_PER_INSTANCE_KEY_SUFFIX,
+        minionTag, JobConfig.DEFAULT_NUM_CONCURRENT_TASKS_PER_INSTANCE, Integer.class, _clusterInfoAccessor);
   }
 
   @Override
@@ -180,18 +145,10 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
   }
 
   @Override
-  public int getMaxAttemptsPerTask() {
-    String taskType = getTaskType();
-    String configKey = taskType + MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX;
-    String configValue = _clusterInfoAccessor.getClusterConfig(configKey);
-    if (configValue != null) {
-      try {
-        return Integer.parseInt(configValue);
-      } catch (Exception e) {
-        LOGGER.error("Invalid config {}: '{}'", configKey, configValue, e);
-      }
-    }
-    return MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK;
+  public int getMaxAttemptsPerTask(String minionTag) {
+    return TaskGeneratorUtils.getClusterMinionConfigValue(getTaskType(),
+        MinionConstants.MAX_ATTEMPTS_PER_TASK_KEY_SUFFIX, minionTag, MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK,
+        Integer.class, _clusterInfoAccessor);
   }
 
   /**
@@ -257,7 +214,7 @@ public abstract class BaseTaskGenerator implements PinotTaskGenerator {
     Map<String, String> baseConfigs = new HashMap<>();
     baseConfigs.put(MinionConstants.TABLE_NAME_KEY, tableConfig.getTableName());
     baseConfigs.put(MinionConstants.SEGMENT_NAME_KEY, StringUtils.join(segmentNames,
-          MinionConstants.SEGMENT_NAME_SEPARATOR));
+        MinionConstants.SEGMENT_NAME_SEPARATOR));
     return baseConfigs;
   }
 }

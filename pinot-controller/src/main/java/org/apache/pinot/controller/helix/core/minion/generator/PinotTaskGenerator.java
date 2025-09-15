@@ -58,12 +58,13 @@ public interface PinotTaskGenerator {
   /**
    * Generates a list of task based on the given table configs, it also gets list of existing task configs
    */
-  void generateTasks(List<TableConfig> tableConfigs, List<PinotTaskConfig> pinotTaskConfigs) throws Exception;
+  void generateTasks(List<TableConfig> tableConfigs, List<PinotTaskConfig> pinotTaskConfigs)
+      throws Exception;
 
   /**
    * Returns the timeout in milliseconds for each task, 3600000 (1 hour) by default.
    */
-  default long getTaskTimeoutMs() {
+  default long getTaskTimeoutMs(String minionTag) {
     return JobConfig.DEFAULT_TIMEOUT_PER_TASK;
   }
 
@@ -98,7 +99,7 @@ public interface PinotTaskGenerator {
   /**
    * Returns the maximum number of attempts per task, 1 by default.
    */
-  default int getMaxAttemptsPerTask() {
+  default int getMaxAttemptsPerTask(String minionTag) {
     return MinionConstants.DEFAULT_MAX_ATTEMPTS_PER_TASK;
   }
 
