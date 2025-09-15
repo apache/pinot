@@ -159,8 +159,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   protected void doInit() {
     _leaseExtender = SegmentBuildTimeLeaseExtender.getOrCreate(_instanceId, _serverMetrics, _tableNameWithType);
     // Tracks ingestion delay of all partitions being served for this table
-    _ingestionDelayTracker =
-        new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this, _isServerReadyToServeQueries);
+    _ingestionDelayTracker = new IngestionDelayTracker(_serverMetrics, _tableNameWithType, this);
     File statsFile = new File(_tableDataDir, STATS_FILE_NAME);
     try {
       _statsHistory = RealtimeSegmentStatsHistory.deserialzeFrom(statsFile);
@@ -505,7 +504,7 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
 
   public Set<Integer> stopTrackingPartitionIngestionDelay(@Nullable Set<Integer> partitionIds) {
     if (CollectionUtils.isEmpty(partitionIds)) {
-      return _ingestionDelayTracker.stopTrackingForAllPartitions();
+      return _ingestionDelayTracker.stopTrackingAllPartitions();
     }
     for (Integer partitionId: partitionIds) {
       _ingestionDelayTracker.stopTrackingPartition(partitionId);
@@ -918,6 +917,10 @@ public class RealtimeTableDataManager extends BaseTableDataManager {
   @VisibleForTesting
   void setEnforceConsumptionInOrder(boolean enforceConsumptionInOrder) {
     _enforceConsumptionInOrder = enforceConsumptionInOrder;
+  }
+
+  public Supplier<Boolean> getIsServerReadyToServeQueries() {
+    return _isServerReadyToServeQueries;
   }
 
   /**

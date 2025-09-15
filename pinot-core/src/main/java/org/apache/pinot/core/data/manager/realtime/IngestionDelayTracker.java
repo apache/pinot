@@ -142,10 +142,10 @@ public class IngestionDelayTracker {
   protected volatile Set<Integer> _partitionsHostedByThisServer = new HashSet<>();
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-      RealtimeTableDataManager realtimeTableDataManager, Supplier<Boolean> isServerReadyToServeQueries)
+      RealtimeTableDataManager realtimeTableDataManager)
       throws RuntimeException {
     this(serverMetrics, tableNameWithType, realtimeTableDataManager, METRICS_CLEANUP_INTERVAL_MS,
-        METRICS_TRACKING_INTERVAL_MS, isServerReadyToServeQueries);
+        METRICS_TRACKING_INTERVAL_MS, realtimeTableDataManager.getIsServerReadyToServeQueries());
   }
 
   @VisibleForTesting
@@ -402,7 +402,7 @@ public class IngestionDelayTracker {
    *
    * @return Set of partitionIds for which ingestion metrics were removed.
    */
-  public Set<Integer> stopTrackingForAllPartitions() {
+  public Set<Integer> stopTrackingAllPartitions() {
     Set<Integer> removedPartitionIds = new HashSet<>(_ingestionInfoMap.keySet());
     for (Integer partitionId : _ingestionInfoMap.keySet()) {
       removePartitionId(partitionId);
