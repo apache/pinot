@@ -219,17 +219,17 @@
     <!-- Java EE Libraries -->
     <!-- Include both newer jakarta ones and older javax ones, but not migrate to Jakarta EE yet -->
     <!-- DO NOT upgrade these versions unless we are migrating to Jakarta EE -->
-    <jakarta.servlet-api.version>4.0.4</jakarta.servlet-api.version>
-    <javax.servlet-api.version>4.0.1</javax.servlet-api.version>
-    <jakarta.annotation-api.version>1.3.5</jakarta.annotation-api.version>
-    <javax.annotation-api.version>1.3.2</javax.annotation-api.version>
-    <jakarta.validation-api.version>2.0.2</jakarta.validation-api.version>
-    <javax.validation-api.version>2.0.1.Final</javax.validation-api.version>
-    <jakarta.xml.bind-api.version>2.3.3</jakarta.xml.bind-api.version>
-    <javax.jaxb-api.version>2.3.1</javax.jaxb-api.version>
-    <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
-    <javax.ws.rs-api.version>2.1.1</javax.ws.rs-api.version>
-    <jakarta.activation-api.version>2.1.4</jakarta.activation-api.version>
+    <jakarta.servlet-api.version>4.0.4</jakarta.servlet-api.version>        <!-- DO NOT UPGRADE -->
+    <javax.servlet-api.version>4.0.1</javax.servlet-api.version>            <!-- DO NOT UPGRADE -->
+    <jakarta.annotation-api.version>1.3.5</jakarta.annotation-api.version>  <!-- DO NOT UPGRADE -->
+    <javax.annotation-api.version>1.3.2</javax.annotation-api.version>      <!-- DO NOT UPGRADE -->
+    <jakarta.validation-api.version>2.0.2</jakarta.validation-api.version>  <!-- DO NOT UPGRADE -->
+    <javax.validation-api.version>2.0.1.Final</javax.validation-api.version><!-- DO NOT UPGRADE -->
+    <jakarta.xml.bind-api.version>2.3.3</jakarta.xml.bind-api.version>      <!-- DO NOT UPGRADE -->
+    <javax.jaxb-api.version>2.3.1</javax.jaxb-api.version>                  <!-- DO NOT UPGRADE -->
+    <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>            <!-- DO NOT UPGRADE -->
+    <javax.ws.rs-api.version>2.1.1</javax.ws.rs-api.version>                <!-- DO NOT UPGRADE -->
+    <jakarta.activation-api.version>1.2.2</jakarta.activation-api.version>  <!-- DO NOT UPGRADE -->
 
     <!-- HTTP Components Libraries -->
     <httpclient.version>4.5.14</httpclient.version>
