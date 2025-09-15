@@ -42,6 +42,7 @@ import org.apache.pinot.controller.util.ServerSegmentMetadataReader;
 import org.apache.pinot.core.common.MinionConstants;
 import org.apache.pinot.core.common.MinionConstants.UpsertCompactionTask;
 import org.apache.pinot.core.minion.PinotTaskConfig;
+import org.apache.pinot.plugin.minion.tasks.MinionTaskUtils;
 import org.apache.pinot.spi.annotations.minion.TaskGenerator;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
@@ -102,6 +103,11 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         continue;
       }
 
+      if (!tableConfig.isUpsertEnabled()) {
+        LOGGER.warn("Upsert config is not enabled for table: {}", tableNameWithType);
+        continue;
+      }
+
       Map<String, String> taskConfigs = tableConfig.getTaskConfig().getConfigsForTaskType(taskType);
       List<SegmentZKMetadata> allSegments = _clusterInfoAccessor.getSegmentsZKMetadata(tableNameWithType);
 
@@ -138,11 +144,8 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
           new ServerSegmentMetadataReader(_clusterInfoAccessor.getExecutor(),
               _clusterInfoAccessor.getConnectionManager());
 
-      // By default, we use 'snapshot' for validDocIdsType. This means that we will use the validDocIds bitmap from
-      // the snapshot from Pinot segment. This will require 'enableSnapshot' from UpsertConfig to be set to true.
-      String validDocIdsTypeStr =
-          taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, ValidDocIdsType.SNAPSHOT.toString());
-      ValidDocIdsType validDocIdsType = ValidDocIdsType.valueOf(validDocIdsTypeStr.toUpperCase());
+      ValidDocIdsType validDocIdsType = MinionTaskUtils.getValidDocIdsType(tableConfig.getUpsertConfig(), taskConfigs,
+          UpsertCompactionTask.VALID_DOC_IDS_TYPE);
 
       // Number of segments to query per server request. If a table has a lot of segments, then we might send a
       // huge payload to pinot-server in request. Batching the requests will help in reducing the payload size.
@@ -317,18 +320,20 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
         taskConfigs.containsKey(UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_PERCENT) || taskConfigs.containsKey(
             UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT),
         "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
-    String validDocIdsType =
-        taskConfigs.getOrDefault(UpsertCompactionTask.VALID_DOC_IDS_TYPE, UpsertCompactionTask.SNAPSHOT);
-    if (validDocIdsType.equals(ValidDocIdsType.SNAPSHOT.toString())) {
-      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-      assert upsertConfig != null;
+
+    UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
+    assert upsertConfig != null;
+    ValidDocIdsType validDocIdsType = MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs,
+        UpsertCompactionTask.VALID_DOC_IDS_TYPE);
+    if (validDocIdsType == ValidDocIdsType.SNAPSHOT || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
       // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
       Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
           "'snapshot' from UpsertConfig must not be 'DISABLE' for UpsertCompactionTask with validDocIdsType = %s",
           validDocIdsType);
-    } else if (validDocIdsType.equals(ValidDocIdsType.IN_MEMORY_WITH_DELETE.toString())) {
-      UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
-      assert upsertConfig != null;
+    }
+
+    if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE
+        || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
       Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(), String.format(
           "deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
           validDocIdsType));
