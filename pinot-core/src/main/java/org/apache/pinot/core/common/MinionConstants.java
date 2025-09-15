@@ -67,6 +67,10 @@ public class MinionConstants {
   // This is primarily used to prevent performance issues in helix leader controller when it creates
   // more subtasks than it can support
   public static final String MAX_ALLOWED_SUB_TASKS_KEY = "minion.maxAllowedSubTasksPerTask";
+  // Cluster level config of maximum disk usage percentage on minion hosts before the task tries to gracefully
+  // handle the situation rather than getting killed due to lack of disk space.
+  // Note - Not all tasks may support this config. Currently, MergeTask and its variants support this config
+  public static final String MAX_DISK_USAGE_PERCENTAGE_KEY = "minion.maxDiskUsagePercentage";
 
   /**
    * Table level configs

@@ -139,6 +139,7 @@ public class MergeTaskUtils {
 
   /**
    * Returns the segment config based on the task config.
+   * TODO - Ensure all tasks that build SegmentConfig use this method so that all appropriate configs are set.
    */
   public static SegmentConfig getSegmentConfig(Map<String, String> taskConfig) {
     SegmentConfig.Builder segmentConfigBuilder = new SegmentConfig.Builder();

@@ -258,6 +258,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       }
       pinotTaskConfigs.forEach(pinotTaskConfig -> pinotTaskConfig.getConfigs()
           .computeIfAbsent(MinionConstants.TRIGGERED_BY, k -> CommonConstants.TaskTriggers.ADHOC_TRIGGER.name()));
+      addDefaultsToTaskConfig(pinotTaskConfigs);
       LOGGER.info("Submitting ad-hoc task for task type: {} with task configs: {}", taskType, pinotTaskConfigs);
       _controllerMetrics.addMeteredTableValue(taskType, ControllerMeter.NUMBER_ADHOC_TASKS_SUBMITTED, 1);
       responseMap.put(tableNameWithType,
@@ -831,6 +832,7 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
                 numTasks, taskType, pinotTaskConfigs, minionInstanceTag);
             throw new IllegalArgumentException("No valid minion instance found for tag: " + minionInstanceTag);
           }
+          addDefaultsToTaskConfig(pinotTaskConfigs);
           // This might lead to lot of logs, maybe sum it up and move outside the loop
           LOGGER.info("Submitting {} tasks for task type: {} to minionInstance: {} with task configs: {}", numTasks,
               taskType, minionInstanceTag, pinotTaskConfigs);
@@ -934,5 +936,15 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
       return false;
     }
     return true;
+  }
+
+  protected void addDefaultsToTaskConfig(List<PinotTaskConfig> taskConfigs) {
+    String maxDiskUsagePercentageStr = getClusterInfoAccessor().getClusterConfig(
+        MinionConstants.MAX_DISK_USAGE_PERCENTAGE_KEY);
+    for (PinotTaskConfig taskConfig : taskConfigs) {
+      Map<String, String> configs = taskConfig.getConfigs();
+      // Add default configs if not present
+      configs.putIfAbsent(MinionConstants.MergeTask.MAX_DISK_USAGE_PERCENTAGE, maxDiskUsagePercentageStr);
+    };
   }
 }
