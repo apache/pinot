@@ -97,7 +97,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
 
     selfNode.put("clockTimeMs", cpuTimeMs / context._parallelism);
 
-    long childrenStat = getChildrenStat(type, children, "executionTimeMs", false);
+    long childrenStat = getChildrenStat(type, children, "executionTimeMs");
     long selfExecutionTimeMs = cpuTimeMs - childrenStat;
     if (selfExecutionTimeMs != 0) {
       selfNode.put("selfExecutionTimeMs", selfExecutionTimeMs);
@@ -110,7 +110,7 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     JsonNode allocatedBytes = selfNode.get("allocatedMemoryBytes");
     long totalAllocatedBytes = allocatedBytes == null ? 0 : allocatedBytes.asLong(0);
 
-    long selfAllocatedBytes = totalAllocatedBytes - getChildrenStat(type, children, "allocatedMemoryBytes", false);
+    long selfAllocatedBytes = totalAllocatedBytes - getChildrenStat(type, children, "allocatedMemoryBytes");
     if (selfAllocatedBytes != 0) {
       selfNode.put("selfAllocatedMB", selfAllocatedBytes / (1024 * 1024));
     }
@@ -120,17 +120,13 @@ public class InStageStatsTreeBuilder implements PlanNodeVisitor<ObjectNode, InSt
     JsonNode gcTimeMs = selfNode.get("gcTimeMs");
     long totalGcTimeMs = gcTimeMs == null ? 0 : gcTimeMs.asLong(0);
 
-    long selfGcTimeMs = totalGcTimeMs - getChildrenStat(type, children, "gcTimeMs", false);
+    long selfGcTimeMs = totalGcTimeMs - getChildrenStat(type, children, "gcTimeMs");
     if (selfGcTimeMs != 0) {
       selfNode.put("selfGcTimeMs", selfGcTimeMs);
     }
   }
 
-  private long getChildrenStat(
-      MultiStageOperator.Type type, JsonNode[] children, String key, boolean crossStageBoundary) {
-    if (type == MultiStageOperator.Type.MAILBOX_RECEIVE && !crossStageBoundary) {
-      return 0;
-    }
+  private long getChildrenStat(MultiStageOperator.Type type, JsonNode[] children, String key) {
     if (children == null) {
       return 0;
     }
