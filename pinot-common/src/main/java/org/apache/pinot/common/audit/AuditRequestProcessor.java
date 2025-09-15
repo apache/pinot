@@ -117,8 +117,8 @@ public class AuditRequestProcessor {
       UriInfo uriInfo = requestContext.getUriInfo();
       String endpoint = uriInfo.getPath();
 
-      // Check endpoint exclusions
-      if (_auditUrlPathFilter.isExcluded(endpoint, _configManager.getCurrentConfig().getUrlFilterExcludePatterns())) {
+      // Check if endpoint should be audited based on include/exclude patterns
+      if (!_auditUrlPathFilter.shouldAudit(endpoint)) {
         return null;
       }
 

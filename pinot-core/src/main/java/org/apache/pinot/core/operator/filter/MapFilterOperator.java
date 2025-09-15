@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator.filter;
 import com.google.common.base.CaseFormat;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.predicate.EqPredicate;
@@ -34,6 +35,8 @@ import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
 import org.apache.pinot.segment.spi.datasource.DataSource;
+import org.apache.pinot.segment.spi.index.IndexService;
+import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.reader.JsonIndexReader;
 
 
@@ -70,6 +73,14 @@ public class MapFilterOperator extends BaseFilterOperator {
       DataSource dataSource = indexSegment.getDataSourceNullable(_columnName);
       if (dataSource != null) {
         jsonIndex = dataSource.getJsonIndex();
+        if (jsonIndex == null) {
+          // Fallback to Composite JSON Index if standard JSON index is not available
+          Optional<IndexType<?, ?, ?>> compositeIndex =
+              IndexService.getInstance().getOptional("composite_json_index");
+          if (compositeIndex.isPresent()) {
+            jsonIndex = (JsonIndexReader) dataSource.getIndex(compositeIndex.get());
+          }
+        }
       }
     }
     if (jsonIndex != null) {

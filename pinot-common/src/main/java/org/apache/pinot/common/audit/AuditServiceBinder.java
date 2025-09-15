@@ -16,12 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.pinot.controller.api.audit;
+package org.apache.pinot.common.audit;
 
-import org.apache.pinot.common.audit.AuditConfigManager;
-import org.apache.pinot.common.audit.AuditIdentityResolver;
-import org.apache.pinot.common.audit.AuditRequestProcessor;
-import org.apache.pinot.common.audit.AuditUrlPathFilter;
 import org.apache.pinot.common.config.DefaultClusterConfigChangeHandler;
 import org.apache.pinot.spi.services.ServiceRole;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;

@@ -269,14 +269,56 @@ public final class TableConfigUtils {
     }
 
     // Retention may not be specified. Ignore validation in that case.
-    String timeUnitString = segmentsConfig.getRetentionTimeUnit();
-    if (timeUnitString == null || timeUnitString.isEmpty()) {
-      return;
+    String retentionTimeUnitString = segmentsConfig.getRetentionTimeUnit();
+    if (retentionTimeUnitString != null && !retentionTimeUnitString.isEmpty()) {
+      try {
+        TimeUnit.valueOf(retentionTimeUnitString.toUpperCase());
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid retention time unit: %s", tableName, retentionTimeUnitString));
+      }
     }
-    try {
-      TimeUnit.valueOf(timeUnitString.toUpperCase());
-    } catch (Exception e) {
-      throw new IllegalStateException(String.format("Table: %s, invalid time unit: %s", tableName, timeUnitString));
+
+    // Untracked segments retention may not be specified. Ignore validation in that case.
+    String untrackedSegmentsRetentionTimeUnitString = segmentsConfig.getUntrackedSegmentsRetentionTimeUnit();
+    String untrackedSegmentsRetentionTimeValueString = segmentsConfig.getUntrackedSegmentsRetentionTimeValue();
+
+    boolean hasUntrackedTimeUnit =
+        untrackedSegmentsRetentionTimeUnitString != null && !untrackedSegmentsRetentionTimeUnitString.isEmpty();
+    boolean hasUntrackedTimeValue =
+        untrackedSegmentsRetentionTimeValueString != null && !untrackedSegmentsRetentionTimeValueString.isEmpty();
+
+    if (hasUntrackedTimeUnit && !hasUntrackedTimeValue) {
+      throw new IllegalStateException(String.format(
+          "Table: %s, untracked retention time value must be specified when untracked retention time unit is provided",
+          tableName));
+    }
+    if (hasUntrackedTimeValue && !hasUntrackedTimeUnit) {
+      throw new IllegalStateException(String.format(
+          "Table: %s, untracked retention time unit must be specified when untracked retention time value is provided",
+          tableName));
+    }
+
+    if (hasUntrackedTimeUnit) {
+      try {
+        TimeUnit.valueOf(untrackedSegmentsRetentionTimeUnitString.toUpperCase());
+      } catch (Exception e) {
+        throw new IllegalStateException(String.format("Table: %s, invalid untracked retention time unit: %s", tableName,
+            untrackedSegmentsRetentionTimeUnitString));
+      }
+
+      try {
+        long timeValue = Long.parseLong(untrackedSegmentsRetentionTimeValueString);
+        if (timeValue <= 0) {
+          throw new IllegalStateException(
+              String.format("Table: %s, untracked retention time value must be positive: %s", tableName,
+                  untrackedSegmentsRetentionTimeValueString));
+        }
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid untracked retention time value: %s", tableName,
+                untrackedSegmentsRetentionTimeValueString));
+      }
     }
   }
 
@@ -774,10 +816,6 @@ public final class TableConfigUtils {
                 deleteRecordColumn));
       }
 
-      // Validate commit-time compaction compatibility with column major segment builder
-      // todo: Remove this after commit time compaction is supported with column major build
-      validateCommitTimeCompactionConfig(tableConfig);
-
       String outOfOrderRecordColumn = upsertConfig.getOutOfOrderRecordColumn();
       if (outOfOrderRecordColumn != null) {
         Preconditions.checkState(!Boolean.TRUE.equals(upsertConfig.isDropOutOfOrderRecord()),
@@ -824,8 +862,8 @@ public final class TableConfigUtils {
 
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-            .containsKey(InstancePartitionsType.COMPLETED),
-        "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
+            .containsKey(InstancePartitionsType.COMPLETED.name()),
+        "COMPLETED instance partitions can't be configured for upsert / dedup tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
     validateTTLForDedupConfig(tableConfig, schema);
@@ -1541,34 +1579,6 @@ public final class TableConfigUtils {
       return false;
     }
     return tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
-  }
-
-  /**
-   * Validates that commit-time compaction is compatible with column major segment builder settings.
-   *
-   * @param tableConfig The table configuration to validate
-   * @throws IllegalStateException if commit-time compaction is enabled with column major segment builder
-   */
-  public static void validateCommitTimeCompactionConfig(TableConfig tableConfig) {
-    boolean commitTimeCompactionEnabled = isCommitTimeCompactionEnabled(tableConfig);
-
-    if (commitTimeCompactionEnabled) {
-      boolean isColumnMajorEnabled = false;
-      if (tableConfig.getIngestionConfig() != null
-          && tableConfig.getIngestionConfig().getStreamIngestionConfig() != null) {
-        isColumnMajorEnabled =
-            tableConfig.getIngestionConfig().getStreamIngestionConfig().getColumnMajorSegmentBuilderEnabled();
-      } else {
-        isColumnMajorEnabled = tableConfig.getIndexingConfig().isColumnMajorSegmentBuilderEnabled();
-      }
-
-      String tableNameForError = tableConfig.getTableName();
-
-      Preconditions.checkState(!isColumnMajorEnabled,
-          "Commit-time compaction is not supported when column major segment builder is enabled. "
-              + "Please disable column major segment builder (set columnMajorSegmentBuilderEnabled=false) "
-              + "to use commit-time compaction for table: " + tableNameForError);
-    }
   }
 
   /**

@@ -2051,6 +2051,37 @@ public class TableConfigUtilsTest {
       assertEquals(e.getMessage(), "Invalid tenant tag override used for Upsert/Dedup table");
     }
 
+    // Instance assignment config with just CONSUMING instance partitions configured should be allowed
+    InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // Instance assignment config with CONSUMING and COMPLETED instance partitions configured should not be allowed
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig,
+            InstancePartitionsType.COMPLETED.name(), instanceAssignmentConfig))
+        .build();
+
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Instance assignment config with COMPLETED instance partitions must not be allowed with upsert");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "COMPLETED instance partitions can't be configured for upsert / dedup tables");
+    }
+
     // empty tag override with upsert should pass
     tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
         .setTimeColumnName(TIME_COLUMN)

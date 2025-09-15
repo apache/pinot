@@ -24,7 +24,7 @@
   <parent>
     <artifactId>pinot-connectors</artifactId>
     <groupId>org.apache.pinot</groupId>
-    <version>1.4.0-SNAPSHOT</version>
+    <version>1.5.0-SNAPSHOT</version>
   </parent>
   <artifactId>pinot-spark-common</artifactId>
   <name>Pinot Spark Common</name>
@@ -61,6 +61,11 @@
         <dependency>
           <groupId>org.scalatest</groupId>
           <artifactId>scalatest_${scala.compat.version}</artifactId>
+          <scope>test</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.mockito</groupId>
+          <artifactId>mockito-core</artifactId>
           <scope>test</scope>
         </dependency>
       </dependencies>
