@@ -89,9 +89,9 @@ public class IngestionDelayTrackerTest {
     private ScheduledExecutorService _scheduledExecutorService;
 
     public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
-        RealtimeTableDataManager realtimeTableDataManager, Supplier<Boolean> isServerReadyToServeQueries)
+        RealtimeTableDataManager realtimeTableDataManager)
         throws RuntimeException {
-      super(serverMetrics, tableNameWithType, realtimeTableDataManager, isServerReadyToServeQueries);
+      this(serverMetrics, tableNameWithType, realtimeTableDataManager, 5, 5, () -> true);
     }
 
     public MockIngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
@@ -100,15 +100,6 @@ public class IngestionDelayTrackerTest {
       super(serverMetrics, tableNameWithType, realtimeTableDataManager, timerThreadTickIntervalMs,
           metricTrackingIntervalMs, isServerReadyToServeQueries);
     }
-
-//    @Override
-//    public void createStreamMetadataProvider(String tableNameWithType,
-//        RealtimeTableDataManager realtimeTableDataManager) {
-//      List<StreamConfig> streamConfigs =
-//          IngestionConfigUtils.getStreamConfigs(realtimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
-//      _streamMetadataProviderList =
-//          List.of(new FakeStreamMetadataProvider(new StreamConfig(tableNameWithType, getStreamConfigs())));
-//    }
 
     @Override
     public void createMetrics(int partitionId) {
@@ -155,14 +146,14 @@ public class IngestionDelayTrackerTest {
   }
 
   private IngestionDelayTracker createTracker() {
-    return new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, () -> true);
+    return new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER);
   }
 
   @Test
   public void testTrackerConstructors() {
     // Test regular constructor
     IngestionDelayTracker ingestionDelayTracker =
-        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER, () -> true);
+        new MockIngestionDelayTracker(_serverMetrics, REALTIME_TABLE_NAME, REALTIME_TABLE_DATA_MANAGER);
 
     Clock clock = Clock.systemUTC();
     ingestionDelayTracker.setClock(clock);
