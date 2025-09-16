@@ -86,31 +86,14 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
 
     // Update the result holder
     ObjectAggregationResultHolder objectHolder = (ObjectAggregationResultHolder) aggregationResultHolder;
-    Object existingResult = objectHolder.getResult();
-    long existingSum = 0L;
-    if (existingResult != null) {
-      if (existingResult instanceof Long) {
-        existingSum = (Long) existingResult;
-      } else if (existingResult instanceof Double) {
-        existingSum = ((Double) existingResult).longValue();
-      } else if (existingResult instanceof Number) {
-        existingSum = ((Number) existingResult).longValue();
-      } else {
-        // If it's some other type, try to parse it as a number
-        try {
-          existingSum = Long.parseLong(existingResult.toString());
-        } catch (NumberFormatException e) {
-          // If parsing fails, start fresh with 0
-          existingSum = 0L;
-        }
-      }
-    }
+    Long existingResult = (Long) objectHolder.getResult();
+    long existingSum = existingResult == null ? 0L : existingResult;
 
     // If sum is null (no non-null values processed), set null
     if (sum == null) {
-      objectHolder.setValue(null);
+      objectHolder.setValue((Object) null);
     } else {
-      objectHolder.setValue(existingSum + sum);
+      objectHolder.setValue((Object) (existingSum + sum));
     }
   }
 
@@ -125,50 +108,20 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
           int groupKey = groupKeyArray[i];
-          Object existingResult = groupByResultHolder.getResult(groupKey);
-          long existingSum = 0L;
-          if (existingResult != null) {
-            if (existingResult instanceof Long) {
-              existingSum = (Long) existingResult;
-            } else if (existingResult instanceof Double) {
-              existingSum = ((Double) existingResult).longValue();
-            } else if (existingResult instanceof Number) {
-              existingSum = ((Number) existingResult).longValue();
-            } else {
-              try {
-                existingSum = Long.parseLong(existingResult.toString());
-              } catch (NumberFormatException e) {
-                existingSum = 0L;
-              }
-            }
-          }
+          Long existingResult = (Long) groupByResultHolder.getResult(groupKey);
+          long existingSum = existingResult == null ? 0L : existingResult;
           long newSum = existingSum + values[i];
-          groupByResultHolder.setValueForKey(groupKey, newSum);
+          groupByResultHolder.setValueForKey(groupKey, (Object) newSum);
         }
       });
     } else {
       // Process all values when null handling is disabled
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
-        Object existingResult = groupByResultHolder.getResult(groupKey);
-        long existingSum = 0L;
-        if (existingResult != null) {
-          if (existingResult instanceof Long) {
-            existingSum = (Long) existingResult;
-          } else if (existingResult instanceof Double) {
-            existingSum = ((Double) existingResult).longValue();
-          } else if (existingResult instanceof Number) {
-            existingSum = ((Number) existingResult).longValue();
-          } else {
-            try {
-              existingSum = Long.parseLong(existingResult.toString());
-            } catch (NumberFormatException e) {
-              existingSum = 0L;
-            }
-          }
-        }
+        Long existingResult = (Long) groupByResultHolder.getResult(groupKey);
+        long existingSum = existingResult == null ? 0L : existingResult;
         long newSum = existingSum + values[i];
-        groupByResultHolder.setValueForKey(groupKey, newSum);
+        groupByResultHolder.setValueForKey(groupKey, (Object) newSum);
       }
     }
   }
@@ -185,25 +138,10 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
         for (int i = from; i < to; i++) {
           int value = values[i];
           for (int groupKey : groupKeysArray[i]) {
-            Object existingResult = groupByResultHolder.getResult(groupKey);
-            long existingSum = 0L;
-            if (existingResult != null) {
-              if (existingResult instanceof Long) {
-                existingSum = (Long) existingResult;
-              } else if (existingResult instanceof Double) {
-                existingSum = ((Double) existingResult).longValue();
-              } else if (existingResult instanceof Number) {
-                existingSum = ((Number) existingResult).longValue();
-              } else {
-                try {
-                  existingSum = Long.parseLong(existingResult.toString());
-                } catch (NumberFormatException e) {
-                  existingSum = 0L;
-                }
-              }
-            }
+            Long existingResult = (Long) groupByResultHolder.getResult(groupKey);
+            long existingSum = existingResult == null ? 0L : existingResult;
             long newSum = existingSum + value;
-            groupByResultHolder.setValueForKey(groupKey, newSum);
+            groupByResultHolder.setValueForKey(groupKey, (Object) newSum);
           }
         }
       });
@@ -212,25 +150,10 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
       for (int i = 0; i < length; i++) {
         int value = values[i];
         for (int groupKey : groupKeysArray[i]) {
-          Object existingResult = groupByResultHolder.getResult(groupKey);
-          long existingSum = 0L;
-          if (existingResult != null) {
-            if (existingResult instanceof Long) {
-              existingSum = (Long) existingResult;
-            } else if (existingResult instanceof Double) {
-              existingSum = ((Double) existingResult).longValue();
-            } else if (existingResult instanceof Number) {
-              existingSum = ((Number) existingResult).longValue();
-            } else {
-              try {
-                existingSum = Long.parseLong(existingResult.toString());
-              } catch (NumberFormatException e) {
-                existingSum = 0L;
-              }
-            }
-          }
+          Long existingResult = (Long) groupByResultHolder.getResult(groupKey);
+          long existingSum = existingResult == null ? 0L : existingResult;
           long newSum = existingSum + value;
-          groupByResultHolder.setValueForKey(groupKey, newSum);
+          groupByResultHolder.setValueForKey(groupKey, (Object) newSum);
         }
       }
     }
@@ -238,46 +161,22 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
 
   @Override
   public Long extractAggregationResult(AggregationResultHolder aggregationResultHolder) {
-    Object result = aggregationResultHolder.getResult();
+    Long result = (Long) aggregationResultHolder.getResult();
     if (result == null) {
       // Return null when null handling is enabled, 0L when disabled
       return _nullHandlingEnabled ? null : 0L;
     }
-    if (result instanceof Long) {
-      return (Long) result;
-    } else if (result instanceof Double) {
-      return ((Double) result).longValue();
-    } else if (result instanceof Number) {
-      return ((Number) result).longValue();
-    } else {
-      try {
-        return Long.parseLong(result.toString());
-      } catch (NumberFormatException e) {
-        return 0L;
-      }
-    }
+    return result;
   }
 
   @Override
   public Long extractGroupByResult(GroupByResultHolder groupByResultHolder, int groupKey) {
-    Object result = groupByResultHolder.getResult(groupKey);
+    Long result = (Long) groupByResultHolder.getResult(groupKey);
     if (result == null) {
       // Return null when null handling is enabled, 0L when disabled
       return _nullHandlingEnabled ? null : 0L;
     }
-    if (result instanceof Long) {
-      return (Long) result;
-    } else if (result instanceof Double) {
-      return ((Double) result).longValue();
-    } else if (result instanceof Number) {
-      return ((Number) result).longValue();
-    } else {
-      try {
-        return Long.parseLong(result.toString());
-      } catch (NumberFormatException e) {
-        return 0L;
-      }
-    }
+    return result;
   }
 
   @Override
@@ -291,25 +190,6 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
       }
     }
     return intermediateResult1 + intermediateResult2;
-  }
-
-  private Long convertToLong(Object value) {
-    if (value == null) {
-      return 0L;
-    }
-    if (value instanceof Long) {
-      return (Long) value;
-    } else if (value instanceof Double) {
-      return ((Double) value).longValue();
-    } else if (value instanceof Number) {
-      return ((Number) value).longValue();
-    } else {
-      try {
-        return Long.parseLong(value.toString());
-      } catch (NumberFormatException e) {
-        return 0L;
-      }
-    }
   }
 
   @Override
