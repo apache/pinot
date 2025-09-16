@@ -23,21 +23,34 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
+import javax.annotation.Nullable;
 import org.apache.pinot.common.request.context.predicate.RegexpLikePredicate;
 import org.apache.pinot.common.utils.regex.Matcher;
+import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Factory for REGEXP_LIKE predicate evaluators.
  */
 public class RegexpLikePredicateEvaluatorFactory {
+  private static final Logger LOGGER = LoggerFactory.getLogger(RegexpLikePredicateEvaluatorFactory.class);
+
   private RegexpLikePredicateEvaluatorFactory() {
   }
 
-  /// When the cardinality of the dictionary is less than this threshold, scan the dictionary to get the matching ids.
-  public static final int DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN = 10000;
+  /// When the cardinality of the dictionary is less than this threshold, scan the dictionary
+  // to get the matching ids. Default value is 10K.
+  public static final int DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD = 10000;
+
+  /// Query option key for configuring the dictionary cardinality threshold
+  public static final String REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION = "regexpDictCardinalityThreshold";
+
+  /// Query option key to force use of dictionary scan
+  public static final String USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION = "useDictForRegexpLikePredicate";
 
   /**
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
@@ -48,9 +61,39 @@ public class RegexpLikePredicateEvaluatorFactory {
    * @return Dictionary based REGEXP_LIKE predicate evaluator
    */
   public static BaseDictionaryBasedPredicateEvaluator newDictionaryBasedEvaluator(
-      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType) {
+      RegexpLikePredicate regexpLikePredicate, Dictionary dictionary, DataType dataType,
+      @Nullable QueryContext queryContext) {
     Preconditions.checkArgument(dataType.getStoredType() == DataType.STRING, "Unsupported data type: " + dataType);
-    if (dictionary.length() < DICTIONARY_CARDINALITY_THRESHOLD_FOR_SCAN) {
+
+    // 1. If useDictForRegexpLikePredicate is set to true, always use dictionary
+    if (queryContext != null && queryContext.getQueryOptions() != null) {
+      String useDictOption = queryContext.getQueryOptions().get(USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION);
+      if ("true".equalsIgnoreCase(useDictOption)) {
+        return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
+      }
+    }
+
+    // 2. Otherwise, get the threshold number from regexpDictCardinalityThreshold (default 10K)
+    int cardinalityThreshold = DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD;
+    if (queryContext != null && queryContext.getQueryOptions() != null) {
+      String queryOptionValue = queryContext.getQueryOptions().get(REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION);
+      if (queryOptionValue != null) {
+        try {
+          int threshold = Integer.parseInt(queryOptionValue);
+          if (threshold >= 0) {
+            cardinalityThreshold = threshold;
+          } else {
+            LOGGER.warn("Invalid negative regexpDictCardinalityThreshold value: '{}', using default: {}",
+                queryOptionValue, DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD);
+          }
+        } catch (NumberFormatException e) {
+          LOGGER.warn("Invalid regexpDictCardinalityThreshold value: '{}', using default: {}", queryOptionValue,
+              DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD);
+        }
+      }
+    }
+
+    if (dictionary.length() < cardinalityThreshold) {
       return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
     } else {
       return new ScanBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
