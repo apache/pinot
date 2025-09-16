@@ -89,9 +89,13 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
     Long existingResult = (Long) objectHolder.getResult();
     long existingSum = existingResult == null ? 0L : existingResult;
 
-    // If sum is null (no non-null values processed), set null
+    // If sum is null (no non-null values processed), handle according to null handling setting
     if (sum == null) {
-      objectHolder.setValue((Object) null);
+      if (_nullHandlingEnabled) {
+        objectHolder.setValue((Object) null);
+      } else {
+        objectHolder.setValue((Object) existingSum);
+      }
     } else {
       objectHolder.setValue((Object) (existingSum + sum));
     }
