@@ -57,7 +57,6 @@ import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
-import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
@@ -74,8 +73,7 @@ public class BenchmarkEquiJoin extends BaseClusterIntegrationTest {
   public static void main(String[] args)
       throws Exception {
     ChainedOptionsBuilder opt = new OptionsBuilder()
-        .include(BenchmarkEquiJoin.class.getSimpleName())
-        .addProfiler(GCProfiler.class);
+        .include(BenchmarkEquiJoin.class.getSimpleName());
     new Runner(opt.build()).run();
   }
 
