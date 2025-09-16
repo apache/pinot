@@ -34,28 +34,23 @@ public class IntIteratorDocIdSetOperator extends BaseDocIdSetOperator {
   //       BatchIterator provides an API to fill up the buffer, switch to BatchIterator.
   private final IntIterator _intIterator;
   private final int[] _docIdBuffer;
-  private final boolean _ascending;
+  private final DidOrder _didOrder;
 
-  public IntIteratorDocIdSetOperator(IntIterator intIterator, int[] docIdBuffer, boolean ascending) {
+  public IntIteratorDocIdSetOperator(IntIterator intIterator, int[] docIdBuffer, DidOrder didOrder) {
     _intIterator = intIterator;
     _docIdBuffer = docIdBuffer;
-    _ascending = ascending;
+    _didOrder = didOrder;
   }
 
   @Override
-  public boolean isAscending() {
-    return _ascending;
+  public boolean isCompatibleWith(DidOrder order) {
+    return _didOrder == order;
   }
 
   @Override
-  public boolean isDescending() {
-    return !_ascending;
-  }
-
-  @Override
-  public BaseDocIdSetOperator withOrder(boolean ascending)
+  public BaseDocIdSetOperator withOrder(DidOrder order)
       throws UnsupportedOperationException {
-    if (_ascending != ascending) {
+    if (_didOrder != order) {
       throw new UnsupportedOperationException(EXPLAIN_NAME + " doesn't support changing its order");
     }
     return this;

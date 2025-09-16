@@ -109,18 +109,13 @@ public class AscDocIdSetOperator extends BaseDocIdSetOperator {
   }
 
   @Override
-  public boolean isAscending() {
-    return true;
+  public boolean isCompatibleWith(DidOrder order) {
+    return order == DidOrder.ASC;
   }
 
   @Override
-  public boolean isDescending() {
-    return false;
-  }
-
-  @Override
-  public BaseDocIdSetOperator withOrder(boolean ascending) {
-    if (isAscending() == ascending) {
+  public BaseDocIdSetOperator withOrder(DidOrder order) {
+    if (isCompatibleWith(order)) {
       return this;
     }
     return new DescDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);

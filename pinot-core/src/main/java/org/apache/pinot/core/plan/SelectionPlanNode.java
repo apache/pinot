@@ -24,6 +24,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.SegmentBlockOperator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
@@ -93,7 +94,8 @@ public class SelectionPlanNode implements PlanNode {
       boolean asc = orderByExpressions.get(0).isAsc();
       // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
       // both ascending and descending
-      if (asc && projectOperator.isAscending() || !asc && projectOperator.isDescending()) {
+      SegmentBlockOperator.DidOrder queryOrder = SegmentBlockOperator.DidOrder.fromAsc(asc);
+      if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
       } else {
@@ -126,9 +128,11 @@ public class SelectionPlanNode implements PlanNode {
         new ProjectPlanNode(_segmentContext, _queryContext, expressions, maxDocsPerCall).run();
 
     boolean asc = orderByExpressions.get(0).isAsc();
-    if (!asc && reverseOptimizationEnabled(_queryContext) && !projectOperator.isDescending()) {
+    if (!asc
+        && reverseOptimizationEnabled(_queryContext)
+        && !projectOperator.isCompatibleWith(SegmentBlockOperator.DidOrder.DESC)) {
       try {
-        return projectOperator.withOrder(false);
+        return projectOperator.withOrder(SegmentBlockOperator.DidOrder.DESC);
       } catch (IllegalArgumentException | UnsupportedOperationException e) {
         // This happens when the operator cannot provide the required order between blocks
         // Fallback to SelectionOrderByOperator

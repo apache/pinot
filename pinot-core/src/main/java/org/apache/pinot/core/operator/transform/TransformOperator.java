@@ -118,19 +118,13 @@ public class TransformOperator extends BaseProjectOperator<TransformBlock> {
     return _projectOperator.getExecutionStatistics();
   }
 
-
   @Override
-  public boolean isAscending() {
-    return _projectOperator.isAscending();
+  public boolean isCompatibleWith(DidOrder order) {
+    return _projectOperator.isCompatibleWith(order);
   }
 
   @Override
-  public boolean isDescending() {
-    return _projectOperator.isDescending();
-  }
-
-  @Override
-  public BaseProjectOperator<TransformBlock> withOrder(boolean ascending) {
-    return new TransformOperator(_projectOperator.withOrder(ascending), _transformFunctionMap);
+  public BaseProjectOperator<TransformBlock> withOrder(DidOrder newOrder) {
+    return new TransformOperator(_projectOperator.withOrder(newOrder), _transformFunctionMap);
   }
 }

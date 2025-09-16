@@ -118,19 +118,14 @@ public class DescDocIdSetOperator extends BaseDocIdSetOperator {
   }
 
   @Override
-  public boolean isAscending() {
-    return false;
+  public boolean isCompatibleWith(DidOrder order) {
+    return order == DidOrder.DESC;
   }
 
   @Override
-  public boolean isDescending() {
-    return true;
-  }
-
-  @Override
-  public BaseDocIdSetOperator withOrder(boolean ascending)
+  public BaseDocIdSetOperator withOrder(DidOrder order)
       throws UnsupportedOperationException {
-    if (isAscending() == ascending) {
+    if (isCompatibleWith(order)) {
       return this;
     }
     return new AscDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);

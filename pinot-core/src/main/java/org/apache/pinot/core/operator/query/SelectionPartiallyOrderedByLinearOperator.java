@@ -24,6 +24,7 @@ import java.util.function.Supplier;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.operator.BaseProjectOperator;
+import org.apache.pinot.core.operator.SegmentBlockOperator;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.IndexSegment;
@@ -52,16 +53,10 @@ public class SelectionPartiallyOrderedByLinearOperator extends LinearSelectionOr
         .findFirst()
         .orElseThrow(() -> new IllegalArgumentException("The query is not order by identifiers"))
         .isAsc();
-    if (firstColIsAsc) {
-      if (!projectOperator.isAscending()) {
-        throw new IllegalArgumentException(EXPLAIN_NAME + " cannot be used when order by asc if the input operator "
-            + "cannot be iterated in ascending order");
-      }
-    } else {
-      if (!projectOperator.isDescending()) {
-        throw new IllegalArgumentException(EXPLAIN_NAME + " cannot be used when order by desc if the input operator "
-            + "cannot be iterated in descending order");
-      }
+    SegmentBlockOperator.DidOrder didOrder = SegmentBlockOperator.DidOrder.fromAsc(firstColIsAsc);
+    if (!projectOperator.isCompatibleWith(didOrder)) {
+      throw new IllegalStateException(EXPLAIN_NAME + " requires the input operator to be compatible with order: "
+          + didOrder + ", but found: " + projectOperator.toExplainString());
     }
   }
 

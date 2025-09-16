@@ -24,23 +24,19 @@ import org.apache.pinot.core.common.Operator;
 
 /// An operator that is bound to a specific segment.
 public interface SegmentBlockOperator<T extends Block> extends Operator<T> {
-  /// Returns true if and only if the rows returned by this operator are sorted in ascending docId order.
-  /// Some operators (e.g. [BaseDocIdSetOperator]) may return more than one block. In that case the order is also
-  /// guaranteed across blocks.
+  /// Returns true if the operator is ordered by docId in the specified order.
   ///
-  /// Most SegmentBlockOperators are ascending.
-  ///
-  /// Remember that an empty operator can be considered to be both ascending and descending, which means that callers
-  /// cannot blindly assume that `isAscending() == !isDescending()`.
-  boolean isAscending();
+  /// Remember that empty operators or operators that return a single row are considered ordered.
+  boolean isCompatibleWith(DidOrder order);
 
-  /// Returns true if and only if the rows returned by this operator are sorted in descending docId order.
-  /// Some operators (e.g. [BaseDocIdSetOperator]) may return more than one block. In that case the order is also
-  /// guaranteed across blocks.
-  ///
-  /// Most SegmentBlockOperators are ascending.
-  ///
-  /// Remember that an empty operator can be considered to be both ascending and descending, which means that callers
-  /// cannot blindly assume that `isAscending() == !isDescending()`.
-  boolean isDescending();
+  enum DidOrder {
+    /// The rows are sorted in strictly ascending docId order.
+    ASC,
+    /// The rows are sorted in strictly descending docId order.
+    DESC;
+
+    public static DidOrder fromAsc(boolean asc) {
+      return asc ? ASC : DESC;
+    }
+  }
 }

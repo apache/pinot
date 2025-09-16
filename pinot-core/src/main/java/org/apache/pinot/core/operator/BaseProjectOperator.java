@@ -44,9 +44,11 @@ public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOper
   }
 
   /**
-   * Returns true if and only if the rows returned by this operator are sorted in ascending docId order.
+   * Returns an instance of {@link BaseProjectOperator} with the given order.
+   *
+   * The instance can be the same as the current one if requested order is the same as the current one.
    *
    * @throws UnsupportedOperationException if the order cannot be changed
    */
-  public abstract BaseProjectOperator<T> withOrder(boolean ascending);
+  public abstract BaseProjectOperator<T> withOrder(DidOrder newOrder);
 }

@@ -44,15 +44,15 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 public abstract class BaseDocIdSetOperator extends BaseOperator<DocIdSetBlock>
     implements SegmentBlockOperator<DocIdSetBlock> {
 
-  /// Returns a [BaseDocIdSetOperator] that follows the requested order or fails with [IllegalArgumentException]
-  /// if the order is not supported for this operator.
+  /// Returns a [BaseDocIdSetOperator] that is compatible with the requested order or fails with
+  /// [IllegalArgumentException] if the order is not supported for this operator.
   ///
   /// It may return `this` if the order is already the requested one.
   ///
   /// @return a [BaseDocIdSetOperator] that is ascending if `ascending` is true or descending otherwise. Remember that
   ///         an operator may be both ascending and descending if it is empty.
   /// @throws UnsupportedOperationException if the order is not supported for this operator.
-  public abstract BaseDocIdSetOperator withOrder(boolean ascending) throws UnsupportedOperationException;
+  public abstract BaseDocIdSetOperator withOrder(DidOrder order) throws UnsupportedOperationException;
 
   /// Returns the next block of document ids that match the filter (if any).
   ///

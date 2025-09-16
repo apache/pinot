@@ -135,18 +135,13 @@ public class ProjectionOperator extends BaseProjectOperator<ProjectionBlock> imp
   }
 
   @Override
-  public boolean isAscending() {
-    return _docIdSetOperator == null || _docIdSetOperator.isAscending();
+  public boolean isCompatibleWith(DidOrder order) {
+    return _docIdSetOperator == null || _docIdSetOperator.isCompatibleWith(order);
   }
 
   @Override
-  public boolean isDescending() {
-    return _docIdSetOperator == null || _docIdSetOperator.isDescending();
-  }
-
-  @Override
-  public BaseProjectOperator<ProjectionBlock> withOrder(boolean ascending) {
-    BaseDocIdSetOperator orderedOperator = _docIdSetOperator.withOrder(ascending);
+  public BaseProjectOperator<ProjectionBlock> withOrder(DidOrder newOrder) {
+    BaseDocIdSetOperator orderedOperator = _docIdSetOperator.withOrder(newOrder);
     if (orderedOperator == _docIdSetOperator) {
       return this;
     }

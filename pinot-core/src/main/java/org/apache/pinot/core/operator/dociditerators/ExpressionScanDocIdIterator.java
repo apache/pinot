@@ -30,6 +30,7 @@ import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.IntIteratorDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
+import org.apache.pinot.core.operator.SegmentBlockOperator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -128,7 +129,8 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
     IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
-    IntIteratorDocIdSetOperator docIdOperator = new IntIteratorDocIdSetOperator(intIterator, _docIdBuffer, true);
+    IntIteratorDocIdSetOperator docIdOperator =
+        new IntIteratorDocIdSetOperator(intIterator, _docIdBuffer, SegmentBlockOperator.DidOrder.ASC);
     try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(
         _dataSourceMap, docIdOperator, _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
@@ -143,7 +145,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-        new BitmapDocIdSetOperator(docIds, _docIdBuffer, true), _queryContext)) {
+        new BitmapDocIdSetOperator(docIds, _docIdBuffer, SegmentBlockOperator.DidOrder.ASC), _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       ProjectionBlock projectionBlock;
       while ((projectionBlock = projectionOperator.nextBlock()) != null) {
@@ -453,22 +455,17 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
     }
 
     @Override
-    public boolean isAscending() {
-      return true;
+    public boolean isCompatibleWith(DidOrder order) {
+      return DidOrder.ASC == order;
     }
 
     @Override
-    public boolean isDescending() {
-      return false;
-    }
-
-    @Override
-    public BaseDocIdSetOperator withOrder(boolean ascending)
+    public BaseDocIdSetOperator withOrder(DidOrder order)
         throws UnsupportedOperationException {
-      if (ascending) {
+      if (order == DidOrder.ASC) {
         return this;
       }
-      throw new UnsupportedOperationException("" + EXPLAIN_NAME + " doesn't support descending order");
+      throw new UnsupportedOperationException(EXPLAIN_NAME + " doesn't support descending order");
     }
   }
 
