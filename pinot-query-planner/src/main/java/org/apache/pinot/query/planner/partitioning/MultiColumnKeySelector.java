@@ -24,6 +24,7 @@ import org.apache.pinot.core.data.table.Key;
 public class MultiColumnKeySelector implements KeySelector<Key> {
   private final int[] _keyIds;
   private final String _hashFunction;
+  private final HashFunctionSelector.MvHasher _hasher;
 
   public MultiColumnKeySelector(int[] keyIds) {
     this(keyIds, KeySelector.DEFAULT_HASH_ALGORITHM);
@@ -32,6 +33,7 @@ public class MultiColumnKeySelector implements KeySelector<Key> {
   public MultiColumnKeySelector(int[] keyIds, String hashFunction) {
     _keyIds = keyIds;
     _hashFunction = hashFunction;
+    _hasher = HashFunctionSelector.getMvHasher(_hashFunction);
   }
 
   @Override
@@ -63,7 +65,7 @@ public class MultiColumnKeySelector implements KeySelector<Key> {
     //
     // TODO: consider better hashing algorithms than hashCode sum, such as XOR'ing
     // return a positive number because this is used directly to modulo-index
-    return HashFunctionSelector.computeMultiHash(input, _keyIds, _hashFunction);
+    return _hasher.hash(input, _keyIds);
   }
 
   @Override

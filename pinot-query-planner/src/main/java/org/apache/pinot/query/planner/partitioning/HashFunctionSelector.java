@@ -34,47 +34,85 @@ public class HashFunctionSelector {
   private HashFunctionSelector() {
   }
 
-  /**
-   * Computes a hash code for a single value using the specified hash function.
-   * @param value The value to hash.
-   * @param hashFunction The hash function to use (e.g., "murmur", "murmur3", "cityhash", "absHashCode").
-   * @return The computed hash code.
-   */
-  public static int computeHash(Object value, String hashFunction) {
-    if (value == null) {
-      return 0;
-    }
+  public interface SvHasher {
+    int hash(Object value);
+  }
 
-    switch (hashFunction.toLowerCase()) {
-      case MURMUR2: return murmur2(value);
-      case MURMUR3: return murmur3(value);
-      // hashCode and absHashCode are treated the same for single hash.
-      case HASH_CODE:
-      // Default hash is absHashCode.
-      default: return absHashCode(value);
-    }
+  public interface MvHasher {
+
+    /**
+     * Computes a hash code for multiple values based on specified key IDs using the specified hash function.
+     * This is useful for partitioning where only certain keys are relevant.
+     * @param values The array of values to hash.
+     * @param keyIds The array of key IDs indicating which values to include in the hash computation.
+     * @return The computed hash code.
+     */
+    int hash(Object[] values, int[] keyIds);
   }
 
   /**
-   * Computes a hash code for multiple values based on specified key IDs using the specified hash function.
-   * This is useful for partitioning where only certain keys are relevant.
-   * @param values The array of values to hash.
-   * @param keyIds The array of key IDs indicating which values to include in the hash computation.
-   * @param hashFunction The hash function to use (e.g., "murmur2", "murmur3", "cityhash", "absHashCode").
+   * Returns a hasher function based on the specified hash function.
+   * @param hashFunction The hash function to use (e.g., "murmur", "murmur3", "cityhash", "absHashCode").
    * @return The computed hash code.
    */
-  public static int computeMultiHash(Object[] values, int[] keyIds, String hashFunction) {
-    if (values == null || values.length == 0) {
-      return 0;
-    }
-
+  public static SvHasher getSvHasher(String hashFunction) {
     switch (hashFunction.toLowerCase()) {
-      case MURMUR2: return murmur2(values, keyIds);
-      case MURMUR3: return murmur3(values, keyIds);
-      // hashCode and absHashCode are treated the same for multi hash.
+      case MURMUR2:
+        return value -> {
+          if (value == null) {
+            return 0;
+          }
+          return HashFunctionSelector.murmur2(value);
+        };
+      case MURMUR3:
+        return value -> {
+          if (value == null) {
+            return 0;
+          }
+          return HashFunctionSelector.murmur3(value);
+        };
       case HASH_CODE:
-        // We should hashCode instead of absHashCode for multi hash to maintain consistency with legacy behavior.
-      default: return hashCode(values, keyIds);
+        return value -> {
+          if (value == null) {
+            return 0;
+          }
+          return HashFunctionSelector.hashCode(value);
+        };
+      // Default hash is absHashCode.
+      default:
+        return value -> {
+          if (value == null) {
+            return 0;
+          }
+          return HashFunctionSelector.absHashCode(value);
+        };
+    }
+  }
+
+  public static MvHasher getMvHasher(String hashFunction) {
+    switch (hashFunction.toLowerCase()) {
+      case MURMUR2:
+        return (values, keys) -> {
+          if (values == null || values.length == 0) {
+            return 0;
+          }
+          return HashFunctionSelector.murmur2(values, keys);
+        };
+      case MURMUR3:
+        return (values, keys) -> {
+          if (values == null || values.length == 0) {
+            return 0;
+          }
+          return HashFunctionSelector.murmur3(values, keys);
+        };
+      case HASH_CODE:
+      default:
+        return (values, keys) -> {
+          if (values == null || values.length == 0) {
+            return 0;
+          }
+          return HashFunctionSelector.hashCode(values, keys);
+        };
     }
   }
 
