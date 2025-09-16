@@ -21,6 +21,7 @@ package org.apache.pinot.broker.requesthandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
@@ -65,6 +66,7 @@ import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.metrics.BrokerQueryPhase;
 import org.apache.pinot.common.metrics.BrokerTimer;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.DataSource;
 import org.apache.pinot.common.request.Expression;
@@ -862,8 +864,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     for (int pool : brokerResponse.getPools()) {
+      String poolTag = BrokerMetrics.getTagForPreferredPool(sqlNodeAndOptions.getOptions());
+      String poolId = String.valueOf(pool);
       _brokerMetrics.addMeteredValue(BrokerMeter.POOL_QUERIES, 1,
-          BrokerMetrics.getTagForPreferredPool(sqlNodeAndOptions.getOptions()), String.valueOf(pool));
+          ImmutableList.of(poolTag, poolId),
+          ImmutableMap.of(MetricAttributeConstants.POOL_TAG, poolTag,
+              MetricAttributeConstants.POOL_ID, poolId)
+      );
     }
 
     brokerResponse.setRLSFiltersApplied(rlsFiltersApplied.get());

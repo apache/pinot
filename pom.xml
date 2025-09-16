@@ -162,6 +162,7 @@
     <reflections.version>0.10.2</reflections.version>
     <dynatrace.hash4j.version>0.26.0</dynatrace.hash4j.version>
     <yammer-metrics.version>2.2.0</yammer-metrics.version>
+    <opentelemetry.version>1.45.0</opentelemetry.version>
     <!-- helix-core, spark-core use libraries from io.dropwizard.metrics -->
     <dropwizard-metrics.version>4.2.37</dropwizard-metrics.version>
     <snappy-java.version>1.1.10.8</snappy-java.version>
@@ -790,6 +791,11 @@
       <dependency>
         <groupId>org.apache.pinot</groupId>
         <artifactId>pinot-dropwizard</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.pinot</groupId>
+        <artifactId>pinot-open-telemetry</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
@@ -1502,6 +1508,14 @@
       </dependency>
 
       <!-- Metrics -->
+      <dependency>
+        <groupId>io.opentelemetry</groupId>
+        <artifactId>opentelemetry-bom</artifactId>
+        <version>${opentelemetry.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
       <dependency>
         <groupId>com.yammer.metrics</groupId>
         <artifactId>metrics-core</artifactId>

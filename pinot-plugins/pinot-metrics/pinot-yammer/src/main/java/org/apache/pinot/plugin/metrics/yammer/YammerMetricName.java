@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.metrics.yammer;
 
 import com.yammer.metrics.core.MetricName;
+import java.util.Map;
 import org.apache.pinot.spi.metrics.PinotMetricName;
 
 
@@ -64,5 +65,15 @@ public class YammerMetricName implements PinotMetricName {
   @Override
   public String toString() {
     return _metricName.toString();
+  }
+
+  @Override
+  public String getSimplifiedMetricName() {
+    return _metricName.getName();
+  }
+
+  @Override
+  public Map<String, String> getAttributes() {
+    return Map.of();
   }
 }

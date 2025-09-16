@@ -97,7 +97,7 @@ public abstract class PinotPrometheusMetricsTest {
         _pinotMetricsFactory.getClass().getCanonicalName());
     PinotMetricUtils.init(pinotConfiguration);
 
-    _pinotMetricsFactory.makePinotJmxReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
+    _pinotMetricsFactory.makePinotMetricReporter(_pinotMetricsFactory.getPinotMetricsRegistry()).start();
     _httpClient = new HttpClient();
     _httpServer = startExporter();
   }

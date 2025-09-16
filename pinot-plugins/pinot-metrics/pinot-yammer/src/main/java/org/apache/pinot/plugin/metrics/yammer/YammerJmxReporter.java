@@ -20,11 +20,13 @@ package org.apache.pinot.plugin.metrics.yammer;
 
 import com.yammer.metrics.core.MetricsRegistry;
 import com.yammer.metrics.reporting.JmxReporter;
-import org.apache.pinot.spi.metrics.PinotJmxReporter;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
-
-public class YammerJmxReporter implements PinotJmxReporter {
+/**
+ * YammerJmxReporter is a metric reporter that exposes metrics to JMX using Yammer's JmxReporter.
+ */
+public class YammerJmxReporter implements PinotMetricReporter {
   private final JmxReporter _jmxReporter;
 
   public YammerJmxReporter(PinotMetricsRegistry metricsRegistry) {

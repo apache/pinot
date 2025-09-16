@@ -19,6 +19,7 @@
 package org.apache.pinot.segment.local.segment.index;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.metrics.ServerMeter;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.segment.local.PinotBuffersAfterMethodCheckRule;
@@ -1018,9 +1020,12 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
       fail();
     }
 
-    verify(_serverMetrics, times(1)).addMeteredTableValue(eq("table1"), eq("col"),
+    verify(_serverMetrics, times(1)).addMeteredTableValue(
+        eq("table1"),
+        eq("col"),
         eq(ServerMeter.MUTABLE_JSON_INDEX_MEMORY_USAGE),
-        eq(25L)); // bytes(.key) + bytes(.key\u0000value) +  bytes(.key\u0000value2)
+        eq(25L), // bytes(.key) + bytes(.key\u0000value) +  bytes(.key\u0000value2)
+        eq(ImmutableMap.of(MetricAttributeConstants.COLUMN_NAME, "col")));
 
     jsonIndexConfig.setMaxBytesSize(5L);
     try (MutableJsonIndexImpl mutableIndex = new MutableJsonIndexImpl(jsonIndexConfig, "table2__0__1", "col")) {
@@ -1030,9 +1035,12 @@ public class JsonIndexTest implements PinotBuffersAfterMethodCheckRule {
     } catch (IOException e) {
       fail();
     }
-    verify(_serverMetrics, times(1)).addMeteredTableValue(eq("table2"), eq("col"),
+    verify(_serverMetrics, times(1)).addMeteredTableValue(
+        eq("table2"),
+        eq("col"),
         eq(ServerMeter.MUTABLE_JSON_INDEX_MEMORY_USAGE),
-        eq(35L)); // bytes(.anotherKey) + bytes(.anotherKey\u0000anotherValue)
+        eq(35L), // bytes(.anotherKey) + bytes(.anotherKey\u0000anotherValue)
+        eq(ImmutableMap.of(MetricAttributeConstants.COLUMN_NAME, "col")));
   }
 
   public static class ConfTest extends AbstractSerdeIndexContract {

@@ -1977,8 +1977,8 @@ public class PinotLLCRealtimeSegmentManager {
       // Skip the fix if an upload is already queued for this segment
       if (!_deepStoreUploadExecutorPendingSegments.add(segmentName)) {
         int queueSize = _deepStoreUploadExecutorPendingSegments.size();
-        _controllerMetrics.setOrUpdateGauge(
-            ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE.getGaugeName(), queueSize);
+        _controllerMetrics.setOrUpdateGlobalGauge(
+            ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE.getGaugeName(), () -> queueSize);
         continue;
       }
 
@@ -2021,8 +2021,8 @@ public class PinotLLCRealtimeSegmentManager {
           _deepStoreUploadExecutorPendingSegments.remove(segmentName);
           // Monitoring in case segment upload retry is lagging
           int queueSize = _deepStoreUploadExecutorPendingSegments.size();
-          _controllerMetrics.setOrUpdateGauge(
-              ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE.getGaugeName(), queueSize);
+          _controllerMetrics.setOrUpdateGlobalGauge(
+              ControllerGauge.LLC_SEGMENTS_DEEP_STORE_UPLOAD_RETRY_QUEUE_SIZE.getGaugeName(), () -> queueSize);
         }
       };
 

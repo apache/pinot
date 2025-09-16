@@ -19,6 +19,7 @@
 package org.apache.pinot.plugin.metrics.dropwizard;
 
 import com.google.auto.service.AutoService;
+import java.util.Map;
 import java.util.function.Function;
 import org.apache.pinot.spi.annotations.metrics.MetricsFactory;
 import org.apache.pinot.spi.annotations.metrics.PinotMetricsFactory;
@@ -26,6 +27,7 @@ import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.metrics.PinotGauge;
 import org.apache.pinot.spi.metrics.PinotJmxReporter;
 import org.apache.pinot.spi.metrics.PinotMetricName;
+import org.apache.pinot.spi.metrics.PinotMetricReporter;
 import org.apache.pinot.spi.metrics.PinotMetricsRegistry;
 
 
@@ -52,17 +54,43 @@ public class DropwizardMetricsFactory implements PinotMetricsFactory {
   }
 
   @Override
+  @Deprecated
   public PinotMetricName makePinotMetricName(Class<?> klass, String name) {
-    return new DropwizardMetricName(klass, name);
+    throw new UnsupportedOperationException("Please use makePinotMetricName(Class, String, String, Map) instead");
   }
 
   @Override
+  public PinotMetricName makePinotMetricName(Class<?> klass, String fullName, String simplifiedName,
+      Map<String, String> attributes) {
+    return new DropwizardMetricName(klass, fullName);
+  }
+
+  @Override
+  @Deprecated
   public <T> PinotGauge<T> makePinotGauge(Function<Void, T> condition) {
     return new DropwizardGauge<T>(condition);
   }
 
   @Override
+  @Deprecated
+  public <T> PinotGauge<T> makePinotGauge(String metricName, Function<Void, T> condition) {
+    throw new UnsupportedOperationException("Please use makePinotGauge(PinotMetricName, Function) instead");
+  }
+
+  @Override
+  public <T> PinotGauge<T> makePinotGauge(PinotMetricName pinotMetricName, Function<Void, T> condition) {
+    return new DropwizardGauge<T>(condition);
+  }
+
+  /**
+   * @deprecated Use {@link #makePinotMetricReporter(PinotMetricsRegistry)} instead.
+   */
+  @Override
   public PinotJmxReporter makePinotJmxReporter(PinotMetricsRegistry metricsRegistry) {
+    return new DropwizardJmxReporter(metricsRegistry, _domainName);
+  }
+
+  public PinotMetricReporter makePinotMetricReporter(PinotMetricsRegistry metricsRegistry) {
     return new DropwizardJmxReporter(metricsRegistry, _domainName);
   }
 

@@ -19,6 +19,7 @@
 package org.apache.pinot.controller.helix.core.minion;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -46,6 +47,7 @@ import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.minion.TaskGeneratorMostRecentRunInfo;
 import org.apache.pinot.common.minion.TaskManagerStatusCache;
 import org.apache.pinot.controller.ControllerConf;
@@ -796,9 +798,12 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         // TODO: find a better way to report task generation information
         _controllerMetrics.setOrUpdateTableGauge(tableName, taskType,
             ControllerGauge.TIME_MS_SINCE_LAST_SUCCESSFUL_MINION_TASK_GENERATION,
+            ImmutableMap.of(MetricAttributeConstants.TASK_TYPE, taskType),
             () -> System.currentTimeMillis() - successRunTimestamp);
         _controllerMetrics.setOrUpdateTableGauge(tableName, taskType,
-            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 0L);
+            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR,
+            ImmutableMap.of(MetricAttributeConstants.TASK_TYPE, taskType),
+            0L);
       } catch (Exception e) {
         StringWriter errors = new StringWriter();
         try (PrintWriter pw = new PrintWriter(errors)) {
@@ -813,7 +818,9 @@ public class PinotTaskManager extends ControllerPeriodicTask<Void> {
         // before the first task schedule, the follow gauge metric will be empty
         // TODO: find a better way to report task generation information
         _controllerMetrics.setOrUpdateTableGauge(tableName, taskType,
-            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR, 1L);
+            ControllerGauge.LAST_MINION_TASK_GENERATION_ENCOUNTERS_ERROR,
+            ImmutableMap.of(MetricAttributeConstants.TASK_TYPE, taskType),
+            1L);
         LOGGER.error("Failed to generate tasks for task type {} for table {}", taskType, tableName, e);
       }
     }

@@ -22,6 +22,11 @@ import java.util.List;
 import org.apache.pinot.spi.metrics.PinotJmxReporter;
 
 
+/**
+ * CompoundPinotJmxReporter is a composite reporter that aggregates multiple PinotJmxReporters.
+ * @deprecated Use {@link org.apache.pinot.plugin.metrics.compound.CompoundPinotMetricReporter} instead.
+ */
+@Deprecated
 public class CompoundPinotJmxReporter implements PinotJmxReporter {
   private final List<PinotJmxReporter> _reporters;
 

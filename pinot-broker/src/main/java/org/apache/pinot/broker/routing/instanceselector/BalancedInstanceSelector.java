@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.routing.instanceselector;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
@@ -30,6 +32,7 @@ import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSele
 import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.metrics.MetricAttributeConstants;
 import org.apache.pinot.common.utils.HashUtil;
 
 /// Instance selector to balance the number of segments served by each selected server instance.
@@ -96,8 +99,13 @@ public class BalancedInstanceSelector extends BaseInstanceSelector {
     }
 
     for (Map.Entry<Integer, Integer> entry : poolToSegmentCount.entrySet()) {
-      _brokerMetrics.addMeteredValue(BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
-        BrokerMetrics.getTagForPreferredPool(queryOptions), String.valueOf(entry.getKey()));
+      String poolTag = BrokerMetrics.getTagForPreferredPool(queryOptions);
+      String poolID = String.valueOf(entry.getKey());
+      _brokerMetrics.addMeteredValue(
+          BrokerMeter.POOL_SEG_QUERIES, entry.getValue(),
+          ImmutableList.of(poolTag, poolID),
+          ImmutableMap.of(MetricAttributeConstants.POOL_TAG, poolTag, MetricAttributeConstants.POOL_ID, poolID)
+      );
     }
     return Pair.of(segmentToSelectedInstanceMap, optionalSegmentToInstanceMap);
   }

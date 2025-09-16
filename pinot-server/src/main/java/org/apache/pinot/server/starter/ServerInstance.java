@@ -19,6 +19,7 @@
 package org.apache.pinot.server.starter;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import io.netty.channel.ChannelHandler;
 import java.util.HashSet;
 import java.util.Set;
@@ -98,7 +99,8 @@ public class ServerInstance {
         new ServerMetrics(serverConf.getMetricsPrefix(), metricsRegistry, serverConf.emitTableLevelMetrics(),
             serverConf.getAllowedTablesForEmittingMetrics());
     _serverMetrics.initializeGlobalMeters();
-    _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1);
+    _serverMetrics.setValueOfGlobalGauge(ServerGauge.VERSION, PinotVersion.VERSION_METRIC_NAME, 1,
+        ImmutableMap.of());
     ServerMetrics.register(_serverMetrics);
     if (segmentOperationsThrottler != null) {
       // Initialize the metrics for the throttler so it picks up the newly registered ServerMetrics object
