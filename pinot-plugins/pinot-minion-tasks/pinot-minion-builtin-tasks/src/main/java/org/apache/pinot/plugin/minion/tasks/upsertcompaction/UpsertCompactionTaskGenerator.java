@@ -321,22 +321,9 @@ public class UpsertCompactionTaskGenerator extends BaseTaskGenerator {
             UpsertCompactionTask.INVALID_RECORDS_THRESHOLD_COUNT),
         "invalidRecordsThresholdPercent or invalidRecordsThresholdCount or both must be provided");
 
+    // validate validDocIdsType default logic
     UpsertConfig upsertConfig = tableConfig.getUpsertConfig();
     assert upsertConfig != null;
-    ValidDocIdsType validDocIdsType = MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs,
-        UpsertCompactionTask.VALID_DOC_IDS_TYPE);
-    if (validDocIdsType == ValidDocIdsType.SNAPSHOT || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
-      // NOTE: Allow snapshot to be DEFAULT because it might be enabled at server level.
-      Preconditions.checkState(upsertConfig.getSnapshot() != Enablement.DISABLE,
-          "'snapshot' from UpsertConfig must not be 'DISABLE' for UpsertCompactionTask with validDocIdsType = %s",
-          validDocIdsType);
-    }
-
-    if (validDocIdsType == ValidDocIdsType.IN_MEMORY_WITH_DELETE
-        || validDocIdsType == ValidDocIdsType.SNAPSHOT_WITH_DELETE) {
-      Preconditions.checkNotNull(upsertConfig.getDeleteRecordColumn(), String.format(
-          "deleteRecordColumn must be provided for " + "UpsertCompactionTask with validDocIdsType = %s",
-          validDocIdsType));
-    }
+    MinionTaskUtils.getValidDocIdsType(upsertConfig, taskConfigs, UpsertCompactionTask.VALID_DOC_IDS_TYPE);
   }
 }
