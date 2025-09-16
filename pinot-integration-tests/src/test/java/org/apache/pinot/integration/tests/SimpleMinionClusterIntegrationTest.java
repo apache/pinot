@@ -45,6 +45,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.testng.Assert.*;
 
 
@@ -110,14 +111,14 @@ public class SimpleMinionClusterIntegrationTest extends ClusterTest {
   public void testTaskTimeout() {
     PinotTaskGenerator taskGenerator = _taskManager.getTaskGeneratorRegistry().getTaskGenerator(TASK_TYPE);
     assertNotNull(taskGenerator);
-    assertEquals(taskGenerator.getTaskTimeoutMs(), 600_000L);
+    assertEquals(taskGenerator.getTaskTimeoutMs(any(String.class)), 600_000L);
   }
 
   @Test
   public void testTaskMaxAttempts() {
     PinotTaskGenerator taskGenerator = _taskManager.getTaskGeneratorRegistry().getTaskGenerator(TASK_TYPE);
     assertNotNull(taskGenerator);
-    assertEquals(taskGenerator.getMaxAttemptsPerTask(), 2);
+    assertEquals(taskGenerator.getMaxAttemptsPerTask(any(String.class)), 2);
   }
 
   private void verifyTaskCount(String task, int errors, int waiting, int running, int total) {
