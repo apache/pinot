@@ -192,8 +192,13 @@ public class IntSumAggregationFunction extends NullableSingleInputAggregationFun
       if (intermediateResult2 == null) {
         return intermediateResult1;
       }
+      // Both are non-null
+      return intermediateResult1 + intermediateResult2;
+    } else {
+      long val1 = (intermediateResult1 != null) ? intermediateResult1 : 0L;
+      long val2 = (intermediateResult2 != null) ? intermediateResult2 : 0L;
+      return val1 + val2;
     }
-    return intermediateResult1 + intermediateResult2;
   }
 
   @Override
