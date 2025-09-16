@@ -29,6 +29,7 @@ import org.apache.pinot.common.utils.regex.Matcher;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.index.reader.Dictionary;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,16 +42,6 @@ public class RegexpLikePredicateEvaluatorFactory {
 
   private RegexpLikePredicateEvaluatorFactory() {
   }
-
-  /// When the cardinality of the dictionary is less than this threshold, scan the dictionary
-  // to get the matching ids. Default value is 10K.
-  public static final int DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD = 10000;
-
-  /// Query option key for configuring the dictionary cardinality threshold
-  public static final String REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION = "regexpDictCardinalityThreshold";
-
-  /// Query option key to force use of dictionary scan
-  public static final String USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION = "useDictForRegexpLikePredicate";
 
   /**
    * Create a new instance of dictionary based REGEXP_LIKE predicate evaluator.
@@ -67,16 +58,18 @@ public class RegexpLikePredicateEvaluatorFactory {
 
     // 1. If useDictForRegexpLikePredicate is set to true, always use dictionary
     if (queryContext != null && queryContext.getQueryOptions() != null) {
-      String useDictOption = queryContext.getQueryOptions().get(USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION);
+      String useDictOption =
+          queryContext.getQueryOptions().get(QueryOptionKey.USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION);
       if ("true".equalsIgnoreCase(useDictOption)) {
         return new DictIdBasedRegexpLikePredicateEvaluator(regexpLikePredicate, dictionary);
       }
     }
 
     // 2. Otherwise, get the threshold number from regexpDictCardinalityThreshold (default 10K)
-    int cardinalityThreshold = DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD;
+    int cardinalityThreshold = QueryOptionKey.DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD;
     if (queryContext != null && queryContext.getQueryOptions() != null) {
-      String queryOptionValue = queryContext.getQueryOptions().get(REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION);
+      String queryOptionValue =
+          queryContext.getQueryOptions().get(QueryOptionKey.REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION);
       if (queryOptionValue != null) {
         try {
           int threshold = Integer.parseInt(queryOptionValue);
@@ -84,11 +77,11 @@ public class RegexpLikePredicateEvaluatorFactory {
             cardinalityThreshold = threshold;
           } else {
             LOGGER.warn("Invalid negative regexpDictCardinalityThreshold value: '{}', using default: {}",
-                queryOptionValue, DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD);
+                queryOptionValue, QueryOptionKey.DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD);
           }
         } catch (NumberFormatException e) {
           LOGGER.warn("Invalid regexpDictCardinalityThreshold value: '{}', using default: {}", queryOptionValue,
-              DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD);
+              QueryOptionKey.DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD);
         }
       }
     }

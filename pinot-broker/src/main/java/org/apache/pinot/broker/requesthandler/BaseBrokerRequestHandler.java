@@ -66,6 +66,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -75,6 +76,7 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
+
   protected final PinotConfiguration _config;
   protected final String _brokerId;
   protected final RoutingManager _routingManager;
@@ -91,6 +93,9 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   @Nullable
   protected final String _enableNullHandling;
   protected final ThreadResourceUsageAccountant _resourceUsageAccountant;
+  // Default values for REGEXP_LIKE query options for switching with dictionary scan
+  protected final String _regexpDictCardinalityThreshold;
+  protected final String _useDictForRegexpLikePredicate;
 
   /**
    * Maps broker-generated query id to the query string.
@@ -131,6 +136,10 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       _clientQueryIds = null;
     }
     _resourceUsageAccountant = resourceUsageAccountant;
+
+    // Initialize default REGEXP_LIKE query options
+    _regexpDictCardinalityThreshold = (_config.getProperty(CommonConstants.Broker.REGEXP_DICT_CARDINALITY_THRESHOLD_KEY));
+    _useDictForRegexpLikePredicate = (_config.getProperty(CommonConstants.Broker.USE_DICT_FOR_REGEXP_LIKE_PREDICATE_KEY));
   }
 
   @Override
@@ -209,6 +218,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (_enableNullHandling != null) {
         sqlNodeAndOptions.getOptions()
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+      }
+
+      // Add REGEXP_LIKE default options for dictionary scan from broker config if not already set
+      if (_useDictForRegexpLikePredicate != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(QueryOptionKey.USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION, _useDictForRegexpLikePredicate);
+      }
+
+      if (_regexpDictCardinalityThreshold != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(QueryOptionKey.REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION, _regexpDictCardinalityThreshold);
       }
 
       BrokerResponse brokerResponse =

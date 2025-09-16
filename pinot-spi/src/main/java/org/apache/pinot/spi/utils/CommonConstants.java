@@ -556,6 +556,12 @@ public class CommonConstants {
         "pinot.broker.enable.single.pool.segments.metric";
     public static final boolean DEFAULT_ENABLE_SINGLE_POOL_SEGMENTS_METRIC = false;
 
+    // REGEXP_LIKE broker configuration constants
+    public static final String REGEXP_DICT_CARDINALITY_THRESHOLD_KEY =
+        "pinot.broker.regexp.dict.cardinality.threshold";
+    public static final String USE_DICT_FOR_REGEXP_LIKE_PREDICATE_KEY =
+        "pinot.broker.use.dict.regexp.predicate";
+
     // When the server instance's pool field is null or the pool contains multi distinguished group value, the broker
     // would set the pool to -1 in the routing table for that server.
     public static final int FALLBACK_POOL_ID = -1;
@@ -788,6 +794,16 @@ public class CommonConstants {
         // Option denoting the workloadName to which the query belongs. This is used to enforce resource budgets for
         // each workload if "Query Workload Isolation" feature enabled.
         public static final String WORKLOAD_NAME = "workloadName";
+
+        /// When the cardinality of the dictionary is less than this threshold, scan the dictionary
+        // to get the matching ids. Default value is 10K.
+        public static final int DEFAULT_DICTIONARY_CARDINALITY_THRESHOLD = 10000;
+
+        /// Query option key for configuring the dictionary cardinality threshold
+        public static final String REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION = "regexpDictCardinalityThreshold";
+
+        /// Query option key to force use of dictionary scan
+        public static final String USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION = "useDictForRegexpLikePredicate";
       }
 
       public static class QueryOptionValue {
