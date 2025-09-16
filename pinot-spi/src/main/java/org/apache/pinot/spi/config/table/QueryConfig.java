@@ -58,7 +58,7 @@ public class QueryConfig extends BaseJsonConfig {
 
   private final Boolean _useDictForRegexpLikePredicate;
 
-  private final int _regexpDictCardinalityThreshold;
+  private final Integer _regexpDictCardinalityThreshold;
 
   @JsonCreator
   public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
