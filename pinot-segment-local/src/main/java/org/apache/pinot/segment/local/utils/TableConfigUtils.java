@@ -269,14 +269,56 @@ public final class TableConfigUtils {
     }
 
     // Retention may not be specified. Ignore validation in that case.
-    String timeUnitString = segmentsConfig.getRetentionTimeUnit();
-    if (timeUnitString == null || timeUnitString.isEmpty()) {
-      return;
+    String retentionTimeUnitString = segmentsConfig.getRetentionTimeUnit();
+    if (retentionTimeUnitString != null && !retentionTimeUnitString.isEmpty()) {
+      try {
+        TimeUnit.valueOf(retentionTimeUnitString.toUpperCase());
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid retention time unit: %s", tableName, retentionTimeUnitString));
+      }
     }
-    try {
-      TimeUnit.valueOf(timeUnitString.toUpperCase());
-    } catch (Exception e) {
-      throw new IllegalStateException(String.format("Table: %s, invalid time unit: %s", tableName, timeUnitString));
+
+    // Untracked segments retention may not be specified. Ignore validation in that case.
+    String untrackedSegmentsRetentionTimeUnitString = segmentsConfig.getUntrackedSegmentsRetentionTimeUnit();
+    String untrackedSegmentsRetentionTimeValueString = segmentsConfig.getUntrackedSegmentsRetentionTimeValue();
+
+    boolean hasUntrackedTimeUnit =
+        untrackedSegmentsRetentionTimeUnitString != null && !untrackedSegmentsRetentionTimeUnitString.isEmpty();
+    boolean hasUntrackedTimeValue =
+        untrackedSegmentsRetentionTimeValueString != null && !untrackedSegmentsRetentionTimeValueString.isEmpty();
+
+    if (hasUntrackedTimeUnit && !hasUntrackedTimeValue) {
+      throw new IllegalStateException(String.format(
+          "Table: %s, untracked retention time value must be specified when untracked retention time unit is provided",
+          tableName));
+    }
+    if (hasUntrackedTimeValue && !hasUntrackedTimeUnit) {
+      throw new IllegalStateException(String.format(
+          "Table: %s, untracked retention time unit must be specified when untracked retention time value is provided",
+          tableName));
+    }
+
+    if (hasUntrackedTimeUnit) {
+      try {
+        TimeUnit.valueOf(untrackedSegmentsRetentionTimeUnitString.toUpperCase());
+      } catch (Exception e) {
+        throw new IllegalStateException(String.format("Table: %s, invalid untracked retention time unit: %s", tableName,
+            untrackedSegmentsRetentionTimeUnitString));
+      }
+
+      try {
+        long timeValue = Long.parseLong(untrackedSegmentsRetentionTimeValueString);
+        if (timeValue <= 0) {
+          throw new IllegalStateException(
+              String.format("Table: %s, untracked retention time value must be positive: %s", tableName,
+                  untrackedSegmentsRetentionTimeValueString));
+        }
+      } catch (Exception e) {
+        throw new IllegalStateException(
+            String.format("Table: %s, invalid untracked retention time value: %s", tableName,
+                untrackedSegmentsRetentionTimeValueString));
+      }
     }
   }
 
@@ -576,8 +618,8 @@ public final class TableConfigUtils {
             expressionEvaluator = FunctionEvaluatorFactory.getExpressionEvaluator(transformFunction);
           } catch (Exception e) {
             throw new IllegalStateException(
-                "Invalid transform function '" + transformFunction + "' for column '" + columnName
-                    + "', exception: " + e.getMessage(), e);
+                "Invalid transform function '" + transformFunction + "' for column '" + columnName + "', exception: "
+                    + e.getMessage(), e);
           }
           List<String> arguments = expressionEvaluator.getArguments();
           if (arguments.contains(columnName)) {
@@ -642,14 +684,17 @@ public final class TableConfigUtils {
       // 2. Ensure segment flush parameters consistent across all streamConfigs. We need this because Pinot is
       // predefining the values before fetching stream partition info from stream. At the construction time, we don't
       // know the value extracted from a streamConfig would be applied to which segment.
+      // 3. There should not be duplicate topic names across streamConfigs.
       // TODO: Remove these limitations
       StreamConfig firstStreamConfig = streamConfigs.get(0);
+      Set<String> topicNames = new HashSet<>();
       String streamType = firstStreamConfig.getType();
       int flushThresholdRows = firstStreamConfig.getFlushThresholdRows();
       long flushThresholdTimeMillis = firstStreamConfig.getFlushThresholdTimeMillis();
       double flushThresholdVarianceFraction = firstStreamConfig.getFlushThresholdVarianceFraction();
       long flushThresholdSegmentSizeBytes = firstStreamConfig.getFlushThresholdSegmentSizeBytes();
       int flushThresholdSegmentRows = firstStreamConfig.getFlushThresholdSegmentRows();
+      topicNames.add(firstStreamConfig.getTopicName());
       for (int i = 1; i < numStreamConfigs; i++) {
         StreamConfig streamConfig = streamConfigs.get(i);
         Preconditions.checkState(streamConfig.getType().equals(streamType),
@@ -660,6 +705,8 @@ public final class TableConfigUtils {
                 && streamConfig.getFlushThresholdSegmentSizeBytes() == flushThresholdSegmentSizeBytes
                 && streamConfig.getFlushThresholdSegmentRows() == flushThresholdSegmentRows,
             "Segment flush parameters must be consistent across all streamConfigs");
+        Preconditions.checkState(topicNames.add(streamConfig.getTopicName()),
+            "Duplicate topic names found in streamConfigs: %s", streamConfig.getTopicName());
       }
     }
   }
@@ -804,8 +851,8 @@ public final class TableConfigUtils {
 
         // enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask / UpsertCompactMergeTask
         TableTaskConfig taskConfig = tableConfig.getTaskConfig();
-        Preconditions.checkState(taskConfig != null
-                && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
+        Preconditions.checkState(
+            taskConfig != null && (taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACTION_TASK_TYPE)
                 || taskConfig.getTaskTypeConfigsMap().containsKey(UPSERT_COMPACT_MERGE_TASK_TYPE)),
             "enableDeletedKeysCompactionConsistency should exist with UpsertCompactionTask"
                 + " / UpsertCompactMergeTask for upsert table");
@@ -820,8 +867,8 @@ public final class TableConfigUtils {
 
     Preconditions.checkState(
         tableConfig.getInstanceAssignmentConfigMap() == null || !tableConfig.getInstanceAssignmentConfigMap()
-            .containsKey(InstancePartitionsType.COMPLETED),
-        "InstanceAssignmentConfig for COMPLETED is not allowed for upsert tables");
+            .containsKey(InstancePartitionsType.COMPLETED.name()),
+        "COMPLETED instance partitions can't be configured for upsert / dedup tables");
     validateAggregateMetricsForUpsertConfig(tableConfig);
     validateTTLForUpsertConfig(tableConfig, schema);
     validateTTLForDedupConfig(tableConfig, schema);
@@ -944,7 +991,8 @@ public final class TableConfigUtils {
       return;
     }
     for (Map.Entry<String, InstanceAssignmentConfig> instanceAssignmentConfigMapEntry
-        : tableConfig.getInstanceAssignmentConfigMap().entrySet()) {
+        : tableConfig.getInstanceAssignmentConfigMap()
+        .entrySet()) {
       String instancePartitionsType = instanceAssignmentConfigMapEntry.getKey();
       InstanceAssignmentConfig instanceAssignmentConfig = instanceAssignmentConfigMapEntry.getValue();
       if (instanceAssignmentConfig.getPartitionSelector()
@@ -1444,8 +1492,7 @@ public final class TableConfigUtils {
     }
 
     if (!duplicates.isEmpty()) {
-      throw new IllegalStateException(
-          "Cannot create TEXT index on duplicate columns: " + duplicates);
+      throw new IllegalStateException("Cannot create TEXT index on duplicate columns: " + duplicates);
     }
   }
 
@@ -1524,12 +1571,19 @@ public final class TableConfigUtils {
     if (clone.getFieldConfigList() != null) {
       List<FieldConfig> cleanFieldConfigList = new ArrayList<>();
       for (FieldConfig fieldConfig : clone.getFieldConfigList()) {
-        cleanFieldConfigList.add(new FieldConfig.Builder(fieldConfig)
-            .withIndexTypes(null).withProperties(null).build());
+        cleanFieldConfigList.add(
+            new FieldConfig.Builder(fieldConfig).withIndexTypes(null).withProperties(null).build());
       }
       clone.setFieldConfigList(cleanFieldConfigList);
     }
     return clone;
+  }
+
+  public static boolean isCommitTimeCompactionEnabled(TableConfig tableConfig) {
+    if (tableConfig.getUpsertConfig() == null) {
+      return false;
+    }
+    return tableConfig.getUpsertConfig().isEnableCommitTimeCompaction();
   }
 
   /**
@@ -1717,8 +1771,7 @@ public final class TableConfigUtils {
     Set<String> relevantTags = new HashSet<>();
     String serverTenantName = tableConfig.getTenantConfig().getServer();
     if (serverTenantName != null) {
-      String serverTenantTag =
-          TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
+      String serverTenantTag = TagNameUtils.getServerTagForTenant(serverTenantName, tableConfig.getTableType());
       relevantTags.add(serverTenantTag);
     }
     TagOverrideConfig tagOverrideConfig = tableConfig.getTenantConfig().getTagOverrideConfig();
@@ -1750,8 +1803,7 @@ public final class TableConfigUtils {
 
   public static boolean isRelevantToTenant(TableConfig tableConfig, String tenantName) {
     Set<String> relevantTenants =
-        getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(
-            Collectors.toSet());
+        getRelevantTags(tableConfig).stream().map(TagNameUtils::getTenantFromTag).collect(Collectors.toSet());
     return relevantTenants.contains(tenantName);
   }
 }

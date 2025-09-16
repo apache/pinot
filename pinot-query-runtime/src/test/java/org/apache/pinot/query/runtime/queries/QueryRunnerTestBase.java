@@ -76,7 +76,6 @@ import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.h2.jdbc.JdbcArray;
 
 import static org.testng.Assert.assertEquals;
-import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 
@@ -452,11 +451,6 @@ public abstract class QueryRunnerTestBase extends QueryTestSet {
   }
 
   protected Connection _h2Connection;
-
-  protected Connection getH2Connection() {
-    assertNotNull(_h2Connection, "H2 Connection has not been initialized");
-    return _h2Connection;
-  }
 
   protected void setH2Connection()
       throws Exception {

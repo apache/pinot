@@ -87,12 +87,14 @@ public class PinotTableIdealStateBuilder {
    *                                            partition groups.
    *                                          The size of this list is equal to the number of partition groups,
    *                                          and is created using the latest segment zk metadata.
+   * @param pausedTopicIndices List of inactive topic indices. Index is the index of the topic in the streamConfigMaps.
    * @param forceGetOffsetFromStream - details in PinotLLCRealtimeSegmentManager.fetchPartitionGroupIdToSmallestOffset
    */
   public static List<PartitionGroupMetadata> getPartitionGroupMetadataList(List<StreamConfig> streamConfigs,
-      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, boolean forceGetOffsetFromStream) {
+      List<PartitionGroupConsumptionStatus> partitionGroupConsumptionStatusList, List<Integer> pausedTopicIndices,
+      boolean forceGetOffsetFromStream) {
     PartitionGroupMetadataFetcher partitionGroupMetadataFetcher = new PartitionGroupMetadataFetcher(
-        streamConfigs, partitionGroupConsumptionStatusList, forceGetOffsetFromStream);
+        streamConfigs, partitionGroupConsumptionStatusList, pausedTopicIndices, forceGetOffsetFromStream);
     try {
       DEFAULT_IDEALSTATE_UPDATE_RETRY_POLICY.attempt(partitionGroupMetadataFetcher);
       return partitionGroupMetadataFetcher.getPartitionGroupMetadataList();

@@ -20,6 +20,7 @@ package org.apache.pinot.connector.spark
 
 import java.util.Optional
 
+import com.fasterxml.jackson.core.`type`.TypeReference
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
@@ -32,6 +33,16 @@ package object common {
   def decodeTo[A](jsonString: String, clazz: Class[A]): A = {
     try {
       objectMapper.readValue(jsonString, clazz)
+    } catch {
+      case e: Exception =>
+        throw new IllegalStateException(s"Error occurred while parsing JSON string: ${e.getMessage}", e)
+    }
+  }
+
+  /** Parse json string to given model using TypeReference for complex generic types. */
+  def decodeTo[A](jsonString: String, typeReference: TypeReference[A]): A = {
+    try {
+      objectMapper.readValue(jsonString, typeReference)
     } catch {
       case e: Exception =>
         throw new IllegalStateException(s"Error occurred while parsing JSON string: ${e.getMessage}", e)

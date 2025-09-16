@@ -245,10 +245,18 @@ public class RealtimeSegmentAssignment extends BaseSegmentAssignment {
       _logger.info("Reassigning CONSUMING segments with CONSUMING instance partitions for table: {}",
           _tableNameWithType);
 
-      for (String segmentName : consumingSegmentAssignment.keySet()) {
+      for (Map.Entry<String, Map<String, String>> entry : consumingSegmentAssignment.entrySet()) {
+        String segmentName = entry.getKey();
+        Map<String, String> originalInstanceStateMap = entry.getValue();
+        // The consumingSegmentAssignment can contain two types of segments:
+        //   1. Segments in CONSUMING state (for both pauseless and non-pauseless tables)
+        //   2. Segments in ONLINE state with segment status in COMMITTING state for pauseless tables
+        // The target state should be determined based on the current state in the original instanceStateMap
+        String targetState = originalInstanceStateMap.containsValue(SegmentStateModel.ONLINE)
+            ? SegmentStateModel.ONLINE : SegmentStateModel.CONSUMING;
         List<String> instancesAssigned = assignConsumingSegment(segmentName, consumingInstancePartitions);
         Map<String, String> instanceStateMap =
-            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, SegmentStateModel.CONSUMING);
+            SegmentAssignmentUtils.getInstanceStateMap(instancesAssigned, targetState);
         newAssignment.put(segmentName, instanceStateMap);
       }
     } else {

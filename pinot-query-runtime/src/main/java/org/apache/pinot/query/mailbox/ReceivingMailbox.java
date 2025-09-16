@@ -281,7 +281,9 @@ public class ReceivingMailbox {
     },
     IN_MEMORY_MESSAGES(StatMap.Type.INT),
     OFFER_CPU_TIME_MS(StatMap.Type.LONG),
-    WAIT_CPU_TIME_MS(StatMap.Type.LONG);
+    WAIT_CPU_TIME_MS(StatMap.Type.LONG),
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG),
+    GC_TIME_MS(StatMap.Type.LONG);
 
     private final StatMap.Type _type;
 

@@ -78,6 +78,7 @@ public class StreamConfig {
   private final boolean _enableOffsetAutoReset;
   private final int _offsetAutoResetOffsetThreshold;
   private final long _offsetAutoResetTimeSecThreshold;
+  private final Boolean _backfillTopic;
 
   private final Map<String, String> _streamConfigMap = new HashMap<>();
 
@@ -206,7 +207,9 @@ public class StreamConfig {
     _enableOffsetAutoReset = Boolean.parseBoolean(streamConfigMap.get(StreamConfigProperties.ENABLE_OFFSET_AUTO_RESET));
     _offsetAutoResetOffsetThreshold = parseOffsetAutoResetOffsetThreshold(streamConfigMap);
     _offsetAutoResetTimeSecThreshold = parseOffsetAutoResetTimeSecThreshold(streamConfigMap);
-
+    _backfillTopic = streamConfigMap.containsKey(StreamConfigProperties.BACKFILL_TOPIC)
+        ? Boolean.valueOf(streamConfigMap.get(StreamConfigProperties.BACKFILL_TOPIC))
+        : null;
     _streamConfigMap.putAll(streamConfigMap);
   }
 
@@ -431,6 +434,10 @@ public class StreamConfig {
     return _offsetAutoResetTimeSecThreshold;
   }
 
+  public boolean isBackfillTopic() {
+    return Boolean.TRUE.equals(_backfillTopic);
+  }
+
   public String getTableNameWithType() {
     return _tableNameWithType;
   }
@@ -454,6 +461,7 @@ public class StreamConfig {
         + ", _enableOffsetAutoReset=" + _enableOffsetAutoReset
         + ", _offsetAutoResetOffsetThreshold" + _offsetAutoResetOffsetThreshold
         + ", _offSetAutoResetTimeSecThreshold" + _offsetAutoResetTimeSecThreshold
+        + ", _backfillTopic=" + _backfillTopic
         + ", _streamConfigMap=" + _streamConfigMap
         + ", _offsetCriteria=" + _offsetCriteria + ", _serverUploadToDeepStore=" + _serverUploadToDeepStore + '}';
   }
@@ -482,7 +490,8 @@ public class StreamConfig {
         that._offsetCriteria) && Objects.equals(_flushThresholdVarianceFraction, that._flushThresholdVarianceFraction)
         && _enableOffsetAutoReset == that._enableOffsetAutoReset
         && _offsetAutoResetOffsetThreshold == that._offsetAutoResetOffsetThreshold
-        && _offsetAutoResetTimeSecThreshold == that._offsetAutoResetTimeSecThreshold;
+        && _offsetAutoResetTimeSecThreshold == that._offsetAutoResetTimeSecThreshold
+        && Objects.equals(_backfillTopic, that._backfillTopic);
   }
 
   @Override
@@ -492,6 +501,6 @@ public class StreamConfig {
         _flushThresholdSegmentRows, _flushThresholdTimeMillis, _flushThresholdSegmentSizeBytes,
         _flushAutotuneInitialRows, _groupId, _topicConsumptionRateLimit, _streamConfigMap, _offsetCriteria,
         _serverUploadToDeepStore, _flushThresholdVarianceFraction, _offsetAutoResetOffsetThreshold,
-        _enableOffsetAutoReset, _offsetAutoResetTimeSecThreshold);
+        _enableOffsetAutoReset, _offsetAutoResetTimeSecThreshold, _backfillTopic);
   }
 }

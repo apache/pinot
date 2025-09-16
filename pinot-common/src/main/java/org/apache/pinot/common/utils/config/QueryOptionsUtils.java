@@ -163,6 +163,11 @@ public class QueryOptionsUtils {
     return "false".equalsIgnoreCase(queryOptions.get(QueryOptionKey.USE_SCAN_REORDER_OPTIMIZATION));
   }
 
+  public static boolean isCollectGcStats(Map<String, String> queryOptions) {
+    // Disabled by default
+    return Boolean.parseBoolean(queryOptions.get(QueryOptionKey.COLLECT_GC_STATS));
+  }
+
   @Nullable
   public static Map<String, Set<FieldConfig.IndexType>> getSkipIndexes(Map<String, String> queryOptions) {
     // Example config:  skipIndexes='col1=inverted,range&col2=inverted'

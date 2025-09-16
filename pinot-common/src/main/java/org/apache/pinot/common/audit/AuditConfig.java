@@ -20,6 +20,7 @@ package org.apache.pinot.common.audit;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.StringJoiner;
 
 
 /**
@@ -28,6 +29,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class AuditConfig {
+
+  public static final int MAX_AUDIT_PAYLOAD_SIZE_BYTES = 65536; // Hard max. This overrides _maxPayloadSize
+  public static final int MAX_AUDIT_PAYLOAD_SIZE_BYTES_DEFAULT = 8192;
 
   @JsonProperty("enabled")
   private boolean _enabled = false;
@@ -38,11 +42,20 @@ public final class AuditConfig {
   @JsonProperty("capture.request.headers")
   private String _captureRequestHeaders = "";
 
-  @JsonProperty("payload.size.max.bytes")
-  private int _maxPayloadSize = 10_240;
+  @JsonProperty("request.payload.size.max.bytes")
+  private int _maxPayloadSize = MAX_AUDIT_PAYLOAD_SIZE_BYTES_DEFAULT;
 
-  @JsonProperty("excluded.endpoints")
-  private String _excludedEndpoints = "";
+  @JsonProperty("url.filter.exclude.patterns")
+  private String _urlFilterExcludePatterns = "";
+
+  @JsonProperty("url.filter.include.patterns")
+  private String _urlFilterIncludePatterns = "";
+
+  @JsonProperty("userid.header")
+  private String _useridHeader = "";
+
+  @JsonProperty("userid.jwt.claim")
+  private String _useridJwtClaimName = "";
 
   public boolean isEnabled() {
     return _enabled;
@@ -76,18 +89,48 @@ public final class AuditConfig {
     _maxPayloadSize = maxPayloadSize;
   }
 
-  public String getExcludedEndpoints() {
-    return _excludedEndpoints;
+  public String getUrlFilterExcludePatterns() {
+    return _urlFilterExcludePatterns;
   }
 
-  public void setExcludedEndpoints(String excludedEndpoints) {
-    _excludedEndpoints = excludedEndpoints;
+  public void setUrlFilterExcludePatterns(String urlFilterExcludePatterns) {
+    _urlFilterExcludePatterns = urlFilterExcludePatterns;
+  }
+
+  public String getUrlFilterIncludePatterns() {
+    return _urlFilterIncludePatterns;
+  }
+
+  public void setUrlFilterIncludePatterns(String urlFilterIncludePatterns) {
+    _urlFilterIncludePatterns = urlFilterIncludePatterns;
+  }
+
+  public String getUseridHeader() {
+    return _useridHeader;
+  }
+
+  public void setUseridHeader(String useridHeader) {
+    _useridHeader = useridHeader;
+  }
+
+  public String getUseridJwtClaimName() {
+    return _useridJwtClaimName;
+  }
+
+  public void setUseridJwtClaimName(String useridJwtClaimName) {
+    _useridJwtClaimName = useridJwtClaimName;
   }
 
   @Override
   public String toString() {
-    return "AuditConfig{" + "enabled=" + _enabled + ", captureRequestPayload=" + _captureRequestPayload
-        + ", captureRequestHeaders='" + _captureRequestHeaders + "', maxPayloadSize=" + _maxPayloadSize
-        + ", excludedEndpoints='" + _excludedEndpoints + "'}";
+    return new StringJoiner(", ", AuditConfig.class.getSimpleName() + "[", "]").add("_enabled=" + _enabled)
+        .add("_captureRequestPayload=" + _captureRequestPayload)
+        .add("_captureRequestHeaders='" + _captureRequestHeaders + "'")
+        .add("_maxPayloadSize=" + _maxPayloadSize)
+        .add("_urlFilterExcludePatterns='" + _urlFilterExcludePatterns + "'")
+        .add("_urlFilterIncludePatterns='" + _urlFilterIncludePatterns + "'")
+        .add("_useridHeader='" + _useridHeader + "'")
+        .add("_useridJwtClaimName='" + _useridJwtClaimName + "'")
+        .toString();
   }
 }

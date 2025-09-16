@@ -165,8 +165,13 @@ public class MailboxAssignmentVisitor extends DefaultPostOrderTraversalVisitor<V
       DispatchablePlanMetadata receiver) {
     int numSenders = sender.getWorkerIdToServerInstanceMap().size();
     int numReceivers = receiver.getWorkerIdToServerInstanceMap().size();
-    return numSenders * sender.getPartitionParallelism() == numReceivers && sender.getPartitionFunction() != null
-        && sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
+    if (numSenders * sender.getPartitionParallelism() != numReceivers) {
+      return false;
+    }
+    if (sender.getPartitionFunction() == null) {
+      return receiver.getPartitionFunction() == null;
+    }
+    return sender.getPartitionFunction().equalsIgnoreCase(receiver.getPartitionFunction());
   }
 
   private void connectWorkers(int stageId, Map<Integer, QueryServerInstance> serverMap,

@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.pinot.common.datatable.DataTable.MetadataKey;
@@ -208,6 +209,42 @@ public class SegmentPartitionLLCRealtimeClusterIntegrationTest extends BaseClust
   }
 
   @Test(dependsOnMethods = "testPartitionRouting")
+  public void testPartitionIdVirtualColumn()
+      throws Exception {
+    // Query to get partition ID information for all segments
+    String query = "SELECT $partitionId, $segmentName FROM mytable GROUP BY $segmentName, $partitionId";
+    JsonNode response = postQuery(query);
+
+    JsonNode resultTable = response.get("resultTable");
+    JsonNode rows = resultTable.get("rows");
+
+    assertTrue(rows.size() > 0, "Should have at least one segment result");
+
+    // Define expected partition ID values
+    Set<String> expectedPartitions = new HashSet<>();
+    expectedPartitions.add("DestState_0");
+    expectedPartitions.add("DestState_1");
+
+    // Validate that $partitionId virtual column returns expected results
+    for (int i = 0; i < rows.size(); i++) {
+      JsonNode row = rows.get(i);
+      String partitionIdResult = row.get(0).asText();
+      String segmentName = row.get(1).asText();
+
+      assertNotNull(partitionIdResult);
+      assertNotNull(segmentName);
+      assertTrue(LLCSegmentName.isLLCSegment(segmentName));
+
+      if (partitionIdResult.isBlank()) {
+        continue;
+      }
+      // Validate that partitionIdResult is one of the expected partition IDs
+      assertTrue(expectedPartitions.contains(partitionIdResult),
+          "Expected one of " + expectedPartitions + " but found: " + partitionIdResult);
+    }
+  }
+
+  @Test(dependsOnMethods = "testPartitionIdVirtualColumn")
   public void testNonPartitionedStream()
       throws Exception {
     // Push the second Avro file into Kafka without partitioning

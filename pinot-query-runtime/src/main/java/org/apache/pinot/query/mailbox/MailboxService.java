@@ -139,8 +139,8 @@ public class MailboxService {
     if (_hostname.equals(hostname) && _port == port) {
       return new InMemorySendingMailbox(mailboxId, this, deadlineMs, statMap);
     } else {
-      return new GrpcSendingMailbox(
-          _config, mailboxId, _channelManager, hostname, port, deadlineMs, statMap, _maxByteStringSize);
+      return new GrpcSendingMailbox(mailboxId, _channelManager, hostname, port, deadlineMs, statMap,
+          _maxByteStringSize);
     }
   }
 

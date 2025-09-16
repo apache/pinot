@@ -445,11 +445,13 @@ public abstract class BaseClusterIntegrationTestSet extends BaseClusterIntegrati
     }
 
     // Check that the virtual columns work as expected (throws no exceptions)
-    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable");
-    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId < 5 limit 50");
-    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId = 5 limit 50");
-    getPinotConnection().execute("select $docId, $segmentName, $hostName from mytable where $docId > 19998 limit 50");
-    getPinotConnection().execute("select max($docId) from mytable group by $segmentName");
+    getPinotConnection().execute("select $docId, $segmentName, $hostName, $partitionId from mytable");
+    getPinotConnection().execute(
+        "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId < 5 limit 50");
+    getPinotConnection().execute(
+        "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId = 5 limit 50");
+    getPinotConnection().execute(
+        "select $docId, $segmentName, $hostName, $partitionId from mytable where $docId > 19998 limit 50");
   }
 
   /**

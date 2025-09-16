@@ -73,6 +73,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 
+@Test(enabled = false) // this test is very spammy and leaks query threads. Enable when fixed
 public class ResourceManagerAccountingTest {
 
   public static final Logger LOGGER = LoggerFactory.getLogger(ResourceManagerAccountingTest.class);
@@ -298,7 +299,7 @@ public class ResourceManagerAccountingTest {
   /**
    * Test instrumentation during {@link DataTable} creation
    */
-  @Test(dataProvider = "accountantFactories")
+  @Test(dataProvider = "accountantFactories", enabled = false)
   public void testGetDataTableOOMSelect(String accountantFactoryClass)
       throws Exception {
 
@@ -365,7 +366,7 @@ public class ResourceManagerAccountingTest {
   /**
    * Test instrumentation during {@link DataTable} creation
    */
-  @Test (dataProvider = "accountantFactories")
+  @Test(dataProvider = "accountantFactories", enabled = false)
   public void testGetDataTableOOMGroupBy(String accountantFactoryClass)
       throws Exception {
 
@@ -446,7 +447,7 @@ public class ResourceManagerAccountingTest {
    *
    * It is roughly equivalent to running json_extract_index(col, '$.key', 'STRING').
    */
-  @Test(dataProvider = "accountantFactories")
+  @Test(dataProvider = "accountantFactories", enabled = false)
   public void testJsonIndexExtractMapOOM(String accountantFactoryClass)
       throws Exception {
     HashMap<String, Object> configs = new HashMap<>();
