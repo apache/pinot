@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
 /**
  * JSON encoded Pinot client transport over AsyncHttpClient.
  */
-public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<ClientStats> {
+public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<ClientStats>, CursorCapable {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsonAsyncHttpPinotClientTransport.class);
   private static final ObjectReader OBJECT_READER = JsonUtils.DEFAULT_READER;
   private static final String DEFAULT_EXTRA_QUERY_OPTION_STRING = "groupByMode=sql;responseFormat=sql";
@@ -215,68 +215,10 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
             }
           });
     } catch (Exception e) {
-      throw new PinotClientException(e);
+      return CompletableFuture.failedFuture(new PinotClientException(e));
     }
   }
 
-  /**
-   * Fetches results from an existing cursor.
-   *
-   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
-   * @param requestId The unique identifier of the cursor
-   * @param offset The starting row offset for the page
-   * @param numRows The number of rows to fetch
-   * @return BrokerResponse containing the requested page of results
-   * @throws PinotClientException If fetch fails
-   */
-  public BrokerResponse fetchCursorResults(String brokerAddress, String requestId, int offset, int numRows)
-      throws PinotClientException {
-    try {
-      return fetchCursorResultsAsync(brokerAddress, requestId, offset, numRows).get(_brokerReadTimeout,
-          TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
-  }
-
-  /**
-   * Fetches results from an existing cursor using offset-based pagination.
-   *
-   * @param brokerAddress The broker address in "host:port" format (must be same as cursor creator)
-   * @param requestId The unique identifier of the cursor
-   * @param offset The starting row offset for the page
-   * @param numRows The number of rows to fetch
-   * @return CompletableFuture containing BrokerResponse with the requested page
-   */
-  public CompletableFuture<BrokerResponse> fetchCursorResultsAsync(String brokerAddress, String requestId, int offset,
-      int numRows) {
-    try {
-      String url = String.format("%s://%s/responseStore/%s/results?offset=%d&numRows=%d", _scheme, brokerAddress,
-          requestId, offset, numRows);
-      BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
-
-      if (_headers != null) {
-        _headers.forEach((k, v) -> requestBuilder.addHeader(k, v));
-      }
-      LOGGER.debug("Fetching cursor results from {}", url);
-      return requestBuilder.execute().toCompletableFuture().thenApply(httpResponse -> {
-        LOGGER.debug("Completed cursor fetch, HTTP status is {}", httpResponse.getStatusCode());
-
-        if (httpResponse.getStatusCode() != 200) {
-          throw new PinotClientException(
-              "Pinot returned HTTP status " + httpResponse.getStatusCode() + ", expected 200");
-        }
-
-        try {
-          return BrokerResponse.fromJson(OBJECT_READER.readTree(httpResponse.getResponseBodyAsStream()));
-        } catch (IOException e) {
-          throw new CompletionException(e);
-        }
-      });
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
-  }
 
   /**
    * Retrieves metadata for an existing cursor.
@@ -286,6 +228,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
    * @return BrokerResponse containing cursor metadata
    * @throws PinotClientException If metadata retrieval fails
    */
+  @Override
   public BrokerResponse getCursorMetadata(String brokerAddress, String requestId) throws PinotClientException {
     try {
       return getCursorMetadataAsync(brokerAddress, requestId).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
@@ -301,6 +244,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
    * @param requestId The unique identifier of the cursor
    * @return CompletableFuture containing BrokerResponse with cursor metadata
    */
+  @Override
   public CompletableFuture<BrokerResponse> getCursorMetadataAsync(String brokerAddress, String requestId) {
     try {
       String url = String.format("%s://%s/responseStore/%s/", _scheme, brokerAddress, requestId);
@@ -336,6 +280,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
    * @param requestId The unique identifier of the cursor to delete
    * @throws PinotClientException If cursor deletion fails
    */
+  @Override
   public void deleteCursor(String brokerAddress, String requestId) throws PinotClientException {
     try {
       deleteCursorAsync(brokerAddress, requestId).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
@@ -351,6 +296,7 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
    * @param requestId The unique identifier of the cursor to delete
    * @return CompletableFuture that completes when the cursor is deleted
    */
+  @Override
   public CompletableFuture<Void> deleteCursorAsync(String brokerAddress, String requestId) {
     try {
       String url = String.format("%s://%s/responseStore/%s/", _scheme, brokerAddress, requestId);
@@ -374,14 +320,6 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
-  @Override
-  public CursorAwareBrokerResponse fetchNextPage(String brokerAddress, String cursorId) throws PinotClientException {
-    try {
-      return fetchNextPageAsync(brokerAddress, cursorId).get(_brokerReadTimeout, TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
-  }
 
   public CursorAwareBrokerResponse fetchNextPage(String brokerAddress, String cursorId, int offset, int numRows)
       throws PinotClientException {
@@ -422,16 +360,6 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
-  @Override
-  public CursorAwareBrokerResponse fetchPreviousPage(String brokerAddress, String cursorId)
-      throws PinotClientException {
-    try {
-      return fetchPreviousPageAsync(brokerAddress, cursorId).get(_brokerReadTimeout,
-          TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
-  }
 
   public CursorAwareBrokerResponse fetchPreviousPage(String brokerAddress, String cursorId, int offset, int numRows)
       throws PinotClientException {
@@ -472,21 +400,11 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
     }
   }
 
-  @Override
-  public CursorAwareBrokerResponse seekToPage(String brokerAddress, String cursorId, int pageNumber)
-      throws PinotClientException {
-    try {
-      return seekToPageAsync(brokerAddress, cursorId, pageNumber).get(_brokerReadTimeout,
-          TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
-      throw new PinotClientException(e);
-    }
-  }
 
-  public CursorAwareBrokerResponse seekToPage(String brokerAddress, String cursorId, int offset, int numRows)
+  public CursorAwareBrokerResponse seekToPage(String brokerAddress, String cursorId, int pageNumber, int numRows)
       throws PinotClientException {
     try {
-      return seekToPageAsync(brokerAddress, cursorId, offset, numRows).get(_brokerReadTimeout,
+      return seekToPageAsync(brokerAddress, cursorId, pageNumber, numRows).get(_brokerReadTimeout,
           TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       throw new PinotClientException(e);
@@ -497,8 +415,9 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
   public CompletableFuture<CursorAwareBrokerResponse> seekToPageAsync(String brokerAddress, String cursorId,
       int pageNumber, int numRows) {
     try {
+      int offset = (pageNumber - 1) * numRows;
       String url = String.format("%s://%s/responseStore/%s/results?offset=%d&numRows=%d", _scheme, brokerAddress,
-          cursorId, pageNumber, numRows);
+          cursorId, offset, numRows);
       BoundRequestBuilder requestBuilder = _httpClient.prepareGet(url);
 
       if (_headers != null) {
@@ -521,7 +440,6 @@ public class JsonAsyncHttpPinotClientTransport implements PinotClientTransport<C
       return CompletableFuture.failedFuture(new PinotClientException(e));
     }
   }
-
 
   @Override
   public ClientStats getClientMetrics() {

@@ -164,11 +164,11 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     JsonAsyncHttpPinotClientTransport transport = (JsonAsyncHttpPinotClientTransport) factory.buildTransport();
     CursorAwareBrokerResponse response = transport.fetchNextPage("localhost:"
-        + _dummyServer.getAddress().getPort(), "cursor-123");
+        + _dummyServer.getAddress().getPort(), "cursor-123", 0, 10);
     assertNotNull(response);
     assertTrue(_requestPath.contains("/responseStore/cursor-123/results"));
-    assertTrue(_requestPath.contains("offset=1"));
-    assertTrue(_requestPath.contains("numRows=1"));
+    assertTrue(_requestPath.contains("offset=0"));
+    assertTrue(_requestPath.contains("numRows=10"));
     assertEquals(_requestMethod, "GET");
   }
 
@@ -190,11 +190,13 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
   }
 
   @Test
-  public void testFetchCursorResultsWithOffsetAndNumRows() {
+  public void testFetchNextPageWithOffsetAndNumRows() {
     _responseJson = _CURSOR_RESPONSE_JSON;
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     JsonAsyncHttpPinotClientTransport transport = (JsonAsyncHttpPinotClientTransport) factory.buildTransport();
-    BrokerResponse response = transport.fetchCursorResults("localhost:" + _dummyServer.getAddress().getPort(),
+
+    // Use the CursorCapable interface method instead of the removed legacy method
+    CursorAwareBrokerResponse response = transport.fetchNextPage("localhost:" + _dummyServer.getAddress().getPort(),
         "cursor-123", 100, 50);
 
     assertFalse(response.hasExceptions());
@@ -211,7 +213,7 @@ public class JsonAsyncHttpPinotClientTransportTest implements HttpHandler {
     JsonAsyncHttpPinotClientTransportFactory factory = new JsonAsyncHttpPinotClientTransportFactory();
     JsonAsyncHttpPinotClientTransport transport = (JsonAsyncHttpPinotClientTransport) factory.buildTransport();
     CompletableFuture<CursorAwareBrokerResponse> future = transport.fetchNextPageAsync(
-        "localhost:" + _dummyServer.getAddress().getPort(), "cursor-123");
+        "localhost:" + _dummyServer.getAddress().getPort(), "cursor-123", 0, 10);
 
     CursorAwareBrokerResponse response = future.get();
     assertFalse(response.hasExceptions());

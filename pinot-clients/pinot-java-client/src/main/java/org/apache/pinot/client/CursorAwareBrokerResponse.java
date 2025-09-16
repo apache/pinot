@@ -48,7 +48,7 @@ public class CursorAwareBrokerResponse extends BrokerResponse {
   private CursorAwareBrokerResponse(JsonNode brokerResponse) {
     super(brokerResponse); // Initialize base BrokerResponse fields
 
-    // Parse cursor-specific fields using helper methods
+    // Parse cursor-specific fields using helper methods (they handle null nodes gracefully)
     _offset = getLongOrNull(brokerResponse, "offset");
     _numRows = getIntOrNull(brokerResponse, "numRows");
     _numRowsResultSet = getLongOrNull(brokerResponse, "numRowsResultSet");
@@ -106,16 +106,25 @@ public class CursorAwareBrokerResponse extends BrokerResponse {
 
   // Helper methods for extracting values from JsonNode with null checks
   private static Long getLongOrNull(JsonNode node, String fieldName) {
+    if (node == null) {
+      return null;
+    }
     JsonNode valueNode = node.get(fieldName);
     return (valueNode != null && !valueNode.isNull()) ? valueNode.asLong() : null;
   }
 
   private static Integer getIntOrNull(JsonNode node, String fieldName) {
+    if (node == null) {
+      return null;
+    }
     JsonNode valueNode = node.get(fieldName);
     return (valueNode != null && !valueNode.isNull()) ? valueNode.asInt() : null;
   }
 
   private static String getTextOrNull(JsonNode node, String fieldName) {
+    if (node == null) {
+      return null;
+    }
     JsonNode valueNode = node.get(fieldName);
     return (valueNode != null && !valueNode.isNull()) ? valueNode.asText() : null;
   }

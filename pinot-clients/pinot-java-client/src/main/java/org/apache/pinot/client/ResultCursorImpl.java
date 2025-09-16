@@ -19,6 +19,7 @@
 package org.apache.pinot.client;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.IntSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +30,9 @@ import org.slf4j.LoggerFactory;
  * keeping the Connection and CursorResultSetGroup classes focused
  * on their primary responsibilities. The cursor starts with the first
  * page already loaded.
+ *
+ * Thread Safety: All navigation methods are synchronized to ensure
+ * safe concurrent access to cursor state.
  */
 public class ResultCursorImpl implements ResultCursor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ResultCursorImpl.class);
@@ -36,11 +40,15 @@ public class ResultCursorImpl implements ResultCursor {
   private final PinotClientTransport<?> _transport;
   private final String _brokerHostPort;
   private final boolean _failOnExceptions;
-
-  private CursorResultSetGroup _currentPage;
-  private int _currentPageNumber;
   private final int _pageSize;
-  private boolean _closed;
+
+  // Synchronization lock for cursor state
+  private final Object _stateLock = new Object();
+
+  // Volatile for visibility across threads
+  private volatile CursorResultSetGroup _currentPage;
+  private volatile int _currentPageNumber;
+  private volatile boolean _closed;
 
   /**
    * Creates a new cursor with the initial page of results already loaded.
@@ -55,226 +63,258 @@ public class ResultCursorImpl implements ResultCursor {
     _transport = transport;
     _brokerHostPort = brokerHostPort;
     _failOnExceptions = failOnExceptions;
-    _currentPage = new CursorResultSetGroup(initialResponse);
-    _currentPageNumber = 0;
     _pageSize = initialResponse.getNumRows() != null
         ? initialResponse.getNumRows().intValue() : -1;
+    // Initialize state - no synchronization needed in constructor
+    _currentPage = new CursorResultSetGroup(initialResponse);
+    _currentPageNumber = 0;
     _closed = false;
   }
 
   @Override
   public CursorResultSetGroup getCurrentPage() {
-    checkNotClosed();
-    return _currentPage;
+    synchronized (_stateLock) {
+      checkNotClosed();
+      return _currentPage;
+    }
   }
 
   @Override
   public boolean hasNext() {
-    checkNotClosed();
-    CursorAwareBrokerResponse response = _currentPage.getCursorResponse();
-    Long offset = response.getOffset();
-    Integer numRows = response.getNumRows();
-    Long totalRows = response.getNumRowsResultSet();
+    synchronized (_stateLock) {
+      checkNotClosed();
+      CursorAwareBrokerResponse response = _currentPage.getCursorResponse();
+      Long offset = response.getOffset();
+      Integer numRows = response.getNumRows();
+      Long totalRows = response.getNumRowsResultSet();
 
-    if (offset == null || numRows == null || totalRows == null) {
-      return false;
+      if (offset == null || numRows == null || totalRows == null) {
+        return false;
+      }
+      return (offset + numRows) < totalRows;
     }
-    return (offset + numRows) < totalRows;
   }
 
   @Override
   public boolean hasPrevious() {
-    checkNotClosed();
-    CursorAwareBrokerResponse response = _currentPage.getCursorResponse();
-    Long offset = response.getOffset();
-    return offset != null && offset > 0;
+    synchronized (_stateLock) {
+      checkNotClosed();
+      CursorAwareBrokerResponse response = _currentPage.getCursorResponse();
+      Long offset = response.getOffset();
+      return offset != null && offset > 0;
+    }
   }
 
   @Override
   public CursorResultSetGroup next() throws PinotClientException {
-    checkNotClosed();
-    if (!hasNext()) {
-      throw new IllegalStateException("No next page available");
-    }
-
-    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
-      throw new UnsupportedOperationException("Cursor operations not supported by this transport type");
-    }
-
-    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
-
-    try {
-      int nextOffset = _currentPageNumber * _pageSize;
-      CursorAwareBrokerResponse response = cursorTransport.fetchNextPage(_brokerHostPort, getCursorId(),
-          nextOffset, _pageSize);
-      if (response.hasExceptions() && _failOnExceptions) {
-        throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
-      }
-
-      _currentPage = new CursorResultSetGroup(response);
-      _currentPageNumber++;
-      return _currentPage;
-    } catch (PinotClientException e) {
-      throw new PinotClientException("Failed to fetch next page", e);
-    }
+    return executeNavigation(
+        () -> {
+          CursorAwareBrokerResponse response = _currentPage.getCursorResponse();
+          Long offset = response.getOffset();
+          Integer numRows = response.getNumRows();
+          Long totalRows = response.getNumRowsResultSet();
+          if (offset == null || numRows == null || totalRows == null
+              || (offset + numRows) >= totalRows) {
+            throw new IllegalStateException("No next page available");
+          }
+        },
+        () -> _currentPageNumber * _pageSize,
+        (transport, cursorId, offset) -> transport.fetchNextPage(_brokerHostPort, cursorId, offset, _pageSize),
+        () -> _currentPageNumber++,
+        "Failed to fetch next page"
+    );
   }
 
   @Override
   public CursorResultSetGroup previous() throws PinotClientException {
-    checkNotClosed();
-    if (!hasPrevious()) {
-      throw new IllegalStateException("No previous page available");
-    }
-
-    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
-      throw new UnsupportedOperationException("Cursor operations not supported by this transport type");
-    }
-
-    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
-
-    try {
-      int prevOffset = (_currentPageNumber - 1) * _pageSize;
-      CursorAwareBrokerResponse response = cursorTransport.fetchPreviousPage(_brokerHostPort, getCursorId(),
-          prevOffset, _pageSize);
-      if (response.hasExceptions() && _failOnExceptions) {
-        throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
-      }
-
-      _currentPage = new CursorResultSetGroup(response);
-      _currentPageNumber--;
-      return _currentPage;
-    } catch (PinotClientException e) {
-      throw new PinotClientException("Failed to fetch previous page", e);
-    }
+    return executeNavigation(
+        () -> {
+          CursorAwareBrokerResponse response = _currentPage.getCursorResponse();
+          Long offset = response.getOffset();
+          if (offset == null || offset <= 0) {
+            throw new IllegalStateException("No previous page available");
+          }
+        },
+        () -> (_currentPageNumber - 1) * _pageSize,
+        (transport, cursorId, offset) -> transport.fetchPreviousPage(_brokerHostPort, cursorId, offset, _pageSize),
+        () -> _currentPageNumber--,
+        "Failed to fetch previous page"
+    );
   }
 
   @Override
   public CursorResultSetGroup seekToPage(int pageNumber) throws PinotClientException {
-    checkNotClosed();
-    if (pageNumber <= 0) {
-      throw new IllegalArgumentException("Page number must be positive (1-based)");
-    }
-
-    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
-      throw new UnsupportedOperationException("Cursor operations not supported by this transport type");
-    }
-
-    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
-
-    try {
-      int seekOffset = (pageNumber - 1) * _pageSize;
-      CursorAwareBrokerResponse response = cursorTransport.seekToPage(_brokerHostPort, getCursorId(),
-          seekOffset, _pageSize);
-      if (response.hasExceptions() && _failOnExceptions) {
-        throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
-      }
-
-      _currentPage = new CursorResultSetGroup(response);
-      _currentPageNumber = pageNumber - 1; // Store 0-based internally
-      return _currentPage;
-    } catch (PinotClientException e) {
-      throw new PinotClientException("Failed to seek to page " + pageNumber, e);
-    }
+    return executeNavigation(
+        () -> {
+          if (pageNumber <= 0) {
+            throw new IllegalArgumentException("Page number must be positive (1-based)");
+          }
+        },
+        () -> (pageNumber - 1) * _pageSize,
+        (transport, cursorId, offset) -> transport.seekToPage(_brokerHostPort, cursorId, pageNumber, _pageSize),
+        () -> _currentPageNumber = pageNumber - 1,
+        "Failed to seek to page " + pageNumber
+    );
   }
 
   @Override
   public CompletableFuture<CursorResultSetGroup> nextAsync() {
-    checkNotClosed();
-    if (!hasNext()) {
-      return CompletableFuture.failedFuture(new IllegalStateException("No next page available"));
-    }
-
-    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
-      return CompletableFuture.failedFuture(
-          new UnsupportedOperationException("Cursor operations not supported by this transport type"));
-    }
-
-    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
-
-    int nextOffset = (_currentPageNumber + 1) * _pageSize;
-    return cursorTransport.fetchNextPageAsync(_brokerHostPort, getCursorId(), nextOffset, _pageSize)
-        .thenApply(response -> {
-          if (response.hasExceptions() && _failOnExceptions) {
-            throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
+    return executeNavigationAsync(
+        () -> {
+          CursorAwareBrokerResponse response = _currentPage.getCursorResponse();
+          Long offset = response.getOffset();
+          Integer numRows = response.getNumRows();
+          Long totalRows = response.getNumRowsResultSet();
+          if (offset == null || numRows == null || totalRows == null
+              || (offset + numRows) >= totalRows) {
+            throw new IllegalStateException("No next page available");
           }
-
-          _currentPage = new CursorResultSetGroup(response);
-          _currentPageNumber++;
-          return _currentPage;
-        });
+        },
+        () -> _currentPageNumber * _pageSize,
+        (transport, cursorId, offset) -> transport.fetchNextPageAsync(_brokerHostPort, cursorId, offset, _pageSize),
+        () -> _currentPageNumber++
+    );
   }
 
   @Override
   public CompletableFuture<CursorResultSetGroup> previousAsync() {
-    checkNotClosed();
-    if (!hasPrevious()) {
-      return CompletableFuture.failedFuture(new IllegalStateException("No previous page available"));
-    }
-
-    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
-      return CompletableFuture.failedFuture(
-          new UnsupportedOperationException("Cursor operations not supported by this transport type"));
-    }
-
-    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
-
-    int prevOffset = (_currentPageNumber - 1) * _pageSize;
-    return cursorTransport.fetchPreviousPageAsync(_brokerHostPort, getCursorId(), prevOffset, _pageSize)
-        .thenApply(response -> {
-          if (response.hasExceptions() && _failOnExceptions) {
-            throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
+    return executeNavigationAsync(
+        () -> {
+          CursorAwareBrokerResponse response = _currentPage.getCursorResponse();
+          Long offset = response.getOffset();
+          if (offset == null || offset <= 0) {
+            throw new IllegalStateException("No previous page available");
           }
-
-          _currentPage = new CursorResultSetGroup(response);
-          _currentPageNumber--;
-          return _currentPage;
-        });
+        },
+        () -> (_currentPageNumber - 1) * _pageSize,
+        (transport, cursorId, offset) -> transport.fetchPreviousPageAsync(_brokerHostPort, cursorId, offset, _pageSize),
+        () -> _currentPageNumber--
+    );
   }
 
   @Override
   public CompletableFuture<CursorResultSetGroup> seekToPageAsync(int pageNumber) {
-    checkNotClosed();
-    if (pageNumber <= 0) {
-      return CompletableFuture.failedFuture(new IllegalArgumentException("Page number must be positive (1-based)"));
-    }
-
-    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
-      return CompletableFuture.failedFuture(
-          new UnsupportedOperationException("Cursor operations not supported by this transport type"));
-    }
-
-    JsonAsyncHttpPinotClientTransport cursorTransport = (JsonAsyncHttpPinotClientTransport) _transport;
-
-    int seekOffset = (pageNumber - 1) * _pageSize;
-    return cursorTransport.seekToPageAsync(_brokerHostPort, getCursorId(), seekOffset, _pageSize)
-        .thenApply(response -> {
-          if (response.hasExceptions() && _failOnExceptions) {
-            throw new RuntimeException("Query had processing exceptions: \n" + response.getExceptions());
+    return executeNavigationAsync(
+        () -> {
+          if (pageNumber <= 0) {
+            throw new IllegalArgumentException("Page number must be positive (1-based)");
           }
+        },
+        () -> (pageNumber - 1) * _pageSize,
+        (transport, cursorId, offset) -> transport.seekToPageAsync(_brokerHostPort, cursorId, pageNumber, _pageSize),
+        () -> _currentPageNumber = pageNumber - 1
+    );
+  }
 
-          _currentPage = new CursorResultSetGroup(response);
-          _currentPageNumber = pageNumber - 1; // Store 0-based internally
-          return _currentPage;
-        });
+  private CursorResultSetGroup executeNavigation(
+      Runnable validator,
+      IntSupplier offsetCalculator,
+      TransportFunction transportFunction,
+      Runnable stateUpdater,
+      String errorMessage) throws PinotClientException {
+    int offset;
+    String cursorId;
+    synchronized (_stateLock) {
+      checkNotClosed();
+      validator.run();
+      offset = offsetCalculator.getAsInt();
+      cursorId = _currentPage.getCursorId();
+    }
+
+    JsonAsyncHttpPinotClientTransport transport = getValidatedTransport();
+
+    try {
+      CursorAwareBrokerResponse response = transportFunction.apply(transport, cursorId, offset);
+      return updateStateAndReturn(response, stateUpdater);
+    } catch (PinotClientException e) {
+      throw new PinotClientException(errorMessage, e);
+    }
+  }
+
+  private CompletableFuture<CursorResultSetGroup> executeNavigationAsync(
+      Runnable validator,
+      IntSupplier offsetCalculator,
+      AsyncTransportFunction transportFunction,
+      Runnable stateUpdater) {
+    try {
+      int offset;
+      String cursorId;
+      synchronized (_stateLock) {
+        checkNotClosed();
+        validator.run();
+        offset = offsetCalculator.getAsInt();
+        cursorId = _currentPage.getCursorId();
+      }
+
+      JsonAsyncHttpPinotClientTransport transport = getValidatedTransport();
+      return transportFunction.apply(transport, cursorId, offset)
+          .thenApply(response -> updateStateAndReturn(response, stateUpdater));
+    } catch (IllegalStateException | IllegalArgumentException | UnsupportedOperationException e) {
+      return CompletableFuture.failedFuture(e);
+    }
+  }
+
+  private JsonAsyncHttpPinotClientTransport getValidatedTransport() {
+    if (!(_transport instanceof JsonAsyncHttpPinotClientTransport)) {
+      throw new UnsupportedOperationException("Cursor operations not supported by this transport type");
+    }
+    return (JsonAsyncHttpPinotClientTransport) _transport;
+  }
+
+  @FunctionalInterface
+  private interface TransportFunction {
+    CursorAwareBrokerResponse apply(JsonAsyncHttpPinotClientTransport transport, String cursorId, int offset)
+        throws PinotClientException;
+  }
+
+  @FunctionalInterface
+  private interface AsyncTransportFunction {
+    CompletableFuture<CursorAwareBrokerResponse> apply(JsonAsyncHttpPinotClientTransport transport,
+        String cursorId, int offset);
+  }
+
+  /**
+   * Common method to update cursor state and return result for both sync and async operations.
+   * This eliminates code duplication between navigation methods.
+   */
+  private CursorResultSetGroup updateStateAndReturn(CursorAwareBrokerResponse response, Runnable stateUpdater) {
+    if (response.hasExceptions() && _failOnExceptions) {
+      throw new PinotClientException("Query had processing exceptions: \n" + response.getExceptions());
+    }
+
+    synchronized (_stateLock) {
+      if (_closed) {
+        throw new IllegalStateException("Cursor was closed during operation");
+      }
+      _currentPage = new CursorResultSetGroup(response);
+      stateUpdater.run();
+    }
+    return _currentPage;
   }
 
   @Override
   public String getCursorId() {
-    checkNotClosed();
-    return _currentPage.getCursorId();
+    synchronized (_stateLock) {
+      checkNotClosed();
+      return _currentPage.getCursorId();
+    }
   }
 
   @Override
   public int getCurrentPageNumber() {
-    checkNotClosed();
-    return _currentPageNumber + 1; // Convert 0-based internal to 1-based public API
+    synchronized (_stateLock) {
+      checkNotClosed();
+      return _currentPageNumber + 1;
+    }
   }
 
   @Override
   public long getTotalRows() {
-    checkNotClosed();
-    Long numRows = _currentPage.getTotalRows();
-    return numRows != null ? numRows : -1;
+    synchronized (_stateLock) {
+      checkNotClosed();
+      Long numRows = _currentPage.getTotalRows();
+      return numRows != null ? numRows : -1;
+    }
   }
 
   @Override
@@ -288,9 +328,12 @@ public class ResultCursorImpl implements ResultCursor {
       return true;
     }
 
-    Long expirationTime = _currentPage.getExpirationTimeMs();
-    if (expirationTime == null) {
-      return false;
+    long expirationTime;
+    synchronized (_stateLock) {
+      if (_closed) {
+        return true;
+      }
+      expirationTime = _currentPage.getExpirationTimeMs();
     }
 
     return System.currentTimeMillis() > expirationTime;
@@ -303,16 +346,13 @@ public class ResultCursorImpl implements ResultCursor {
     }
 
     // Get cursor ID before marking as closed
-    String cursorId = null;
-    try {
-      cursorId = getCursorId();
-    } catch (RuntimeException e) {
-      // Ignore if we can't get cursor ID
+    String cursorId;
+    synchronized (_stateLock) {
+      cursorId = _currentPage.getCursorId();
+      _closed = true;
     }
 
-    _closed = true;
-
-    // TODO: Implement server-side cursor cleanup
+    // Server-side cursor cleanup could be implemented in the future
     // This would involve sending a DELETE request to the broker to clean up cursor resources
     // For now, cursors will expire naturally based on their expiration time
     LOGGER.debug("Cursor {} closed, server-side cleanup not yet implemented", cursorId);

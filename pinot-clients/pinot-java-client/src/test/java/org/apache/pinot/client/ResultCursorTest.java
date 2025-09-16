@@ -68,17 +68,19 @@ public class ResultCursorTest {
     }
 
     @Override
-    public CursorAwareBrokerResponse seekToPage(String brokerHostPort, String cursorId, int offset, int numRows) {
-      _currentPage = (offset / _pageSize);
-      return createMockResponse(_currentPage + 1, (_currentPage + 1) < _totalPages, _currentPage > 0);
+    public CursorAwareBrokerResponse seekToPage(String brokerHostPort, String cursorId, int pageNumber, int numRows) {
+      // pageNumber is 1-based, store as current page number (1-based)
+      _currentPage = pageNumber;
+      return createMockResponse(_currentPage, _currentPage < _totalPages, _currentPage > 1);
     }
 
     @Override
     public CompletableFuture<CursorAwareBrokerResponse> seekToPageAsync(String brokerHostPort, String cursorId,
-        int offset, int numRows) {
-      _currentPage = (offset / _pageSize);
+        int pageNumber, int numRows) {
+      // pageNumber is 1-based, store as current page number (1-based)
+      _currentPage = pageNumber;
       return CompletableFuture.completedFuture(
-          createMockResponse(_currentPage + 1, (_currentPage + 1) < _totalPages, _currentPage > 0));
+          createMockResponse(_currentPage, _currentPage < _totalPages, _currentPage > 1));
     }
 
     private CursorAwareBrokerResponse createMockResponse(int pageNum, boolean hasNext, boolean hasPrevious) {
@@ -86,6 +88,8 @@ public class ResultCursorTest {
         ObjectMapper mapper = new ObjectMapper();
         // Calculate total rows across all pages
         int totalRows = _totalPages * _pageSize;
+        // Calculate offset for this page (0-based offset)
+        int offset = (pageNum - 1) * _pageSize;
         String jsonResponse = String.format(
             "{"
             + "\"requestId\": \"cursor-test-%d\","
@@ -104,8 +108,8 @@ public class ResultCursorTest {
             + "  ]"
             + "}"
             + "}",
-            pageNum, totalRows, _pageSize, (pageNum - 1) * _pageSize,
-            System.currentTimeMillis() + 300000, // 5 minutes from now
+            pageNum, totalRows, _pageSize, offset,
+            System.currentTimeMillis() + 300000,
             pageNum, pageNum * 10,
             pageNum, pageNum * 10 + 1
         );
@@ -185,6 +189,8 @@ public class ResultCursorTest {
       CursorResultSetGroup page2 = cursor.seekToPage(2);
       Assert.assertNotNull(page2);
       Assert.assertEquals(cursor.getCurrentPageNumber(), 2);
+
+
       Assert.assertTrue(cursor.hasNext());
       Assert.assertTrue(cursor.hasPrevious());
 

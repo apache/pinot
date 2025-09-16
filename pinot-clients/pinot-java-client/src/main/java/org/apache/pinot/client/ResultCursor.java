@@ -88,9 +88,9 @@ public interface ResultCursor extends AutoCloseable {
   CursorResultSetGroup previous() throws PinotClientException;
 
   /**
-   * Seeks to a specific page number (0-based) and updates the cursor position.
+   * Seeks to a specific page number (1-based) and updates the cursor position.
    *
-   * @param pageNumber the page number to seek to (0-based)
+   * @param pageNumber the page number to seek to (1-based)
    * @return the requested page of results
    * @throws PinotClientException if an error occurs while seeking
    * @throws IllegalArgumentException if pageNumber is invalid
@@ -114,7 +114,7 @@ public interface ResultCursor extends AutoCloseable {
   /**
    * Seeks to a specific page number asynchronously.
    *
-   * @param pageNumber the page number to seek to (0-based)
+   * @param pageNumber the page number to seek to (1-based)
    * @return a CompletableFuture containing the requested page of results
    */
   CompletableFuture<CursorResultSetGroup> seekToPageAsync(int pageNumber);
@@ -127,7 +127,7 @@ public interface ResultCursor extends AutoCloseable {
   String getCursorId();
 
   /**
-   * Gets the current page number (0-based).
+   * Gets the current page number (1-based).
    *
    * @return the current page number
    */

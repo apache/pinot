@@ -18,10 +18,12 @@
  */
 package org.apache.pinot.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.Map;
 import java.util.Properties;
 import org.I0Itec.zkclient.ZkClient;
@@ -153,32 +155,17 @@ public class ConnectionFactoryTest {
     Assert.assertTrue(hasFromHostList, "fromHostList methods should be preserved");
     Assert.assertTrue(hasFromProperties, "fromProperties methods should be preserved");
 
-    // Verify that Connection has cursor methods (hybrid approach)
+    // Verify that Connection has current cursor API (openCursor method)
     Method[] connectionMethods = Connection.class.getDeclaredMethods();
-    boolean hasExecuteWithCursor = false;
-    boolean hasFetchNext = false;
-    boolean hasFetchPrevious = false;
-    boolean hasSeekToPage = false;
+    boolean hasOpenCursor = false;
 
     for (Method method : connectionMethods) {
-      if (method.getName().equals("executeCursorQuery")) {
-        hasExecuteWithCursor = true;
-      }
-      if (method.getName().equals("fetchNext")) {
-        hasFetchNext = true;
-      }
-      if (method.getName().equals("fetchPrevious")) {
-        hasFetchPrevious = true;
-      }
-      if (method.getName().equals("seekToPage")) {
-        hasSeekToPage = true;
+      if (method.getName().equals("openCursor")) {
+        hasOpenCursor = true;
       }
     }
 
-    Assert.assertTrue(hasExecuteWithCursor, "Connection should have executeCursorQuery method");
-    Assert.assertTrue(hasFetchNext, "Connection should have fetchNext method");
-    Assert.assertTrue(hasFetchPrevious, "Connection should have fetchPrevious method");
-    Assert.assertTrue(hasSeekToPage, "Connection should have seekToPage method");
+    Assert.assertTrue(hasOpenCursor, "Connection should have openCursor method");
   }
 
   @Test
@@ -194,18 +181,87 @@ public class ConnectionFactoryTest {
   }
 
   @Test
-  public void testConnectionCursorFunctionalityWithOtherTransports() {
-    // Test that connections created with other transports handle cursor operations gracefully
+  public void testOpenCursorWithUnsupportedTransport() {
+    // Test that openCursor throws UnsupportedOperationException with non-JsonAsyncHttpPinotClientTransport
     List<String> brokers = ImmutableList.of("127.0.0.1:1234");
-    PinotClientTransport mockTransport = Mockito.mock(PinotClientTransport.class);
-    Connection connection = ConnectionFactory.fromHostList(brokers, mockTransport);
+    PinotClientTransport<?> mockTransport = Mockito.mock(PinotClientTransport.class);
+    Connection connection = new Connection(brokers, mockTransport);
 
-    // Verify cursor operations throw UnsupportedOperationException for non-JsonAsyncHttpPinotClientTransport
     try {
-      connection.fetchNext("test-cursor");
-      Assert.fail("Should throw UnsupportedOperationException");
+      connection.openCursor("SELECT * FROM testTable", 10);
+      Assert.fail("Expected UnsupportedOperationException");
     } catch (UnsupportedOperationException e) {
-      Assert.assertEquals(e.getMessage(), "Cursor operations not supported by this connection type");
+      Assert.assertEquals("Cursor operations not supported by this connection type", e.getMessage());
+    }
+  }
+
+  @Test
+  public void testOpenCursorWithNullBroker() {
+    // Test that openCursor throws PinotClientException when no broker is available
+    BrokerSelector mockBrokerSelector = Mockito.mock(BrokerSelector.class);
+    Mockito.when(mockBrokerSelector.selectBroker(Mockito.any())).thenReturn(null);
+
+    JsonAsyncHttpPinotClientTransport mockTransport = Mockito.mock(JsonAsyncHttpPinotClientTransport.class);
+    Connection connection = new Connection(mockBrokerSelector, mockTransport);
+
+    try {
+      connection.openCursor("SELECT * FROM testTable", 10);
+      Assert.fail("Expected PinotClientException");
+    } catch (PinotClientException e) {
+      Assert.assertEquals("Could not find broker to execute cursor query", e.getMessage());
+    }
+  }
+
+  @Test
+  public void testOpenCursorWithValidParameters() throws Exception {
+    // Test successful openCursor call with valid parameters
+    BrokerSelector mockBrokerSelector = Mockito.mock(BrokerSelector.class);
+    Mockito.when(mockBrokerSelector.selectBroker(Mockito.any())).thenReturn("localhost:8099");
+    JsonAsyncHttpPinotClientTransport mockTransport = Mockito.mock(JsonAsyncHttpPinotClientTransport.class);
+    CursorAwareBrokerResponse mockResponse = Mockito.mock(CursorAwareBrokerResponse.class);
+    Mockito.when(mockResponse.hasExceptions()).thenReturn(false);
+
+    // Mock both sync and async methods since openCursor now uses async internally
+    Mockito.when(mockTransport.executeQueryWithCursor(Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(mockResponse);
+    Mockito.when(mockTransport.executeQueryWithCursorAsync(Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(CompletableFuture.completedFuture(mockResponse));
+
+    Connection connection = new Connection(mockBrokerSelector, mockTransport);
+
+    ResultCursor cursor = connection.openCursor("SELECT * FROM testTable", 10);
+    Assert.assertNotNull(cursor, "Cursor should not be null");
+
+    // Verify that table name resolution was used
+    Mockito.verify(mockBrokerSelector).selectBroker(Mockito.any(String[].class));
+    Mockito.verify(mockTransport).executeQueryWithCursorAsync("localhost:8099", "SELECT * FROM testTable", 10);
+  }
+
+  @Test
+  public void testOpenCursorWithQueryExceptions() throws Exception {
+    // Test openCursor behavior when query has exceptions and failOnExceptions is true
+    Properties props = new Properties();
+    props.setProperty(Connection.FAIL_ON_EXCEPTIONS, "true");
+
+    BrokerSelector mockBrokerSelector = Mockito.mock(BrokerSelector.class);
+    Mockito.when(mockBrokerSelector.selectBroker(Mockito.any())).thenReturn("localhost:8099");
+
+    JsonAsyncHttpPinotClientTransport mockTransport = Mockito.mock(JsonAsyncHttpPinotClientTransport.class);
+    CursorAwareBrokerResponse mockResponse = Mockito.mock(CursorAwareBrokerResponse.class);
+    Mockito.when(mockResponse.hasExceptions()).thenReturn(true);
+    JsonNode mockExceptions = Mockito.mock(JsonNode.class);
+    Mockito.when(mockResponse.getExceptions()).thenReturn(mockExceptions);
+    Mockito.when(mockTransport.executeQueryWithCursor(Mockito.anyString(), Mockito.anyString(), Mockito.anyInt()))
+        .thenReturn(mockResponse);
+
+    Connection connection = new Connection(props, mockBrokerSelector, mockTransport);
+
+    try {
+      connection.openCursor("SELECT * FROM invalidTable", 10);
+      Assert.fail("Expected PinotClientException due to query exceptions");
+    } catch (PinotClientException e) {
+      Assert.assertTrue(e.getMessage().contains("Failed to open cursor"),
+          "Expected exception message to contain 'Failed to open cursor', but was: " + e.getMessage());
     }
   }
 }
