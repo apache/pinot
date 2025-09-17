@@ -130,8 +130,8 @@ public class MultiStageReplicaGroupSelectorTest {
     selectionResult = multiStageSelector.select(_brokerRequest, segments, 1);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
 
-    long expiredSegmentEpochMs = System.currentTimeMillis() - multiStageSelector._newSegmentExpirationTimeInSeconds * 1000
-        - 10_000;
+    long delta = multiStageSelector._newSegmentExpirationTimeInSeconds * 1000 + 10_000;
+    long expiredSegmentEpochMs = System.currentTimeMillis() - delta;
     segments.set(segments.size() - 1, getLLCSegmentName(expiredSegmentEpochMs).getSegmentName());
     try {
       multiStageSelector.select(_brokerRequest, segments, 1);
