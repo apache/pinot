@@ -580,6 +580,12 @@ public class SegmentDeletionManagerTest {
         @Nullable Long deletedSegmentsRetentionMs, long deletionDelaySeconds) {
       _segmentsToRetry.addAll(segmentIds);
     }
+
+    @Override
+    public void removeSegmentsFromStoreInBatch(String tableNameWithType, List<String> segments,
+        @Nullable Long deletedSegmentsRetentionMs) {
+      _segmentsRemovedFromStore.addAll(segments);
+    }
   }
 
   public static class FakePinotFs extends LocalPinotFS {

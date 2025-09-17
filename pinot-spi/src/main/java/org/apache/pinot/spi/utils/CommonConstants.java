@@ -541,11 +541,20 @@ public class CommonConstants {
 
     /**
      * Default server stage limit for lite mode queries.
-     * This value can always be overridden by {@link Request.QueryOptionKey#LITE_MODE_SERVER_STAGE_LIMIT} query option
+     * This value can always be overridden by {@link Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_LIMIT} query option
      */
     public static final String CONFIG_OF_LITE_MODE_LEAF_STAGE_LIMIT =
         "pinot.broker.multistage.lite.mode.leaf.stage.limit";
     public static final int DEFAULT_LITE_MODE_LEAF_STAGE_LIMIT = 100_000;
+
+    /**
+     * When fan-out adjusted limit is enabled for lite-mode, Pinot will divide the limit set in the leaf stage
+     * with the number of workers executing the leaf stage. This value can always be overridden by
+     * {@link Request.QueryOptionKey#LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT} query option.
+     */
+    public static final String CONFIG_OF_LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT =
+        "pinot.broker.multistage.lite.mode.leaf.stage.fanOutAdjustedLimit";
+    public static final int DEFAULT_LITE_MODE_LEAF_STAGE_FAN_OUT_ADJUSTED_LIMIT = -1;
 
     // Config for default hash function used in KeySelector for data shuffling
     public static final String CONFIG_OF_BROKER_DEFAULT_HASH_FUNCTION = "pinot.broker.multistage.default.hash.function";
@@ -583,6 +592,7 @@ public class CommonConstants {
         public static final String ROUTING_OPTIONS = "routingOptions";
         public static final String USE_SCAN_REORDER_OPTIMIZATION = "useScanReorderOpt";
         public static final String MAX_EXECUTION_THREADS = "maxExecutionThreads";
+        public static final String COLLECT_GC_STATS = "collectGCStats";
 
         // For group-by queries with order-by clause, the tail groups are trimmed off to reduce the memory footprint. To
         // ensure the accuracy of the result, {@code max(limit * 5, minTrimSize)} groups are retained. When
@@ -770,7 +780,8 @@ public class CommonConstants {
         public static final String INFER_REALTIME_SEGMENT_PARTITION = "inferRealtimeSegmentPartition";
         public static final String USE_LITE_MODE = "useLiteMode";
         // Server stage limit for lite mode queries.
-        public static final String LITE_MODE_SERVER_STAGE_LIMIT = "liteModeServerStageLimit";
+        public static final String LITE_MODE_LEAF_STAGE_LIMIT = "liteModeLeafStageLimit";
+        public static final String LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT = "liteModeLeafStageFanOutAdjustedLimit";
         // Used by the MSE Engine to determine whether to use the broker pruning logic. Only supported by the
         // new MSE query optimizer.
         // TODO(mse-physical): Consider removing this query option and making this the default, since there's already

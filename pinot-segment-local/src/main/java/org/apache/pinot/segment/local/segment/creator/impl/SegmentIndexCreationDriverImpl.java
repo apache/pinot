@@ -44,6 +44,7 @@ import org.apache.pinot.segment.local.segment.index.converter.SegmentFormatConve
 import org.apache.pinot.segment.local.segment.index.dictionary.DictionaryIndexType;
 import org.apache.pinot.segment.local.segment.index.loader.IndexLoadingConfig;
 import org.apache.pinot.segment.local.segment.index.loader.invertedindex.MultiColumnTextIndexHandler;
+import org.apache.pinot.segment.local.segment.readers.CompactedPinotSegmentRecordReader;
 import org.apache.pinot.segment.local.segment.readers.PinotSegmentRecordReader;
 import org.apache.pinot.segment.local.startree.v2.builder.MultipleTreesBuilder;
 import org.apache.pinot.segment.local.utils.CrcUtils;
@@ -67,6 +68,7 @@ import org.apache.pinot.segment.spi.index.IndexService;
 import org.apache.pinot.segment.spi.index.IndexType;
 import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.index.creator.SegmentIndexCreationInfo;
+import org.apache.pinot.segment.spi.index.mutable.ThreadSafeMutableRoaringBitmap;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderContext;
 import org.apache.pinot.segment.spi.loader.SegmentDirectoryLoaderRegistry;
 import org.apache.pinot.segment.spi.store.SegmentDirectory;
@@ -232,6 +234,23 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     return res;
   }
 
+  /**
+   * Get sorted document IDs from the record reader if it supports this functionality.
+   * This method handles the fact that getSortedDocIds() was removed from the RecordReader interface
+   * but is still available on specific implementations.
+   *
+   * @return sorted document IDs array, or null if not available
+   */
+  @Nullable
+  private int[] getSortedDocIdsFromRecordReader() {
+    if (_recordReader instanceof PinotSegmentRecordReader) {
+      return ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+    } else if (_recordReader instanceof CompactedPinotSegmentRecordReader) {
+      return ((CompactedPinotSegmentRecordReader) _recordReader).getSortedDocIds();
+    }
+    return null;
+  }
+
   @Override
   public void build()
       throws Exception {
@@ -327,7 +346,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     handlePostCreation();
   }
 
-  public void buildByColumn(IndexSegment indexSegment)
+  public void buildByColumn(IndexSegment indexSegment, ThreadSafeMutableRoaringBitmap validDocIds)
       throws Exception {
     // Count the number of documents and gather per-column statistics
     LOGGER.debug("Start building StatsCollector!");
@@ -338,7 +357,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     try {
       // TODO: Eventually pull the doc Id sorting logic out of Record Reader so that all row oriented logic can be
       //    removed from this code.
-      int[] sortedDocIds = ((PinotSegmentRecordReader) _recordReader).getSortedDocIds();
+      int[] sortedDocIds = getSortedDocIdsFromRecordReader();
       int[] immutableToMutableIdMap = getImmutableToMutableIdMap(sortedDocIds);
 
       // Initialize the index creation using the per-column statistics information
@@ -353,7 +372,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       TreeSet<String> columns = _dataSchema.getPhysicalColumnNames();
 
       for (String col : columns) {
-        _indexCreator.indexColumn(col, sortedDocIds, indexSegment);
+        _indexCreator.indexColumn(col, sortedDocIds, indexSegment, validDocIds);
       }
     } catch (Exception e) {
       _indexCreator.close();
@@ -552,6 +571,7 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
     converter.convert(segmentDirectory);
   }
 
+  @Override
   public ColumnStatistics getColumnStatisticsCollector(final String columnName)
       throws Exception {
     return _segmentStats.getColumnProfileFor(columnName);

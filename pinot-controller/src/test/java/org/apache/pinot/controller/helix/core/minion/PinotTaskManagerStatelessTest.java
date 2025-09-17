@@ -611,17 +611,17 @@ public class PinotTaskManagerStatelessTest extends ControllerTest {
       }
 
       @Override
-      public long getTaskTimeoutMs() {
+      public long getTaskTimeoutMs(String minionTag) {
         return 10000; // 10 seconds
       }
 
       @Override
-      public int getNumConcurrentTasksPerInstance() {
+      public int getNumConcurrentTasksPerInstance(String minionTag) {
         return 5;
       }
 
       @Override
-      public int getMaxAttemptsPerTask() {
+      public int getMaxAttemptsPerTask(String minionTag) {
         return 5;
       }
 
