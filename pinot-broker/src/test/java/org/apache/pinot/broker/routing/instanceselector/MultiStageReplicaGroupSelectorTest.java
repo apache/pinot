@@ -39,6 +39,7 @@ import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.utils.LLCSegmentName;
+import org.apache.pinot.common.utils.UploadedRealtimeSegmentName;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -51,6 +52,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
 
 
@@ -130,13 +132,26 @@ public class MultiStageReplicaGroupSelectorTest {
     selectionResult = multiStageSelector.select(_brokerRequest, segments, 1);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
 
+    // Test with an LLC segment that is older than the new segment expiration time.
     long delta = multiStageSelector._newSegmentExpirationTimeInSeconds * 1000 + 10_000;
     long expiredSegmentEpochMs = System.currentTimeMillis() - delta;
     segments.set(segments.size() - 1, getLLCSegmentName(expiredSegmentEpochMs).getSegmentName());
     try {
       multiStageSelector.select(_brokerRequest, segments, 1);
       fail("call should have failed");
-    } catch (Exception ignored) {
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
+    }
+
+    // Test with a non LLC segment, like UploadedRealtimeSegment, that has just been created. Since it is not present
+    // in segmentState, it should throw.
+    segments.set(segments.size() - 1, new UploadedRealtimeSegmentName(TABLE_NAME, 1 /* partition */,
+        System.currentTimeMillis(), "someprefix", "somesuffix").getSegmentName());
+    try {
+      multiStageSelector.select(_brokerRequest, segments, 1);
+      fail("call should have failed");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains(segments.get(segments.size() - 1)));
     }
   }
 
