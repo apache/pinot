@@ -401,7 +401,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
 
     AggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 0, 0, 1);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
     List<Object> aggregationResult = resultsBlock.getResults();
     Assert.assertNotNull(aggregationResult);
     Assert.assertEquals((long) aggregationResult.get(0), 0);
@@ -429,7 +429,7 @@ public class H3IndexQueriesTest extends BaseQueriesTest {
 
     AggregationOperator aggregationOperator = getOperator(query);
     AggregationResultsBlock resultsBlock = aggregationOperator.nextBlock();
-    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 1, 0, 1);
+    QueriesTestUtils.testInnerSegmentExecutionStatistics(aggregationOperator.getExecutionStatistics(), 0, 2, 0, 1);
     List<Object> aggregationResult = resultsBlock.getResults();
     Assert.assertNotNull(aggregationResult);
     Assert.assertEquals((long) aggregationResult.get(0), 0);

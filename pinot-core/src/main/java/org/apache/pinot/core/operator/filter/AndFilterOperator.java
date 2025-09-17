@@ -57,6 +57,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     for (BaseFilterOperator filterOperator : _filterOperators) {
       BlockDocIdSet blockDocIdSet = filterOperator.getTrues();
       BlockDocIdSet optimizedDocIdSet = blockDocIdSet.getOptimizedDocIdSet();
+      totalEntriesScanned += blockDocIdSet.getNumEntriesScannedInFilter();
       if (optimizedDocIdSet instanceof EmptyDocIdSet) {
         return new ShortCircuitingDocIdSet(totalEntriesScanned);
       }
@@ -64,7 +65,6 @@ public class AndFilterOperator extends BaseFilterOperator {
         continue;
       }
       blockDocIdSets.add(optimizedDocIdSet);
-      totalEntriesScanned += blockDocIdSet.getNumEntriesScannedInFilter();
     }
     if (blockDocIdSets.isEmpty()) {
       return new MatchAllDocIdSet(_numDocs);
