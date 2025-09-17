@@ -68,8 +68,6 @@ import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
 import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -216,7 +214,18 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       }
 
       // Add REGEXP_LIKE default options using hierarchy: Query Option > Table Config > Broker Config
-      setRegexpLikeDefaults(sqlNodeAndOptions);
+      // Set defaults only if not already present in query options
+      String brokerUseDictDefault = _config.getProperty(Broker.USE_DICT_FOR_REGEXP_LIKE_PREDICATE_KEY);
+      if (brokerUseDictDefault != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(QueryOptionKey.USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION, brokerUseDictDefault);
+      }
+
+      String brokerThresholdDefault = _config.getProperty(Broker.REGEXP_DICT_CARDINALITY_THRESHOLD_KEY);
+      if (brokerThresholdDefault != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(QueryOptionKey.REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION, brokerThresholdDefault);
+      }
 
       BrokerResponse brokerResponse =
           handleRequest(requestId, query, sqlNodeAndOptions, request, requesterIdentity, requestContext, httpHeaders,
@@ -430,39 +439,5 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   protected boolean isQueryCancellationEnabled() {
     return _queriesById != null;
-  }
-
-  /**
-   * Sets REGEXP_LIKE default options using hierarchy: Query Option > Table Config > Broker Config
-   */
-  private void setRegexpLikeDefaults(SqlNodeAndOptions sqlNodeAndOptions) {
-    Map<String, String> queryOptions = sqlNodeAndOptions.getOptions();
-
-    // Get default values from table config (if available)
-    String tableUseDictDefault = null;
-    String tableThresholdDefault = null;
-    try {
-      String tableName = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions).getDataSource().getTableName();
-      TableConfig tableConfig = _tableCache.getTableConfig(tableName);
-      if (tableConfig != null && tableConfig.getQueryConfig() != null) {
-        tableUseDictDefault = String.valueOf(tableConfig.getQueryConfig().getUseDictForRegexpLikePredicate());
-        tableThresholdDefault = String.valueOf(tableConfig.getQueryConfig().getRegexpDictCardinalityThreshold());
-      }
-    } catch (Exception e) {
-      LOGGER.warn("Could not extract table name for REGEXP_LIKE defaults, using broker config only", e);
-    }
-
-    // Use table config value if available, otherwise fall back to broker config
-    String useDictDefault = tableUseDictDefault != null ? tableUseDictDefault
-        : _config.getProperty(CommonConstants.Broker.REGEXP_DICT_CARDINALITY_THRESHOLD_KEY);
-    String thresholdDefault = tableThresholdDefault != null ? tableThresholdDefault
-        : _config.getProperty(CommonConstants.Broker.REGEXP_DICT_CARDINALITY_THRESHOLD_KEY);
-
-    if (useDictDefault != null) {
-      queryOptions.putIfAbsent(QueryOptionKey.USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION, useDictDefault);
-    }
-    if (thresholdDefault != null) {
-      queryOptions.putIfAbsent(QueryOptionKey.REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION, thresholdDefault);
-    }
   }
 }
