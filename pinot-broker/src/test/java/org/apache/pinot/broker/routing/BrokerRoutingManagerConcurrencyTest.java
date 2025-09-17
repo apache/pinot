@@ -52,6 +52,7 @@ import org.apache.pinot.spi.data.PhysicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.data.TimeBoundaryConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.LogicalTableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableConfigBuilder;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -62,6 +63,7 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -101,6 +103,9 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     // Setup required configuration for BrokerRoutingManager
     Mockito.when(_pinotConfig.getProperty(Mockito.eq("pinot.broker.adaptive.server.selector.type")))
         .thenReturn("UNIFORM_RANDOM");
+    Mockito.when(_pinotConfig.getProperty(
+        Mockito.eq(CommonConstants.Broker.CONFIG_OF_ROUTING_PROCESS_SEGMENT_ASSIGNMENT_CHANGE_NUM_THREADS), anyInt()))
+        .thenReturn(10);
     Mockito.when(_pinotConfig.getProperty(Mockito.anyString(), Mockito.anyString()))
         .thenAnswer(invocation -> invocation.getArgument(1)); // Return default value
 
