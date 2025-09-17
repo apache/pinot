@@ -21,17 +21,17 @@ package org.apache.pinot.controller.workload.splitter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 
 
 public class DefaultCostSplitter implements CostSplitter {
 
   @Override
-  public Map<String, InstanceCost> computeInstanceCostMap(CostSplit costSplit, Set<String> instances) {
+  public Map<String, InstanceCost> computeInstanceCostMap(Long totalCpuCostNs, Long totalMemoryCostBytes,
+                                                          Set<String> instances) {
     long totalInstances = instances.size();
-    long cpuCostNs = costSplit.getCpuCostNs() / totalInstances;
-    long memoryCostBytes = costSplit.getMemoryCostBytes() / totalInstances;
+    long cpuCostNs = totalCpuCostNs / totalInstances;
+    long memoryCostBytes = totalMemoryCostBytes / totalInstances;
     InstanceCost instanceCost = new InstanceCost(cpuCostNs, memoryCostBytes);
 
     Map<String, InstanceCost> instanceCostMap = new HashMap<>();

@@ -45,6 +45,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -99,6 +100,9 @@ public class PinotQueryWorkloadRestletResource {
    * This API returns the detailed configuration including node-specific settings,
    * enforcement profiles, propagation schemes, and cost splits.
    * </p>
+   *
+   * See {@link org.apache.pinot.spi.config.workload.PropagationScheme} and {@link EnforcementProfile} for more details
+   * on the configuration definition and what each field means.
    * <p><strong>Example:</strong></p>
    * <pre>{@code
    * {
@@ -112,14 +116,14 @@ public class PinotQueryWorkloadRestletResource {
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TABLE",
-   *         "costSplits": [
+   *         "propagationEntities": [
    *           {
-   *             "costId": "airlineStats",
+   *             "entity": "airlineStats",
    *             "cpuCostNs": 250,
    *             "memoryCostBytes": 500
    *           },
    *           {
-   *             "costId": "baseballStats",
+   *             "entity": "baseballStats",
    *             "cpuCostNs": 250,
    *             "memoryCostBytes": 500
    *           }
@@ -134,14 +138,14 @@ public class PinotQueryWorkloadRestletResource {
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TENANT",
-   *         "costSplits": [
+   *         "propagationEntities": [
    *           {
-   *             "costId": "DefaultTenant",
+   *             "entity": "DefaultTenant",
    *             "cpuCostNs": 1000,
    *             "memoryCostBytes": 8000
    *           },
    *           {
-   *             "costId": "PremiumTenant",
+   *             "entity": "PremiumTenant",
    *             "cpuCostNs": 500,
    *             "memoryCostBytes": 4000
    *           }
@@ -190,6 +194,9 @@ public class PinotQueryWorkloadRestletResource {
    * This API returns a mapping of workload names to their instance-level cost
    * (CPU and memory) for the given Helix instance.
    * </p>
+   *
+   * See {@link InstanceCost} for more details on the instance cost definition and what each field means.
+   *
    * <p><strong>Example:</strong></p>
    * <pre>{@code
    * GET /queryWorkloadConfigs/instance/Server_localhost_1234
@@ -244,6 +251,10 @@ public class PinotQueryWorkloadRestletResource {
    * node-specific enforcement profiles and propagation schemes. The configuration
    * is validated and persisted in Helix, enabling Pinot to enforce resource
    * isolation based on workload classification.
+   *
+   * See {@link org.apache.pinot.spi.config.workload.PropagationScheme} and {@link EnforcementProfile} for more details
+   * on the configuration definition and what each field means.
+   *
    * </p>
    * <p><strong>Example:</strong></p>
    * <pre>{@code
@@ -258,14 +269,14 @@ public class PinotQueryWorkloadRestletResource {
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TABLE",
-   *         "costSplits": [
+   *         "propagationEntities": [
    *           {
-   *             "costId": "airlineStats",
+   *             "entity": "airlineStats",
    *             "cpuCostNs": 300,
    *             "memoryCostBytes": 600
    *           },
    *           {
-   *             "costId": "baseballStats",
+   *             "entity": "baseballStats",
    *             "cpuCostNs": 200,
    *             "memoryCostBytes": 400
    *           }
@@ -280,14 +291,14 @@ public class PinotQueryWorkloadRestletResource {
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TENANT",
-   *         "costSplits": [
+   *         "propagationEntities": [
    *           {
-   *             "costId": "DefaultTenant",
+   *             "entity": "DefaultTenant",
    *             "cpuCostNs": 1000,
    *             "memoryCostBytes": 8000
    *           },
    *           {
-   *             "costId": "PremiumTenant",
+   *             "entity": "PremiumTenant",
    *             "cpuCostNs": 500,
    *             "memoryCostBytes": 4000
    *           }

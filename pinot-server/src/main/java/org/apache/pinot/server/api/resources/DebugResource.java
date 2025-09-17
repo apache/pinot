@@ -243,16 +243,28 @@ public class DebugResource {
 
   /**
    * Get the instance cost (budget) information for a specific workload.
-   * Returns with CPU and memory budget information enforced on this instance for the workload.
-   * Example response:
+   * <p>
+   * Returns CPU and memory budget information enforced on this instance for the workload.
+   *
+   * <p>Example response:
+   * <pre>
    * {
-   *  "workloadName": "testWorkload",
-   *  "cpuCostNs": 5000000,
-   *  "memoryCostBytes": 104857600
-   *  }
-   *  If the workload is not found, returns 404.
-   *  If the WorkloadBudgetManager is not available, returns 500.
-   *  If the workload name is invalid, returns 400.
+   *   "workloadName": "testWorkload",
+   *   "cpuBudgetNs": 5000000,
+   *   "memoryBudgetBytes": 104857600,
+   *   "cpuRemainingNs": 3500000,
+   *   "memoryRemainingBytes": 73400320
+   * }
+   * </pre>
+   *
+   * @param workloadName the name of the workload to query
+   * @return workload budget information including CPU and memory limits and remaining capacity
+   * @throws WebApplicationException with one of the following status codes:
+   *         <ul>
+   *         <li>400 - if the workload name is invalid</li>
+   *         <li>404 - if the workload is not found</li>
+   *         <li>500 - if the WorkloadBudgetManager is not available</li>
+   *         </ul>
    */
   @GET
   @Path("queryWorkloadCost/{workloadName}")
@@ -263,7 +275,7 @@ public class DebugResource {
       @ApiResponse(code = 500, message = "Internal server error")
   })
   @Produces(MediaType.APPLICATION_JSON)
-  public String getWorkloadCost(
+  public String getWorkloadBudgetStats(
       @ApiParam(value = "Name of the workload", required = true) @PathParam("workloadName") String workloadName
   ) {
     // Input validation
@@ -272,24 +284,14 @@ public class DebugResource {
           Response.Status.BAD_REQUEST);
     }
     try {
-      WorkloadBudgetManager workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
-      if (workloadBudgetManager == null) {
-        LOGGER.warn("WorkloadBudgetManager is not available on instance: {}", _instanceId);
-        throw new WebApplicationException("WorkloadBudgetManager is not available",
-            Response.Status.INTERNAL_SERVER_ERROR);
-      }
+      WorkloadBudgetManager workloadBudgetManager = requireWorkloadBudgetManager();
 
-      // Get the workload budget stats for the specific workload
       WorkloadBudgetManager.BudgetStats budgetStats = workloadBudgetManager.getBudgetStats(workloadName);
       if (budgetStats == null) {
         LOGGER.warn("No budget stats found for workload: {} on instance: {}", workloadName, _instanceId);
         throw new WebApplicationException("Workload not found: " + workloadName, Response.Status.NOT_FOUND);
       }
-      Map<String, Object> response = new HashMap<>();
-      response.put("workloadName", workloadName);
-      response.put("cpuBudgetNs", budgetStats._initialCpuBudget);
-      response.put("memoryBudgetBytes", budgetStats._initialMemoryBudget);
-      return ResourceUtils.convertToJsonString(response);
+      return ResourceUtils.convertToJsonString(toWorkloadBudgetMap(workloadName, budgetStats));
     } catch (WebApplicationException e) {
       throw e;
     } catch (Exception e) {
@@ -297,5 +299,82 @@ public class DebugResource {
       throw new WebApplicationException("Failed to get workload info: " + e.getMessage(),
           Response.Status.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /**
+   * Get the instance cost (budget) information for all workloads.
+   * <p>
+   * Returns CPU and memory budget information enforced on this instance for all workloads.
+   *
+   * <p>Example response:
+   * <pre>
+   * [
+   *   {
+   *     "workloadName": "testWorkload1",
+   *     "cpuBudgetNs": 5000000,
+   *     "memoryBudgetBytes": 104857600,
+   *     "cpuRemainingNs": 3500000,
+   *     "memoryRemainingBytes": 73400320
+   *   },
+   *   {
+   *     "workloadName": "testWorkload2",
+   *     "cpuBudgetNs": 10000000,
+   *     "memoryBudgetBytes": 209715200,
+   *     "cpuRemainingNs": 8000000,
+   *     "memoryRemainingBytes": 157286400
+   *   }
+   * ]
+   * </pre>
+   *
+   * @return list of workload budget information including CPU and memory limits and remaining capacity
+   * @throws WebApplicationException on failure to retrieve the workload budget information
+   */
+  @GET
+  @Path("queryWorkloadCosts")
+  @ApiOperation(value = "Get instance cost information for all workloads")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error")
+  })
+  @Produces(MediaType.APPLICATION_JSON)
+  public String getAllWorkloadBudgetStats() {
+    try {
+      WorkloadBudgetManager workloadBudgetManager = requireWorkloadBudgetManager();
+      Map<String, WorkloadBudgetManager.BudgetStats> allBudgetStats = workloadBudgetManager.getAllBudgetStats();
+      List<Map<String, Object>> response = new ArrayList<>();
+      for (Map.Entry<String, WorkloadBudgetManager.BudgetStats> entry : allBudgetStats.entrySet()) {
+        response.add(toWorkloadBudgetMap(entry.getKey(), entry.getValue()));
+      }
+      return ResourceUtils.convertToJsonString(response);
+    } catch (WebApplicationException e) {
+      throw e;
+    } catch (Exception e) {
+      LOGGER.error("Error getting all workload info on instance: {}", _instanceId, e);
+      throw new WebApplicationException("Failed to get all workload info: " + e.getMessage(),
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /** Returns a non-null WorkloadBudgetManager or throws a 500 WebApplicationException (and logs a warning). */
+  private WorkloadBudgetManager requireWorkloadBudgetManager() {
+    WorkloadBudgetManager workloadBudgetManager = Tracing.ThreadAccountantOps.getWorkloadBudgetManager();
+    if (workloadBudgetManager == null) {
+      LOGGER.warn("WorkloadBudgetManager is not available on instance: {}", _instanceId);
+      throw new WebApplicationException("WorkloadBudgetManager is not available",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    }
+    return workloadBudgetManager;
+  }
+
+  /** Builds a stable JSON-serializable map for a single workload's budget stats. */
+  private static Map<String, Object> toWorkloadBudgetMap(String workloadName,
+                                                         WorkloadBudgetManager.BudgetStats stats) {
+    Map<String, Object> map = new HashMap<>();
+    map.put("workloadName", workloadName);
+    map.put("cpuBudgetNs", stats._initialCpuBudget);
+    map.put("memoryBudgetBytes", stats._initialMemoryBudget);
+    map.put("cpuRemainingNs", stats._cpuRemaining);
+    map.put("memoryRemainingBytes", stats._memoryRemaining);
+    return map;
   }
 }

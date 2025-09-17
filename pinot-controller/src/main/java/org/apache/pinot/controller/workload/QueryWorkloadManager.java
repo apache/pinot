@@ -18,24 +18,30 @@
  */
 package org.apache.pinot.controller.workload;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import org.apache.helix.ClusterMessagingService;
+import org.apache.helix.Criteria;
+import org.apache.helix.InstanceType;
 import org.apache.helix.model.InstanceConfig;
 import org.apache.pinot.common.messages.QueryWorkloadRefreshMessage;
 import org.apache.pinot.common.utils.config.QueryWorkloadConfigUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.util.MessagingServiceUtils;
 import org.apache.pinot.controller.workload.scheme.PropagationScheme;
 import org.apache.pinot.controller.workload.scheme.PropagationSchemeProvider;
 import org.apache.pinot.controller.workload.scheme.PropagationUtils;
 import org.apache.pinot.controller.workload.splitter.CostSplitter;
 import org.apache.pinot.controller.workload.splitter.DefaultCostSplitter;
-import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.slf4j.Logger;
@@ -69,9 +75,6 @@ public class QueryWorkloadManager {
   private final CostSplitter _costSplitter;
 
   public QueryWorkloadManager(PinotHelixResourceManager pinotHelixResourceManager) {
-    if (pinotHelixResourceManager == null) {
-      throw new IllegalArgumentException("PinotHelixResourceManager cannot be null");
-    }
     _pinotHelixResourceManager = pinotHelixResourceManager;
     _propagationSchemeProvider = new PropagationSchemeProvider(pinotHelixResourceManager);
     // TODO: To make this configurable once we have multiple cost splitters implementations
@@ -98,6 +101,17 @@ public class QueryWorkloadManager {
    * same set of messages being sent. Instances are expected to apply the new costs immediately.
    * </p>
    *
+   * <p>
+   *  This call is atomic to the extent possible: if any error occurs during estimating the target instances
+   *  and their cost. The entire propagation is aborted and no partial updates are sent to any instances.
+   * </p>
+   *
+   * <p>
+   *  We rely on Helix reliable messaging to ensure message delivery to instances.
+   *  However, if an instance is down during the propagation, it will miss the update however, we have logic
+   *  on the instance side to fetch the latest workload configs from controller during startup.
+   * </p>
+   *
    * @param queryWorkloadConfig The workload definition (name, node types, budgets, and propagation
    *                            scheme) to propagate.
    */
@@ -105,32 +119,35 @@ public class QueryWorkloadManager {
     String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
     LOGGER.info("Propagating workload update for: {}", queryWorkloadName);
 
-    for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
-      try {
+    Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = new HashMap<>();
+    try {
+      for (NodeConfig nodeConfig: queryWorkloadConfig.getNodeConfigs()) {
         PropagationScheme propagationScheme = _propagationSchemeProvider.getPropagationScheme(
             nodeConfig.getPropagationScheme().getPropagationType());
-        // For cost splits with empty cpu or memory cost, distribute the remaining cost evenly among them
-        checkAndDistributeEmptyCostSplitsEvenly(nodeConfig);
+        // For propagation entities with empty cpu or memory cost, distribute the remaining cost evenly among them
+        checkAndDistributeEmptyPropagationEntitiesEvenly(nodeConfig);
         Map<String, InstanceCost> instanceCostMap = propagationScheme.resolveInstanceCostMap(nodeConfig, _costSplitter);
-
         if (instanceCostMap.isEmpty()) {
-          LOGGER.warn("No instances found for workload: {} with nodeConfig: {}", queryWorkloadName, nodeConfig);
-          continue;
+          // This is to ensure that the configured entity is valid and maps to some instances
+          String errorMsg = String.format("No instances found for workload update: %s with nodeConfig: %s",
+              queryWorkloadName, nodeConfig);
+          LOGGER.error(errorMsg);
+          throw new RuntimeException(errorMsg);
         }
 
-        Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instanceCostMap.entrySet().stream()
+        Map<String, QueryWorkloadRefreshMessage> nodeToRefreshMessageMap = instanceCostMap.entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, entry -> new QueryWorkloadRefreshMessage(queryWorkloadName,
                 QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE, entry.getValue())));
-
-        _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
-        LOGGER.info("Successfully propagated workload update for: {} to {} instances", queryWorkloadName,
-            instanceCostMap.size());
-      } catch (Exception e) {
-        String errorMsg = String.format("Failed to propagate workload update for: %s with nodeConfig: %s",
-            queryWorkloadName, nodeConfig);
-        LOGGER.error(errorMsg, e);
-        throw new RuntimeException(errorMsg, e);
+        instanceToRefreshMessageMap.putAll(nodeToRefreshMessageMap);
       }
+      // Sends the message only after all nodeConfigs are processed successfully
+      sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
+      LOGGER.info("Successfully propagated workload update for: {} to {} instances", queryWorkloadName,
+          instanceToRefreshMessageMap.size());
+    } catch (Exception e) {
+      String errorMsg = String.format("Failed to propagate workload update for: %s", queryWorkloadName);
+      LOGGER.error(errorMsg, e);
+      throw new RuntimeException(errorMsg, e);
     }
   }
 
@@ -140,9 +157,8 @@ public class QueryWorkloadManager {
    * <p>
    * The method resolves the target instances for each {@link NodeConfig} and sends a
    * {@link QueryWorkloadRefreshMessage} with subtype
-   * {@link QueryWorkloadRefreshMessage#DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE}. The payload contains
-   * an {@link InstanceCost} of zero, which instructs the instance to remove any local state
-   * associated with the workload and stop enforcing costs for it.
+   * {@link QueryWorkloadRefreshMessage#DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE},
+   * which instructs the instance to remove local state associated with the workload and stop enforcing costs for it.
    * </p>
    *
    * @param queryWorkloadConfig The workload to delete (only the name and node scoping are used).
@@ -162,14 +178,13 @@ public class QueryWorkloadManager {
           LOGGER.warn("No instances found for workload delete: {} with nodeConfig: {}", queryWorkloadName, nodeConfig);
           continue;
         }
-
         QueryWorkloadRefreshMessage deleteMessage = new QueryWorkloadRefreshMessage(queryWorkloadName,
             QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE, new InstanceCost(0, 0));
         Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap = instances.stream()
             .collect(Collectors.toMap(instance -> instance, instance -> deleteMessage));
 
         // Send the QueryWorkloadRefreshMessage to the instances
-        _pinotHelixResourceManager.sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
+       sendQueryWorkloadRefreshMessage(instanceToRefreshMessageMap);
         LOGGER.info("Successfully propagated workload delete for: {} to {} instances", queryWorkloadName,
             instances.size());
       } catch (Exception e) {
@@ -209,7 +224,7 @@ public class QueryWorkloadManager {
     try {
       List<QueryWorkloadConfig> queryWorkloadConfigs = _pinotHelixResourceManager.getAllQueryWorkloadConfigs();
       if (queryWorkloadConfigs.isEmpty()) {
-          return;
+        return;
       }
       // Get the helixTags associated with the table
       List<String> helixTags = PropagationUtils.getHelixTagsForTable(_pinotHelixResourceManager, tableName);
@@ -233,8 +248,8 @@ public class QueryWorkloadManager {
         try {
           List<String> errors = QueryWorkloadConfigUtils.validateQueryWorkloadConfig(queryWorkloadConfig);
           if (!errors.isEmpty()) {
-            LOGGER.error("Invalid QueryWorkloadConfig: {} for table: {}, errors: {}", queryWorkloadConfig,
-                tableName, errors);
+            LOGGER.error("Invalid QueryWorkloadConfig: {} for table: {}, errors: {}", queryWorkloadConfig, tableName,
+                errors);
             continue;
           }
           propagateWorkloadUpdateMessage(queryWorkloadConfig);
@@ -320,8 +335,9 @@ public class QueryWorkloadManager {
         return workloadToInstanceCostMap;
       }
 
-      // For each workload, aggregate contributions across all applicable nodeConfigs and costSplits
+      // For each workload, aggregate contributions across all applicable nodeConfigs and propagation entities
       for (QueryWorkloadConfig queryWorkloadConfig : queryWorkloadConfigsForTags) {
+        String queryWorkloadName = queryWorkloadConfig.getQueryWorkloadName();
         for (NodeConfig nodeConfig : queryWorkloadConfig.getNodeConfigs()) {
           try {
             if (nodeConfig.getNodeType() == nodeType) {
@@ -337,16 +353,16 @@ public class QueryWorkloadManager {
 
               InstanceCost instanceCost = instanceCostMap.get(instanceName);
               if (instanceCost != null) {
-                workloadToInstanceCostMap.put(queryWorkloadConfig.getQueryWorkloadName(), instanceCost);
+                workloadToInstanceCostMap.put(queryWorkloadName, instanceCost);
                 LOGGER.info("Found workload cost for instance: {} workload: {} cost: {}",
-                    instanceName, queryWorkloadConfig.getQueryWorkloadName(), instanceCost);
+                    instanceName, queryWorkloadName, instanceCost);
               }
               // There should be only one matching nodeConfig (BROKER_NODE or SERVER_NODE) within a workload
               break;
             }
           } catch (Exception e) {
             LOGGER.error("Failed to compute instance cost for instance: {} workload: {}",
-                instanceName, queryWorkloadConfig.getQueryWorkloadName(), e);
+                instanceName, queryWorkloadName, e);
             // Continue with other workloads instead of failing completely
           }
         }
@@ -366,42 +382,112 @@ public class QueryWorkloadManager {
     return propagationScheme.resolveInstances(nodeConfig);
   }
 
-  private void checkAndDistributeEmptyCostSplitsEvenly(NodeConfig nodeConfig) {
-    // Check for empty cost splits
-    List<CostSplit> costSplits = nodeConfig.getPropagationScheme().getCostSplits();
-    List<CostSplit> emptySplits = new ArrayList<>();
-    List<CostSplit> nonEmptySplits = new ArrayList<>();
-    for (CostSplit costSplit : costSplits) {
-      if (costSplit.getCpuCostNs() == null || costSplit.getMemoryCostBytes() == null) {
-        emptySplits.add(costSplit);
+  /**
+   * For propagation entities with empty cpu or memory cost, distribute the remaining cost evenly among them.
+   * If all entities have defined costs, we do nothing.
+   *
+   * @param nodeConfig The node config containing the propagation entities to check and distribute costs for.
+   */
+  private void checkAndDistributeEmptyPropagationEntitiesEvenly(NodeConfig nodeConfig) {
+    List<PropagationEntity> propagationEntities = nodeConfig.getPropagationScheme().getPropagationEntities();
+    int emptyEntitiesCount = 0;
+    int definedEntitiesCount = 0;
+    for (PropagationEntity entity : propagationEntities) {
+      if (entity.getCpuCostNs() == null || entity.getMemoryCostBytes() == null) {
+        emptyEntitiesCount++;
       } else {
-        nonEmptySplits.add(costSplit);
+        definedEntitiesCount++;
       }
     }
-    if (emptySplits.isEmpty()) {
-      return;
+    if (definedEntitiesCount > 0 && emptyEntitiesCount > 0) {
+      String errorMsg = String.format("Mixed defined and empty costs in propagation entities is not supported. "
+          + "NodeConfig: %s", nodeConfig);
+      LOGGER.error(errorMsg);
+      throw new RuntimeException(errorMsg);
     }
-    // Get remaining cpu and memory cost after removing share of non-empty splits
-    long totalCpuCostNs = nodeConfig.getEnforcementProfile().getCpuCostNs();
-    long totalMemoryCostBytes = nodeConfig.getEnforcementProfile().getMemoryCostBytes();
-    for (CostSplit costSplit : nonEmptySplits) {
-      totalCpuCostNs -= costSplit.getCpuCostNs();
-      totalMemoryCostBytes -= costSplit.getMemoryCostBytes();
+    if (emptyEntitiesCount == propagationEntities.size()) {
+      // All entities have empty costs - distribute total budget evenly
+      long totalCpuCostNs = nodeConfig.getEnforcementProfile().getCpuCostNs();
+      long totalMemoryCostBytes = nodeConfig.getEnforcementProfile().getMemoryCostBytes();
+
+      int numEntities = propagationEntities.size();
+      long shareCpuCostNs = totalCpuCostNs / numEntities;
+      long shareMemoryCostBytes = totalMemoryCostBytes / numEntities;
+
+      for (PropagationEntity entity : propagationEntities) {
+        entity.setCpuCostNs(shareCpuCostNs);
+        entity.setMemoryCostBytes(shareMemoryCostBytes);
+      }
+      LOGGER.info("Distributed costs evenly across {} entities: CPU={}ns, Memory={}bytes per entity",
+          numEntities, shareCpuCostNs, shareMemoryCostBytes);
     }
-    // Distribute remaining cost equally among empty splits
-    int numEmptySplits = emptySplits.size();
-    long shareCpuCostNs = totalCpuCostNs / numEmptySplits;
-    long shareMemoryCostBytes = totalMemoryCostBytes / numEmptySplits;
-    for (CostSplit costSplit : emptySplits) {
-      costSplit.setCpuCostNs(shareCpuCostNs);
-      costSplit.setMemoryCostBytes(shareMemoryCostBytes);
+  }
+
+  /**
+   * Sends the given map of {@link QueryWorkloadRefreshMessage} to their respective instances asynchronously.
+   *
+   * <p>
+   * Each message is sent in its own asynchronous task, and the method waits for all tasks to complete
+   * with a timeout of 60 seconds per instance. Success and failure counts are logged.
+   * </p>
+   *
+   * @param instanceToRefreshMessageMap A map from instance name to the {@link QueryWorkloadRefreshMessage} to send.
+   */
+  public void sendQueryWorkloadRefreshMessage(Map<String, QueryWorkloadRefreshMessage> instanceToRefreshMessageMap) {
+    ClusterMessagingService messagingService = _pinotHelixResourceManager.getHelixZkManager().getMessagingService();
+    List<CompletableFuture<Boolean>> futures = instanceToRefreshMessageMap.entrySet().stream()
+      .map(entry -> CompletableFuture.supplyAsync(() -> {
+        String instance = entry.getKey();
+        QueryWorkloadRefreshMessage message = entry.getValue();
+        try {
+          Criteria criteria = new Criteria();
+          criteria.setRecipientInstanceType(InstanceType.PARTICIPANT);
+          criteria.setInstanceName(instance);
+          criteria.setSessionSpecific(true);
+          int numMessagesSent = MessagingServiceUtils.send(messagingService, message, criteria);
+          if (numMessagesSent > 0) {
+            LOGGER.info("Sent {} query workload config refresh messages to instance: {}", numMessagesSent, instance);
+            return true;
+          } else {
+            LOGGER.warn("No query workload config refresh message sent to instance: {}", instance);
+            return false;
+          }
+        } catch (Exception e) {
+          LOGGER.error("Error sending message to instance: {}", instance, e);
+          return false;
+        }
+      }))
+      .collect(Collectors.toList());
+
+    // Collect results with overall timeout of 1 minute for all tasks
+    try {
+      CompletableFuture<Void> allFutures = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+      allFutures.get(60, TimeUnit.SECONDS); // Overall timeout for all tasks
+      // Collect individual results (all should be completed by now)
+      List<Boolean> results = futures.stream()
+        .map(future -> {
+          try {
+            return future.get(); // No timeout needed since allOf already completed
+          } catch (Exception e) {
+            LOGGER.warn("Error getting result for query workload refresh message", e);
+            return false;
+          }
+        })
+        .collect(Collectors.toList());
+
+      long successCount = results.stream().filter(Boolean::booleanValue).count();
+      LOGGER.info("Query workload refresh completed: {}/{} successful", successCount,
+          instanceToRefreshMessageMap.size());
+    } catch (TimeoutException e) {
+      // Count completed tasks
+      long completedCount = futures.stream()
+        .mapToLong(future -> future.isDone() && !future.isCancelled() ? 1 : 0)
+        .sum();
+      LOGGER.warn("Query workload refresh partial completion: {}/{} tasks finished", completedCount,
+          instanceToRefreshMessageMap.size());
+    } catch (Exception e) {
+      LOGGER.error("Error collecting results from query workload refresh", e);
+      throw new RuntimeException("Error collecting results from query workload refresh", e);
     }
-    // Add empty and non-empty splits back together
-    costSplits.clear();
-    List<CostSplit> mergedCostSplits = new ArrayList<>();
-    mergedCostSplits.addAll(nonEmptySplits);
-    mergedCostSplits.addAll(emptySplits);
-    // Set merged cost splits back to nodeConfig
-    nodeConfig.getPropagationScheme().setCostSplits(mergedCostSplits);
   }
 }

@@ -39,10 +39,11 @@ import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.utils.http.HttpClientConfig;
 import org.apache.pinot.common.utils.tls.TlsUtils;
-import org.apache.pinot.spi.config.workload.CostSplit;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
+import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -214,23 +215,28 @@ public class QueryWorkloadConfigUtils {
         if (enforcementProfile == null) {
           errors.add(prefix + "enforcementProfile cannot be null");
         } else {
-           if (enforcementProfile.getCpuCostNs() < 0) {
+          long enforcementCpu = enforcementProfile.getCpuCostNs();
+          long enforcementMem = enforcementProfile.getMemoryCostBytes();
+           if (enforcementCpu < 0) {
              errors.add(prefix + ".enforcementProfile.cpuCostNs cannot be negative");
            }
-           if (enforcementProfile.getMemoryCostBytes() < 0) {
-               errors.add(prefix + ".enforcementProfile.memoryCostBytes cannot be negative");
+           if (enforcementMem < 0) {
+             errors.add(prefix + ".enforcementProfile.memoryCostBytes cannot be negative");
            }
-        }
-        // Validate PropagationScheme
-        PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
-        if (propagationScheme == null) {
-          errors.add(prefix + ".propagationScheme cannot be null");
-        } else {
-          if (propagationScheme.getPropagationType() == null) {
-            errors.add(prefix + ".propagationScheme.type cannot be null");
+          // Validate PropagationScheme
+          PropagationScheme propagationScheme = nodeConfig.getPropagationScheme();
+          if (propagationScheme == null) {
+            errors.add(prefix + ".propagationScheme cannot be null");
+          } else {
+            PropagationScheme.Type propagationType = propagationScheme.getPropagationType();
+            if (propagationType == null) {
+              errors.add(prefix + ".propagationScheme.type cannot be null");
+            }
+            // Validate PropagationEntities
+            validateEntityList(propagationScheme.getPropagationEntities(),
+                prefix + ".propagationScheme.propagationEntities", errors,
+                enforcementProfile.getCpuCostNs(), enforcementProfile.getMemoryCostBytes());
           }
-          // Validate CostSplits
-          validateCostSplits(propagationScheme.getCostSplits(), prefix + ".propagationScheme.costSplits", errors);
         }
       }
     }
@@ -238,203 +244,121 @@ public class QueryWorkloadConfigUtils {
   }
 
   /**
-   * Validates a list of CostSplit objects and their nested sub-allocations.
+   * Validates a list of PropagationEntity objects.
+   * <p>
+   * This method performs comprehensive validation including:
+   * <ul>
+   *   <li>Ensures the list is non-null and non-empty</li>
+   *   <li>Checks for duplicate propagationEntity IDs</li>
+   *   <li>Validates cpuCostNs and memoryCostBytes for non-null/non-negative values</li>
+   *   <li>Ensures consistency in cost definitions across all entities (either all or none define costs)</li>
+   *   <li>Validates that total costs do not exceed provided limits (if any)</li>
+   *   <li>Validates any overrides within each entity for the same cost rules</li>
+   * </ul>
    *
-   * @param costSplits the list of CostSplit objects to validate
-   * @param prefix the prefix for error messages
-   * @param errors the list to add validation errors to
    */
-  private static void validateCostSplits(List<CostSplit> costSplits, String prefix, List<String> errors) {
-    if (costSplits == null) {
-      errors.add(prefix + " cannot be null");
+  private static void validateEntityList(List<PropagationEntity> entities, String prefix,
+                                         List<String> errors, Long limitCpu, Long limitMem) {
+    if (entities == null || entities.isEmpty()) {
+      errors.add(prefix + " cannot be null or empty");
       return;
     }
-
-    if (costSplits.isEmpty()) {
-      errors.add(prefix + " cannot be empty");
-      return;
-    }
-
-    Set<String> costIds = new HashSet<>();
-    long totalCpuCost = 0;
-    long totalMemoryCost = 0;
-
-    for (int i = 0; i < costSplits.size(); i++) {
-      CostSplit costSplit = costSplits.get(i);
-      String costSplitPrefix = prefix + "[" + i + "]";
-
-      if (costSplit == null) {
-        errors.add(costSplitPrefix + " cannot be null");
+    Set<String> seenIds = new HashSet<>();
+    // Accumulate total CPU/memory costs to ensure they don't exceed enforcementProfile limits
+    long totalCpu = 0;
+    long totalMem = 0;
+    // Track whether costs are defined or empty to ensure consistency across all entities
+    int definedCount = 0;
+    int emptyCount = 0;
+    for (int i = 0; i < entities.size(); i++) {
+      PropagationEntity entity = entities.get(i);
+      String entityPrefix = prefix + "[" + i + "]";
+      if (entity == null) {
+        errors.add(entityPrefix + " cannot be null");
         continue;
       }
-
-      // Validate costId
-      String costId = costSplit.getCostId();
-      if (costId == null || costId.trim().isEmpty()) {
-        errors.add(costSplitPrefix + ".costId cannot be null or empty");
+      validateDuplicateEntity(entity.getEntity(), entityPrefix, seenIds, errors);
+      Long currentCpu = entity.getCpuCostNs();
+      Long currentMem = entity.getMemoryCostBytes();
+      // Both costs must be defined or both null
+      // If both are defined, add to totalCpu and totalMem for limit validation
+      // If both are null, do nothing
+      if (currentCpu != null && currentMem != null) {
+        totalCpu += costOrZero(entityPrefix, "cpuCostNs", currentCpu, errors);
+        totalMem += costOrZero(entityPrefix, "memoryCostBytes", currentMem, errors);
+        definedCount++;
+      } else if (currentCpu == null && currentMem == null) {
+        emptyCount++;
       } else {
-        // Check for duplicate costIds
-        if (costIds.contains(costId)) {
-          errors.add(costSplitPrefix + ".costId '" + costId + "' is duplicated");
-        } else {
-          costIds.add(costId);
-        }
-
-        // Validate costId format (basic validation)
-        if (!isValidCostId(costId)) {
-          errors.add(costSplitPrefix + ".costId '" + costId + "' contains invalid characters");
-        }
+        errors.add(entityPrefix + " must have both cpuCostNs and memoryCostBytes defined or both null");
+        break;
       }
-      // Validate that either both costs are null or both are non-null when sub-allocations exist
-      boolean hasCpuCost = costSplit.getCpuCostNs() != null;
-      boolean hasMemoryCost = costSplit.getMemoryCostBytes() != null;
-      boolean hasSubAllocations = costSplit.getSubAllocations() != null;
+      if (definedCount > 0 && emptyCount > 0) {
+        errors.add(prefix + " must have either all or none of the propagationEntities define costs");
+        break;
+      }
+      List<PropagationEntityOverrides> overrides = entity.getOverrides();
+      if (overrides != null && !overrides.isEmpty()) {
+        validateOverrides(overrides, entityPrefix, errors, currentCpu, currentMem);
+      }
+    }
+    validateLimits(totalCpu, totalMem, limitCpu, limitMem, prefix, errors);
+  }
 
-      if ((hasCpuCost != hasMemoryCost)) {
-        errors.add(costSplitPrefix + ".cpuCostNs and memoryCostBytes must either both be null or both be non-null");
-        if (hasSubAllocations) {
-          errors.add(costSplitPrefix + ".subAllocations must be null when costs are null");
-        }
+  private static void validateOverrides(List<PropagationEntityOverrides> overrides, String prefix,
+                                        List<String> errors, Long limitCpu, Long limitMem) {
+    long totalCpu = 0;
+    long totalMem = 0;
+    for (int i = 0; i < overrides.size(); i++) {
+      PropagationEntityOverrides override = overrides.get(i);
+      String overridePrefix = prefix + ".overrides[" + i + "]";
+      if (override == null) {
+        errors.add(overridePrefix + " cannot be null");
         continue;
       }
-      // Validate CPU cost
-      Long cpuCostNs = costSplit.getCpuCostNs();
-      if (cpuCostNs != null) {
-        if (cpuCostNs <= 0) {
-          errors.add(costSplitPrefix + ".cpuCostNs should be greater than 0, got: " + cpuCostNs);
-        } else {
-          // Check for potential overflow when summing
-          if (totalCpuCost > Long.MAX_VALUE - cpuCostNs) {
-            errors.add(prefix + " total CPU cost would overflow");
-          } else {
-            totalCpuCost += cpuCostNs;
-          }
-        }
-      }
+      Set<String> seenIds = new HashSet<>();
+      validateDuplicateEntity(override.getEntity(), overridePrefix, seenIds, errors);
+      // For overrides, costs must be defined for each entry
+      totalCpu += costOrZero(overridePrefix, "cpuCostNs", override.getCpuCostNs(), errors);
+      totalMem += costOrZero(overridePrefix, "memoryCostBytes", override.getMemoryCostBytes(), errors);
+    }
+    validateLimits(totalCpu, totalMem, limitCpu, limitMem, prefix, errors);
+  }
 
-      // Validate memory cost
-      Long memoryCostBytes = costSplit.getMemoryCostBytes();
-      if (memoryCostBytes != null) {
-        if (memoryCostBytes <= 0) {
-          errors.add(costSplitPrefix + ".memoryCostBytes should be greater than 0, got: " + memoryCostBytes);
-        } else {
-          // Check for potential overflow when summing
-          if (totalMemoryCost > Long.MAX_VALUE - memoryCostBytes) {
-            errors.add(prefix + " total memory cost would overflow");
-          } else {
-            totalMemoryCost += memoryCostBytes;
-          }
-        }
-      }
+  private static void validateLimits(Long totalCpu, Long totalMem, Long limitCpu, Long limitMem,
+      String prefix, List<String> errors) {
+    if (limitCpu != null && totalCpu > limitCpu) {
+      errors.add(prefix + " total CPU cost (" + totalCpu + " ns) exceeds parent/limit (" + limitCpu + " ns)");
+    }
+    if (limitMem != null && totalMem > limitMem) {
+      errors.add(prefix + " total memory cost (" + totalMem + " bytes) exceeds parent/limit (" + limitMem + " bytes)");
+    }
+  }
 
-      // Validate sub-allocations (recursive validation)
-      List<CostSplit> subAllocations = costSplit.getSubAllocations();
-      if (subAllocations != null && !subAllocations.isEmpty() && cpuCostNs != null && memoryCostBytes != null) {
-        validateCostSplitSubAllocations(subAllocations, costSplitPrefix + ".subAllocations",
-                                      cpuCostNs, memoryCostBytes, errors);
+  private static void validateDuplicateEntity(String entityId, String prefix, Set<String> entityIds,
+      List<String> errors) {
+    if (entityId == null || entityId.trim().isEmpty()) {
+      errors.add(prefix + ".propagationEntity cannot be null or empty");
+    } else {
+      // Check for duplicate propagationEntity IDs
+      if (entityIds.contains(entityId)) {
+        errors.add(prefix + ".propagationEntity '" + entityId + "' is duplicated");
+      } else {
+        entityIds.add(entityId);
       }
     }
   }
 
-  /**
-   * Validates sub-allocations within a CostSplit to ensure they don't exceed parent limits.
-   *
-   * @param subAllocations the list of sub-allocation CostSplit objects
-   * @param prefix the prefix for error messages
-   * @param parentCpuCostNs the parent's CPU cost limit
-   * @param parentMemoryCostBytes the parent's memory cost limit
-   * @param errors the list to add validation errors to
-   */
-  private static void validateCostSplitSubAllocations(List<CostSplit> subAllocations, String prefix,
-                                                     long parentCpuCostNs, long parentMemoryCostBytes,
-                                                     List<String> errors) {
-    if (subAllocations.isEmpty()) {
-      errors.add(prefix + " cannot be empty when specified");
-      return;
+  /** Validate non-null/non-negative and return the positive value (else 0) for accumulation. */
+  private static long costOrZero(String prefix, String field, Long value, List<String> errors) {
+    if (value == null) {
+      errors.add(prefix + "." + field + " cannot be null");
+      return 0L;
     }
-
-    Set<String> subCostIds = new HashSet<>();
-    long totalSubCpuCost = 0;
-    long totalSubMemoryCost = 0;
-
-    for (int i = 0; i < subAllocations.size(); i++) {
-      CostSplit subAllocation = subAllocations.get(i);
-      String subPrefix = prefix + "[" + i + "]";
-
-      if (subAllocation == null) {
-        errors.add(subPrefix + " cannot be null");
-        continue;
-      }
-
-      // Validate sub-allocation costId
-      String subCostId = subAllocation.getCostId();
-      if (subCostId == null || subCostId.trim().isEmpty()) {
-        errors.add(subPrefix + ".costId cannot be null or empty");
-      } else {
-        // Check for duplicate sub-allocation costIds
-        if (subCostIds.contains(subCostId)) {
-          errors.add(subPrefix + ".costId '" + subCostId + "' is duplicated within sub-allocations");
-        } else {
-          subCostIds.add(subCostId);
-        }
-
-        if (!isValidCostId(subCostId)) {
-          errors.add(subPrefix + ".costId '" + subCostId + "' contains invalid characters");
-        }
-      }
-
-      // Validate sub-allocation costs
-      long subCpuCostNs = subAllocation.getCpuCostNs();
-      long subMemoryCostBytes = subAllocation.getMemoryCostBytes();
-
-      if (subCpuCostNs < 0) {
-        errors.add(subPrefix + ".cpuCostNs cannot be negative, got: " + subCpuCostNs);
-      } else if (subCpuCostNs == 0) {
-        errors.add(subPrefix + ".cpuCostNs should be positive, got: " + subCpuCostNs);
-      } else {
-        totalSubCpuCost += subCpuCostNs;
-      }
-
-      if (subMemoryCostBytes < 0) {
-        errors.add(subPrefix + ".memoryCostBytes cannot be negative, got: " + subMemoryCostBytes);
-      } else if (subMemoryCostBytes == 0) {
-        errors.add(subPrefix + ".memoryCostBytes should be positive, got: " + subMemoryCostBytes);
-      } else {
-        totalSubMemoryCost += subMemoryCostBytes;
-      }
-
-      // Sub-allocations should not have their own sub-allocations (prevent deep nesting)
-      if (subAllocation.getSubAllocations() != null && !subAllocation.getSubAllocations().isEmpty()) {
-        errors.add(subPrefix + ".subAllocations nested sub-allocations are not supported");
-      }
+    if (value < 0) {
+      errors.add(prefix + "." + field + " cannot be negative, got: " + value);
+      return 0L;
     }
-
-    // Validate that sub-allocations don't exceed parent limits
-    if (totalSubCpuCost > parentCpuCostNs) {
-      errors.add(prefix + " total CPU cost (" + totalSubCpuCost
-          + "ns) exceeds parent limit (" + parentCpuCostNs + "ns)");
-    }
-
-    if (totalSubMemoryCost > parentMemoryCostBytes) {
-      errors.add(prefix + " total memory cost (" + totalSubMemoryCost
-          + " bytes) exceeds parent limit (" + parentMemoryCostBytes + " bytes)");
-    }
-  }
-
-  /**
-   * Validates that a costId contains only valid characters.
-   * Cost IDs should be alphanumeric with underscores, hyphens, and dots allowed.
-   *
-   * @param costId the cost ID to validate
-   * @return true if the cost ID is valid, false otherwise
-   */
-  private static boolean isValidCostId(String costId) {
-    if (costId == null || costId.trim().isEmpty()) {
-      return false;
-    }
-
-    // Allow alphanumeric characters, underscores, hyphens, and dots
-    // This covers table names, tenant names, and other common identifiers in Pinot
-    return costId.matches("^[a-zA-Z0-9_.-]+$");
+    return value > 0 ? value : 0L;
   }
 }

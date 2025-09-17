@@ -707,11 +707,7 @@ public class ControllerRequestURLBuilder {
     return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs");
   }
 
-  public String forQueryWorkloadConfigDelete(String config) {
-    return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs", config);
-  }
-
-  public String forQueryWorkloadConfigGet(String config) {
+  public String forBaseQueryWorkloadConfig(String config) {
     return StringUtil.join("/", _baseUrl, "queryWorkloadConfigs", config);
   }
 }

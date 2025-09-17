@@ -20,13 +20,22 @@ package org.apache.pinot.integration.tests;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.config.workload.CostSplit;
+import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.config.table.assignment.InstanceAssignmentConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceConstraintConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceReplicaGroupPartitionConfig;
+import org.apache.pinot.spi.config.table.assignment.InstanceTagPoolConfig;
 import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
 import org.apache.pinot.spi.config.workload.PropagationScheme;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.Schema;
@@ -77,9 +86,18 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
     // Create and upload the schema and table config
     Schema schema = createSchema();
     addSchema(schema);
+    // Add offline table config
     TableConfig offlineTableConfig = createOfflineTableConfig();
+    Map<String, InstanceAssignmentConfig> instanceAssignmentConfigMap =
+        Collections.singletonMap("OFFLINE", createInstanceAssignmentConfig(true, TableType.OFFLINE));
+    offlineTableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
     addTableConfig(offlineTableConfig);
-    addTableConfig(createRealtimeTableConfig(realtimeAvroFiles.get(0)));
+    // Add realtime table config
+    TableConfig realtimeTableConfig = createRealtimeTableConfig(realtimeAvroFiles.get(0));
+    instanceAssignmentConfigMap =
+        Collections.singletonMap("COMPLETED", createInstanceAssignmentConfig(false, TableType.REALTIME));
+    realtimeTableConfig.setInstanceAssignmentConfigMap(instanceAssignmentConfigMap);
+    addTableConfig(realtimeTableConfig);
 
     // Create and upload segments
     ClusterIntegrationTestUtils.buildSegmentsFromAvro(offlineAvroFiles, offlineTableConfig, schema, 0, _segmentDir,
@@ -103,8 +121,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
   @Test
   public void testQueryWorkloadConfig() throws Exception {
     EnforcementProfile enforcementProfile = new EnforcementProfile(1000, 1000);
-    CostSplit costSplit = new CostSplit(DEFAULT_TABLE_NAME + "_OFFLINE", 1000L, 1000L, null);
-    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(costSplit));
+    PropagationEntity entity = new PropagationEntity(DEFAULT_TABLE_NAME + "_OFFLINE", 1000L, 1000L, null);
+    PropagationScheme propagationScheme = new PropagationScheme(PropagationScheme.Type.TABLE, List.of(entity));
     NodeConfig nodeConfig = new NodeConfig(NodeConfig.Type.SERVER_NODE, enforcementProfile, propagationScheme);
     QueryWorkloadConfig queryWorkloadConfig = new QueryWorkloadConfig("testWorkload", List.of(nodeConfig));
     try {
@@ -120,8 +138,8 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
       // Get server instances that actually serve this specific table
       String tableName = getTableName();
       Set<String> serverInstances = getServerInstancesForTable(tableName);
-      long expectedCpuCostNs = costSplit.getCpuCostNs() / serverInstances.size();
-      long expectedMemoryCostBytes = costSplit.getMemoryCostBytes() / serverInstances.size();
+      long expectedCpuCostNs = entity.getCpuCostNs() / serverInstances.size();
+      long expectedMemoryCostBytes = entity.getMemoryCostBytes() / serverInstances.size();
       // Test calling the endpoints on each server that serves this table
       for (String serverInstance : serverInstances) {
         testServerQueryWorkloadEndpoints(serverInstance, "testWorkload", expectedCpuCostNs, expectedMemoryCostBytes);
@@ -178,5 +196,19 @@ public class QueryWorkloadIntegrationTest extends BaseClusterIntegrationTest {
       }
     }
     return serverInstances;
+  }
+
+  private InstanceAssignmentConfig createInstanceAssignmentConfig(boolean minimizeDataMovement, TableType tableType) {
+    InstanceTagPoolConfig instanceTagPoolConfig =
+        new InstanceTagPoolConfig(TagNameUtils.getServerTagForTenant(getServerTenant(), tableType), false, 1, null);
+    List<String> constraints = new ArrayList<>();
+    constraints.add("constraints1");
+    InstanceConstraintConfig instanceConstraintConfig = new InstanceConstraintConfig(constraints);
+    InstanceReplicaGroupPartitionConfig instanceReplicaGroupPartitionConfig =
+        new InstanceReplicaGroupPartitionConfig(true, 1, 1,
+            1, 1, 1, minimizeDataMovement,
+            null);
+    return new InstanceAssignmentConfig(instanceTagPoolConfig,
+        instanceConstraintConfig, instanceReplicaGroupPartitionConfig, null, minimizeDataMovement);
   }
 }
