@@ -131,12 +131,12 @@ public abstract class BaseBrokerStarter implements ServiceStartable {
   private volatile boolean _isStarting = false;
   private volatile boolean _isShuttingDown = false;
 
-  // Class dedicated towards handling cluster config change
+  // Dedicated handler for listening to cluster config changes
   protected final DefaultClusterConfigChangeHandler _defaultClusterConfigChangeHandler =
       new DefaultClusterConfigChangeHandler();
 
-  // Deprecated in favor of using a dedicated _defaultClusterConfigChangeHandler to manage config related changes
-  @Deprecated
+  // TODO To be removed in favor of _defaultClusterConfigChangeHandler to manage config related changes.
+  //      Please use this only if you are reliant specifically on the ClusterChangeMediator infra.
   protected final List<ClusterChangeHandler> _clusterConfigChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _idealStateChangeHandlers = new ArrayList<>();
   protected final List<ClusterChangeHandler> _externalViewChangeHandlers = new ArrayList<>();
