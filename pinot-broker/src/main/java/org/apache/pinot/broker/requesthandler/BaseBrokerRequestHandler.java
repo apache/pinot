@@ -76,7 +76,6 @@ import org.slf4j.LoggerFactory;
 @ThreadSafe
 public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   private static final Logger LOGGER = LoggerFactory.getLogger(BaseBrokerRequestHandler.class);
-
   protected final PinotConfiguration _config;
   protected final String _brokerId;
   protected final RoutingManager _routingManager;

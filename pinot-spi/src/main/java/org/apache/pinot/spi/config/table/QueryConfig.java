@@ -56,19 +56,13 @@ public class QueryConfig extends BaseJsonConfig {
   // Indicates the maximum length of the serialized response per server for a query.
   private final Long _maxServerResponseSizeBytes;
 
-  private final Boolean _useDictForRegexpLikePredicate;
-
-  private final Integer _regexpDictCardinalityThreshold;
-
   @JsonCreator
   public QueryConfig(@JsonProperty("timeoutMs") @Nullable Long timeoutMs,
       @JsonProperty("disableGroovy") @Nullable Boolean disableGroovy,
       @JsonProperty("useApproximateFunction") @Nullable Boolean useApproximateFunction,
       @JsonProperty("expressionOverrideMap") @Nullable Map<String, String> expressionOverrideMap,
       @JsonProperty("maxQueryResponseSizeBytes") @Nullable Long maxQueryResponseSizeBytes,
-      @JsonProperty("maxServerResponseSizeBytes") @Nullable Long maxServerResponseSizeBytes,
-      @JsonProperty("useDictForRegexpLikePredicate") Boolean useDictForRegexpLikePredicate,
-      @JsonProperty("regexpDictCardinalityThreshold") int regexpDictCardinalityThreshold) {
+      @JsonProperty("maxServerResponseSizeBytes") @Nullable Long maxServerResponseSizeBytes) {
     Preconditions.checkArgument(timeoutMs == null || timeoutMs > 0, "Invalid 'timeoutMs': %s", timeoutMs);
     Preconditions.checkArgument(maxQueryResponseSizeBytes == null || maxQueryResponseSizeBytes > 0,
         "Invalid 'maxQueryResponseSizeBytes': %s", maxQueryResponseSizeBytes);
@@ -81,8 +75,6 @@ public class QueryConfig extends BaseJsonConfig {
     _expressionOverrideMap = expressionOverrideMap;
     _maxQueryResponseSizeBytes = maxQueryResponseSizeBytes;
     _maxServerResponseSizeBytes = maxServerResponseSizeBytes;
-    _useDictForRegexpLikePredicate = useDictForRegexpLikePredicate;
-    _regexpDictCardinalityThreshold = regexpDictCardinalityThreshold;
   }
 
   @Nullable
@@ -119,17 +111,5 @@ public class QueryConfig extends BaseJsonConfig {
   @JsonProperty("maxServerResponseSizeBytes")
   public Long getMaxServerResponseSizeBytes() {
     return _maxServerResponseSizeBytes;
-  }
-
-  @Nullable
-  @JsonProperty("regexpDictCardinalityThreshold")
-  public int getRegexpDictCardinalityThreshold() {
-    return _regexpDictCardinalityThreshold;
-  }
-
-  @Nullable
-  @JsonProperty("useDictForRegexpLikePredicate")
-  public Boolean getUseDictForRegexpLikePredicate() {
-    return _useDictForRegexpLikePredicate;
   }
 }
