@@ -26,7 +26,6 @@ import org.apache.pinot.core.common.BlockValSet;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
-import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class CountMVAggregationFunction extends CountAggregationFunction {
@@ -55,7 +54,7 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() == DataType.LONG) {
+    if (blockValSet.isSingleValue()) {
       long[] valueArray = blockValSet.getLongValuesSV();
       long count = 0;
       for (int i = 0; i < length; i++) {
@@ -82,7 +81,7 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() == DataType.LONG) {
+    if (blockValSet.isSingleValue()) {
       long[] valueArray = blockValSet.getLongValuesSV();
       for (int i = 0; i < length; i++) {
         int groupKey = groupKeyArray[i];
@@ -106,7 +105,7 @@ public class CountMVAggregationFunction extends CountAggregationFunction {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() == DataType.LONG) {
+    if (blockValSet.isSingleValue()) {
       long[] valueArray = blockValSet.getLongValuesSV();
       for (int i = 0; i < length; i++) {
         long value = valueArray[i];

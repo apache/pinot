@@ -90,7 +90,7 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
         }
       });
     } else {
-      // Serialized AvgPair
+      // Serialized AvgPair.
       byte[][] bytesValues = blockValSet.getBytesValuesSV();
       forEachNotNull(length, blockValSet, (from, to) -> {
         for (int i = from; i < to; i++) {
@@ -106,28 +106,17 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
 
-    if (blockValSet.getValueType() != DataType.BYTES) {
-      double[][] valuesArray = blockValSet.getDoubleValuesMV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          double[] values = valuesArray[i];
-          for (int groupKey : groupKeysArray[i]) {
-            aggregateOnGroupKey(groupKey, groupByResultHolder, values);
-          }
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
+    forEachNotNull(length, blockValSet, (from, to) -> {
+      for (int i = from; i < to; i++) {
+        double[] values = valuesArray[i];
+        for (int groupKey : groupKeysArray[i]) {
+          aggregateOnGroupKey(groupKey, groupByResultHolder, values);
         }
-      });
-    } else {
-      // Serialized AvgPair
-      byte[][] bytesValues = blockValSet.getBytesValuesSV();
-      forEachNotNull(length, blockValSet, (from, to) -> {
-        for (int i = from; i < to; i++) {
-          AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
-          for (int groupKey : groupKeysArray[i]) {
-            updateGroupByResult(groupKey, groupByResultHolder, avgPair.getSum(), avgPair.getCount());
-          }
-        }
-      });
-    }
+      }
+    });
+
+    // Startree index does not support grouping by multi-value field, so no need to handle serialized AvgPair here.
   }
 
   private void aggregateOnGroupKey(int groupKey, GroupByResultHolder groupByResultHolder, double[] values) {

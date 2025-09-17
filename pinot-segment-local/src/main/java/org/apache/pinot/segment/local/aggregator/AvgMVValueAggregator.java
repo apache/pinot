@@ -50,7 +50,6 @@ public class AvgMVValueAggregator implements ValueAggregator<Object, AvgPair> {
     if (rawValue instanceof byte[]) {
       return deserializeAggregatedValue((byte[]) rawValue);
     } else {
-      // Handle multi-value array
       return processMultiValueArray(rawValue);
     }
   }
@@ -60,7 +59,6 @@ public class AvgMVValueAggregator implements ValueAggregator<Object, AvgPair> {
     if (rawValue instanceof byte[]) {
       value.apply(deserializeAggregatedValue((byte[]) rawValue));
     } else {
-      // Handle multi-value array
       AvgPair mvResult = processMultiValueArray(rawValue);
       value.apply(mvResult);
     }
@@ -115,7 +113,6 @@ public class AvgMVValueAggregator implements ValueAggregator<Object, AvgPair> {
       }
       return new AvgPair(sum, count);
     } else {
-      // Single value case - treat as single element array
       return new AvgPair(ValueAggregatorUtils.toDouble(rawValue), 1L);
     }
   }
