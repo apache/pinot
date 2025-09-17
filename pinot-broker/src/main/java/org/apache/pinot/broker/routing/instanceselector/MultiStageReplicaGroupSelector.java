@@ -132,15 +132,20 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     Map<String, Set<String>> instanceToSegmentsMap = new HashMap<>();
 
     // instanceToSegmentsMap stores the mapping from instance to the active segments it can serve.
-    // We have to handle new segments explicitly.
     for (String segment : segments) {
       List<SegmentInstanceCandidate> candidates = segmentStates.getCandidates(segment);
-      Preconditions.checkState(CollectionUtils.isNotEmpty(candidates) || isNewLLCSegment(segment),
-          "Failed to find servers for segment: %s", segment);
+      if (CollectionUtils.isEmpty(candidates)) {
+        if (isNewLLCSegment(segment)) {
+          // New segments might not be tracked in segmentStates yet.
+          continue;
+        } else {
+          throw new IllegalStateException(String.format("Failed to find servers for segment: %s", segment));
+        }
+      }
       for (SegmentInstanceCandidate candidate : candidates) {
         instanceToSegmentsMap
-          .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
-          .add(segment);
+            .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
+            .add(segment);
       }
     }
 
