@@ -1361,15 +1361,12 @@ public final class TableConfigUtils {
         }
       }
 
-      // Validate all referenced columns exist in the schema
-      // Note: Dimensions must be single-valued, but metrics can be multi-valued for certain aggregation functions
-      Set<String> dimensionColumns = new HashSet<>(dimensionsSplitOrder);
+      Set<String> dimensionSplitOrderColumns = new HashSet<>(dimensionsSplitOrder);
       for (String column : referencedColumns) {
         FieldSpec fieldSpec = schema.getFieldSpecFor(column);
         Preconditions.checkState(fieldSpec != null,
             "Failed to find column: %s specified in star-tree index config in schema", column);
-        // Dimension columns must be single-valued
-        if (dimensionColumns.contains(column)) {
+        if (dimensionSplitOrderColumns.contains(column)) {
           Preconditions.checkState(fieldSpec.isSingleValueField(),
               "Star-tree dimension columns must be single-value, but found multi-value column: %s", column);
         }
