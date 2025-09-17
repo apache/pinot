@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.controller.helix.core.rebalance.tenant;
 
+import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -42,10 +43,21 @@ public class TenantRebalanceProgressStats {
   }
 
   public TenantRebalanceProgressStats(Set<String> tables) {
+    Preconditions.checkState(tables != null && !tables.isEmpty(), "List of tables to observe is empty.");
     _tableStatusMap = tables.stream()
         .collect(Collectors.toMap(Function.identity(), k -> TableStatus.UNPROCESSED.name()));
     _totalTables = tables.size();
     _remainingTables = _totalTables;
+  }
+
+  public TenantRebalanceProgressStats(TenantRebalanceProgressStats other) {
+    _tableStatusMap = new HashMap<>(other._tableStatusMap);
+    _tableRebalanceJobIdMap.putAll(other._tableRebalanceJobIdMap);
+    _totalTables = other._totalTables;
+    _remainingTables = other._remainingTables;
+    _startTimeMs = other._startTimeMs;
+    _timeToFinishInSeconds = other._timeToFinishInSeconds;
+    _completionStatusMsg = other._completionStatusMsg;
   }
 
   public Map<String, String> getTableStatusMap() {
@@ -109,6 +121,6 @@ public class TenantRebalanceProgressStats {
   }
 
   public enum TableStatus {
-    UNPROCESSED, PROCESSING, PROCESSED
+    UNPROCESSED, PROCESSING, PROCESSED, ABORTED, CANCELLED
   }
 }

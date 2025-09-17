@@ -138,10 +138,6 @@ public class MockInstanceDataManagerFactory {
     return _registeredSchemaMap;
   }
 
-  public Map<String, Schema> buildSchemaMap() {
-    return _schemaMap;
-  }
-
   public Map<String, List<GenericRow>> buildTableRowsMap() {
     return _tableRowsMap;
   }

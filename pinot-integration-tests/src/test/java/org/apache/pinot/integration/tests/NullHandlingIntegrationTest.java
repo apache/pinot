@@ -372,7 +372,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     explainLogical(query,
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
-            + "  LogicalFilter(condition=[AND(IS NOT NULL($7), <>($7, 0))])\n"
+            + "  LogicalFilter(condition=[AND(IS NOT NULL($8), <>($8, 0))])\n"
             + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
   }
@@ -390,7 +390,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     explainLogical(query,
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
-            + "  LogicalFilter(condition=[<>($7, 0)])\n"
+            + "  LogicalFilter(condition=[<>($8, 0)])\n"
             + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "true"));
   }
@@ -408,7 +408,7 @@ public class NullHandlingIntegrationTest extends BaseClusterIntegrationTestSet
     explainLogical(query,
         "Execution Plan\n"
             + "LogicalProject(EXPR$0=[1])\n"
-            + "  LogicalFilter(condition=[AND(IS NULL($7), <>($7, 0))])\n"
+            + "  LogicalFilter(condition=[AND(IS NULL($8), <>($8, 0))])\n"
             + "    PinotLogicalTableScan(table=[[default, mytable]])\n",
         Map.of(CommonConstants.Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, "false"));
   }

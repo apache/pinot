@@ -34,6 +34,7 @@ import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.broker.routing.adaptiveserverselector.AdaptiveServerSelector;
+import org.apache.pinot.broker.routing.adaptiveserverselector.ServerSelectionContext;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.assignment.InstancePartitionsUtils;
 import org.apache.pinot.common.metrics.BrokerMetrics;
@@ -90,7 +91,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
     // Create a copy of InstancePartitions to avoid race-condition with event-listeners above.
     InstancePartitions instancePartitions = _instancePartitions;
     int replicaGroupSelected;
-    if (isUseFixedReplica(queryOptions)) {
+    ServerSelectionContext ctx = new ServerSelectionContext(queryOptions, _config);
+    if (ctx.isUseFixedReplica()) {
       // When using sticky routing, we want to iterate over the instancePartitions in order to ensure deterministic
       // selection of replica group across queries i.e. same instance replica group id is picked each time.
       // Since the instances within a selected replica group are iterated in order, the assignment within a selected

@@ -116,6 +116,7 @@ public class OpChainSchedulerService {
 
   private void registerInternal(OpChain operatorChain) {
     OpChainId opChainId = operatorChain.getId();
+    MultiStageOperator rootOperator = operatorChain.getRoot();
     Future<?> scheduledFuture = _executorService.submit(new TraceRunnable() {
       @Override
       public void runJob() {
@@ -127,11 +128,11 @@ public class OpChainSchedulerService {
           Tracing.ThreadAccountantOps.setupWorker(opChainId.getStageId(), ThreadExecutionContext.TaskType.MSE,
               operatorChain.getParentContext());
           LOGGER.trace("({}): Executing", operatorChain);
-          MseBlock result = operatorChain.getRoot().nextBlock();
+          MseBlock result = rootOperator.nextBlock();
           while (result.isData()) {
-            result = operatorChain.getRoot().nextBlock();
+            result = rootOperator.nextBlock();
           }
-          MultiStageQueryStats stats = operatorChain.getRoot().calculateStats();
+          MultiStageQueryStats stats = rootOperator.calculateStats();
           if (result.isError()) {
             errorBlock = (ErrorMseBlock) result;
             LOGGER.error("({}): Completed erroneously {} {}", operatorChain, stats, errorBlock.getErrorMessages());
@@ -154,7 +155,7 @@ public class OpChainSchedulerService {
         }
       }
     });
-    _opChainCache.put(opChainId, operatorChain.getRoot());
+    _opChainCache.put(opChainId, rootOperator);
     _submittedOpChainMap.put(opChainId, scheduledFuture);
   }
 

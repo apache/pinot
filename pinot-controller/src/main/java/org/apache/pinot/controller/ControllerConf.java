@@ -117,6 +117,12 @@ public class ControllerConf extends PinotConfiguration {
         "controller.realtime.segment.validation.frequencyPeriod";
     public static final String REALTIME_SEGMENT_VALIDATION_INITIAL_DELAY_IN_SECONDS =
         "controller.realtime.segment.validation.initialDelayInSeconds";
+    public static final String REALTIME_OFFSET_AUTO_RESET_BACKFILL_ENABLED =
+        "controller.realtime.offsetAutoReset.backfill.enabled";
+    public static final String REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_PERIOD =
+        "controller.realtime.offsetAutoReset.backfill.frequencyPeriod";
+    public static final String REALTIME_OFFSET_AUTO_RESET_BACKFILL_INITIAL_DELAY_IN_SECONDS =
+        "controller.realtime.offsetAutoReset.backfill.initialDelayInSeconds";
     // Deprecated as of 0.8.0
     @Deprecated
     public static final String DEPRECATED_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS =
@@ -242,6 +248,10 @@ public class ControllerConf extends PinotConfiguration {
         "controller.segmentRelocator.initialDelayInSeconds";
     public static final String REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
         "controller.rebalanceChecker.initialDelayInSeconds";
+    public static final String TENANT_REBALANCE_CHECKER_FREQUENCY_PERIOD =
+        "controller.tenant.rebalance.checker.frequencyPeriod";
+    public static final String TENANT_REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS =
+        "controller.tenant.rebalance.checker.initialDelayInSeconds";
 
     // The flag to indicate if controller periodic job will fix the missing LLC segment deep store copy.
     // Default value is false.
@@ -261,6 +271,9 @@ public class ControllerConf extends PinotConfiguration {
     // Untracked segments are those that exist in deep store but have no corresponding entry in the ZK property store.
     public static final String ENABLE_UNTRACKED_SEGMENT_DELETION =
         "controller.retentionManager.untrackedSegmentDeletionEnabled";
+    public static final String UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS =
+        "controller.retentionManager.untrackedSegmentsRetentionTimeInDays";
+    public static final int DEFAULT_UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS = 3;
     public static final int MIN_INITIAL_DELAY_IN_SECONDS = 120;
     public static final int MAX_INITIAL_DELAY_IN_SECONDS = 300;
     public static final int DEFAULT_SPLIT_COMMIT_TMP_SEGMENT_LIFETIME_SECOND = 60 * 60; // 1 Hour.
@@ -275,9 +288,11 @@ public class ControllerConf extends PinotConfiguration {
     public static final int DEFAULT_RETENTION_MANAGER_FREQUENCY_IN_SECONDS = 6 * 60 * 60; // 6 Hours.
     public static final int DEFAULT_OFFLINE_SEGMENT_INTERVAL_CHECKER_FREQUENCY_IN_SECONDS = 24 * 60 * 60; // 24 Hours.
     public static final int DEFAULT_REALTIME_SEGMENT_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
+    public static final int DEFAULT_REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_BROKER_RESOURCE_VALIDATION_FREQUENCY_IN_SECONDS = 60 * 60; // 1 Hour.
     public static final int DEFAULT_STATUS_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     public static final int DEFAULT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
+    public static final int DEFAULT_TENANT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     public static final int DEFAULT_TASK_METRICS_EMITTER_FREQUENCY_IN_SECONDS = 5 * 60; // 5 minutes
     public static final int DEFAULT_STATUS_CONTROLLER_WAIT_FOR_PUSH_TIME_IN_SECONDS = 10 * 60; // 10 minutes
     public static final int DEFAULT_TASK_MANAGER_FREQUENCY_IN_SECONDS = -1; // Disabled
@@ -677,6 +692,20 @@ public class ControllerConf extends PinotConfiguration {
         Integer.toString(validationFrequencyInSeconds));
   }
 
+  public boolean isRealtimeOffsetAutoResetBackfillEnabled() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_ENABLED, false);
+  }
+
+  public int getRealtimeOffsetAutoResetBackfillFrequencyInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_PERIOD,
+        ControllerPeriodicTasksConf.DEFAULT_REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_IN_SECONDS);
+  }
+
+  public void setRealtimeOffsetAutoResetBackfillFrequencyInSeconds(int offsetAutoResetBackfillFrequencyInSeconds) {
+    setProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_FREQUENCY_PERIOD,
+        Integer.toString(offsetAutoResetBackfillFrequencyInSeconds));
+  }
+
   /**
    * Return <code>controller.broker.resource.validation.frequencyPeriod</code> or
    * <code>controller.broker.resource.validation.frequencyInSeconds</code> or the default broker resource validation
@@ -729,6 +758,19 @@ public class ControllerConf extends PinotConfiguration {
 
   public long getRebalanceCheckerInitialDelayInSeconds() {
     return getProperty(ControllerPeriodicTasksConf.REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS,
+        ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
+  }
+
+  public int getTenantRebalanceCheckerFrequencyInSeconds() {
+    return Optional.ofNullable(getProperty(ControllerPeriodicTasksConf.TENANT_REBALANCE_CHECKER_FREQUENCY_PERIOD))
+        .filter(period -> isValidPeriodWithLogging(
+            ControllerPeriodicTasksConf.TENANT_REBALANCE_CHECKER_FREQUENCY_PERIOD, period))
+        .map(period -> (int) convertPeriodToSeconds(period))
+        .orElse(ControllerPeriodicTasksConf.DEFAULT_TENANT_REBALANCE_CHECKER_FREQUENCY_IN_SECONDS);
+  }
+
+  public long getTenantRebalanceCheckerInitialDelayInSeconds() {
+    return getProperty(ControllerPeriodicTasksConf.TENANT_REBALANCE_CHECKER_INITIAL_DELAY_IN_SECONDS,
         ControllerPeriodicTasksConf.getRandomInitialDelayInSeconds());
   }
 
@@ -1156,6 +1198,11 @@ public class ControllerConf extends PinotConfiguration {
         getPeriodicTaskInitialDelayInSeconds());
   }
 
+  public long getRealtimeOffsetAutoResetBackfillInitialDelaySeconds() {
+    return getProperty(ControllerPeriodicTasksConf.REALTIME_OFFSET_AUTO_RESET_BACKFILL_INITIAL_DELAY_IN_SECONDS,
+        getPeriodicTaskInitialDelayInSeconds());
+  }
+
   public boolean isDeepStoreRetryUploadLLCSegmentEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_DEEP_STORE_RETRY_UPLOAD_LLC_SEGMENT, false);
   }
@@ -1179,6 +1226,11 @@ public class ControllerConf extends PinotConfiguration {
 
   public boolean getUntrackedSegmentDeletionEnabled() {
     return getProperty(ControllerPeriodicTasksConf.ENABLE_UNTRACKED_SEGMENT_DELETION, false);
+  }
+
+  public int getUntrackedSegmentsRetentionTimeInDays() {
+    return getProperty(ControllerPeriodicTasksConf.UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS,
+        ControllerPeriodicTasksConf.DEFAULT_UNTRACKED_SEGMENTS_RETENTION_TIME_IN_DAYS);
   }
 
   public void setUntrackedSegmentDeletionEnabled(boolean untrackedSegmentDeletionEnabled) {

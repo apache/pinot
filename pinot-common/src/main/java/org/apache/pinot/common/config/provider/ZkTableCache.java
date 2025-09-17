@@ -20,18 +20,15 @@ package org.apache.pinot.common.config.provider;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.commons.collections4.MapUtils;
 import org.apache.helix.AccessOption;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
@@ -45,17 +42,11 @@ import org.apache.pinot.spi.config.provider.LogicalTableConfigChangeListener;
 import org.apache.pinot.spi.config.provider.PinotConfigProvider;
 import org.apache.pinot.spi.config.provider.SchemaChangeListener;
 import org.apache.pinot.spi.config.provider.TableConfigChangeListener;
-import org.apache.pinot.spi.config.table.QueryConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
-import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
-import org.apache.pinot.spi.utils.CommonConstants.Segment.BuiltInVirtualColumn;
 import org.apache.pinot.spi.utils.CommonConstants.ZkPaths;
-import org.apache.pinot.spi.utils.TimestampIndexUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
-import org.apache.pinot.sql.parsers.CalciteSqlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,6 +145,7 @@ public class ZkTableCache implements TableCache {
   /**
    * Returns {@code true} if the TableCache is case-insensitive, {@code false} otherwise.
    */
+  @Override
   public boolean isIgnoreCase() {
     return _ignoreCase;
   }
@@ -163,6 +155,7 @@ public class ZkTableCache implements TableCache {
    * does not exist.
    */
   @Nullable
+  @Override
   public String getActualTableName(String tableName) {
     if (_ignoreCase) {
       return _tableNameMap.get(tableName.toLowerCase());
@@ -177,6 +170,7 @@ public class ZkTableCache implements TableCache {
    * @return Actual logical table name
    */
   @Nullable
+  @Override
   public String getActualLogicalTableName(String logicalTableName) {
     return _ignoreCase
       ? _logicalTableNameMap.get(logicalTableName.toLowerCase())
@@ -187,6 +181,7 @@ public class ZkTableCache implements TableCache {
    * Returns a map from table name to actual table name. For case-insensitive case, the keys of the map are in lower
    * case.
    */
+  @Override
   public Map<String, String> getTableNameMap() {
     return _tableNameMap;
   }
@@ -196,6 +191,7 @@ public class ZkTableCache implements TableCache {
    * are in lower case.
    * @return Map from logical table name to actual logical table name
    */
+  @Override
   public Map<String, String> getLogicalTableNameMap() {
     return _logicalTableNameMap;
   }
@@ -204,6 +200,7 @@ public class ZkTableCache implements TableCache {
    * Get all dimension table names.
    * @return List of dimension table names
    */
+  @Override
   public List<String> getAllDimensionTables() {
     List<String> dimensionTables = new ArrayList<>();
     for (TableConfigInfo tableConfigInfo : _tableConfigInfoMap.values()) {
@@ -219,6 +216,7 @@ public class ZkTableCache implements TableCache {
    * not exist. For case-insensitive case, the keys of the map are in lower case.
    */
   @Nullable
+  @Override
   public Map<String, String> getColumnNameMap(String rawTableName) {
     SchemaInfo schemaInfo = _schemaInfoMap.get(rawTableName);
     return schemaInfo != null ? schemaInfo._columnNameMap : null;
@@ -229,6 +227,7 @@ public class ZkTableCache implements TableCache {
    * configured.
    */
   @Nullable
+  @Override
   public Map<Expression, Expression> getExpressionOverrideMap(String physicalOrLogicalTableName) {
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(physicalOrLogicalTableName);
     if (tableConfigInfo != null) {
@@ -242,6 +241,7 @@ public class ZkTableCache implements TableCache {
    * Returns the timestamp index columns for the given table, or {@code null} if table does not exist.
    */
   @Nullable
+  @Override
   public Set<String> getTimestampIndexColumns(String tableNameWithType) {
     TableConfigInfo tableConfigInfo = _tableConfigInfoMap.get(tableNameWithType);
     return tableConfigInfo != null ? tableConfigInfo._timestampIndexColumns : null;
@@ -414,7 +414,7 @@ public class ZkTableCache implements TableCache {
   }
 
   private void putSchema(ZNRecord znRecord)
-    throws IOException {
+      throws IOException {
     Schema schema = SchemaSerDeUtils.fromZNRecord(znRecord);
     addBuiltInVirtualColumns(schema);
     String schemaName = schema.getSchemaName();
@@ -429,22 +429,6 @@ public class ZkTableCache implements TableCache {
       }
     }
     _schemaInfoMap.put(schemaName, new SchemaInfo(schema, columnNameMap));
-  }
-
-  /**
-   * Adds the built-in virtual columns to the schema.
-   * NOTE: The virtual column provider class is not added.
-   */
-  private static void addBuiltInVirtualColumns(Schema schema) {
-    if (!schema.hasColumn(BuiltInVirtualColumn.DOCID)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.DOCID, FieldSpec.DataType.INT, true));
-    }
-    if (!schema.hasColumn(BuiltInVirtualColumn.HOSTNAME)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.HOSTNAME, FieldSpec.DataType.STRING, true));
-    }
-    if (!schema.hasColumn(BuiltInVirtualColumn.SEGMENTNAME)) {
-      schema.addField(new DimensionFieldSpec(BuiltInVirtualColumn.SEGMENTNAME, FieldSpec.DataType.STRING, true));
-    }
   }
 
   private void removeSchema(String path) {
@@ -479,6 +463,7 @@ public class ZkTableCache implements TableCache {
     return tableConfigs;
   }
 
+  @Override
   public List<LogicalTableConfig> getLogicalTableConfigs() {
     return _logicalTableConfigInfoMap.values().stream().map(o -> o._logicalTableConfig).collect(Collectors.toList());
   }
@@ -500,6 +485,7 @@ public class ZkTableCache implements TableCache {
     return schemas;
   }
 
+  @Override
   public boolean isLogicalTable(String logicalTableName) {
     logicalTableName = _ignoreCase ? logicalTableName.toLowerCase() : logicalTableName;
     return _logicalTableConfigInfoMap.containsKey(logicalTableName);
@@ -643,65 +629,6 @@ public class ZkTableCache implements TableCache {
       String logicalTableName = path.substring(path.lastIndexOf('/') + 1);
       removeLogicalTableConfig(ZkPaths.LOGICAL_TABLE_PATH_PREFIX + logicalTableName);
       notifyLogicalTableConfigChangeListeners();
-    }
-  }
-
-  private static Map<Expression, Expression> createExpressionOverrideMap(String physicalOrLogicalTableName,
-    QueryConfig queryConfig) {
-    Map<Expression, Expression> expressionOverrideMap = new TreeMap<>();
-    if (queryConfig != null && MapUtils.isNotEmpty(queryConfig.getExpressionOverrideMap())) {
-      for (Map.Entry<String, String> entry : queryConfig.getExpressionOverrideMap().entrySet()) {
-        try {
-          Expression srcExp = CalciteSqlParser.compileToExpression(entry.getKey());
-          Expression destExp = CalciteSqlParser.compileToExpression(entry.getValue());
-          expressionOverrideMap.put(srcExp, destExp);
-        } catch (Exception e) {
-          LOGGER.warn("Caught exception while compiling expression override: {} -> {} for table: {}, skipping it",
-            entry.getKey(), entry.getValue(), physicalOrLogicalTableName);
-        }
-      }
-      int mapSize = expressionOverrideMap.size();
-      if (mapSize == 1) {
-        Map.Entry<Expression, Expression> entry = expressionOverrideMap.entrySet().iterator().next();
-        return Collections.singletonMap(entry.getKey(), entry.getValue());
-      } else if (mapSize > 1) {
-        return expressionOverrideMap;
-      }
-    }
-    return null;
-  }
-
-  private static class TableConfigInfo {
-    final TableConfig _tableConfig;
-    final Map<Expression, Expression> _expressionOverrideMap;
-    // All the timestamp with granularity column names
-    final Set<String> _timestampIndexColumns;
-
-    private TableConfigInfo(TableConfig tableConfig) {
-      _tableConfig = tableConfig;
-      _expressionOverrideMap = createExpressionOverrideMap(tableConfig.getTableName(), tableConfig.getQueryConfig());
-      _timestampIndexColumns = TimestampIndexUtils.extractColumnsWithGranularity(tableConfig);
-    }
-  }
-
-  private static class SchemaInfo {
-    final Schema _schema;
-    final Map<String, String> _columnNameMap;
-
-    private SchemaInfo(Schema schema, Map<String, String> columnNameMap) {
-      _schema = schema;
-      _columnNameMap = columnNameMap;
-    }
-  }
-
-  private static class LogicalTableConfigInfo {
-    final LogicalTableConfig _logicalTableConfig;
-    final Map<Expression, Expression> _expressionOverrideMap;
-
-    private LogicalTableConfigInfo(LogicalTableConfig logicalTableConfig) {
-      _logicalTableConfig = logicalTableConfig;
-      _expressionOverrideMap = createExpressionOverrideMap(logicalTableConfig.getTableName(),
-        logicalTableConfig.getQueryConfig());
     }
   }
 }

@@ -34,6 +34,7 @@ import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.TableConfigRefreshMessage;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.spi.config.workload.InstanceCost;
+import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -268,20 +269,39 @@ public class BrokerUserDefinedMessageHandlerFactory implements MessageHandlerFac
   private static class QueryWorkloadRefreshMessageHandler extends MessageHandler {
     final String _queryWorkloadName;
     final InstanceCost _instanceCost;
+    final String _messageType;
 
     QueryWorkloadRefreshMessageHandler(QueryWorkloadRefreshMessage queryWorkloadRefreshMessage,
         NotificationContext context) {
       super(queryWorkloadRefreshMessage, context);
       _queryWorkloadName = queryWorkloadRefreshMessage.getQueryWorkloadName();
       _instanceCost = queryWorkloadRefreshMessage.getInstanceCost();
+      _messageType = queryWorkloadRefreshMessage.getMsgSubType();
     }
 
     @Override
     public HelixTaskResult handleMessage() {
-      // TODO: Add logic to invoke the query workload manager to refresh/delete the query workload config
-      HelixTaskResult result = new HelixTaskResult();
-      result.setSuccess(true);
-      return result;
+      LOGGER.info("Handling query workload message: {}", _message);
+      try {
+        if (_messageType.equals(QueryWorkloadRefreshMessage.DELETE_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+          Tracing.ThreadAccountantOps.getWorkloadBudgetManager().deleteWorkload(_queryWorkloadName);
+        } else if (_messageType.equals(QueryWorkloadRefreshMessage.REFRESH_QUERY_WORKLOAD_MSG_SUB_TYPE)) {
+          if (_instanceCost == null) {
+            throw new IllegalStateException(
+                "Instance cost is not provided for refreshing query workload: " + _queryWorkloadName);
+          }
+          Tracing.ThreadAccountantOps.getWorkloadBudgetManager()
+            .addOrUpdateWorkload(_queryWorkloadName, _instanceCost.getCpuCostNs(), _instanceCost.getMemoryCostBytes());
+        } else {
+          throw new IllegalStateException("Unknown message type: " + _messageType);
+        }
+        HelixTaskResult result = new HelixTaskResult();
+        result.setSuccess(true);
+        return result;
+      } catch (Exception e) {
+        LOGGER.warn("Failed to handle query workload message: {}", _queryWorkloadName, e);
+        throw e;
+      }
     }
 
     @Override

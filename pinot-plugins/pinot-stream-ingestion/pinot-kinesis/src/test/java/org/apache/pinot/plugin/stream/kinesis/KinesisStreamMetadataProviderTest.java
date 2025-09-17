@@ -170,7 +170,7 @@ public class KinesisStreamMetadataProviderTest {
     when(_streamConsumerFactory.createPartitionGroupConsumer(stringCapture.capture(),
         partitionGroupMetadataCapture.capture())).thenReturn(_partitionGroupConsumer);
     when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture())).thenReturn(
-        new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true));
+        new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true, 0));
 
     List<PartitionGroupMetadata> result =
         _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
@@ -182,9 +182,9 @@ public class KinesisStreamMetadataProviderTest {
 
     // Simulate the case where initial calls to fetchMessages returns empty messages but non-null next shard iterator
     when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture()))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true));
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true, 0));
     result =
         _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
             currentPartitionGroupMeta, TIMEOUT);
@@ -194,13 +194,13 @@ public class KinesisStreamMetadataProviderTest {
 
     // Simulate the case where all calls to fetchMessages returns empty messages and non-null next shard iterator
     when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture()))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false))
-        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false));
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0))
+        .thenReturn(new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, false, 0));
 
     result =
         _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),
@@ -241,7 +241,7 @@ public class KinesisStreamMetadataProviderTest {
     when(_streamConsumerFactory.createPartitionGroupConsumer(stringCapture.capture(),
         partitionGroupMetadataCapture.capture())).thenReturn(_partitionGroupConsumer);
     when(_partitionGroupConsumer.fetchMessages(checkpointArgs.capture(), intArguments.capture())).thenReturn(
-        new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true));
+        new KinesisMessageBatch(new ArrayList<>(), kinesisPartitionGroupOffset, true, 0));
 
     List<PartitionGroupMetadata> result =
         _kinesisStreamMetadataProvider.computePartitionGroupMetadata(CLIENT_ID, getStreamConfig(),

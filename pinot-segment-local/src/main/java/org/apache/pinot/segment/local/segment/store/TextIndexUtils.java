@@ -109,7 +109,7 @@ public class TextIndexUtils {
     FileUtils.deleteQuietly(nativeIndexFile);
   }
 
-  static boolean hasTextIndex(File segDir, String column) {
+  public static boolean hasTextIndex(File segDir, String column) {
     //@formatter:off
     return new File(segDir, column + Indexes.LUCENE_TEXT_INDEX_FILE_EXTENSION).exists()
         || new File(segDir, column + Indexes.LUCENE_V9_TEXT_INDEX_FILE_EXTENSION).exists()
