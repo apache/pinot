@@ -310,8 +310,8 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
 
     LOGGER.info(
         "Processed segment assignment change in {}ms (fetch ideal state and external view stats for {} tables: {}ms, "
-            + "update routing entry for {} tables ({}): {}ms)", updateRoutingEntriesEndTimeMs - startTimeMs,
-        numTables, fetchStatsEndTimeMs - startTimeMs, tablesToUpdate.size(), tablesToUpdate,
+            + "update routing entry for {} tables ({}): {}ms)", updateRoutingEntriesEndTimeMs - startTimeMs, numTables,
+        fetchStatsEndTimeMs - startTimeMs, tablesToUpdate.size(), tablesToUpdate,
         updateRoutingEntriesEndTimeMs - fetchStatsEndTimeMs);
   }
 
@@ -503,8 +503,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           routingEntry.onInstancesChange(_routableServers, changedServers);
         }
       } catch (Exception e) {
-        LOGGER.error(
-            "Caught unexpected exception while updating routing entry when excluding server: {} for table: {}",
+        LOGGER.error("Caught unexpected exception while updating routing entry when excluding server: {} for table: {}",
             instanceId, routingEntry.getTableNameWithType(), e);
       }
     }
@@ -548,8 +547,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
           routingEntry.onInstancesChange(_routableServers, changedServers);
         }
       } catch (Exception e) {
-        LOGGER.error(
-            "Caught unexpected exception while updating routing entry when including server: {} for table: {}",
+        LOGGER.error("Caught unexpected exception while updating routing entry when including server: {} for table: {}",
             instanceId, routingEntry.getTableNameWithType(), e);
       }
     }
