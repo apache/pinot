@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.server.api.resources;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiKeyAuthDefinition;
@@ -34,6 +35,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -59,6 +61,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
@@ -407,6 +410,64 @@ public class TablesResource {
     } finally {
       tableDataManager.releaseSegment(segmentDataManager);
     }
+  }
+
+  @GET
+  @Encoded
+  @Path("/tables/{tableName}/segments/metadata")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Provide segments metadata", notes = "Provide segments metadata for the segments on server")
+  @ApiResponses(value = {
+      @ApiResponse(code = 200, message = "Success"),
+      @ApiResponse(code = 500, message = "Internal server error", response = ErrorInfo.class),
+      @ApiResponse(code = 404, message = "Table or segment not found", response = ErrorInfo.class)
+  })
+  public String getSegmentsMetadata(
+      @ApiParam(value = "Table name including type", required = true, example = "myTable_OFFLINE")
+      @PathParam("tableName") String tableName,
+      @Nullable @ApiParam(value = "Segments name", allowMultiple = true) @QueryParam("segments") List<String> segments,
+      @Nullable @ApiParam(value = "Column name", allowMultiple = true) @QueryParam("columns") List<String> columns,
+      @Context HttpHeaders headers) {
+    tableName = DatabaseUtils.translateTableName(tableName, headers);
+    TableDataManager tableDataManager = ServerResourceUtils.checkGetTableDataManager(_serverInstance, tableName);
+    // decode columns and segments
+    List<String> decodedSegments = new ArrayList<>();
+    if (CollectionUtils.isNotEmpty(segments)) {
+      for (String segment : segments) {
+        decodedSegments.add(URIUtils.decode(segment));
+      }
+    }
+    List<SegmentDataManager> segmentDataManagers;
+    if (!decodedSegments.isEmpty()) {
+      segmentDataManagers = tableDataManager.acquireSegments(decodedSegments, new ArrayList<>());
+    } else {
+      segmentDataManagers = tableDataManager.acquireAllSegments();
+    }
+    List<String> decodedColumns = new ArrayList<>();
+    if (CollectionUtils.isNotEmpty(columns)) {
+      for (String column: columns) {
+        decodedColumns.add(URIUtils.decode(column));
+      }
+    }
+    // get metadata for every segment in the list
+    Map<String, JsonNode> response = new HashMap<>();
+    try {
+      for (SegmentDataManager segmentDataManager: segmentDataManagers) {
+        String segmentName = segmentDataManager.getSegmentName();
+        String segmentMetadata = SegmentMetadataFetcher.getSegmentMetadata(segmentDataManager, decodedColumns);
+        JsonNode segmentMetadataJson = JsonUtils.stringToJsonNode(segmentMetadata);
+        response.put(segmentName, segmentMetadataJson);
+      }
+    } catch (Exception e) {
+      LOGGER.error("Failed to convert table {} segments to json", tableName);
+      throw new WebApplicationException("Failed to convert segment metadata to json",
+          Response.Status.INTERNAL_SERVER_ERROR);
+    } finally {
+      for (SegmentDataManager segmentDataManager : segmentDataManagers) {
+        tableDataManager.releaseSegment(segmentDataManager);
+      }
+    }
+    return ResourceUtils.convertToJsonString(response);
   }
 
   @GET
@@ -1089,6 +1150,10 @@ public class TablesResource {
                   recordsLagMap, availabilityLagMsMap)));
         }
       }
+    } catch (ConcurrentModificationException e) {
+      LOGGER.warn("Multi-threaded access is unsafe for KafkaConsumer, caught exception when fetching stream offset",
+          e);
+      return segmentConsumerInfoList;
     } catch (Exception e) {
       throw new WebApplicationException("Caught exception when getting consumer info for table: " + realtimeTableName);
     } finally {

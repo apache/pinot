@@ -854,9 +854,32 @@ public class TableConfigUtilsTest {
 
     try {
       TableConfigUtils.validate(tableConfigWithoutPauseless, schema);
-      // Should pass - multiple stream configs are allowed when pauseless consumption is disabled
+      fail("Should fail when duplicate topic names are present in multiple stream configs");
     } catch (IllegalStateException e) {
-      fail("Should not fail when pauseless consumption is disabled with multiple stream configs: " + e.getMessage());
+      // Expected - should fail with specific error message
+      assertTrue(
+          e.getMessage().contains("Duplicate topic names found in streamConfigs:"));
+    }
+
+    // Test for multiple stream configs with pauseless consumption disabled and unique topic names - should pass
+    Map<String, String> anotherStreamConfig = new HashMap<>(streamConfigs);
+    anotherStreamConfig.put("stream.kafka.topic.name", "myTopic2");
+    StreamIngestionConfig streamIngestionConfigWithoutPauselessUniqueTopics =
+        new StreamIngestionConfig(Arrays.asList(streamConfigs, anotherStreamConfig));
+    streamIngestionConfigWithoutPauselessUniqueTopics.setPauselessConsumptionEnabled(false);
+
+    IngestionConfig ingestionConfigWithoutPauselessUniqueTopics = new IngestionConfig();
+    ingestionConfigWithoutPauselessUniqueTopics.setStreamIngestionConfig(
+        streamIngestionConfigWithoutPauselessUniqueTopics);
+    TableConfig tableConfigWithoutPauselessUniqueTopics = new TableConfigBuilder(TableType.REALTIME)
+        .setTableName(TABLE_NAME)
+            .setTimeColumnName("timeColumn")
+            .setIngestionConfig(ingestionConfigWithoutPauselessUniqueTopics)
+            .build();
+    try {
+      TableConfigUtils.validate(tableConfigWithoutPauselessUniqueTopics, schema);
+    } catch (IllegalStateException e) {
+      fail("Should not fail when pauseless consumption is disabled with multiple stream configs with unique topics");
     }
   }
 
@@ -2049,6 +2072,37 @@ public class TableConfigUtilsTest {
       fail("Tag override must not be allowed with upsert");
     } catch (IllegalStateException e) {
       assertEquals(e.getMessage(), "Invalid tenant tag override used for Upsert/Dedup table");
+    }
+
+    // Instance assignment config with just CONSUMING instance partitions configured should be allowed
+    InstanceAssignmentConfig instanceAssignmentConfig = Mockito.mock(InstanceAssignmentConfig.class);
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig))
+        .build();
+
+    TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+
+    // Instance assignment config with CONSUMING and COMPLETED instance partitions configured should not be allowed
+    tableConfig = new TableConfigBuilder(TableType.REALTIME).setTableName(TABLE_NAME)
+        .setTimeColumnName(TIME_COLUMN)
+        .setUpsertConfig(new UpsertConfig(UpsertConfig.Mode.FULL))
+        .setStreamConfigs(getStreamConfigs())
+        .setRoutingConfig(
+            new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE, false))
+        .setInstanceAssignmentConfigMap(Map.of(InstancePartitionsType.CONSUMING.name(), instanceAssignmentConfig,
+            InstancePartitionsType.COMPLETED.name(), instanceAssignmentConfig))
+        .build();
+
+    try {
+      TableConfigUtils.validateUpsertAndDedupConfig(tableConfig, schema);
+      fail("Instance assignment config with COMPLETED instance partitions must not be allowed with upsert");
+    } catch (IllegalStateException e) {
+      assertEquals(e.getMessage(), "COMPLETED instance partitions can't be configured for upsert / dedup tables");
     }
 
     // empty tag override with upsert should pass

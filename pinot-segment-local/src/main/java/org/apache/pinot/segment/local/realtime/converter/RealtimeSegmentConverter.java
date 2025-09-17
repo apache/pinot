@@ -128,7 +128,7 @@ public class RealtimeSegmentConverter {
       }
       // Use CompactedPinotSegmentRecordReader to remove obsolete/invalidated records
       try (CompactedPinotSegmentRecordReader recordReader = new CompactedPinotSegmentRecordReader(
-          validDocIdsSnapshot, _realtimeSegmentImpl.getDeleteRecordColumn())) {
+          validDocIdsSnapshot)) {
         recordReader.init(_realtimeSegmentImpl, sortedDocIds);
         buildSegmentWithReader(driver, genConfig, recordReader, sortedDocIds, useCompactedReader, validDocIdsSnapshot);
         publishCompactionMetrics(serverMetrics, preCommitRowCount, driver, compactionStartTime);
@@ -218,7 +218,9 @@ public class RealtimeSegmentConverter {
     if (!_enableColumnMajor) {
       driver.build();
     } else {
-      driver.buildByColumn(_realtimeSegmentImpl);
+      //buildByColumn uses validDocIds to skip invalid record while indexing each column. We pass the validDocIds
+      // only if we are using compacted reader.
+      driver.buildByColumn(_realtimeSegmentImpl, useCompactedReader ? validDocIdsSnapshot : null);
     }
   }
 

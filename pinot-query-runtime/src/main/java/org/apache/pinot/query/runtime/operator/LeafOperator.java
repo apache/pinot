@@ -129,9 +129,11 @@ public class LeafOperator extends MultiStageOperator {
   }
 
   @Override
-  public void registerExecution(long time, int numRows) {
+  public void registerExecution(long time, int numRows, long memoryUsedBytes, long gcTimeMs) {
     _statMap.merge(StatKey.EXECUTION_TIME_MS, time);
     _statMap.merge(StatKey.EMITTED_ROWS, numRows);
+    _statMap.merge(StatKey.ALLOCATED_MEMORY_BYTES, memoryUsedBytes);
+    _statMap.merge(StatKey.GC_TIME_MS, gcTimeMs);
   }
 
   @Override
@@ -714,7 +716,19 @@ public class LeafOperator extends MultiStageOperator {
       public String getStatName() {
         return "responseSerializationCpuTimeNs";
       }
-    };
+    },
+    /**
+     * Allocated memory in bytes for this operator or its children in the same stage.
+     */
+    ALLOCATED_MEMORY_BYTES(StatMap.Type.LONG, null),
+    /**
+     * Time spent on GC while this operator or its children in the same stage were running.
+     */
+    GC_TIME_MS(StatMap.Type.LONG, null);
+    // IMPORTANT: When adding new StatKeys, make sure to either create the same key in BrokerResponseNativeV2.StatKey or
+    //  call the constructor that accepts a String as last argument and set it to null.
+    //  Otherwise the constructor will fail with an IllegalArgumentException which will not be caught and will
+    //  propagate to the caller, causing the query to timeout.
 
     private final StatMap.Type _type;
     @Nullable
@@ -722,7 +736,12 @@ public class LeafOperator extends MultiStageOperator {
 
     StatKey(StatMap.Type type) {
       _type = type;
-      _brokerKey = BrokerResponseNativeV2.StatKey.valueOf(name());
+      try {
+        _brokerKey = BrokerResponseNativeV2.StatKey.valueOf(name());
+      } catch (IllegalArgumentException e) {
+        LOGGER.error("Failed to map StatKey: {} to BrokerResponseNativeV2.StatKey", name(), e);
+        throw e;
+      }
     }
 
     StatKey(StatMap.Type type, @Nullable BrokerResponseNativeV2.StatKey brokerKey) {

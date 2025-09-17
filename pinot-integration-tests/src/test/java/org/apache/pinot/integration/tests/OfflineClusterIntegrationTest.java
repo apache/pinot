@@ -3520,7 +3520,7 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
         + "    LogicalProject(count=[$1], name=[$0])\n"
         + "      PinotLogicalAggregate(group=[{0}], agg#0=[COUNT($1)], aggType=[FINAL])\n"
         + "        PinotLogicalExchange(distribution=[hash[0]])\n"
-        + "          PinotLogicalAggregate(group=[{17}], agg#0=[COUNT()], aggType=[LEAF])\n"
+        + "          PinotLogicalAggregate(group=[{18}], agg#0=[COUNT()], aggType=[LEAF])\n"
         + "            PinotLogicalTableScan(table=[[default, mytable]])\n");
     assertEquals(response1Json.get("rows").get(0).get(2).asText(), "Rule Execution Times\n"
         + "Rule: SortRemove -> Time:*\n"
@@ -3798,26 +3798,26 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
 
     JsonNode starColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=*"));
-    validateMetadataResponse(starColumnResponse, 82, 9);
+    validateMetadataResponse(starColumnResponse, 83, 10);
 
     JsonNode starEncodedColumnResponse =
         JsonUtils.stringToJsonNode(sendGetRequest(getControllerBaseApiUrl() + "/tables/mytable/metadata?columns=%2A"));
-    validateMetadataResponse(starEncodedColumnResponse, 82, 9);
+    validateMetadataResponse(starEncodedColumnResponse, 83, 10);
 
     JsonNode starWithExtraColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=*&columns=OriginStateName"));
-    validateMetadataResponse(starWithExtraColumnResponse, 82, 9);
+    validateMetadataResponse(starWithExtraColumnResponse, 83, 10);
 
     JsonNode starWithExtraEncodedColumnResponse = JsonUtils.stringToJsonNode(sendGetRequest(
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime&columns=%2A&columns=OriginStateName"));
-    validateMetadataResponse(starWithExtraEncodedColumnResponse, 82, 9);
+    validateMetadataResponse(starWithExtraEncodedColumnResponse, 83, 10);
 
     JsonNode starWithExtraColumnWholeEncodedResponse = JsonUtils.stringToJsonNode(sendGetRequest(
         getControllerBaseApiUrl() + "/tables/mytable/metadata?columns="
             + "CRSElapsedTime%26columns%3D%2A%26columns%3DOriginStateName"));
-    validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 82, 9);
+    validateMetadataResponse(starWithExtraColumnWholeEncodedResponse, 83, 10);
   }
 
   private void validateMetadataResponse(JsonNode response, int numTotalColumn, int numMVColumn) {

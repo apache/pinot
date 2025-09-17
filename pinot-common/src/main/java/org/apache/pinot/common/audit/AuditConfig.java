@@ -30,6 +30,9 @@ import java.util.StringJoiner;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class AuditConfig {
 
+  public static final int MAX_AUDIT_PAYLOAD_SIZE_BYTES = 65536; // Hard max. This overrides _maxPayloadSize
+  public static final int MAX_AUDIT_PAYLOAD_SIZE_BYTES_DEFAULT = 8192;
+
   @JsonProperty("enabled")
   private boolean _enabled = false;
 
@@ -39,11 +42,14 @@ public final class AuditConfig {
   @JsonProperty("capture.request.headers")
   private String _captureRequestHeaders = "";
 
-  @JsonProperty("payload.size.max.bytes")
-  private int _maxPayloadSize = 10_240;
+  @JsonProperty("request.payload.size.max.bytes")
+  private int _maxPayloadSize = MAX_AUDIT_PAYLOAD_SIZE_BYTES_DEFAULT;
 
   @JsonProperty("url.filter.exclude.patterns")
   private String _urlFilterExcludePatterns = "";
+
+  @JsonProperty("url.filter.include.patterns")
+  private String _urlFilterIncludePatterns = "";
 
   @JsonProperty("userid.header")
   private String _useridHeader = "";
@@ -91,6 +97,14 @@ public final class AuditConfig {
     _urlFilterExcludePatterns = urlFilterExcludePatterns;
   }
 
+  public String getUrlFilterIncludePatterns() {
+    return _urlFilterIncludePatterns;
+  }
+
+  public void setUrlFilterIncludePatterns(String urlFilterIncludePatterns) {
+    _urlFilterIncludePatterns = urlFilterIncludePatterns;
+  }
+
   public String getUseridHeader() {
     return _useridHeader;
   }
@@ -114,6 +128,7 @@ public final class AuditConfig {
         .add("_captureRequestHeaders='" + _captureRequestHeaders + "'")
         .add("_maxPayloadSize=" + _maxPayloadSize)
         .add("_urlFilterExcludePatterns='" + _urlFilterExcludePatterns + "'")
+        .add("_urlFilterIncludePatterns='" + _urlFilterIncludePatterns + "'")
         .add("_useridHeader='" + _useridHeader + "'")
         .add("_useridJwtClaimName='" + _useridJwtClaimName + "'")
         .toString();

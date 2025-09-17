@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -31,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * URL path filter utility that uses Java's PathMatcher with glob and regex patterns
- * to determine if a URL path should be excluded from processing.
+ * to determine if a URL path should be audited based on include/exclude patterns.
  *
  * This class provides powerful pattern matching capabilities including:
  * - Wildcards: * (within path segment), ** (across path segments), ? (single character)
@@ -58,6 +59,37 @@ public class AuditUrlPathFilter {
   private static final Logger LOG = LoggerFactory.getLogger(AuditUrlPathFilter.class);
   private static final String PREFIX_GLOB = "glob:";
   private static final String PREFIX_REGEX = "regex:";
+  private final AuditConfigManager _configManager;
+
+  @Inject
+  public AuditUrlPathFilter(AuditConfigManager configManager) {
+    _configManager = configManager;
+  }
+
+  /**
+   * Determines whether a given endpoint should be audited based on include/exclude patterns.
+   * Exclusion patterns have priority over inclusion patterns.
+   *
+   * @param endpoint the URL endpoint to check
+   * @return true if the endpoint should be audited, false otherwise
+   */
+  public boolean shouldAudit(String endpoint) {
+    AuditConfig config = _configManager.getCurrentConfig();
+
+    // Priority 1: Exclusion always wins - if excluded, don't audit
+    if (matches(endpoint, config.getUrlFilterExcludePatterns())) {
+      return false;
+    }
+
+    // Priority 2: If include patterns defined, URL must match to be audited
+    String includePatterns = config.getUrlFilterIncludePatterns();
+    if (StringUtils.isNotBlank(includePatterns)) {
+      return matches(endpoint, includePatterns);
+    }
+
+    // Default: No include patterns = audit everything not excluded
+    return true;
+  }
 
   private static boolean matches(Path path, String pattern) {
     try {
@@ -77,20 +109,20 @@ public class AuditUrlPathFilter {
   }
 
   /**
-   * Checks if the given URL path should be excluded based on the provided patterns.
+   * Checks if the given URL path matches any of the provided patterns.
    *
    * @param urlPath The URL path to check (e.g., "api/v1/users")
-   * @param excludePatterns Comma-separated list of glob patterns
-   * @return true if the path matches any exclude pattern, false otherwise
+   * @param patternsCommaSeparated Comma-separated list of glob patterns
+   * @return true if the path matches any pattern, false otherwise
    */
-  public boolean isExcluded(String urlPath, String excludePatterns) {
-    if (StringUtils.isBlank(urlPath) || StringUtils.isBlank(excludePatterns)) {
+  public boolean matches(String urlPath, String patternsCommaSeparated) {
+    if (StringUtils.isBlank(urlPath) || StringUtils.isBlank(patternsCommaSeparated)) {
       return false;
     }
 
     try {
       Path path = Paths.get(urlPath);
-      String[] patterns = excludePatterns.split(",");
+      String[] patterns = patternsCommaSeparated.split(",");
 
       if (Arrays.stream(patterns)
           .map(String::trim)
@@ -99,7 +131,7 @@ public class AuditUrlPathFilter {
         return true;
       }
     } catch (Exception e) {
-      LOG.warn("Error checking URL path '{}' against exclude patterns", urlPath, e);
+      LOG.warn("Error checking URL path '{}' against pattern: {}", urlPath, patternsCommaSeparated, e);
     }
 
     return false;
