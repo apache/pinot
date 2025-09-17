@@ -190,7 +190,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       LOGGER.info("Processing segment assignment change");
       long startTimeMs = System.currentTimeMillis();
 
-      Map<String, RoutingEntry> routingEntrySnapshot = new ConcurrentHashMap<>(_routingEntryMap);
+      Map<String, RoutingEntry> routingEntrySnapshot = new HashMap<>(_routingEntryMap);
 
       int numTables = routingEntrySnapshot.size();
       if (numTables == 0) {
