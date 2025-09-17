@@ -144,8 +144,8 @@ public class MultiStageReplicaGroupSelector extends BaseInstanceSelector {
       }
       for (SegmentInstanceCandidate candidate : candidates) {
         instanceToSegmentsMap
-            .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
-            .add(segment);
+          .computeIfAbsent(candidate.getInstance(), k -> new HashSet<>())
+          .add(segment);
       }
     }
 
