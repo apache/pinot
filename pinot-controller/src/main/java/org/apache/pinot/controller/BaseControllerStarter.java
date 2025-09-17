@@ -120,6 +120,7 @@ import org.apache.pinot.controller.util.TableSizeReader;
 import org.apache.pinot.controller.validation.BrokerResourceValidationManager;
 import org.apache.pinot.controller.validation.DiskUtilizationChecker;
 import org.apache.pinot.controller.validation.OfflineSegmentIntervalChecker;
+import org.apache.pinot.controller.validation.RealtimeOffsetAutoResetManager;
 import org.apache.pinot.controller.validation.RealtimeSegmentValidationManager;
 import org.apache.pinot.controller.validation.ResourceUtilizationChecker;
 import org.apache.pinot.controller.validation.ResourceUtilizationManager;
@@ -191,6 +192,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
   protected SqlQueryExecutor _sqlQueryExecutor;
   // Can only be constructed after resource manager getting started
   protected OfflineSegmentIntervalChecker _offlineSegmentIntervalChecker;
+  protected RealtimeOffsetAutoResetManager _realtimeOffsetAutoResetManager;
   protected RealtimeSegmentValidationManager _realtimeSegmentValidationManager;
   protected BrokerResourceValidationManager _brokerResourceValidationManager;
   protected SegmentRelocator _segmentRelocator;
@@ -382,6 +384,10 @@ public abstract class BaseControllerStarter implements ServiceStartable {
 
   public OfflineSegmentIntervalChecker getOfflineSegmentIntervalChecker() {
     return _offlineSegmentIntervalChecker;
+  }
+
+  public RealtimeOffsetAutoResetManager getRealtimeOffsetAutoResetManager() {
+    return _realtimeOffsetAutoResetManager;
   }
 
   public RealtimeSegmentValidationManager getRealtimeSegmentValidationManager() {
@@ -884,6 +890,7 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     _taskManager = createTaskManager();
     _taskManager.init();
     periodicTasks.add(_taskManager);
+    initRealtimeOffsetAutoResetManager(periodicTasks);
     BrokerServiceHelper brokerServiceHelper =
         new BrokerServiceHelper(_helixResourceManager, _config, _executorService, _connectionManager);
     _retentionManager = new RetentionManager(_helixResourceManager, _leadControllerManager, _config, _controllerMetrics,
@@ -935,6 +942,17 @@ public abstract class BaseControllerStarter implements ServiceStartable {
     periodicTasks.add(tenantRebalanceChecker);
 
     return periodicTasks;
+  }
+
+  private void initRealtimeOffsetAutoResetManager(List<PeriodicTask> periodicTasks) {
+    if (!_config.isRealtimeOffsetAutoResetBackfillEnabled()) {
+      LOGGER.info("Realtime offset auto reset is disabled, skipping initialization");
+      return;
+    }
+    _realtimeOffsetAutoResetManager =
+        new RealtimeOffsetAutoResetManager(_config, _helixResourceManager, _leadControllerManager,
+            _pinotLLCRealtimeSegmentManager, _controllerMetrics);
+    periodicTasks.add(_realtimeOffsetAutoResetManager);
   }
 
   /**
