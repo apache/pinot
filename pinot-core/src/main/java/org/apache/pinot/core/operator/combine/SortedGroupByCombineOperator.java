@@ -66,8 +66,8 @@ import org.slf4j.LoggerFactory;
  */
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator<GroupByResultsBlock> {
-
   private static final Logger LOGGER = LoggerFactory.getLogger(SortedGroupByCombineOperator.class);
+  // TODO: Consider changing it to "COMBINE_GROUP_BY_SORTED" to distinguish from GroupByCombineOperator
   private static final String EXPLAIN_NAME = "COMBINE_GROUP_BY";
 
   // We use a CountDownLatch to track if all Futures are finished by the query timeout, and cancel the unfinished
@@ -237,10 +237,7 @@ public class SortedGroupByCombineOperator extends BaseSingleBlockCombineOperator
   }
 
   private GroupByResultsBlock finishSortedRecords(SortedRecords records) {
-    SortedRecordTable table =
-        new SortedRecordTable(records, _dataSchema, _queryContext, _executorService);
-
-    // finish
+    SortedRecordTable table = new SortedRecordTable(records, _dataSchema, _queryContext, _executorService);
     if (_queryContext.isServerReturnFinalResult()) {
       table.finish(true, true);
     } else if (_queryContext.isServerReturnFinalResultKeyUnpartitioned()) {
