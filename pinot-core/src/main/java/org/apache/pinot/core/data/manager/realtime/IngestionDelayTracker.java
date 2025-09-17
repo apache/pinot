@@ -21,6 +21,7 @@ package org.apache.pinot.core.data.manager.realtime;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -136,10 +137,10 @@ public class IngestionDelayTracker {
   private final ScheduledExecutorService _metricsCleanupScheduler;
   private final ScheduledExecutorService _ingestionDelayTrackingScheduler;
 
+  protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
   // List of StreamMetadataProvider to fetch upstream latest stream offset (List because table can have multiple
   // upstream topics)
-  protected List<StreamMetadataProvider> _streamMetadataProviderList;
-  protected volatile Map<Integer, StreamPartitionMsgOffset> _partitionIdToLatestOffset;
+  protected List<StreamMetadataProvider> _streamMetadataProviderList = new ArrayList<>();
   protected volatile Set<Integer> _partitionsHostedByThisServer = new HashSet<>();
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
@@ -177,7 +178,6 @@ public class IngestionDelayTracker {
   private void createStreamMetadataProvider(RealtimeTableDataManager realtimeTableDataManager) {
     List<StreamConfig> streamConfigs =
         IngestionConfigUtils.getStreamConfigs(realtimeTableDataManager.getCachedTableConfigAndSchema().getLeft());
-    _streamMetadataProviderList = new ArrayList<>();
 
     for (StreamConfig streamConfig : streamConfigs) {
       StreamConsumerFactory streamConsumerFactory = StreamConsumerFactoryProvider.create(streamConfig);
@@ -564,6 +564,13 @@ public class IngestionDelayTracker {
     _metricsCleanupScheduler.shutdown(); // ScheduledExecutor is installed in constructor so must always be cancelled
     if (_ingestionDelayTrackingScheduler != null) {
       _ingestionDelayTrackingScheduler.shutdown();
+    }
+    for (StreamMetadataProvider streamMetadataProvider : _streamMetadataProviderList) {
+      try {
+        streamMetadataProvider.close();
+      } catch (IOException e) {
+        LOGGER.error("Failed to close streamMetadataProvider", e);
+      }
     }
     if (!_isServerReadyToServeQueries.get()) {
       // Do not update the tracker state during server startup period

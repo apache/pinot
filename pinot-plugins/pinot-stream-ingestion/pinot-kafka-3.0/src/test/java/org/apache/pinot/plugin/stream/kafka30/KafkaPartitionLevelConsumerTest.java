@@ -477,7 +477,7 @@ public class KafkaPartitionLevelConsumerTest {
       Map<Integer, StreamPartitionMsgOffset> partitionMsgOffsetMap =
           streamMetadataProvider.fetchLatestStreamOffset(partitions, 1000);
       Assert.assertEquals(((LongMsgOffset) (partitionMsgOffsetMap.get(0))).getOffset(), NUM_MSG_PRODUCED_PER_PARTITION);
-      Assert.assertEquals(((LongMsgOffset) (partitionMsgOffsetMap.get(0))).getOffset(), NUM_MSG_PRODUCED_PER_PARTITION);
+      Assert.assertEquals(((LongMsgOffset) (partitionMsgOffsetMap.get(1))).getOffset(), NUM_MSG_PRODUCED_PER_PARTITION);
     }
   }
 
