@@ -392,6 +392,7 @@ public class SegmentColumnarIndexCreator implements SegmentCreator {
    * @param columnReader ColumnReader for the column data
    * @throws IOException if indexing fails
    */
+  @Override
   public void indexColumn(String columnName, ColumnReader columnReader) throws IOException {
     Map<IndexType<?, ?, ?>, IndexCreator> creatorsByIndex = _creatorsByColAndIndex.get(columnName);
     NullValueVectorCreator nullVec = _nullValueVectorCreatorMap.get(columnName);

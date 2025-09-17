@@ -68,7 +68,7 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
     _statsCollectorConfig = statsCollectorConfig;
     _targetSchema = statsCollectorConfig.getSchema();
     _columnStatsCollectorMap = new HashMap<>();
-    _totalDocCount = 0;
+    _totalDocCount = -1; // indicates unset
 
     initializeStatsCollectors();
     collectColumnStats();
@@ -112,6 +112,10 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
         case BYTES:
           _columnStatsCollectorMap.put(columnName,
               new BytesColumnPredIndexStatsCollector(columnName, _statsCollectorConfig));
+          break;
+        case MAP:
+          _columnStatsCollectorMap.put(columnName,
+              new MapColumnPreIndexStatsCollector(columnName, _statsCollectorConfig));
           break;
         default:
           throw new IllegalStateException("Unsupported data type: " + fieldSpec.getDataType());
@@ -162,10 +166,11 @@ public class ColumnarSegmentPreIndexStatsContainer implements SegmentPreIndexSta
         docCount++;
       }
 
-      // Set total doc count from the first column (all columns should have same count)
-      if (_totalDocCount == 0) {
+      // if totalDocCount is unset then set total doc count from the first column
+      if (_totalDocCount == -1) {
         _totalDocCount = docCount;
       } else if (_totalDocCount != docCount) {
+        // all columns should have same count
         LOGGER.warn("Column {} has {} documents, but expected {} documents",
             columnName, docCount, _totalDocCount);
       }

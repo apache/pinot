@@ -83,6 +83,10 @@ public class PinotSegmentColumnReaderFactory implements ColumnReaderFactory {
       throw new IllegalStateException("Factory not initialized. Call init() first.");
     }
 
+    if (targetFieldSpec.isVirtualColumn()) {
+      throw new IllegalStateException("Target field spec is a virtual column.");
+    }
+
     // Check if we already have a reader for this column
     ColumnReader existingReader = _columnReaders.get(columnName);
     if (existingReader != null) {

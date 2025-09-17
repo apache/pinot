@@ -211,7 +211,6 @@ public class SegmentIndexCreationDriverImpl implements SegmentIndexCreationDrive
       _recordReader = null;
       _transformPipeline = null; // No transform pipeline for columnar mode
       _dataSource = dataSource;
-      // Initialize common components with columnar-specific reader class name
     } else {
       // For record reader-based data sources
       _recordReader = dataSource.getRecordReader();
