@@ -18,7 +18,6 @@
  */
 package org.apache.pinot.controller.workload.scheme;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -59,14 +58,8 @@ public class DefaultPropagationScheme implements PropagationScheme {
     if (instances.isEmpty()) {
       throw new IllegalArgumentException("No instances found for node config: " + nodeConfig);
     }
-    InstanceCost instanceCost = new InstanceCost(
-        nodeConfig.getEnforcementProfile().getCpuCostNs() / instances.size(),
-        nodeConfig.getEnforcementProfile().getMemoryCostBytes() / instances.size()
-    );
-    Map<String, InstanceCost> instanceCostMap = new HashMap<>();
-    for (String instance: instances) {
-      instanceCostMap.put(instance, instanceCost);
-    }
-    return instanceCostMap;
+    // Split the total cost equally among all instances
+   return costSplitter.computeInstanceCostMap(nodeConfig.getEnforcementProfile().getCpuCostNs(),
+       nodeConfig.getEnforcementProfile().getMemoryCostBytes(), instances);
   }
 }

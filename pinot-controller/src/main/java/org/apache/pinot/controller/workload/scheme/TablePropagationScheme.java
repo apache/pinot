@@ -25,22 +25,26 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.apache.helix.HelixManager;
+import org.apache.helix.model.ExternalView;
+import org.apache.pinot.common.assignment.InstancePartitionsUtils;
+import org.apache.pinot.common.utils.helix.HelixHelper;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.workload.splitter.CostSplitter;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.config.workload.CostSplit;
+import org.apache.pinot.spi.config.table.assignment.InstancePartitionsType;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
+import org.apache.pinot.spi.config.workload.PropagationEntityOverrides;
+import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 
 /**
  * A {@code TablePropagationScheme} resolves Pinot instances based on table names in a node
  * configuration.
  *
- * <p>
- * This scheme looks up Helix tags for offline and realtime tables and maps them to
- * instances, enabling workload propagation by table.
- * </p>
  */
 public class TablePropagationScheme implements PropagationScheme {
 
@@ -53,122 +57,190 @@ public class TablePropagationScheme implements PropagationScheme {
   /**
    * Resolves the union of all instances across all cost splits for the given node config.
    *
-   * @param nodeConfig Node configuration containing propagation scheme and cost splits.
-   * @return A set of instance names that should receive workload messages.
-   * @throws IllegalArgumentException If no instances are found for a cost split.
+   * Example:
+   * <pre>
+   *   { "Broker_Instance_1", "Broker_Instance_2", "Server_Instance_1" }
+   * </pre>
    */
   public Set<String> resolveInstances(NodeConfig nodeConfig) {
     Set<String> instances = new HashSet<>();
-    Map<String, Map<NodeConfig.Type, Set<String>>> tableWithTypeToHelixTags =
-        PropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
-    Map<String, Set<String>> helixTagToInstances =
-        PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
-
+    Map<String, Set<String>> partitionKeyToInstances =
+        PropagationUtils.getPartitionConfigKeyToInstances(_pinotHelixResourceManager);
+    HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
+    ExternalView brokerResource = HelixHelper.getExternalViewForResource(helixManager.getClusterManagmentTool(),
+        helixManager.getClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
     NodeConfig.Type nodeType = nodeConfig.getNodeType();
-    for (CostSplit costSplit : nodeConfig.getPropagationScheme().getCostSplits()) {
-      Map<String, Set<String>> byTag = resolveInstancesByHelixTag(costSplit, nodeType, tableWithTypeToHelixTags,
-          helixTagToInstances);
-      if (!byTag.isEmpty()) {
-        for (Set<String> set : byTag.values()) {
-          instances.addAll(set);
+
+    for (PropagationEntity entity : nodeConfig.getPropagationScheme().getPropagationEntities()) {
+      String tableName = entity.getEntity();
+      if (nodeConfig.getNodeType() == NodeConfig.Type.BROKER_NODE) {
+        for (String tableWithType : expandToTablesWithType(tableName)) {
+          instances.addAll(getBrokerInstances(brokerResource, tableWithType));
         }
+      } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
+        for (String partitionKey : InstancePartitionsUtils.getAllPossibleInstancePartitionsName(tableName)) {
+          instances.addAll(partitionKeyToInstances.getOrDefault(partitionKey, Collections.emptySet()));
+        }
+      } else {
+        throw new IllegalStateException("Unsupported node type: " + nodeType);
       }
     }
     return instances;
   }
-
   /**
    * Computes the per-instance cost map for the given node config using the provided splitter.
    *
    * <p>
-   * This method supports sub-allocations: the cost-ids in the sub-allocations are the helix tags.
-   * For example, for a realtime table having different consuming and completed servers and different
-   * costs for each, the cost-ids can be "myTable_REALTIME" and "myTableCompleted_OFFLINE".
+   * For each cost split in the node config, the relevant instances are resolved based on
+   * table names and node type. The splitter is then used to compute costs for those instances.
+   * If multiple splits resolve to the same instance, their costs are summed.
    * </p>
    *
-   * @param nodeConfig Node configuration containing cost splits and scope.
-   * @param costSplitter Strategy used to compute costs per instance.
-   * @return A mapping of instance name to its computed {@link InstanceCost}.
-   * @throws IllegalArgumentException If no instances are found for a cost split.
+   * Example:
+   * <pre>
+   *   {
+   *     "Broker_Instance_1": { cpuCostNs: 1000000, memoryCostBytes: 1048576 },
+   *     "Broker_Instance_2": { cpuCostNs: 1000000, memoryCostBytes: 1048576 },
+   *     "Server_Instance_1": { cpuCostNs: 2000000, memoryCostBytes: 2097152 },
+   *   }
+   * </pre>
    */
+  @Override
   public Map<String, InstanceCost> resolveInstanceCostMap(NodeConfig nodeConfig, CostSplitter costSplitter) {
     Map<String, InstanceCost> instanceCostMap = new HashMap<>();
-    Map<String, Map<NodeConfig.Type, Set<String>>> tableWithTypeToHelixTags =
-        PropagationUtils.getTableToHelixTags(_pinotHelixResourceManager);
-    Map<String, Set<String>> helixTagToInstances =
-        PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
+    // One-time zk lookups reused across all entities
+    HelixManager helixManager = _pinotHelixResourceManager.getHelixZkManager();
+    ExternalView brokerResource = HelixHelper.getExternalViewForResource(helixManager.getClusterManagmentTool(),
+        helixManager.getClusterName(), CommonConstants.Helix.BROKER_RESOURCE_INSTANCE);
+    Map<String, Set<String>> partitionKeyToInstances =
+        PropagationUtils.getPartitionConfigKeyToInstances(_pinotHelixResourceManager);
 
     NodeConfig.Type nodeType = nodeConfig.getNodeType();
-    for (CostSplit costSplit : nodeConfig.getPropagationScheme().getCostSplits()) {
-      // Gives a mapping of helix tag to instances for this cost split
-      // e.g. "myTable_REALTIME" -> {"Server_1", "Server_2"}, "myTableCompleted_OFFLINE" -> {"Server_3", "Server_4"}
-      // we get it this way to check for sub-allocations later that are based on helix tags
-      Map<String, Set<String>> instancesByTag = resolveInstancesByHelixTag(costSplit, nodeType,
-          tableWithTypeToHelixTags, helixTagToInstances);
-      if (instancesByTag.isEmpty()) {
-        // This is to ensure active table name is passed in the cost split
-        throw new IllegalArgumentException("No instances found for CostSplit: " + costSplit);
+
+    for (PropagationEntity entity : nodeConfig.getPropagationScheme().getPropagationEntities()) {
+      String tableName = entity.getEntity();
+      Set<String> instances;
+      Map<String, InstanceCost> deltaCost;
+      if (nodeType == NodeConfig.Type.BROKER_NODE) {
+        instances = getBrokerInstances(brokerResource, tableName);
+        deltaCost = costSplitter.computeInstanceCostMap(entity.getCpuCostNs(), entity.getMemoryCostBytes(), instances);
+      } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
+        deltaCost = resolveServerCosts(partitionKeyToInstances, entity, costSplitter);
+      } else {
+        throw new IllegalStateException("Unsupported node type: " + nodeType);
       }
+      // Since entities are explicit, we fail if no instances are found.
+      if (deltaCost == null || deltaCost.isEmpty()) {
+        throw new IllegalArgumentException(
+            "No instances found for entity: " + entity + " and node config: " + nodeConfig);
+      }
+      // For a workload, if the multiple entities resolve to the same instance, we sum the costs for that instance
+      PropagationUtils.mergeCosts(instanceCostMap, deltaCost);
+    }
+    return instanceCostMap;
+  }
 
-      for (Map.Entry<String, Set<String>> entry : instancesByTag.entrySet()) {
-        String helixTag = entry.getKey();
-        Set<String> instances = entry.getValue();
+  /**
+   * Resolves the set of broker instances responsible for serving the given table name.
+   *
+   * Returns the first non-empty set of instances since the brokers are shared across all table types.
+   */
+  private Set<String> getBrokerInstances(ExternalView brokerResource, String tableName) {
+    for (String tableWithType : expandToTablesWithType(tableName)) {
+      Set<String> instances = brokerResource.getStateMap(tableWithType) != null
+          ? brokerResource.getStateMap(tableWithType).keySet() : Collections.emptySet();
+      if (!instances.isEmpty()) {
+        return new HashSet<>(instances);
+      }
+    }
+    return Collections.emptySet();
+  }
 
-        // Support sub-allocations based on Helix tag ids
-        if (costSplit.getSubAllocations() != null) {
-          for (CostSplit split : costSplit.getSubAllocations()) {
-            if (helixTag.equals(split.getCostId())) {
-              Set<String> subInstances = instancesByTag.getOrDefault(split.getCostId(), instances);
-              mergeCosts(instanceCostMap, costSplitter.computeInstanceCostMap(split, subInstances));
-              break;
-            }
-          }
+  private Map<String, InstanceCost> resolveServerCosts(Map<String, Set<String>> partitionKeyToInstances,
+                                                       PropagationEntity entity, CostSplitter costSplitter) {
+    Map<String, InstanceCost> instanceCostMap = new HashMap<>();
+    Long cpuCostNs = entity.getCpuCostNs();
+    Long memoryCostBytes = entity.getMemoryCostBytes();
+    List<PropagationEntityOverrides> overrides = entity.getOverrides();
+    for (String tableWithType : expandToTablesWithType(entity.getEntity())) {
+      TableType tableType = TableNameBuilder.getTableTypeFromTableName(tableWithType);
+      Map<String, InstanceCost> deltaCost;
+      if (tableType == TableType.OFFLINE) {
+        // We skip overrides since they are only applicable to REALTIME tables
+        String offlineKey = InstancePartitionsUtils.getInstancePartitionsName(tableWithType,
+            InstancePartitionsType.OFFLINE.toString());
+        Set<String> instances = partitionKeyToInstances.get(offlineKey);
+        // Given we allow for entity without table type, it's possible to not find any OFFLINE instances if the
+        // table is REALTIME only. However, we have a check above to ensure at least one table type resolves
+        // to instances.
+        if (instances != null && !instances.isEmpty()) {
+          deltaCost = costSplitter.computeInstanceCostMap(cpuCostNs, memoryCostBytes, instances);
+          PropagationUtils.mergeCosts(instanceCostMap, deltaCost);
+        }
+      } else if (tableType == TableType.REALTIME) {
+        // Overrides present → apply each override separately
+        if (overrides != null && !overrides.isEmpty()) {
+          handleOverrides(instanceCostMap, overrides, tableWithType, costSplitter, partitionKeyToInstances);
         } else {
-          mergeCosts(instanceCostMap, costSplitter.computeInstanceCostMap(costSplit, instances));
+          // No overrides → union CONSUMING + COMPLETED
+          Set<String> instances = getRealtimeInstances(partitionKeyToInstances, tableWithType, null);
+          if (!instances.isEmpty()) {
+            deltaCost = costSplitter.computeInstanceCostMap(cpuCostNs, memoryCostBytes, instances);
+            PropagationUtils.mergeCosts(instanceCostMap, deltaCost);
+          }
         }
       }
     }
     return instanceCostMap;
   }
 
-  /**
-   * Resolves instances grouped by Helix tag for a given cost split and node type.
-   *
-   * <p>
-   * This is the single source of truth for mapping table → Helix tag → instances. Copies of
-   * instance sets are returned to avoid accidental external mutation.
-   * </p>
-   *
-   * @param costSplit The cost split specifying the table name.
-   * @param nodeType The node type (broker or server).
-   * @param tableWithTypeToHelixTags Precomputed mapping of table → node type → Helix tags.
-   * @param helixTagToInstances Precomputed mapping of Helix tag → instances.
-   * @return A map of Helix tag → set of instances for this cost split.
-   * @throws IllegalArgumentException If the cost split has no table name.
-   */
-  private Map<String, Set<String>> resolveInstancesByHelixTag(CostSplit costSplit, NodeConfig.Type nodeType,
-      Map<String, Map<NodeConfig.Type, Set<String>>> tableWithTypeToHelixTags,
-      Map<String, Set<String>> helixTagToInstances) {
-    String tableName = costSplit.getCostId();
-    Map<String, Set<String>> instancesByTag = new HashMap<>();
-    for (String tableWithType : expandToTablesWithType(tableName)) {
-      Map<NodeConfig.Type, Set<String>> nodeToHelixTags = tableWithTypeToHelixTags.get(tableWithType);
-      if (nodeToHelixTags == null) {
-        continue;
+  private void handleOverrides(Map<String, InstanceCost> instanceCostMap, List<PropagationEntityOverrides> overrides,
+                               String tableWithType, CostSplitter costSplitter,
+                               Map<String, Set<String>> partitionKeyToInstances) {
+    for (PropagationEntityOverrides override : overrides) {
+      OverrideEntityType overrideEntityType = OverrideEntityType.fromString(override.getEntity());
+      Set<String> instances = getRealtimeInstances(partitionKeyToInstances, tableWithType, overrideEntityType);
+      // Since overrides are explicit, we fail if no instances are found.
+      if (instances.isEmpty()) {
+        throw new IllegalArgumentException(
+            "No instances found for override: " + override + " and table: " + tableWithType);
       }
-      Set<String> helixTags = nodeToHelixTags.get(nodeType);
-      if (helixTags == null) {
-        continue;
-      }
-      for (String helixTag : helixTags) {
-        Set<String> helixInstances = helixTagToInstances.get(helixTag);
-        if (helixInstances != null && !helixInstances.isEmpty()) {
-          // Use a copy to avoid accidental external mutation
-          instancesByTag.put(helixTag, new HashSet<>(helixInstances));
-        }
-      }
+      Map<String, InstanceCost> deltaCost = costSplitter.computeInstanceCostMap(override.getCpuCostNs(),
+          override.getMemoryCostBytes(), instances);
+      PropagationUtils.mergeCosts(instanceCostMap, deltaCost);
     }
-    return instancesByTag;
+  }
+
+  /**
+   * Returns REALTIME instances for the given tableWithType.
+   * If {@code type} is null, returns the union of CONSUMING and COMPLETED.
+   */
+  private Set<String> getRealtimeInstances(Map<String, Set<String>> partitionKeyToInstances, String tableWithType,
+                                           @Nullable OverrideEntityType type) {
+    String consumingKey = InstancePartitionsUtils.getInstancePartitionsName(
+        tableWithType, InstancePartitionsType.CONSUMING.toString());
+    String completedKey = InstancePartitionsUtils.getInstancePartitionsName(
+        tableWithType, InstancePartitionsType.COMPLETED.toString());
+    if (type == OverrideEntityType.CONSUMING) {
+      Set<String> instances = partitionKeyToInstances.get(consumingKey);
+      return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);
+    } else if (type == OverrideEntityType.COMPLETED) {
+      Set<String> instances = partitionKeyToInstances.get(completedKey);
+      return (instances == null) ? Collections.emptySet() : new HashSet<>(instances);
+    }
+
+    // Union CONSUMING + COMPLETED
+    Set<String> consuming = partitionKeyToInstances.get(consumingKey);
+    Set<String> completed = partitionKeyToInstances.get(completedKey);
+
+    Set<String> union = new HashSet<>();
+    if (consuming != null) {
+      union.addAll(consuming);
+    }
+    if (completed != null) {
+      union.addAll(completed);
+    }
+    return union;
   }
 
   /**
@@ -193,18 +265,17 @@ public class TablePropagationScheme implements PropagationScheme {
     return Collections.singletonList(tableName);
   }
 
-  /**
-   * Merges the delta cost map into the target map by summing CPU and memory costs.
-   *
-   * @param target The target map to merge into.
-   * @param delta The delta map whose values are added.
-   */
-  private static void mergeCosts(Map<String, InstanceCost> target, Map<String, InstanceCost> delta) {
-    for (Map.Entry<String, InstanceCost> e : delta.entrySet()) {
-      target.merge(e.getKey(), e.getValue(), (oldCost, newCost) ->
-          new InstanceCost(
-              oldCost.getCpuCostNs() + newCost.getCpuCostNs(),
-              oldCost.getMemoryCostBytes() + newCost.getMemoryCostBytes()));
+  private enum OverrideEntityType {
+    CONSUMING,
+    COMPLETED;
+
+    public static OverrideEntityType fromString(String value) {
+      for (OverrideEntityType type : OverrideEntityType.values()) {
+        if (type.name().equalsIgnoreCase(value)) {
+          return type;
+        }
+      }
+      throw new IllegalArgumentException("Unknown OverrideEntityType: " + value);
     }
   }
 }

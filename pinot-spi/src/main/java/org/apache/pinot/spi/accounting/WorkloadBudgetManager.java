@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.accounting;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -151,13 +152,12 @@ public class WorkloadBudgetManager {
   /**
    * Retrieves the remaining budget for a specific workload.
    */
-  public BudgetStats getRemainingBudgetForWorkload(String workload) {
+  public BudgetStats getBudgetStats(String workload) {
     if (!_isEnabled) {
-      return new BudgetStats(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE);
+      return null;
     }
-
     Budget budget = _workloadBudgets.get(workload);
-    return budget != null ? budget.getStats() : new BudgetStats(0, 0, 0, 0);
+    return budget != null ? budget.getStats() : null;
   }
 
   /**
@@ -176,14 +176,6 @@ public class WorkloadBudgetManager {
     long totalMemRemaining =
         _workloadBudgets.values().stream().mapToLong(budget -> budget.getStats()._memoryRemaining).sum();
     return new BudgetStats(totalCpuBudget, totalMemoryBudget, totalCpuRemaining, totalMemRemaining);
-  }
-
-  public BudgetStats getBudgetStats(String workload) {
-    if (!_isEnabled) {
-      return null;
-    }
-    Budget budget = _workloadBudgets.get(workload);
-    return budget != null ? budget.getStats() : null;
   }
 
   /**
@@ -234,6 +226,15 @@ public class WorkloadBudgetManager {
     }
     BudgetStats stats = budget.getStats();
     return stats._cpuRemaining > 0 && stats._memoryRemaining > 0;
+  }
+
+  public Map<String, BudgetStats> getAllBudgetStats() {
+    if (!_isEnabled) {
+      return null;
+    }
+    Map<String, BudgetStats> allStats = new ConcurrentHashMap<>();
+    _workloadBudgets.forEach((workload, budget) -> allStats.put(workload, budget.getStats()));
+    return allStats;
   }
   /**
    * Internal class representing budget statistics.

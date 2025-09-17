@@ -511,7 +511,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
-          new URI(_controllerRequestURLBuilder.forQueryWorkloadConfigDelete(config)), _headers));
+          new URI(_controllerRequestURLBuilder.forBaseQueryWorkloadConfig(config)), _headers));
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }
@@ -521,7 +521,7 @@ public class ControllerRequestClient {
       throws IOException {
     try {
       SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
-          new URI(_controllerRequestURLBuilder.forQueryWorkloadConfigGet(config)), _headers));
+          new URI(_controllerRequestURLBuilder.forBaseQueryWorkloadConfig(config)), _headers));
       return JsonUtils.stringToObject(response.getResponse(), QueryWorkloadConfig.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
