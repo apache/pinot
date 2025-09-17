@@ -145,7 +145,7 @@ public class SelectionPlanNode implements PlanNode {
   private boolean reverseOptimizationEnabled(QueryContext queryContext) {
     String value = queryContext.getQueryOptions().get(CommonConstants.Broker.Request.QueryOptionKey.REVERSE_ORDER);
     if (value == null) {
-      return CommonConstants.Broker.Request.QueryOptionKey.DEFAULT_REVERSE_ORDER;
+      return CommonConstants.Broker.Request.QueryOptionKey.DEFAULT_ALLOW_REVERSE_ORDER;
     }
     return Boolean.parseBoolean(value);
   }
