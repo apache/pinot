@@ -38,6 +38,7 @@ import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.metrics.BrokerMetrics;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.common.request.PinotQuery;
+import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -54,7 +55,7 @@ import static org.testng.Assert.fail;
 
 
 public class MultiStageReplicaGroupSelectorTest {
-  private static final String TABLE_NAME = "testTable_OFFLINE";
+  private static final String TABLE_NAME = "testTable_REALTIME";
   private final static List<String> SEGMENTS =
       Arrays.asList("segment0", "segment1", "segment2", "segment3", "segment4", "segment5", "segment6", "segment7",
           "segment8", "segment9", "segment10", "segment11");
@@ -71,6 +72,10 @@ public class MultiStageReplicaGroupSelectorTest {
 
   private static List<String> getSegments() {
     return SEGMENTS;
+  }
+
+  private static LLCSegmentName getLLCSegmentName(long epochMillis) {
+    return new LLCSegmentName(TABLE_NAME, 1 /* partitionGroup */, 2 /* seqNum */, epochMillis);
   }
 
   @BeforeMethod
@@ -116,6 +121,23 @@ public class MultiStageReplicaGroupSelectorTest {
     expectedSelectorResult = createExpectedAssignment(replicaGroup1, getSegments());
     selectionResult = multiStageSelector.select(_brokerRequest, getSegments(), 1);
     assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    // Add a new LLC segment to the list of segments but don't update segment states. The selection result should
+    // remain the same.
+    List<String> segments = new ArrayList<>(getSegments());
+    LLCSegmentName newSegmentName = getLLCSegmentName(System.currentTimeMillis());
+    segments.add(newSegmentName.getSegmentName());
+    selectionResult = multiStageSelector.select(_brokerRequest, segments, 1);
+    assertEquals(selectionResult.getSegmentToInstanceMap(), expectedSelectorResult);
+
+    long expiredSegmentEpochMs = System.currentTimeMillis() - multiStageSelector._newSegmentExpirationTimeInSeconds * 1000
+        - 10_000;
+    segments.set(segments.size() - 1, getLLCSegmentName(expiredSegmentEpochMs).getSegmentName());
+    try {
+      multiStageSelector.select(_brokerRequest, segments, 1);
+      fail("call should have failed");
+    } catch (Exception ignored) {
+    }
   }
 
   @Test
