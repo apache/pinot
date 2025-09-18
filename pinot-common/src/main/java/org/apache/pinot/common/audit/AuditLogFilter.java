@@ -69,7 +69,9 @@ public class AuditLogFilter implements ContainerRequestFilter, ContainerResponse
     AuditResponseContext responseContext = null;
     // Only create and store the context if response auditing is enabled
     if (config.isCaptureResponseEnabled()) {
-      responseContext = new AuditResponseContext().setRequestId(UUID.randomUUID().toString());
+      responseContext = new AuditResponseContext()
+          .setRequestId(UUID.randomUUID().toString())
+          .setStartTimeNanos(System.nanoTime());
       requestContext.setProperty(PROPERTY_KEY_AUDIT_RESPONSE_CONTEXT, responseContext);
     }
 
@@ -108,9 +110,12 @@ public class AuditLogFilter implements ContainerRequestFilter, ContainerResponse
       return;
     }
     try {
+      long durationMs = (System.nanoTime() - auditContext.getStartTimeNanos()) / 1_000_000;
+
       final AuditEvent auditEvent = new AuditEvent().setRequestId(requestId)
           .setTimestamp(Instant.now().toString())
           .setResponseCode(responseContext.getStatus())
+          .setDurationMs(durationMs)
           .setEndpoint(requestContext.getUriInfo().getPath())
           .setMethod(requestContext.getMethod());
 

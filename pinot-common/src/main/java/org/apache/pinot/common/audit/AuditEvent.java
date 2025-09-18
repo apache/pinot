@@ -57,6 +57,9 @@ public class AuditEvent {
   @JsonProperty("response_code")
   private Integer _responseCode;
 
+  @JsonProperty("duration_ms")
+  private Long _durationMs;
+
   public String getTimestamp() {
     return _timestamp;
   }
@@ -135,6 +138,15 @@ public class AuditEvent {
 
   public AuditEvent setResponseCode(Integer responseCode) {
     _responseCode = responseCode;
+    return this;
+  }
+
+  public Long getDurationMs() {
+    return _durationMs;
+  }
+
+  public AuditEvent setDurationMs(Long durationMs) {
+    _durationMs = durationMs;
     return this;
   }
 

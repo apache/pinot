@@ -24,6 +24,7 @@ package org.apache.pinot.common.audit;
  */
 public class AuditResponseContext {
   private String _requestId;
+  private long _startTimeNanos;
 
   public AuditResponseContext() {
   }
@@ -34,6 +35,15 @@ public class AuditResponseContext {
 
   public AuditResponseContext setRequestId(String requestId) {
     _requestId = requestId;
+    return this;
+  }
+
+  public long getStartTimeNanos() {
+    return _startTimeNanos;
+  }
+
+  public AuditResponseContext setStartTimeNanos(long startTimeNanos) {
+    _startTimeNanos = startTimeNanos;
     return this;
   }
 }
