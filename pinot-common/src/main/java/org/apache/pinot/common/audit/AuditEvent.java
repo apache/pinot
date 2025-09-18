@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.common.audit;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
@@ -28,6 +29,7 @@ import java.util.Map;
  * Contains all required fields as specified in the Phase 1 audit logging specification.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonAutoDetect(getterVisibility = JsonAutoDetect.Visibility.NONE, isGetterVisibility = JsonAutoDetect.Visibility.NONE)
 public class AuditEvent {
 
   @JsonProperty("timestamp")
@@ -45,7 +47,7 @@ public class AuditEvent {
   @JsonProperty("origin_ip_address")
   private String _originIpAddress;
 
-  @JsonProperty("userid")
+  @JsonProperty("user_id")
   private UserIdentity _userid;
 
   @JsonProperty("request")
@@ -157,7 +159,7 @@ public class AuditEvent {
   @JsonInclude(JsonInclude.Include.NON_NULL)
   public static class AuditRequestPayload {
 
-    @JsonProperty("queryParameters")
+    @JsonProperty("query_params")
     private Map<String, Object> _queryParameters;
 
     @JsonProperty("headers")
