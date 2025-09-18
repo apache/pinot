@@ -36,7 +36,7 @@ import org.roaringbitmap.RoaringBitmapWriter;
 
 
 public class ReverseDocIdSetOperator extends BaseDocIdSetOperator {
-  private static final String EXPLAIN_NAME = "DOC_ID_SET";
+  private static final String EXPLAIN_NAME = "REVERSE_DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
