@@ -28,6 +28,7 @@ import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.container.ContainerResponseContext;
 import javax.ws.rs.container.ContainerResponseFilter;
 import org.apache.pinot.common.audit.AuditLogFilter;
+import org.apache.pinot.common.audit.AuditResponseFilter;
 import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.swagger.SwaggerApiListingResource;
@@ -83,6 +84,7 @@ public class ControllerAdminApiApplication extends ResourceConfig {
     register(new CorsFilter());
     register(AuthenticationFilter.class);
     register(AuditLogFilter.class);
+    register(AuditResponseFilter.class);
     // property("jersey.config.server.tracing.type", "ALL");
     // property("jersey.config.server.tracing.threshold", "VERBOSE");
   }

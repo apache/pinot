@@ -19,6 +19,7 @@
 package org.apache.pinot.common.audit;
 
 import java.io.IOException;
+import java.util.UUID;
 import javax.inject.Inject;
 import javax.inject.Provider;
 import javax.inject.Singleton;
@@ -52,12 +53,18 @@ public class AuditLogFilter implements ContainerRequestFilter {
       return;
     }
 
+    // Generate a unique request ID for correlation
+    String requestId = UUID.randomUUID().toString();
+    requestContext.setProperty("audit.request.id", requestId);
+
     // Extract the remote address and delegate to the auditor
     final Request grizzlyRequest = _requestProvider.get();
     final String remoteAddr = grizzlyRequest.getRemoteAddr();
 
     final AuditEvent auditEvent = _auditRequestProcessor.processRequest(requestContext, remoteAddr);
     if (auditEvent != null) {
+      // Add the request ID to the audit event
+      auditEvent.setRequestId(requestId);
       AuditLogger.auditLog(auditEvent);
     }
   }

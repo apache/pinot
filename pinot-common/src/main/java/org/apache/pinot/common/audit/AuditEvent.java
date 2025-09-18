@@ -51,6 +51,12 @@ public class AuditEvent {
   @JsonProperty("request")
   private AuditRequestPayload _request;
 
+  @JsonProperty("request_id")
+  private String _requestId;
+
+  @JsonProperty("response_code")
+  private Integer _responseCode;
+
   public String getTimestamp() {
     return _timestamp;
   }
@@ -111,6 +117,24 @@ public class AuditEvent {
 
   public AuditEvent setRequest(AuditRequestPayload request) {
     _request = request;
+    return this;
+  }
+
+  public String getRequestId() {
+    return _requestId;
+  }
+
+  public AuditEvent setRequestId(String requestId) {
+    _requestId = requestId;
+    return this;
+  }
+
+  public Integer getResponseCode() {
+    return _responseCode;
+  }
+
+  public AuditEvent setResponseCode(Integer responseCode) {
+    _responseCode = responseCode;
     return this;
   }
 
