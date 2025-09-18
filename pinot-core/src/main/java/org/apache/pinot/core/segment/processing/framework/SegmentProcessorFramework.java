@@ -165,8 +165,8 @@ public class SegmentProcessorFramework {
     int nextRecordReaderIndexToBeProcessed = 0;
     int iterationCount = 1;
     boolean canMapperBeEarlyTerminated =
-        _segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE ||
-            _segmentProcessorConfig.getSegmentConfig().getMaxDiskUsagePercentage() < 100;
+        _segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE
+            || _segmentProcessorConfig.getSegmentConfig().getMaxDiskUsagePercentage() < 100;
     String logMessage;
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {

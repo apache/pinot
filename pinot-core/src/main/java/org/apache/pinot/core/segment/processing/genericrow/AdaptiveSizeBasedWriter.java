@@ -57,7 +57,7 @@ public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWr
   private final FileStore _fileStore;
   private long _lastDiskUsageCheckTime = 0L;
 
-  private boolean hasExceededSizeLimit = false;
+  private boolean _hasExceededSizeLimit = false;
 
   private static final long DISK_USAGE_CHECK_INTERVAL_MS = 10 * 1000L; // 10 seconds
 
@@ -98,12 +98,12 @@ public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWr
   private boolean isDiskUsageExceeded() {
     if (_fileStore == null || _maxDiskUsagePercentage <= 0 || _maxDiskUsagePercentage >= 100) {
       // Unable to get the filestore or invalid or no limit on max disk usage percentage
-      return hasExceededSizeLimit;
+      return _hasExceededSizeLimit;
     }
     try {
       long currentTime = System.currentTimeMillis();
       if (currentTime - _lastDiskUsageCheckTime < DISK_USAGE_CHECK_INTERVAL_MS) {
-        return hasExceededSizeLimit;
+        return _hasExceededSizeLimit;
       }
       _lastDiskUsageCheckTime = currentTime;
 
@@ -114,12 +114,12 @@ public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWr
       if (usedPercentage >= _maxDiskUsagePercentage) {
         LOGGER.warn("Disk usage percentage: {}% has exceeded the max limit: {}%. Will stop writing more data",
             usedPercentage, _maxDiskUsagePercentage);
-        hasExceededSizeLimit = true;
+        _hasExceededSizeLimit = true;
       }
-      return hasExceededSizeLimit;
+      return _hasExceededSizeLimit;
     } catch (Exception e) {
       LOGGER.error("Failed to get the disk usage info", e);
-      return hasExceededSizeLimit;
+      return _hasExceededSizeLimit;
     }
   }
 }
