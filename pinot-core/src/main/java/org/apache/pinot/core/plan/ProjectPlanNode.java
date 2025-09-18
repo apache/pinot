@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.operator.AscDocIdSetOperator;
+import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
@@ -78,7 +78,7 @@ public class ProjectPlanNode implements PlanNode {
     projectionColumns.forEach(
         column -> dataSourceMap.put(column, _indexSegment.getDataSource(column, _queryContext.getSchema())));
     // NOTE: Skip creating DocIdSetOperator when maxDocsPerCall is 0 (for selection query with LIMIT 0)
-    AscDocIdSetOperator docIdSetOperator = _maxDocsPerCall > 0
+    DocIdSetOperator docIdSetOperator = _maxDocsPerCall > 0
         ? new DocIdSetPlanNode(_segmentContext, _queryContext, _maxDocsPerCall, _filterOperator).run()
         : null;
 

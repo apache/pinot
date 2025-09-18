@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.core.plan;
 
-import org.apache.pinot.core.operator.AscDocIdSetOperator;
+import org.apache.pinot.core.operator.DocIdSetOperator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.segment.spi.SegmentContext;
@@ -42,7 +42,7 @@ public class DocIdSetPlanNode implements PlanNode {
   }
 
   @Override
-  public AscDocIdSetOperator run() {
-    return new AscDocIdSetOperator(_filterOperator, _maxDocPerCall);
+  public DocIdSetOperator run() {
+    return new DocIdSetOperator(_filterOperator, _maxDocPerCall);
   }
 }

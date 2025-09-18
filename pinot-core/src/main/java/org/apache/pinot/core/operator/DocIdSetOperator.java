@@ -25,17 +25,19 @@ import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
-import org.apache.pinot.core.operator.dociditerators.BitmapBasedDocIdIterator;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.trace.Tracing;
-import org.roaringbitmap.IntIterator;
-import org.roaringbitmap.RoaringBitmap;
-import org.roaringbitmap.RoaringBitmapWriter;
 
 
-public class DescDocIdSetOperator extends BaseDocIdSetOperator {
+/**
+ * The <code>AscendingDocIdSetOperator</code> takes a filter operator and returns blocks with set of the matched
+ * document Ids.
+ * <p>Should call {@link #nextBlock()} multiple times until it returns <code>null</code> (already exhausts all the
+ * matched documents) or already gathered enough documents (for selection queries).
+ */
+public class DocIdSetOperator extends BaseDocIdSetOperator {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
   private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
@@ -45,10 +47,10 @@ public class DescDocIdSetOperator extends BaseDocIdSetOperator {
   private final int _maxSizeOfDocIdSet;
 
   private BlockDocIdSet _blockDocIdSet;
+  private BlockDocIdIterator _blockDocIdIterator;
   private int _currentDocId = 0;
-  private IntIterator _reverseIterator;
 
-  public DescDocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
+  public DocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
     Preconditions.checkArgument(maxSizeOfDocIdSet > 0 && maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _filterOperator = filterOperator;
     _maxSizeOfDocIdSet = maxSizeOfDocIdSet;
@@ -56,42 +58,31 @@ public class DescDocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   protected DocIdSetBlock getNextBlock() {
-    if (_reverseIterator == null) {
-      initializeBitmap();
-    }
-
     if (_currentDocId == Constants.EOF) {
       return null;
+    }
+
+    // Initialize filter block document Id set
+    if (_blockDocIdSet == null) {
+      _blockDocIdSet = _filterOperator.nextBlock().getBlockDocIdSet();
+      _blockDocIdIterator = _blockDocIdSet.iterator();
     }
 
     Tracing.ThreadAccountantOps.sample();
 
     int pos = 0;
     int[] docIds = THREAD_LOCAL_DOC_IDS.get();
-    for (int i = 0; i < _maxSizeOfDocIdSet && _reverseIterator.hasNext(); i++) {
-      _currentDocId = _reverseIterator.next();
+    for (int i = 0; i < _maxSizeOfDocIdSet; i++) {
+      _currentDocId = _blockDocIdIterator.next();
+      if (_currentDocId == Constants.EOF) {
+        break;
+      }
       docIds[pos++] = _currentDocId;
     }
     if (pos > 0) {
       return new DocIdSetBlock(docIds, pos);
     } else {
       return null;
-    }
-  }
-
-  private void initializeBitmap() {
-    _blockDocIdSet = _filterOperator.nextBlock().getBlockDocIdSet();
-    BlockDocIdIterator iterator = _blockDocIdSet.iterator();
-    if (iterator instanceof BitmapBasedDocIdIterator) {
-      _reverseIterator = ((BitmapBasedDocIdIterator) iterator).getDocIds().getReverseIntIterator();
-    } else {
-      RoaringBitmapWriter<RoaringBitmap> writer = RoaringBitmapWriter.writer().get();
-      int docId = iterator.next();
-      while (docId != Constants.EOF) {
-        writer.add(docId);
-        docId = iterator.next();
-      }
-      _reverseIterator = writer.get().getReverseIntIterator();
     }
   }
 
@@ -119,15 +110,14 @@ public class DescDocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   public boolean isCompatibleWith(DidOrder order) {
-    return order == DidOrder.DESC;
+    return order == DidOrder.ASC;
   }
 
   @Override
-  public BaseDocIdSetOperator withOrder(DidOrder order)
-      throws UnsupportedOperationException {
+  public BaseDocIdSetOperator withOrder(DidOrder order) {
     if (isCompatibleWith(order)) {
       return this;
     }
-    return new AscDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
+    return new ReverseDocIdSetOperator(_filterOperator, _maxSizeOfDocIdSet);
   }
 }
