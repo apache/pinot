@@ -145,7 +145,7 @@ public class TenantRebalancer {
         new ZkBasedTenantRebalanceObserver(tenantRebalanceContext.getJobId(), config.getTenantName(),
             tables, tenantRebalanceContext, _pinotHelixResourceManager);
     // Step 4: Spin up threads to consume the parallel queue and sequential queue.
-    rebalanceWithContext(tenantRebalanceContext, observer);
+    rebalanceWithObserver(observer);
 
     // Step 5: Prepare the rebalance results to be returned to the user. The rebalance jobs are running in the
     // background asynchronously.
@@ -166,16 +166,14 @@ public class TenantRebalancer {
   }
 
   /**
-   * Spins up threads to rebalance the tenant with the given context and observer.
-   * The rebalance operation is performed in parallel for the tables in the parallel queue, then, sequentially for the
-   * tables in the sequential queue.
-   * The observer should be initiated with the tenantRebalanceContext in order to track the progress properly.
+   * Spins up threads to rebalance the tenant with the given context and observer. The rebalance operation is performed
+   * in parallel for the tables in the parallel queue, then, sequentially for the tables in the sequential queue. The
+   * observer should be initiated with the tenantRebalanceContext in order to track the progress properly.
    *
-   * @param tenantRebalanceContext The context containing the configuration and queues for the rebalance operation.
    * @param observer The observer to notify about the rebalance progress and results.
    */
-  public void rebalanceWithContext(TenantRebalanceContext tenantRebalanceContext,
-      ZkBasedTenantRebalanceObserver observer) {
+  public void rebalanceWithObserver(ZkBasedTenantRebalanceObserver observer) {
+    TenantRebalanceContext tenantRebalanceContext = observer.getTenantRebalanceContext();
     LOGGER.info("Starting tenant rebalance with context: {}", tenantRebalanceContext);
     TenantRebalanceConfig config = tenantRebalanceContext.getConfig();
     ConcurrentLinkedDeque<TenantTableRebalanceJobContext> parallelQueue = tenantRebalanceContext.getParallelQueue();
