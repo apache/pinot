@@ -98,6 +98,7 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false, "The offset of the last consumed message."),
   REALTIME_INGESTION_DELAY_MS("milliseconds", false,
       "The difference of the current timestamp and the timestamp present in the last consumed message record."),
+  BACKFILL_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   REALTIME_CONSUMER_DIR_USAGE("bytes", true),
   SEGMENT_DOWNLOAD_SPEED("bytes", true),
   PREDOWNLOAD_SPEED("bytes", true),
