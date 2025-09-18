@@ -22,6 +22,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.common.utils.LLCSegmentName;
 import org.apache.pinot.spi.stream.LongMsgOffset;
@@ -108,7 +109,7 @@ public class IngestionDelayTrackerTest {
     for (long ingestionTimeMs = maxTestDelay; ingestionTimeMs >= 0; ingestionTimeMs--) {
       long firstStreamIngestionTimeMs = ingestionTimeMs + 1;
       ingestionDelayTracker.updateIngestionMetrics(segment0, partition0, ingestionTimeMs, firstStreamIngestionTimeMs,
-          null, null);
+          null, null, ServerGauge.BACKFILL_REALTIME_INGESTION_DELAY_MS);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition0),
           clock.millis() - ingestionTimeMs);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition0),
@@ -123,7 +124,7 @@ public class IngestionDelayTrackerTest {
     for (long ingestionTimeMs = 0; ingestionTimeMs <= 2 * maxTestDelay; ingestionTimeMs++) {
       long firstStreamIngestionTimeMs = ingestionTimeMs + 1;
       ingestionDelayTracker.updateIngestionMetrics(segment1, partition1, ingestionTimeMs, firstStreamIngestionTimeMs,
-          null, null);
+          null, null, ServerGauge.REALTIME_INGESTION_DELAY_MS);
       Assert.assertEquals(ingestionDelayTracker.getPartitionIngestionDelayMs(partition1),
           clock.millis() - ingestionTimeMs);
       Assert.assertEquals(ingestionDelayTracker.getPartitionEndToEndIngestionDelayMs(partition1),
