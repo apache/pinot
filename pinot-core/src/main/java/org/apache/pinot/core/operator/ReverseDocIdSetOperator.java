@@ -102,7 +102,7 @@ public class ReverseDocIdSetOperator extends BaseDocIdSetOperator {
 
   @Override
   public List<Operator> getChildOperators() {
-    return Collections.singletonList(_filterOperator);
+    return List.of(_filterOperator);
   }
 
   @Override
