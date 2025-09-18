@@ -23,7 +23,7 @@ import org.apache.pinot.core.common.Operator;
 
 
 /// An operator that is bound to a specific segment.
-public interface SegmentBlockOperator<T extends Block> extends Operator<T> {
+public interface DidOrderedOperator<T extends Block> extends Operator<T> {
   /// Returns true if the operator is ordered by docId in the specified order.
   ///
   /// Remember that empty operators or operators that return a single row are considered ordered.

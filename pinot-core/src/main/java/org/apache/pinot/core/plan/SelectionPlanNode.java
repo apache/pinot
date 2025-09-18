@@ -24,7 +24,7 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.OrderByExpressionContext;
 import org.apache.pinot.core.common.Operator;
 import org.apache.pinot.core.operator.BaseProjectOperator;
-import org.apache.pinot.core.operator.SegmentBlockOperator;
+import org.apache.pinot.core.operator.DidOrderedOperator;
 import org.apache.pinot.core.operator.blocks.results.SelectionResultsBlock;
 import org.apache.pinot.core.operator.query.EmptySelectionOperator;
 import org.apache.pinot.core.operator.query.SelectionOnlyOperator;
@@ -94,7 +94,7 @@ public class SelectionPlanNode implements PlanNode {
       boolean asc = orderByExpressions.get(0).isAsc();
       // Remember that we cannot use asc == projectOperator.isAscending() because empty operators are considered
       // both ascending and descending
-      SegmentBlockOperator.DidOrder queryOrder = SegmentBlockOperator.DidOrder.fromAsc(asc);
+      DidOrderedOperator.DidOrder queryOrder = DidOrderedOperator.DidOrder.fromAsc(asc);
       if (projectOperator.isCompatibleWith(queryOrder)) {
         return new SelectionPartiallyOrderedByLinearOperator(_indexSegment, _queryContext, expressions, projectOperator,
             sortedColumnsPrefixSize);
@@ -130,9 +130,9 @@ public class SelectionPlanNode implements PlanNode {
     boolean asc = orderByExpressions.get(0).isAsc();
     if (!asc
         && reverseOptimizationEnabled(_queryContext)
-        && !projectOperator.isCompatibleWith(SegmentBlockOperator.DidOrder.DESC)) {
+        && !projectOperator.isCompatibleWith(DidOrderedOperator.DidOrder.DESC)) {
       try {
-        return projectOperator.withOrder(SegmentBlockOperator.DidOrder.DESC);
+        return projectOperator.withOrder(DidOrderedOperator.DidOrder.DESC);
       } catch (IllegalArgumentException | UnsupportedOperationException e) {
         // This happens when the operator cannot provide the required order between blocks
         // Fallback to SelectionOrderByOperator

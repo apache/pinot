@@ -30,7 +30,7 @@ import org.apache.pinot.core.operator.BitmapDocIdSetOperator;
 import org.apache.pinot.core.operator.IntIteratorDocIdSetOperator;
 import org.apache.pinot.core.operator.ProjectionOperator;
 import org.apache.pinot.core.operator.ProjectionOperatorUtils;
-import org.apache.pinot.core.operator.SegmentBlockOperator;
+import org.apache.pinot.core.operator.DidOrderedOperator;
 import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 import org.apache.pinot.core.operator.blocks.ProjectionBlock;
 import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
@@ -130,7 +130,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   public MutableRoaringBitmap applyAnd(BatchIterator batchIterator, OptionalInt firstDoc, OptionalInt lastDoc) {
     IntIterator intIterator = batchIterator.asIntIterator(new int[OPTIMAL_ITERATOR_BATCH_SIZE]);
     IntIteratorDocIdSetOperator docIdOperator =
-        new IntIteratorDocIdSetOperator(intIterator, _docIdBuffer, SegmentBlockOperator.DidOrder.ASC);
+        new IntIteratorDocIdSetOperator(intIterator, _docIdBuffer, DidOrderedOperator.DidOrder.ASC);
     try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(
         _dataSourceMap, docIdOperator, _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
@@ -145,7 +145,7 @@ public final class ExpressionScanDocIdIterator implements ScanBasedDocIdIterator
   @Override
   public MutableRoaringBitmap applyAnd(ImmutableRoaringBitmap docIds) {
     try (ProjectionOperator projectionOperator = ProjectionOperatorUtils.getProjectionOperator(_dataSourceMap,
-        new BitmapDocIdSetOperator(docIds, _docIdBuffer, SegmentBlockOperator.DidOrder.ASC), _queryContext)) {
+        new BitmapDocIdSetOperator(docIds, _docIdBuffer, DidOrderedOperator.DidOrder.ASC), _queryContext)) {
       MutableRoaringBitmap matchingDocIds = new MutableRoaringBitmap();
       ProjectionBlock projectionBlock;
       while ((projectionBlock = projectionOperator.nextBlock()) != null) {

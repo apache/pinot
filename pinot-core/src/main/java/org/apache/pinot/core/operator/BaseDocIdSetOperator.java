@@ -42,7 +42,7 @@ import org.apache.pinot.core.operator.blocks.DocIdSetBlock;
 /// operators to emit rows in descending order to optimize the performance of top-N queries on segments sorted in
 /// ascending order.
 public abstract class BaseDocIdSetOperator extends BaseOperator<DocIdSetBlock>
-    implements SegmentBlockOperator<DocIdSetBlock> {
+    implements DidOrderedOperator<DocIdSetBlock> {
 
   /// Returns a [BaseDocIdSetOperator] that is compatible with the requested order or fails with
   /// [IllegalArgumentException] if the order is not supported for this operator.

@@ -24,7 +24,7 @@ import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
 public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOperator<T>
-    implements SegmentBlockOperator<T> {
+    implements DidOrderedOperator<T> {
 
   /**
    * Returns a map from source column name to context.
