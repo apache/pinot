@@ -69,10 +69,6 @@ public class AdaptiveSizeBasedWriter implements AdaptiveConstraintsWriter<FileWr
     try {
       Path path = outputDir.toPath();
       fileStore = Files.getFileStore(path);
-      long totalSpace = fileStore.getTotalSpace();
-      long usableSpace = fileStore.getUsableSpace();
-      LOGGER.info("File store for path: {} has total space: {}, usable space: {}", outputDir.getAbsolutePath(),
-          totalSpace, usableSpace);
     } catch (Exception e) {
       LOGGER.error("Failed to get the filestore for path: {}", outputDir.getAbsolutePath(), e);
       fileStore = null;
