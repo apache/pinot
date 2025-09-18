@@ -32,9 +32,8 @@ import org.apache.pinot.core.operator.docidsets.EmptyDocIdSet;
 public final class EmptyFilterOperator extends BaseFilterOperator {
   private EmptyFilterOperator() {
     // We will never call its getFalses() method.
-    super(0, false);
+    super(0, false, true);
   }
-
 
   public static final String EXPLAIN_NAME = "FILTER_EMPTY";
 
@@ -78,5 +77,10 @@ public final class EmptyFilterOperator extends BaseFilterOperator {
   @Override
   public void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
     explainPlanRows.setHasEmptyFilter(true);
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return this;
   }
 }

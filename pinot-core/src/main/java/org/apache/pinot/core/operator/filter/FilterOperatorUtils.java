@@ -85,7 +85,7 @@ public class FilterOperatorUtils {
             }
           }
         }
-        return new MatchAllFilterOperator(numDocs);
+        return new MatchAllFilterOperator(numDocs, true);
       }
 
       // Currently sorted index based filtering is supported only for
@@ -98,7 +98,7 @@ public class FilterOperatorUtils {
       if (predicateType == Predicate.Type.RANGE) {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
-          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs, true);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.RANGE)) {
@@ -109,22 +109,22 @@ public class FilterOperatorUtils {
         if (predicateEvaluator instanceof BaseDictIdBasedRegexpLikePredicateEvaluator) {
           if (dataSource.getDataSourceMetadata().isSorted()
               && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
-            return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+            return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs, true);
           }
           if (dataSource.getInvertedIndex() != null
               && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
-            return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+            return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs, true);
           }
         }
         return new ScanBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
       } else {
         if (dataSource.getDataSourceMetadata().isSorted() && dataSource.getDictionary() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.SORTED)) {
-          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          return new SortedIndexBasedFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs, true);
         }
         if (dataSource.getInvertedIndex() != null
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.INVERTED)) {
-          return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs);
+          return new InvertedIndexFilterOperator(queryContext, predicateEvaluator, dataSource, numDocs, true);
         }
         if (RangeIndexBasedFilterOperator.canEvaluate(predicateEvaluator, dataSource)
             && queryContext.isIndexUseAllowed(dataSource, FieldConfig.IndexType.RANGE)) {
@@ -148,7 +148,7 @@ public class FilterOperatorUtils {
       int numChildFilterOperators = childFilterOperators.size();
       if (numChildFilterOperators == 0) {
         // Return match all filter operator if all child filter operators match all records
-        return new MatchAllFilterOperator(numDocs);
+        return new MatchAllFilterOperator(numDocs, true);
       } else if (numChildFilterOperators == 1) {
         // Return the child filter operator if only one left
         return childFilterOperators.get(0);
@@ -166,7 +166,7 @@ public class FilterOperatorUtils {
       List<BaseFilterOperator> childFilterOperators = new ArrayList<>(filterOperators.size());
       for (BaseFilterOperator filterOperator : filterOperators) {
         if (filterOperator.isResultMatchingAll()) {
-          return new MatchAllFilterOperator(numDocs);
+          return new MatchAllFilterOperator(numDocs, true);
         } else if (!filterOperator.isResultEmpty()) {
           childFilterOperators.add(filterOperator);
         }
@@ -191,7 +191,7 @@ public class FilterOperatorUtils {
       if (filterOperator.isResultMatchingAll()) {
         return EmptyFilterOperator.getInstance();
       } else if (filterOperator.isResultEmpty()) {
-        return new MatchAllFilterOperator(numDocs);
+        return new MatchAllFilterOperator(numDocs, true);
       }
 
       return new NotFilterOperator(filterOperator, numDocs, queryContext.isNullHandlingEnabled());

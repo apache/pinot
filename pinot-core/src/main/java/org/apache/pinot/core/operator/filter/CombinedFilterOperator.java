@@ -40,7 +40,7 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   public CombinedFilterOperator(BaseFilterOperator mainFilterOperator, BaseFilterOperator subFilterOperator,
       Map<String, String> queryOptions) {
     // This filter operator does not support AND/OR/NOT operations.
-    super(0, false);
+    super(0, false, getCommonAscending(List.of(mainFilterOperator, subFilterOperator)));
     assert !mainFilterOperator.isResultEmpty() && !mainFilterOperator.isResultMatchingAll()
         && !subFilterOperator.isResultEmpty() && !subFilterOperator.isResultMatchingAll();
     _mainFilterOperator = mainFilterOperator;
@@ -61,8 +61,16 @@ public class CombinedFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     Tracing.activeRecording().setNumChildren(2);
-    BlockDocIdSet mainFilterDocIdSet = _mainFilterOperator.nextBlock().getNonScanFilterBLockDocIdSet();
+    BlockDocIdSet mainFilterDocIdSet = _mainFilterOperator.nextBlock().getNonScanFilterBlockDocIdSet();
     BlockDocIdSet subFilterDocIdSet = _subFilterOperator.nextBlock().getBlockDocIdSet();
     return new AndDocIdSet(Arrays.asList(mainFilterDocIdSet, subFilterDocIdSet), _queryOptions);
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    BaseFilterOperator reverseMainOperator = _mainFilterOperator.withOrder(!_ascending);
+    BaseFilterOperator reverseSubOperator = _subFilterOperator.withOrder(!_ascending);
+
+    return new CombinedFilterOperator(reverseMainOperator, reverseSubOperator, _queryOptions);
   }
 }

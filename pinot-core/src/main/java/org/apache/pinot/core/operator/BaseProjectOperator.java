@@ -23,7 +23,8 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.operator.blocks.ValueBlock;
 
 
-public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOperator<T> {
+public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOperator<T>
+    implements SegmentBlockOperator<T> {
 
   /**
    * Returns a map from source column name to context.
@@ -41,4 +42,11 @@ public abstract class BaseProjectOperator<T extends ValueBlock> extends BaseOper
   public int getNumColumnsProjected() {
     return getSourceColumnContextMap().size();
   }
+
+  /**
+   * Returns true if and only if the rows returned by this operator are sorted in ascending docId order.
+   *
+   * @throws UnsupportedOperationException if the order cannot be changed
+   */
+  public abstract BaseProjectOperator<T> withOrder(boolean ascending);
 }

@@ -65,7 +65,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
   @SuppressWarnings("unchecked")
   public RangeIndexBasedFilterOperator(QueryContext queryContext, PredicateEvaluator predicateEvaluator,
       DataSource dataSource, int numDocs) {
-    super(queryContext, dataSource, numDocs);
+    super(queryContext, dataSource, numDocs, true);
     _predicateEvaluator = predicateEvaluator;
     _rangeIndexReader = (RangeIndexReader<ImmutableRoaringBitmap>) dataSource.getRangeIndex();
     _parameterType = predicateEvaluator.isDictionaryBased() ? FieldSpec.DataType.INT : predicateEvaluator.getDataType();
@@ -76,7 +76,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     if (_rangeIndexReader.isExact()) {
       ImmutableRoaringBitmap matches = getMatchingDocIds();
       recordFilter(matches);
-      return new BitmapDocIdSet(matches, _numDocs);
+      return new BitmapDocIdSet(matches, _numDocs, _ascending);
     }
     return evaluateLegacyRangeFilter();
   }
@@ -89,7 +89,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
     ImmutableRoaringBitmap partialMatches = getPartiallyMatchingDocIds();
     // this branch is likely until RangeIndexReader reimplemented and enabled by default
     if (partialMatches == null) {
-      return new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs);
+      return new BitmapDocIdSet(matches == null ? new MutableRoaringBitmap() : matches, _numDocs, _ascending);
     }
     // Need to scan the first and last range as they might be partially matched
     ScanBasedFilterOperator scanBasedFilterOperator =
@@ -100,7 +100,7 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
       docIds.or(matches);
     }
     recordFilter(matches);
-    return new BitmapDocIdSet(docIds, _numDocs) {
+    return new BitmapDocIdSet(docIds, _numDocs, _ascending) {
       // Override this method to reflect the entries scanned
       @Override
       public long getNumEntriesScannedInFilter() {
@@ -260,5 +260,10 @@ public class RangeIndexBasedFilterOperator extends BaseColumnFilterOperator {
       recording.setFilter(FilterType.INDEX, _predicateEvaluator.getPredicateType().name());
       recording.setNumDocsScanned(_numDocs);
     }
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    throw new UnsupportedOperationException("Range index based filter operator does not support reverse operation");
   }
 }

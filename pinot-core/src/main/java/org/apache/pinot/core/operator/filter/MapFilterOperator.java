@@ -54,9 +54,15 @@ public class MapFilterOperator extends BaseFilterOperator {
   private final String _keyName;
   private final Predicate _predicate;
 
+
   public MapFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
       int numDocs) {
-    super(numDocs, false);
+    this(indexSegment, predicate, queryContext, numDocs, true);
+  }
+
+  public MapFilterOperator(IndexSegment indexSegment, Predicate predicate, QueryContext queryContext,
+      int numDocs, boolean ascending) {
+    super(numDocs, false, ascending);
     _predicate = predicate;
 
     // Get column name and key name from function arguments
@@ -91,6 +97,17 @@ public class MapFilterOperator extends BaseFilterOperator {
       _jsonMatchOperator = null;
       _expressionFilterOperator = new ExpressionFilterOperator(indexSegment, queryContext, predicate, numDocs);
     }
+  }
+
+  private MapFilterOperator(JsonMatchFilterOperator jsonMatchOperator,
+      ExpressionFilterOperator expressionFilterOperator, String columnName, String keyName, Predicate predicate,
+      int numDocs, boolean ascending) {
+    super(numDocs, false, ascending);
+    _jsonMatchOperator = jsonMatchOperator;
+    _expressionFilterOperator = expressionFilterOperator;
+    _columnName = columnName;
+    _keyName = keyName;
+    _predicate = predicate;
   }
 
   /**
@@ -226,5 +243,11 @@ public class MapFilterOperator extends BaseFilterOperator {
       default:
         return false;
     }
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new MapFilterOperator(_jsonMatchOperator, _expressionFilterOperator, _columnName, _keyName, _predicate,
+        _numDocs, !_ascending);
   }
 }

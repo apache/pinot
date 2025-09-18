@@ -33,7 +33,7 @@ public class NotFilterOperator extends BaseFilterOperator {
   private final BaseFilterOperator _filterOperator;
 
   public NotFilterOperator(BaseFilterOperator filterOperator, int numDocs, boolean nullHandlingEnabled) {
-    super(numDocs, nullHandlingEnabled);
+    super(numDocs, nullHandlingEnabled, filterOperator._ascending);
     _filterOperator = filterOperator;
   }
 
@@ -51,7 +51,7 @@ public class NotFilterOperator extends BaseFilterOperator {
   @Override
   protected BlockDocIdSet getTrues() {
     if (_filterOperator.isResultEmpty()) {
-      return new MatchAllDocIdSet(_numDocs);
+      return MatchAllDocIdSet.create(_numDocs, _ascending);
     } else {
       return _filterOperator.getFalses();
     }
@@ -84,5 +84,10 @@ public class NotFilterOperator extends BaseFilterOperator {
 
   public BaseFilterOperator getChildFilterOperator() {
     return _filterOperator;
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    return new NotFilterOperator(_filterOperator.reverse(), _numDocs, _nullHandlingEnabled);
   }
 }

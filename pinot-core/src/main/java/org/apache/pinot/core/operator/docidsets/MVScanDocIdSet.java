@@ -24,10 +24,11 @@ import org.apache.pinot.core.operator.filter.predicate.PredicateEvaluator;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 
 
-public final class MVScanDocIdSet implements BlockDocIdSet {
+public final class MVScanDocIdSet extends BlockDocIdSet.Base {
   private final MVScanDocIdIterator _docIdIterator;
 
   public MVScanDocIdSet(PredicateEvaluator predicateEvaluator, DataSource dataSource, int numDocs) {
+    super(true);
     _docIdIterator = new MVScanDocIdIterator(predicateEvaluator, dataSource, numDocs);
   }
 

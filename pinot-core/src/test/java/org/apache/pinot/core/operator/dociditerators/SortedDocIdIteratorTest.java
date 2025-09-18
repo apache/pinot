@@ -35,7 +35,7 @@ public class SortedDocIdIteratorTest {
 
   @Test
   public void testPairWithSameStartAndEnd() {
-    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(Collections.singletonList(new Pairs.IntPair(1, 1)));
+    SortedDocIdSet sortedDocIdSet = new SortedDocIdSet(Collections.singletonList(new Pairs.IntPair(1, 1)), true);
     BlockDocIdIterator iterator = sortedDocIdSet.iterator();
     List<Integer> result = new ArrayList<>();
     int docId;
@@ -48,7 +48,7 @@ public class SortedDocIdIteratorTest {
   @Test
   public void testOneDocIdRange() {
     List<Pairs.IntPair> docIdRanges = Collections.singletonList(new Pairs.IntPair(5, 15));
-    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges).iterator();
+    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges, true).iterator();
     assertEquals(docIdIterator.next(), 5);
     assertEquals(docIdIterator.next(), 6);
     assertEquals(docIdIterator.advance(8), 8);
@@ -61,7 +61,7 @@ public class SortedDocIdIteratorTest {
   @Test
   public void testTwoDocIdRanges() {
     List<Pairs.IntPair> docIdRanges = Arrays.asList(new Pairs.IntPair(20, 25), new Pairs.IntPair(30, 35));
-    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges).iterator();
+    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges, true).iterator();
     assertEquals(docIdIterator.advance(15), 20);
     assertEquals(docIdIterator.next(), 21);
     assertEquals(docIdIterator.next(), 22);
@@ -75,7 +75,7 @@ public class SortedDocIdIteratorTest {
   public void testDocIdRangesWithSingleDocument() {
     List<Pairs.IntPair> docIdRanges = Arrays
         .asList(new Pairs.IntPair(3, 3), new Pairs.IntPair(8, 8), new Pairs.IntPair(15, 15), new Pairs.IntPair(20, 20));
-    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges).iterator();
+    SortedDocIdIterator docIdIterator = new SortedDocIdSet(docIdRanges, true).iterator();
     assertEquals(docIdIterator.next(), 3);
     assertEquals(docIdIterator.advance(5), 8);
     assertEquals(docIdIterator.next(), 15);

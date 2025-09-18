@@ -18,24 +18,27 @@
  */
 package org.apache.pinot.core.operator.docidsets;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.operator.dociditerators.SortedDocIdIterator;
 import org.apache.pinot.spi.utils.Pairs.IntPair;
 
 
-public final class SortedDocIdSet implements BlockDocIdSet {
+public final class SortedDocIdSet extends BlockDocIdSet.Base {
   private final List<IntPair> _docIdRanges;
 
   // NOTE: No need to track numDocs because sorted index can only apply to ImmutableSegment, so the document ids are
   //       always smaller than numDocs.
-  public SortedDocIdSet(List<IntPair> docIdRanges) {
+  public SortedDocIdSet(List<IntPair> docIdRanges, boolean ascending) {
+    super(ascending);
+    Preconditions.checkArgument(!docIdRanges.isEmpty(), "docIdRanges must not be empty");
     _docIdRanges = docIdRanges;
   }
 
   @Override
   public SortedDocIdIterator iterator() {
-    return new SortedDocIdIterator(_docIdRanges);
+    return SortedDocIdIterator.create(_docIdRanges, _ascending);
   }
 
   @Override

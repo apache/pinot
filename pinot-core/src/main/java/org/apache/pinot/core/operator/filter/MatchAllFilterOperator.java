@@ -24,7 +24,6 @@ import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.ExplainPlanRows;
 import org.apache.pinot.core.common.Operator;
-import org.apache.pinot.core.operator.ExplainAttributeBuilder;
 import org.apache.pinot.core.operator.docidsets.MatchAllDocIdSet;
 
 
@@ -32,7 +31,11 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   public static final String EXPLAIN_NAME = "FILTER_MATCH_ENTIRE_SEGMENT";
 
   public MatchAllFilterOperator(int numDocs) {
-    super(numDocs, false);
+    this(numDocs, true);
+  }
+
+  public MatchAllFilterOperator(int numDocs, boolean ascending) {
+    super(numDocs, false, ascending);
   }
 
   @Override
@@ -42,9 +45,8 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
 
   @Override
   protected BlockDocIdSet getTrues() {
-    return new MatchAllDocIdSet(_numDocs);
+    return MatchAllDocIdSet.create(_numDocs, _ascending);
   }
-
 
   @Override
   public List<Operator> getChildOperators() {
@@ -63,7 +65,7 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
 
   @Override
   public String toExplainString() {
-    return new StringBuilder(EXPLAIN_NAME).append("(docs:").append(_numDocs).append(')').toString();
+    return EXPLAIN_NAME + "(docs:" + _numDocs + ", order:" + (_ascending ? "asc" : "desc") + ')';
   }
 
   @Override
@@ -72,13 +74,12 @@ public class MatchAllFilterOperator extends BaseFilterOperator {
   }
 
   @Override
-  protected void explainAttributes(ExplainAttributeBuilder attributeBuilder) {
-    super.explainAttributes(attributeBuilder);
-    attributeBuilder.putLong("numDocs", _numDocs);
+  public void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
+    explainPlanRows.setHasMatchAllFilter(true);
   }
 
   @Override
-  public void prepareForExplainPlan(ExplainPlanRows explainPlanRows) {
-    explainPlanRows.setHasMatchAllFilter(true);
+  protected BaseFilterOperator reverse() {
+    return new MatchAllFilterOperator(_numDocs, !_ascending);
   }
 }

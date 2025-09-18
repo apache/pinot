@@ -56,7 +56,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
 
   public VectorSimilarityFilterOperator(VectorIndexReader vectorIndexReader, VectorSimilarityPredicate predicate,
       int numDocs) {
-    super(numDocs, false);
+    super(numDocs, false, true);
     _vectorIndexReader = vectorIndexReader;
     _predicate = predicate;
     _matches = null;
@@ -67,7 +67,7 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
     if (_matches == null) {
       _matches = _vectorIndexReader.getDocIds(_predicate.getValue(), _predicate.getTopK());
     }
-    return new BitmapDocIdSet(_matches, _numDocs);
+    return new BitmapDocIdSet(_matches, _numDocs, _ascending);
   }
 
   @Override
@@ -131,5 +131,10 @@ public class VectorSimilarityFilterOperator extends BaseFilterOperator {
       recording.setInputDataType(FieldSpec.DataType.FLOAT, false);
       recording.setNumDocsMatchingAfterFilter(matches.getCardinality());
     }
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    throw new UnsupportedOperationException("Vector similarity filter operator does not support reversing");
   }
 }

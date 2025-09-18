@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -38,13 +39,16 @@ public class OrFilterOperator extends BaseFilterOperator {
   private static final String EXPLAIN_NAME = "FILTER_OR";
 
   private final List<BaseFilterOperator> _filterOperators;
-  private final Map<String, String> _queryOptions;
 
   public OrFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled) {
-    super(numDocs, nullHandlingEnabled);
+    this(filterOperators, numDocs, nullHandlingEnabled);
+  }
+
+  public OrFilterOperator(List<BaseFilterOperator> filterOperators,
+      int numDocs, boolean nullHandlingEnabled) {
+    super(numDocs, nullHandlingEnabled, getCommonAscending(filterOperators));
     _filterOperators = filterOperators;
-    _queryOptions = queryOptions;
   }
 
   @Override
@@ -78,7 +82,7 @@ public class OrFilterOperator extends BaseFilterOperator {
       blockDocIdSets.add(trues);
     }
     if (blockDocIdSets.isEmpty()) {
-      return new MatchAllDocIdSet(_numDocs);
+      return MatchAllDocIdSet.create(_numDocs, _ascending);
     }
     if (blockDocIdSets.size() == 1) {
       return new NotDocIdSet(blockDocIdSets.get(0), _numDocs);
@@ -115,5 +119,13 @@ public class OrFilterOperator extends BaseFilterOperator {
       bitmaps[i] = _filterOperators.get(i).getBitmaps().reduce();
     }
     return BufferFastAggregation.orCardinality(bitmaps);
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    List<BaseFilterOperator> reverseChildren = _filterOperators.stream()
+        .map(BaseFilterOperator::reverse)
+        .collect(Collectors.toList());
+    return new OrFilterOperator(reverseChildren, _numDocs, _nullHandlingEnabled);
   }
 }

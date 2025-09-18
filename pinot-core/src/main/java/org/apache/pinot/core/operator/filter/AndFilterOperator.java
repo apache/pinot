@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -43,7 +44,7 @@ public class AndFilterOperator extends BaseFilterOperator {
 
   public AndFilterOperator(List<BaseFilterOperator> filterOperators, @Nullable Map<String, String> queryOptions,
       int numDocs, boolean nullHandlingEnabled) {
-    super(numDocs, nullHandlingEnabled);
+    super(numDocs, nullHandlingEnabled, getCommonAscending(filterOperators));
     _filterOperators = filterOperators;
     _queryOptions = queryOptions;
   }
@@ -64,7 +65,7 @@ public class AndFilterOperator extends BaseFilterOperator {
     for (BaseFilterOperator filterOperator : _filterOperators) {
       BlockDocIdSet trues = filterOperator.getTrues();
       if (trues instanceof EmptyDocIdSet) {
-        return new MatchAllDocIdSet(_numDocs);
+        return MatchAllDocIdSet.create(_numDocs, _ascending);
       }
       if (trues instanceof MatchAllDocIdSet) {
         continue;
@@ -117,5 +118,13 @@ public class AndFilterOperator extends BaseFilterOperator {
   @Override
   public String toExplainString() {
     return EXPLAIN_NAME;
+  }
+
+  @Override
+  protected BaseFilterOperator reverse() {
+    List<BaseFilterOperator> reverseChildren = _filterOperators.stream()
+        .map(BaseFilterOperator::reverse)
+        .collect(Collectors.toList());
+    return new AndFilterOperator(reverseChildren, _queryOptions, _numDocs, _nullHandlingEnabled);
   }
 }
