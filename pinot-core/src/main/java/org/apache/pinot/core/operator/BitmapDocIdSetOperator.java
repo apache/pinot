@@ -65,7 +65,7 @@ public class BitmapDocIdSetOperator extends BaseDocIdSetOperator {
   }
 
   public static BitmapDocIdSetOperator descending(ImmutableBitmapDataProvider bitmap, int[] docIdBuffer) {
-    return new BitmapDocIdSetOperator(bitmap, docIdBuffer, DidOrder.ASC);
+    return new BitmapDocIdSetOperator(bitmap, docIdBuffer, DidOrder.DESC);
   }
 
   @Override
