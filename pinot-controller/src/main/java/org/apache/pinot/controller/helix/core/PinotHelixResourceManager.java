@@ -2187,6 +2187,10 @@ public class PinotHelixResourceManager {
 
     // Update IdealState replication
     IdealState idealState = _helixAdmin.getResourceIdealState(_helixClusterName, tableNameWithType);
+    Preconditions.checkArgument(idealState != null,
+        "Ideal state is not present for the table " + tableNameWithType + ". "
+            + "Its possible due to ongoing/incomplete table deletion. "
+            + "Please re-trigger the table delete operation to clean it up and recreate the table");
     String replicationConfigured = Integer.toString(tableConfig.getReplication());
     if (!idealState.getReplicas().equals(replicationConfigured)) {
       HelixHelper.updateIdealState(_helixZkManager, tableNameWithType, is -> {

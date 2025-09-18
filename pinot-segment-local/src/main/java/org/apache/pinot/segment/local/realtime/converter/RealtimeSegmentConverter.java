@@ -218,7 +218,9 @@ public class RealtimeSegmentConverter {
     if (!_enableColumnMajor) {
       driver.build();
     } else {
-      driver.buildByColumn(_realtimeSegmentImpl);
+      //buildByColumn uses validDocIds to skip invalid record while indexing each column. We pass the validDocIds
+      // only if we are using compacted reader.
+      driver.buildByColumn(_realtimeSegmentImpl, useCompactedReader ? validDocIdsSnapshot : null);
     }
   }
 

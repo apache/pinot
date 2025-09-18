@@ -496,9 +496,15 @@ public class QueryOptionsUtils {
     return option != null ? Boolean.parseBoolean(option) : defaultValue;
   }
 
-  public static int getLiteModeServerStageLimit(Map<String, String> queryOptions, int defaultValue) {
-    String option = queryOptions.get(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT);
-    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_SERVER_STAGE_LIMIT, option) : defaultValue;
+  public static Integer getLiteModeLeafStageLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_LIMIT, option) : defaultValue;
+  }
+
+  public static Integer getLiteModeLeafStageFanOutAdjustedLimit(Map<String, String> queryOptions, int defaultValue) {
+    String option = queryOptions.get(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT);
+    return option != null ? checkedParseIntPositive(QueryOptionKey.LITE_MODE_LEAF_STAGE_FANOUT_ADJUSTED_LIMIT, option)
+        : defaultValue;
   }
 
   @Nullable
