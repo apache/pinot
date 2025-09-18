@@ -148,6 +148,10 @@ public class ZkBasedTenantRebalanceObserver implements TenantRebalanceObserver {
     return _tenantName;
   }
 
+  public TenantRebalanceContext getTenantRebalanceContext() {
+    return _tenantRebalanceContext;
+  }
+
   @VisibleForTesting
   void setDone(boolean isDone) {
     _isDone = isDone;

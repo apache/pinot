@@ -135,11 +135,11 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     _tenantRebalanceChecker.runTask(new Properties());
 
     // Verify that the tenant rebalancer was called to resume the job
-    verify(_mockTenantRebalancer, times(1)).rebalanceWithContext(
-        contextCaptor.capture(), observerCaptor.capture());
+    verify(_mockTenantRebalancer, times(1)).rebalanceWithObserver(
+        observerCaptor.capture());
 
     // Verify the resumed context
-    TenantRebalanceContext resumedContext = contextCaptor.getValue();
+    TenantRebalanceContext resumedContext = observerCaptor.getValue().getTenantRebalanceContext();
     assertNotNull(resumedContext);
     assertEquals(resumedContext.getAttemptId(), TenantRebalanceContext.INITIAL_ATTEMPT_ID + 1);
     assertEquals(resumedContext.getOriginalJobId(), ORIGINAL_JOB_ID);
@@ -191,11 +191,13 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     // Verify that the tenant rebalancer was called
     ArgumentCaptor<TenantRebalanceContext> contextCaptor =
         ArgumentCaptor.forClass(TenantRebalanceContext.class);
-    verify(_mockTenantRebalancer, times(1)).rebalanceWithContext(
-        contextCaptor.capture(), any(ZkBasedTenantRebalanceObserver.class));
+    ArgumentCaptor<ZkBasedTenantRebalanceObserver> observerCaptor =
+        ArgumentCaptor.forClass(ZkBasedTenantRebalanceObserver.class);
+    verify(_mockTenantRebalancer, times(1)).rebalanceWithObserver(
+        observerCaptor.capture());
 
     // Verify that both stuck table jobs were moved back to parallel queue
-    TenantRebalanceContext resumedContext = contextCaptor.getValue();
+    TenantRebalanceContext resumedContext = observerCaptor.getValue().getTenantRebalanceContext();
     assertEquals(resumedContext.getAttemptId(), TenantRebalanceContext.INITIAL_ATTEMPT_ID + 1);
     assertEquals(resumedContext.getParallelQueue().size(), 2);
     assertTrue(resumedContext.getOngoingJobsQueue().isEmpty());
@@ -222,7 +224,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     _tenantRebalanceChecker.runTask(new Properties());
 
     // Verify that the tenant rebalancer was NOT called
-    verify(_mockTenantRebalancer, never()).rebalanceWithContext(any(), any());
+    verify(_mockTenantRebalancer, never()).rebalanceWithObserver(any());
   }
 
   @Test
@@ -255,7 +257,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     _tenantRebalanceChecker.runTask(new Properties());
 
     // Verify that the tenant rebalancer was NOT called
-    verify(_mockTenantRebalancer, never()).rebalanceWithContext(any(), any());
+    verify(_mockTenantRebalancer, never()).rebalanceWithObserver(any());
   }
 
   @Test
@@ -292,8 +294,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     _tenantRebalanceChecker.runTask(new Properties());
 
     // Verify that the tenant rebalancer was NOT called because ZK update failed
-    verify(_mockTenantRebalancer, times(0)).rebalanceWithContext(
-        contextCaptor.capture(), observerCaptor.capture());
+    verify(_mockTenantRebalancer, never()).rebalanceWithObserver(any());
   }
 
   @Test
@@ -320,7 +321,7 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     _tenantRebalanceChecker.runTask(new Properties());
 
     // Verify that the tenant rebalancer was NOT called
-    verify(_mockTenantRebalancer, never()).rebalanceWithContext(any(), any());
+    verify(_mockTenantRebalancer, never()).rebalanceWithObserver(any());
   }
 
   @Test
@@ -355,23 +356,23 @@ public class TenantRebalanceCheckerTest extends ControllerTest {
     _tenantRebalanceChecker.runTask(new Properties());
 
     // Verify that the tenant rebalancer was called to resume the job
-    verify(_mockTenantRebalancer, times(1)).rebalanceWithContext(
-        contextCaptor.capture(), observerCaptor.capture());
+    verify(_mockTenantRebalancer, times(1)).rebalanceWithObserver(
+        observerCaptor.capture());
     // The mockTenantRebalance never let the job done
     assertFalse(observerCaptor.getValue().isDone());
 
     _tenantRebalanceChecker.runTask(new Properties());
     // Since the previous job is not done, the rebalanceWithContext should not be called again as we have set the limit
     // to one tenant rebalance retry at a time
-    verify(_mockTenantRebalancer, times(1)).rebalanceWithContext(
-        contextCaptor.capture(), observerCaptor.capture());
+    verify(_mockTenantRebalancer, times(1)).rebalanceWithObserver(
+        observerCaptor.capture());
 
     // Mark the job as done and run the checker again - should pick up another job now
     observerCaptor.getValue().setDone(true);
     _tenantRebalanceChecker.runTask(new Properties());
 
-    verify(_mockTenantRebalancer, times(2)).rebalanceWithContext(
-        contextCaptor.capture(), observerCaptor.capture());
+    verify(_mockTenantRebalancer, times(2)).rebalanceWithObserver(
+        observerCaptor.capture());
   }
 
   // Helper methods to create test data
