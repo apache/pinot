@@ -164,8 +164,9 @@ public class SegmentProcessorFramework {
     int numRecordReaders = _recordReaderFileConfigs.size();
     int nextRecordReaderIndexToBeProcessed = 0;
     int iterationCount = 1;
-    boolean isMapperOutputSizeThresholdEnabled =
-        _segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE;
+    boolean canMapperBeEarlyTerminated =
+        _segmentProcessorConfig.getSegmentConfig().getIntermediateFileSizeThreshold() != Long.MAX_VALUE ||
+            _segmentProcessorConfig.getSegmentConfig().getMaxDiskUsagePercentage() < 100;
     String logMessage;
 
     while (nextRecordReaderIndexToBeProcessed < numRecordReaders) {
@@ -174,7 +175,7 @@ public class SegmentProcessorFramework {
           getSegmentMapper(_recordReaderFileConfigs.subList(nextRecordReaderIndexToBeProcessed, numRecordReaders));
 
       // Log start of iteration details only if intermediate file size threshold is set.
-      if (isMapperOutputSizeThresholdEnabled) {
+      if (canMapperBeEarlyTerminated) {
         logMessage =
             String.format("Starting iteration %d with %d record readers. Starting index = %d, end index = %d",
                 iterationCount,
@@ -223,7 +224,7 @@ public class SegmentProcessorFramework {
       nextRecordReaderIndexToBeProcessed = getNextRecordReaderIndexToBeProcessed(nextRecordReaderIndexToBeProcessed);
 
       // Log the details between iteration only if intermediate file size threshold is set.
-      if (isMapperOutputSizeThresholdEnabled) {
+      if (canMapperBeEarlyTerminated) {
         // Take care of logging the proper RecordReader index in case of the last iteration.
         int boundaryIndexToLog =
             nextRecordReaderIndexToBeProcessed == numRecordReaders ? nextRecordReaderIndexToBeProcessed
