@@ -294,15 +294,22 @@ public class SegmentDeletionManagerTest {
     // Try to remove files with the retention of 1 days.
     deletionManager.removeAgedDeletedSegments(leadControllerManager);
 
-    Thread.sleep(10000);
     // Check that only 1 day retention file is remaining
-    Assert.assertEquals(dummyDir1.list().length, 1);
+    TestUtils.waitForCondition((aVoid) -> dummyDir1.list().length == 1, 1000, 100000,
+        "Unable to delete desired segments from dummyDir1");
 
-    // Check that empty directory has successfully been removed.
-    Assert.assertEquals(dummyDir2.exists(), true);
+    // Check that empty directory has not been removed in the first run
+    TestUtils.waitForCondition((aVoid) -> dummyDir2.exists(), 1000, 100000,
+        "dummyDir2 does not exist");
+
 
     // Check that deleted file without retention suffix is honoring cluster-wide retention period of 7 days.
-    Assert.assertEquals(dummyDir3.list().length, 1);
+    TestUtils.waitForCondition((aVoid) -> dummyDir3.list().length == 1, 1000, 100000,
+        "Unable to delete desired segments from dummyDir3");
+
+    // Try to remove empty directory in the next run
+    deletionManager.removeAgedDeletedSegments(leadControllerManager);
+    Assert.assertFalse(dummyDir2.exists());
   }
 
   @Test

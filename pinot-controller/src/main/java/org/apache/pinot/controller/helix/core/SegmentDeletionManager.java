@@ -30,13 +30,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
@@ -367,8 +364,20 @@ public class SegmentDeletionManager {
             // Get files that are aged
             final List<FileMetadata> targetFiles = pinotFS.listFilesWithMetadata(tableNameURI, false);
 
-            if (targetFiles.size() == 0) {
-
+            if (targetFiles.isEmpty()) {
+              LOGGER.info("Deleting empty deleted segments directory: {} for table: {}", tableNameURI, tableName);
+              try {
+                if (!pinotFS.delete(tableNameURI, false)) {
+                  LOGGER.info("Could not delete deleted segments directory: {} for table: {}", tableNameURI, tableName);
+                } else {
+                  LOGGER.info("Successfully deleted deleted segments directory: {} for table: {}", tableNameURI,
+                      tableName);
+                }
+              } catch (Exception e) {
+                LOGGER.error("Exception occurred while deleting deleted segments directory: {} for table: {}",
+                    tableNameURI, tableName, e);
+              }
+              continue;
             }
             int numFilesDeleted = 0;
             URI targetURI = null;
