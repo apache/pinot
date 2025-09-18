@@ -143,7 +143,7 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
     _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
 
-    if (segmentMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+    if (segmentMetadata.getStatus().isCompleted()) {
       _state = BlockingSegmentCompletionFSMState.COMMITTED;
       StreamPartitionMsgOffsetFactory factory =
           _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
