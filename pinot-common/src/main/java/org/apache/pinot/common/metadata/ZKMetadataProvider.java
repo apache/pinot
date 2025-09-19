@@ -308,6 +308,10 @@ public class ZKMetadataProvider {
     return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType);
   }
 
+  public static String constructPropertyStorePathForMinionTaskGenerationLock(String tableNameWithType) {
+    return StringUtil.join("/", PROPERTYSTORE_MINION_TASK_METADATA_PREFIX, tableNameWithType + "-Lock");
+  }
+
   public static String getPropertyStoreWorkloadConfigsPrefix() {
     return PROPERTYSTORE_QUERY_WORKLOAD_CONFIGS_PREFIX;
   }
