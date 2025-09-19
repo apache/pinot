@@ -25,6 +25,7 @@ import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.pinot.broker.broker.helix.BaseBrokerStarter;
 import org.apache.pinot.broker.queryquota.HelixExternalViewBasedQueryQuotaManagerTest;
 import org.apache.pinot.client.BrokerResponse;
@@ -348,6 +349,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   private void runQueries(int qps, boolean shouldFail) {
     runQueries(qps, shouldFail, "default");
   }
+
   private void runQueries(int qps, boolean shouldFail, String applicationName) {
     runQueries(qps, shouldFail, applicationName, getTableName());
   }
@@ -465,7 +467,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
   public void addQueryQuotaToTableConfig(Integer maxQps)
       throws Exception {
     TableConfig tableConfig = getOfflineTableConfig();
-    tableConfig.setQuotaConfig(new QuotaConfig(null, maxQps == null ? null : maxQps.toString()));
+    tableConfig.setQuotaConfig(new QuotaConfig(null, TimeUnit.SECONDS, 1d, Double.valueOf(maxQps)));
     updateTableConfig(tableConfig);
     // to allow change propagation to QueryQuotaManager
   }
@@ -482,7 +484,7 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     String url = _controllerRequestURLBuilder.getBaseUrl() + "/databases/default/quotas";
     if (maxQps != null) {
-        url += "?maxQueriesPerSecond=" + maxQps;
+      url += "?maxQueriesPerSecond=" + maxQps;
     }
     HttpClient.wrapAndThrowHttpException(_httpClient.sendPostRequest(new URI(url), null, null));
     // to allow change propagation to QueryQuotaManager
@@ -502,8 +504,8 @@ public class QueryQuotaClusterIntegrationTest extends BaseClusterIntegrationTest
       throws Exception {
     if (maxQps == null) {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(new URI(
-        _controllerRequestURLBuilder.forClusterConfigs() + "/"
-            + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND)));
+          _controllerRequestURLBuilder.forClusterConfigs() + "/"
+              + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND)));
     } else {
       String payload = "{\"" + CommonConstants.Helix.DATABASE_MAX_QUERIES_PER_SECOND + "\":\"" + maxQps + "\"}";
       HttpClient.wrapAndThrowHttpException(
