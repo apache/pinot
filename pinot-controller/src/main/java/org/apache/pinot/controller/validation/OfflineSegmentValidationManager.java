@@ -47,13 +47,13 @@ import org.slf4j.LoggerFactory;
  * Manages the segment validation metrics, to ensure that all offline segments are contiguous (no missing segments) and
  * that the offline push delay isn't too high.
  */
-public class OfflineSegmentIntervalChecker extends ControllerPeriodicTask<Void> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentIntervalChecker.class);
+public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Void> {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OfflineSegmentValidationManager.class);
 
   private final ValidationMetrics _validationMetrics;
   private final boolean _segmentAutoResetOnErrorAtValidation;
 
-  public OfflineSegmentIntervalChecker(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
+  public OfflineSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ValidationMetrics validationMetrics,
       ControllerMetrics controllerMetrics) {
     super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
