@@ -25,8 +25,10 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ServiceLoader;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.function.FunctionInfo;
 import org.apache.pinot.common.function.FunctionRegistry;
 import org.apache.pinot.common.function.TransformFunctionType;
@@ -34,57 +36,10 @@ import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FunctionContext;
 import org.apache.pinot.common.request.context.LiteralContext;
 import org.apache.pinot.common.utils.HashUtil;
-import org.apache.pinot.core.geospatial.transform.function.GeoToH3Function;
-import org.apache.pinot.core.geospatial.transform.function.GridDiskFunction;
-import org.apache.pinot.core.geospatial.transform.function.GridDistanceFunction;
-import org.apache.pinot.core.geospatial.transform.function.StAreaFunction;
-import org.apache.pinot.core.geospatial.transform.function.StAsBinaryFunction;
-import org.apache.pinot.core.geospatial.transform.function.StAsGeoJsonFunction;
-import org.apache.pinot.core.geospatial.transform.function.StAsTextFunction;
-import org.apache.pinot.core.geospatial.transform.function.StContainsFunction;
-import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
-import org.apache.pinot.core.geospatial.transform.function.StEqualsFunction;
-import org.apache.pinot.core.geospatial.transform.function.StGeogFromGeoJsonFunction;
-import org.apache.pinot.core.geospatial.transform.function.StGeogFromTextFunction;
-import org.apache.pinot.core.geospatial.transform.function.StGeogFromWKBFunction;
-import org.apache.pinot.core.geospatial.transform.function.StGeomFromGeoJsonFunction;
-import org.apache.pinot.core.geospatial.transform.function.StGeomFromTextFunction;
-import org.apache.pinot.core.geospatial.transform.function.StGeomFromWKBFunction;
-import org.apache.pinot.core.geospatial.transform.function.StGeometryTypeFunction;
-import org.apache.pinot.core.geospatial.transform.function.StPointFunction;
-import org.apache.pinot.core.geospatial.transform.function.StPolygonFunction;
-import org.apache.pinot.core.geospatial.transform.function.StWithinFunction;
 import org.apache.pinot.core.operator.ColumnContext;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.AbsTransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.CeilTransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.ExpTransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.FloorTransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.LnTransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.Log10TransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.Log2TransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SignTransformFunction;
-import org.apache.pinot.core.operator.transform.function.SingleParamMathTransformFunction.SqrtTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AcosTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AsinTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.Atan2TransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.AtanTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CosTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CoshTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.CotTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.DegreesTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.RadiansTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.SinTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.SinhTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanTransformFunction;
-import org.apache.pinot.core.operator.transform.function.TrigonometricTransformFunctions.TanhTransformFunction;
-import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.CosineDistanceTransformFunction;
-import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.InnerProductTransformFunction;
-import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.L1DistanceTransformFunction;
-import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.L2DistanceTransformFunction;
-import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.VectorDimsTransformFunction;
-import org.apache.pinot.core.operator.transform.function.VectorTransformFunctions.VectorNormTransformFunction;
 import org.apache.pinot.core.query.request.context.QueryContext;
 import org.apache.pinot.core.query.request.context.utils.QueryContextConverterUtils;
+import org.apache.pinot.core.udf.Udf;
 import org.apache.pinot.segment.spi.datasource.DataSource;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
 import org.apache.pinot.sql.parsers.CalciteSqlParser;
@@ -104,161 +59,17 @@ public class TransformFunctionFactory {
 
   private static Map<String, Class<? extends TransformFunction>> createRegistry() {
     Map<TransformFunctionType, Class<? extends TransformFunction>> typeToImplementation =
-        new EnumMap<>(TransformFunctionType.class);
-    // NOTE: add all built-in transform functions here
-    typeToImplementation.put(TransformFunctionType.ADD, AdditionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.SUB, SubtractionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.MULT, MultiplicationTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DIV, DivisionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.MOD, ModuloTransformFunction.class);
-
-    typeToImplementation.put(TransformFunctionType.ABS, AbsTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.CEIL, CeilTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.EXP, ExpTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.FLOOR, FloorTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LOG, LnTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LOG2, Log2TransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LOG10, Log10TransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.SQRT, SqrtTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.SIGN, SignTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.POWER, PowerTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ROUND_DECIMAL, RoundDecimalTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.TRUNCATE, TruncateDecimalTransformFunction.class);
-
-    typeToImplementation.put(TransformFunctionType.CAST, CastTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_SCALAR, JsonExtractScalarTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_KEY, JsonExtractKeyTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.TIME_CONVERT, TimeConversionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT, DateTimeConversionTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DATE_TIME_CONVERT_WINDOW_HOP,
-        DateTimeConversionHopTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DATE_TRUNC, DateTruncTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.JSON_EXTRACT_INDEX, JsonExtractIndexTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.YEAR, DateTimeTransformFunction.Year.class);
-    typeToImplementation.put(TransformFunctionType.YEAR_OF_WEEK, DateTimeTransformFunction.YearOfWeek.class);
-    typeToImplementation.put(TransformFunctionType.QUARTER, DateTimeTransformFunction.Quarter.class);
-    typeToImplementation.put(TransformFunctionType.MONTH_OF_YEAR, DateTimeTransformFunction.Month.class);
-    typeToImplementation.put(TransformFunctionType.WEEK_OF_YEAR, DateTimeTransformFunction.WeekOfYear.class);
-    typeToImplementation.put(TransformFunctionType.DAY_OF_YEAR, DateTimeTransformFunction.DayOfYear.class);
-    typeToImplementation.put(TransformFunctionType.DAY_OF_MONTH, DateTimeTransformFunction.DayOfMonth.class);
-    typeToImplementation.put(TransformFunctionType.DAY_OF_WEEK, DateTimeTransformFunction.DayOfWeek.class);
-    typeToImplementation.put(TransformFunctionType.HOUR, DateTimeTransformFunction.Hour.class);
-    typeToImplementation.put(TransformFunctionType.MINUTE, DateTimeTransformFunction.Minute.class);
-    typeToImplementation.put(TransformFunctionType.SECOND, DateTimeTransformFunction.Second.class);
-    typeToImplementation.put(TransformFunctionType.MILLISECOND, DateTimeTransformFunction.Millisecond.class);
-    typeToImplementation.put(TransformFunctionType.ARRAY_LENGTH, ArrayLengthTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.VALUE_IN, ValueInTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.MAP_VALUE, MapValueTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IN_ID_SET, InIdSetTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LOOKUP, LookupTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.CLP_DECODE, CLPDecodeTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.CLP_ENCODED_VARS_MATCH, ClpEncodedVarsMatchTransformFunction.class);
-
-    typeToImplementation.put(TransformFunctionType.EXTRACT, ExtractTransformFunction.class);
-
-    // Regexp functions
-    typeToImplementation.put(TransformFunctionType.REGEXP_EXTRACT, RegexpExtractTransformFunction.class);
-
-    // Array functions
-    typeToImplementation.put(TransformFunctionType.ARRAY_AVERAGE, ArrayAverageTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAY_MAX, ArrayMaxTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAY_MIN, ArrayMinTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ARRAY_SUM, ArraySumTransformFunction.class);
-
-    typeToImplementation.put(TransformFunctionType.GROOVY, GroovyTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.CASE, CaseTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.TEXT_MATCH, TextMatchTransformFunction.class);
-
-    typeToImplementation.put(TransformFunctionType.EQUALS, EqualsTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.NOT_EQUALS, NotEqualsTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.GREATER_THAN, GreaterThanTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.GREATER_THAN_OR_EQUAL, GreaterThanOrEqualTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LESS_THAN, LessThanTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.LESS_THAN_OR_EQUAL, LessThanOrEqualTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IN, InTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.NOT_IN, NotInTransformFunction.class);
-
-    // logical functions
-    typeToImplementation.put(TransformFunctionType.AND, AndOperatorTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.OR, OrOperatorTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.NOT, NotOperatorTransformFunction.class);
-
-    // geo functions
-    // geo constructors
-    typeToImplementation.put(TransformFunctionType.ST_GEOG_FROM_TEXT, StGeogFromTextFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_GEOG_FROM_WKB, StGeogFromWKBFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_GEOG_FROM_GEO_JSON, StGeogFromGeoJsonFunction.class);
-
-    typeToImplementation.put(TransformFunctionType.ST_GEOM_FROM_TEXT, StGeomFromTextFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_GEOM_FROM_WKB, StGeomFromWKBFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_GEOM_FROM_GEO_JSON, StGeomFromGeoJsonFunction.class);
-
-    typeToImplementation.put(TransformFunctionType.ST_POINT, StPointFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_POLYGON, StPolygonFunction.class);
-
-    // geo measurements
-    typeToImplementation.put(TransformFunctionType.ST_AREA, StAreaFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_DISTANCE, StDistanceFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_GEOMETRY_TYPE, StGeometryTypeFunction.class);
-
-    // geo outputs
-    typeToImplementation.put(TransformFunctionType.ST_AS_BINARY, StAsBinaryFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_AS_TEXT, StAsTextFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_AS_GEO_JSON, StAsGeoJsonFunction.class);
-
-    // geo relationship
-    typeToImplementation.put(TransformFunctionType.ST_CONTAINS, StContainsFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_EQUALS, StEqualsFunction.class);
-    typeToImplementation.put(TransformFunctionType.ST_WITHIN, StWithinFunction.class);
-
-    // geo indexing
-    typeToImplementation.put(TransformFunctionType.GEO_TO_H3, GeoToH3Function.class);
-    typeToImplementation.put(TransformFunctionType.GRID_DISTANCE, GridDistanceFunction.class);
-    typeToImplementation.put(TransformFunctionType.GRID_DISK, GridDiskFunction.class);
-
-    // tuple selection
-    typeToImplementation.put(TransformFunctionType.LEAST, LeastTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.GREATEST, GreatestTransformFunction.class);
-
-    // null handling
-    typeToImplementation.put(TransformFunctionType.IS_TRUE, IsTrueTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IS_NOT_TRUE, IsNotTrueTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IS_FALSE, IsFalseTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IS_NOT_FALSE, IsNotFalseTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IS_NULL, IsNullTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IS_NOT_NULL, IsNotNullTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.COALESCE, CoalesceTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IS_DISTINCT_FROM, IsDistinctFromTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.IS_NOT_DISTINCT_FROM, IsNotDistinctFromTransformFunction.class);
-
-    // Trignometric functions
-    typeToImplementation.put(TransformFunctionType.SIN, SinTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.COS, CosTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.TAN, TanTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.COT, CotTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ASIN, AsinTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ACOS, AcosTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ATAN, AtanTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.ATAN2, Atan2TransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.SINH, SinhTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.COSH, CoshTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.TANH, TanhTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.DEGREES, DegreesTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.RADIANS, RadiansTransformFunction.class);
-
-    // Vector functions
-    typeToImplementation.put(TransformFunctionType.COSINE_DISTANCE, CosineDistanceTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.INNER_PRODUCT, InnerProductTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.L1_DISTANCE, L1DistanceTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.L2_DISTANCE, L2DistanceTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.VECTOR_DIMS, VectorDimsTransformFunction.class);
-    typeToImplementation.put(TransformFunctionType.VECTOR_NORM, VectorNormTransformFunction.class);
-
-    // Item functions
-    typeToImplementation.put(TransformFunctionType.ITEM, ItemTransformFunction.class);
-
-    // Time Series functions
-    typeToImplementation.put(TransformFunctionType.TIME_SERIES_BUCKET, TimeSeriesBucketTransformFunction.class);
+        ManualTransformFunctionMapProvider.manualMap();
+    for (Map.Entry<TransformFunctionType, Class<? extends TransformFunction>> fromUdf : fromUdf().entrySet()) {
+      TransformFunctionType type = fromUdf.getKey();
+      Class<? extends TransformFunction> implementation = fromUdf.getValue();
+      if (typeToImplementation.containsKey(type)) {
+        LOGGER.warn("Manually registered implementation of transform function type {} using {} has been replaced "
+                + "with {} from UDF",
+            type, typeToImplementation.get(type).getCanonicalName(), implementation.getCanonicalName());
+      }
+      typeToImplementation.put(type, implementation);
+    }
 
     Map<String, Class<? extends TransformFunction>> registry =
         new HashMap<>(HashUtil.getHashMapCapacity(typeToImplementation.size()));
@@ -407,7 +218,41 @@ public class TransformFunctionFactory {
     return StringUtils.remove(functionName, '_').toLowerCase();
   }
 
+  @VisibleForTesting
   public static Map<String, Class<? extends TransformFunction>> getAllFunctions() {
     return Collections.unmodifiableMap(TRANSFORM_FUNCTION_MAP);
+  }
+
+  private static Map<TransformFunctionType, Class<? extends TransformFunction>> fromUdf() {
+    Map<TransformFunctionType, Udf> typeToUdf = new EnumMap<>(TransformFunctionType.class);
+    Map<TransformFunctionType, Class<? extends TransformFunction>> typeToImplementation =
+        new EnumMap<>(TransformFunctionType.class);
+    // Register UDFs as transform functions
+    ServiceLoader.load(Udf.class).stream()
+        .map(ServiceLoader.Provider::get)
+        .forEach(udf -> {
+          Pair<TransformFunctionType, Class<? extends TransformFunction>> entry = udf.getTransformFunction();
+          if (entry == null) {
+            LOGGER.debug("UDF {} does not have a transform function type, skipping", udf.getMainName());
+            return;
+          }
+          Udf oldUdf = typeToUdf.get(entry.getKey());
+          if (oldUdf == null) {
+            typeToUdf.put(entry.getKey(), udf);
+            typeToImplementation.put(entry.getKey(), entry.getValue());
+            LOGGER.debug("Adding transform function {} with UDF {}", entry.getKey(),
+                udf.getClass().getCanonicalName());
+          } else if (oldUdf.priority() < udf.priority()) {
+            typeToUdf.put(entry.getKey(), udf);
+            typeToImplementation.put(entry.getKey(), entry.getValue());
+            LOGGER.info("Changing transform function {} from lower priority UDF {} with {}",
+                entry.getKey(), oldUdf.getClass().getCanonicalName(), udf.getClass().getCanonicalName());
+          } else {
+            LOGGER.debug("Keeping transform function {} with UDF {} as it has higher priority than {}",
+                entry.getKey(), oldUdf.getClass().getCanonicalName(), udf.getClass().getCanonicalName());
+          }
+        });
+
+    return typeToImplementation;
   }
 }
