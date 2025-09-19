@@ -67,6 +67,10 @@ public class MinionConstants {
   // This is primarily used to prevent performance issues in helix leader controller when it creates
   // more subtasks than it can support
   public static final String MAX_ALLOWED_SUB_TASKS_KEY = "minion.maxAllowedSubTasksPerTask";
+  // Cluster level config of maximum disk usage percentage on minion hosts before the task tries to gracefully
+  // handle the situation rather than getting killed due to lack of disk space.
+  // Note - Not all tasks may support this config. Currently, MergeTask and its variants support this config
+  public static final String MAX_DISK_USAGE_PERCENTAGE_KEY = "minion.maxDiskUsagePercentage";
 
   /**
    * Table level configs
@@ -128,7 +132,11 @@ public class MinionConstants {
     // Segment config
     public static final String MAX_NUM_RECORDS_PER_TASK_KEY = "maxNumRecordsPerTask";
     public static final String MAX_NUM_RECORDS_PER_SEGMENT_KEY = "maxNumRecordsPerSegment";
+
+    // See AdaptiveSizeBasedWriter for documentation of these configs
     public static final String SEGMENT_MAPPER_FILE_SIZE_IN_BYTES = "segmentMapperFileSizeThresholdInBytes";
+    public static final String MAX_DISK_USAGE_PERCENTAGE = "maxDiskUsagePercentage";
+
     public static final String MAX_NUM_PARALLEL_BUCKETS = "maxNumParallelBuckets";
     public static final String SEGMENT_NAME_PREFIX_KEY = "segmentNamePrefix";
     public static final String SEGMENT_NAME_POSTFIX_KEY = "segmentNamePostfix";

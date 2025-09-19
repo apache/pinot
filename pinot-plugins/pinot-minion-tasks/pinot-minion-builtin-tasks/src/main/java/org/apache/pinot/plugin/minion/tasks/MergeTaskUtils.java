@@ -139,6 +139,7 @@ public class MergeTaskUtils {
 
   /**
    * Returns the segment config based on the task config.
+   * TODO - Ensure all tasks that build SegmentConfig use this method so that all appropriate configs are set.
    */
   public static SegmentConfig getSegmentConfig(Map<String, String> taskConfig) {
     SegmentConfig.Builder segmentConfigBuilder = new SegmentConfig.Builder();
@@ -149,6 +150,10 @@ public class MergeTaskUtils {
     String segmentMapperFileSizeThreshold = taskConfig.get(MergeTask.SEGMENT_MAPPER_FILE_SIZE_IN_BYTES);
     if (segmentMapperFileSizeThreshold != null) {
       segmentConfigBuilder.setIntermediateFileSizeThreshold(Long.parseLong(segmentMapperFileSizeThreshold));
+    }
+    String maxDiskUsagePercentage = taskConfig.get(MergeTask.MAX_DISK_USAGE_PERCENTAGE);
+    if (maxDiskUsagePercentage != null) {
+      segmentConfigBuilder.setMaxDiskUsagePercentage(Integer.parseInt(maxDiskUsagePercentage));
     }
     segmentConfigBuilder.setSegmentNamePrefix(taskConfig.get(MergeTask.SEGMENT_NAME_PREFIX_KEY));
     segmentConfigBuilder.setSegmentNamePostfix(taskConfig.get(MergeTask.SEGMENT_NAME_POSTFIX_KEY));
