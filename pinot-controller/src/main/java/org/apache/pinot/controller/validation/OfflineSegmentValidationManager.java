@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
+import org.apache.pinot.common.metrics.ControllerGauge;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.metrics.ValidationMetrics;
 import org.apache.pinot.controller.ControllerConf;
@@ -52,15 +53,17 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Void
 
   private final ValidationMetrics _validationMetrics;
   private final boolean _segmentAutoResetOnErrorAtValidation;
+  private final ResourceUtilizationManager _resourceUtilizationManager;
 
   public OfflineSegmentValidationManager(ControllerConf config, PinotHelixResourceManager pinotHelixResourceManager,
       LeadControllerManager leadControllerManager, ValidationMetrics validationMetrics,
-      ControllerMetrics controllerMetrics) {
+      ControllerMetrics controllerMetrics, ResourceUtilizationManager resourceUtilizationManager) {
     super("OfflineSegmentIntervalChecker", config.getOfflineSegmentIntervalCheckerFrequencyInSeconds(),
         config.getOfflineSegmentIntervalCheckerInitialDelayInSeconds(), pinotHelixResourceManager,
         leadControllerManager, controllerMetrics);
     _validationMetrics = validationMetrics;
     _segmentAutoResetOnErrorAtValidation = config.isAutoResetErrorSegmentsOnValidationEnabled();
+    _resourceUtilizationManager = resourceUtilizationManager;
   }
 
   @Override
@@ -73,8 +76,21 @@ public class OfflineSegmentValidationManager extends ControllerPeriodicTask<Void
         LOGGER.warn("Failed to find table config for table: {}, skipping validation", tableNameWithType);
         return;
       }
+      updateResourceUtilizationMetric(tableNameWithType);
       validateOfflineSegmentPush(tableConfig);
     }
+  }
+
+  private void updateResourceUtilizationMetric(String tableNameWithType) {
+    if (_resourceUtilizationManager.isResourceUtilizationWithinLimits(tableNameWithType,
+        UtilizationChecker.CheckPurpose.TASK_GENERATION) == UtilizationChecker.CheckResult.FAIL) {
+      LOGGER.warn("Resource utilization is above threshold for table: {}", tableNameWithType);
+      _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+          1L);
+      return;
+    }
+    _controllerMetrics.setOrUpdateTableGauge(tableNameWithType, ControllerGauge.RESOURCE_UTILIZATION_LIMIT_EXCEEDED,
+        0L);
   }
 
   // For offline segment pushes, validate that there are no missing segments, and update metrics

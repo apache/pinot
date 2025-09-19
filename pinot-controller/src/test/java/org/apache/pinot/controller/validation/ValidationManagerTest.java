@@ -136,7 +136,8 @@ public class ValidationManagerTest {
 
     ArrayList<Interval> jan1st2nd3rd5th = new ArrayList<>(jan1st2nd3rd);
     jan1st2nd3rd5th.add(jan5th);
-    assertEquals(OfflineSegmentValidationManager.computeNumMissingSegments(jan1st2nd3rd5th, Duration.standardDays(1)), 1);
+    assertEquals(OfflineSegmentValidationManager.computeNumMissingSegments(jan1st2nd3rd5th, Duration.standardDays(1)),
+        1);
 
     // Should also work if the intervals are in random order
     ArrayList<Interval> jan5th2nd1st = new ArrayList<>();
@@ -151,7 +152,8 @@ public class ValidationManagerTest {
     jan1st2nd4th5th.add(jan1stAnd2nd);
     jan1st2nd4th5th.add(jan4th);
     jan1st2nd4th5th.add(jan5th);
-    assertEquals(OfflineSegmentValidationManager.computeNumMissingSegments(jan1st2nd4th5th, Duration.standardDays(1)), 1);
+    assertEquals(OfflineSegmentValidationManager.computeNumMissingSegments(jan1st2nd4th5th, Duration.standardDays(1)),
+        1);
   }
 
   @AfterClass
