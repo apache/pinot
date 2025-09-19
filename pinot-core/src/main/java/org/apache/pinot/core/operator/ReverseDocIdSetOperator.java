@@ -19,7 +19,6 @@
 package org.apache.pinot.core.operator;
 
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.List;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
