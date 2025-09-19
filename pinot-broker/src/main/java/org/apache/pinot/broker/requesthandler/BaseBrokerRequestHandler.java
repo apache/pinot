@@ -66,6 +66,7 @@ import org.apache.pinot.spi.query.QueryThreadContext;
 import org.apache.pinot.spi.trace.RequestContext;
 import org.apache.pinot.spi.utils.CommonConstants;
 import org.apache.pinot.spi.utils.CommonConstants.Broker;
+import org.apache.pinot.spi.utils.CommonConstants.Broker.Request.QueryOptionKey;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.SqlNodeAndOptions;
 import org.slf4j.Logger;
@@ -209,6 +210,20 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
       if (_enableNullHandling != null) {
         sqlNodeAndOptions.getOptions()
             .putIfAbsent(Broker.Request.QueryOptionKey.ENABLE_NULL_HANDLING, _enableNullHandling);
+      }
+
+      // Add REGEXP_LIKE default options using hierarchy: Query Option > Table Config > Broker Config
+      // Set defaults only if not already present in query options
+      String brokerUseDictDefault = _config.getProperty(Broker.USE_DICT_FOR_REGEXP_LIKE_PREDICATE_KEY);
+      if (brokerUseDictDefault != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(QueryOptionKey.USE_DICT_FOR_REGEXP_LIKE_PREDICATE_OPTION, brokerUseDictDefault);
+      }
+
+      String brokerThresholdDefault = _config.getProperty(Broker.REGEXP_DICT_CARDINALITY_THRESHOLD_KEY);
+      if (brokerThresholdDefault != null) {
+        sqlNodeAndOptions.getOptions()
+            .putIfAbsent(QueryOptionKey.REGEXP_DICTIONARY_CARDINALITY_THRESHOLD_OPTION, brokerThresholdDefault);
       }
 
       BrokerResponse brokerResponse =

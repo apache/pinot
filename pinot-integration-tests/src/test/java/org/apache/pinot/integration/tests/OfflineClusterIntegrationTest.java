@@ -2226,6 +2226,58 @@ public class OfflineClusterIntegrationTest extends BaseClusterIntegrationTestSet
       assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
       assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0);
     }
+    // Test configurable percentage-based threshold functionality
+    testRegexpLikeConfigurableThreshold(numTotalDocs);
+  }
+
+  private void testRegexpLikeConfigurableThreshold(int numTotalDocs)
+      throws Exception {
+    // Test 1: Force dictionary use with useDictForRegexpLikePredicate=true
+    String queryWithForcedDict = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(NewAddedSVJSONDimension, '.*') "
+        + "OPTION(useDictForRegexpLikePredicate=true)";
+    JsonNode response = postQuery(queryWithForcedDict);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
+    assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0); // Should always use dictionary scan
+
+    // Test 2: Default threshold behavior (10K when useDictForRegexpLikePredicate is not set)
+    response = postQuery("SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(NewAddedSVJSONDimension, '.*')");
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
+    assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0); // Should use dictionary scan (default 10K)
+
+    // Test 3: Custom threshold via regexpDictCardinalityThreshold (high threshold = 50K)
+    String queryWithHighThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(NewAddedSVJSONDimension, '.*') "
+        + "OPTION(regexpDictCardinalityThreshold=50000)";
+    response = postQuery(queryWithHighThreshold);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
+    assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0); // Should use dictionary scan
+
+    // Test 4: Very low threshold (1) to force raw scan for multi-element dictionaries
+    String queryWithLowThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(NewAddedSVJSONDimension, '.*') "
+        + "OPTION(regexpDictCardinalityThreshold=1)";
+    response = postQuery(queryWithLowThreshold);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
+    // Note: For single-element dictionaries, this should still be 0 entries scanned
+
+    // Test 5: Priority check - useDictForRegexpLikePredicate overrides threshold
+    String queryWithPriority = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(NewAddedSVJSONDimension, '.*') "
+        + "OPTION(useDictForRegexpLikePredicate=true,regexpDictCardinalityThreshold=1)";
+    response = postQuery(queryWithPriority);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
+    assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0); // Should use dictionary despite low threshold
+
+    // Test 6: Invalid threshold value (should fall back to default 10K)
+    String queryWithInvalidThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(NewAddedSVJSONDimension, '.*') "
+        + "OPTION(regexpDictCardinalityThreshold=invalid)";
+    response = postQuery(queryWithInvalidThreshold);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
+    assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0); // Should use default threshold
+
+    // Test 7: Negative threshold (should fall back to default)
+    String queryWithNegativeThreshold = "SELECT COUNT(*) FROM mytable WHERE REGEXP_LIKE(NewAddedSVJSONDimension, '.*') "
+        + "OPTION(regexpDictCardinalityThreshold=-1)";
+    response = postQuery(queryWithNegativeThreshold);
+    assertEquals(response.get("resultTable").get("rows").get(0).get(0).asInt(), numTotalDocs);
+    assertEquals(response.get("numEntriesScannedInFilter").asInt(), 0); // Should use default threshold
   }
 
   private void testExpressionOverride()
