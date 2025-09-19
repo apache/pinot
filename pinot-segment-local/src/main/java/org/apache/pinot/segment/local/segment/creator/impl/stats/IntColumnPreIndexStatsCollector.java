@@ -21,17 +21,25 @@ package org.apache.pinot.segment.local.segment.creator.impl.stats;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
 
 
 public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCollector {
-  private IntSet _values = new IntOpenHashSet(INITIAL_HASH_SET_SIZE);
+  @Nullable
+  private IntSet _values;
+  @Nullable
   private int[] _sortedValues;
   private boolean _sealed = false;
   private int _prevValue = Integer.MIN_VALUE;
+  private int _minValue = Integer.MAX_VALUE;
+  private int _maxValue = Integer.MIN_VALUE;
 
   public IntColumnPreIndexStatsCollector(String column, StatsCollectorConfig statsCollectorConfig) {
     super(column, statsCollectorConfig);
+    if (_dictionaryEnabled) {
+      _values = new IntOpenHashSet(INITIAL_HASH_SET_SIZE);
+    }
   }
 
   @Override
@@ -42,7 +50,15 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
       Object[] values = (Object[]) entry;
       for (Object obj : values) {
         int value = (int) obj;
-        _values.add(value);
+        if (_dictionaryEnabled) {
+          _values.add(value);
+        }
+        if (value < _minValue) {
+          _minValue = value;
+        }
+        if (value > _maxValue) {
+          _maxValue = value;
+        }
       }
 
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
@@ -50,7 +66,15 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     } else if (entry instanceof int[]) {
       int[] values = (int[]) entry;
       for (int value : values) {
-        _values.add(value);
+        if (_dictionaryEnabled) {
+          _values.add(value);
+        }
+        if (value < _minValue) {
+          _minValue = value;
+        }
+        if (value > _maxValue) {
+          _maxValue = value;
+        }
       }
 
       _maxNumberOfMultiValues = Math.max(_maxNumberOfMultiValues, values.length);
@@ -58,9 +82,16 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
     } else {
       int value = (int) entry;
       addressSorted(value);
-      if (_values.add(value)) {
+      boolean isNewValue = _dictionaryEnabled ? _values.add(value) : true;
+      if (isNewValue) {
         if (isPartitionEnabled()) {
           updatePartition(Integer.toString(value));
+        }
+        if (value < _minValue) {
+          _minValue = value;
+        }
+        if (value > _maxValue) {
+          _maxValue = value;
         }
       }
 
@@ -78,7 +109,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public Integer getMinValue() {
     if (_sealed) {
-      return _sortedValues[0];
+      return _minValue;
     }
     throw new IllegalStateException("you must seal the collector first before asking for min value");
   }
@@ -86,7 +117,7 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public Integer getMaxValue() {
     if (_sealed) {
-      return _sortedValues[_sortedValues.length - 1];
+      return _maxValue;
     }
     throw new IllegalStateException("you must seal the collector first before asking for max value");
   }
@@ -94,22 +125,27 @@ public class IntColumnPreIndexStatsCollector extends AbstractColumnStatisticsCol
   @Override
   public Object getUniqueValuesSet() {
     if (_sealed) {
-      return _sortedValues;
+      return _dictionaryEnabled ? _sortedValues : null;
     }
     throw new IllegalStateException("you must seal the collector first before asking for unique values set");
   }
 
   @Override
   public int getCardinality() {
-    return _sealed ? _sortedValues.length : _values.size();
+    if (_dictionaryEnabled) {
+      return _sealed ? _sortedValues.length : _values.size();
+    }
+    return _totalNumberOfEntries;
   }
 
   @Override
   public void seal() {
     if (!_sealed) {
-      _sortedValues = _values.toIntArray();
-      _values = null;
-      Arrays.sort(_sortedValues);
+      if (_dictionaryEnabled) {
+        _sortedValues = _values.toIntArray();
+        _values = null;
+        Arrays.sort(_sortedValues);
+      }
       _sealed = true;
     }
   }

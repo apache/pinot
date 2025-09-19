@@ -25,6 +25,9 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.pinot.segment.spi.creator.ColumnStatistics;
 import org.apache.pinot.segment.spi.creator.StatsCollectorConfig;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigs;
+import org.apache.pinot.segment.spi.index.FieldIndexConfigsUtil;
+import org.apache.pinot.segment.spi.index.StandardIndexes;
 import org.apache.pinot.segment.spi.partition.PartitionFunction;
 import org.apache.pinot.segment.spi.partition.PartitionFunctionFactory;
 import org.apache.pinot.spi.config.table.FieldConfig;
@@ -46,6 +49,10 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
   protected static final int INITIAL_HASH_SET_SIZE = 1000;
   protected final FieldSpec _fieldSpec;
   protected final FieldConfig _fieldConfig;
+  // If dictionary isn't enabled
+  // 1. cardinality is approximated by setting it to total entries in segment
+  // 2. getUniqueValuesSet() returns null
+  protected final boolean _dictionaryEnabled;
 
   private final Map<String, String> _partitionFunctionConfig;
   private final PartitionFunction _partitionFunction;
@@ -76,6 +83,16 @@ public abstract class AbstractColumnStatisticsCollector implements ColumnStatist
     } else {
       _partitions = null;
     }
+
+    // Determine whether dictionary is enabled for this column based on table/index configs.
+    // If there is no explicit config, dictionary is enabled by default.
+    // TODO - Check if we can obtain dictionary info from _fieldConfig
+    Map<String, FieldIndexConfigs> indexConfigsByCol =
+        FieldIndexConfigsUtil.createIndexConfigsByColName(statsCollectorConfig.getTableConfig(),
+            statsCollectorConfig.getSchema());
+    FieldIndexConfigs fieldIndexConfigs = indexConfigsByCol.get(column);
+    _dictionaryEnabled = fieldIndexConfigs == null
+        || fieldIndexConfigs.getConfig(StandardIndexes.dictionary()).isEnabled();
   }
 
   public int getMaxNumberOfMultiValues() {
