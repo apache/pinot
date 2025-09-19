@@ -33,6 +33,8 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.helix.model.IdealState;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
+import org.apache.helix.zookeeper.zkclient.exception.ZkInterruptedException;
+import org.apache.pinot.common.exception.SegmentIngestionFailureException;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataCustomMapModifier;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadataUtils;
@@ -45,6 +47,7 @@ import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.resources.ResourceUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
 import org.apache.pinot.segment.spi.SegmentMetadata;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -451,6 +454,27 @@ public class ZKOperator {
       // Call deleteSegment to remove the segment from permanent location if needed.
       LOGGER.error("Caught exception while calling assignTableSegment for adding segment: {} to table: {}", segmentName,
           tableNameWithType, e);
+      if (containsException(e, ZkInterruptedException.class)) {
+        LOGGER.warn("Caught ZkInterruptedException while assigning segment: {} to table: {}. "
+                        + "Deleting segment to prevent inconsistent state.",
+                segmentName, tableNameWithType);
+
+        PinotResourceManagerResponse response =
+                _pinotHelixResourceManager.deleteSegment(tableNameWithType, segmentName);
+        String errorMessage;
+        if (!response.isSuccessful()) {
+          errorMessage =
+                  String.format("Failed to delete segment: %s of table: %s after ZkInterruptedException. Response: %s",
+                          segmentName, tableNameWithType, response.getMessage());
+        } else {
+          errorMessage = String.format(
+                  "Failed to assign segment: %s to table: %s due to ZkInterruptedException. "
+                          + "Segment deleted successfully.",
+                  segmentName, tableNameWithType);
+        }
+        LOGGER.error(errorMessage);
+        throw new SegmentIngestionFailureException(errorMessage);
+      }
       deleteSegmentIfNeeded(tableNameWithType, segmentName, segmentUploadStartTime, enableParallelPushProtection);
       throw e;
     }
@@ -591,6 +615,25 @@ public class ZKOperator {
         releaseParallelPushLock(tableNameWithType, segmentZKMetadata, segmentUploadStartTime);
       }
     }
+  }
+
+  /**
+   * Checks if the given exception or any exception in its causal chain
+   * is an instance of the specified exception type.
+   *
+   * @param exception the exception to check
+   * @param exceptionType the exception type to look for
+   * @return true if the exception type is found in the chain, false otherwise
+   */
+  public static boolean containsException(Throwable exception, Class<? extends Throwable> exceptionType) {
+    Throwable current = exception;
+    while (current != null) {
+      if (exceptionType.isInstance(current)) {
+        return true;
+      }
+      current = current.getCause();
+    }
+    return false;
   }
 
   /**
