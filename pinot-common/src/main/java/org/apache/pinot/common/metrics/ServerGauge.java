@@ -85,9 +85,6 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
    */
   NETTY_POOLED_THREADLOCALCACHE("bytes", true),
   NETTY_POOLED_CHUNK_SIZE("bytes", true),
-  // Ingestion delay metrics
-  REALTIME_INGESTION_DELAY_MS("milliseconds", false),
-  END_TO_END_REALTIME_INGESTION_DELAY_MS("milliseconds", false),
   LUCENE_INDEXING_DELAY_MS("milliseconds", false),
   LUCENE_INDEXING_DELAY_DOCS("documents", false),
   // Needed to track if valid doc id snapshots are present for faster restarts
@@ -95,9 +92,12 @@ public enum ServerGauge implements AbstractMetrics.Gauge {
   UPSERT_QUERYABLE_DOC_ID_SNAPSHOT_COUNT("upsertQueryableDocIdSnapshotCount", false),
   UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT("upsertPrimaryKeysInSnapshotCount", false),
   UPSERT_QUERYABLE_DOCS_IN_SNAPSHOT_COUNT("upsertQueryableDocIdsInSnapshot", false),
-  REALTIME_INGESTION_OFFSET_LAG("offsetLag", false),
-  REALTIME_INGESTION_UPSTREAM_OFFSET("upstreamOffset", false),
-  REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false),
+  REALTIME_INGESTION_OFFSET_LAG("offsetLag", false,
+      "The difference between latest message offset and the last consumed message offset."),
+  REALTIME_INGESTION_UPSTREAM_OFFSET("upstreamOffset", false, "The offset of the latest message in the upstream."),
+  REALTIME_INGESTION_CONSUMING_OFFSET("consumingOffset", false, "The offset of the last consumed message."),
+  REALTIME_INGESTION_DELAY_MS("milliseconds", false,
+      "The difference of the current timestamp and the timestamp present in the last consumed message record."),
   REALTIME_CONSUMER_DIR_USAGE("bytes", true),
   SEGMENT_DOWNLOAD_SPEED("bytes", true),
   PREDOWNLOAD_SPEED("bytes", true),
