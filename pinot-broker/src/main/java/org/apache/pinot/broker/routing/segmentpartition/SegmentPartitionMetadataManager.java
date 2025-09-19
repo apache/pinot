@@ -63,6 +63,7 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private final String _partitionColumn;
   private final String _partitionFunctionName;
   private final int _numPartitions;
+  private final boolean _allowPartitionRemapping;
 
   // cache-able content, only follow changes if onlineSegments list (of ideal-state) is changed.
   private final Map<String, SegmentInfo> _segmentInfoMap = new HashMap<>();
@@ -72,11 +73,12 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
   private transient TablePartitionReplicatedServersInfo _tablePartitionReplicatedServersInfo;
 
   public SegmentPartitionMetadataManager(String tableNameWithType, String partitionColumn, String partitionFunctionName,
-      int numPartitions) {
+      int numPartitions, boolean allowPartitionRemapping) {
     _tableNameWithType = tableNameWithType;
     _partitionColumn = partitionColumn;
     _partitionFunctionName = partitionFunctionName;
     _numPartitions = numPartitions;
+    _allowPartitionRemapping = allowPartitionRemapping;
   }
 
   @Override
@@ -106,14 +108,28 @@ public class SegmentPartitionMetadataManager implements SegmentZkMetadataFetchLi
     if (!_partitionFunctionName.equalsIgnoreCase(partitionFunction.getName())) {
       return INVALID_PARTITION_ID;
     }
-    if (_numPartitions != partitionFunction.getNumPartitions()) {
-      return INVALID_PARTITION_ID;
+    if (_allowPartitionRemapping) {
+      // Ensure segment partitions can be evenly distributed across table partitions.
+      // For example, 8 Kafka partitions can be remapped to 4 Pinot partitions (8 % 4 = 0),
+      // but 8 partitions cannot be remapped to 3 partitions (8 % 3 ≠ 0).
+      if (partitionFunction.getNumPartitions() % _numPartitions != 0) {
+        return INVALID_PARTITION_ID;
+      }
+      Set<Integer> partitions = segmentPartitionInfo.getPartitions();
+      if (partitions.size() != 1) {
+        return INVALID_PARTITION_ID;
+      }
+      return partitions.iterator().next() % _numPartitions;
+    } else {
+      if (partitionFunction.getNumPartitions() != _numPartitions) {
+        return INVALID_PARTITION_ID;
+      }
+      Set<Integer> partitions = segmentPartitionInfo.getPartitions();
+      if (partitions.size() != 1) {
+        return INVALID_PARTITION_ID;
+      }
+      return partitions.iterator().next();
     }
-    Set<Integer> partitions = segmentPartitionInfo.getPartitions();
-    if (partitions.size() != 1) {
-      return INVALID_PARTITION_ID;
-    }
-    return partitions.iterator().next();
   }
 
   private static long getCreationTimeMs(@Nullable ZNRecord znRecord) {
