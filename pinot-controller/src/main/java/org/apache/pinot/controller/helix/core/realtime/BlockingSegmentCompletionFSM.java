@@ -143,7 +143,9 @@ public class BlockingSegmentCompletionFSM implements SegmentCompletionFSM {
     _maxTimeAllowedToCommitMs = _startTimeMs + _initialCommitTimeMs;
     _controllerVipUrl = segmentCompletionManager.getControllerVipUrl();
 
-    if (segmentMetadata.getStatus() != CommonConstants.Segment.Realtime.Status.IN_PROGRESS) {
+    // NOTE: If segment ZK status is COMMITTING, The current behaviour expects the segment protocol calls to fail and
+    // abort leaving it to realtime segment validation job to fix it.
+    if (segmentMetadata.getStatus().isCompleted()) {
       _state = BlockingSegmentCompletionFSMState.COMMITTED;
       StreamPartitionMsgOffsetFactory factory =
           _segmentCompletionManager.getStreamPartitionMsgOffsetFactory(_segmentName);
