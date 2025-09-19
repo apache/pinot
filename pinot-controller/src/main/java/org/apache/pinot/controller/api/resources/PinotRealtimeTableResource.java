@@ -18,6 +18,10 @@
  */
 package org.apache.pinot.controller.api.resources;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonGetter;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonValue;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import io.swagger.annotations.Api;
@@ -53,6 +57,7 @@ import javax.ws.rs.core.Response;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
 import org.apache.helix.model.ExternalView;
 import org.apache.helix.model.IdealState;
+import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.utils.DatabaseUtils;
 import org.apache.pinot.controller.ControllerConf;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
@@ -63,9 +68,15 @@ import org.apache.pinot.controller.util.ConsumingSegmentInfoReader;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.core.util.NumberUtils;
+import org.apache.pinot.core.util.NumericException;
 import org.apache.pinot.spi.config.table.PauseState;
+import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
+import org.apache.pinot.spi.stream.PartitionGroupConsumptionStatus;
+import org.apache.pinot.spi.stream.StreamConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.slf4j.Logger;
@@ -430,6 +441,100 @@ public class PinotRealtimeTableResource {
       throw new ControllerApplicationException(LOGGER,
           String.format("Failed to get pauseless debug info for table %s. %s", realtimeTableName, e.getMessage()),
           Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+
+  @GET
+  @Produces(MediaType.APPLICATION_JSON)
+  @Path("/tables/{tableName}/watermarks")
+  @Authorize(targetType = TargetType.TABLE, paramName = "tableName", action = Actions.Table.GET_IDEAL_STATE)
+  @ApiOperation(value = "Get table ideal state", notes = "Get table ideal state")
+  public WaterMarks inductConsumingWatermark(
+      @ApiParam(value = "Name of the realtime table", required = true) @PathParam("tableName") String tableName,
+      @Context HttpHeaders headers) {
+    try {
+      tableName = DatabaseUtils.translateTableName(tableName, headers);
+      String tableNameWithType = TableNameBuilder.REALTIME.tableNameWithType(tableName);
+      if (!_pinotHelixResourceManager.hasRealtimeTable(tableName)) {
+        throw new TableNotFoundException("Table " + tableNameWithType + " does not exist");
+      }
+      TableConfig tableConfig = _pinotHelixResourceManager.getTableConfig(tableNameWithType);
+      Preconditions.checkNotNull(tableConfig, "Table " + tableNameWithType + "exists but null tableConfig");
+      List<StreamConfig> streamConfigs = IngestionConfigUtils.getStreamConfigs(tableConfig);
+      IdealState idealState = _pinotHelixResourceManager.getHelixAdmin()
+          .getResourceIdealState(_pinotHelixResourceManager.getHelixClusterName(), tableNameWithType);
+      List<PartitionGroupConsumptionStatus> lst = _pinotLLCRealtimeSegmentManager
+          .getPartitionGroupConsumptionStatusList(idealState, streamConfigs);
+      List<WaterMarks.WaterMark> watermarks = lst.stream().map( status -> {
+        long seq = status.getSequenceNumber();
+        long startOffset;
+        try {
+          if (status.getStatus().equalsIgnoreCase("done")) {
+            Preconditions.checkNotNull(status.getEndOffset());
+            startOffset = NumberUtils.parseLong(status.getEndOffset().toString());
+            seq++;
+          } else {
+            startOffset = NumberUtils.parseLong(status.getStartOffset().toString());
+          }
+        } catch (NumericException e) {
+          throw new RuntimeException(e);
+        }
+        return new WaterMarks.WaterMark(status.getPartitionGroupId(), seq, startOffset);
+      }).collect(Collectors.toList());
+      return new WaterMarks(watermarks);
+    } catch (TableNotFoundException e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.NOT_FOUND, e);
+    } catch (Exception e) {
+      throw new ControllerApplicationException(LOGGER, e.getMessage(), Response.Status.INTERNAL_SERVER_ERROR, e);
+    }
+  }
+
+  /**
+   * Represents a collection of WaterMark objects.
+   * This class will serialize directly to a JSON array of watermarks.
+   */
+  public static class WaterMarks {
+
+    /**
+     * The @JsonValue annotation tells Jackson to serialize an instance of WaterMarks
+     * as this list itself, rather than as a JSON object containing the list.
+     * So, the output will be an array `[...]` instead of an object `{"watermarks": [...]}`.
+     */
+    @JsonValue
+    public List<WaterMark> watermarks;
+
+    /**
+     * The @JsonCreator annotation marks this constructor to be used for deserializing
+     * a JSON array back into a WaterMarks object.
+     */
+    @JsonCreator
+    public WaterMarks(List<WaterMark> watermarks) {
+      this.watermarks = watermarks;
+    }
+
+    /**
+     * Represents a single watermark with its partition, sequence, and offset.
+     */
+    public static class WaterMark {
+      public long partitionGroupId;
+      public long sequenceId;
+      public long startOffset;
+
+      /**
+       * The @JsonCreator annotation tells Jackson to use this constructor to create
+       * a WaterMark instance from a JSON object. The @JsonProperty annotations
+       * map the keys in the JSON object to the constructor parameters.
+       */
+      @JsonCreator
+      public WaterMark(
+          @JsonProperty("partitionGroupId") long partitionGroupId,
+          @JsonProperty("sequenceId") long sequenceId,
+          @JsonProperty("startOffset") long startOffset) {
+        this.partitionGroupId = partitionGroupId;
+        this.sequenceId = sequenceId;
+        this.startOffset = startOffset;
+      }
     }
   }
 
