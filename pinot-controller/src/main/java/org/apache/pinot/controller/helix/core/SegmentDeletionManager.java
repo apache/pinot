@@ -30,13 +30,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
@@ -54,6 +51,7 @@ import org.apache.pinot.core.segment.processing.lifecycle.impl.SegmentDeletionEv
 import org.apache.pinot.segment.local.utils.SegmentPushUtils;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
 import org.apache.pinot.spi.utils.TimeUtils;
@@ -210,17 +208,6 @@ public class SegmentDeletionManager {
     }
   }
 
-  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments) {
-    removeSegmentsFromStore(tableNameWithType, segments, null);
-  }
-
-  public void removeSegmentsFromStore(String tableNameWithType, List<String> segments,
-      @Nullable Long deletedSegmentsRetentionMs) {
-    for (String segment : segments) {
-      removeSegmentFromStore(tableNameWithType, segment, deletedSegmentsRetentionMs);
-    }
-  }
-
   public void removeSegmentsFromStoreInBatch(String tableNameWithType, List<String> segments,
       @Nullable Long deletedSegmentsRetentionMs) {
     if (_dataDir == null) {
@@ -270,49 +257,6 @@ public class SegmentDeletionManager {
     }
   }
 
-  private void deleteSegmentMetadataFromStore(PinotFS pinotFS, URI segmentFileUri, String segmentId) {
-    // Check if segment metadata exists in remote store and delete it.
-    // URI is generated from segment's location and segment name
-    try {
-      URI segmentMetadataUri = SegmentPushUtils.generateSegmentMetadataURI(segmentFileUri.toString(), segmentId);
-      if (pinotFS.exists(segmentMetadataUri)) {
-        LOGGER.info("Deleting segment metadata: {} from: {}", segmentId, segmentMetadataUri);
-        if (!deleteWithTimeout(pinotFS, segmentMetadataUri, true, OBJECT_DELETION_TIMEOUT, TimeUnit.SECONDS)) {
-          LOGGER.warn("Could not delete segment metadata: {} from: {}", segmentId, segmentMetadataUri);
-        }
-      }
-    } catch (IOException e) {
-      LOGGER.warn("Could not delete segment metadata {} from {}", segmentId, segmentFileUri, e);
-    } catch (URISyntaxException e) {
-      LOGGER.warn("Could not parse segment uri {}", segmentFileUri, e);
-    }
-  }
-
-  protected void removeSegmentFromStore(String tableNameWithType, String segmentId,
-      @Nullable Long deletedSegmentsRetentionMs) {
-    if (_dataDir != null) {
-      long retentionMs = deletedSegmentsRetentionMs == null
-          ? _defaultDeletedSegmentsRetentionMs : deletedSegmentsRetentionMs;
-      String rawTableName = TableNameBuilder.extractRawTableName(tableNameWithType);
-      URI fileToDeleteURI = getFileToDeleteURI(rawTableName, segmentId);
-      if (fileToDeleteURI == null) {
-        return;
-      }
-      PinotFS pinotFS = PinotFSFactory.create(fileToDeleteURI.getScheme());
-      // Segment metadata in remote store is an optimization, to avoid downloading segment to parse metadata.
-      // This is catch all clean up to ensure that metadata is removed from deep store.
-      deleteSegmentMetadataFromStore(pinotFS, fileToDeleteURI, segmentId);
-      if (retentionMs <= 0) {
-        // delete the segment file instantly if retention is set to zero
-        segmentDeletion(segmentId, pinotFS, fileToDeleteURI);
-      } else {
-        moveSegmentsToDeletedDir(segmentId, deletedSegmentsRetentionMs, rawTableName, pinotFS, fileToDeleteURI);
-      }
-    } else {
-      LOGGER.info("dataDir is not configured, won't delete segment {} from disk", segmentId);
-    }
-  }
-
   private void moveSegmentsToDeletedDir(String segmentId, Long deletedSegmentsRetentionMs, String rawTableName,
       PinotFS pinotFS,
       URI fileToDeleteURI) {
@@ -342,13 +286,6 @@ public class SegmentDeletionManager {
     }
   }
 
-  private static void segmentDeletion(String segmentId, PinotFS pinotFS, URI fileToDeleteURI) {
-    if (deleteWithTimeout(pinotFS, fileToDeleteURI, true, OBJECT_DELETION_TIMEOUT, TimeUnit.SECONDS)) {
-      LOGGER.info("Deleted segment: {} from: {}", segmentId, fileToDeleteURI.toString());
-    } else {
-      LOGGER.warn("Failed to delete segment: {} from: {}", segmentId, fileToDeleteURI.toString());
-    }
-  }
 
   /**
    * Retrieves the URI for segment deletion by checking two possible segment file variants in deep store.
@@ -425,36 +362,70 @@ public class SegmentDeletionManager {
           if (leadControllerManager.isLeaderForTable(tableName)) {
             URI tableNameURI = URIUtils.getUri(deletedDirURI.toString(), URIUtils.encode(tableName));
             // Get files that are aged
-            final String[] targetFiles = pinotFS.listFiles(tableNameURI, false);
-            int numFilesDeleted = 0;
-            URI targetURI = null;
-            for (String targetFile : targetFiles) {
+            final List<FileMetadata> targetFiles = pinotFS.listFilesWithMetadata(tableNameURI, false);
+
+            if (targetFiles.isEmpty()) {
+              LOGGER.info("Deleting empty deleted segments directory: {} for table: {}", tableNameURI, tableName);
               try {
-                targetURI =
-                    URIUtils.getUri(tableNameURI.toString(), URIUtils.encode(URIUtils.getLastPart(targetFile)));
-                long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), pinotFS.lastModified(targetURI));
-                if (System.currentTimeMillis() >= deletionTimeMs) {
-                  if (!deleteWithTimeout(pinotFS, targetURI, true, OBJECT_DELETION_TIMEOUT, TimeUnit.SECONDS)) {
-                    LOGGER.warn("Failed to remove resource: {}", targetURI);
-                  } else {
-                    numFilesDeleted++;
-                    if (numFilesDeleted >= NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT) {
-                      LOGGER.info("Reached threshold of max aged segments to delete per attempt. Deleted: {} files "
-                          + "from directory: {}", numFilesDeleted, tableNameDir);
-                      break;
-                    }
-                  }
+                if (!pinotFS.delete(tableNameURI, false)) {
+                  LOGGER.info("Could not delete deleted segments directory: {} for table: {}", tableNameURI, tableName);
+                } else {
+                  LOGGER.info("Successfully deleted deleted segments directory: {} for table: {}", tableNameURI,
+                      tableName);
                 }
               } catch (Exception e) {
-                LOGGER.warn("Failed to delete uri: {} for table: {}", targetURI, tableName, e);
+                LOGGER.error("Exception occurred while deleting deleted segments directory: {} for table: {}",
+                    tableNameURI, tableName, e);
+              }
+              continue;
+            }
+            int numFilesDeleted = 0;
+            URI targetURI = null;
+            List<URI> targetURIs = new ArrayList<>();
+            for (FileMetadata targetFile : targetFiles) {
+              // Some file system implementations also return the current table directory
+              // we do not want to delete the table directory
+              if (targetFile.isDirectory()) {
+                continue;
+              }
+
+              targetURI =
+                  URIUtils.getUri(tableNameURI.toString(),
+                      URIUtils.encode(URIUtils.getLastPart(targetFile.getFilePath())));
+              long deletionTimeMs = getDeletionTimeMsFromFile(targetURI.toString(), targetFile.getLastModifiedTime());
+              if (System.currentTimeMillis() >= deletionTimeMs) {
+                numFilesDeleted++;
+                targetURIs.add(targetURI);
+                if (numFilesDeleted == NUM_AGED_SEGMENTS_TO_DELETE_PER_ATTEMPT) {
+                  LOGGER.info(
+                      "Reached threshold of max aged segments to delete per attempt. Deleting: {} segment files "
+                          + "from directory: {}", numFilesDeleted, tableNameDir);
+                  break;
+                }
               }
             }
-
-            if (numFilesDeleted == targetFiles.length) {
-              // Delete directory if it's empty
-              if (!deleteWithTimeout(pinotFS, tableNameURI, false, OBJECT_DELETION_TIMEOUT, TimeUnit.SECONDS)) {
-                LOGGER.warn("Failed to remove the directory: {}", tableNameDir);
+            try {
+              if (numFilesDeleted > 0) {
+                LOGGER.info("Submitting request to delete: {} segment files from directory: {}", numFilesDeleted,
+                    tableNameDir);
+                int finalNumFilesDeleted = numFilesDeleted;
+                _executorService.submit(() -> {
+                  try {
+                    if (!pinotFS.deleteBatch(targetURIs, false)) {
+                      LOGGER.warn("Failed to delete aged segment files from table: {}", tableName);
+                    } else {
+                      LOGGER.info("Successfully deleted {} aged segment files from table: {}", finalNumFilesDeleted,
+                          tableName);
+                    }
+                  } catch (Exception e) {
+                    LOGGER.error("Exception occurred while deleting aged segments for table: {} from path: {}",
+                        tableName, tableNameURI, e);
+                  }
+                });
               }
+            } catch (Exception e) {
+              LOGGER.warn("Failed to submit deletion task for segments in table: {} from path: {}", tableName,
+                  tableNameURI, e);
             }
           }
         }
@@ -463,32 +434,6 @@ public class SegmentDeletionManager {
       }
     } else {
       LOGGER.info("dataDir is not configured, won't delete any expired segments from deleted directory.");
-    }
-  }
-
-  private static boolean deleteWithTimeout(PinotFS pinotFS, URI targetURI, boolean forceDelete, long timeout,
-      TimeUnit timeUnit) {
-    CompletableFuture<Boolean> deleteFuture = CompletableFuture.supplyAsync(() -> {
-      try {
-        return pinotFS.delete(targetURI, forceDelete);
-      } catch (IOException e) {
-        LOGGER.warn("Error while deleting resource: {}", targetURI, e);
-        return false;
-      }
-    });
-
-    try {
-      return deleteFuture.get(timeout, timeUnit);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      LOGGER.warn("Thread was interrupted while deleting resource: {}", targetURI, e);
-      return false;
-    } catch (TimeoutException e) {
-      LOGGER.warn("Timeout occurred while deleting resource: {}", targetURI, e);
-      return false;
-    } catch (ExecutionException e) {
-      LOGGER.warn("Exception occurred while deleting resource: {}", targetURI, e);
-      return false;
     }
   }
 
