@@ -262,6 +262,13 @@ public class IngestionDelayTracker {
   public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
       long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
       @Nullable StreamPartitionMsgOffset latestOffset) {
+    updateIngestionMetrics(segmentName, partitionId, ingestionTimeMs, firstStreamIngestionTimeMs,
+        currentOffset, latestOffset, ServerGauge.REALTIME_INGESTION_DELAY_MS);
+  }
+
+  public void updateIngestionMetrics(String segmentName, int partitionId, long ingestionTimeMs,
+      long firstStreamIngestionTimeMs, @Nullable StreamPartitionMsgOffset currentOffset,
+      @Nullable StreamPartitionMsgOffset latestOffset, @Nullable ServerGauge ingestionDelayGauge) {
     if (!_isServerReadyToServeQueries.get() || _realTimeTableDataManager.isShutDown()) {
       // Do not update the ingestion delay metrics during server startup period
       // or once the table data manager has been shutdown.
@@ -273,6 +280,8 @@ public class IngestionDelayTracker {
       return;
     }
 
+    ServerGauge ingestionDelayGaugeToUse =
+        ingestionDelayGauge != null ? ingestionDelayGauge : ServerGauge.REALTIME_INGESTION_DELAY_MS;
     _ingestionInfoMap.compute(partitionId, (k, v) -> {
       if (_segmentsToIgnore.getIfPresent(segmentName) != null) {
         // Do not update the metrics for the segment that is marked to be ignored.
@@ -281,14 +290,11 @@ public class IngestionDelayTracker {
       if (v == null) {
         // Add metric when we start tracking a partition. Only publish the metric if supported by the stream.
         if (ingestionTimeMs > 0) {
-          _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
-              () -> getPartitionIngestionDelayMs(partitionId));
-        }
-        if (firstStreamIngestionTimeMs > 0) {
+
           _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId,
-              ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
-              () -> getPartitionEndToEndIngestionDelayMs(partitionId));
+              ingestionDelayGaugeToUse, () -> getPartitionIngestionDelayMs(partitionId));
         }
+
         if (currentOffset != null && latestOffset != null) {
           _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionId, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
               () -> getPartitionIngestionOffsetLag(partitionId));
