@@ -22,10 +22,12 @@ import java.util.List;
 import java.util.Map;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.core.common.BlockValSet;
+import org.apache.pinot.core.common.ObjectSerDeUtils;
 import org.apache.pinot.core.query.aggregation.AggregationResultHolder;
 import org.apache.pinot.core.query.aggregation.groupby.GroupByResultHolder;
 import org.apache.pinot.segment.local.customobject.AvgPair;
 import org.apache.pinot.segment.spi.AggregationFunctionType;
+import org.apache.pinot.spi.data.FieldSpec.DataType;
 
 
 public class AvgMVAggregationFunction extends AvgAggregationFunction {
@@ -43,8 +45,24 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
   public void aggregate(int length, AggregationResultHolder aggregationResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
 
+    if (blockValSet.getValueType() == DataType.BYTES) {
+      // Serialized AvgPair
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      AvgPair avgPair = new AvgPair();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          AvgPair value = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+          avgPair.apply(value);
+        }
+      });
+      if (avgPair.getCount() != 0) {
+        updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
+      }
+      return;
+    }
+
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
     AvgPair avgPair = new AvgPair();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
@@ -53,7 +71,7 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
         }
       }
     });
-
+    // Only set the aggregation result when there is at least one non-null input value
     if (avgPair.getCount() != 0) {
       updateAggregationResult(aggregationResultHolder, avgPair.getSum(), avgPair.getCount());
     }
@@ -63,21 +81,32 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
   public void aggregateGroupBySV(int length, int[] groupKeyArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
 
-    forEachNotNull(length, blockValSet, (from, to) -> {
-      for (int i = from; i < to; i++) {
-        aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
-      }
-    });
+    if (blockValSet.getValueType() != DataType.BYTES) {
+      double[][] valuesArray = blockValSet.getDoubleValuesMV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          aggregateOnGroupKey(groupKeyArray[i], groupByResultHolder, valuesArray[i]);
+        }
+      });
+    } else {
+      // Serialized AvgPair.
+      byte[][] bytesValues = blockValSet.getBytesValuesSV();
+      forEachNotNull(length, blockValSet, (from, to) -> {
+        for (int i = from; i < to; i++) {
+          AvgPair avgPair = ObjectSerDeUtils.AVG_PAIR_SER_DE.deserialize(bytesValues[i]);
+          updateGroupByResult(groupKeyArray[i], groupByResultHolder, avgPair.getSum(), avgPair.getCount());
+        }
+      });
+    }
   }
 
   @Override
   public void aggregateGroupByMV(int length, int[][] groupKeysArray, GroupByResultHolder groupByResultHolder,
       Map<ExpressionContext, BlockValSet> blockValSetMap) {
     BlockValSet blockValSet = blockValSetMap.get(_expression);
-    double[][] valuesArray = blockValSet.getDoubleValuesMV();
 
+    double[][] valuesArray = blockValSet.getDoubleValuesMV();
     forEachNotNull(length, blockValSet, (from, to) -> {
       for (int i = from; i < to; i++) {
         double[] values = valuesArray[i];
@@ -86,6 +115,8 @@ public class AvgMVAggregationFunction extends AvgAggregationFunction {
         }
       }
     });
+
+    // Startree index does not support grouping by multi-value field, so no need to handle serialized AvgPair here.
   }
 
   private void aggregateOnGroupKey(int groupKey, GroupByResultHolder groupByResultHolder, double[] values) {
