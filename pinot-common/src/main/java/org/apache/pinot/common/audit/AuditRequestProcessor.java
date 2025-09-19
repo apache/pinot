@@ -109,7 +109,7 @@ public class AuditRequestProcessor {
 
   public AuditEvent processRequest(ContainerRequestContext requestContext, String remoteAddr) {
     // Check if auditing is enabled (if config manager is available)
-    if (!isEnabled()) {
+    if (!_configManager.isEnabled()) {
       return null;
     }
 
@@ -135,10 +135,6 @@ public class AuditRequestProcessor {
       LOG.warn("Failed to process audit logging for request", e);
     }
     return null;
-  }
-
-  public boolean isEnabled() {
-    return _configManager.isEnabled();
   }
 
   private String extractClientIpAddress(ContainerRequestContext requestContext, String remoteAddr) {
