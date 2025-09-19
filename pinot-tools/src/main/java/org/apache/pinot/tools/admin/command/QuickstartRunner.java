@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Random;
 import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixManager;
@@ -34,6 +35,8 @@ import org.apache.helix.HelixManagerFactory;
 import org.apache.helix.InstanceType;
 import org.apache.helix.model.HelixConfigScope;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.pinot.common.utils.ZkSSLUtils;
+import org.apache.pinot.common.utils.ZkStarter;
 import org.apache.pinot.spi.auth.AuthProvider;
 import org.apache.pinot.spi.config.tenant.TenantRole;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -76,6 +79,8 @@ public class QuickstartRunner {
   private final Map<String, Object> _configOverrides;
   private final Map<String, String> _clusterConfigOverrides;
   private final boolean _deleteExistingData;
+  private final boolean _zookeeperSslEnabled = RANDOM.nextBoolean();
+  private Properties _zkSSLClientSSLProperties;
 
   // If this field is non-null, an embedded Zookeeper instance will not be launched
   private final String _zkExternalAddress;
@@ -130,11 +135,27 @@ public class QuickstartRunner {
     StartZookeeperCommand zkStarter = new StartZookeeperCommand();
     zkStarter.setPort(ZK_PORT);
     zkStarter.setDataDir(new File(_tempDir, DEFAULT_ZK_DIR).getAbsolutePath());
+    System.out.println("Starting Zookeeper with SSL enabled: " + _zookeeperSslEnabled);
+    if (_zookeeperSslEnabled) {
+      String keystorePath = _tempDir.getAbsolutePath() + File.separator + "keystore.jks";
+      String truststorePath = _tempDir.getAbsolutePath() + File.separator + "truststore.jks";
+      String password = "Password";
+      ZkStarter.SSLConfig testSSLConfig = ZkStarter.createTestSSLConfig(keystorePath, truststorePath, password);
+      zkStarter.setSslEnabled(true);
+      zkStarter.setKeyStorePath(testSSLConfig.getKeyStorePath());
+      zkStarter.setKeyStorePassword(testSSLConfig.getKeyStorePassword());
+      zkStarter.setTrustStorePath(testSSLConfig.getTrustStorePath());
+      zkStarter.setTrustStorePassword(testSSLConfig.getTrustStorePassword());
+      _zkSSLClientSSLProperties = zkStarter.getSSLConfig().getClientSSLProperties();
+    }
     zkStarter.execute();
   }
 
   private void startControllers()
       throws Exception {
+    if (_zookeeperSslEnabled) {
+      ZkSSLUtils.configureSSL(_zkSSLClientSSLProperties);
+    }
     for (int i = 0; i < _numControllers; i++) {
       StartControllerCommand controllerStarter = new StartControllerCommand();
       controllerStarter.setControllerPort(String.valueOf(DEFAULT_CONTROLLER_PORT + i))
@@ -162,6 +183,9 @@ public class QuickstartRunner {
 
   private void startBrokers()
       throws Exception {
+    if (_zookeeperSslEnabled) {
+      ZkSSLUtils.configureSSL(_zkSSLClientSSLProperties);
+    }
     for (int i = 0; i < _numBrokers; i++) {
       StartBrokerCommand brokerStarter = new StartBrokerCommand();
       brokerStarter.setPort(DEFAULT_BROKER_PORT + i)
@@ -176,6 +200,9 @@ public class QuickstartRunner {
 
   private void startServers()
       throws Exception {
+    if (_zookeeperSslEnabled) {
+      ZkSSLUtils.configureSSL(_zkSSLClientSSLProperties);
+    }
     for (int i = 0; i < _numServers; i++) {
       StartServerCommand serverStarter = new StartServerCommand();
       serverStarter.setPort(DEFAULT_SERVER_NETTY_PORT + i).setAdminPort(DEFAULT_SERVER_ADMIN_API_PORT + i)
@@ -192,6 +219,9 @@ public class QuickstartRunner {
 
   private void startMinions()
       throws Exception {
+    if (_zookeeperSslEnabled) {
+      ZkSSLUtils.configureSSL(_zkSSLClientSSLProperties);
+    }
     for (int i = 0; i < _numMinions; i++) {
       StartMinionCommand minionStarter = new StartMinionCommand();
       minionStarter.setMinionPort(DEFAULT_MINION_PORT + i)
