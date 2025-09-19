@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.helix.AccessOption;
@@ -48,6 +49,7 @@ import org.apache.pinot.controller.helix.core.SegmentDeletionManager;
 import org.apache.pinot.spi.config.table.SegmentsValidationAndRetentionConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.filesystem.FileMetadata;
 import org.apache.pinot.spi.filesystem.LocalPinotFS;
 import org.apache.pinot.spi.filesystem.PinotFS;
 import org.apache.pinot.spi.filesystem.PinotFSFactory;
@@ -314,7 +316,7 @@ public class SegmentDeletionManagerTest {
 
   @Test
   public void testRemoveDeletedSegmentsForGcsPinotFS()
-      throws URISyntaxException, IOException {
+      throws URISyntaxException, IOException, InterruptedException {
     Map<String, Object> properties = new HashMap<>();
     properties.put(CommonConstants.Controller.PREFIX_OF_CONFIG_OF_PINOT_FS_FACTORY + ".class",
         LocalPinotFS.class.getName());
@@ -351,11 +353,31 @@ public class SegmentDeletionManagerTest {
     pinotFS.mkdir(segment2ForTable2);
 
     deletionManager1.removeAgedDeletedSegments(leadControllerManager);
-    // all files should get deleted
-    Assert.assertFalse(pinotFS.exists(tableUri2));
+
+    // All files should get deleted but the directory will be deleted in the next run
+    TestUtils.waitForCondition((aVoid) -> {
+          try {
+            return pinotFS.listFiles(tableUri2, false).length == 0;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }, 1000, 10000,
+        "All the files in the tableUri2 could not be deleted");
+    Assert.assertTrue(pinotFS.exists(tableUri2));
 
     // One file that doesn't meet retention criteria, and another file due to the per attempt batch limit remains.
-    Assert.assertEquals(pinotFS.listFiles(tableUri1, false).length, 2);
+    TestUtils.waitForCondition((aVoid) -> {
+          try {
+            return pinotFS.listFiles(tableUri1, false).length == 2;
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }, 1000, 10000,
+        "100 out of 102 files could not be deleted from tableUri1 directory");
+
+    // the next run of the deletion manager should remove the empty directory as well.
+    deletionManager1.removeAgedDeletedSegments(leadControllerManager);
+    Assert.assertFalse(pinotFS.exists(tableUri2));
   }
 
   @Test
@@ -621,14 +643,32 @@ public class SegmentDeletionManagerTest {
         _tableDirs.remove(uri.getPath() + "/");
         return true;
       }
-      // remote the segment
+      // remove the segment
       String tableName = uri.getPath().substring(0, uri.getPath().lastIndexOf("/") + 1);
       return _tableDirs.get(tableName).remove(uri.getPath());
     }
 
     @Override
+    public boolean deleteBatch(List<URI> segmentUris, boolean forceDelete)
+        throws IOException {
+      // the expectation here is that the batch delete call is only limited to segments.
+      URI segmentURI = segmentUris.get(0);
+      String tableName = segmentURI.getPath().substring(0, segmentURI.getPath().lastIndexOf("/") + 1);
+      if (_tableDirs.containsKey(tableName)) {
+        // remove all the segments from the table directory
+        segmentUris.forEach(segmentUri -> _tableDirs.get(tableName).remove(segmentUri.getPath()));
+      }
+      // the table does not exist and we return a true;
+      return true;
+    }
+
+    @Override
     public boolean exists(URI fileUri) {
-      return fileUri.getPath().endsWith("Deleted_Segments") || _tableDirs.containsKey(fileUri.getPath() + "/");
+      String uriPath = fileUri.getPath();
+      if (uriPath.endsWith("/")) {
+        uriPath = uriPath.substring(0, uriPath.lastIndexOf("/"));
+      }
+      return uriPath.endsWith("Deleted_Segments") || _tableDirs.containsKey(uriPath + "/");
     }
 
     @Override
@@ -643,8 +683,22 @@ public class SegmentDeletionManagerTest {
     }
 
     @Override
+    public List<FileMetadata> listFilesWithMetadata(URI fileUri, boolean recursive) {
+      if (_tableDirs.containsKey(fileUri.getPath() + "/")) {
+        return _tableDirs.get(fileUri.getPath() + "/")
+            .stream()
+            .map(segmentFilePath -> new FileMetadata.Builder().setFilePath(segmentFilePath).build())
+            .collect(Collectors.toList());
+      }
+      return List.of();
+    }
+
+    @Override
     public boolean isDirectory(URI uri) {
-      return true;
+      if (_tableDirs.containsKey(uri.getPath() + "/")) {
+        return true;
+      }
+      return uri.getPath().endsWith("Deleted_Segments");
     }
   }
 }
