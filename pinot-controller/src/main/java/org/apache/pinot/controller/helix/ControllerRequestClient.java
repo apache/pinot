@@ -38,6 +38,7 @@ import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.config.tenant.Tenant;
 import org.apache.pinot.spi.config.tenant.TenantRole;
+import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.data.LogicalTableConfig;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.utils.JsonUtils;
@@ -490,6 +491,38 @@ public class ControllerRequestClient {
     try {
       HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
           new URI(_controllerRequestURLBuilder.forClusterConfigDelete(config)), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void updateQueryWorkloadConfig(QueryWorkloadConfig queryWorkloadConfig)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendJsonPostRequest(
+          new URI(_controllerRequestURLBuilder.forQueryWorkloadConfigUpdate()),
+          JsonUtils.objectToString(queryWorkloadConfig), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public void deleteQueryWorkloadConfig(String config)
+      throws IOException {
+    try {
+      HttpClient.wrapAndThrowHttpException(_httpClient.sendDeleteRequest(
+          new URI(_controllerRequestURLBuilder.forBaseQueryWorkloadConfig(config)), _headers));
+    } catch (HttpErrorStatusException | URISyntaxException e) {
+      throw new IOException(e);
+    }
+  }
+
+  public QueryWorkloadConfig getQueryWorkloadConfig(String config)
+      throws IOException {
+    try {
+      SimpleHttpResponse response = HttpClient.wrapAndThrowHttpException(_httpClient.sendGetRequest(
+          new URI(_controllerRequestURLBuilder.forBaseQueryWorkloadConfig(config)), _headers));
+      return JsonUtils.stringToObject(response.getResponse(), QueryWorkloadConfig.class);
     } catch (HttpErrorStatusException | URISyntaxException e) {
       throw new IOException(e);
     }

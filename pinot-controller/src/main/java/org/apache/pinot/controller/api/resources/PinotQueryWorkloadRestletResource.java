@@ -45,6 +45,7 @@ import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.Authorize;
 import org.apache.pinot.core.auth.TargetType;
+import org.apache.pinot.spi.config.workload.EnforcementProfile;
 import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.QueryWorkloadConfig;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -94,38 +95,68 @@ public class PinotQueryWorkloadRestletResource {
   }
 
   /**
-   * API to fetch query workload config
-   * @param queryWorkloadName Name of the query workload
-   * Example request:
-   * /queryWorkloadConfigs/workload-foo1
-   * Example response:
+   * Retrieves the query workload configuration for the specified workload name.
+   * <p>
+   * This API returns the detailed configuration including node-specific settings,
+   * enforcement profiles, propagation schemes, and cost splits.
+   * </p>
+   *
+   * See {@link org.apache.pinot.spi.config.workload.PropagationScheme} and {@link EnforcementProfile} for more details
+   * on the configuration definition and what each field means.
+   * <p><strong>Example:</strong></p>
+   * <pre>{@code
    * {
-   *   "queryWorkloadName" : "workload-foo1",
-   *   "nodeConfigs" : {
-   *   {
-   *       "nodeType" : "brokerNode",
+   *   "queryWorkloadName": "workload-foo1",
+   *   "nodeConfigs": [
+   *     {
+   *       "nodeType": "brokerNode",
    *       "enforcementProfile": {
    *         "cpuCostNs": 500,
    *         "memoryCostBytes": 1000
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TABLE",
-   *         "values": ["airlineStats"]
+   *         "propagationEntities": [
+   *           {
+   *             "entity": "airlineStats",
+   *             "cpuCostNs": 250,
+   *             "memoryCostBytes": 500
+   *           },
+   *           {
+   *             "entity": "baseballStats",
+   *             "cpuCostNs": 250,
+   *             "memoryCostBytes": 500
+   *           }
+   *         ]
    *       }
    *     },
    *     {
-   *       "nodeType" : "serverNode",
+   *       "nodeType": "serverNode",
    *       "enforcementProfile": {
    *         "cpuCostNs": 1500,
    *         "memoryCostBytes": 12000
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TENANT",
-   *         "values": ["DefaultTenant"]
+   *         "propagationEntities": [
+   *           {
+   *             "entity": "DefaultTenant",
+   *             "cpuCostNs": 1000,
+   *             "memoryCostBytes": 8000
+   *           },
+   *           {
+   *             "entity": "PremiumTenant",
+   *             "cpuCostNs": 500,
+   *             "memoryCostBytes": 4000
+   *           }
+   *         ]
    *       }
    *     }
-   *   }
+   *   ]
    * }
+   * }</pre>
+   *
+   * @param queryWorkloadName Name of the query workload
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -158,21 +189,32 @@ public class PinotQueryWorkloadRestletResource {
 
 
   /**
-   * API to get all workload configs associated with the instance
+   * Retrieves all workload configurations associated with the specified instance.
+   * <p>
+   * This API returns a mapping of workload names to their instance-level cost
+   * (CPU and memory) for the given Helix instance.
+   * </p>
+   *
+   * See {@link InstanceCost} for more details on the instance cost definition and what each field means.
+   *
+   * <p><strong>Example:</strong></p>
+   * <pre>{@code
+   * GET /queryWorkloadConfigs/instance/Server_localhost_1234
+   *
+   * {
+   *   "workload1": {
+   *     "cpuCostNs": 100,
+   *     "memoryCostBytes": 100
+   *   },
+   *   "workload2": {
+   *     "cpuCostNs": 50,
+   *     "memoryCostBytes": 50
+   *   }
+   * }
+   * }</pre>
+   *
    * @param instanceName Helix instance name
    * @return Map of workload name to instance cost
-   * Example request:
-   * /queryWorkloadConfigs/instance/Server_localhost_1234
-   * Example response:
-   * {
-   *  "workload1": {
-   *    "cpuCostNs": 100,
-   *    "memoryCostBytes":100
-   *  },
-   *  "workload2": {
-   *    "cpuCostNs": 50,
-   *    "memoryCostBytes": 50
-   *  }
    */
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -203,37 +245,71 @@ public class PinotQueryWorkloadRestletResource {
   }
 
   /**
-   * Updates the query workload config
-   * @param requestString JSON string representing the QueryWorkloadConfig
-   * Example request:
+   * Updates the query workload configuration for a given workload.
+   * <p>
+   * This API accepts a JSON body describing the {@code QueryWorkloadConfig} including
+   * node-specific enforcement profiles and propagation schemes. The configuration
+   * is validated and persisted in Helix, enabling Pinot to enforce resource
+   * isolation based on workload classification.
+   *
+   * See {@link org.apache.pinot.spi.config.workload.PropagationScheme} and {@link EnforcementProfile} for more details
+   * on the configuration definition and what each field means.
+   *
+   * </p>
+   * <p><strong>Example:</strong></p>
+   * <pre>{@code
    * {
-   *   "queryWorkloadName" : "workload-foo1",
-   *   "nodeConfigs" : {
-   *    {
-   *       "nodeType" : "brokerNode",
+   *   "queryWorkloadName": "workload-foo1",
+   *   "nodeConfigs": [
+   *     {
+   *       "nodeType": "brokerNode",
    *       "enforcementProfile": {
    *         "cpuCostNs": 500,
    *         "memoryCostBytes": 1000
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TABLE",
-   *         "values": ["airlineStats"]
+   *         "propagationEntities": [
+   *           {
+   *             "entity": "airlineStats",
+   *             "cpuCostNs": 300,
+   *             "memoryCostBytes": 600
+   *           },
+   *           {
+   *             "entity": "baseballStats",
+   *             "cpuCostNs": 200,
+   *             "memoryCostBytes": 400
+   *           }
+   *         ]
    *       }
    *     },
    *     {
-   *       "nodeType" : "serverNode",
+   *       "nodeType": "serverNode",
    *       "enforcementProfile": {
    *         "cpuCostNs": 1500,
    *         "memoryCostBytes": 12000
    *       },
    *       "propagationScheme": {
    *         "propagationType": "TENANT",
-   *         "values": ["DefaultTenant"]
+   *         "propagationEntities": [
+   *           {
+   *             "entity": "DefaultTenant",
+   *             "cpuCostNs": 1000,
+   *             "memoryCostBytes": 8000
+   *           },
+   *           {
+   *             "entity": "PremiumTenant",
+   *             "cpuCostNs": 500,
+   *             "memoryCostBytes": 4000
+   *           }
+   *         ]
    *       }
    *     }
-   *   }
+   *   ]
    * }
+   * }</pre>
    *
+   * @param requestString JSON string representing the QueryWorkloadConfig
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)
@@ -263,10 +339,18 @@ public class PinotQueryWorkloadRestletResource {
   }
 
   /**
-   * Deletes the query workload config
+   * Deletes the query workload configuration for the specified workload name.
+   * <p>
+   * This API removes the workload configuration from Helix. Once deleted,
+   * the workload will no longer have resource enforcement or propagation
+   * applied within the cluster.
+   * </p>
+   * <p><strong>Example:</strong></p>
+   * <pre>{@code
+   * DELETE /queryWorkloadConfigs/workload-foo1
+   * }</pre>
+   *
    * @param queryWorkloadName Name of the query workload to be deleted
-   * Example request:
-   * /queryWorkloadConfigs/workload-foo1
    */
   @DELETE
   @Produces(MediaType.APPLICATION_JSON)
@@ -290,12 +374,18 @@ public class PinotQueryWorkloadRestletResource {
   }
 
   /**
-   * API to refresh propagation for a single query workload config
-   * This API doesn't update the config, it only triggers the propagation of an existing workload config
+   * Refreshes the propagation of a query workload configuration without updating it.
+   * <p>
+   * This API re-triggers propagation for an existing `QueryWorkloadConfig`. It does not
+   * modify the configuration itself but ensures that the workload settings are pushed
+   * to all relevant nodes.
+   * </p>
+   * <p><strong>Example:</strong></p>
+   * <pre>{@code
+   * POST /queryWorkloadConfigs/workload-foo1/refresh
+   * }</pre>
    *
    * @param queryWorkloadName Name of the query workload to refresh
-   * Example request:
-   * POST /queryWorkloadConfigs/{queryWorkloadName}/refresh
    */
   @POST
   @Produces(MediaType.APPLICATION_JSON)

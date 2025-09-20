@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.controller.workload.scheme;
 
+import java.util.Map;
 import java.util.Set;
+import org.apache.pinot.controller.workload.splitter.CostSplitter;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
 
 /**
@@ -33,4 +36,13 @@ public interface PropagationScheme {
    * @return The set of instances to propagate the workload
    */
   Set<String> resolveInstances(NodeConfig nodeConfig);
+
+  /**
+   * Computes the per-instance cost map for the given node config using the provided splitter.
+   *
+   * @param nodeConfig Node configuration containing cost splits and scope.
+   * @param costSplitter Strategy used to compute costs per instance.
+   * @return A mapping of instance name to its computed {@link InstanceCost}.
+   */
+  Map<String, InstanceCost> resolveInstanceCostMap(NodeConfig nodeConfig, CostSplitter costSplitter);
 }

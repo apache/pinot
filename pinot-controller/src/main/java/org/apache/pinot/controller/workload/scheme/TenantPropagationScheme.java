@@ -18,13 +18,16 @@
  */
 package org.apache.pinot.controller.workload.scheme;
 
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.utils.config.TagNameUtils;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
+import org.apache.pinot.controller.workload.splitter.CostSplitter;
+import org.apache.pinot.spi.config.workload.InstanceCost;
 import org.apache.pinot.spi.config.workload.NodeConfig;
+import org.apache.pinot.spi.config.workload.PropagationEntity;
 
 
 /**
@@ -41,23 +44,55 @@ public class TenantPropagationScheme implements PropagationScheme {
 
   @Override
   public Set<String> resolveInstances(NodeConfig nodeConfig) {
-    Map<String, Set<String>> helixTagToInstances
-            = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
-    Set<String> allInstances = new HashSet<>();
-    List<String> tenantNames = nodeConfig.getPropagationScheme().getValues();
+    Set<String> instances = new HashSet<>();
+    Map<String, Set<String>> helixTagToInstances = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
     NodeConfig.Type nodeType = nodeConfig.getNodeType();
+    for (PropagationEntity entity : nodeConfig.getPropagationScheme().getPropagationEntities()) {
+      Set<String> resolvedInstances = resolveInstances(entity, nodeType, helixTagToInstances);
+      if (!resolvedInstances.isEmpty()) {
+        instances.addAll(resolvedInstances);
+      } else {
+        throw new IllegalArgumentException("No instances found for PropagationEntity: "
+            + entity.getEntity());
+      }
+    }
+    return instances;
+  }
+
+  @Override
+  public Map<String, InstanceCost> resolveInstanceCostMap(NodeConfig nodeConfig, CostSplitter costSplitter) {
+    Map<String, InstanceCost> instanceCostMap = new HashMap<>();
+    Map<String, Set<String>> helixTagToInstances = PropagationUtils.getHelixTagToInstances(_pinotHelixResourceManager);
+    for (PropagationEntity entity : nodeConfig.getPropagationScheme().getPropagationEntities()) {
+      if (entity.getOverrides() != null) {
+        throw new IllegalArgumentException("Sub-allocations are not supported in TenantPropagationScheme");
+      }
+      Set<String> instances = resolveInstances(entity, nodeConfig.getNodeType(), helixTagToInstances);
+      if (instances.isEmpty()) {
+        // This is to ensure cost splits are added for active tenants
+        throw new IllegalArgumentException("No instances found for PropagationEntity: " + entity);
+      }
+      Map<String, InstanceCost> delta = costSplitter.computeInstanceCostMap(entity.getCpuCostNs(),
+          entity.getMemoryCostBytes(), instances);
+      PropagationUtils.mergeCosts(instanceCostMap, delta);
+    }
+    return instanceCostMap;
+  }
+
+  public Set<String> resolveInstances(PropagationEntity entity, NodeConfig.Type nodeType,
+                                       Map<String, Set<String>> helixTagToInstances) {
+    String tenantName = entity.getEntity();
+    Set<String> allInstances = new HashSet<>();
     // Get the unique set of helix tags for the tenants
     Set<String> helixTags = new HashSet<>();
-    for (String tenantName : tenantNames) {
-      if (nodeType == NodeConfig.Type.BROKER_NODE) {
-        helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
-      } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
-        if (TagNameUtils.isOfflineServerTag(tenantName) || TagNameUtils.isRealtimeServerTag(tenantName)) {
-          helixTags.add(tenantName);
-        } else {
-          helixTags.add(TagNameUtils.getOfflineTagForTenant(tenantName));
-          helixTags.add(TagNameUtils.getRealtimeTagForTenant(tenantName));
-        }
+    if (nodeType == NodeConfig.Type.BROKER_NODE) {
+      helixTags.add(TagNameUtils.getBrokerTagForTenant(tenantName));
+    } else if (nodeType == NodeConfig.Type.SERVER_NODE) {
+      if (TagNameUtils.isOfflineServerTag(tenantName) || TagNameUtils.isRealtimeServerTag(tenantName)) {
+        helixTags.add(tenantName);
+      } else {
+        helixTags.add(TagNameUtils.getOfflineTagForTenant(tenantName));
+        helixTags.add(TagNameUtils.getRealtimeTagForTenant(tenantName));
       }
     }
     // Get the instances for the helix tags
