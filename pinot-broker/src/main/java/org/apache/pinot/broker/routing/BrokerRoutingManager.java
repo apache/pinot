@@ -249,22 +249,22 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
       final Stat idealStateStat = idealStateStats[i];
       final Stat externalViewStat = externalViewStats[i];
       if (idealStateStat != null && externalViewStat != null) {
-        RoutingEntry cachedRoutingEntry = routingEntries.get(i);
-        // The routingEntry may have been removed from the _routingEntryMap by the time we get here in case
-        // one of the other functions such as 'removeRouting' was called since taking the snapshot. Check for
-        // existence before proceeding. Also note that if new entries were added since the snapshot was taken, we
-        // will miss processing them in this call. The buildRouting() method tries to handle that by checking for
-        // changes in the IS / EV version after adding a new entry
-        final RoutingEntry routingEntry = _routingEntryMap.get(cachedRoutingEntry.getTableNameWithType());
-        if (routingEntry == null) {
-          LOGGER.info("Table {} was removed while processing segment assignment change, skipping",
-              cachedRoutingEntry.getTableNameWithType());
-          continue;
-        }
-
+        final int index = i;
         futures.add(executorService.submit(() -> {
-          Object tableLock = getRoutingTableBuildLock(routingEntry.getTableNameWithType());
+          RoutingEntry cachedRoutingEntry = routingEntries.get(index);
+          Object tableLock = getRoutingTableBuildLock(cachedRoutingEntry.getTableNameWithType());
           synchronized (tableLock) {
+            // The routingEntry may have been removed from the _routingEntryMap by the time we get here in case
+            // one of the other functions such as 'removeRouting' was called since taking the snapshot. Check for
+            // existence before proceeding. Also note that if new entries were added since the snapshot was taken, we
+            // will miss processing them in this call. The buildRouting() method tries to handle that by checking for
+            // changes in the IS / EV version after adding a new entry
+            final RoutingEntry routingEntry = _routingEntryMap.get(cachedRoutingEntry.getTableNameWithType());
+            if (routingEntry == null) {
+              LOGGER.info("Table {} was removed while processing segment assignment change, skipping",
+                  cachedRoutingEntry.getTableNameWithType());
+              return;
+            }
             boolean hasISOrEVVersionChanged = processAssignmentChangeForTable(idealStateStat.getVersion(),
                 externalViewStat.getVersion(), routingEntry);
             String tableNameWithType = routingEntry.getTableNameWithType();
