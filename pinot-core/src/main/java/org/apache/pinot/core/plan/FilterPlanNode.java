@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.pinot.common.cache.SegmentQueryCache;
+import org.apache.pinot.common.cache.SegmentQueryCacheFactory;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
@@ -37,6 +39,7 @@ import org.apache.pinot.common.request.context.predicate.VectorSimilarityPredica
 import org.apache.pinot.core.geospatial.transform.function.StDistanceFunction;
 import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.operator.filter.BitmapBasedFilterOperator;
+import org.apache.pinot.core.operator.filter.CachedBitmapFilterOperator;
 import org.apache.pinot.core.operator.filter.EmptyFilterOperator;
 import org.apache.pinot.core.operator.filter.ExpressionFilterOperator;
 import org.apache.pinot.core.operator.filter.FilterOperatorUtils;
@@ -68,6 +71,7 @@ import org.apache.pinot.segment.spi.index.reader.TextIndexReader;
 import org.apache.pinot.segment.spi.index.reader.VectorIndexReader;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
+import org.roaringbitmap.buffer.ImmutableRoaringBitmap;
 import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
@@ -76,6 +80,7 @@ public class FilterPlanNode implements PlanNode {
   private final SegmentContext _segmentContext;
   private final QueryContext _queryContext;
   private final FilterContext _filter;
+  private final SegmentQueryCache _queryCache;
 
   // Cache the predicate evaluators
   private final List<Pair<Predicate, PredicateEvaluator>> _predicateEvaluators = new ArrayList<>(4);
@@ -89,6 +94,7 @@ public class FilterPlanNode implements PlanNode {
     _segmentContext = segmentContext;
     _queryContext = queryContext;
     _filter = filter != null ? filter : _queryContext.getFilter();
+    _queryCache = SegmentQueryCacheFactory.get(queryContext.getTableName());
   }
 
   @Override
@@ -214,6 +220,15 @@ public class FilterPlanNode implements PlanNode {
    * Helper method to build the operator tree from the filter.
    */
   private BaseFilterOperator constructPhysicalOperator(FilterContext filter, int numDocs) {
+    if (_queryCache != null) {
+      // Check if the filter is cacheable
+      Object bitmap = _queryCache.get(new SegmentQueryCache.SegmentKey(_indexSegment.getSegmentName(), filter));
+      if (bitmap instanceof ImmutableRoaringBitmap) {
+        // Check if the filter is already cached
+        return new CachedBitmapFilterOperator((ImmutableRoaringBitmap) bitmap, false, numDocs,
+            _queryContext.isNullHandlingEnabled());
+      }
+    }
     switch (filter.getType()) {
       case AND:
         List<FilterContext> childFilters = filter.getChildren();

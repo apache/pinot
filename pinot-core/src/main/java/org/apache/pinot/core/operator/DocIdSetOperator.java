@@ -21,6 +21,7 @@ package org.apache.pinot.core.operator;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
+import org.apache.pinot.common.cache.SegmentQueryCache;
 import org.apache.pinot.core.common.BlockDocIdIterator;
 import org.apache.pinot.core.common.BlockDocIdSet;
 import org.apache.pinot.core.common.Operator;
@@ -29,6 +30,7 @@ import org.apache.pinot.core.operator.filter.BaseFilterOperator;
 import org.apache.pinot.core.plan.DocIdSetPlanNode;
 import org.apache.pinot.segment.spi.Constants;
 import org.apache.pinot.spi.trace.Tracing;
+import org.roaringbitmap.buffer.MutableRoaringBitmap;
 
 
 /**
@@ -39,20 +41,30 @@ import org.apache.pinot.spi.trace.Tracing;
 public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
   private static final String EXPLAIN_NAME = "DOC_ID_SET";
 
-  private static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
+  protected static final ThreadLocal<int[]> THREAD_LOCAL_DOC_IDS =
       ThreadLocal.withInitial(() -> new int[DocIdSetPlanNode.MAX_DOC_PER_CALL]);
 
   private final BaseFilterOperator _filterOperator;
-  private final int _maxSizeOfDocIdSet;
+  protected final int _maxSizeOfDocIdSet;
 
   private BlockDocIdSet _blockDocIdSet;
   private BlockDocIdIterator _blockDocIdIterator;
-  private int _currentDocId = 0;
+  protected int _currentDocId = 0;
+  private final MutableRoaringBitmap _queryCacheToFill;
+  private final SegmentQueryCache.QueryCacheUpdater _queryCacheUpdater;
 
   public DocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet) {
+    this(filterOperator, maxSizeOfDocIdSet, null, null);
+  }
+
+  public DocIdSetOperator(BaseFilterOperator filterOperator, int maxSizeOfDocIdSet,
+      MutableRoaringBitmap queryCacheToFill,
+      SegmentQueryCache.QueryCacheUpdater queryCacheUpdater) {
     Preconditions.checkArgument(maxSizeOfDocIdSet > 0 && maxSizeOfDocIdSet <= DocIdSetPlanNode.MAX_DOC_PER_CALL);
     _filterOperator = filterOperator;
     _maxSizeOfDocIdSet = maxSizeOfDocIdSet;
+    _queryCacheToFill = queryCacheToFill;
+    _queryCacheUpdater = queryCacheUpdater;
   }
 
   @Override
@@ -77,6 +89,12 @@ public class DocIdSetOperator extends BaseOperator<DocIdSetBlock> {
         break;
       }
       docIds[pos++] = _currentDocId;
+    }
+    if (_queryCacheToFill != null && _queryCacheUpdater != null) {
+      _queryCacheToFill.addN(docIds, 0, pos);
+      if (_currentDocId == Constants.EOF) {
+        _queryCacheUpdater.update(_queryCacheToFill.toImmutableRoaringBitmap());
+      }
     }
     if (pos > 0) {
       return new DocIdSetBlock(docIds, pos);
