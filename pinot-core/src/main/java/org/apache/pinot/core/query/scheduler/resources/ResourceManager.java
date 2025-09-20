@@ -27,7 +27,6 @@ import java.util.concurrent.ThreadFactory;
 import org.apache.pinot.core.query.request.ServerQueryRequest;
 import org.apache.pinot.core.query.scheduler.SchedulerGroupAccountant;
 import org.apache.pinot.core.util.trace.TracedThreadFactory;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.executor.ThrottleOnCriticalHeapUsageExecutor;
 import org.apache.pinot.spi.utils.CommonConstants;
@@ -53,8 +52,6 @@ public abstract class ResourceManager {
   public static final int DEFAULT_QUERY_RUNNER_THREADS;
   public static final int DEFAULT_QUERY_WORKER_THREADS;
 
-
-
   static {
     int numCores = Runtime.getRuntime().availableProcessors();
     // arbitrary...but not completely arbitrary
@@ -78,7 +75,7 @@ public abstract class ResourceManager {
   /**
    * @param config configuration for initializing resource manager
    */
-  public ResourceManager(PinotConfiguration config, ThreadResourceUsageAccountant resourceUsageAccountant) {
+  public ResourceManager(PinotConfiguration config) {
     _numQueryRunnerThreads = config.getProperty(QUERY_RUNNER_CONFIG_KEY, DEFAULT_QUERY_RUNNER_THREADS);
     _numQueryWorkerThreads = config.getProperty(QUERY_WORKER_CONFIG_KEY, DEFAULT_QUERY_WORKER_THREADS);
 
@@ -91,7 +88,7 @@ public abstract class ResourceManager {
     ExecutorService runnerService = Executors.newFixedThreadPool(_numQueryRunnerThreads, queryRunnerFactory);
     if (config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE,
         CommonConstants.Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE)) {
-      runnerService = new ThrottleOnCriticalHeapUsageExecutor(runnerService, resourceUsageAccountant);
+      runnerService = new ThrottleOnCriticalHeapUsageExecutor(runnerService);
     }
     _queryRunners = MoreExecutors.listeningDecorator(runnerService);
 
@@ -101,7 +98,7 @@ public abstract class ResourceManager {
     ExecutorService workerService = Executors.newFixedThreadPool(_numQueryWorkerThreads, queryWorkersFactory);
     if (config.getProperty(CommonConstants.Server.CONFIG_OF_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE,
         CommonConstants.Server.DEFAULT_ENABLE_QUERY_SCHEDULER_THROTTLING_ON_HEAP_USAGE)) {
-      workerService = new ThrottleOnCriticalHeapUsageExecutor(workerService, resourceUsageAccountant);
+      workerService = new ThrottleOnCriticalHeapUsageExecutor(workerService);
     }
     _queryWorkers = MoreExecutors.listeningDecorator(workerService);
   }

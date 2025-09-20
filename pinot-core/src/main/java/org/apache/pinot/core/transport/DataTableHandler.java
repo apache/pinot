@@ -25,9 +25,9 @@ import org.apache.pinot.common.datatable.DataTable;
 import org.apache.pinot.common.datatable.DataTableFactory;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceSnapshot;
 import org.apache.pinot.spi.accounting.TrackingScope;
-import org.apache.pinot.spi.trace.Tracing;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,14 +40,15 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
   private static final Logger LOGGER = LoggerFactory.getLogger(DataTableHandler.class);
 
   private final QueryRouter _queryRouter;
+  private final ThreadAccountant _threadAccountant;
   private final ServerRoutingInstance _serverRoutingInstance;
-  private final BrokerMetrics _brokerMetrics;
+  private final BrokerMetrics _brokerMetrics = BrokerMetrics.get();
 
-  public DataTableHandler(QueryRouter queryRouter, ServerRoutingInstance serverRoutingInstance,
-      BrokerMetrics brokerMetrics) {
+  public DataTableHandler(QueryRouter queryRouter, ThreadAccountant threadAccountant,
+      ServerRoutingInstance serverRoutingInstance) {
     _queryRouter = queryRouter;
+    _threadAccountant = threadAccountant;
     _serverRoutingInstance = serverRoutingInstance;
-    _brokerMetrics = brokerMetrics;
   }
 
   @Override
@@ -72,14 +73,15 @@ public class DataTableHandler extends SimpleChannelInboundHandler<ByteBuf> {
       DataTable dataTable = DataTableFactory.getDataTable(msg.nioBuffer());
       _queryRouter.receiveDataTable(_serverRoutingInstance, dataTable, responseSize,
           (int) (System.currentTimeMillis() - deserializationStartTimeMs));
-      long requestID = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
-      String workloadName = dataTable.getMetadata().get(DataTable.MetadataKey.WORKLOAD_NAME.getName());
+      long cpuTimeNs = resourceSnapshot.getCpuTimeNs();
+      long allocatedBytes = resourceSnapshot.getAllocatedBytes();
       // QUERY scope - keyed by requestId
-      Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(String.valueOf(requestID),
-          resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes(), TrackingScope.QUERY);
+      long requestId = Long.parseLong(dataTable.getMetadata().get(DataTable.MetadataKey.REQUEST_ID.getName()));
+      _threadAccountant.updateUntrackedResourceUsage(String.valueOf(requestId), cpuTimeNs, allocatedBytes,
+          TrackingScope.QUERY);
       // WORKLOAD scope - keyed by workloadName
-      Tracing.ThreadAccountantOps.updateQueryUsageConcurrently(workloadName,
-          resourceSnapshot.getCpuTimeNs(), resourceSnapshot.getAllocatedBytes(), TrackingScope.WORKLOAD);
+      String workloadName = dataTable.getMetadata().get(DataTable.MetadataKey.WORKLOAD_NAME.getName());
+      _threadAccountant.updateUntrackedResourceUsage(workloadName, cpuTimeNs, allocatedBytes, TrackingScope.WORKLOAD);
     } catch (Exception e) {
       LOGGER.error("Caught exception while deserializing data table of size: {} from server: {}", responseSize,
           _serverRoutingInstance, e);

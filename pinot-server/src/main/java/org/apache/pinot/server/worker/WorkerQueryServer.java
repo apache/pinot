@@ -24,9 +24,11 @@ import org.apache.pinot.core.data.manager.InstanceDataManager;
 import org.apache.pinot.query.runtime.QueryRunner;
 import org.apache.pinot.query.service.server.QueryServer;
 import org.apache.pinot.server.starter.helix.SendStatsPredicate;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.utils.CommonConstants;
+import org.apache.pinot.spi.utils.CommonConstants.Helix;
+import org.apache.pinot.spi.utils.CommonConstants.MultiStageQueryRunner;
+import org.apache.pinot.spi.utils.CommonConstants.Server;
 import org.apache.pinot.spi.utils.NetUtils;
 
 
@@ -35,40 +37,37 @@ public class WorkerQueryServer {
   private final QueryServer _queryWorkerService;
 
   public WorkerQueryServer(PinotConfiguration serverConf, InstanceDataManager instanceDataManager,
-      @Nullable TlsConfig tlsConfig, SendStatsPredicate sendStats,
-      ThreadResourceUsageAccountant resourceUsageAccountant) {
+      @Nullable TlsConfig tlsConfig, ThreadAccountant threadAccountant, SendStatsPredicate sendStats) {
     serverConf = toWorkerQueryConfig(serverConf);
-    String instanceId = serverConf.getProperty(CommonConstants.Server.CONFIG_OF_INSTANCE_ID);
-    _queryServicePort = serverConf.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
+    _queryServicePort = serverConf.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
+        MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     QueryRunner queryRunner = new QueryRunner();
-    queryRunner.init(serverConf, instanceDataManager, tlsConfig, sendStats::isSendStats, resourceUsageAccountant);
-    _queryWorkerService = new QueryServer(instanceId, _queryServicePort, queryRunner, tlsConfig, serverConf);
+    queryRunner.init(serverConf, instanceDataManager, tlsConfig, sendStats::isSendStats);
+    _queryWorkerService =
+        new QueryServer(serverConf, instanceDataManager.getInstanceId(), _queryServicePort, queryRunner, tlsConfig,
+            threadAccountant);
   }
 
   private static PinotConfiguration toWorkerQueryConfig(PinotConfiguration configuration) {
     PinotConfiguration newConfig = new PinotConfiguration(configuration.toMap());
-    String hostname = newConfig.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
+    String hostname = newConfig.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME);
     if (hostname == null) {
-      String instanceId =
-          newConfig.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_HOST, NetUtils.getHostnameOrAddress());
-      hostname = instanceId.startsWith(CommonConstants.Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceId.substring(
-          CommonConstants.Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceId;
-      newConfig.addProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, hostname);
+      String instanceId = newConfig.getProperty(Helix.KEY_OF_SERVER_NETTY_HOST, NetUtils.getHostnameOrAddress());
+      hostname = instanceId.startsWith(Helix.PREFIX_OF_SERVER_INSTANCE) ? instanceId.substring(
+          Helix.SERVER_INSTANCE_PREFIX_LENGTH) : instanceId;
+      newConfig.addProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_HOSTNAME, hostname);
     }
-    int runnerPort = newConfig.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
+    int runnerPort = newConfig.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT,
+        MultiStageQueryRunner.DEFAULT_QUERY_RUNNER_PORT);
     if (runnerPort == -1) {
-      runnerPort =
-          newConfig.getProperty(CommonConstants.Server.CONFIG_OF_GRPC_PORT, CommonConstants.Server.DEFAULT_GRPC_PORT);
-      newConfig.addProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, runnerPort);
+      runnerPort = newConfig.getProperty(Server.CONFIG_OF_GRPC_PORT, Server.DEFAULT_GRPC_PORT);
+      newConfig.addProperty(MultiStageQueryRunner.KEY_OF_QUERY_RUNNER_PORT, runnerPort);
     }
-    int servicePort = newConfig.getProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
-        CommonConstants.MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
+    int servicePort = newConfig.getProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT,
+        MultiStageQueryRunner.DEFAULT_QUERY_SERVER_PORT);
     if (servicePort == -1) {
-      servicePort = newConfig.getProperty(CommonConstants.Helix.KEY_OF_SERVER_NETTY_PORT,
-          CommonConstants.Helix.DEFAULT_SERVER_NETTY_PORT);
-      newConfig.addProperty(CommonConstants.MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, servicePort);
+      servicePort = newConfig.getProperty(Helix.KEY_OF_SERVER_NETTY_PORT, Helix.DEFAULT_SERVER_NETTY_PORT);
+      newConfig.addProperty(MultiStageQueryRunner.KEY_OF_QUERY_SERVER_PORT, servicePort);
     }
     return newConfig;
   }

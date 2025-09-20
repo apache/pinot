@@ -61,10 +61,9 @@ import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsEntry;
 import org.apache.pinot.core.transport.server.routing.stats.ServerRoutingStatsManager;
 import org.apache.pinot.spi.accounting.QueryResourceTracker;
+import org.apache.pinot.spi.accounting.ThreadAccountant;
 import org.apache.pinot.spi.accounting.ThreadResourceTracker;
-import org.apache.pinot.spi.accounting.ThreadResourceUsageAccountant;
 import org.apache.pinot.spi.config.table.TableType;
-import org.apache.pinot.spi.trace.Tracing;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.sql.parsers.CalciteSqlCompiler;
 
@@ -99,6 +98,9 @@ public class PinotBrokerDebug {
 
   @Inject
   AccessControlFactory _accessControlFactory;
+
+  @Inject
+  ThreadAccountant _threadAccountant;
 
   @GET
   @Produces(MediaType.APPLICATION_JSON)
@@ -290,8 +292,7 @@ public class PinotBrokerDebug {
   @Authorize(targetType = TargetType.CLUSTER, action = Actions.Cluster.DEBUG_RESOURCE_USAGE)
   @ApiOperation(value = "Get resource usage of threads")
   public Collection<? extends ThreadResourceTracker> getThreadResourceUsage() {
-    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    return threadAccountant.getThreadResources();
+    return _threadAccountant.getThreadResources();
   }
 
   @GET
@@ -301,8 +302,7 @@ public class PinotBrokerDebug {
   @ApiOperation(value = "Get current resource usage of queries in this service", notes = "This is a debug endpoint, "
       + "and won't maintain backward compatibility")
   public Collection<? extends QueryResourceTracker> getQueryUsage() {
-    ThreadResourceUsageAccountant threadAccountant = Tracing.getThreadAccountant();
-    return threadAccountant.getQueryResources().values();
+    return _threadAccountant.getQueryResources().values();
   }
 
   @GET

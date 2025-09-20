@@ -34,7 +34,7 @@ service PinotQueryWorker {
 
 message CancelRequest {
   int64 requestId = 1;
-  string cid = 2;
+  string cid = 2; // TODO: cid is not used, consider removing it
 }
 
 message CancelResponse {

@@ -42,7 +42,6 @@ import org.apache.pinot.query.routing.VirtualServerAddress;
 import org.apache.pinot.query.runtime.blocks.MseBlock;
 import org.apache.pinot.query.runtime.blocks.SuccessMseBlock;
 import org.apache.pinot.query.runtime.plan.OpChainExecutionContext;
-import org.apache.pinot.spi.accounting.ThreadExecutionContext;
 import org.apache.pinot.spi.exception.QueryErrorCode;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -368,7 +367,7 @@ public class LeafOperatorTest {
     LeafOperator operator =
         new LeafOperator(context, mockQueryRequests(1), schema, mock(QueryExecutor.class), _executorService) {
           @Override
-          void execute(ThreadExecutionContext parentContext) {
+          void execute() {
             try {
               // Fill queue and block on second add
               SelectionResultsBlock dataBlock =
