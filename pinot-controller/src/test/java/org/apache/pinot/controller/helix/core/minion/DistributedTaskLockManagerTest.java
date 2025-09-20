@@ -216,7 +216,8 @@ public class DistributedTaskLockManagerTest {
     // Create a stale state record
     ZNRecord staleState = new ZNRecord("testTable");
     staleState.setSimpleField("status", "COMPLETED");
-    staleState.setSimpleField("startTimeMillis", String.valueOf(System.currentTimeMillis() - 86400000)); // 24 hours ago
+    // Set a time larger than the 24 hours staleness timeout
+    staleState.setSimpleField("startTimeMillis", String.valueOf(System.currentTimeMillis() - 86410000));
     staleState.setSimpleField("lockPath", "/MINION_TASK_METADATA/testTable-Lock/controller2-" + expectedUuid
         + "-lock-0000000001");
     when(mockPropertyStore.get(anyString(), any(), eq(AccessOption.PERSISTENT))).thenReturn(staleState);
