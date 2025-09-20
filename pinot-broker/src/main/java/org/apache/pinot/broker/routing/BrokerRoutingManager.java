@@ -259,7 +259,7 @@ public class BrokerRoutingManager implements RoutingManager, ClusterChangeHandle
             // existence before proceeding. Also note that if new entries were added since the snapshot was taken, we
             // will miss processing them in this call. The buildRouting() method tries to handle that by checking for
             // changes in the IS / EV version after adding a new entry
-            final RoutingEntry routingEntry = _routingEntryMap.get(cachedRoutingEntry.getTableNameWithType());
+            RoutingEntry routingEntry = _routingEntryMap.get(cachedRoutingEntry.getTableNameWithType());
             if (routingEntry == null) {
               LOGGER.info("Table {} was removed while processing segment assignment change, skipping",
                   cachedRoutingEntry.getTableNameWithType());
