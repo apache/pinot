@@ -2392,9 +2392,8 @@ public class PinotLLCRealtimeSegmentManager {
       Set<String> invalidSegments = partitionedByIsConsuming.get(false);
       if (!invalidSegments.isEmpty()) {
         LOGGER.warn("Cannot commit segments that are not in CONSUMING state. All consuming segments: {}, "
-            + "provided segments to commit: {}. Ignoring all non-consuming segments, sampling 10: {}",
-            allConsumingSegments,
-                segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
+                + "provided segments to commit: {}. Ignoring all non-consuming segments, sampling 10: {}",
+            allConsumingSegments, segmentsToCommitStr, invalidSegments.stream().limit(10).collect(Collectors.toSet()));
       }
       return validSegmentsToCommit;
     }
@@ -2598,26 +2597,27 @@ public class PinotLLCRealtimeSegmentManager {
   }
 
   /**
-   * Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any server. This method
-   * will call the server reingestSegment API
-   * on one of the alive servers that are supposed to host that segment according to IdealState.
+   * Repair segments in error state:
+   * Re-ingests segments that are in ERROR state in EV but ONLINE in IS with no peer copy on any
+   * server. This method will call the server reingestSegment API on one of the alive servers that are supposed to
+   * host that segment according to IdealState.
    *
    * API signature:
    *   POST http://[serverURL]/reingestSegment/[segmentName]
    *   Request body (JSON):
    *
-   * If segment is in ERROR state in only few replicas but has download URL, we instead trigger a segment reset
+   * If segment is in ERROR state but has download URL, we instead trigger a segment reset
    * @param tableConfig The table config
    */
-  public void repairSegmentsInErrorStateForPauselessConsumption(TableConfig tableConfig,
+  public void repairSegmentsInErrorState(TableConfig tableConfig,
       boolean repairErrorSegmentsForPartialUpsertOrDedup) {
+    boolean isPauselessTable = PauselessConsumptionUtils.isPauselessEnabled(tableConfig);
     String realtimeTableName = tableConfig.getTableName();
     // Fetch ideal state and external view
     IdealState idealState = getIdealState(realtimeTableName);
     ExternalView externalView = _helixResourceManager.getTableExternalView(realtimeTableName);
     if (externalView == null) {
-      LOGGER.warn(
-          "External view not found for table: {}, skipping repairing segments in error state for pauseless consumption",
+      LOGGER.warn("External view not found for table: {}, skipping repairing segments in error state",
           realtimeTableName);
       return;
     }
@@ -2654,7 +2654,7 @@ public class PinotLLCRealtimeSegmentManager {
         continue;
       }
 
-      // Skip segments that are not ONLINE in ideal state
+      // Skip segments that are not ONLINE in idealState
       boolean hasOnlineInstance = false;
       for (String state : idealStateMap.values()) {
         if (SegmentStateModel.ONLINE.equals(state)) {
@@ -2676,9 +2676,14 @@ public class PinotLLCRealtimeSegmentManager {
     }
 
     if (segmentsInErrorStateInAtLeastOneReplica.isEmpty()) {
-      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT, 0);
-      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
-          ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 0);
+      if (isPauselessTable) {
+        _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
+            0);
+        _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
+            ControllerGauge.PAUSELESS_SEGMENTS_IN_UNRECOVERABLE_ERROR_COUNT, 0);
+      } else {
+        _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE, 0);
+      }
       return;
     }
 
@@ -2687,7 +2692,7 @@ public class PinotLLCRealtimeSegmentManager {
         segmentsInErrorStateInAtLeastOneReplica.size(), segmentsInErrorStateInAtLeastOneReplica,
         segmentsInErrorStateInAllReplicas.size(), segmentsInErrorStateInAllReplicas, realtimeTableName);
 
-    if (!allowRepairOfErrorSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig)) {
+    if (isPauselessTable && !allowRepairOfErrorSegments(repairErrorSegmentsForPartialUpsertOrDedup, tableConfig)) {
       // We do not run reingestion for dedup and partial upsert tables in pauseless as it can
       // lead to data inconsistencies
       _controllerMetrics.setOrUpdateTableGauge(realtimeTableName,
@@ -2695,8 +2700,13 @@ public class PinotLLCRealtimeSegmentManager {
       return;
     } else {
       LOGGER.info("Repairing error segments in table: {}.", realtimeTableName);
-      _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
-          segmentsInErrorStateInAllReplicas.size());
+      if (isPauselessTable) {
+        _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.PAUSELESS_SEGMENTS_IN_ERROR_COUNT,
+            segmentsInErrorStateInAllReplicas.size());
+      } else {
+        _controllerMetrics.setOrUpdateTableGauge(realtimeTableName, ControllerGauge.SEGMENTS_IN_ERROR_STATE,
+            segmentsInErrorStateInAllReplicas.size());
+      }
     }
 
     for (String segmentName : segmentsInErrorStateInAtLeastOneReplica) {
@@ -2717,16 +2727,15 @@ public class PinotLLCRealtimeSegmentManager {
         assert idealStateMap != null;
         String aliveServer = pickServerToReingest(idealStateMap.keySet());
         if (aliveServer == null) {
-          LOGGER.warn("No alive server found to re-ingest segment: {} in table: {}, skipping re-ingestion", segmentName,
-              realtimeTableName);
+          LOGGER.warn("No alive server found to re-ingest segment: {} in table: {}", segmentName, realtimeTableName);
           continue;
         }
-
         try {
+          LOGGER.info("Triggering re-ingestion for segment: {} in table: {} on server: {}", segmentName,
+              realtimeTableName, aliveServer);
           triggerReingestion(aliveServer, segmentName);
-          LOGGER.info("Successfully triggered re-ingestion for segment: {} on server: {}", segmentName, aliveServer);
         } catch (Exception e) {
-          LOGGER.error("Failed to call reingestSegment for segment: {} on server: {}", segmentName, aliveServer, e);
+          LOGGER.error("Failed to trigger re-ingestion for segment: {} on server: {}", segmentName, aliveServer, e);
         }
       } else if (segmentZKMetadata.getStatus() != Status.IN_PROGRESS) {
         // Trigger reset for segment not in IN_PROGRESS state to download the segment from deep store or peer server
