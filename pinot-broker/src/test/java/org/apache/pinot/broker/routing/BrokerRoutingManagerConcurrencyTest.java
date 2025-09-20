@@ -104,7 +104,7 @@ public class BrokerRoutingManagerConcurrencyTest extends ControllerTest {
     Mockito.when(_pinotConfig.getProperty(Mockito.eq("pinot.broker.adaptive.server.selector.type")))
         .thenReturn("UNIFORM_RANDOM");
     Mockito.when(_pinotConfig.getProperty(
-        Mockito.eq(CommonConstants.Broker.CONFIG_OF_ROUTING_PROCESS_SEGMENT_ASSIGNMENT_CHANGE_NUM_THREADS), anyInt()))
+        Mockito.eq(CommonConstants.Broker.CONFIG_OF_ROUTING_ASSIGNMENT_CHANGE_PROCESS_PARALLELISM), anyInt()))
         .thenReturn(10);
     Mockito.when(_pinotConfig.getProperty(Mockito.anyString(), Mockito.anyString()))
         .thenAnswer(invocation -> invocation.getArgument(1)); // Return default value
